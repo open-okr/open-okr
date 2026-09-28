@@ -2,8 +2,7 @@
  * The probes behind the wizard's connection tests (P1-T09).
  *
  * Kept apart from the framework so the framework stays testable without a
- * database or a mail server, and so adding the channel and AI probes in
- * Phase 5 and Phase 6 is one file each.
+ * database or a mail server.
  */
 import type { Pool } from "pg";
 import type { ConnectionProbe } from "./connection-tests.ts";
@@ -146,22 +145,59 @@ export function storageProbe(options: StorageProbeOptions): ConnectionProbe {
 }
 
 /**
- * A port with no driver in this build.
+ * Chat channels, which a deployment never needs (completeness review H-24).
  *
- * Channels land in Phase 5 and the AI providers in Phase 6. Until then the
- * wizard says so, rather than showing a tick for something it never tested.
- * The tasks that add those drivers replace this with a real probe.
+ * This said "Not in this build. Arrives in Phase 5" from P1-T09 onwards,
+ * long after Slack, Teams, WhatsApp and Telegram all shipped: the first thing
+ * every self-hoster read told them half the product was missing. Channels are
+ * connected per workspace, after setup, so at this point nothing is connected
+ * and nothing needs to be. Optional is the true answer, and it is not a tick:
+ * nothing was tested.
  */
-export function notInThisBuild(
-  port: string,
-  arrivesIn: string,
-): ConnectionProbe {
+export function channelsProbe(): ConnectionProbe {
   return {
-    port,
+    port: "channel",
     async run() {
       return {
-        outcome: "unavailable" as const,
-        detail: `Not in this build. Arrives in ${arrivesIn}.`,
+        outcome: "optional" as const,
+        detail:
+          "Connected per workspace after setup, in Admin > Channels: Slack, Microsoft Teams, WhatsApp and Telegram. Email and the browser cover everything without one.",
+      };
+    },
+  };
+}
+
+export interface AIProbeOptions {
+  /** The provider the deployment names for every workspace, or "" for none. */
+  readonly provider: string;
+  /** Whether that provider has what it needs to be called. */
+  readonly configured: boolean;
+}
+
+/**
+ * The AI provider, which a deployment never needs either (H-24).
+ *
+ * Said "Not in this build. Arrives in Phase 6", while six providers had
+ * shipped in Phase 2. A deployment-wide provider is reported by name and not
+ * called: a paid request to prove a key works is not something a setup page
+ * should spend, and "configured" is exactly what is known. With none, the
+ * answer is that every feature works without one, which is the product's own
+ * rule.
+ */
+export function aiProbe(options: AIProbeOptions): ConnectionProbe {
+  return {
+    port: "ai",
+    async run() {
+      if (options.provider !== "" && options.configured) {
+        return {
+          outcome: "optional" as const,
+          detail: `${options.provider} is configured for every workspace. It is first called when somebody uses an assist, and each workspace can choose its own in Admin > AI.`,
+        };
+      }
+      return {
+        outcome: "optional" as const,
+        detail:
+          "Off. Every feature works without one, and the Coach and the Champion run in their deterministic form. Add Anthropic, OpenAI, Google, OpenRouter, a local Ollama or any OpenAI-compatible endpoint in Admin > AI.",
       };
     },
   };

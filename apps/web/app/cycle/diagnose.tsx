@@ -12,10 +12,8 @@ import { addIssue, rankIssue } from "./actions.ts";
  * before the phase is complete, and the count is stated here so nobody has to
  * count rows to find out how far off they are.
  *
- * Scoring the prior cycle, the other half of S-07, needs key result rows and
- * arrives with them at P3-T04. Baseline health has its write
- * (`workflow.setBaselineHealth`) but its editor is the rich text three-column
- * surface, which belongs with the phase 2 screen at that same task.
+ * Baseline health, phase 2's other condition, is its own card beside this one
+ * (`BaselineHealth` in phase-forms.tsx, completeness review H-09).
  */
 
 export interface Issue {

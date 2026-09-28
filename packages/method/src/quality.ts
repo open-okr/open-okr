@@ -1356,7 +1356,7 @@ export function evaluateCycle(
           id: cy8.id,
           status: "todo",
           prompt:
-            "Nothing books sessions yet, so whether the cadence is in the calendar cannot be read. P4-T04 brings it.",
+            "Whether every check-in and review is booked for the cycle could not be read.",
           condition: "Nothing books sessions yet",
           feedsStrengthScore: false,
         }

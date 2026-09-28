@@ -268,6 +268,69 @@ export async function listSSOProviders(
   }
 }
 
+/** What the sign-in page may know about a provider (completeness review H-03). */
+export interface PublicSSOProvider {
+  readonly id: string;
+  readonly displayName: string;
+  readonly kind: "oidc" | "saml";
+}
+
+/** The lowercased domain of an address, or null when it has none. */
+const domainOf = (email: string): string | null => {
+  const at = email.lastIndexOf("@");
+  const domain =
+    at < 0
+      ? ""
+      : email
+          .slice(at + 1)
+          .trim()
+          .toLowerCase();
+  return domain === "" ? null : domain;
+};
+
+/**
+ * The providers the sign-in page may show, and only what it needs to show
+ * them (completeness review H-03).
+ *
+ * The route used to return `listSSOProviders` whole, unauthenticated: every
+ * enabled connection on the instance, with its workspace id, its email
+ * domains and whether it enforces single sign-on. On a self-hosted instance
+ * that is one organisation telling its own sign-in page about itself. On the
+ * managed cloud it was a list of every customer and their identity provider,
+ * available to anyone, and it drew every customer's button on every visitor's
+ * sign-in page.
+ *
+ * So on the cloud nothing is listed until the visitor gives an address, and
+ * then only the providers configured for that address's domain. On a
+ * self-hosted instance the page may still list its own providers before an
+ * address is typed. Either way the answer carries the id the sign-in call
+ * needs, a name to put on the button and the protocol, and nothing else.
+ */
+export async function publicSSOProviders(
+  pool: Pool,
+  options: { readonly email?: string; readonly cloud: boolean },
+): Promise<readonly PublicSSOProvider[]> {
+  const all = await listSSOProviders(pool);
+  let visible: readonly SSOProviderInfo[] = all;
+  if (options.cloud) {
+    const domain = options.email ? domainOf(options.email) : null;
+    visible =
+      domain === null
+        ? []
+        : all.filter((provider) =>
+            provider.emailDomains
+              .split(",")
+              .map((entry) => entry.trim().toLowerCase())
+              .includes(domain),
+          );
+  }
+  return visible.map(({ id, displayName, kind }) => ({
+    id,
+    displayName,
+    kind,
+  }));
+}
+
 /** What an administrator supplies when configuring a provider. */
 export interface CreateSSOConnectionInput {
   /**

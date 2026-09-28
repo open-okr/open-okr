@@ -72,12 +72,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "no screen yet, and it is P7's own row for personal keys",
   "ai.updateCustomModel":
     "no screen yet, and it is P7's own row for the model catalogue",
-  "workflow.setRevalidation":
-    "it is an AI draft, offered through the phase assists",
-  "workflow.setBaselineHealth":
-    "it is an AI draft, offered through the phase assists",
-  "workflow.setCapacityNotes":
-    "it is an AI draft, offered through the phase assists",
   "workflow.calibrate": "it is an AI draft, offered through the phase assists",
   "kpis.recoveryDraft":
     "it is an AI draft, offered on the recovery board beside the corridor it is recovering from",
@@ -103,8 +97,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "a read the goal page does not need: it shows the decision log from `decisions.forGoal`, which carries the same answer with its author and its session",
   "goals.removeDependency":
     "the alignment studio owns dependencies and removes them through its own canvas write",
-  "sessions.create":
-    "the sessions screen creates through `sessions.schedule`, which is the one a person uses",
   "sessions.votes":
     "a read the session screen does not need: the stage panels carry their own tallies",
   // **A fifth reason, and the first of its kind: the caller is real and this

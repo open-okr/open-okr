@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   checkUrl,
+  createGuardedFetch,
   isBlockedAddress,
+  OutboundRefusedError,
   outboundFetch,
 } from "../src/outbound/guard.ts";
 
@@ -249,5 +251,64 @@ describe("fetching", () => {
     });
     expect(outcome.ok).toBe(false);
     expect(called).toBe(false);
+  });
+});
+
+/**
+ * The same checks as a `fetch` a provider SDK can be handed (completeness
+ * review H-07). A model's answer streams, so this cannot buffer the way
+ * `outboundFetch` does; it checks the address and refuses redirects, and
+ * leaves the body alone.
+ */
+describe("createGuardedFetch", () => {
+  const answering =
+    (status = 200, headers: Record<string, string> = {}) =>
+    async () =>
+      new Response("streamed", { status, headers });
+
+  it("refuses a private address before any request is made", async () => {
+    let called = false;
+    const guarded = createGuardedFetch({
+      fetchImpl: async () => {
+        called = true;
+        return new Response("");
+      },
+    });
+    await expect(
+      guarded("http://169.254.169.254/latest/meta-data/"),
+    ).rejects.toBeInstanceOf(OutboundRefusedError);
+    expect(called).toBe(false);
+  });
+
+  it("refuses a public name that resolves to a private address", async () => {
+    const guarded = createGuardedFetch({
+      fetchImpl: answering(),
+      resolve: resolves({ "llm.example.com": ["10.0.0.7"] }),
+    });
+    await expect(
+      guarded("https://llm.example.com/v1/chat/completions"),
+    ).rejects.toMatchObject({ refusal: "address_not_allowed" });
+  });
+
+  it("refuses a redirect rather than following it", async () => {
+    const guarded = createGuardedFetch({
+      fetchImpl: answering(302, { location: "http://127.0.0.1/" }),
+      resolve: resolves({ "llm.example.com": ["93.184.216.34"] }),
+    });
+    await expect(
+      guarded("https://llm.example.com/v1/models"),
+    ).rejects.toMatchObject({ refusal: "redirected" });
+  });
+
+  it("passes an allowed request through with its body untouched", async () => {
+    const guarded = createGuardedFetch({
+      fetchImpl: answering(),
+      resolve: resolves({ "llm.example.com": ["93.184.216.34"] }),
+    });
+    const response = await guarded(
+      new URL("https://llm.example.com/v1/chat/completions"),
+      { method: "POST", body: "{}" },
+    );
+    expect(await response.text()).toBe("streamed");
   });
 });

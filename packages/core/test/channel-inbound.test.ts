@@ -5,6 +5,7 @@ import {
   handleInbound,
   hashLinkCode,
   type InboundRequestFacts,
+  memberForChannelIdentity,
   workspaceForProviderTeam,
 } from "../src/channels/inbound.ts";
 import { parseKeyRing } from "../src/secrets/key-ring.ts";
@@ -617,5 +618,73 @@ describe("the conversation window's clock", () => {
       ["U-owner"],
     );
     expect(stamped.rows[0].last_inbound_at).toBeNull();
+  });
+});
+
+/**
+ * The member behind a form submission (completeness review H-06).
+ *
+ * A Slack form carries no message, so the route asked `channel_identities`
+ * itself, with a bare pool query and no tenant setting. This suite connects as
+ * the application role, which is what the bare query saw nothing under.
+ */
+describe("memberForChannelIdentity", () => {
+  it("finds a verified sender under the application role", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...asOwner() },
+      "channels.linkIdentity",
+      { provider: "slack", externalId: "U-owner" },
+    );
+
+    // The query the route used to run, as proof of the defect.
+    const bare = await wb.appPool.query(
+      "select member_id from channel_identities where external_id = 'U-owner'",
+    );
+    expect(bare.rows).toEqual([]);
+
+    expect(
+      await memberForChannelIdentity(wb.appPool, {
+        workspaceId,
+        provider: "slack",
+        externalId: "U-owner",
+      }),
+    ).toEqual({ memberId: ownerMemberId, userId: OWNER });
+  });
+
+  it("gives an unverified claim nothing", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into channel_identities (id, workspace_id, member_id, provider, external_id)
+       values (gen_random_uuid(), $1, $2, 'slack', 'U-claimed')`,
+      [workspaceId, ownerMemberId],
+    );
+    expect(
+      await memberForChannelIdentity(wb.appPool, {
+        workspaceId,
+        provider: "slack",
+        externalId: "U-claimed",
+      }),
+    ).toBeNull();
+  });
+
+  it("gives a suspended member nothing", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...asOwner() },
+      "channels.linkIdentity",
+      { provider: "slack", externalId: "U-owner" },
+    );
+    await wb.admin.query(
+      "update workspace_members set status = 'suspended' where id = $1",
+      [ownerMemberId],
+    );
+    expect(
+      await memberForChannelIdentity(wb.appPool, {
+        workspaceId,
+        provider: "slack",
+        externalId: "U-owner",
+      }),
+    ).toBeNull();
   });
 });

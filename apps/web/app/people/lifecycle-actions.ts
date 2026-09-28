@@ -18,6 +18,7 @@ import type { ErasureExport } from "@openokr/core";
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import type { LifecycleState } from "./lifecycle-state.ts";
 
@@ -144,6 +145,33 @@ export async function eraseMemberAction(
     async (context) => {
       const result = await callAction(context, "people.erase", { memberId });
       return { export: result.export };
+    },
+  );
+}
+
+/**
+ * Makes a member an administrator, or returns one to the standard level
+ * (completeness review H-14). The last administrator's refusal comes back as
+ * core wrote it.
+ */
+export async function setAdministratorAction(
+  _previous: LifecycleState,
+  form: FormData,
+): Promise<LifecycleState> {
+  const { t } = await getTranslations();
+  const memberId = String(form.get("memberId") ?? "");
+  const administrator = form.get("administrator") === "true";
+  return lifecycle(
+    memberId,
+    administrator
+      ? t("people.detail.admin.made")
+      : t("people.detail.admin.removed"),
+    async (context) => {
+      await callAction(context, "people.setAdministrator", {
+        memberId,
+        administrator,
+      });
+      return { export: null };
     },
   );
 }

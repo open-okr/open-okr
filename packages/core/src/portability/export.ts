@@ -60,8 +60,8 @@ export interface ExportWorkspaceOptions {
   readonly workspaceId: string;
   /** Reads blob bytes. Omit and the archive carries rows only, and says so. */
   readonly storage?: BlobBytes;
-  /** Seals the archive. */
-  readonly ring: Parameters<typeof writeArchive>[0];
+  /** What the archive is sealed under (completeness review H-18). */
+  readonly passphrase: string;
   /** A fingerprint naming the writing instance. Never a secret. */
   readonly instance: string;
 }
@@ -120,6 +120,29 @@ export async function exportWorkspace(
       }
     }
 
+    // **Every member carries the address they are known by** (completeness
+    // review H-18). `users` is the instance's and stays behind, so a member
+    // with an account arrived as nobody anybody could claim. The address goes
+    // in `placeholder_email`, which is what an import matches and what a
+    // person joining the receiving instance claims their member by.
+    for (const record of rows) {
+      if (
+        record.r !== "row" ||
+        record.t !== "workspace_members" ||
+        record.d.placeholder_email ||
+        !record.d.user_id
+      ) {
+        continue;
+      }
+      const account = await tx.execute<{ email: string }>(
+        sql`select email from users where id = ${String(record.d.user_id)}`,
+      );
+      const email = account.rows[0]?.email;
+      if (email) {
+        record.d.placeholder_email = email;
+      }
+    }
+
     const blobRows = rows.filter(
       (record) => record.r === "row" && record.t === "blobs",
     );
@@ -173,7 +196,7 @@ export async function exportWorkspace(
       { r: "end", rows: rows.length, blobs: blobs.length },
     ];
 
-    const written = writeArchive(options.ring, records);
+    const written = writeArchive(options.passphrase, records);
     return { ...written, manifest, missingBlobs };
   }
 }

@@ -35,6 +35,11 @@ vi.mock("../lib/admission", () => ({ installAdmission: vi.fn() }));
 // The sixth route (P8-T07). `lib/sso` reaches the pool and the key ring
 // to decrypt SSO connections at boot. Mocked for the import cost.
 vi.mock("../lib/sso", () => ({ resolveSSOProviders: vi.fn() }));
+// The seventh (completeness review H-01). `lib/tenant-floor` asks the pool
+// which role it connects as, so unmocked it would open a connection.
+vi.mock("../lib/tenant-floor", () => ({
+  tenantFloor: vi.fn(async () => "enforced"),
+}));
 
 const original = { ...process.env };
 

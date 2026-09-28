@@ -37,6 +37,7 @@ import { OperationError } from "../operations/operation.ts";
 import {
   ArchiveError,
   MAX_ARCHIVE_BYTES,
+  MIN_PASSPHRASE_LENGTH,
   readArchive,
 } from "../portability/archive.ts";
 import {
@@ -70,6 +71,12 @@ export const exportArchive = defineWriteAction({
      * and the files can be most of the workspace.
      */
     includeFiles: z.boolean().default(true),
+    /**
+     * What the archive is sealed under (completeness review H-18). Any
+     * instance given it can open the archive; none can without it. Never
+     * stored: the person exporting keeps it with the file.
+     */
+    passphrase: z.string().min(MIN_PASSPHRASE_LENGTH).max(1024),
   }),
   output: z.object({
     runId: z.uuid(),
@@ -97,24 +104,17 @@ export const exportArchive = defineWriteAction({
       requires: ACCESS_LEVELS.full,
       async load({ tx, workspaceId }) {
         const ring = context.ring;
-        if (!ring) {
-          // Not a validation error and not a bug: an instance with no root
-          // key cannot seal anything, and saying which variable is missing is
-          // the only useful answer.
-          throw new OperationError(
-            "forbidden",
-            "This instance has no encryption key, so an archive cannot be sealed. Set OPENOKR_ENCRYPTION_KEY.",
-          );
-        }
         try {
           built = await exportWorkspace({
             tx,
             workspaceId,
-            ring,
+            passphrase: input.passphrase,
             // The key's fingerprint names the instance without naming
             // anything about it: not a hostname, not a secret, and stable
-            // across restarts.
-            instance: rootKeyFingerprint(ring.current.key.toString("base64")),
+            // across restarts. The archive no longer needs the key itself.
+            instance: ring
+              ? rootKeyFingerprint(ring.current.key.toString("base64"))
+              : "unkeyed",
             ...(input.includeFiles && context.storage
               ? { storage: context.storage }
               : {}),
@@ -257,6 +257,8 @@ export const importArchive = defineWriteAction({
   input: z.object({
     archiveBase64: z.string(),
     dryRun: z.boolean().default(true),
+    /** The passphrase the archive was exported with. A version 1 archive needs none. */
+    passphrase: z.string().max(1024).optional(),
   }),
   output: z.object({
     importId: z.uuid(),
@@ -273,14 +275,6 @@ export const importArchive = defineWriteAction({
     return {
       requires: ACCESS_LEVELS.full,
       async load({ tx, workspaceId, actor }) {
-        const ring = context.ring;
-        if (!ring) {
-          throw new OperationError(
-            "forbidden",
-            "This instance has no encryption key, so an archive cannot be opened. Set OPENOKR_ENCRYPTION_KEY.",
-          );
-        }
-
         const archiveBytes = Buffer.from(input.archiveBase64, "base64");
         archiveDigest = createHash("sha256").update(archiveBytes).digest("hex");
 
@@ -310,7 +304,10 @@ export const importArchive = defineWriteAction({
 
         let archive: ReturnType<typeof readArchive> | undefined;
         try {
-          archive = readArchive(ring, archiveBytes);
+          archive = readArchive(archiveBytes, {
+            ...(input.passphrase ? { passphrase: input.passphrase } : {}),
+            ...(context.ring ? { ring: context.ring } : {}),
+          });
         } catch (error) {
           if (error instanceof ArchiveError) {
             throw new OperationError("forbidden", error.message);
@@ -327,15 +324,19 @@ export const importArchive = defineWriteAction({
           );
         }
 
-        // Blob re-upload needs a full storage port (prepare, put, claim),
-        // which the action context does not carry. The admin cards (P6-T05c)
-        // wire the port in; until then, blobs are imported as rows only.
+        // Every file's bytes are written back when the host gives a storage
+        // port that can write (completeness review H-18). Nothing passed one,
+        // so files arrived as rows with no bytes behind them.
+        const storage = context.storage;
         difference = await importWorkspace({
           tx,
           workspaceId,
           archive,
           dryRun: input.dryRun,
           actorMemberId: actor.memberId,
+          ...(storage?.put
+            ? { storage: { put: storage.put.bind(storage) } }
+            : {}),
         });
 
         return undefined;

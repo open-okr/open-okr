@@ -16,18 +16,19 @@
  */
 import {
   activeOnly,
+  aiBudgets,
   operatorWorkspaceUsage,
   tenants,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { z } from "zod";
 import { OperationError } from "../operations/errors.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
-import { readTenant } from "./store.ts";
+import { readTenant, setTenantPlanInTx } from "./store.ts";
 
 const CLOUD_PLANS_KEY = "cloud.plans";
 
@@ -218,4 +219,174 @@ export async function requireSeatInTx(
   if (limit !== null && used >= limit) {
     throw new OperationError("forbidden", message(used, limit));
   }
+}
+
+export interface ApplyPlanInput {
+  readonly workspaceId: string;
+  /** Null is the free tier, which needs no catalogue row. */
+  readonly plan: Plan | null;
+  /** An operator's own seat count, overriding the plan's. */
+  readonly seats?: number | null;
+}
+
+/**
+ * Puts a workspace on a plan (completeness review H-21).
+ *
+ * Nothing wrote `plan_key` or `seats` after a tenant was created, so no seat
+ * limit ever applied to anybody. Both the administrator's change on S-49 and
+ * an operator's on S-46 come through here, so the rule cannot differ between
+ * them:
+ *
+ * - **Never below the headcount.** Refused naming both numbers, because the
+ *   product never picks who loses access (UIUX-PLAN S-49).
+ * - **The plan's AI allowance becomes the workspace's monthly cost budget**,
+ *   in the existing `ai_budgets` row rather than a mechanism of its own. A
+ *   plan with none leaves whatever budget the workspace set alone.
+ *
+ * Returns false when the workspace has no tenant row, which is every
+ * self-hosted instance.
+ */
+export async function applyPlanInTx(
+  tx: AnyTx,
+  input: ApplyPlanInput,
+): Promise<boolean> {
+  const seats =
+    input.seats !== undefined ? input.seats : (input.plan?.seats ?? null);
+  if (seats !== null) {
+    const [row] = await tx
+      .select({ n: count() })
+      .from(workspaceMembers)
+      .where(
+        activeOnly(
+          workspaceMembers,
+          and(
+            eq(workspaceMembers.workspaceId, input.workspaceId),
+            eq(workspaceMembers.kind, "human"),
+            inArray(workspaceMembers.status, [...SEAT_STATUSES]),
+          ),
+        ),
+      );
+    const used = row?.n ?? 0;
+    if (used > seats) {
+      throw new OperationError(
+        "forbidden",
+        `That plan has ${seats} seat(s) and ${used} are in use. Free ${used - seats} first: the product never chooses who loses access.`,
+      );
+    }
+  }
+
+  const moved = await setTenantPlanInTx(tx, {
+    workspaceId: input.workspaceId,
+    planKey: input.plan?.key ?? null,
+    seats,
+  });
+  if (!moved) {
+    return false;
+  }
+
+  if (input.plan?.aiMonthlyUsd != null) {
+    const [existing] = await tx
+      .select({ id: aiBudgets.id })
+      .from(aiBudgets)
+      .where(
+        activeOnly(
+          aiBudgets,
+          eq(aiBudgets.workspaceId, input.workspaceId),
+          eq(aiBudgets.scope, "workspace"),
+          isNull(aiBudgets.scopeRef),
+          eq(aiBudgets.metric, "cost"),
+        ),
+      )
+      .limit(1);
+    const values = {
+      period: "month" as const,
+      limitValue: String(input.plan.aiMonthlyUsd),
+      updatedAt: new Date(),
+    };
+    if (existing) {
+      // openokr:allow-mutation: the caller's Operation transaction.
+      await tx
+        .update(aiBudgets)
+        .set(values)
+        .where(activeOnly(aiBudgets, eq(aiBudgets.id, existing.id)));
+    } else {
+      // openokr:allow-mutation: the caller's Operation transaction.
+      await tx.insert(aiBudgets).values({
+        workspaceId: input.workspaceId,
+        scope: "workspace",
+        scopeRef: null,
+        metric: "cost",
+        ...values,
+      });
+    }
+  }
+  return true;
+}
+
+/** One plan from the catalogue by its key, or a refusal that says so. */
+export async function planByKey(
+  pool: Pool,
+  planKey: string | null,
+): Promise<Plan | null> {
+  if (planKey === null) {
+    return null;
+  }
+  const plan = (await readPlans(pool)).find((entry) => entry.key === planKey);
+  if (!plan) {
+    throw new OperationError(
+      "not_found",
+      `There is no plan called "${planKey}" in this instance's catalogue.`,
+    );
+  }
+  return plan;
+}
+
+/**
+ * The plan this workspace is on, for its own S-49. Null on a self-hosted
+ * instance, which has no tenant row.
+ */
+export async function readOwnPlan(
+  pool: Pool,
+  workspaceId: string,
+): Promise<{ readonly planKey: string | null } | null> {
+  const tenant = await readTenant(pool, workspaceId);
+  return tenant ? { planKey: tenant.planKey } : null;
+}
+
+export interface SeatHolder {
+  readonly memberId: string;
+  readonly name: string;
+  readonly status: (typeof SEAT_STATUSES)[number];
+}
+
+/**
+ * Who holds the seats `countSeats` counts, by the same rule, so the list and
+ * the number beside it cannot disagree (completeness review H-21). An
+ * administrator told to free a seat needs to see whose it is.
+ */
+export async function listSeatHolders(
+  pool: Pool,
+  workspaceId: string,
+): Promise<readonly SeatHolder[]> {
+  const db = drizzle(pool);
+  return withWorkspace(db, workspaceId, (tx) =>
+    tx
+      .select({
+        memberId: workspaceMembers.id,
+        name: workspaceMembers.name,
+        status: workspaceMembers.status,
+      })
+      .from(workspaceMembers)
+      .where(
+        activeOnly(
+          workspaceMembers,
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.kind, "human"),
+            inArray(workspaceMembers.status, [...SEAT_STATUSES]),
+          ),
+        ),
+      )
+      .orderBy(workspaceMembers.name),
+  ) as Promise<readonly SeatHolder[]>;
 }

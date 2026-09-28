@@ -10,6 +10,7 @@ import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
+import { ScheduleSessions } from "../../sessions/schedule.tsx";
 import { SpaceManagement } from "./manage.tsx";
 import { SpaceMembership } from "./space-membership";
 import { SpaceSettingsCard } from "./space-settings.tsx";
@@ -23,7 +24,7 @@ import { SpaceSettingsCard } from "./space-settings.tsx";
  * sessions ahead (P5-T01c) and who is in the space in what role.
  *
  * Still absent: the space's goals and its KPI trees, which have their own
- * screens and are reached from the rail.
+ * screens and are reached from the rail. Sessions are booked here since H-08.
  */
 export default async function SpacePage({
   params,
@@ -293,6 +294,9 @@ export default async function SpacePage({
           )}
         </CardBody>
       </Card>
+
+      {/* Booking this room's rhythm, here where the team is (H-08). */}
+      <ScheduleSessions spaceId={space.id} />
 
       {/* P4-T15b-b: the open-blocker board REQUIREMENTS §7 asks for. */}
       <Card>

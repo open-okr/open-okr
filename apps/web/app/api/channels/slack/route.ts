@@ -24,6 +24,7 @@ import {
 import {
   CHECK_IN_COMMAND,
   callAction,
+  memberForChannelIdentity,
   parseCommand,
   parseSlackSecret,
   submitCheckIn,
@@ -234,28 +235,20 @@ export async function POST(request: NextRequest): Promise<Response> {
  * A submission is not a message, so it never went through `handleInbound`'s
  * identity resolution. Read here rather than trusted from the payload: Slack
  * says who submitted, and the product says whether that account is anybody.
+ *
+ * Through core, inside the workspace's tenant setting (completeness review
+ * H-06). This was a bare pool query on two tables that force row-level
+ * security, which answered only because the Compose install connected as a
+ * superuser. Under the application role it answered nothing, and every form
+ * check-in from Slack was dropped without a reply.
  */
-async function memberFor(
+function memberFor(
   workspaceId: string,
   externalSenderId: string,
 ): Promise<{ memberId: string; userId: string } | null> {
-  const result = await getPool().query<{
-    member_id: string;
-    user_id: string | null;
-  }>(
-    `select i.member_id, m.user_id
-       from channel_identities i
-       join workspace_members m on m.id = i.member_id
-      where i.workspace_id = $1
-        and i.provider = 'slack'
-        and i.external_id = $2
-        and i.verified_at is not null
-        and i.deleted_at is null
-        and m.status = 'active'
-        and m.deleted_at is null
-      limit 1`,
-    [workspaceId, externalSenderId],
-  );
-  const row = result.rows[0];
-  return row?.user_id ? { memberId: row.member_id, userId: row.user_id } : null;
+  return memberForChannelIdentity(getPool(), {
+    workspaceId,
+    provider: "slack",
+    externalId: externalSenderId,
+  });
 }

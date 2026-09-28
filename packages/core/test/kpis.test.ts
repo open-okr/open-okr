@@ -267,6 +267,22 @@ describe("achievement and the corridor", () => {
   });
 });
 
+describe("the corridor a new KPI takes (completeness review H-17)", () => {
+  it("is the workspace's kpi.healthyThreshold and kpi.watchThreshold", async () => {
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
+      overrides: { "kpi.healthyThreshold": 85, "kpi.watchThreshold": 60 },
+    });
+    const kpi = await makeKpi({ title: "Net revenue retention" });
+    const { rows } = await wb.admin.query<{
+      healthy_pct: string;
+      watch_pct: string;
+    }>("select healthy_pct, watch_pct from kpis where id = $1", [kpi.id]);
+    expect(Number(rows[0]?.healthy_pct)).toBe(85);
+    expect(Number(rows[0]?.watch_pct)).toBe(60);
+  });
+});
+
 describe("the grid read", () => {
   it("groups by category and puts the uncategorised last", async () => {
     const wb = await workerDb();

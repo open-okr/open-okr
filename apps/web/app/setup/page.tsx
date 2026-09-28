@@ -1,7 +1,9 @@
 import {
+  aiProbe,
+  channelsProbe,
   databaseProbe,
   mailProbe,
-  notInThisBuild,
+  resolveDeploymentAISettings,
   runConnectionTests,
   storageProbe,
 } from "@openokr/core";
@@ -9,6 +11,7 @@ import { buttonVariants, cn } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { getMailSettings, mailerFrom } from "../../lib/mail";
+import { getKeyRing } from "../../lib/secrets";
 import { getStorage, storageDescription } from "../../lib/storage";
 import { getTranslations } from "../../lib/translations";
 import { CheckList } from "./check-list";
@@ -26,6 +29,28 @@ import { CheckList } from "./check-list";
  * failing database is the only thing that blocks finishing.
  */
 export const dynamic = "force-dynamic";
+
+/**
+ * The deployment-wide AI provider, as the wizard reports it (completeness
+ * review H-24). Never fatal: a setup page that would not render because a
+ * stored setting could not be read would hide the very thing being set up.
+ */
+async function deploymentAI(pool: ReturnType<typeof getPool>) {
+  try {
+    const settings = await resolveDeploymentAISettings(
+      pool,
+      getKeyRing(),
+      process.env,
+    );
+    const keyless = settings.provider === "ollama";
+    return {
+      provider: settings.provider === "off" ? "" : settings.provider,
+      configured: keyless || settings.apiKey !== "",
+    };
+  } catch {
+    return { provider: "", configured: false };
+  }
+}
 
 export default async function SetupPage() {
   const { t } = await getTranslations();
@@ -58,8 +83,8 @@ export default async function SetupPage() {
         await getStorage().delete(key);
       },
     }),
-    notInThisBuild("channel", "Phase 5"),
-    notInThisBuild("ai", "Phase 6"),
+    channelsProbe(),
+    aiProbe(await deploymentAI(pool)),
   ]);
 
   return (

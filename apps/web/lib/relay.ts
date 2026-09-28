@@ -29,7 +29,6 @@
  * serving replicas and leaves one instance with it on.
  */
 import {
-  createAIProvider,
   EmailChannel,
   OutboxRelay,
   SlackChannel,
@@ -40,7 +39,6 @@ import {
 import { type Env, loadEnv } from "@openokr/config";
 import {
   dispatchOutbox,
-  findSeededModel,
   memberEmail,
   memberExternalId,
   type OutboxDelivery,
@@ -50,9 +48,8 @@ import {
   parseTeamsSecret,
   parseTelegramSecret,
   parseWhatsAppSecret,
-  resolveAICredential,
-  resolveTierRoute,
 } from "@openokr/core";
+import { providerForTier } from "./ai-provider";
 import { drafterFor } from "./drafter";
 import { getMailSettings, mailerFrom } from "./mail";
 import { getPool } from "./pool";
@@ -87,36 +84,23 @@ const reason = (error: unknown): string =>
  * provider arrives and the content next changes.
  */
 async function embedFor(workspaceId: string) {
-  const pool = getPool();
-  const resolved = await resolveAICredential(pool, getKeyRing(), process.env, {
-    workspaceId,
-    provider: "openrouter",
-  });
-  if (resolved.source === "off") {
+  // Whichever provider the workspace routes the embed tier to, rather than
+  // OpenRouter always (completeness review H-27). An unpriced model is still
+  // refused: an unmetered embedding loop is the one place a runaway cost would
+  // not show until the bill.
+  const routed = await providerForTier(workspaceId, "embed");
+  if (!routed) {
     return undefined;
   }
-  const route = await resolveTierRoute(pool, { workspaceId, tier: "embed" });
-  if (!route || !findSeededModel(route.provider, route.modelId)) {
-    // An unpriced model cannot be metered, and an unmetered embedding loop is
-    // the one place a runaway cost would not show until the bill.
-    return undefined;
-  }
-
-  const provider = createAIProvider({
-    provider: "openrouter",
-    apiKey: resolved.apiKey,
-    appName: "OpenOKR",
-    appUrl: loadEnv().BETTER_AUTH_URL,
-  });
   return async (inputs: readonly string[]) => {
-    const result = await provider.embed({
-      model: route.modelId,
+    const result = await routed.provider.embed({
+      model: routed.modelId,
       input: [...inputs],
     });
     return {
       vectors: result.vectors,
       dimensions: result.dimensions,
-      model: route.modelId,
+      model: routed.modelId,
     };
   };
 }

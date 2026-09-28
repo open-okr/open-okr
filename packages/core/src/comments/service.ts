@@ -22,6 +22,11 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
+import { notifyRecipients } from "../notifications/create.ts";
+import {
+  type Recipient,
+  resolveRecipients,
+} from "../notifications/recipients.ts";
 import {
   ensureSubscriptionList,
   reconcileMentions,
@@ -112,6 +117,65 @@ export async function createComment<
   }
 
   return { id: commentId, subscribedMemberIds };
+}
+
+/**
+ * Tells a subject's subscribers about a comment, and the people it mentions
+ * that they were mentioned (completeness review H-13).
+ *
+ * A mention used to subscribe the person and tell them nothing, and nothing
+ * told the subject's other watchers either: the pipeline fans out only
+ * activities that set `notify`, and a comment's activity names the comment,
+ * which nobody subscribes to. So the comment notifies its parent's list here,
+ * through the one resolver that checks each recipient is still active and can
+ * still see the subject, which is what stops a mention reaching somebody who
+ * cannot read what they were mentioned in.
+ *
+ * A subscriber who is mentioned hears it once, as a mention, which is the
+ * reason that delivers immediately where their settings allow.
+ * `onlyMentions` is for an edit: the people newly mentioned are told, and
+ * nobody hears about the comment a second time.
+ */
+export async function notifyCommentInTx<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: {
+    readonly workspaceId: string;
+    readonly subjectType: string;
+    readonly subjectId: string;
+    readonly authorMemberId: string;
+    readonly mentionIds: readonly string[];
+    readonly onlyMentions?: boolean;
+  },
+): Promise<number> {
+  const mentioned = new Set(input.mentionIds);
+  const recipients: Recipient[] = (
+    await resolveRecipients(tx, {
+      workspaceId: input.workspaceId,
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      excludeMemberId: input.authorMemberId,
+    })
+  )
+    .filter(
+      (recipient) => !input.onlyMentions || mentioned.has(recipient.memberId),
+    )
+    .map((recipient) =>
+      mentioned.has(recipient.memberId)
+        ? { memberId: recipient.memberId, reason: "mentioned" as const }
+        : recipient,
+    );
+  if (recipients.length === 0) {
+    return 0;
+  }
+  const result = await notifyRecipients(tx, {
+    workspaceId: input.workspaceId,
+    subjectType: input.subjectType,
+    subjectId: input.subjectId,
+    recipients,
+  });
+  return result.created;
 }
 
 export interface UpdateCommentInput {

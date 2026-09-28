@@ -25,6 +25,8 @@ import {
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { getKeyRing } from "../../../lib/secrets";
+import { getStorage } from "../../../lib/storage";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /** One column of a file, as the mapping step draws it. */
@@ -271,14 +273,36 @@ export interface ExportResult {
   readonly missingFiles: readonly { id: string; filename: string }[];
 }
 
+/**
+ * The context an archive needs: the storage port, so an export carries file
+ * bytes and an import writes them back, and the key ring, which only a
+ * version 1 archive still needs (completeness review H-18). Neither was
+ * passed, so an export could not seal and an import restored no file.
+ */
+async function archiveContext() {
+  let ring: ReturnType<typeof getKeyRing> | undefined;
+  try {
+    ring = getKeyRing();
+  } catch {
+    // An instance with no key still exports and imports under a passphrase.
+    ring = undefined;
+  }
+  return {
+    ...(await context()),
+    storage: getStorage(),
+    ...(ring ? { ring } : {}),
+  };
+}
+
 export async function exportWorkspaceArchive(
   includeFiles: boolean,
+  passphrase: string,
 ): Promise<Answer<ExportResult>> {
   try {
     const result = await callAction(
-      await context(),
+      await archiveContext(),
       "workspace.exportArchive",
-      { includeFiles },
+      { includeFiles, passphrase },
     );
     return {
       ok: true,
@@ -316,12 +340,13 @@ export interface ImportResult {
 export async function importWorkspaceArchive(
   archiveBase64: string,
   dryRun: boolean,
+  passphrase: string,
 ): Promise<Answer<ImportResult>> {
   try {
     const result = await callAction(
-      await context(),
+      await archiveContext(),
       "workspace.importArchive",
-      { archiveBase64, dryRun },
+      { archiveBase64, dryRun, ...(passphrase ? { passphrase } : {}) },
     );
     if (!dryRun) {
       revalidatePath("/admin/imports");

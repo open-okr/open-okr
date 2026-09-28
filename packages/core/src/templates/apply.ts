@@ -118,6 +118,10 @@ async function seed(
   // idempotent, so a workspace that already has this quarter keeps it.
   const cycle = await callAction(context, "cycles.ensureCurrent", {});
   const cycleId = (cycle as { id: string }).id;
+  // Every key result below is due on the cycle's last day and owned by the
+  // member applying the template: KR-3 fails without both, and a starter set
+  // that fails the product's own checks is a poor first lesson (H-09).
+  const cycleEndsOn = (cycle as { endsOn: string }).endsOn;
 
   const me = await callAction(context, "people.directory", {});
   const memberId = firstMemberId(me);
@@ -196,6 +200,8 @@ async function seed(
         baselineValue: keyResult.baselineValue,
         targetValue: keyResult.targetValue,
         weight: 1,
+        dueOn: cycleEndsOn,
+        ...(memberId ? { ownerId: memberId } : {}),
         ...(keyResult.unit ? { unit: keyResult.unit } : {}),
         ...(keyResult.linkToKpi && kpiId ? { kpiId } : {}),
       });

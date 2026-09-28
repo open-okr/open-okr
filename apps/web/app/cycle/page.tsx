@@ -24,6 +24,12 @@ import { Drafting } from "./drafting.tsx";
 import { Gates } from "./gates.tsx";
 import { GuidanceRail } from "./guidance-rail.tsx";
 import { InputPack } from "./input-pack.tsx";
+import {
+  BaselineHealth,
+  CapacityCuts,
+  CycleSetup,
+  Revalidation,
+} from "./phase-forms.tsx";
 import { PhaseRail } from "./phase-rail.tsx";
 import { QualityPanel } from "./quality-panel.tsx";
 import { ReviewAndLearn } from "./review-and-learn.tsx";
@@ -256,9 +262,13 @@ export default async function CyclePage({
               includeClosed: false,
             })
           ).goals,
-          members: (await callAction(context, "people.directory", {})).map(
-            (member) => ({ id: member.id, name: member.name }),
-          ),
+          // People only: an agent or an unclaimed placeholder cannot
+          // champion, review or own a key result (H-09).
+          members: (await callAction(context, "people.directory", {}))
+            .filter(
+              (member) => member.kind === "human" || member.kind === "guest",
+            )
+            .map((member) => ({ id: member.id, name: member.name })),
           // The coach runs in the browser and cannot read the settings row, so
           // the resolved thresholds travel with the page. Sending them rather
           // than letting the client fall back to the canon is what keeps a
@@ -278,6 +288,17 @@ export default async function CyclePage({
           thresholds: canonThresholds(),
           checkTitles: [],
         };
+
+  // The people a phase 1 role can name, read only there. Agents and
+  // placeholders are not people who can sponsor or facilitate (H-09).
+  const people =
+    viewing === 1 && canPublish
+      ? (await callAction(context, "people.directory", {}))
+          .filter(
+            (member) => member.kind === "human" || member.kind === "guest",
+          )
+          .map((member) => ({ id: member.id, name: member.name }))
+      : [];
 
   // Only phase 5 needs the capacity check, and only phase 5 pays for reading
   // it. The same rule the phase-4 block above follows (P5-T10b).
@@ -390,11 +411,39 @@ export default async function CyclePage({
           />
         ) : null}
 
+        {viewing === 1 && canPublish ? (
+          <CycleSetup
+            cycleId={workflow.cycleId}
+            people={people}
+            sponsorId={workflow.sponsor?.id ?? null}
+            facilitatorId={workflow.facilitator?.id ?? null}
+            firstCycle={workflow.firstCycle}
+            sessionDates={workflow.sessionDates}
+          />
+        ) : null}
+
+        {viewing === 2 ? (
+          <BaselineHealth
+            cycleId={workflow.cycleId}
+            saved={workflow.baselineHealth}
+            canEdit={canEdit}
+          />
+        ) : null}
+
         {viewing === 2 ? (
           <Diagnose
             cycleId={workflow.cycleId}
             issues={workflow.issues}
             minimum={workflow.asks.strategicIssues}
+            canEdit={canEdit}
+          />
+        ) : null}
+
+        {viewing === 3 && workflow.mode === "quarterly" ? (
+          <Revalidation
+            cycleId={workflow.cycleId}
+            saved={workflow.revalidation}
+            focus={workflow.focus}
             canEdit={canEdit}
           />
         ) : null}
@@ -438,6 +487,14 @@ export default async function CyclePage({
         ) : null}
 
         {viewing === 5 ? (
+          <CapacityCuts
+            cycleId={workflow.cycleId}
+            saved={workflow.capacityCuts}
+            canEdit={canEdit}
+          />
+        ) : null}
+
+        {viewing === 5 ? (
           <Gates
             cycleId={workflow.cycleId}
             gates={workflow.gates}
@@ -450,6 +507,8 @@ export default async function CyclePage({
         {viewing === 4 ? (
           <Drafting
             cycleId={workflow.cycleId}
+            endsOn={workflow.endsOn}
+            draftingAllowed={work.allowed}
             goals={draft.goals}
             members={draft.members}
             canEdit={canEdit}

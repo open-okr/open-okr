@@ -8,8 +8,14 @@
  * gets that membership back rather than a second row. Accepting the same
  * invite twice, or one invite after another already worked, both land here.
  */
-import { activeOnly, type WorkspaceTx, workspaceMembers } from "@openokr/db";
-import { eq } from "drizzle-orm";
+import {
+  accessBindings,
+  activeOnly,
+  users,
+  type WorkspaceTx,
+  workspaceMembers,
+} from "@openokr/db";
+import { eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
@@ -64,6 +70,17 @@ export async function provisionMemberForInvite<
     .limit(1);
   if (existing) {
     return { memberId: existing.id, created: false };
+  }
+
+  // **A member waiting for this person is claimed, not doubled** (completeness
+  // review H-18). An archive import and the FlowyTeam importer both write a
+  // member with no account behind it and the person's address in
+  // `placeholder_email`, and nothing ever connected that row to the person
+  // when they arrived: they got a second, empty membership, and every goal,
+  // check-in and comment stayed with the first.
+  const claimed = await claimWaitingMember(tx, input);
+  if (claimed) {
+    return { memberId: claimed, created: false };
   }
 
   // **The seat check that must be right**, because this is the one place a
@@ -122,4 +139,102 @@ export async function provisionMemberForInvite<
   }
 
   return { memberId, created: true };
+}
+
+/**
+ * The unclaimed member carrying this person's address, taken over by them.
+ *
+ * Unclaimed means no account behind it, and it is matched on the address the
+ * person signed up with, ignoring case, which is the one fact an import and a
+ * sign-up can agree on. A suspended row stays suspended: somebody decided
+ * that, and joining does not undo it. A placeholder was never a seat, so
+ * claiming one is checked like a new member.
+ */
+async function claimWaitingMember<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: ProvisionMemberInput): Promise<string | null> {
+  if ((input.kind ?? "human") !== "human") {
+    return null;
+  }
+  const [user] = await tx
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, input.user.id))
+    .limit(1);
+  if (!user?.email) {
+    return null;
+  }
+  const [waiting] = await tx
+    .select({ id: workspaceMembers.id, kind: workspaceMembers.kind })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, input.workspaceId),
+        isNull(workspaceMembers.userId),
+        ne(workspaceMembers.status, "suspended"),
+        inArray(workspaceMembers.kind, ["human", "placeholder"]),
+        sql`lower(${workspaceMembers.placeholderEmail}) = lower(${user.email})`,
+      ),
+    )
+    .limit(1);
+  if (!waiting) {
+    return null;
+  }
+  if (waiting.kind === "placeholder") {
+    await requireSeatInTx(
+      tx,
+      input.workspaceId,
+      (used, limit) =>
+        `This workspace is full: ${used} of ${limit} seats are in use. Ask an administrator to free one or add seats.`,
+    );
+  }
+  // openokr:allow-mutation: the caller's Operation transaction, like the
+  // insert this replaces.
+  await tx
+    .update(workspaceMembers)
+    .set({
+      userId: input.user.id,
+      kind: "human",
+      status: "active",
+      placeholderEmail: null,
+      updatedAt: new Date(),
+    })
+    .where(activeOnly(workspaceMembers, eq(workspaceMembers.id, waiting.id)));
+
+  // Whatever access the import carried stands. A member that arrived with
+  // none gets what a joiner gets, through the same binding.
+  const context = await resolveSubjectContext(
+    tx,
+    "workspace",
+    input.workspaceId,
+    input.workspaceId,
+  );
+  if (context) {
+    const groupId = await ensureMemberGroup(tx, {
+      workspaceId: input.workspaceId,
+      memberId: waiting.id,
+    });
+    const [bound] = await tx
+      .select({ id: accessBindings.id })
+      .from(accessBindings)
+      .where(
+        activeOnly(
+          accessBindings,
+          eq(accessBindings.groupId, groupId),
+          eq(accessBindings.contextId, context.contextId),
+          isNull(accessBindings.tag),
+        ),
+      )
+      .limit(1);
+    if (!bound) {
+      await bindGroup(tx, {
+        workspaceId: input.workspaceId,
+        groupId,
+        contextId: context.contextId,
+        level: input.level ?? ACCESS_LEVELS.edit,
+      });
+    }
+  }
+  return waiting.id;
 }

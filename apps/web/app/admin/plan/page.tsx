@@ -1,14 +1,19 @@
 import {
   ACCESS_LEVELS,
   isCloudEnabled,
+  listSeatHolders,
+  readOwnPlan,
   readOwnUsage,
   readPlans,
   seatState,
 } from "@openokr/core";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAccessLevel } from "../../../lib/access.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
+import { changePlan } from "./actions";
+import { PlanForm } from "./plan-form";
 
 /**
  * S-49 Plan and seats: the customer's own side (P8-T05).
@@ -24,6 +29,11 @@ import { getTranslations } from "../../../lib/translations";
  * turns on, because REQUIREMENTS §5 says self-host is never feature-gated and
  * PLAN.md §4 says the cloud sells operation rather than features. A plan is a
  * seat count and a spend cap.
+ *
+ * **The administrator can change plan here, and sees who holds each seat**
+ * (completeness review H-21). Until then this screen described plans nobody
+ * could move between, and told an administrator to free a seat without
+ * saying whose.
  */
 export const dynamic = "force-dynamic";
 
@@ -37,11 +47,22 @@ export default async function PlanPage() {
 
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
   const { t } = await getTranslations();
-  const [seats, plans, usage] = await Promise.all([
+  const [seats, plans, usage, own, holders] = await Promise.all([
     seatState(pool, access.workspaceId),
     readPlans(pool),
     readOwnUsage(pool, access.workspaceId),
+    readOwnPlan(pool, access.workspaceId),
+    listSeatHolders(pool, access.workspaceId),
   ]);
+  const currentKey = own?.planKey ?? null;
+  const currentName =
+    plans.find((plan) => plan.key === currentKey)?.name ??
+    currentKey ??
+    t("admin.plan.free");
+  const describe = (plan: (typeof plans)[number]): string =>
+    `${plan.name}, ${
+      plan.seats === null ? "unlimited seats" : `${plan.seats} seats`
+    }`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -49,6 +70,25 @@ export default async function PlanPage() {
         <h1 className="font-bold text-ink text-lg">{t("admin.plan.title")}</h1>
         <p className="text-ink-2 text-sm">{t("admin.plan.intro")}</p>
       </header>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-semibold text-ink text-sm">
+          {t("admin.plan.current")}
+        </h2>
+        <p className="font-semibold text-ink text-xl">{currentName}</p>
+        {/* Only with a tenant row and a catalogue: on a cloud with no plans
+         * configured there is nothing to move to. */}
+        {own && plans.length > 0 ? (
+          <PlanForm
+            action={changePlan}
+            current={currentKey}
+            plans={plans.map((plan) => ({
+              key: plan.key,
+              label: describe(plan),
+            }))}
+          />
+        ) : null}
+      </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold text-ink text-sm">
@@ -73,6 +113,36 @@ export default async function PlanPage() {
             {t("admin.plan.invitedHoldsSeat")}
           </p>
         </div>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+          <h3 className="font-medium text-ink text-sm">
+            {t("admin.plan.holders")}
+          </h3>
+          <Link
+            className="text-brand-text text-sm hover:underline"
+            href="/people"
+          >
+            {t("admin.plan.manageMembers")}
+          </Link>
+        </div>
+        {holders.length === 0 ? (
+          <p className="text-ink-2 text-sm">{t("admin.plan.noHolders")}</p>
+        ) : (
+          <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
+            {holders.map((holder) => (
+              <li
+                className="flex items-baseline justify-between gap-3 px-4 py-2 text-sm"
+                key={holder.memberId}
+              >
+                <span className="text-ink">{holder.name}</span>
+                {holder.status === "invited" ? (
+                  <span className="text-ink-3 text-xs">
+                    {t("admin.plan.holderInvited")}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {usage ? (

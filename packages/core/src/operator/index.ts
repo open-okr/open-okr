@@ -5,7 +5,14 @@
  * `docs/design/p8-t01b-operator-console.md`.
  */
 export { readInstanceFlags } from "./flags.ts";
+export {
+  type GrantOutcome,
+  grantOperator,
+  OperatorGrantError,
+  revokeOperator,
+} from "./grants.ts";
 export { setLifecycleAsOperator } from "./lifecycle.ts";
+export { setPlanAsOperator } from "./plans.ts";
 export {
   endSupportSession,
   grantSupportSession,

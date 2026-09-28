@@ -209,6 +209,27 @@ export function dueInstant(due: LocalDate, timeZone: string): Date {
   return new Date(instant);
 }
 
+/**
+ * The instant a local wall-clock time names in a zone (completeness review
+ * H-08).
+ *
+ * A session is booked for "Monday at 09:00" where the team is, and the same
+ * Monday is a different instant in Jakarta and in London. The same two-pass
+ * correction `dueInstant` uses, for the same reason: the offset belongs to the
+ * date, and it changes twice a year in most zones.
+ */
+export function localInstant(
+  on: LocalDate,
+  hour: number,
+  minute: number,
+  timeZone: string,
+): Date {
+  const naive = Date.UTC(on.year, on.month - 1, on.day, hour, minute);
+  let instant = naive - offsetAt(naive, timeZone);
+  instant = naive - offsetAt(instant, timeZone);
+  return new Date(instant);
+}
+
 /** How far ahead of UTC a zone is at an instant, in milliseconds. */
 function offsetAt(instant: number, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-CA", {

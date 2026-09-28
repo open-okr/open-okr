@@ -252,6 +252,27 @@ describe("cross-frequency references", () => {
     await setFormula(monthly.id, { k: daily.id });
     expect((await actualOf(monthly.id, "2026-08-01")).actual).toBe(60);
   });
+
+  it("keeps the month's total when the source records on any other day (H-20)", async () => {
+    // The cascade passed the daily source's own date, and the monthly
+    // dependent evaluated a "month starting on the 15th", found nothing, and
+    // wrote null over the month's total.
+    const daily = await makeKpi("Daily signups", "daily");
+    const monthly = await makeKpi("Monthly signups");
+    await record(daily.id, "2026-08-01", 10);
+    await setFormula(monthly.id, { k: daily.id });
+    expect((await actualOf(monthly.id, "2026-08-01")).actual).toBe(10);
+
+    await record(daily.id, "2026-08-15", 25);
+    expect((await actualOf(monthly.id, "2026-08-01")).actual).toBe(35);
+    // And no stray record for a period that does not exist.
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select period_start from kpi_records where kpi_id = $1 and period_start = '2026-08-15'",
+      [monthly.id],
+    );
+    expect(rows).toEqual([]);
+  });
 });
 
 describe("a calculated KPI", () => {

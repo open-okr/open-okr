@@ -41,14 +41,20 @@ way.
 
 1. Have a PostgreSQL with the `pgvector` extension available, and a database
    for OpenOKR.
-2. Put the connection string in a Secret rather than on the command line, and
+2. **Connect as a role that is not a superuser and has no `BYPASSRLS`.** Row
+   level security is what keeps one workspace out of another's rows, and
+   Postgres never applies it to either kind of role. A role that owns the
+   database is right: the tables force the policy on their owner too. The
+   instance warns at boot, in `/api/health` and on `/admin/general` when its
+   role bypasses the floor.
+3. Put the connection string in a Secret rather than on the command line, and
    point `database.existingSecret` at it.
-3. Install the chart, with your ingress host.
-4. **Back up the generated secret.** The chart generates a root encryption key
+4. Install the chart, with your ingress host.
+5. **Back up the generated secret.** The chart generates a root encryption key
    on first install and keeps it across upgrades and uninstalls, and it cannot
    recover it. Losing it makes stored credentials unreadable while everything
    else keeps working, which is the worst way to find out.
-5. Open the host. The first-run wizard takes over exactly as it does on a
+6. Open the host. The first-run wizard takes over exactly as it does on a
    single server.
 
 Migrations run as a job from the same image, before the application rolls, so

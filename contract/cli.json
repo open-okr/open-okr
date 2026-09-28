@@ -39,12 +39,29 @@
       "pages": false
     },
     {
+      "name": "workspace changePlan",
+      "action": "workspace.changePlan",
+      "method": "POST",
+      "path": "/workspace/changePlan",
+      "scope": "write",
+      "summary": "Move this cloud workspace onto another plan from the catalogue.",
+      "flags": [
+        {
+          "name": "plan-key",
+          "field": "planKey",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "workspace setLifecycle",
       "action": "workspace.setLifecycle",
       "method": "POST",
       "path": "/workspace/setLifecycle",
       "scope": "write",
-      "summary": "Move a cloud workspace between active, suspended and closed (P8-T02c).",
+      "summary": "Move a cloud workspace between active, suspended and closed.",
       "flags": [
         {
           "name": "state",
@@ -250,6 +267,29 @@
           "field": "managerId",
           "type": "string",
           "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "people setAdministrator",
+      "action": "people.setAdministrator",
+      "method": "POST",
+      "path": "/people/setAdministrator",
+      "scope": "write",
+      "summary": "Makes a member an administrator with full access to the workspace, or returns them to the standard level.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "administrator",
+          "field": "administrator",
+          "type": "boolean",
+          "required": true
         }
       ],
       "pages": false
@@ -1802,6 +1842,12 @@
           "field": "includeFiles",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "passphrase",
+          "field": "passphrase",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false
@@ -1824,6 +1870,12 @@
           "name": "dry-run",
           "field": "dryRun",
           "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "passphrase",
+          "field": "passphrase",
+          "type": "string",
           "required": false
         }
       ],
@@ -3969,6 +4021,29 @@
       "pages": false
     },
     {
+      "name": "workflow setFocusKeyResults",
+      "action": "workflow.setFocusKeyResults",
+      "method": "POST",
+      "path": "/workflow/setFocusKeyResults",
+      "scope": "write",
+      "summary": "Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3).",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "key-result-ids",
+          "field": "keyResultIds",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "workflow calibrate",
       "action": "workflow.calibrate",
       "method": "POST",
@@ -5544,6 +5619,12 @@
           "field": "legacy",
           "type": "object",
           "required": false
+        },
+        {
+          "name": "guided",
+          "field": "guided",
+          "type": "boolean",
+          "required": false
         }
       ],
       "pages": false
@@ -5887,6 +5968,12 @@
           "name": "legacy",
           "field": "legacy",
           "type": "object",
+          "required": false
+        },
+        {
+          "name": "guided",
+          "field": "guided",
+          "type": "boolean",
           "required": false
         }
       ],
@@ -7701,7 +7788,7 @@
       "method": "POST",
       "path": "/sessions/create",
       "scope": "write",
-      "summary": "Creates a scheduled session for a space.",
+      "summary": "Creates a scheduled session for a space. A time with no offset is read in the workspace timezone.",
       "flags": [
         {
           "name": "space-id",
@@ -7736,6 +7823,47 @@
         {
           "name": "scheduled-for",
           "field": "scheduledFor",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "facilitator-id",
+          "field": "facilitatorId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions bookCycle",
+      "action": "sessions.bookCycle",
+      "method": "POST",
+      "path": "/sessions/bookCycle",
+      "scope": "write",
+      "summary": "Books every weekly check-in, monthly review and the quarterly review a space needs for a whole cycle, around what is already booked.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "weekday",
+          "field": "weekday",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "time",
+          "field": "time",
           "type": "string",
           "required": true
         },

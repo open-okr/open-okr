@@ -84,3 +84,19 @@ describe("every identifier on an admin screen has a name", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * A nudge's headline is the rule's own name (completeness review H-12). The
+ * channel message reads it from `packages/method`, which has no catalogue;
+ * this page reads it from the catalogue, which can be translated. Kept equal
+ * here, so an email and the nudge volume page never name one rule twice.
+ */
+describe("a trigger's name is the same in the method and the catalogue", () => {
+  test("every English name matches the title the channel message uses", () => {
+    const english = CATALOGUES.en as Record<string, string>;
+    const drift = TRIGGER_CATALOGUE.filter(
+      (entry) => english[TRIGGER_NAME_KEYS[entry.key] ?? ""] !== entry.title,
+    ).map((entry) => entry.key);
+    expect(drift).toEqual([]);
+  });
+});

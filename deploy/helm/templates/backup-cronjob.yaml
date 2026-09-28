@@ -1,5 +1,6 @@
 {{- if .Values.backup.enabled }}
 {{- include "openokr.validate" . -}}
+{{- $filesOnVolume := and .Values.persistence.enabled (not .Values.storage.s3.bucket) }}
 # Scheduled encrypted backup (P6-T06).
 #
 # pg_dump custom format, encrypted with the instance's root key, and a
@@ -28,6 +29,22 @@ spec:
             app.kubernetes.io/component: backup
         spec:
           restartPolicy: Never
+          {{- if and $filesOnVolume (eq .Values.persistence.accessMode "ReadWriteOnce") }}
+          # A ReadWriteOnce volume mounts on one node at a time, so the backup
+          # runs beside the application that holds it. The application's pods
+          # carry the selector labels and no component; the backup's own pod
+          # carries `backup`, so it cannot be its own anchor.
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      {{- include "openokr.selectorLabels" . | nindent 22 }}
+                    matchExpressions:
+                      - key: app.kubernetes.io/component
+                        operator: DoesNotExist
+          {{- end }}
           {{- with .Values.image.pullSecrets }}
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
@@ -44,8 +61,12 @@ spec:
                   BACKUP_DIR="/backups/$TIMESTAMP"
                   mkdir -p "$BACKUP_DIR"
 
+                  # The owner's address when there is one: a role under
+                  # forced row-level security cannot dump the tables it holds.
+                  DB_URL="${DATABASE_ADMIN_URL:-$DATABASE_URL}"
+
                   echo "backup: dumping database..."
-                  pg_dump "$DATABASE_URL" -Fc > "$BACKUP_DIR/db.dump"
+                  pg_dump "$DB_URL" -Fc > "$BACKUP_DIR/db.dump"
 
                   echo "backup: encrypting..."
                   apk add --no-cache openssl >/dev/null 2>&1 || true
@@ -56,11 +77,26 @@ spec:
                   rm -f "$BACKUP_DIR/db.dump"
 
                   DB_SIZE="$(wc -c < "$BACKUP_DIR/db.dump.enc" | tr -d ' ')"
+
+                  # The uploaded files, when they live on the chart's own
+                  # volume (H-19). In object storage they are the bucket's to
+                  # keep, with the provider's versioning or replication.
+                  {{- if $filesOnVolume }}
+                  echo "backup: archiving files..."
+                  tar -C /storage -cf - . | openssl enc -aes-256-cbc -salt -pbkdf2 \
+                    -pass "pass:$OPENOKR_ENCRYPTION_KEY" \
+                    -out "$BACKUP_DIR/blobs.tar.enc"
+                  FILES="blobs.tar.enc"
+                  {{- else }}
+                  echo "backup: files are in object storage; back up the bucket there."
+                  FILES=""
+                  {{- end }}
+
                   cat > "$BACKUP_DIR/manifest.json" <<MANIFEST
-                  {"timestamp":"$TIMESTAMP","dbBytes":$DB_SIZE,"format":"openokr-backup-v1"}
+                  {"timestamp":"$TIMESTAMP","dbBytes":$DB_SIZE,"files":"${FILES:-object-storage}","format":"openokr-backup-v1"}
                   MANIFEST
 
-                  (cd "$BACKUP_DIR" && sha256sum db.dump.enc manifest.json > checksum.sha256)
+                  (cd "$BACKUP_DIR" && sha256sum db.dump.enc manifest.json $FILES > checksum.sha256)
 
                   # Retention
                   KEPT=0
@@ -73,20 +109,20 @@ spec:
                   done
 
                   echo "backup: complete ($BACKUP_DIR, $DB_SIZE bytes)"
+              # The chart's own helper, so the job reads the Secrets the chart
+              # creates (completeness review H-19). It named a Secret called
+              # after the release, which does not exist, and every backup
+              # failed before it started.
               env:
-                - name: DATABASE_URL
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ include "openokr.fullname" . }}
-                      key: database-url
-                - name: OPENOKR_ENCRYPTION_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ include "openokr.fullname" . }}
-                      key: encryption-key
+                {{- include "openokr.commonEnv" . | nindent 16 }}
               volumeMounts:
                 - name: backups
                   mountPath: /backups
+                {{- if $filesOnVolume }}
+                - name: storage
+                  mountPath: /storage
+                  readOnly: true
+                {{- end }}
           volumes:
             - name: backups
               {{- if .Values.backup.existingClaim }}
@@ -95,4 +131,9 @@ spec:
               {{- else }}
               emptyDir: {}
               {{- end }}
+            {{- if $filesOnVolume }}
+            - name: storage
+              persistentVolumeClaim:
+                claimName: {{ printf "%s-storage" (include "openokr.fullname" .) }}
+            {{- end }}
 {{- end }}

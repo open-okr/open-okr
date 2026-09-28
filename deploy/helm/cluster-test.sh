@@ -218,5 +218,45 @@ kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=migration --tail=50 
   || fail "the second migration run did not report the schema as current"
 pass "re-running migrations is idempotent"
 
+# --- a backup runs, and verifies (completeness review H-19) ---------------
+# With backups enabled the CronJob failed at once, `secret "okr-openokr" not
+# found`, and `check.sh` passed because it only rendered. This runs one: a
+# volume for the backups, the CronJob's own template as a Job, then the verify
+# Job through `helm test`, which restores the newest backup into a scratch
+# database and checks every workspace.
+kubectl apply -n "$NAMESPACE" -f - >/dev/null <<'YAML'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: okr-backups
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+YAML
+
+helm upgrade "$RELEASE" . \
+  --namespace "$NAMESPACE" \
+  --reuse-values \
+  --set backup.enabled=true \
+  --set backup.existingClaim=okr-backups \
+  --wait --timeout 5m >/dev/null \
+  || fail "enabling backups did not upgrade cleanly"
+
+kubectl create job -n "$NAMESPACE" --from="cronjob/$RELEASE-openokr-backup" backup-drill >/dev/null \
+  || fail "the backup CronJob could not be run as a Job"
+if ! kubectl wait -n "$NAMESPACE" --for=condition=complete job/backup-drill --timeout=300s >/dev/null; then
+  kubectl logs -n "$NAMESPACE" job/backup-drill --tail=40 >&2 || true
+  fail "the backup did not complete"
+fi
+pass "a backup ran against the chart's own Secrets"
+
+if ! helm test "$RELEASE" --namespace "$NAMESPACE" --timeout 5m >/dev/null 2>&1; then
+  kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=backup-verify --tail=40 >&2 || true
+  fail "the backup did not verify"
+fi
+pass "the backup restored into a scratch database and verified"
+
 echo ""
-echo "openokr: the chart installs, serves, registers a user and upgrades cleanly."
+echo "openokr: the chart installs, serves, registers a user, upgrades, and backs up cleanly."

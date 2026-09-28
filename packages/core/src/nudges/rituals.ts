@@ -37,6 +37,7 @@ import {
   sessionLifecycleStage,
 } from "@openokr/method";
 import { asc, eq } from "drizzle-orm";
+import { type AgentScope, agentSeesSession } from "../agents/scope.ts";
 import {
   formatLocalDate,
   localDateIn,
@@ -143,6 +144,11 @@ export async function dueSessionNudges(
     readonly workspaceId: string;
     readonly now: Date;
     readonly thresholds: ResolvedThresholds;
+    /**
+     * The agent this reads as, when it is an agent's run (completeness review
+     * H-04). Absent reads everything, which is what a person's own run does.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<readonly DueNudge[]> {
   const rows = await tx
@@ -155,7 +161,11 @@ export async function dueSessionNudges(
     })
     .from(okrSessions)
     .where(
-      activeOnly(okrSessions, eq(okrSessions.workspaceId, input.workspaceId)),
+      activeOnly(
+        okrSessions,
+        eq(okrSessions.workspaceId, input.workspaceId),
+        input.scope ? agentSeesSession(input.scope) : undefined,
+      ),
     );
 
   const due: DueNudge[] = [];
@@ -202,12 +212,9 @@ export async function dueSessionNudges(
  * milliseconds: a cycle starting on the first of April starts on that date in
  * the workspace's timezone, not 24 hours after some instant.
  *
- * `cycle.phase_blocked` is not here. §6.4 fires it on "phase conditions unmet
- * as window closes", which is a question about the workflow's gate state rather
- * than about a date, and `publishGates` already answers it inside the publish
- * path (P4-T03). Firing it from a countdown would need this reader to assemble
- * a full workflow snapshot per cycle per day, and the honest place for it is the
- * Coach's own evaluation, which is P4-T06a. Recorded rather than half-built.
+ * `cycle.phase_blocked` is not here: it needs the workflow evaluated, and
+ * `duePhaseBlockedNudges` in rhythm-triggers.ts does that only on the days a
+ * phase's window closes (completeness review H-11).
  */
 export async function dueCycleNudges(
   tx: WorkspaceTx,

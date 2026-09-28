@@ -52,6 +52,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "workspace.lifecycle_changed": z.object({
     state: z.enum(["active", "suspended", "closed"]),
   }),
+  // Completeness review H-21. In the feed because a plan change can change
+  // what everybody's invitations do.
+  "workspace.plan_changed": z.object({
+    plan: z.string(),
+    seats: z.number().nullable(),
+  }),
   "member.profile_updated": z.object({ name: z.string() }),
   "channel.templatesSynced": z.object({
     recorded: z.number(),
@@ -73,6 +79,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "member.updated": z.object({ name: z.string() }),
   "member.suspended": z.object({ name: z.string() }),
   "member.restored": z.object({ name: z.string() }),
+  // Full access granted or returned to standard (completeness review H-14).
+  "member.administrator_set": z.object({
+    name: z.string(),
+    administrator: z.boolean(),
+  }),
   "member.converted_to_guest": z.object({ name: z.string() }),
   "member.erased": z.object({ name: z.string() }),
   /**
@@ -229,6 +240,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.revalidated": z.object({ holds: z.boolean(), changed: z.boolean() }),
   "cycle.baseline_health_set": z.object({}),
   "cycle.capacity_recorded": z.object({}),
+  "cycle.focus_set": z.object({ count: z.number().int() }),
   "cycle.calibrated": z.object({}),
   "cycle.published": z.object({
     name: z.string(),
@@ -414,6 +426,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   // Sessions (P4-T07a)
   "session.created": z.object({ kind: z.string(), title: z.string() }),
+  // A whole cycle's rituals booked in one write (completeness review H-08).
+  "session.cycleBooked": z.object({
+    cycleId: z.string(),
+    booked: z.number().int(),
+  }),
   "session.opened": z.object({ kind: z.string() }),
   "session.stageAdvanced": z.object({
     from: z.string().nullable(),

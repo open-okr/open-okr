@@ -25,6 +25,7 @@ import {
   keyResults,
   type WorkspaceTx,
 } from "@openokr/db";
+import { trigger } from "@openokr/method";
 import { eq } from "drizzle-orm";
 import type { MessageDraft } from "../channels/builder.ts";
 
@@ -103,7 +104,8 @@ export async function blockerDraft(
 
   const age = ageInWords(row.openedAt, input.now);
   const text = [
-    "You have a reminder waiting in OpenOKR.",
+    // The rule's own name (H-12), rather than a line that could be anything.
+    trigger(input.ruleKey)?.title ?? "A blocker needs you",
     "",
     `A ${row.type.replace(/_/g, " ")} blocker has been open for ${age}.`,
     row.keyResultTitle ? `It blocks: ${row.keyResultTitle}` : null,

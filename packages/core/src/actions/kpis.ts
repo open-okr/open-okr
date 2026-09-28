@@ -33,7 +33,9 @@ import { type KpiFrequency, normalisePeriod } from "@openokr/method";
 import { asc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
+import { ensureContext } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { bindAgentsToContextInTx } from "../agents/bindings.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import {
@@ -171,10 +173,15 @@ export const createKpi = defineWriteAction({
 
       await assertLegacyKeyFree(tx, workspaceId, kpis, input.legacy, "KPI");
 
-      if (
-        (input.healthyPct !== undefined || input.watchPct !== undefined) &&
-        (input.watchPct ?? 70) > (input.healthyPct ?? 90)
-      ) {
+      // The workspace's own corridor where the caller names none (completeness
+      // review H-17). The columns' defaults were the canon's 90 and 70, so a
+      // workspace that moved its thresholds on /admin/rhythm still got those.
+      const thresholds = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      ).thresholds;
+      const healthyPct = input.healthyPct ?? thresholds["kpi.healthyThreshold"];
+      const watchPct = input.watchPct ?? thresholds["kpi.watchThreshold"];
+      if (watchPct > healthyPct) {
         // The corridor reads from below in both bands, so a watch band above the
         // healthy band would put every KPI in `watch` and none in `healthy`. The
         // database refuses it too; this says why.
@@ -207,18 +214,26 @@ export const createKpi = defineWriteAction({
           input.targetDefault === undefined
             ? null
             : String(input.targetDefault),
-        ...(input.healthyPct === undefined
-          ? {}
-          : { healthyPct: String(input.healthyPct) }),
-        ...(input.watchPct === undefined
-          ? {}
-          : { watchPct: String(input.watchPct) }),
+        healthyPct: String(healthyPct),
+        watchPct: String(watchPct),
         ...legacyColumns(input.legacy),
       });
 
       // No records yet, so this settles the KPI at `no_data` rather than leaving
       // the column at its default and hoping they agree.
       await recomputeKpi(tx, workspaceId, id);
+
+      // A KPI that belongs to no space owns a context of its own, so the
+      // built-in agents can be bound to it by name (completeness review H-04).
+      // One in a space is in their sight through the space.
+      if (!input.spaceId) {
+        const contextId = await ensureContext(tx, {
+          workspaceId,
+          resourceType: "kpi",
+          resourceId: id,
+        });
+        await bindAgentsToContextInTx(tx, { workspaceId, contextId });
+      }
 
       return {
         result: { id, shortId: short },

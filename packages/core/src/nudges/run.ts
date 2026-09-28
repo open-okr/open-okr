@@ -17,10 +17,18 @@
  * It takes a transaction and writes on it. Both callers are Operations, so the
  * nudge rows, the inbox rows and the audit row commit together or not at all.
  */
-import { activeOnly, cycles, type WorkspaceTx } from "@openokr/db";
+import { activeOnly, blockers, cycles, type WorkspaceTx } from "@openokr/db";
 import { deferralFor, type SuppressionReason } from "@openokr/method";
-import { desc, eq, ne } from "drizzle-orm";
+import {
+  desc,
+  eq,
+  isNull,
+  ne,
+  or,
+  TransactionRollbackError,
+} from "drizzle-orm";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import type { AgentScope } from "../agents/scope.ts";
 import { sweepDivergenceInTx } from "../alignment/divergence.ts";
 import { sweepSemanticInTx } from "../alignment/semantic.ts";
 import { sweepStaleness } from "../cadence/service.ts";
@@ -30,6 +38,18 @@ import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { deliverDueNudges, unreachableRecipients } from "./deliver.ts";
 import { resolveRhythmWithLadders } from "./ladders.ts";
 import { dueQualityNudges } from "./quality.ts";
+import {
+  dueCycleQualityNudges,
+  dueObjectiveQualityNudges,
+  dueProcessHealthNudges,
+} from "./quality-triggers.ts";
+import {
+  dueCommitmentNudges,
+  dueCriticalConfidenceNudges,
+  duePhaseBlockedNudges,
+  dueStreakNudges,
+  dueWeeklyDigestNudges,
+} from "./rhythm-triggers.ts";
 import { dueCycleNudges, dueSessionNudges } from "./rituals.ts";
 import {
   activeMemberIds,
@@ -88,6 +108,15 @@ export interface NudgeRunInput {
   readonly runId?: string;
   /** Language for the proposals, when the host has a provider (P4-T05c-b). */
   readonly drafter?: AgentDrafter;
+  /**
+   * The agent this run reads as (completeness review H-04). Every reader of a
+   * goal, KPI, blocker, check-in or session honours the agent's bindings when
+   * it is set. The Champion's and the Coach's runs always set it; the hourly
+   * queue an administrator runs by hand does not.
+   */
+  readonly scope?: AgentScope;
+  /** The instance's address, for the links in what it sends (H-12). */
+  readonly baseUrl?: string;
 }
 
 export interface NudgeRunResult {
@@ -174,6 +203,7 @@ export async function runDueNudgesInTx(
     resolveRhythm(await readRhythmRow(tx, workspaceId)),
   );
   const timeZone = await workspaceTimeZone(tx, workspaceId);
+  const scoped = input.scope ? { scope: input.scope } : {};
 
   let staleFlipped = 0;
   let diverged = 0;
@@ -191,11 +221,27 @@ export async function runDueNudgesInTx(
         timeZone,
         thresholds,
         ...(input.drafter ? { drafter: input.drafter } : {}),
+        ...scoped,
       })),
       ...(await dueAcknowledgementNudges(tx, {
         workspaceId,
         now: at,
         thresholds,
+        ...scoped,
+      })),
+      // The two that react to an event, looking back one deduplication
+      // window (completeness review H-11).
+      ...(await dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: at,
+        thresholds,
+        ...scoped,
+      })),
+      ...(await dueWeeklyDigestNudges(tx, {
+        workspaceId,
+        now: at,
+        thresholds,
+        ...scoped,
       })),
     );
   }
@@ -209,7 +255,12 @@ export async function runDueNudgesInTx(
     staleFlipped = (await sweepStaleness(tx, workspaceId, thresholds, at))
       .flipped;
     due.push(
-      ...(await dueBlockerNudges(tx, { workspaceId, now: at, thresholds })),
+      ...(await dueBlockerNudges(tx, {
+        workspaceId,
+        now: at,
+        thresholds,
+        ...scoped,
+      })),
       ...(await dueKpiCorridorNudges(tx, {
         workspaceId,
         thresholds,
@@ -218,18 +269,36 @@ export async function runDueNudgesInTx(
         // answer: a workspace with no open cycle has nothing to propose a
         // recovery objective into.
         ...(await openCycleId(tx, workspaceId)),
+        ...scoped,
       })),
       ...(await dueDailyDigestNudges(tx, {
         workspaceId,
         now: at,
         workspaceTimeZone: timeZone,
       })),
+      ...(await dueCommitmentNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        ...scoped,
+      })),
+      ...(await dueStreakNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        ...scoped,
+      })),
     );
   }
 
   if (cadence === "weekly") {
     due.push(
-      ...(await dueSessionNudges(tx, { workspaceId, now: at, thresholds })),
+      ...(await dueSessionNudges(tx, {
+        workspaceId,
+        now: at,
+        thresholds,
+        ...scoped,
+      })),
     );
   }
 
@@ -240,7 +309,12 @@ export async function runDueNudgesInTx(
     const cycleId = (await openCycleId(tx, workspaceId)).cycleId;
     if (cycleId) {
       diverged = (
-        await sweepDivergenceInTx(tx, { workspaceId, cycleId, thresholds })
+        await sweepDivergenceInTx(tx, {
+          workspaceId,
+          cycleId,
+          thresholds,
+          ...scoped,
+        })
       ).found;
       // §5.3's semantic review, the one part of the Coach that needs a
       // provider. With none it writes nothing **and clears nothing**, so a
@@ -250,15 +324,41 @@ export async function runDueNudgesInTx(
           workspaceId,
           cycleId,
           ...(input.drafter ? { drafter: input.drafter } : {}),
+          ...scoped,
         })
       ).found;
     }
-    due.push(...(await dueQualityNudges(tx, { workspaceId, thresholds })));
+    due.push(
+      ...(await dueQualityNudges(tx, { workspaceId, thresholds, ...scoped })),
+      ...(await dueObjectiveQualityNudges(tx, {
+        workspaceId,
+        thresholds,
+        ...scoped,
+      })),
+      ...(await dueCycleQualityNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        thresholds,
+        ...scoped,
+      })),
+      ...(await dueProcessHealthNudges(tx, {
+        workspaceId,
+        now: at,
+        ...scoped,
+      })),
+    );
   }
 
   if (cadence === "cycle") {
     due.push(
       ...(await dueCycleNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        thresholds,
+      })),
+      ...(await duePhaseBlockedNudges(tx, {
         workspaceId,
         now: at,
         timeZone,
@@ -344,13 +444,18 @@ export async function runDueNudgesInTx(
     at,
     ...(input.runId ? { runId: input.runId } : {}),
   });
+  await stampBlockerEscalations(tx, workspaceId, withNotices, at);
 
   // Routing, the inbox row and the channel message, for everything now due:
   // what this run just wrote, and anything an earlier run deferred into this
   // window (P5-T01b-b). One pass, so a deferred nudge and a fresh one take the
   // same path, and the inbox row is written where the channel is chosen rather
   // than in two places that could disagree about what was sent.
-  const delivery = await deliverDueNudges(tx, { workspaceId, now: at });
+  const delivery = await deliverDueNudges(tx, {
+    workspaceId,
+    now: at,
+    ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+  });
 
   const sent = ids.filter((written) => written.sent).length;
   return {
@@ -374,4 +479,89 @@ export async function runDueNudgesInTx(
       ),
     ],
   };
+}
+
+/**
+ * Records who each aging blocker has been escalated to (completeness review
+ * H-10), so it reaches their review inbox as "Escalated to you".
+ *
+ * Written whether or not today's nudge was suppressed as a duplicate: the
+ * escalation stands either way. Moves only upward, from the coordinator to the
+ * sponsor, and never rewrites a blocker already escalated to that person.
+ * Inside the run's own transaction, so a sandboxed run discards it.
+ */
+async function stampBlockerEscalations(
+  tx: WorkspaceTx,
+  workspaceId: string,
+  due: readonly DueNudge[],
+  at: Date,
+): Promise<void> {
+  for (const nudge of due) {
+    if (!nudge.escalatesBlocker || nudge.subjectType !== "blocker") {
+      continue;
+    }
+    // openokr:allow-mutation: the run's own transaction, which the Champion's
+    // Operation opened; the escalation commits with the nudge that states it.
+    await tx
+      .update(blockers)
+      .set({
+        escalatedToId: nudge.recipientMemberId,
+        escalatedAt: at,
+        updatedAt: at,
+      })
+      .where(
+        activeOnly(
+          blockers,
+          eq(blockers.workspaceId, workspaceId),
+          eq(blockers.id, nudge.subjectId),
+          isNull(blockers.resolvedAt),
+          or(
+            isNull(blockers.escalatedToId),
+            ne(blockers.escalatedToId, nudge.recipientMemberId),
+          ),
+        ),
+      );
+  }
+}
+
+/**
+ * An agent's run of the queue, as that agent (completeness review H-04).
+ *
+ * Reads through the agent's bindings, always. And in sandbox mode commits
+ * nothing: the whole run happens inside a savepoint that is rolled back, so
+ * every nudge, proposal, finding, health flip and outbox row it would have
+ * written is computed, counted and discarded. What survives is the caller's
+ * own run row, which says what would have happened. That is what the run
+ * executor has always done for a sandboxed task, and what CLAUDE.md means by
+ * "sandbox mode commits nothing at all". The Champion and the Coach ignored
+ * it, and the public demo relies on it.
+ *
+ * No drafter in sandbox. A draft nobody will see is still a paid call.
+ */
+export async function runAgentNudgesInTx(
+  tx: WorkspaceTx,
+  input: NudgeRunInput & {
+    readonly scope: AgentScope;
+    readonly sandbox: boolean;
+  },
+): Promise<NudgeRunResult> {
+  const { sandbox, drafter, ...rest } = input;
+  if (!sandbox) {
+    return runDueNudgesInTx(tx, { ...rest, ...(drafter ? { drafter } : {}) });
+  }
+  let simulated: NudgeRunResult | undefined;
+  try {
+    await tx.transaction(async (savepoint) => {
+      simulated = await runDueNudgesInTx(savepoint as WorkspaceTx, rest);
+      savepoint.rollback();
+    });
+  } catch (error) {
+    if (!(error instanceof TransactionRollbackError)) {
+      throw error;
+    }
+  }
+  if (!simulated) {
+    throw new Error("The sandboxed run produced no result.");
+  }
+  return simulated;
 }

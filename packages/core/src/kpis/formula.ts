@@ -13,6 +13,7 @@ import {
   type FormulaNode,
   type KpiAggregate,
   type KpiFrequency,
+  normalisePeriod,
   validateFormula,
 } from "@openokr/method";
 import { eq, inArray } from "drizzle-orm";
@@ -171,7 +172,7 @@ export async function evaluateKpiForPeriod(
   tx: OperationTx,
   workspaceId: string,
   kpiId: string,
-  periodStart: string,
+  on: string,
   authorMemberId: string,
 ): Promise<{ value: number | null; diagnostic: string | null }> {
   const [kpi] = await tx
@@ -188,6 +189,13 @@ export async function evaluateKpiForPeriod(
   if (!kpi?.isCalculated || kpi.formula === null) {
     return { value: null, diagnostic: null };
   }
+
+  // **This KPI's own period, not the caller's** (completeness review H-20).
+  // A cascade from a daily source passes that source's date, and a monthly
+  // KPI evaluated for "the month starting on the 15th" found no month, came
+  // back null, and wrote the null over the month's real total. Any date
+  // inside the period names it, so each dependent normalises for itself.
+  const periodStart = normalisePeriod(kpi.frequency as KpiFrequency, on);
 
   const shape = validateFormula(kpi.formula);
   if (!shape.ok) {
@@ -290,6 +298,9 @@ async function resolveReference(
 
 /**
  * Recomputes everything downstream of a changed KPI, in topological order.
+ *
+ * `periodStart` is the changed KPI's period, and each dependent reads it as
+ * "a date inside my period" rather than as its own period start (H-20).
  *
  * Returns the identifiers it touched, so a caller can recompute their corridor
  * states afterwards without walking the graph again.

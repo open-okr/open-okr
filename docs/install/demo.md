@@ -15,9 +15,9 @@ password they share. They pick one, and they are that person: their goals,
 their check-ins, their review inbox, their nudges.
 
 The workspace holds a quarter in flight and a quarter that is finished. The
-finished one has a scorecard row and a closing diagnostic. Both agents are
-running in sandbox, so their nudges and proposals are real and nothing they
-suggest is ever committed.
+finished one has a scorecard row and a closing diagnostic. Both agents ran
+once to produce the nudges and proposals on screen, which are real, and then
+went to sandbox, so nothing they do afterwards is ever committed.
 
 ## What you need
 
@@ -104,8 +104,8 @@ pnpm demo:prepare
 ```
 
 `pnpm db:seed` writes the organisation. `pnpm demo:prepare` gives the cast
-accounts, puts both agents in sandbox, and runs the Coach and the Champion once
-so the nudges on screen are ones the product produced.
+accounts, runs the Coach and the Champion once so the nudges on screen are ones
+the product produced, and then puts both agents in sandbox.
 
 `pnpm demo:prepare` refuses a workspace the demo builder did not build, and
 never touches a member who already has a real person behind them.

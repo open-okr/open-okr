@@ -298,7 +298,7 @@ Written as the test plan P8-T03 inherits.
 
 | # | Question | Why it is not answered here |
 |---|---|---|
-| 1 | How the first operator is created | Written here as "by the deployment", which in practice means a seeded row or a command. The mechanism is P8-T03's, and it should not be a screen, because a screen that creates the first operator can be reached by whoever gets there first |
+| 1 | How the first operator is created | Written here as "by the deployment", which in practice means a seeded row or a command. The mechanism is P8-T03's, and it should not be a screen, because a screen that creates the first operator can be reached by whoever gets there first. **Answered at completeness review H-21: a command**, `pnpm cloud:operator --email <address> --granted-by <address>`. Never self; once one operator exists only an operator grants another; every grant and revocation goes to the instance audit chain |
 | 2 | Whether an operator may read a workspace's own audit log without a support session | Written here as yes, on S-46, because investigating an incident is what the trail is for and the trail holds no content. An argument exists that the trail names people and is therefore personal data, which would put it behind a session |
 | 3 | Whether site messages are rich text or plain | Written here as rich text through the shared module, for consistency. Plain text would remove a sanitising surface that has an instance-wide audience |
 | 4 | The P1-T09 follow-up carried on the P8-T03 row | Instance settings writes sit outside the Operation pipeline behind an escape hatch. This design adds two more writers to `system_settings` (flags and site messages), so the follow-up gets larger rather than smaller and wants closing before or during P8-T03 |
