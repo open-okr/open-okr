@@ -1569,3 +1569,92 @@ describe("a blocker raised in a session reaches its owner (H-10)", () => {
     ).rejects.toMatchObject({ code: "not_found" });
   });
 });
+
+describe("the confidence round the panel draws (completeness review M-03)", () => {
+  const status = async (userId: string, sessionId: string) => {
+    const wb = await workerDb();
+    const rows = (await callAction(
+      { pool: wb.appPool, ...context(userId) },
+      "sessions.confidenceStatus",
+      { sessionId },
+    )) as Array<{
+      keyResultId: string;
+      teamVoting: boolean;
+      votesCast: number;
+      revealed: boolean;
+      votes: { memberId: string; confidence: number }[];
+      average: number | null;
+      myVote: number | null;
+    }>;
+    return rows.find((row) => row.keyResultId === keyResultId);
+  };
+
+  it("shows a count and your own vote before reveal, and every vote and the average after", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+      sessionId,
+      keyResultId,
+      confidence: 0.6,
+    });
+    await callAction(
+      { pool: wb.appPool, ...context(MEMBER) },
+      "sessions.castVote",
+      { sessionId, keyResultId, confidence: 0.4 },
+    );
+
+    const before = await status(MEMBER, sessionId);
+    expect(before).toMatchObject({
+      teamVoting: true,
+      votesCast: 2,
+      revealed: false,
+      votes: [],
+      average: null,
+      myVote: 0.4,
+    });
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.revealVotes",
+      { sessionId, keyResultId },
+    );
+    const after = await status(MEMBER, sessionId);
+    expect(after?.revealed).toBe(true);
+    expect(after?.votes).toHaveLength(2);
+    expect(after?.average).toBe(0.5);
+  });
+
+  it("says when voting is off, and the facilitator confirms without a vote", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.updateSettings",
+      { id: spaceId, teamVoting: false },
+    );
+    const sessionId = await openSessionAtConfidence();
+    expect((await status(FACILITATOR, sessionId))?.teamVoting).toBe(false);
+
+    // Step 1 used to be impossible here: the panel waited for a vote the
+    // server refuses.
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confirmConfidence",
+      {
+        sessionId,
+        keyResultId,
+        confidence: 0.7,
+        whatChanged: "Two deals closed",
+      },
+    );
+    const rows = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confidenceStatus",
+      { sessionId },
+    )) as Array<{ keyResultId: string; confirmed: boolean }>;
+    expect(rows.find((row) => row.keyResultId === keyResultId)?.confirmed).toBe(
+      true,
+    );
+  });
+});

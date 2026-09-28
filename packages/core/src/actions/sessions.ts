@@ -2275,6 +2275,21 @@ export const sessionConfidenceStatus = defineReadAction({
       confirmed: z.boolean(),
       confirmedConfidence: z.number().nullable(),
       whatChanged: z.string().nullable(),
+      /**
+       * Whether the space votes before the facilitator confirms (completeness
+       * review M-03). The same on every row; carried per row so the one read
+       * the panel makes answers every question it asks.
+       */
+      teamVoting: z.boolean(),
+      /** How many have voted. A count only, so nobody anchors before reveal. */
+      votesCast: z.number().int(),
+      revealed: z.boolean(),
+      /** Every vote, after reveal only. Empty before. */
+      votes: z.array(z.object({ memberId: z.uuid(), confidence: z.number() })),
+      /** The room's mean, after reveal only. */
+      average: z.number().nullable(),
+      /** The caller's own vote, which they may always see. */
+      myVote: z.number().nullable(),
     }),
   ),
   access: ACCESS_LEVELS.view,
@@ -2288,6 +2303,12 @@ export const sessionConfidenceStatus = defineReadAction({
       confirmed: boolean;
       confirmedConfidence: number | null;
       whatChanged: string | null;
+      teamVoting: boolean;
+      votesCast: number;
+      revealed: boolean;
+      votes: { memberId: string; confidence: number }[];
+      average: number | null;
+      myVote: number | null;
     }>
   > {
     const db = drizzle(context.pool);
@@ -2352,14 +2373,83 @@ export const sessionConfidenceStatus = defineReadAction({
 
         const confirmedMap = new Map(confirmed.map((c) => [c.keyResultId, c]));
 
+        const [space] = await tx
+          .select({ settings: spaces.settings })
+          // openokr:allow-raw-read: the session was read under the caller's
+          // own membership above; this reads one setting of its space to say
+          // which confidence round the panel should draw.
+          .from(spaces)
+          .where(
+            activeOnly(
+              spaces,
+              eq(spaces.id, session.spaceId),
+              eq(spaces.workspaceId, context.workspaceId),
+            ),
+          )
+          .limit(1);
+        const teamVoting = resolveSpaceSettingsFrom(space?.settings).teamVoting;
+
+        const [me] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+            ),
+          )
+          .limit(1);
+
+        const cast = await tx
+          .select({
+            keyResultId: checkInVotes.keyResultId,
+            memberId: checkInVotes.memberId,
+            confidence: checkInVotes.confidence,
+            revealedAt: checkInVotes.revealedAt,
+          })
+          .from(checkInVotes)
+          .where(
+            activeOnly(
+              checkInVotes,
+              eq(checkInVotes.workspaceId, context.workspaceId),
+              eq(checkInVotes.sessionId, input.sessionId),
+            ),
+          );
+
         return krs.map((kr) => {
           const c = confirmedMap.get(kr.id);
+          const mine = cast.filter((vote) => vote.keyResultId === kr.id);
+          // Revealed together or not at all: `sessions.revealVotes` stamps
+          // every vote for the key result in one statement.
+          const revealed =
+            mine.length > 0 && mine.every((vote) => vote.revealedAt !== null);
+          const shown = revealed
+            ? mine.map((vote) => ({
+                memberId: vote.memberId,
+                confidence: Number(vote.confidence),
+              }))
+            : [];
+          const own = mine.find((vote) => vote.memberId === me?.id);
           return {
             keyResultId: kr.id,
             title: kr.title,
             confirmed: !!c,
             confirmedConfidence: c ? Number(c.confirmedConfidence) : null,
             whatChanged: c?.whatChanged ?? null,
+            teamVoting,
+            votesCast: mine.length,
+            revealed,
+            votes: shown,
+            average:
+              shown.length === 0
+                ? null
+                : Math.round(
+                    (shown.reduce((sum, vote) => sum + vote.confidence, 0) /
+                      shown.length) *
+                      100,
+                  ) / 100,
+            myVote: own ? Number(own.confidence) : null,
           };
         });
       },

@@ -127,6 +127,12 @@ export default async function SessionPage({ params }: SessionPageProps) {
     confirmed: boolean;
     confirmedConfidence: number | null;
     whatChanged: string | null;
+    teamVoting: boolean;
+    votesCast: number;
+    revealed: boolean;
+    votes: { memberId: string; confidence: number }[];
+    average: number | null;
+    myVote: number | null;
   }> = [];
   // The workspace's own §3.2 boundaries, which the dial colours and names
   // bands from (completeness review H-17). Canon until the stage is read.
@@ -706,6 +712,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           krStatuses={krStatuses}
           isFacilitator={isFacilitator}
           thresholds={confidenceThresholds}
+          names={Object.fromEntries(
+            participants.map((one) => [one.memberId, one.name]),
+          )}
         />
       )}
 
