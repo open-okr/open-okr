@@ -13,6 +13,7 @@ The `mockups/` folder does double duty. It supplies the screenshots for both art
 | `deck/make-deck.py` | The deck source. Every slide is laid out here |
 | `mockups/src/*.html` | The mockup screens, hand-built against UIUX-PLAN.md §2 and the S-xx screen specifications |
 | `mockups/png/*.png` | Rendered at 1440 wide, 2x, palette-optimised. Reusable on a site or in another deck |
+| `OpenOKR-Overview.pdf`, `OpenOKR-Deck.pdf` | The same two artifacts as PDF, exported from Word and PowerPoint. Nothing in this folder produces them |
 | `build.sh` | Markdown to Word |
 | `render.sh` | Mockups to PNG |
 
@@ -24,7 +25,9 @@ The `mockups/` folder does double duty. It supplies the screenshots for both art
 python3 deck/make-deck.py    # writes OpenOKR-Deck.pptx
 ```
 
-`render.sh` needs a Chromium headless shell. It looks in the Playwright browser cache and falls back to Google Chrome, and `CHROME=/path/to/binary` overrides both. `build.sh` needs pandoc and python3 with Pillow. The deck needs neither: `deck/pptx.py` writes the OOXML itself.
+`render.sh` needs a Chromium headless shell. It looks in the Playwright browser cache and falls back to Google Chrome, and `CHROME=/path/to/binary` overrides both. `build.sh` needs pandoc, python3 and the `zip` and `unzip` commands; no Python package beyond the standard library, despite what this line used to say about Pillow. The deck needs python3 alone: `deck/pptx.py` writes the OOXML itself.
+
+**The two PDFs are a manual step.** No script makes them. Open the generated `.docx` in Word and the `.pptx` in PowerPoint and export each as PDF, over the file already in this folder. Word will also do it from the command line through automation; PowerPoint on the Windows build machine refuses to open the deck that way, including decks that predate this note, so the deck's PDF is exported by hand.
 
 ## How the Word file is produced
 
