@@ -553,6 +553,7 @@ export {
   type InboundOutcome,
   type InboundRequestFacts,
   LINK_CODE_TTL_SECONDS,
+  memberForChannelIdentity,
   resolveInbound,
   workspaceForProviderTeam,
 } from "./channels/inbound.ts";
