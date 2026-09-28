@@ -269,11 +269,11 @@ The only exceptions are the instance connections that describe the deployment it
 | Setting | Default |
 |---|---|
 | Workspace name and slug | From the registering member's details, editable immediately |
-| Workspace timezone | The registering member's browser timezone, falling back to UTC |
-| Branding | The product's own palette, until a brand colour is chosen |
-| Trusted email domains | None. Joining is by invitation |
+| Workspace timezone (`timezone`) | The registering member's browser timezone, falling back to UTC |
+| Branding (`branding`) | The product's own palette, until a brand colour is chosen |
+| Trusted email domains (`trustedEmailDomains`) | None. Joining is by invitation |
 | Rhythm and thresholds | The METHOD.md §11 canon defaults, stored as an empty override set |
-| Workspace default language | The instance default language |
+| Workspace default language (`language`) | The instance default language |
 | Terminology labels | The canon terms in the workspace default language |
 | Coach strictness | Warn, with the six gates hard |
 | Nudge rules | Every rule in the AI-NATIVE-PLAN.md §6.4 catalogue enabled, on the member's primary channel, with the canon ladder. Workspace quiet mode off |
@@ -285,11 +285,18 @@ The only exceptions are the instance connections that describe the deployment it
 | Spaces | One space named after the workspace, with the first member as its manager, who covers the coordinator's duties until one is named |
 | Export inline row limit | 5000 rows (`exportInlineRowLimit`, in `workspaces.settings`). At or below it a person clicking Export gets a file in the answer; above it the relay builds it and they collect it from their own list. §4.9 asks for the behaviour and names no figure; P5-T15 picked this one |
 | Import row limit | 1000 rows (`importRowLimit`, in `workspaces.settings`). How many rows one wizard run may carry. Each row is its own transaction through the Operation pipeline, so a thousand is already a thousand transactions plus their reference lookups, and it is a run the browser waits for. A file above it is refused with the number rather than truncated. The bound is on the two table actions, `imports.previewTable` and `imports.runTable`, and not on `pnpm import:csv`, which reads a path in a terminal rather than holding a table in a request. IMPLEMENTATION-PLAN asks for a bound and names no figure; P6-T01b-b picked this one |
-| Member primary channel | Email, beside the always-on in-app inbox, until a chat identity is linked |
-| Member quiet hours | 19:00 to 08:00 in the member's own timezone |
-| Member notifications | Mentions immediate, everything else batched in a 30-minute window, daily summary on at 08:00 local |
-| Member daily summary | The row above, stored as `notification_settings.daily_summary` and `daily_summary_time` since P2-T06 and read by the Champion's daily run since P4-T05b. On at 08:00 local rather than off: this row is the default and it outranks AI-NATIVE-PLAN.md §6.4's "everyone opted in", which reads as opt-out in practice. The row is created lazily, so a member who has never opened their settings still gets the summary from the table's own defaults |
-| Member language, theme, density | The workspace default language, system theme, comfortable density |
+| Second factor required | Off (`requireSecondFactor`, in `workspaces.settings`). A policy an organisation chooses. A second factor nobody asked for would lock members out on the day they upgrade |
+| Storage quota | 5 GiB (`storageQuotaBytes`, in `workspaces.settings`). Enough for a small team's files on the local disk driver, small enough that a runaway upload loop is noticed. P2-T05 picked the figure |
+| Orphaned upload age | A day (`orphanBlobMinutes`, in `workspaces.settings`). How old an upload that was prepared and never attached must be before the scheduled reap removes it and its bytes |
+| Channel message log retention | 0, meaning keep forever (`messageLogRetentionDays`, in `workspaces.settings`). Retention is opt-in, and covers the channel message log only: nudge rows and agent run logs are records the product must keep |
+| Chat conversation window | 30 minutes (`chatConversationMinutes`, in `workspaces.settings`). How long a chat check-in waits for its next answer before it closes |
+| Onboarding finished | True (`onboardingDone`, in `workspaces.settings`). Provisioning writes false for a brand-new workspace; any workspace nobody marked has nothing to finish |
+| Demo data | Off (`demoEnabled`, in `workspaces.settings`). Opted into from the wizard, never assumed |
+| Member primary channel (`primaryChannel`) | Email, beside the always-on in-app inbox, until a chat identity is linked |
+| Member quiet hours (`quietHours`) | 19:00 to 08:00 in the member's own timezone |
+| Member notifications (`routing`, `mentionImmediate`, `batchWindowMinutes`) | Mentions immediate, everything else batched in a 30-minute window, daily summary on at 08:00 local |
+| Member daily summary (`dailySummary`, `dailySummaryTime`) | The row above, stored as `notification_settings.daily_summary` and `daily_summary_time` since P2-T06 and read by the Champion's daily run since P4-T05b. On at 08:00 local rather than off: this row is the default and it outranks AI-NATIVE-PLAN.md §6.4's "everyone opted in", which reads as opt-out in practice. The row is created lazily, so a member who has never opened their settings still gets the summary from the table's own defaults |
+| Member language, theme, density (`language`, `theme`, `density`) | The workspace default language, system theme, comfortable density |
 | Member timezone | The browser timezone at first sign-in, falling back to the workspace timezone |
 
 ## 5. Adapter ports
