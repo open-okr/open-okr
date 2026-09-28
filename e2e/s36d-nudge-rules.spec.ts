@@ -95,10 +95,17 @@ test("workspace quiet mode can be turned on and off", async () => {
 
 test("the rule goes back to the canon, leaving the instance as it was", async () => {
   await goTo(page, "/admin/nudges");
-  await page.getByTestId(`toggle-${RULE}`).click();
-  await expect(page.getByTestId(`toggle-${RULE}`)).toHaveText("Turn off", {
-    timeout: 15_000,
-  });
+  const toggle = page.getByTestId(`toggle-${RULE}`);
+  // **Read the switch before pressing it.** Every matcher settles the document
+  // first and an action does not, which `fixtures.ts` sets out: a click
+  // straight after a navigation can land while the App Router still holds two
+  // copies of the list, and this locator then matches both. That is what it
+  // did on 28 September, and this was the one click in the file with no
+  // assertion in front of it. The state is worth asserting anyway, because
+  // the rule being off is this test's precondition rather than its subject.
+  await expect(toggle).toHaveText("Turn on");
+  await toggle.click();
+  await expect(toggle).toHaveText("Turn off", { timeout: 15_000 });
 });
 
 /**
