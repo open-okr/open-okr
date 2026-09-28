@@ -5,6 +5,7 @@ import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
 import { resolveSSOProviders } from "./lib/sso";
 import { installTelemetry } from "./lib/telemetry";
+import { tenantFloor } from "./lib/tenant-floor";
 
 /**
  * Node-only boot checks. Kept out of `instrumentation.ts` so the edge bundle
@@ -157,6 +158,35 @@ export async function resolveAdmission(): Promise<void> {
  * A build worker has the placeholder `DATABASE_URL` and no key ring, so
  * this is skipped during `next build`.
  */
+/**
+ * Says so, loudly, when the database would not enforce the tenant floor
+ * (completeness review H-01).
+ *
+ * Not fatal. An existing install that connects as a superuser must keep
+ * serving through an upgrade, and `/admin` and `/api/health` carry the same
+ * finding for anybody who does not read the log. The Compose target no longer
+ * does this; a Helm install pointed at a superuser URL still can.
+ */
+export async function checkTenantFloor(): Promise<void> {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  try {
+    if ((await tenantFloor()) === "bypassed") {
+      process.stderr.write(
+        "\ndatabase: WARNING. This instance connects as a role that bypasses " +
+          "row-level security (a superuser, or a role with BYPASSRLS). The " +
+          "tenant floor is not enforced. Connect as a role with neither; " +
+          "docs/install explains how.\n\n",
+      );
+    }
+  } catch (error) {
+    process.stderr.write(
+      `database: could not check the tenant floor: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
+}
+
 export async function resolveSSO(): Promise<void> {
   if (process.env.NEXT_PHASE === "phase-production-build") {
     return;

@@ -34,7 +34,9 @@ export {
   type OutboxPayload,
 } from "./outbox.ts";
 export {
+  type EnsureLoginRoleOptions,
   type EnsureRolesOptions,
+  ensureLoginRole,
   ensureRoles,
   type SqlRunner,
 } from "./roles.ts";
@@ -588,6 +590,7 @@ export {
 } from "./soft-delete-lint.ts";
 export {
   INSTANCE_ADMIN_SETTING,
+  SYSTEM_SCAN_SETTING,
   type TenantContext,
   USER_SETTING,
   WORKSPACE_SETTING,
@@ -602,6 +605,7 @@ export {
   withOperator,
   withProviderTeam,
   withSSOLookup,
+  withSystemScan,
   withUser,
   withWorkspace,
 } from "./tenant.ts";

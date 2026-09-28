@@ -5,6 +5,7 @@ import {
   schedulerBootedAt,
   schedulerEnabled,
   schedulerLastRunAt,
+  schedulerState,
 } from "../../../lib/scheduler";
 
 /**
@@ -116,6 +117,9 @@ function checkScheduler(): ComponentStatus {
   // that can be unhealthy. Report operational so the overall status does
   // not degrade for a deliberate choice.
   if (!schedulerEnabled()) return "operational";
+  // A scheduler that could not start is unavailable now, not in two hours
+  // when the heartbeat would have gone stale (completeness review H-02).
+  if (schedulerState() === "failed") return "unavailable";
 
   const lastRun = schedulerLastRunAt();
   const booted = schedulerBootedAt();

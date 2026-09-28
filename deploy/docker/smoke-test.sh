@@ -36,6 +36,15 @@ service_log() {
 app_log() { service_log app; }
 proxy_log() { service_log proxy; }
 
+# One value from the bundled database, asked as its admin role.
+db_query() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -p openokr exec -T db psql -U openokr -d openokr -tAc "$1"
+  else
+    docker-compose -p openokr exec -T db psql -U openokr -d openokr -tAc "$1"
+  fi
+}
+
 cleanup() {
   # Volumes too. "From nothing" has to include the database volume: Postgres
   # sets its password only when it initialises an empty data directory, so a
@@ -87,6 +96,36 @@ pass "inside the 30-minute budget (${elapsed}s)"
 app_log | grep -qE "applied [0-9]+ migration" \
   || fail "migrations did not run on boot"
 pass "migrations ran on boot"
+
+# --- the server runs as a role the tenant floor binds ----------------------
+# Completeness review H-01. The server used to connect as the Postgres image's
+# own role, which is a superuser, so row-level security never applied to the
+# running product and every check here still passed. Asked of the database
+# itself, and of the running server, because either can be wrong alone.
+grep -q '^DATABASE_URL=postgres://openokr_app:' secrets/app.env \
+  || fail "the server does not connect as openokr_app"
+attrs="$(db_query "select rolsuper::text || ',' || rolbypassrls::text from pg_roles where rolname = 'openokr_app'")"
+[ "$attrs" = "false,false" ] \
+  || fail "openokr_app is '$attrs', expected neither superuser nor bypassrls"
+pass "the server's role cannot bypass row-level security"
+
+# --- the scheduler starts under that role ----------------------------------
+# Completeness review H-02. Under a restricted role pg-boss used to fail to
+# create its schema, the scheduler logged one line and the product went
+# quiet while the health check stayed green. The health check says so now.
+health=""
+for _ in $(seq 1 30); do
+  health="$(curl -s "$BASE/api/health" || true)"
+  case "$health" in
+    *'"scheduler":"running"'*) break ;;
+  esac
+  sleep 2
+done
+case "$health" in
+  *'"scheduler":"running"'*'"tenantFloor":"enforced"'*) ;;
+  *) fail "expected a running scheduler and an enforced floor, got: $health" ;;
+esac
+pass "the scheduler is running and the tenant floor is enforced"
 
 # --- an unconfigured instance leads to the wizard --------------------------
 location=$(curl -s -o /dev/null -w '%{redirect_url}' "$BASE/sign-in")

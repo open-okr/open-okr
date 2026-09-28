@@ -14,6 +14,15 @@ export interface PgBossJobQueueOptions {
   readonly connectionString: string;
   /** Schema pg-boss owns. Kept apart from the application's tables. */
   readonly schema?: string;
+  /**
+   * Whether pg-boss issues `CREATE SCHEMA` on first install. Defaults to true.
+   *
+   * The application sets this to false (completeness review H-02). Postgres
+   * checks CREATE on the database before it checks whether the schema exists,
+   * so a restricted role is refused `CREATE SCHEMA IF NOT EXISTS` even when
+   * migration 0099 has already created the schema for it.
+   */
+  readonly createSchema?: boolean;
   readonly onError?: (error: unknown) => void;
 }
 
@@ -26,6 +35,7 @@ export class PgBossJobQueue implements JobQueue {
     this.#boss = new PgBoss({
       connectionString: options.connectionString,
       schema: options.schema ?? "pgboss",
+      createSchema: options.createSchema ?? true,
     });
     this.#boss.on("error", (error) => options.onError?.(error));
   }

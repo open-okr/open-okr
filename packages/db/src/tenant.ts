@@ -204,6 +204,22 @@ const SSO_LOOKUP_SETTING = "app.sso_lookup";
  */
 const DIRECTORY_TOKEN_HASH_SETTING = "app.directory_token_hash";
 
+/**
+ * Opens the list of workspaces for reading, for the scheduler only
+ * (completeness review H-02, migration 0099).
+ *
+ * A scheduled run has no acting member and no workspace yet: listing the
+ * tenants is the one thing it has to do before it can scope anything. Under
+ * the floor that list is empty, so a scheduler running as the restricted
+ * application role started and then found nobody to run for. This reveals the
+ * `workspaces` rows for SELECT and no other table; every run then opens its own
+ * workspace through `withWorkspace` like any request.
+ *
+ * `app.instance_admin` was refused for the same reason `app.sso_lookup` refused
+ * it: it also opens instance-setting writes and the tenant rows.
+ */
+export const SYSTEM_SCAN_SETTING = "app.system_scan";
+
 /** What a transaction is scoped to. At least one of the three is required. */
 export interface TenantContext {
   readonly workspaceId?: string;
@@ -272,6 +288,11 @@ export interface TenantContext {
    * it, and nothing else in the database.
    */
   readonly directoryTokenHash?: string;
+  /**
+   * Opens the `workspaces` rows for reading only, for the scheduler and the
+   * maintenance commands that iterate every tenant (migration 0099).
+   */
+  readonly systemScan?: boolean;
 }
 
 /**
@@ -418,6 +439,20 @@ export async function withInstanceAdmin<
 }
 
 /**
+ * Opens a transaction that can list every workspace, and read nothing else
+ * across tenants. For the scheduler and maintenance commands only.
+ */
+export async function withSystemScan<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { systemScan: true }, fn);
+}
+
+/**
  * Opens a transaction and applies the tenant context transaction-locally.
  *
  * Provisioning needs both settings at once: it inserts into the new workspace
@@ -466,6 +501,7 @@ export async function withContext<
     operatorUserId,
     ssoLookup,
     directoryTokenHash,
+    systemScan,
   } = context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
@@ -533,10 +569,11 @@ export async function withContext<
     operatorUserId === undefined &&
     directoryTokenHash === undefined &&
     !ssoLookup &&
-    !instanceAdmin
+    !instanceAdmin &&
+    !systemScan
   ) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, an invitation token hash, an operator id, a directory token hash, the SSO provider list, or instance admin.",
+      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, an invitation token hash, an operator id, a directory token hash, the SSO provider list, instance admin, or a system scan.",
     );
   }
 
@@ -596,6 +633,11 @@ export async function withContext<
     if (directoryTokenHash !== undefined) {
       await tx.execute(
         sql`select set_config(${DIRECTORY_TOKEN_HASH_SETTING}, ${directoryTokenHash}, true)`,
+      );
+    }
+    if (systemScan) {
+      await tx.execute(
+        sql`select set_config(${SYSTEM_SCAN_SETTING}, 'on', true)`,
       );
     }
     return fn(tx);

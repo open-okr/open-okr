@@ -1,26 +1,30 @@
+/**
+ * The liveness check the container and the chart probe.
+ *
+ * Answers 200 while the database answers, because a probe that failed on a
+ * degraded scheduler would restart a serving instance for something a restart
+ * does not fix. It also says two things a green probe used to hide
+ * (completeness review H-01, H-02): whether the scheduler actually started,
+ * and whether the database enforces the tenant floor for the role this
+ * instance connects as. `/admin` shows the same.
+ */
 import { NextResponse } from "next/server";
 import { getPool } from "../../../lib/auth";
+import { schedulerState } from "../../../lib/scheduler";
+import { tenantFloor } from "../../../lib/tenant-floor";
 
-/**
- * Readiness, for the container health check and the compose dependency graph
- * (P1-T09).
- *
- * It queries the database rather than only answering. A process that is
- * listening but cannot reach Postgres is not ready, and the difference matters
- * to compose: the proxy should not be put in front of an instance that will
- * answer every request with an error.
- *
- * Deliberately says almost nothing. This endpoint is unauthenticated, so a
- * version string or a database error here would be reconnaissance for anyone
- * who can reach the port.
- */
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<NextResponse> {
   try {
     await getPool().query("select 1");
-    return NextResponse.json({ status: "ok" });
   } catch {
     return NextResponse.json({ status: "unavailable" }, { status: 503 });
   }
+  const floor = await tenantFloor().catch(() => "unknown" as const);
+  return NextResponse.json({
+    status: "ok",
+    scheduler: schedulerState(),
+    tenantFloor: floor,
+  });
 }

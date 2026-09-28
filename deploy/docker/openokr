@@ -108,6 +108,7 @@ generate_secrets() {
   chmod 700 "$SECRETS_DIR"
 
   db_password="$(random_password)"
+  app_password="$(random_password)"
 
   umask 077
   cat > "$DB_ENV" <<EOF
@@ -123,7 +124,15 @@ EOF
 # OPENOKR_ENCRYPTION_KEY is the root key for every stored credential. Losing it
 # means losing them: mail passwords, channel credentials and provider keys all
 # become unreadable. Back this file up somewhere other than this server.
-DATABASE_URL=postgres://openokr:$db_password@db:5432/openokr
+#
+# Two database roles. The server connects as openokr_app, which row-level
+# security binds, so one workspace can never read another's rows even if the
+# code forgets to ask. DATABASE_ADMIN_URL is the Postgres image's own role:
+# the migrator uses it to change the schema and create openokr_app, and the
+# server never holds it.
+DATABASE_URL=postgres://openokr_app:$app_password@db:5432/openokr
+DATABASE_ADMIN_URL=postgres://openokr:$db_password@db:5432/openokr
+OPENOKR_APP_ROLE=openokr_app
 BETTER_AUTH_SECRET=$(random_key)
 OPENOKR_ENCRYPTION_KEY=$(random_key)
 BETTER_AUTH_URL=$(public_url)
@@ -131,6 +140,67 @@ EOF
 
   chmod 600 "$APP_ENV" "$DB_ENV"
   log "secrets written to $SECRETS_DIR (mode 600). Back up $APP_ENV."
+}
+
+# Moves an instance created before the split onto the application role
+# (completeness review H-01).
+#
+# Until then every instance connected as the Postgres image's own role, which
+# is a superuser, so row-level security never applied to the running product.
+# An app.env with no DATABASE_ADMIN_URL is one of those. Its existing URL
+# becomes the admin connection, the server gets a new role with its own
+# password, and the migrator creates that role and hands it the privileges on
+# the next start. Nothing in the database moves except the job queue's own
+# tables, which change owner.
+#
+# Only for the bundled database. An install pointed at an external Postgres
+# (`db` is not its host) was configured by hand, and its operator decides its
+# roles; the instance warns at boot and on /admin if that role bypasses the
+# floor.
+adopt_app_role() {
+  [ -f "$APP_ENV" ] || return 0
+  grep -q '^DATABASE_ADMIN_URL=' "$APP_ENV" && return 0
+
+  current_url="$(grep '^DATABASE_URL=' "$APP_ENV" | cut -d= -f2-)"
+  [ -n "$current_url" ] || fail "no DATABASE_URL in $APP_ENV"
+  location="${current_url#*@}"
+  case "$location" in
+    db:*|db/*) ;;
+    *) return 0 ;;
+  esac
+
+  log "moving the server to a database role that row-level security binds"
+  app_password="$(random_password)"
+  cp "$APP_ENV" "$APP_ENV.before-app-role"
+  chmod 600 "$APP_ENV.before-app-role"
+  {
+    grep -v '^DATABASE_URL=\|^DATABASE_ADMIN_URL=\|^OPENOKR_APP_ROLE=' "$APP_ENV"
+    echo "DATABASE_URL=postgres://openokr_app:$app_password@$location"
+    echo "DATABASE_ADMIN_URL=$current_url"
+    echo "OPENOKR_APP_ROLE=openokr_app"
+  } > "$APP_ENV.next"
+  mv "$APP_ENV.next" "$APP_ENV"
+  chmod 600 "$APP_ENV"
+  log "the previous app.env is kept as $APP_ENV.before-app-role"
+}
+
+# Waits until the app container reports healthy, and the proxy is running.
+#
+# `compose up -d` returns as soon as a container is created, not once it is
+# serving. `upgrade` and `rotate-key` used to return at that moment, and the
+# smoke test's next request found nothing listening (completeness review L-01).
+wait_for_health() {
+  log "waiting for the instance to become healthy"
+  waited=0
+  until [ "$(compose ps -q app | xargs -r docker inspect -f '{{.State.Health.Status}}' 2>/dev/null || echo starting)" = "healthy" ]; do
+    waited=$((waited + 3))
+    if [ "$waited" -ge 180 ]; then
+      echo "openokr: the application did not become healthy in 180s." >&2
+      echo "openokr: run './openokr logs' to see why." >&2
+      exit 1
+    fi
+    sleep 3
+  done
 }
 
 # The origin the browser will use. Passkeys are bound to it, and so are the
@@ -256,6 +326,7 @@ decrypt_dump() {
 case "${1:-help}" in
   up)
     generate_secrets
+    adopt_app_role
     reconcile_public_url
     # A bare hostname turns on automatic HTTPS; the default stays plain HTTP.
     if [ -n "${OPENOKR_DOMAIN:-}" ]; then
@@ -264,17 +335,7 @@ case "${1:-help}" in
       log "serving https://$OPENOKR_DOMAIN with an automatic certificate"
     fi
     compose up -d
-    log "waiting for the instance to become healthy"
-    waited=0
-    until [ "$(compose ps -q app | xargs -r docker inspect -f '{{.State.Health.Status}}' 2>/dev/null || echo starting)" = "healthy" ]; do
-      waited=$((waited + 3))
-      if [ "$waited" -ge 180 ]; then
-        echo "openokr: the application did not become healthy in 180s." >&2
-        echo "openokr: run './openokr logs' to see why." >&2
-        exit 1
-      fi
-      sleep 3
-    done
+    wait_for_health
     # The application being healthy is not the same as the instance being
     # reachable: the proxy sits in front of it and can be crash-looping on a
     # bad configuration while the application behind it is perfectly well.
@@ -387,7 +448,9 @@ somewhere else."
     # Migrations run in the entrypoint, so a restart applies them. They are
     # forward-only and take an advisory lock, so this is safe to repeat and
     # safe with more than one replica.
+    adopt_app_role
     compose up -d
+    wait_for_health
     log "upgraded. Migrations ran on boot; './openokr logs' shows what applied."
     ;;
 
@@ -412,6 +475,7 @@ somewhere else."
     chmod 600 "$APP_ENV"
 
     compose up -d
+    wait_for_health
     compose exec -T app node --experimental-strip-types --no-warnings \
       /app/migrator/packages/core/src/bin/rotate-keys.ts
 
@@ -420,6 +484,7 @@ somewhere else."
     mv "$APP_ENV.next" "$APP_ENV"
     chmod 600 "$APP_ENV"
     compose up -d
+    wait_for_health
 
     log "rotated. The previous key is in $APP_ENV.backup; delete it once you are satisfied."
     ;;
@@ -541,8 +606,13 @@ MANIFEST
 
     # Run migrations in case the backup is from an older schema.
     log "running migrations..."
-    compose exec -T app node --experimental-strip-types --no-warnings \
-      /app/migrator/packages/db/src/migrate.ts 2>/dev/null || true
+    # The container's own migrator, not the library behind it: this one also
+    # re-creates the application role's privileges, which a restore with
+    # --no-privileges does not carry (completeness review H-01, L-13). It
+    # fails loudly, because a restored database the server cannot read is
+    # not a restore.
+    compose exec -T -w /app app node --experimental-strip-types --no-warnings \
+      ./migrator/deploy/docker/migrate.ts
 
     log "restore complete from $backup_dir"
     log "verify with: ./openokr status"

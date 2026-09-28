@@ -33,7 +33,8 @@ const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
 try {
   const report = await rotateInstanceSecrets(pool, ring);
   process.stdout.write(
-    `Rotation complete. ${report.examined} secret(s) examined, ` +
+    `Rotation complete. ${report.examined} secret(s) examined ` +
+      `(${report.workspaceSecrets} held by workspaces), ` +
       `${report.rewrapped} re-wrapped, ${report.current} already current.\n`,
   );
   if (report.rewrapped > 0) {

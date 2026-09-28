@@ -45,6 +45,7 @@ import {
   callAction,
   chainWorkspace,
   defaultMetrics,
+  listLiveWorkspaces,
   METRIC,
 } from "@openokr/core";
 import { drafterFor } from "./drafter";
@@ -339,27 +340,14 @@ export async function runScheduledJob(
 /**
  * Every live workspace with its timezone.
  *
- * A raw read, like `pnpm cadence:sweep` and `pnpm audit:verify` before it: a
- * scheduled job has no acting member, so there is no access getter to go
+ * A scheduled job has no acting member, so there is no access getter to go
  * through, and enumerating tenants is the one thing it must do before it can
- * scope anything at all.
+ * scope anything at all. Through the system scan rather than a bare pool
+ * query: under the restricted application role a bare query sees no workspace
+ * (completeness review H-02).
  */
 async function listWorkspaces(): Promise<readonly SchedulableWorkspace[]> {
-  const { rows } = await getPool().query<{
-    id: string;
-    slug: string;
-    timezone: string | null;
-  }>(
-    `select id, slug, settings->>'timezone' as timezone
-       from workspaces
-      where deleted_at is null
-      order by created_at`,
-  );
-  return rows.map((row) => ({
-    id: row.id,
-    slug: row.slug,
-    timezone: row.timezone ?? "UTC",
-  }));
+  return listLiveWorkspaces(getPool());
 }
 
 /**
@@ -410,8 +398,18 @@ async function runOne(
   });
 }
 
+/**
+ * Whether the scheduler is doing its job (completeness review H-02).
+ *
+ * `failed` used to be a log line and nothing else: the health check stayed
+ * green and the status page called the scheduler operational for two hours
+ * after a boot that never started it. Both read this now.
+ */
+export type SchedulerState = "off" | "starting" | "running" | "failed";
+
 const globals = globalThis as typeof globalThis & {
   openokrScheduler?: PgBossJobQueue;
+  openokrSchedulerState?: Exclude<SchedulerState, "off">;
   /** Updated after each successful scheduler sweep (P8-T06c). */
   openokrSchedulerLastRunAt?: number;
   /** Set to `Date.now()` at boot so the status endpoint does not report
@@ -446,6 +444,14 @@ export function schedulerBootedAt(): number | null {
   return globals.openokrSchedulerBootedAt ?? null;
 }
 
+/** The scheduler's state in this process. */
+export function schedulerState(): SchedulerState {
+  if (!schedulerEnabled()) {
+    return "off";
+  }
+  return globals.openokrSchedulerState ?? "starting";
+}
+
 /**
  * Starts the scheduler once per process.
  *
@@ -468,12 +474,17 @@ export function startScheduler(): PgBossJobQueue | null {
 
   const queue = new PgBossJobQueue({
     connectionString: loadEnv().DATABASE_URL,
+    // Migration 0099 creates the schema and the privilege step gives it to
+    // the application role. Asking pg-boss to create it again is what a
+    // restricted role is refused (completeness review H-02).
+    createSchema: false,
     onError(error: unknown) {
       logError(`queue error: ${reason(error)}`);
     },
   });
   globals.openokrScheduler = queue;
   globals.openokrSchedulerBootedAt = Date.now();
+  globals.openokrSchedulerState = "starting";
 
   void (async () => {
     try {
@@ -525,11 +536,13 @@ export function startScheduler(): PgBossJobQueue | null {
           crons.set(run.job, run.cron);
         }
       }
+      globals.openokrSchedulerState = "running";
       log(
         `started, ${crons.size} recurring runs: ` +
           `${[...crons].map(([name, cron]) => `${name} (${cron})`).join(", ")}`,
       );
     } catch (error) {
+      globals.openokrSchedulerState = "failed";
       logError(`could not start: ${reason(error)}`);
     }
   })();

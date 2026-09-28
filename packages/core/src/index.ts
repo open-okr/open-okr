@@ -1115,3 +1115,7 @@ export {
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
 } from "./workspaces/registration.ts";
+export {
+  type LiveWorkspace,
+  listLiveWorkspaces,
+} from "./workspaces/scan.ts";

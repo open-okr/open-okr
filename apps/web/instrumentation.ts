@@ -19,6 +19,7 @@ export async function register(): Promise<void> {
     resolveAdmission,
     resolveAuthPolicy,
     resolveSSO,
+    checkTenantFloor,
   } = await import("./instrumentation.node");
   validateEnvironment();
   // Before the relay and the scheduler, so the work they do from the first
@@ -27,6 +28,7 @@ export async function register(): Promise<void> {
   // Before the relay and the scheduler, because both call actions and an
   // unlimited first minute is the minute a burst arrives in (P8-T06a).
   await resolveAdmission();
+  await checkTenantFloor();
   startOutboxRelay();
   startRecurringWork();
   // Before resolveAuthPolicy, because getAuth() is built once and SSO
