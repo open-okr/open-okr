@@ -11,6 +11,7 @@ import {
 } from "../src/data-change.ts";
 import { backfillMemberTimezone } from "../src/data-changes/0001_backfill_member_timezone.ts";
 import { seedChampionAgent } from "../src/data-changes/0006_seed_champion_agent.ts";
+import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_goal.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -398,5 +399,76 @@ describe("0006: seeding the Champion into workspaces that predate it", () => {
       [workspaceId],
     );
     expect(count.rows[0]?.n).toBe("1");
+  });
+});
+
+describe("0008: recording the goal on blockers that have none", () => {
+  it("takes each blocker's goal from its key result, and leaves one with no key result alone", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+
+    // The shape `sessions.createBlocker` left behind before completeness
+    // review H-10: a key result, and no goal. Raw inserts, because this is a
+    // repair of rows the application wrote wrongly, and the application no
+    // longer writes them that way.
+    const { rows } = await client.query<{
+      workspace_id: string;
+      goal_id: string;
+      key_result_id: string;
+      member_id: string;
+    }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Owner', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe)
+         select gen_random_uuid(), m.workspace_id, 'Keep customers', 'company',
+                'workspace', m.id, m.id,
+                '{"start": "2026-07-01", "end": "2026-09-30"}'::jsonb
+           from m
+         returning id, workspace_id
+       ), k as (
+         insert into key_results (id, workspace_id, goal_id, title, direction,
+                                  indicator_type, baseline_value,
+                                  target_value, current_value)
+         select gen_random_uuid(), g.workspace_id, g.id, 'Retention',
+                'increase', 'lagging', 0, 10, 0
+           from g
+         returning id, goal_id, workspace_id
+       )
+       select k.workspace_id, k.goal_id, k.id as key_result_id, m.id as member_id
+         from k, m`,
+    );
+    const seeded = rows[0];
+    if (!seeded) {
+      throw new Error("seeding failed");
+    }
+
+    await client.query(
+      `insert into blockers (id, workspace_id, key_result_id, type, owner_id,
+                             next_action, opened_at, due_at, source)
+       values (gen_random_uuid(), $1, $2, 'resource', $3, 'Ask', now(), now(), 'session'),
+              (gen_random_uuid(), $1, null, 'resource', $3, 'Ask', now(), now(), 'manual')`,
+      [seeded.workspace_id, seeded.key_result_id, seeded.member_id],
+    );
+
+    const outcomes = await runDataChanges(client, {
+      scripts: [backfillBlockerGoal],
+    });
+    expect(outcomes[0]?.rowsChanged).toBe(1);
+
+    const after = await client.query<{ goal_id: string | null }>(
+      "select goal_id from blockers order by key_result_id nulls last",
+    );
+    expect(after.rows.map((row) => row.goal_id)).toEqual([
+      seeded.goal_id,
+      null,
+    ]);
   });
 });

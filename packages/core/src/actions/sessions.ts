@@ -183,6 +183,89 @@ async function requireSessionAccess(
   return session;
 }
 
+/** The goal a key result belongs to, or null when there is no such row. */
+async function goalOfKeyResult(
+  tx: OperationTx,
+  workspaceId: string,
+  keyResultId: string,
+): Promise<string | null> {
+  const [row] = await tx
+    .select({ goalId: keyResults.goalId })
+    .from(keyResults)
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        eq(keyResults.id, keyResultId),
+      ),
+    )
+    .limit(1);
+  return row?.goalId ?? null;
+}
+
+/**
+ * A blocker, authorised through what it belongs to (completeness review
+ * H-05).
+ *
+ * `sessions.resolveBlocker` and `sessions.reassignBlocker` used to check the
+ * workspace level and then act on a bare id, so anybody with edit rights
+ * anywhere in the workspace could close or take a blocker in a space they
+ * cannot see, given its id. A blocker raised in a session is now authorised
+ * through that session's space, exactly as the session's own writes are, and
+ * one raised elsewhere through its goal. Not-found on refusal, like every
+ * other protected read, so a refused caller learns nothing about the row.
+ */
+async function requireBlockerAccess(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  blockerId: string,
+  requires: number,
+) {
+  const [blocker] = await tx
+    .select()
+    .from(blockers)
+    .where(
+      activeOnly(
+        blockers,
+        eq(blockers.workspaceId, workspaceId),
+        eq(blockers.id, blockerId),
+      ),
+    )
+    .limit(1);
+  if (!blocker) {
+    throw new OperationError("not_found", "No such blocker.");
+  }
+
+  if (blocker.sessionId) {
+    await requireSessionAccess(
+      tx,
+      workspaceId,
+      memberId,
+      blocker.sessionId,
+      requires,
+    );
+    return blocker;
+  }
+
+  const goalId =
+    blocker.goalId ??
+    (blocker.keyResultId
+      ? await goalOfKeyResult(tx, workspaceId, blocker.keyResultId)
+      : null);
+  if (!goalId) {
+    throw new OperationError("not_found", "No such blocker.");
+  }
+  await getAccessScoped(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "goal",
+    resourceId: goalId,
+    requires: requires as never,
+  });
+  return blocker;
+}
+
 /**
  * The space access getter, on the way into a space-scoped read (P6-G19b,
  * P6-G19c).
@@ -1187,8 +1270,19 @@ export const readSession = defineReadAction({
           throw new OperationError("not_found", "No such session.");
         }
 
-        // Verify the caller is a member of the session's space.
+        // Through the access getter first (completeness review H-05), so a
+        // revoked binding or a suspended member is refused by the one
+        // enforcement point every other protected read uses. Then the
+        // stricter rule a session keeps on top: it is a room you are in, not
+        // a page you can look at, so the caller must be in the space as well.
         if (row.spaceId) {
+          await getAccessScoped(tx, {
+            workspaceId: context.workspaceId,
+            memberId: member.id,
+            resourceType: "space",
+            resourceId: row.spaceId,
+            requires: ACCESS_LEVELS.view as never,
+          });
           const [spaceMembership] = await tx
             .select({ memberId: spaceMembers.memberId })
             .from(spaceMembers)
@@ -2011,18 +2105,32 @@ export const createSessionBlocker = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
+      // The key result's goal, recorded on the blocker (completeness review
+      // H-10). The review inbox decides who may see a blocker by its goal and
+      // skips one without, so every blocker this wrote, from a session or
+      // from a chat command, reached nobody's inbox. A key result that is not
+      // in this workspace is refused rather than stored with no goal.
+      const goalId = await goalOfKeyResult(tx, workspaceId, input.keyResultId);
+      if (!goalId) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+
       const now = new Date();
-      // 24-hour clock from §11 cadence.blockerClockHours (default 24).
-      const BLOCKER_CLOCK_HOURS = 24;
-      const dueAt = new Date(
-        now.getTime() + BLOCKER_CLOCK_HOURS * 60 * 60 * 1000,
+      // The clock is the workspace's `cadence.blockerClockHours` (§11), not a
+      // literal 24 (completeness review H-17): a workspace that tuned it got
+      // a board and nudges on one clock and blockers due on another.
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
       );
+      const clockHours = thresholds["cadence.blockerClockHours"];
+      const dueAt = new Date(now.getTime() + clockHours * 60 * 60 * 1000);
 
       const id = crypto.randomUUID();
       await tx.insert(blockers).values({
         id,
         workspaceId,
         keyResultId: input.keyResultId,
+        goalId,
         sessionId: input.sessionId,
         type: input.type,
         description: input.description ?? null,
@@ -2072,21 +2180,13 @@ export const resolveSessionBlocker = defineWriteAction({
         throw new OperationError("not_found", "No such workspace.");
       }
 
-      const [blocker] = await tx
-        .select()
-        .from(blockers)
-        .where(
-          activeOnly(
-            blockers,
-            eq(blockers.workspaceId, workspaceId),
-            eq(blockers.id, input.id),
-          ),
-        )
-        .limit(1);
-
-      if (!blocker) {
-        throw new OperationError("not_found", "No such blocker.");
-      }
+      const blocker = await requireBlockerAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
 
       await tx
         .update(blockers)
@@ -2135,6 +2235,13 @@ export const reassignSessionBlocker = defineWriteAction({
       if (!actor.memberId) {
         throw new OperationError("not_found", "No such workspace.");
       }
+      await requireBlockerAccess(
+        tx,
+        workspaceId,
+        actor.memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
 
       const [owner] = await tx
         .select({ id: workspaceMembers.id, name: workspaceMembers.name })
@@ -2367,6 +2474,35 @@ export const closeSessionCommitments = defineWriteAction({
       const memberId = actor.memberId;
       if (!memberId) {
         throw new OperationError("not_found", "No such workspace.");
+      }
+
+      // Each commitment through its own space (completeness review H-05).
+      // This used to update by bare id at the workspace level, so anybody with
+      // edit rights anywhere could close a commitment in a space they cannot
+      // see. An id that is not there, or not the caller's to close, is
+      // refused rather than counted as closed.
+      for (const item of input.items) {
+        const [commitment] = await tx
+          .select({ spaceId: commitments.spaceId })
+          .from(commitments)
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, workspaceId),
+              eq(commitments.id, item.id),
+            ),
+          )
+          .limit(1);
+        if (!commitment) {
+          throw new OperationError("not_found", "No such commitment.");
+        }
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "space",
+          resourceId: commitment.spaceId,
+          requires: ACCESS_LEVELS.edit as never,
+        });
       }
 
       const now = new Date();

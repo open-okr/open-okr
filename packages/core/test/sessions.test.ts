@@ -1256,3 +1256,227 @@ describe("sessions.digest carries the coordinator's note (P6-G19b)", () => {
     expect(digest?.note).toBe("Hiring is the constraint, not the roadmap.");
   });
 });
+
+/**
+ * Session writes are authorised through what they belong to (completeness
+ * review H-05), and a blocker records its goal (H-10).
+ *
+ * The three writes below used to check the workspace level and then act on a
+ * bare id. A member with edit rights anywhere in the workspace could close or
+ * take a blocker, or close a commitment, in a space they cannot see. The space
+ * here is made private the way a space is: the workspace-wide group loses its
+ * binding on the space's own context, and the space's members keep theirs.
+ */
+describe("session writes in a space the caller cannot see (H-05)", () => {
+  const makeSpacePrivate = async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update access_bindings b set deleted_at = now()
+         from access_contexts c, access_groups g
+        where b.context_id = c.id
+          and b.group_id = g.id
+          and c.workspace_id = $1
+          and c.resource_type = 'space'
+          and c.resource_id = $2
+          and g.kind = 'workspace_standard'`,
+      [workspaceId, spaceId],
+    );
+  };
+
+  /** A workspace member with edit rights, who is not in the space. */
+  const addOutsider = async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into workspace_members (id, workspace_id, user_id, name, status)
+       values (gen_random_uuid(), $1, $2, 'Outsider', 'active')`,
+      [workspaceId, OUTSIDER],
+    );
+  };
+
+  const openBlocker = async (): Promise<string> => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.3);
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.createBlocker",
+      {
+        sessionId,
+        keyResultId,
+        type: "resource",
+        ownerId: facilitatorMemberId,
+        nextAction: "Hire a contractor by Friday",
+      },
+    );
+    return (created as { id: string }).id;
+  };
+
+  it("refuses to resolve a blocker in that space, as not found", async () => {
+    const wb = await workerDb();
+    const blockerId = await openBlocker();
+    await addOutsider();
+    await makeSpacePrivate();
+
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OUTSIDER) },
+        "sessions.resolveBlocker",
+        { id: blockerId },
+      ),
+    ).rejects.toMatchObject({ code: "not_found" });
+
+    const row = await wb.admin.query(
+      "select resolved_at from blockers where id = $1",
+      [blockerId],
+    );
+    expect(row.rows[0]?.resolved_at).toBeNull();
+  });
+
+  it("refuses to hand that blocker to anybody", async () => {
+    const wb = await workerDb();
+    const blockerId = await openBlocker();
+    await addOutsider();
+    await makeSpacePrivate();
+
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OUTSIDER) },
+        "sessions.reassignBlocker",
+        { id: blockerId, ownerId: memberMemberId },
+      ),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("refuses to close a commitment in that space", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await wb.admin.query(
+      `insert into commitments (id, workspace_id, session_id, space_id,
+                                week_start, text, owner_id)
+       values (gen_random_uuid(), $1, $2, $3, current_date, 'Ship it', $4)`,
+      [workspaceId, sessionId, spaceId, facilitatorMemberId],
+    );
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from commitments where session_id = $1",
+      [sessionId],
+    );
+    const commitmentId = rows[0]?.id as string;
+    await addOutsider();
+    await makeSpacePrivate();
+
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OUTSIDER) },
+        "sessions.closeCommitments",
+        { items: [{ id: commitmentId, delivered: true }] },
+      ),
+    ).rejects.toMatchObject({ code: "not_found" });
+
+    const after = await wb.admin.query(
+      "select closed_at from commitments where id = $1",
+      [commitmentId],
+    );
+    expect(after.rows[0]?.closed_at).toBeNull();
+  });
+
+  it("still lets a member of the space resolve it", async () => {
+    const wb = await workerDb();
+    const blockerId = await openBlocker();
+    await makeSpacePrivate();
+
+    await callAction(
+      { pool: wb.appPool, ...context(MEMBER) },
+      "sessions.resolveBlocker",
+      { id: blockerId },
+    );
+    const row = await wb.admin.query(
+      "select resolved_at from blockers where id = $1",
+      [blockerId],
+    );
+    expect(row.rows[0]?.resolved_at).not.toBeNull();
+  });
+
+  it("refuses to close a commitment that does not exist, rather than counting it", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "sessions.closeCommitments",
+        {
+          items: [
+            { id: "00000000-0000-4000-8000-000000000000", delivered: true },
+          ],
+        },
+      ),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
+describe("a blocker raised in a session reaches its owner (H-10)", () => {
+  it("records the key result's goal", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.3);
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.createBlocker",
+      {
+        sessionId,
+        keyResultId,
+        type: "clarity",
+        ownerId: memberMemberId,
+        nextAction: "Agree the definition",
+      },
+    );
+    const row = await wb.admin.query(
+      "select goal_id from blockers where id = $1",
+      [(created as { id: string }).id],
+    );
+    expect(row.rows[0]?.goal_id).toBe(goalId);
+  });
+
+  it("appears in the owner's review inbox", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.3);
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.createBlocker",
+      {
+        sessionId,
+        keyResultId,
+        type: "clarity",
+        ownerId: memberMemberId,
+        nextAction: "Agree the definition",
+      },
+    );
+    const inbox = await callAction(
+      { pool: wb.appPool, ...context(MEMBER) },
+      "review.inbox",
+      {},
+    );
+    expect(inbox.obligations.map((obligation) => obligation.id)).toContain(
+      `blocker:${(created as { id: string }).id}`,
+    );
+  });
+
+  it("refuses a key result that is not in the workspace", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.3);
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.createBlocker", {
+        sessionId,
+        keyResultId: "00000000-0000-4000-8000-000000000000",
+        type: "clarity",
+        ownerId: memberMemberId,
+        nextAction: "Agree the definition",
+      }),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+});
