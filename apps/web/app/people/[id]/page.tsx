@@ -85,6 +85,13 @@ export default async function MemberProfilePage({
   );
   const isAdmin = level >= ACCESS_LEVELS.full;
   const isSelf = id === workspace.memberId;
+  // Whether the member on this page is an administrator, for the handover
+  // control (completeness review H-14). Only read for somebody who could act
+  // on the answer.
+  const targetIsAdmin = isAdmin
+    ? (await resolveAccessLevelFor(workspace.workspaceId, id)) >=
+      ACCESS_LEVELS.full
+    : false;
 
   // Load additional data in parallel.
   const [goals, directory, possibleManagers] = await Promise.all([
@@ -370,6 +377,7 @@ export default async function MemberProfilePage({
           status={member.status}
           kind={member.kind}
           isSelf={isSelf}
+          isAdministrator={targetIsAdmin}
         />
       ) : null}
 

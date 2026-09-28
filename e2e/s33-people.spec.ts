@@ -149,6 +149,23 @@ test("suspending the only owner is refused by name", async () => {
   await expect(page.getByText("Suspended", { exact: true })).toHaveCount(0);
 });
 
+test("the only administrator cannot step down, and is told why", async () => {
+  // Completeness review H-14: the handover control, on the one profile where
+  // its refusal can fire. With a second administrator it would succeed.
+  page.once("dialog", (dialog) => {
+    void dialog.accept();
+  });
+  await page.getByRole("button", { name: "Remove as administrator" }).click();
+  await expect(
+    page
+      .getByText("This is the only member with full access to the workspace.")
+      .last(),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByRole("button", { name: "Remove as administrator" }),
+  ).toBeVisible();
+});
+
 test("erasure asks for the name typed, and a wrong one erases nothing", async () => {
   await page.getByRole("button", { name: "Erase this member" }).click();
   await page.getByLabel(`Type ${INSTANCE_ACCOUNT.name} to confirm`).fill("not the name");

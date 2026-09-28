@@ -45,6 +45,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
   "member.restored": (p) => `${asString(p.name, "A member")} was restored`,
+  "member.administrator_set": (p) =>
+    p.administrator === true
+      ? `${asString(p.name, "A member")} became an administrator`
+      : `${asString(p.name, "A member")} is no longer an administrator`,
   "member.converted_to_guest": (p) =>
     `${asString(p.name, "A member")} was converted to a guest`,
   "member.erased": (p) => `${asString(p.name, "A member")}'s data was erased`,

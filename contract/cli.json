@@ -255,6 +255,29 @@
       "pages": false
     },
     {
+      "name": "people setAdministrator",
+      "action": "people.setAdministrator",
+      "method": "POST",
+      "path": "/people/setAdministrator",
+      "scope": "write",
+      "summary": "Makes a member an administrator with full access to the workspace, or returns them to the standard level.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "administrator",
+          "field": "administrator",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "people suspend",
       "action": "people.suspend",
       "method": "POST",

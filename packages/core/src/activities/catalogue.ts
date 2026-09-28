@@ -73,6 +73,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "member.updated": z.object({ name: z.string() }),
   "member.suspended": z.object({ name: z.string() }),
   "member.restored": z.object({ name: z.string() }),
+  // Full access granted or returned to standard (completeness review H-14).
+  "member.administrator_set": z.object({
+    name: z.string(),
+    administrator: z.boolean(),
+  }),
   "member.converted_to_guest": z.object({ name: z.string() }),
   "member.erased": z.object({ name: z.string() }),
   /**

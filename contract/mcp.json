@@ -398,6 +398,37 @@
       }
     },
     {
+      "name": "people.setAdministrator",
+      "description": "Makes a member an administrator with full access to the workspace, or returns them to the standard level.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "administrator": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "memberId",
+          "administrator"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "memberId": "00000000-0000-4000-8000-000000000000",
+        "administrator": false
+      }
+    },
+    {
       "name": "people.suspend",
       "description": "Suspend a member, removing every access they had.",
       "inputSchema": {
