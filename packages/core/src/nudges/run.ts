@@ -115,6 +115,8 @@ export interface NudgeRunInput {
    * queue an administrator runs by hand does not.
    */
   readonly scope?: AgentScope;
+  /** The instance's address, for the links in what it sends (H-12). */
+  readonly baseUrl?: string;
 }
 
 export interface NudgeRunResult {
@@ -449,7 +451,11 @@ export async function runDueNudgesInTx(
   // window (P5-T01b-b). One pass, so a deferred nudge and a fresh one take the
   // same path, and the inbox row is written where the channel is chosen rather
   // than in two places that could disagree about what was sent.
-  const delivery = await deliverDueNudges(tx, { workspaceId, now: at });
+  const delivery = await deliverDueNudges(tx, {
+    workspaceId,
+    now: at,
+    ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+  });
 
   const sent = ids.filter((written) => written.sent).length;
   return {

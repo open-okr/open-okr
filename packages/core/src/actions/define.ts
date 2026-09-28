@@ -92,6 +92,12 @@ export interface ActionCallContext {
    */
   readonly drafter?: AgentDrafter;
   /**
+   * The instance's own address, for the links inside a message an action
+   * sends (completeness review H-12). The scheduler and the web host pass it;
+   * absent, a message goes without its links rather than not at all.
+   */
+  readonly baseUrl?: string;
+  /**
    * How to turn text into a vector, when the host has a provider that can
    * (P4-T14a-a).
    *

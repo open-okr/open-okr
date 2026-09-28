@@ -373,6 +373,10 @@ async function runOne(
     // and an action that does not use it does not notice it.
     storage: getStorage(),
     ...(drafter ? { drafter } : {}),
+    // The links inside what the agents send (completeness review H-12).
+    ...(loadEnv().BETTER_AUTH_URL
+      ? { baseUrl: loadEnv().BETTER_AUTH_URL }
+      : {}),
   };
   if (run.action === "notifications.drainBatches") {
     await callAction(context, "notifications.drainBatches", {});

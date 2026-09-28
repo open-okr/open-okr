@@ -999,6 +999,8 @@ export const runChampion = defineWriteAction({
         // Absent unless the host has a provider, which is the normal case and
         // is what makes every assertion in the deterministic suites true.
         ...(_context.drafter ? { drafter: _context.drafter } : {}),
+        // Links in the messages it sends, when the host knows its address.
+        ...(_context.baseUrl ? { baseUrl: _context.baseUrl } : {}),
       });
 
       // One entry per rule, because a log that said "3 nudges" could not
@@ -1192,6 +1194,8 @@ export const runCoach = defineWriteAction({
         scope: { memberId: loaded.memberId },
         sandbox: loaded.sandbox,
         ...(_context.drafter ? { drafter: _context.drafter } : {}),
+        // Links in the messages it sends, when the host knows its address.
+        ...(_context.baseUrl ? { baseUrl: _context.baseUrl } : {}),
       });
 
       for (const [index, ruleKey] of run.ruleKeys.entries()) {
