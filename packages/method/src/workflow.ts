@@ -176,7 +176,7 @@ export interface CycleWorkflowInput {
   readonly focusKeyResultCount: number;
   readonly hasCapacityNotes: boolean;
   readonly frame: FrameSnapshot | null;
-  /** Undefined until P3-T04 ships goals and key results. */
+  /** The cycle's goals and key results. Undefined when not read. */
   readonly goals?: readonly GoalSnapshot[];
   /**
    * The initiatives serving this cycle's key results. Undefined until P5-T10a
@@ -189,7 +189,10 @@ export interface CycleWorkflowInput {
    * §5.5.
    */
   readonly initiatives?: readonly InitiativeSnapshot[];
-  /** Undefined until P4-T01 ships the quality engine. */
+  /**
+   * An answer for phase 4 and gate 2 from a caller that has already judged
+   * the set. Left undefined, both judge the goal snapshots themselves.
+   */
   readonly qualityChecksPass?: boolean;
   /**
    * The §7.1 rhythm as booked, and the decision log. Undefined means nobody
@@ -201,9 +204,9 @@ export interface CycleWorkflowInput {
     /** What is not booked, per space, as `cadenceCoverage` words it. */
     readonly gaps?: readonly string[];
   };
-  /** Undefined until P3-T04 ships key result scores. */
+  /** Every key result in the cycle has its score. Undefined when not read. */
   readonly allKeyResultsScored?: boolean;
-  /** Undefined until P4-T08 ships the cycle retrospective. */
+  /** The quarterly review's retro holds a note. Undefined when not read. */
   readonly retrospectiveWritten?: boolean;
 }
 

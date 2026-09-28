@@ -24,6 +24,7 @@ let spaceName: string;
 let ownerMemberId: string;
 let secondMemberId: string;
 let cycleId: string;
+let goalId: string;
 
 const context = () => ({
   workspaceId,
@@ -96,16 +97,18 @@ beforeEach(async () => {
       id: string;
     }
   ).id;
-  await call("goals.create", {
-    title: "Make onboarding the reason new customers stay",
-    cycleId,
-    spaceId,
-    level: "team",
-    ownerKind: "space",
-    championId: ownerMemberId,
-    reviewerId: secondMemberId,
-    weight: 1,
-  });
+  goalId = (
+    (await call("goals.create", {
+      title: "Make onboarding the reason new customers stay",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: ownerMemberId,
+      reviewerId: secondMemberId,
+      weight: 1,
+    })) as { id: string }
+  ).id;
 });
 
 afterAll(async () => {
@@ -279,5 +282,72 @@ describe("phase 6 reads the booking", () => {
     });
     const six = await phaseSix();
     expect(six?.missing).toEqual(["No decision has been recorded"]);
+  });
+});
+
+/**
+ * Phase 7 reads the scores and the retro (completeness review H-09). Neither
+ * input was ever supplied, so the last phase of every cycle stayed blocked.
+ */
+describe("phase 7 reads the scores and the retro", () => {
+  const phaseSeven = async () => {
+    const read = (await call("workflow.read", { cycleId })) as {
+      phases: Array<{
+        phase: number;
+        state: string;
+        missing: string[];
+        blocked: string[];
+      }>;
+    };
+    return read.phases.find((phase) => phase.phase === 7);
+  };
+
+  it("names both conditions until the key results are scored and the retro is held", async () => {
+    const keyResult = (await call("goals.addKeyResult", {
+      goalId,
+      title: "Raise activation from 41% to 60%",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 41,
+      targetValue: 60,
+      weight: 1,
+    })) as { id: string };
+
+    const before = await phaseSeven();
+    expect(before?.blocked).toEqual([]);
+    expect(before?.missing).toEqual([
+      "Not every key result is scored",
+      "The retrospective is not written",
+    ]);
+
+    // The quarterly review writes a score back when it closes; the close is
+    // covered by the review suites, and this reads the column it writes.
+    const wb = await workerDb();
+    await wb.admin.query("update key_results set score = 0.7 where id = $1", [
+      keyResult.id,
+    ]);
+    const review = (await call("sessions.create", {
+      spaceId,
+      cycleId,
+      kind: "quarterly",
+      title: "Quarterly review",
+      scheduledFor: "2030-03-28T10:00",
+      facilitatorId: ownerMemberId,
+    })) as { id: string };
+    await call("sessions.addRetroNote", {
+      sessionId: review.id,
+      columnKey: "worked",
+      text: "Booking the whole quarter up front kept the rhythm",
+    });
+
+    const after = await phaseSeven();
+    expect(after?.state).toBe("pass");
+    expect(after?.missing).toEqual([]);
+  });
+
+  it("does not call a cycle with no key results scored", async () => {
+    expect((await phaseSeven())?.missing).toContain(
+      "Not every key result is scored",
+    );
   });
 });

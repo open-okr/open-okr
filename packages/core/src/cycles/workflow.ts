@@ -33,6 +33,8 @@ import {
   keyResultDependencies,
   keyResults,
   newId,
+  okrSessions,
+  retroNotes,
   type WorkspaceTx,
 } from "@openokr/db";
 import {
@@ -47,7 +49,17 @@ import {
   publishGates,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  or,
+} from "drizzle-orm";
 import { loadCycleCadence } from "../sessions/booking.ts";
 import { workspaceTimeZone } from "./service.ts";
 
@@ -64,10 +76,11 @@ export interface WorkflowSnapshot {
 /**
  * Everything the workflow reads, in one pass over the cycle's children.
  *
- * The quality engine and the cycle retrospective are left `undefined` rather
- * than defaulted, because `packages/method` treats "no rows" and "not read" as
- * different facts and only one of them lets a gate pass. Goals stopped being
- * one of them at P3-T04, and the booked cadence at H-08.
+ * Every input is read here since the completeness review (H-08, H-09): the
+ * booked cadence, the scores and the retrospective. `packages/method` still
+ * treats "no rows" and "not read" as different facts, so a field left
+ * `undefined` by a caller reports its phase as unanswered rather than passed.
+ * Phase 4 judges the goal snapshots itself, so it needs no field of its own.
  */
 export async function loadWorkflowInput<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -238,6 +251,9 @@ export async function loadWorkflowInput<
     frame,
     goals: await loadGoalSnapshots(tx, workspaceId, cycleId),
     initiatives: await loadInitiativeSnapshots(tx, workspaceId, cycleId),
+    // Phase 7: every key result scored, and the retrospective written
+    // (completeness review H-09).
+    ...(await loadReviewAndLearn(tx, workspaceId, cycle)),
     // Phase 6: the §7.1 rhythm booked for the whole cycle, and at least one
     // decision recorded (completeness review H-08).
     cadence: await loadCycleCadence(
@@ -246,6 +262,73 @@ export async function loadWorkflowInput<
       { id: cycleId, startsOn: cycle.startsOn, endsOn: cycle.endsOn },
       await workspaceTimeZone(tx, workspaceId),
     ),
+  };
+}
+
+/**
+ * Phase 7's two conditions (METHOD.md §2.3: "Every key result scored and the
+ * retrospective written"; completeness review H-09).
+ *
+ * **Scored** means `key_results.score` is set, which the quarterly review
+ * writes back when it closes (P4-T10b-a). A cycle with no key results has
+ * nothing scored, not everything.
+ *
+ * **The retrospective** is §8.1 stage five, the team retro, held in a
+ * quarterly review of this cycle: one note in either column is a retro that
+ * happened. A review booked before sessions carried a cycle counts when it
+ * falls inside the cycle or the week after its close, the same reading
+ * `sessions/booking.ts` gives "at cycle close".
+ */
+async function loadReviewAndLearn<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  cycle: Pick<Cycle, "id" | "startsOn" | "endsOn">,
+): Promise<{ allKeyResultsScored: boolean; retrospectiveWritten: boolean }> {
+  const [tally] = await tx
+    .select({ total: count(), scored: count(keyResults.score) })
+    .from(keyResults)
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        eq(goals.cycleId, cycle.id),
+        isNull(goals.deletedAt),
+      ),
+    );
+  const total = Number(tally?.total ?? 0);
+
+  const earliest = new Date(`${cycle.startsOn}T00:00:00Z`);
+  earliest.setUTCDate(earliest.getUTCDate() - 1);
+  const latest = new Date(`${cycle.endsOn}T00:00:00Z`);
+  latest.setUTCDate(latest.getUTCDate() + 9);
+  const [note] = await tx
+    .select({ id: retroNotes.id })
+    .from(retroNotes)
+    .innerJoin(okrSessions, eq(okrSessions.id, retroNotes.sessionId))
+    .where(
+      activeOnly(
+        retroNotes,
+        eq(retroNotes.workspaceId, workspaceId),
+        isNull(okrSessions.deletedAt),
+        eq(okrSessions.kind, "quarterly"),
+        or(
+          eq(okrSessions.cycleId, cycle.id),
+          and(
+            isNull(okrSessions.cycleId),
+            gte(okrSessions.scheduledFor, earliest),
+            lte(okrSessions.scheduledFor, latest),
+          ),
+        ),
+      ),
+    )
+    .limit(1);
+
+  return {
+    allKeyResultsScored: total > 0 && Number(tally?.scored ?? 0) === total,
+    retrospectiveWritten: Boolean(note),
   };
 }
 
