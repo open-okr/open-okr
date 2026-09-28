@@ -212,7 +212,7 @@ The loop this repository is built for:
 4. The agent builds feature by feature, one task at a time.
 5. Every task meets the Definition of Done in CLAUDE.md before it merges.
 
-Throughput is planned, not assumed: one human reviewer plus the agent, sustaining **3 to 5 merged tasks per week**, where large tasks count double, with parallel worktrees allowed for independent slices. At 105 tasks that is a realistic **7 to 10 months** to the end of Phase 7. If reality diverges by more than half over a month, re-baseline the plan rather than slipping quietly.
+Throughput is planned, not assumed: one human reviewer plus the agent, sustaining **3 to 5 merged tasks per week**, where large tasks count double, with parallel worktrees allowed for independent slices. At the 105 tasks this was written against that is a realistic **7 to 10 months** to the end of Phase 7. The plan ended up at 200 tasks, because a task that will not fit one session is split before anybody starts it, and all eight phases were delivered between August and September 2026. If reality diverges by more than half over a month, re-baseline the plan rather than slipping quietly.
 
 ## 12. Risk register
 

@@ -22,7 +22,7 @@ Two rules keep this safe:
 
 The plan lives in `docs/development-plan/`. `CLAUDE.md` at the repository root is loaded automatically. Before the first task:
 
-1. Check that STATUS.md is present with all 105 tasks set to `todo`.
+1. Check that STATUS.md is present with every task set to `todo`. It held 105 rows at bootstrap and holds 200 now, because a task that will not fit one session is split before anybody starts it.
 2. Open Claude Code at the repository root and paste the bootstrap prompt from PROMPT.md §1.
 3. Fix any real contradiction it finds by editing the documents and committing. When the reply is clean, start `P1-T01`.
 

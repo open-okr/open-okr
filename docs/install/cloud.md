@@ -3,6 +3,12 @@
 For a team that does not want to run anything. Sign up, name a workspace,
 start.
 
+> **No managed cloud is operating yet**, and there is no address to sign up
+> at. The tenant provisioning, the operator console and the plan model are
+> built and tested, and this page describes what they do. Until a vendor runs
+> an instance, [one server](compose.md) or [Kubernetes](kubernetes.md) are the
+> two ways to use OpenOKR.
+
 ## What you get
 
 The same release that a self-hosted instance runs. **Nothing is feature-gated
