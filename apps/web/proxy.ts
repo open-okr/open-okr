@@ -194,6 +194,18 @@ function formActionFor(request: NextRequest): string {
   }
 }
 
+/**
+ * The policy every page is served under.
+ *
+ * **`style-src-attr 'unsafe-inline'`, in production too** (completeness
+ * review H-15). A progress bar's width is an inline `style` attribute, and
+ * `style-src` with a nonce and no `unsafe-inline` refuses every attribute,
+ * because an attribute cannot carry a nonce. So on every server-rendered page
+ * a bar at 0% drew at 100%: the browser dropped the width and the element
+ * filled its track. Development allowed `unsafe-inline` for the bundler, which
+ * is why nobody saw it. This allows attributes only; a `<style>` element still
+ * needs the nonce, and an attribute has no selectors to read a page with.
+ */
 function buildContentSecurityPolicy(request?: NextRequest): {
   nonce: string;
   header: string;
@@ -206,6 +218,7 @@ function buildContentSecurityPolicy(request?: NextRequest): {
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""};
     style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    style-src-attr 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
     object-src 'none';
