@@ -36,6 +36,7 @@ import {
   trigger,
 } from "@openokr/method";
 import { and, eq, isNull } from "drizzle-orm";
+import { type AgentScope, agentSeesGoal } from "../agents/scope.ts";
 import { OperationError } from "../operations/errors.ts";
 import { evaluateGoalInTx } from "../quality/service.ts";
 import { resolveManagers } from "../spaces/roles.ts";
@@ -131,6 +132,11 @@ export async function dueQualityNudges(
   input: {
     readonly workspaceId: string;
     readonly thresholds: ResolvedThresholds;
+    /**
+     * The agent this reads as, when it is an agent's run (completeness review
+     * H-04). Absent reads everything, which is what a person's own run does.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<readonly DueNudge[]> {
   const open = await tx
@@ -145,6 +151,7 @@ export async function dueQualityNudges(
         goals,
         eq(goals.workspaceId, input.workspaceId),
         isNull(goals.closedAt),
+        input.scope ? agentSeesGoal(input.scope) : undefined,
       ),
     );
 

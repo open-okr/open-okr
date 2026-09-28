@@ -12,6 +12,7 @@ import {
 import { backfillMemberTimezone } from "../src/data-changes/0001_backfill_member_timezone.ts";
 import { seedChampionAgent } from "../src/data-changes/0006_seed_champion_agent.ts";
 import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_goal.ts";
+import { bindAgentsToSpacelessItems } from "../src/data-changes/0009_bind_agents_to_spaceless_items.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -470,5 +471,121 @@ describe("0008: recording the goal on blockers that have none", () => {
       seeded.goal_id,
       null,
     ]);
+  });
+});
+
+describe("0009: binding the built-in agents to what belongs to no space", () => {
+  it("binds both agents to a company goal and a workspace KPI, gives the KPI a context, and leaves space items alone", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+
+    // A workspace as it stood before completeness review H-04: two agents
+    // bound to their space, a company goal with its own context and no agent
+    // binding, a workspace KPI with no context at all, and a space KPI.
+    const { rows } = await client.query<{
+      workspace_id: string;
+      goal_context: string;
+      kpi_id: string;
+      space_kpi_id: string;
+    }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), s as (
+         insert into spaces (id, workspace_id, name)
+         select gen_random_uuid(), w.id, 'Product' from w returning id, workspace_id
+       ), owner as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Owner', 'human', 'active' from w
+         returning id, workspace_id
+       ), champion as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'OKR Champion', 'agent', 'active' from w
+         returning id, workspace_id
+       ), coach as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'OKR Coach', 'agent', 'active' from w
+         returning id, workspace_id
+       ), agents_in as (
+         insert into agents (id, workspace_id, member_id, name, kind)
+         select gen_random_uuid(), champion.workspace_id, champion.id, 'OKR Champion', 'champion' from champion
+         union all
+         select gen_random_uuid(), coach.workspace_id, coach.id, 'OKR Coach', 'coach' from coach
+         returning id
+       ), groups_in as (
+         insert into access_groups (id, workspace_id, kind, member_id)
+         select gen_random_uuid(), champion.workspace_id, 'member', champion.id from champion
+         union all
+         select gen_random_uuid(), coach.workspace_id, 'member', coach.id from coach
+         returning id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe)
+         select gen_random_uuid(), owner.workspace_id, 'Keep customers',
+                'company', 'workspace', owner.id, owner.id,
+                '{"start": "2026-07-01", "end": "2026-09-30"}'::jsonb
+           from owner
+         returning id, workspace_id
+       ), gc as (
+         insert into access_contexts (id, workspace_id, resource_type, resource_id)
+         select gen_random_uuid(), g.workspace_id, 'goal', g.id from g
+         returning id
+       ), k as (
+         insert into kpis (id, workspace_id, short_id, title, frequency)
+         select gen_random_uuid(), w.id, 'K-1', 'Net revenue retention', 'monthly' from w
+         returning id
+       ), sk as (
+         insert into kpis (id, workspace_id, short_id, title, frequency, owner_kind, space_id)
+         select gen_random_uuid(), s.workspace_id, 'K-2', 'Activation', 'weekly', 'space', s.id from s
+         returning id
+       )
+       select w.id as workspace_id, gc.id as goal_context,
+              k.id as kpi_id, sk.id as space_kpi_id
+         from w, gc, k, sk, (select count(*) from agents_in) a, (select count(*) from groups_in) gr`,
+    );
+    const seeded = rows[0];
+    if (!seeded) {
+      throw new Error("seeding failed");
+    }
+
+    const outcomes = await runDataChanges(client, {
+      scripts: [bindAgentsToSpacelessItems],
+    });
+    // Two agents times a goal and a KPI.
+    expect(outcomes[0]?.rowsChanged).toBe(4);
+
+    const contexts = await client.query<{ resource_id: string }>(
+      "select resource_id from access_contexts where resource_type = 'kpi'",
+    );
+    expect(contexts.rows.map((row) => row.resource_id)).toEqual([
+      seeded.kpi_id,
+    ]);
+
+    const bindings = await client.query<{
+      member_name: string;
+      resource_type: string;
+    }>(
+      `select m.name as member_name, c.resource_type
+         from access_bindings b
+         join access_groups g on g.id = b.group_id
+         join workspace_members m on m.id = g.member_id
+         join access_contexts c on c.id = b.context_id
+        order by m.name, c.resource_type`,
+    );
+    expect(bindings.rows).toEqual([
+      { member_name: "OKR Champion", resource_type: "goal" },
+      { member_name: "OKR Champion", resource_type: "kpi" },
+      { member_name: "OKR Coach", resource_type: "goal" },
+      { member_name: "OKR Coach", resource_type: "kpi" },
+    ]);
+
+    // A second run of the ledger does nothing; a fresh run of the script,
+    // as after a restore, binds nothing new either.
+    await client.query("delete from _data_changes");
+    const again = await runDataChanges(client, {
+      scripts: [bindAgentsToSpacelessItems],
+    });
+    expect(again[0]?.rowsChanged).toBe(0);
   });
 });

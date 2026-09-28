@@ -133,6 +133,8 @@ Unique on `(workspace_id, user_id)` for live rows, so one person has at most one
 ### access_contexts
 `resource_type`, `resource_id`. One live row per protected aggregate, unique on `(workspace_id, resource_type, resource_id)`. Created inside the same Operation that creates the resource, via `ensureContext` in `packages/core/src/access/contexts.ts`.
 
+**What the built-in agents are bound to (completeness review H-04).** The Champion and the Coach hold view bindings through their own member groups and never a workspace-wide one. Their readers now honour those bindings (`packages/core/src/agents/scope.ts`), so each is bound to every space as it is created, and to every goal and KPI that belongs to no space, by name, as it is created (`bindAgentsToContextInTx`). A KPI that belongs to no space owns a `kpi` context for exactly this, which no KPI had before. Data change 0009 binds the ones that existed first.
+
 ### access_groups
 `kind` (`member` / `workspace_standard` / `space_standard` / `anonymous`), `member_id?`, `space_id?`. A check constraint pins each kind to the column that scopes it: `member` carries `member_id` and no `space_id`, `space_standard` carries `space_id` and no `member_id`, and `workspace_standard` and `anonymous` carry neither. Partial unique indexes give a workspace exactly one live `workspace_standard` group and one live `anonymous` group, a member exactly one live group of their own, and a space exactly one live group of its own. `space_id` carries no foreign key: spaces are P3-T01.
 

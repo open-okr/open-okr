@@ -25,10 +25,15 @@
  *   nobody can sign into is not a demo account. It is stated here, in the
  *   documentation and on the sign-in page, so nobody mistakes it for a secret
  *   that leaked.
- * - **The agents go to sandbox, not to propose.** AI-NATIVE-PLAN's sandbox
- *   commits nothing at all, which is what a public instance strangers can
- *   press buttons on needs. A visitor still sees the runs, the nudges and the
- *   review queue, because those are recorded either way.
+ * - **The agents go to sandbox, not to propose, after one real run each.**
+ *   AI-NATIVE-PLAN's sandbox commits nothing at all, which is what a public
+ *   instance strangers can press buttons on needs. So the Coach and the
+ *   Champion run once first, in the autonomy they were seeded with, and the
+ *   nudges and proposals a visitor sees are ones the product produced. Then
+ *   both go to sandbox, and every run after that is recorded as simulated
+ *   and commits nothing. This used to sandbox first and run second, which
+ *   produced nudges only because the agents ignored sandbox (completeness
+ *   review H-04).
  */
 import { activeOnly, withWorkspace, workspaceMembers } from "@openokr/db";
 import { eq, isNull } from "drizzle-orm";
@@ -124,8 +129,8 @@ type Context = {
  * Prepares the workspace, or refuses it.
  *
  * Idempotent in every part: an account that exists is reused, an agent already
- * in sandbox is set to sandbox again, and the two runs deduplicate their own
- * nudges the way they do on any other day.
+ * in sandbox runs as simulated and is set to sandbox again, and the nudges the
+ * first preparation wrote stay where they are.
  */
 export async function prepareDemoPersonas(
   input: PrepareDemoPersonasInput,
@@ -178,9 +183,11 @@ export async function prepareDemoPersonas(
     });
   }
 
-  const agentsSandboxed = await sandboxEveryAgent(context);
+  // One real run each before sandbox: a sandboxed run commits nothing, so
+  // the nudges on screen have to come from a run that does.
   const { coachNudges, championNudges, ruleKeys } =
     await runBothAgents(context);
+  const agentsSandboxed = await sandboxEveryAgent(context);
 
   return {
     personas,
@@ -371,9 +378,9 @@ async function attachAccount(
  * Both agent members to sandbox.
  *
  * Sandbox commits nothing at all, which is the only autonomy a public instance
- * strangers can press buttons on should run. The runs, the nudges and the
- * review queue are all still recorded, so what a visitor sees is the product
- * working rather than the product switched off.
+ * strangers can press buttons on should run. Done after the first runs, so
+ * what a visitor sees is the product working rather than the product switched
+ * off, and every run after it is recorded as simulated.
  */
 async function sandboxEveryAgent(context: Context): Promise<number> {
   const agents = await callAction(context, "agents.list", {});

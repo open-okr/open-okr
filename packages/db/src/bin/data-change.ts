@@ -18,6 +18,7 @@ import { backfillCheckInReviewer } from "../data-changes/0005_backfill_check_in_
 import { seedChampionAgent } from "../data-changes/0006_seed_champion_agent.ts";
 import { seedCoachAgent } from "../data-changes/0007_seed_coach_agent.ts";
 import { backfillBlockerGoal } from "../data-changes/0008_backfill_blocker_goal.ts";
+import { bindAgentsToSpacelessItems } from "../data-changes/0009_bind_agents_to_spaceless_items.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -35,6 +36,7 @@ try {
       seedChampionAgent,
       seedCoachAgent,
       backfillBlockerGoal,
+      bindAgentsToSpacelessItems,
     ],
   });
   process.stdout.write(

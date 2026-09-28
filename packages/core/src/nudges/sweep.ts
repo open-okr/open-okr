@@ -47,6 +47,11 @@ import {
 } from "@openokr/method";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import {
+  type AgentScope,
+  agentSeesBlocker,
+  agentSeesKpi,
+} from "../agents/scope.ts";
 import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
@@ -186,6 +191,11 @@ export async function dueKpiCorridorNudges(
     readonly cycleId?: string;
     /** Language for the recovery objective's title (P4-T05c-b). */
     readonly drafter?: AgentDrafter;
+    /**
+     * The agent this reads as, when it is an agent's run (completeness review
+     * H-04). Absent reads everything, which is what a person's own run does.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<readonly DueNudge[]> {
   const rows = await tx
@@ -204,7 +214,13 @@ export async function dueKpiCorridorNudges(
       recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
     })
     .from(kpis)
-    .where(activeOnly(kpis, eq(kpis.workspaceId, input.workspaceId)));
+    .where(
+      activeOnly(
+        kpis,
+        eq(kpis.workspaceId, input.workspaceId),
+        input.scope ? agentSeesKpi(input.scope) : undefined,
+      ),
+    );
 
   const delay = input.thresholds["kpi.recoveryProposalDelayPeriods"];
   const due: DueNudge[] = [];
@@ -597,6 +613,11 @@ export async function dueBlockerNudges(
     readonly workspaceId: string;
     readonly now: Date;
     readonly thresholds: ResolvedThresholds;
+    /**
+     * The agent this reads as, when it is an agent's run (completeness review
+     * H-04). Absent reads everything, which is what a person's own run does.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<readonly DueNudge[]> {
   const rows = await tx
@@ -613,6 +634,7 @@ export async function dueBlockerNudges(
         blockers,
         eq(blockers.workspaceId, input.workspaceId),
         isNull(blockers.resolvedAt),
+        input.scope ? agentSeesBlocker(input.scope) : undefined,
       ),
     );
 

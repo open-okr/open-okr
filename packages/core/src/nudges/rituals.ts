@@ -37,6 +37,7 @@ import {
   sessionLifecycleStage,
 } from "@openokr/method";
 import { asc, eq } from "drizzle-orm";
+import { type AgentScope, agentSeesSession } from "../agents/scope.ts";
 import {
   formatLocalDate,
   localDateIn,
@@ -143,6 +144,11 @@ export async function dueSessionNudges(
     readonly workspaceId: string;
     readonly now: Date;
     readonly thresholds: ResolvedThresholds;
+    /**
+     * The agent this reads as, when it is an agent's run (completeness review
+     * H-04). Absent reads everything, which is what a person's own run does.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<readonly DueNudge[]> {
   const rows = await tx
@@ -155,7 +161,11 @@ export async function dueSessionNudges(
     })
     .from(okrSessions)
     .where(
-      activeOnly(okrSessions, eq(okrSessions.workspaceId, input.workspaceId)),
+      activeOnly(
+        okrSessions,
+        eq(okrSessions.workspaceId, input.workspaceId),
+        input.scope ? agentSeesSession(input.scope) : undefined,
+      ),
     );
 
   const due: DueNudge[] = [];

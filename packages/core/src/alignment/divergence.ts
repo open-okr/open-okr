@@ -41,6 +41,7 @@ import {
   type ResolvedThresholds,
 } from "@openokr/method";
 import { eq, isNull } from "drizzle-orm";
+import { type AgentScope, agentSeesGoal } from "../agents/scope.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { linkedWorkForKeyResults } from "../tasks/service.ts";
 import { reconcileFindingsInTx, type WantedFinding } from "./service.ts";
@@ -71,6 +72,8 @@ export async function sweepDivergenceInTx(
     readonly workspaceId: string;
     readonly cycleId: string;
     readonly thresholds: ResolvedThresholds;
+    /** The Coach this reads as (completeness review H-04). */
+    readonly scope?: AgentScope;
   },
 ): Promise<DivergenceSweepResult> {
   const open = await tx
@@ -86,6 +89,7 @@ export async function sweepDivergenceInTx(
         eq(goals.workspaceId, input.workspaceId),
         eq(goals.cycleId, input.cycleId),
         isNull(goals.closedAt),
+        input.scope ? agentSeesGoal(input.scope) : undefined,
       ),
     );
 
@@ -188,6 +192,9 @@ export async function sweepDivergenceInTx(
     source: "coach",
     kind: "divergence",
     wanted,
+    ...(input.scope
+      ? { subjectGoalIds: new Set(open.map((goal) => goal.id)) }
+      : {}),
   });
 
   return { examined: open.length, found: wanted.length };

@@ -55,6 +55,11 @@ import {
   isNull,
 } from "drizzle-orm";
 import type { AgentDrafter, DraftedCheckIn } from "../agents/drafter.ts";
+import {
+  type AgentScope,
+  agentSeesCheckIn,
+  agentSeesGoal,
+} from "../agents/scope.ts";
 import { daysPastDue } from "../cadence/service.ts";
 import { OperationError } from "../operations/errors.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
@@ -202,6 +207,11 @@ export async function dueCheckInNudges(
      * the nudge are unchanged, and only the drafted check-in is missing.
      */
     readonly drafter?: AgentDrafter;
+    /**
+     * The agent this reads as, when it is an agent's run (completeness review
+     * H-04). Absent reads everything, which is what a person's own run does.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<readonly DueNudge[]> {
   const grace = input.thresholds["cadence.stalenessGraceDays"];
@@ -226,6 +236,7 @@ export async function dueCheckInNudges(
         // A closed goal owes nobody a check-in. Nudging on one is the fastest
         // way to teach a champion to ignore the product.
         isNull(goals.closedAt),
+        input.scope ? agentSeesGoal(input.scope) : undefined,
       ),
     );
 
@@ -834,6 +845,11 @@ export async function dueAcknowledgementNudges(
     readonly workspaceId: string;
     readonly now: Date;
     readonly thresholds: ResolvedThresholds;
+    /**
+     * The agent this reads as, when it is an agent's run (completeness review
+     * H-04). Absent reads everything, which is what a person's own run does.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<readonly DueNudge[]> {
   const rows = await tx
@@ -853,6 +869,7 @@ export async function dueAcknowledgementNudges(
         isNotNull(checkIns.publishedAt),
         // An acknowledged check-in is a closed loop and owes nobody anything.
         isNull(checkIns.acknowledgedAt),
+        input.scope ? agentSeesCheckIn(input.scope) : undefined,
       ),
     );
 

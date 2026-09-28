@@ -33,7 +33,9 @@ import { type KpiFrequency, normalisePeriod } from "@openokr/method";
 import { asc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
+import { ensureContext } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { bindAgentsToContextInTx } from "../agents/bindings.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import {
@@ -219,6 +221,18 @@ export const createKpi = defineWriteAction({
       // No records yet, so this settles the KPI at `no_data` rather than leaving
       // the column at its default and hoping they agree.
       await recomputeKpi(tx, workspaceId, id);
+
+      // A KPI that belongs to no space owns a context of its own, so the
+      // built-in agents can be bound to it by name (completeness review H-04).
+      // One in a space is in their sight through the space.
+      if (!input.spaceId) {
+        const contextId = await ensureContext(tx, {
+          workspaceId,
+          resourceType: "kpi",
+          resourceId: id,
+        });
+        await bindAgentsToContextInTx(tx, { workspaceId, contextId });
+      }
 
       return {
         result: { id, shortId: short },
