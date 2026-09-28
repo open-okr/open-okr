@@ -21,7 +21,13 @@
  *
  * Pure: no database, no clock beyond what the caller passes, no framework.
  */
-import { applyStrictness, evaluateKeyResults } from "./quality.ts";
+import {
+  applyStrictness,
+  evaluateKeyResults,
+  evaluateObjective,
+  type KeyResultVerdict,
+  type QualityVerdict,
+} from "./quality.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
 export type PredicateState = "pass" | "todo" | "not_applicable";
@@ -225,7 +231,7 @@ export const PHASE_TITLES = [
 
 export const GATE_TITLES = [
   "Every objective has a title, a champion and a reviewer",
-  "Every key result passes the quality checks",
+  "Every key result passes the quality checks, and every objective names an outcome",
   "Alignment is mapped: each objective states what it contributes to",
   "Every dependency is confirmed, or logged with a named risk owner",
   "Capacity is checked, and nothing is left exceeding it",
@@ -526,31 +532,136 @@ function phaseThree(
   };
 }
 
-function phaseFour(input: CycleWorkflowInput): PhaseResult {
+const OBJECTIVE_LEVELS = [
+  "company",
+  "department",
+  "team",
+  "individual",
+] as const;
+
+/**
+ * One objective's §4.1 and §4.2 verdicts, with the workspace's strictness
+ * applied, exactly as the Draft Coach beside it judges them.
+ *
+ * The objective is in a cycle by construction, so OBJ-3 passes, and the count
+ * OBJ-5 reads is the number of objectives at its level in this cycle, which is
+ * the count the drafting surface shows.
+ */
+function goalVerdicts(
+  goal: GoalSnapshot,
+  goals: readonly GoalSnapshot[],
+  thresholds: ResolvedThresholds,
+): {
+  readonly objective: readonly QualityVerdict[];
+  readonly keyResults: readonly KeyResultVerdict[];
+} {
+  const strictness = thresholds["quality.coachStrictness"];
+  const level = (OBJECTIVE_LEVELS as readonly string[]).includes(goal.level)
+    ? (goal.level as (typeof OBJECTIVE_LEVELS)[number])
+    : "team";
+  return {
+    objective: applyStrictness(
+      evaluateObjective(
+        {
+          title: goal.title,
+          hasCycle: true,
+          hasTimeframe: false,
+          championId: goal.championId,
+          reviewerId: goal.reviewerId,
+          objectivesInUnit: goals.filter((other) => other.level === goal.level)
+            .length,
+          level,
+        },
+        thresholds,
+      ),
+      strictness,
+    ),
+    keyResults: applyStrictness(
+      evaluateKeyResults(
+        {
+          keyResults: goal.keyResults.map((keyResult) => ({
+            text: keyResult.title,
+            ...(keyResult.quality as NonNullable<KeyResultSnapshot["quality"]>),
+          })),
+        },
+        thresholds,
+      ),
+      strictness,
+    ),
+  };
+}
+
+const unjudgedIn = (goals: readonly GoalSnapshot[]): boolean =>
+  goals.some((goal) =>
+    goal.keyResults.some((keyResult) => keyResult.quality === undefined),
+  );
+
+/**
+ * §2.3 phase 4: "Every objective and key result passes the §4 quality
+ * checks." Judged over the set here rather than read from a stored flag, so
+ * the phase cannot disagree with the coach or with gate 2 (completeness
+ * review H-09). A fail holds the phase and a warn does not, which is §4's own
+ * reading of the two and the one gate 2 uses; strict strictness makes warns
+ * fail, and then they hold it too.
+ *
+ * One condition per objective: the rail's bar fills as each objective and its
+ * key results come clean.
+ */
+function phaseFour(
+  input: CycleWorkflowInput,
+  thresholds: ResolvedThresholds,
+): PhaseResult {
   const base = { phase: 4, title: PHASE_TITLES[4] } as const;
-  if (input.qualityChecksPass === undefined) {
+  if (input.qualityChecksPass !== undefined) {
+    // A caller that has already decided, which a test may be.
+    const missing = input.qualityChecksPass
+      ? []
+      : ["Some objectives or key results do not pass the §4 quality checks"];
+    return {
+      ...base,
+      state: input.qualityChecksPass ? "pass" : "todo",
+      missing,
+      blocked: [],
+      conditions: conditionsOf(1, missing),
+    };
+  }
+  const goals = input.goals;
+  if (goals === undefined || unjudgedIn(goals)) {
     return {
       ...base,
       state: "todo",
       missing: [],
-      // The catalogue and the stored verdicts both exist since P4-T01 and
-      // P4-T02a. What is missing is the reading that turns a set of stored
-      // flags into one answer for the phase, and that is publish gate 2,
-      // which P4-T03 builds. Naming the task that will supply it beats
-      // naming the one that already did.
       blocked: ["The §4 verdicts across the set could not be read"],
       conditions: { met: 0, total: 0 },
     };
   }
-  const missing = input.qualityChecksPass
-    ? []
-    : ["Some objectives or key results do not pass the §4 quality checks"];
+  if (goals.length === 0) {
+    const missing = ["No objective is drafted yet"];
+    return {
+      ...base,
+      state: "todo",
+      missing,
+      blocked: [],
+      conditions: conditionsOf(1, missing),
+    };
+  }
+
+  const missing: string[] = [];
+  for (const goal of goals) {
+    const verdicts = goalVerdicts(goal, goals, thresholds);
+    const failing = [...verdicts.objective, ...verdicts.keyResults]
+      .filter((verdict) => verdict.status === "fail")
+      .map((verdict) => verdict.id);
+    if (failing.length > 0) {
+      missing.push(`"${goal.title}" fails ${failing.join(", ")}`);
+    }
+  }
   return {
     ...base,
-    state: input.qualityChecksPass ? "pass" : "todo",
+    state: missing.length === 0 ? "pass" : "todo",
     missing,
     blocked: [],
-    conditions: conditionsOf(1, missing),
+    conditions: conditionsOf(goals.length, missing),
   };
 }
 
@@ -717,12 +828,17 @@ export function publishGates(
     results.push(gate(1, missing.length === 0, missing));
   }
 
-  // 2. Every key result passes the §4.2 checks.
+  // 2. Every key result passes the §4.2 checks, and no objective fails OBJ-1.
   //
   // **A fail blocks and a warn does not**, which is §4's own wording: warn is
   // "worth another look", fail is "fix before publishing". A workspace that
   // wants warnings to block sets strictness to strict, and then they are fails
   // and this gate sees them as such. That is what the setting is for.
+  //
+  // **OBJ-1 joined on 28 September 2026** (completeness review H-09, decided
+  // by a human). REQUIREMENTS §3.2's acceptance has an objective beginning
+  // "Launch the new mobile app" block publishing until it passes or is
+  // overridden with a reason; §4.5 judged key results only, so it never did.
   //
   // `qualityChecksPass` stays supported for a caller that has already decided,
   // and it wins when given. Otherwise the gate evaluates the set itself, so it
@@ -745,31 +861,19 @@ export function publishGates(
       ),
     );
   } else {
-    const unjudged = goals.filter((goal) =>
-      goal.keyResults.some((keyResult) => keyResult.quality === undefined),
-    );
-    if (unjudged.length > 0) {
+    if (unjudgedIn(goals)) {
       results.push(
         unevaluable(2, "some key results carry nothing for §4.2 to judge"),
       );
     } else {
       const failures: string[] = [];
       for (const goal of goals) {
-        const verdicts = applyStrictness(
-          evaluateKeyResults(
-            {
-              keyResults: goal.keyResults.map((keyResult) => ({
-                text: keyResult.title,
-                ...(keyResult.quality as NonNullable<
-                  KeyResultSnapshot["quality"]
-                >),
-              })),
-            },
-            thresholds,
-          ),
-          thresholds["quality.coachStrictness"],
-        );
-        for (const verdict of verdicts.filter(
+        const judged = goalVerdicts(goal, goals, thresholds);
+        const outcome = judged.objective.find((entry) => entry.id === "OBJ-1");
+        if (outcome?.status === "fail") {
+          failures.push(`OBJ-1 on "${goal.title}": ${outcome.prompt}`);
+        }
+        for (const verdict of judged.keyResults.filter(
           (entry) => entry.status === "fail",
         )) {
           const offenders = verdict.keyResults
@@ -883,13 +987,16 @@ export function phaseCompletion(
   input: CycleWorkflowInput,
   thresholds: ResolvedThresholds,
 ): readonly PhaseResult[] {
-  const gates = publishGates(input);
+  // With the thresholds, so gate 2 is judged here exactly as it is at
+  // publication rather than reported as unevaluable on phase 5's rail
+  // (completeness review H-09).
+  const gates = publishGates(input, thresholds);
   return [
     phaseZero(input),
     phaseOne(input, thresholds),
     phaseTwo(input, thresholds),
     phaseThree(input, thresholds),
-    phaseFour(input),
+    phaseFour(input, thresholds),
     phaseFive(input, gates),
     phaseSix(input),
     phaseSeven(input),

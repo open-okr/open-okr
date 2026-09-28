@@ -782,3 +782,123 @@ describe("gate 4 and the dependency register", () => {
     expect(gate?.passed).toBe(true);
   });
 });
+
+/**
+ * Phase 4 and gate 2 judge the set themselves (completeness review H-09).
+ *
+ * Nothing supplied `qualityChecksPass`, so phase 4 could never be answered,
+ * and `phaseCompletion` called the gates without thresholds, so gate 2 read
+ * as unevaluable on phase 5's rail while the publish action judged it fine.
+ * Since 28 September 2026 a failing OBJ-1 also holds gate 2, by a human's
+ * decision recorded in METHOD.md §4.5.
+ */
+describe("phase 4 and gate 2 over the drafted set", () => {
+  const judged = (title: string, overrides: Partial<GoalSnapshot> = {}) =>
+    goal({
+      title,
+      keyResults: [
+        {
+          id: "k1",
+          title: "Raise activation from 41% to 60%",
+          capacity: "fits",
+          dependencies: [],
+          quality: {
+            baseline: 41,
+            target: 60,
+            dueOn: "2026-09-30",
+            ownerId: "m1",
+            indicatorType: "leading",
+            direction: "increase",
+            confidence: 0.6,
+          },
+        },
+        {
+          id: "k2",
+          title: "Grow mobile revenue from 1.2m to 2m",
+          capacity: "fits",
+          dependencies: [],
+          quality: {
+            baseline: 1.2,
+            target: 2,
+            dueOn: "2026-09-30",
+            ownerId: "m1",
+            indicatorType: "lagging",
+            direction: "increase",
+            confidence: 0.6,
+          },
+        },
+      ],
+      ...overrides,
+    });
+
+  it("passes phase 4 when every objective and key result is clean", () => {
+    const four = phase(base({ goals: [judged(goal().title)] }), 4);
+    expect(four?.state).toBe("pass");
+    expect(four?.conditions).toEqual({ met: 1, total: 1 });
+  });
+
+  it("holds phase 4 on an objective that names an output, and says which", () => {
+    const four = phase(
+      base({ goals: [judged("Launch the new mobile app by end of Q3")] }),
+      4,
+    );
+    expect(four?.state).toBe("todo");
+    expect(four?.missing).toEqual([
+      '"Launch the new mobile app by end of Q3" fails OBJ-1',
+    ]);
+  });
+
+  it("holds phase 4 on a key result with no owner or date", () => {
+    const bare = judged(goal().title);
+    const four = phase(
+      base({
+        goals: [
+          {
+            ...bare,
+            keyResults: bare.keyResults.map((keyResult) => ({
+              ...keyResult,
+              quality: keyResult.quality && {
+                ...keyResult.quality,
+                ownerId: null,
+                dueOn: null,
+              },
+            })),
+          },
+        ],
+      }),
+      4,
+    );
+    expect(four?.missing[0]).toMatch(/fails KR-3/);
+  });
+
+  it("says nothing is drafted yet rather than passing on an empty set", () => {
+    expect(phase(base({ goals: [] }), 4)?.missing).toEqual([
+      "No objective is drafted yet",
+    ]);
+  });
+
+  it("stays unanswered while the set cannot be read", () => {
+    expect(phase(base(), 4)?.blocked).toEqual([
+      "The §4 verdicts across the set could not be read",
+    ]);
+  });
+
+  it("refuses publication on a failing OBJ-1", () => {
+    const gates = publishGates(
+      base({ goals: [judged("Launch the new mobile app by end of Q3")] }),
+      thresholds,
+    );
+    const two = gates.find((entry) => entry.gateKey === 2);
+    expect(two?.passed).toBe(false);
+    expect(two?.detail.missing[0]).toMatch(
+      /^OBJ-1 on "Launch the new mobile app by end of Q3": /,
+    );
+    expect(canPublish(gates)).toBe(false);
+  });
+
+  it("judges gate 2 on phase 5's rail, not only at publication", () => {
+    const five = phase(base({ goals: [judged(goal().title)] }), 5);
+    expect(five?.blocked).toEqual([]);
+    expect(five?.missing).toEqual(["The set is not published"]);
+  });
+});
