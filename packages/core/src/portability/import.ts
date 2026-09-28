@@ -19,22 +19,15 @@
 import { randomUUID } from "node:crypto";
 import type { WorkspaceTx } from "@openokr/db";
 import { sql } from "drizzle-orm";
+import { generateStorageKey } from "../blobs/provisioning.ts";
 import type { ReadArchiveResult } from "./archive.ts";
 import { EXPORTED_TABLES, isDeferred } from "./policy.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
-/** What the storage port looks like from here. */
+/** What the storage port looks like from here: somewhere to write bytes. */
 interface ImportBlobStorage {
-  prepare(input: {
-    workspaceId: string;
-    memberId: string;
-    filename: string;
-    contentType: string;
-    sizeBytes: number;
-  }): Promise<{ blobId: string; storageKey: string }>;
-  put(key: string, body: Buffer): Promise<void>;
-  claim(blobId: string): Promise<void>;
+  put(key: string, body: Buffer): Promise<unknown>;
 }
 
 export interface ImportWorkspaceOptions {
@@ -442,32 +435,20 @@ export async function importWorkspace(
     const remappedBlobId = keyMap.get(archivedBlobId) ?? archivedBlobId;
     const bytes = Buffer.from(record.b, "base64");
 
-    // Look up the blob row to get filename and content type
-    const blobRow = await tx.execute<{
-      filename: string;
-      content_type: string;
-      storage_key: string;
-    }>(
-      sql`select filename, content_type, storage_key from blobs where id = ${remappedBlobId}`,
+    // The row the import just wrote. Its bytes go under a fresh key in this
+    // workspace's own prefix: the archived key named the old workspace, and
+    // reusing it would put two workspaces' files under one name.
+    const blobRow = await tx.execute<{ filename: string }>(
+      sql`select filename from blobs where id = ${remappedBlobId}`,
     );
     const row = blobRow.rows[0];
     if (!row) continue;
 
-    // Prepare, put, claim
-    const prepared = await options.storage.prepare({
-      workspaceId,
-      memberId: options.actorMemberId,
-      filename: row.filename,
-      contentType: row.content_type,
-      sizeBytes: bytes.byteLength,
-    });
-    await options.storage.put(prepared.storageKey, bytes);
-    await options.storage.claim(prepared.blobId);
-
-    // Update the blob row's storage key to the new one
+    const storageKey = generateStorageKey(workspaceId, row.filename);
+    await options.storage.put(storageKey, bytes);
     // openokr:allow-mutation: the calling Operation's own transaction.
     await tx.execute(
-      sql`update blobs set storage_key = ${prepared.storageKey} where id = ${remappedBlobId}`,
+      sql`update blobs set storage_key = ${storageKey} where id = ${remappedBlobId}`,
     );
   }
 

@@ -2668,8 +2668,16 @@
           "includeFiles": {
             "default": true,
             "type": "boolean"
+          },
+          "passphrase": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 1024
           }
-        }
+        },
+        "required": [
+          "passphrase"
+        ]
       },
       "scope": "write",
       "annotations": {
@@ -2677,7 +2685,9 @@
         "destructiveHint": false,
         "idempotentHint": false
       },
-      "example": {}
+      "example": {
+        "passphrase": "…"
+      }
     },
     {
       "name": "workspace.importArchive",
@@ -2691,6 +2701,10 @@
           "dryRun": {
             "default": true,
             "type": "boolean"
+          },
+          "passphrase": {
+            "type": "string",
+            "maxLength": 1024
           }
         },
         "required": [

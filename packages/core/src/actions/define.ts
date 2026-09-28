@@ -82,6 +82,8 @@ export interface ActionCallContext {
   readonly storage?: {
     get(key: string): Promise<Buffer>;
     delete(key: string): Promise<void>;
+    /** Writes bytes, for an archive import restoring its files (H-18). */
+    put?(key: string, body: Buffer): Promise<unknown>;
   };
   /**
    * Language for the agents, when the host has a provider to give (P4-T05c-b).

@@ -9528,8 +9528,16 @@
                   "includeFiles": {
                     "default": true,
                     "type": "boolean"
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 1024
                   }
-                }
+                },
+                "required": [
+                  "passphrase"
+                ]
               }
             }
           }
@@ -9684,6 +9692,10 @@
                   "dryRun": {
                     "default": true,
                     "type": "boolean"
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "maxLength": 1024
                   }
                 },
                 "required": [

@@ -31,6 +31,8 @@ const OWNER = "33333333-3333-4333-8333-333333333333";
 let pool: Pool;
 let workspaceId: string;
 const ring = parseKeyRing({ current: newRootKey() });
+/** What every archive here is sealed under (completeness review H-18). */
+const PASSPHRASE = "correct horse battery staple";
 
 /** A blob store with a few bytes in it and one key that is not there. */
 class Bytes {
@@ -82,7 +84,7 @@ async function exported(storage?: Bytes) {
     exportWorkspace({
       tx,
       workspaceId,
-      ring,
+      passphrase: PASSPHRASE,
       instance: "test-instance",
       ...(storage ? { storage } : {}),
     }),
@@ -92,7 +94,7 @@ async function exported(storage?: Bytes) {
 describe("exporting a workspace", () => {
   it("acceptance: carries the workspace and nothing on the exclusion list", async () => {
     const result = await exported();
-    const opened = readArchive(ring, result.bytes);
+    const opened = readArchiveWith(result.bytes);
 
     expect(opened.manifest.format).toBe(ARCHIVE_FORMAT);
     expect(opened.manifest.version).toBe(ARCHIVE_VERSION);
@@ -121,7 +123,7 @@ describe("exporting a workspace", () => {
   });
 
   it("counts in the manifest what the archive actually holds", async () => {
-    const opened = readArchive(ring, (await exported()).bytes);
+    const opened = readArchiveWith((await exported()).bytes);
 
     const actual = new Map<string, number>();
     for (const record of opened.records) {
@@ -183,7 +185,7 @@ describe("exporting a workspace", () => {
     );
 
     const result = await exported(store);
-    const opened = readArchive(ring, result.bytes);
+    const opened = readArchiveWith(result.bytes);
 
     const blobs = opened.records.filter((record) => record.r === "blob");
     expect(blobs).toHaveLength(1);
@@ -204,7 +206,7 @@ describe("exporting a workspace", () => {
   });
 
   it("carries the rows but no bytes when no storage is given", async () => {
-    const opened = readArchive(ring, (await exported()).bytes);
+    const opened = readArchiveWith((await exported()).bytes);
     expect(opened.records.filter((record) => record.r === "blob")).toEqual([]);
     expect(opened.manifest.blobs.count).toBe(0);
   });
@@ -216,30 +218,40 @@ describe("exporting a workspace", () => {
     const start = tampered.indexOf(0x0a) + 1;
     tampered[start + 5] = (tampered[start + 5] ?? 0) ^ 0xff;
 
-    expect(() => readArchive(ring, tampered)).toThrow(ArchiveError);
-    expect(() => readArchive(ring, tampered)).toThrow(
-      /do not match the digest/,
+    expect(() => readArchiveWith(tampered)).toThrow(ArchiveError);
+    expect(() => readArchiveWith(tampered)).toThrow(/do not match the digest/);
+  });
+
+  it("refuses to open an archive with the wrong passphrase", async () => {
+    const result = await exported();
+    expect(() =>
+      readArchive(result.bytes, { passphrase: "not the passphrase at all" }),
+    ).toThrow(/does not open this archive/);
+    expect(() => readArchive(result.bytes, {})).toThrow(
+      /protected by a passphrase/,
     );
   });
 
-  it("refuses to open an archive sealed under a key this instance does not hold", async () => {
+  it("opens on an instance that holds no key at all, given the passphrase", async () => {
+    // The point of H-18: a move between instances needs the passphrase, not
+    // the writing instance's root key.
     const result = await exported();
-    const stranger = parseKeyRing({ current: newRootKey() });
-    expect(() => readArchive(stranger, result.bytes)).toThrow(/does not hold/);
+    const opened = readArchive(result.bytes, { passphrase: PASSPHRASE });
+    expect(opened.manifest.workspace.id).toBe(workspaceId);
   });
 
   it("refuses a truncated archive", async () => {
     const result = await exported();
     expect(() =>
-      readArchive(ring, result.bytes.subarray(0, result.bytes.length - 20)),
+      readArchiveWith(result.bytes.subarray(0, result.bytes.length - 20)),
     ).toThrow(/truncated or something was appended/);
   });
 
   it("refuses a file that is not an archive at all", () => {
-    expect(() => readArchive(ring, Buffer.from("hello\nworld"))).toThrow(
+    expect(() => readArchiveWith(Buffer.from("hello\nworld"))).toThrow(
       /not readable JSON/,
     );
-    expect(() => readArchive(ring, Buffer.from("no newline here"))).toThrow(
+    expect(() => readArchiveWith(Buffer.from("no newline here"))).toThrow(
       /no header line/,
     );
   });
@@ -252,20 +264,20 @@ describe("exporting a workspace", () => {
       Buffer.from(`${JSON.stringify({ ...header, version: 99 })}\n`),
       result.bytes.subarray(newline + 1),
     ]);
-    expect(() => readArchive(ring, future)).toThrow(/format version 99/);
+    expect(() => readArchiveWith(future)).toThrow(/format version 99/);
   });
 });
 
 describe("the archive writer's own rules", () => {
   it("refuses a run of records with no manifest first", () => {
-    expect(() => writeArchive(ring, [{ r: "end", rows: 0, blobs: 0 }])).toThrow(
-      /begins with its manifest/,
-    );
+    expect(() =>
+      writeArchive(PASSPHRASE, [{ r: "end", rows: 0, blobs: 0 }]),
+    ).toThrow(/begins with its manifest/);
   });
 
   it("refuses a run of records with no end record", () => {
     expect(() =>
-      writeArchive(ring, [
+      writeArchive(PASSPHRASE, [
         {
           r: "manifest",
           manifest: {
@@ -304,16 +316,14 @@ describe("workspace.exportArchive", () => {
   it("acceptance: returns a sealed archive that opens, and records the run", async () => {
     const result = await callAction(context(), "workspace.exportArchive", {
       includeFiles: false,
+      passphrase: PASSPHRASE,
     });
 
     expect(result.filename).toMatch(/^workspace-.+-\d{4}-\d{2}-\d{2}\.okr$/);
     expect(result.bytes).toBeGreaterThan(0);
     expect(result.digest).toMatch(/^[0-9a-f]{64}$/);
 
-    const opened = readArchive(
-      ring,
-      Buffer.from(result.archiveBase64, "base64"),
-    );
+    const opened = readArchiveWith(Buffer.from(result.archiveBase64, "base64"));
     expect(opened.manifest.workspace.id).toBe(workspaceId);
     expect(result.counts).toEqual(opened.manifest.counts);
 
@@ -339,6 +349,7 @@ describe("workspace.exportArchive", () => {
   it("writes an audit row naming who took the copy", async () => {
     const result = await callAction(context(), "workspace.exportArchive", {
       includeFiles: false,
+      passphrase: PASSPHRASE,
     });
 
     const wb = await workerDb();
@@ -357,24 +368,35 @@ describe("workspace.exportArchive", () => {
     expect(audit?.payload.filename).toBe(result.filename);
   });
 
-  it("refuses when the instance holds no encryption key", async () => {
+  it("seals without the instance's key, and refuses a short passphrase", async () => {
+    const keyless = {
+      pool,
+      workspaceId,
+      actor: { kind: "human" as const, userId: OWNER },
+    };
+    const result = await callAction(keyless, "workspace.exportArchive", {
+      includeFiles: false,
+      passphrase: PASSPHRASE,
+    });
+    expect(result.bytes).toBeGreaterThan(0);
     await expect(
-      callAction(
-        {
-          pool,
-          workspaceId,
-          actor: { kind: "human" as const, userId: OWNER },
-        },
-        "workspace.exportArchive",
-        { includeFiles: false },
-      ),
-    ).rejects.toThrow(/OPENOKR_ENCRYPTION_KEY/);
+      callAction(keyless, "workspace.exportArchive", {
+        includeFiles: false,
+        passphrase: "too short",
+      }),
+    ).rejects.toThrow();
   });
 
   it("carries no file bytes when asked not to", async () => {
     const result = await callAction(context(), "workspace.exportArchive", {
       includeFiles: false,
+      passphrase: PASSPHRASE,
     });
     expect(result.blobs.count).toBe(0);
   });
 });
+
+/** Reads an archive with the passphrase every test here seals under. */
+function readArchiveWith(bytes: Buffer) {
+  return readArchive(bytes, { passphrase: PASSPHRASE });
+}

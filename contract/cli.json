@@ -1825,6 +1825,12 @@
           "field": "includeFiles",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "passphrase",
+          "field": "passphrase",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false
@@ -1847,6 +1853,12 @@
           "name": "dry-run",
           "field": "dryRun",
           "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "passphrase",
+          "field": "passphrase",
+          "type": "string",
           "required": false
         }
       ],

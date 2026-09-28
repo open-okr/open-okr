@@ -24,10 +24,11 @@ backups and the monitoring.
 
 ## Getting out
 
-A workspace archive is one signed, checksummed file holding every row and
-every uploaded file, and an administrator can take one whenever they like. It
-imports into a self-hosted instance. That is deliberate: the exit is part of
-the product rather than a support ticket.
+A workspace archive is one checksummed file holding every row and every
+uploaded file, and an administrator can take one whenever they like. It is
+sealed with a passphrase you choose, not with the cloud's own key, so it
+imports into a self-hosted instance given that passphrase. That is deliberate:
+the exit is part of the product rather than a support ticket.
 
 ## Support access
 
