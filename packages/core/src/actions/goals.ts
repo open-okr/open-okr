@@ -1273,6 +1273,50 @@ export const updateGoal = defineWriteAction({
         }
       }
 
+      // The same two checks for a parent key result (completeness review
+      // M-28). A key result is aligned through the goal that owns it, so that
+      // goal is what the writer must be able to see, and what the loop walk
+      // starts from. Before this, a key result anywhere in the workspace could
+      // be named as a parent by its id, and a goal could be hung under one of
+      // its own key results.
+      if (input.parentKeyResultId) {
+        const [owner] = await tx
+          .select({ goalId: keyResults.goalId })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, workspaceId),
+              eq(keyResults.id, input.parentKeyResultId),
+            ),
+          )
+          .limit(1);
+        if (!owner) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+        await requireGoalAccess(
+          tx,
+          workspaceId,
+          memberId,
+          owner.goalId,
+          ACCESS_LEVELS.view,
+        );
+        if (
+          owner.goalId === input.id ||
+          (await wouldCloseAlignmentLoop(
+            tx,
+            workspaceId,
+            input.id,
+            owner.goalId,
+          ))
+        ) {
+          throw new OperationError(
+            "forbidden",
+            "That would make the alignment circular.",
+          );
+        }
+      }
+
       const patch: Record<string, unknown> = { updatedAt: new Date() };
       if (input.title !== undefined) {
         patch.title = input.title;
