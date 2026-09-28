@@ -30,24 +30,33 @@ import { LinkForm } from "./link-form.tsx";
  *
  * Enumerated from the table's own constant rather than written out, so a
  * seventh reason appears on this card without anybody remembering it exists.
- * The labels are here because they are wording; the list is not.
+ * The labels are here because they are wording; the list is not. Each is a
+ * catalogue key, so the wording reaches a reader in their own language.
  */
 const REASON_LABELS: Readonly<Record<string, string>> = {
-  mentioned: "Somebody mentions me",
-  review: "A check-in is waiting on my review",
-  check_in: "A reminder from the Champion or the Coach",
-  invited: "An invitation",
-  joined: "Somebody joins the workspace",
-  role: "My role changes",
+  mentioned: "account.channels.reasonMentioned",
+  review: "account.channels.reasonReview",
+  check_in: "account.channels.reasonCheckIn",
+  invited: "account.channels.reasonInvited",
+  joined: "account.channels.reasonJoined",
+  role: "account.channels.reasonRole",
 };
 
 const CHOICES = [
-  { id: "app", label: "In the product only", needsLink: false },
-  { id: "email", label: "Email", needsLink: false },
-  { id: "slack", label: "Slack", needsLink: true },
-  { id: "teams", label: "Microsoft Teams", needsLink: true },
-  { id: "whatsapp", label: "WhatsApp", needsLink: true },
-  { id: "telegram", label: "Telegram", needsLink: true },
+  {
+    id: "app",
+    labelKey: "account.channels.inTheProductOnly",
+    needsLink: false,
+  },
+  {
+    id: "email",
+    labelKey: "people.detail.profileForm.email",
+    needsLink: false,
+  },
+  { id: "slack", labelKey: "channels.slack", needsLink: true },
+  { id: "teams", labelKey: "channels.teams", needsLink: true },
+  { id: "whatsapp", labelKey: "channels.whatsapp", needsLink: true },
+  { id: "telegram", labelKey: "channels.telegram", needsLink: true },
 ] as const;
 
 export default async function AccountChannelsPage() {
@@ -121,12 +130,12 @@ export default async function AccountChannelsPage() {
                       defaultChecked={settings.primaryChannel === choice.id}
                       disabled={unavailable}
                     />
-                    {choice.label}
+                    {t(choice.labelKey)}
                     {unavailable ? (
                       <span className="text-xs text-ink-3">
                         {connected.has(choice.id as never)
-                          ? "link your account first"
-                          : "not connected for this workspace"}
+                          ? t("account.channels.linkYourAccountFirst")
+                          : t("account.channels.notConnectedForThisWorkspace")}
                       </span>
                     ) : null}
                   </label>
@@ -238,13 +247,13 @@ export default async function AccountChannelsPage() {
           <CadenceForm
             action={saveCadence}
             settings={cadence}
-            reasons={NOTIFICATION_REASONS.map((reason) => ({
-              id: reason,
-              label: REASON_LABELS[reason] ?? reason,
-            }))}
+            reasons={NOTIFICATION_REASONS.map((reason) => {
+              const labelKey = REASON_LABELS[reason];
+              return { id: reason, label: labelKey ? t(labelKey) : reason };
+            })}
             channels={CHOICES.map((choice) => ({
               id: choice.id,
-              label: choice.label,
+              label: t(choice.labelKey),
             }))}
           />
         </CardBody>

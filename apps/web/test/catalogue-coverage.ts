@@ -11,11 +11,18 @@ import ts from "typescript";
  * depending on where they sit. A regular expression over the file cannot tell
  * those apart and would either miss most of them or flag every `className`.
  *
- * **Two positions count.** Text between tags, which is the body of a screen,
+ * **Three positions count.** Text between tags, which is the body of a screen,
  * and the four attributes whose value a person reads: `placeholder`,
  * `aria-label`, `title` and `alt`. An attribute written as `{t("…")}` is a
  * JSX expression rather than a string literal, so it is excluded by the shape
  * of the check rather than by a special case.
+ *
+ * The third is a string rendered from an expression between tags:
+ * `{done ? "Saved" : "Not saved"}`, `{empty && "Nothing yet"}`, and a
+ * template literal such as `` {`${n} goals`} ``. Added at completeness review
+ * M-15, which found 261 of them. The first two positions were the only ones
+ * the gate read, so every one of those sentences reached a Malay reader in
+ * English while the catalogue said the screen was translated.
  *
  * Kept out of the test file so the detector can be exercised on strings of its
  * own rather than only on the repository, which is what makes it testable.
@@ -60,7 +67,71 @@ export function findUnlocalisedStrings(
   const lineOf = (node: ts.Node): number =>
     tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1;
 
+  // A string an expression renders as a child. Only the branches a reader
+  // sees: both arms of a conditional, the right of `&&`, either side of `||`
+  // and `??`. A call, a variable or a property is somebody else's value.
+  const inspect = (expression: ts.Expression | undefined): void => {
+    if (expression === undefined) {
+      return;
+    }
+    if (ts.isParenthesizedExpression(expression)) {
+      inspect(expression.expression);
+      return;
+    }
+    if (
+      ts.isStringLiteral(expression) ||
+      ts.isNoSubstitutionTemplateLiteral(expression)
+    ) {
+      if (looksLikeProse(expression.text)) {
+        found.push({
+          line: lineOf(expression),
+          text: expression.text,
+          where: "expression",
+        });
+      }
+      return;
+    }
+    if (ts.isTemplateExpression(expression)) {
+      const literal = [
+        expression.head.text,
+        ...expression.templateSpans.map((span) => span.literal.text),
+      ].join(" ");
+      if (looksLikeProse(literal)) {
+        found.push({
+          line: lineOf(expression),
+          text: expression.getText(tree),
+          where: "expression",
+        });
+      }
+      return;
+    }
+    if (ts.isConditionalExpression(expression)) {
+      inspect(expression.whenTrue);
+      inspect(expression.whenFalse);
+      return;
+    }
+    if (ts.isBinaryExpression(expression)) {
+      const operator = expression.operatorToken.kind;
+      if (operator === ts.SyntaxKind.AmpersandAmpersandToken) {
+        inspect(expression.right);
+      } else if (
+        operator === ts.SyntaxKind.BarBarToken ||
+        operator === ts.SyntaxKind.QuestionQuestionToken
+      ) {
+        inspect(expression.left);
+        inspect(expression.right);
+      }
+    }
+  };
+
   const visit = (node: ts.Node): void => {
+    if (
+      ts.isJsxExpression(node) &&
+      (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent))
+    ) {
+      inspect(node.expression);
+    }
+
     if (ts.isJsxText(node)) {
       const text = node.text.trim();
       if (looksLikeProse(text)) {

@@ -34,12 +34,20 @@ export interface ScoredKeyResult {
 }
 
 /** The band names in the order §3.3 states them, worst last. */
-const BAND_WORDS: Readonly<Record<string, string>> = {
-  fully_achieved: "Fully achieved",
-  strong: "Strong",
-  partial: "Partial",
-  little: "Little movement",
-};
+function bandWord(band: string, t: (key: string) => string): string {
+  switch (band) {
+    case "fully_achieved":
+      return t("cycle.reviewAndLearn.band.fullyAchieved");
+    case "strong":
+      return t("common.strong");
+    case "partial":
+      return t("cycle.reviewAndLearn.band.partial");
+    case "little":
+      return t("cycle.reviewAndLearn.band.little");
+    default:
+      return band;
+  }
+}
 
 export async function ReviewAndLearn({
   keyResults,
@@ -76,16 +84,32 @@ export async function ReviewAndLearn({
   const band = average === null ? null : scoreBand(average, thresholds);
   const boundaries = thresholds["scoring.scoreBands"];
   const table: readonly (readonly [string, string])[] = [
-    ["fully_achieved", `${boundaries.achieved.toFixed(2)} and above`],
+    [
+      "fully_achieved",
+      t("cycle.reviewAndLearn.rangeAndAbove", {
+        value: boundaries.achieved.toFixed(2),
+      }),
+    ],
     [
       "strong",
-      `${boundaries.strong.toFixed(2)} to ${boundaries.achieved.toFixed(2)}`,
+      t("cycle.reviewAndLearn.rangeBetween", {
+        low: boundaries.strong.toFixed(2),
+        high: boundaries.achieved.toFixed(2),
+      }),
     ],
     [
       "partial",
-      `${boundaries.partial.toFixed(2)} to ${boundaries.strong.toFixed(2)}`,
+      t("cycle.reviewAndLearn.rangeBetween", {
+        low: boundaries.partial.toFixed(2),
+        high: boundaries.strong.toFixed(2),
+      }),
     ],
-    ["little", `below ${boundaries.partial.toFixed(2)}`],
+    [
+      "little",
+      t("cycle.reviewAndLearn.rangeBelow", {
+        value: boundaries.partial.toFixed(2),
+      }),
+    ],
   ];
 
   return (
@@ -132,7 +156,7 @@ export async function ReviewAndLearn({
               {t("cycle.reviewAndLearn.scored")}
             </span>
           </div>
-          {band ? <Chip tone="info">{BAND_WORDS[band] ?? band}</Chip> : null}
+          {band ? <Chip tone="info">{bandWord(band, t)}</Chip> : null}
         </CardBody>
       </Card>
 
@@ -154,7 +178,7 @@ export async function ReviewAndLearn({
                     : "flex items-center justify-between gap-2.5 px-2.5 py-1.5 text-sm text-ink-2"
                 }
               >
-                <span>{BAND_WORDS[name] ?? name}</span>
+                <span>{bandWord(name, t)}</span>
                 <span className="tabular-nums text-xs">{range}</span>
               </div>
             );
@@ -193,7 +217,9 @@ export async function ReviewAndLearn({
                     <Chip tone="warn">{t("cycle.reviewAndLearn.carry")}</Chip>
                   ) : null}
                   <span className="tabular-nums text-ink-2">
-                    {row.score === null ? "not scored" : row.score.toFixed(2)}
+                    {row.score === null
+                      ? t("cycle.reviewAndLearn.notScored")
+                      : row.score.toFixed(2)}
                   </span>
                 </span>
               </div>

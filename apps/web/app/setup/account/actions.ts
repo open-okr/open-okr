@@ -4,6 +4,7 @@ import { completeSetup, readSetupState } from "@openokr/core";
 import { getPool } from "../../../lib/auth";
 import { getKeyRing } from "../../../lib/secrets";
 import { currentSession } from "../../../lib/session";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * Finishing setup, from the browser (P1-T09).
@@ -29,11 +30,12 @@ export type FinishSetupResult =
 export async function finishSetup(
   input: FinishSetupInput,
 ): Promise<FinishSetupResult> {
+  const { t } = await getTranslations();
   const pool = getPool();
 
   const state = await readSetupState(pool);
   if (state.configured) {
-    return { ok: false, message: "This instance is already set up." };
+    return { ok: false, message: t("setup.account.actions.alreadySetUp") };
   }
 
   // An account must exist before setup can be recorded as done. Without this,
@@ -42,7 +44,7 @@ export async function finishSetup(
   if (!state.hasUser) {
     return {
       ok: false,
-      message: "Create the first account before finishing setup.",
+      message: t("setup.account.actions.createTheFirstAccount"),
     };
   }
 
@@ -55,7 +57,7 @@ export async function finishSetup(
   if (!(await currentSession())) {
     return {
       ok: false,
-      message: "Sign in as the account you just created, then finish setup.",
+      message: t("setup.account.actions.signInAsThatAccount"),
     };
   }
 
@@ -68,7 +70,7 @@ export async function finishSetup(
   ) {
     return {
       ok: false,
-      message: "The instance name must be 120 characters or fewer.",
+      message: t("setup.account.actions.instanceNameTooLong"),
     };
   }
 
@@ -90,8 +92,9 @@ export async function finishSetup(
       ok: false,
       message:
         error instanceof Error
-          ? (error.message.split("\n")[0] ?? "Unknown error.")
-          : "Unknown error.",
+          ? (error.message.split("\n")[0] ??
+            t("setup.account.actions.unknownError"))
+          : t("setup.account.actions.unknownError"),
     };
   }
 }

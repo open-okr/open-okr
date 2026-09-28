@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Field, fieldInputClass } from "../../(auth)/auth-card";
@@ -24,6 +24,7 @@ import { Field, fieldInputClass } from "../../(auth)/auth-card";
  * what is wrong.
  */
 export function SSOForm() {
+  const { t } = useTranslations();
   const router = useRouter();
   const [kind, setKind] = useState<"oidc" | "saml">("oidc");
   const [pending, setPending] = useState(false);
@@ -68,17 +69,22 @@ export function SSOForm() {
           error?: string;
           field?: string;
         };
-        setError(body.error || `Failed to save (${response.status})`);
+        setError(
+          body.error ||
+            t("admin.sso.ssoForm.failedToSave", { status: response.status }),
+        );
         setField(body.field ?? "");
       } else {
-        setSuccess(
-          "Provider saved. It will take effect on the next instance restart.",
-        );
+        setSuccess(t("admin.sso.ssoForm.providerSaved"));
         (event.target as HTMLFormElement).reset();
         router.refresh();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("admin.sso.ssoForm.networkError"),
+      );
     } finally {
       setPending(false);
     }
@@ -96,7 +102,7 @@ export function SSOForm() {
     <form onSubmit={submit} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
         <label htmlFor="field-kind" className="text-sm font-medium text-ink-2">
-          Protocol
+          {t("admin.sso.ssoForm.protocol")}
         </label>
         <select
           id="field-kind"
@@ -107,22 +113,24 @@ export function SSOForm() {
             setKind(event.target.value === "saml" ? "saml" : "oidc")
           }
         >
-          <option value="oidc">OIDC (OpenID Connect)</option>
-          <option value="saml">SAML 2.0</option>
+          <option value="oidc">
+            {t("admin.sso.ssoForm.oidcOpenIdConnect")}
+          </option>
+          <option value="saml">{t("admin.sso.saml2")}</option>
         </select>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field
-          label="Provider ID"
+          label={t("admin.sso.ssoForm.providerId")}
           name="providerId"
-          placeholder="okta"
+          placeholder={t("admin.sso.ssoForm.providerIdPlaceholder")}
           required
         />
         <Field
-          label="Display name"
+          label={t("admin.sso.ssoForm.displayName")}
           name="displayName"
-          placeholder="Sign in with Okta"
+          placeholder={t("admin.sso.ssoForm.displayNamePlaceholder")}
           required
         />
       </div>
@@ -132,44 +140,46 @@ export function SSOForm() {
       {kind === "oidc" ? (
         <>
           <Field
-            label="Discovery URL (OIDC)"
+            label={t("admin.sso.ssoForm.discoveryUrl")}
             name="discoveryUrl"
-            placeholder="https://login.example.com/.well-known/openid-configuration"
+            placeholder={t("admin.sso.ssoForm.discoveryUrlPlaceholder")}
             type="url"
           />
           {problem("discoveryUrl")}
 
           <p className="text-xs text-ink-3">
-            If a discovery URL is set, authorization, token and user info
-            endpoints are fetched from it automatically. Fill in the fields
-            below only if your provider does not support discovery.
+            {t("admin.sso.ssoForm.ifADiscoveryUrlIsSet")}
           </p>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Field
-              label="Authorization URL"
+              label={t("admin.sso.ssoForm.authorizationUrl")}
               name="authorizationUrl"
               type="url"
-              placeholder="https://..."
+              placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
             />
             <Field
-              label="Token URL"
+              label={t("admin.sso.ssoForm.tokenUrl")}
               name="tokenUrl"
               type="url"
-              placeholder="https://..."
+              placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
             />
             <Field
-              label="User info URL"
+              label={t("admin.sso.ssoForm.userInfoUrl")}
               name="userInfoUrl"
               type="url"
-              placeholder="https://..."
+              placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
             />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Client ID" name="clientId" required />
             <Field
-              label="Client secret"
+              label={t("admin.sso.ssoForm.clientId")}
+              name="clientId"
+              required
+            />
+            <Field
+              label={t("admin.sso.ssoForm.clientSecret")}
               name="clientSecret"
               type="password"
               required
@@ -180,26 +190,26 @@ export function SSOForm() {
           {problem("clientSecret")}
 
           <Field
-            label="Scopes"
+            label={t("account.apiTokens.scopes")}
             name="scopes"
-            placeholder="openid email profile"
+            placeholder={t("admin.sso.ssoForm.scopesPlaceholder")}
           />
         </>
       ) : (
         <>
           <Field
-            label="Sign-on URL"
+            label={t("admin.sso.ssoForm.signOnUrl")}
             name="samlEntryPoint"
             type="url"
-            placeholder="https://login.example.com/app/sso/saml"
+            placeholder={t("admin.sso.ssoForm.signOnUrlPlaceholder")}
             required
           />
           {problem("samlEntryPoint")}
 
           <Field
-            label="Issuer (the provider's entity ID)"
+            label={t("admin.sso.ssoForm.issuer")}
             name="samlIssuer"
-            placeholder="http://www.example.com/exk1fc..."
+            placeholder={t("admin.sso.ssoForm.issuerPlaceholder")}
             required
           />
           {problem("samlIssuer")}
@@ -209,7 +219,7 @@ export function SSOForm() {
               htmlFor="field-samlCertificate"
               className="text-sm font-medium text-ink-2"
             >
-              Signing certificate
+              {t("admin.sso.ssoForm.signingCertificate")}
             </label>
             <textarea
               id="field-samlCertificate"
@@ -217,44 +227,39 @@ export function SSOForm() {
               rows={5}
               required
               className={`${fieldInputClass} h-auto py-2 font-mono text-xs`}
-              placeholder="-----BEGIN CERTIFICATE-----"
+              placeholder={t("admin.sso.ssoForm.certificatePlaceholder")}
             />
           </div>
           {problem("samlCertificate")}
 
           <p className="text-xs text-ink-3">
-            Paste the certificate your identity provider publishes, with or
-            without its BEGIN CERTIFICATE header. Assertions signed by any other
-            key are refused. This instance's entity ID, reply URL and metadata
-            document appear beside the connection once it is saved.
+            {t("admin.sso.ssoForm.pasteTheCertificate")}
           </p>
 
           <Field
-            label="Audience (optional)"
+            label={t("admin.sso.ssoForm.audienceOptional")}
             name="samlAudience"
-            placeholder="Leave empty to use this instance's URL"
+            placeholder={t("admin.sso.ssoForm.leaveEmptyToUseThisInstancesUrl")}
           />
         </>
       )}
 
       <Field
-        label="Email domains (comma-separated)"
+        label={t("admin.sso.ssoForm.emailDomains")}
         name="emailDomains"
-        placeholder="acme.com, acme.org"
+        placeholder={t("admin.sso.ssoForm.emailDomainsPlaceholder")}
       />
       {problem("emailDomains")}
 
       <label className="flex items-center gap-2 text-sm text-ink-2">
         <input type="checkbox" name="enforce" className="rounded" />
-        Enforce SSO for the email domains listed above
+        {t("admin.sso.ssoForm.enforceSsoForTheEmailDomains")}
       </label>
       <p className="text-sm text-ink-3">
-        Enforcing refuses a password, a reset link and a passkey for every
-        address on those domains, including your own. List at least one domain:
-        enforcing with the field empty does nothing, because an empty list would
-        otherwise claim every address on this instance. To undo an enforcement
-        that locked you out, clear <code>enforce</code> on the row in{" "}
-        <code>sso_connections</code>.
+        {t("admin.sso.ssoForm.enforcingRefusesAPassword", {
+          column: "enforce",
+          table: "sso_connections",
+        })}
       </p>
 
       {error && !field && (
@@ -269,7 +274,7 @@ export function SSOForm() {
       )}
 
       <Button type="submit" variant="primary" disabled={pending}>
-        {pending ? "Saving..." : "Add provider"}
+        {pending ? t("admin.sso.ssoForm.saving") : t("admin.sso.addProvider")}
       </Button>
     </form>
   );

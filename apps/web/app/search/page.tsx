@@ -18,21 +18,37 @@ import { Snippet } from "./palette.tsx";
  * that.
  */
 
-/** The types a reader can narrow to, and what to call each one. */
+/**
+ * The types a reader can narrow to, and what to call each one: the plural on
+ * the filter chip and the singular on a result. Both are catalogue keys, so a
+ * translation never has to be derived by trimming an English plural.
+ */
 const TYPES = [
-  { value: "goal", label: "Objectives" },
-  { value: "key_result", label: "Key results" },
-  { value: "kpi", label: "KPIs" },
-  { value: "initiative", label: "Initiatives" },
-  { value: "task", label: "Tasks" },
-  { value: "document", label: "Documents" },
-  { value: "comment", label: "Comments" },
-  { value: "check_in", label: "Check-ins" },
-  { value: "session", label: "Sessions" },
+  { value: "goal", label: "search.objectives", one: "search.objective" },
+  {
+    value: "key_result",
+    label: "cycle.reviewAndLearn.keyResults",
+    one: "common.keyResult",
+  },
+  { value: "kpi", label: "common.count", one: "kpis.grid.kpi" },
+  {
+    value: "initiative",
+    label: "common.initiatives",
+    one: "search.initiative",
+  },
+  { value: "task", label: "search.tasks", one: "search.task" },
+  {
+    value: "document",
+    label: "documents.subjectDocuments.documents",
+    one: "search.document",
+  },
+  { value: "comment", label: "search.comments", one: "search.comment" },
+  { value: "check_in", label: "search.checkIns", one: "search.checkIn" },
+  { value: "session", label: "common.sessions", one: "search.session" },
 ] as const;
 
 const LABEL: Readonly<Record<string, string>> = Object.fromEntries(
-  TYPES.map((one) => [one.value, one.label.replace(/s$/, "")]),
+  TYPES.map((one) => [one.value, one.one]),
 );
 
 export default async function SearchPage({
@@ -61,6 +77,12 @@ export default async function SearchPage({
           limit: 50,
         });
 
+  // A result's type in words, or the raw value for a type with no name here.
+  const typeName = (entityType: string): string => {
+    const key = LABEL[entityType];
+    return key === undefined ? entityType : t(key);
+  };
+
   const href = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams();
     for (const [key, value] of Object.entries({
@@ -86,10 +108,18 @@ export default async function SearchPage({
             </h1>
             <p className="text-xs text-ink-3" data-testid="search-count">
               {phrase === ""
-                ? "Type a phrase. Only what you can already open is searched."
+                ? t("search.typeAPhrase")
                 : hits.length === 0
-                  ? `Nothing matches "${phrase}".`
-                  : `${hits.length} ${hits.length === 1 ? "result" : "results"} for "${phrase}".`}
+                  ? t("search.nothingMatches", { phrase })
+                  : hits.length === 1
+                    ? t("search.resultsForOne", {
+                        count: hits.length,
+                        phrase,
+                      })
+                    : t("search.resultsForOther", {
+                        count: hits.length,
+                        phrase,
+                      })}
             </p>
           </div>
         </CardHeader>
@@ -139,7 +169,7 @@ export default async function SearchPage({
                     : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
                 }
               >
-                {one.label}
+                {t(one.label)}
               </Link>
             ))}
           </div>
@@ -147,8 +177,8 @@ export default async function SearchPage({
           {hits.length === 0 ? (
             <p className="rounded-md border border-line border-dashed px-3 py-6 text-center text-sm text-ink-3">
               {phrase === ""
-                ? "Goals, key results, KPIs, initiatives, tasks, documents, comments, check-ins and sessions are all searchable."
-                : "Nothing here. A draft nobody has published is not searchable, and neither is anything you could not already open."}
+                ? t("search.allSearchable")
+                : t("search.nothingHereADraft")}
             </p>
           ) : (
             <ul
@@ -167,9 +197,7 @@ export default async function SearchPage({
                     >
                       {hit.title}
                     </Link>
-                    <Chip tone="neutral">
-                      {LABEL[hit.entityType] ?? hit.entityType}
-                    </Chip>
+                    <Chip tone="neutral">{typeName(hit.entityType)}</Chip>
                     {hit.semantic ? (
                       // Marked, because a semantic hit answered a different
                       // question from the one the words asked.

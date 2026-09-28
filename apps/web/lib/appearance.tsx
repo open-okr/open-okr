@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "@openokr/ui";
+import { useTheme, useTranslations } from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
 import { setAppearance } from "./appearance-action.ts";
 
@@ -21,14 +21,14 @@ import { setAppearance } from "./appearance-action.ts";
  */
 
 const THEMES = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "System" },
+  { value: "light", label: "appearance.light" },
+  { value: "dark", label: "appearance.dark" },
+  { value: "system", label: "appearance.system" },
 ] as const;
 
 const DENSITIES = [
-  { value: "comfortable", label: "Comfortable" },
-  { value: "compact", label: "Compact" },
+  { value: "comfortable", label: "appearance.comfortable" },
+  { value: "compact", label: "appearance.compact" },
 ] as const;
 
 /**
@@ -41,8 +41,8 @@ const DENSITIES = [
  * unnoticed.
  */
 const LANGUAGES = [
-  { value: "en", label: "English" },
-  { value: "ms", label: "Bahasa Melayu" },
+  { value: "en", label: "appearance.english" },
+  { value: "ms", label: "appearance.bahasaMelayu" },
 ] as const;
 
 export function AppearanceControl({
@@ -58,6 +58,7 @@ export function AppearanceControl({
    */
   readonly language?: "en" | "ms" | null;
 }) {
+  const { t } = useTranslations();
   const { theme, density, setTheme, setDensity } = useTheme();
   const [problem, setProblem] = useState<string | null>(null);
   const [pendingLanguage, setPendingLanguage] = useState<"en" | "ms" | null>(
@@ -75,7 +76,9 @@ export function AppearanceControl({
       }
     >
       <fieldset className="flex flex-col gap-1">
-        <legend className="text-xs font-semibold text-ink-3">Theme</legend>
+        <legend className="text-xs font-semibold text-ink-3">
+          {t("appearance.theme")}
+        </legend>
         <div className="flex gap-1.5">
           {THEMES.map((option) => (
             <button
@@ -93,7 +96,7 @@ export function AppearanceControl({
                   : "rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4"
               }
             >
-              {option.label}
+              {t(option.label)}
             </button>
           ))}
         </div>
@@ -110,7 +113,9 @@ export function AppearanceControl({
        */}
       {compact ? null : (
         <fieldset className="flex flex-col gap-1">
-          <legend className="text-xs font-semibold text-ink-3">Language</legend>
+          <legend className="text-xs font-semibold text-ink-3">
+            {t("admin.general.generalSettingsForm.language")}
+          </legend>
           <div className="flex gap-1.5">
             {LANGUAGES.map((option) => (
               <button
@@ -128,20 +133,20 @@ export function AppearanceControl({
                     : "rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4"
                 }
               >
-                {option.label}
+                {t(option.label)}
               </button>
             ))}
           </div>
           <span className="text-xs text-ink-4">
-            Bahasa Melayu is stubbed: the keys exist and resolve, and a speaker
-            has not reviewed the wording yet. Most screens are still English
-            either way, which is P6-G22c.
+            {t("appearance.bahasaMelayuNote")}
           </span>
         </fieldset>
       )}
 
       <fieldset className="flex flex-col gap-1">
-        <legend className="text-xs font-semibold text-ink-3">Density</legend>
+        <legend className="text-xs font-semibold text-ink-3">
+          {t("appearance.density")}
+        </legend>
         <div className="flex gap-1.5">
           {DENSITIES.map((option) => (
             <button
@@ -159,7 +164,7 @@ export function AppearanceControl({
                   : "rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4"
               }
             >
-              {option.label}
+              {t(option.label)}
             </button>
           ))}
         </div>

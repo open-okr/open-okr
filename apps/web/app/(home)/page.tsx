@@ -120,7 +120,7 @@ export default async function HomePage({
       })
     : null;
 
-  const nodes = flatten(goals);
+  const nodes = flatten(t, goals);
   const selected = nodes.find((node) => node.id === query.node) ?? null;
 
   // Health lives on the goal, never on a key result (METHOD.md §3.5), so "on
@@ -273,7 +273,10 @@ type Goal = Awaited<
  * dropped, the same way the explorer treats one: a tree that silently omits work
  * is worse than one that shows it at the wrong indent.
  */
-function flatten(goals: readonly Goal[]): MapNode[] {
+function flatten(
+  t: Parameters<typeof mapNodesFor>[0],
+  goals: readonly Goal[],
+): MapNode[] {
   const present = new Set(goals.map((goal) => goal.id));
   const childrenOf = new Map<string, Goal[]>();
   const roots: Goal[] = [];
@@ -299,7 +302,7 @@ function flatten(goals: readonly Goal[]): MapNode[] {
       return;
     }
     seen.add(goal.id);
-    out.push(...mapNodesFor(goal, depth));
+    out.push(...mapNodesFor(t, goal, depth));
     for (const child of childrenOf.get(goal.id) ?? []) {
       walk(child, depth + 1);
     }

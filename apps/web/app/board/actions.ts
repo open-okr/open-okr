@@ -10,6 +10,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
@@ -46,6 +47,7 @@ export async function createTaskAction(
   _previous: WriteState,
   formData: FormData,
 ): Promise<WriteState> {
+  const { t } = await getTranslations();
   const title = String(formData.get("title") ?? "").trim();
   const spaceId = String(formData.get("spaceId") ?? "");
   const status = String(formData.get("status") ?? "backlog");
@@ -53,10 +55,10 @@ export async function createTaskAction(
   const dueOn = String(formData.get("dueOn") ?? "").trim();
 
   if (title === "") {
-    return { error: "A task needs a title. What has to happen?" };
+    return { error: t("board.actions.taskNeedsATitle") };
   }
   if (spaceId === "") {
-    return { error: "A task lives in a space." };
+    return { error: t("board.actions.taskLivesInASpace") };
   }
   const column = STATUSES.find((one) => one === status) ?? "backlog";
 
@@ -85,7 +87,8 @@ export async function moveTaskAction(
 ): Promise<WriteState> {
   const column = STATUSES.find((one) => one === status);
   if (!column) {
-    return { error: "That is not a column this board has." };
+    const { t } = await getTranslations();
+    return { error: t("board.actions.notAColumnThisBoardHas") };
   }
   return run((context) =>
     callAction(context, "tasks.move", {
@@ -130,7 +133,8 @@ export async function addChecklistItemAction(
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   if (id === "" || title === "") {
-    return { error: "A checklist line needs some words." };
+    const { t } = await getTranslations();
+    return { error: t("board.actions.checklistLineNeedsWords") };
   }
   return run(
     (context) => callAction(context, "tasks.addChecklistItem", { id, title }),

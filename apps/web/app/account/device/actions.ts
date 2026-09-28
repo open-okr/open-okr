@@ -2,6 +2,7 @@
 
 import { callAction } from "@openokr/core";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { DecisionResult } from "./decision-state.ts";
 
@@ -16,6 +17,7 @@ export async function decide(
   _previous: DecisionResult | null,
   form: FormData,
 ): Promise<DecisionResult> {
+  const { t } = await getTranslations();
   const userCode = String(form.get("userCode") ?? "").trim();
   const approve = String(form.get("approve") ?? "") === "yes";
 
@@ -40,8 +42,10 @@ export async function decide(
       decided: true,
       approved: answer.approved,
       message: answer.approved
-        ? `${answer.clientName} can now act as you. Its token is being handed to it now.`
-        : `${answer.clientName} was refused.`,
+        ? t("account.device.actions.canNowActAsYou", {
+            client: answer.clientName,
+          })
+        : t("account.device.actions.wasRefused", { client: answer.clientName }),
     };
   } catch (error) {
     return {
@@ -51,7 +55,7 @@ export async function decide(
       message:
         error instanceof Error
           ? error.message
-          : "That code could not be answered.",
+          : t("account.device.actions.codeCouldNotBeAnswered"),
     };
   }
 }

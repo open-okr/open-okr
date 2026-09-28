@@ -16,6 +16,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
 
@@ -98,7 +99,8 @@ export async function addIssue(
   const text = String(formData.get("text") ?? "").trim();
   const impact = Number(formData.get("impact") ?? 3);
   if (text === "") {
-    return { error: "An issue needs a sentence saying what it is." };
+    const { t } = await getTranslations();
+    return { error: t("cycle.actions.issueNeedsASentence") };
   }
   return run((context) =>
     callAction(context, "workflow.addIssue", {
@@ -137,7 +139,8 @@ export async function addPriority(
   ).trim();
   const fromIssueId = String(formData.get("fromIssueId") ?? "");
   if (text === "") {
-    return { error: "A priority needs a sentence saying what it is." };
+    const { t } = await getTranslations();
+    return { error: t("cycle.actions.priorityNeedsASentence") };
   }
   return run((context) =>
     callAction(context, "workflow.addPriority", {

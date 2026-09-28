@@ -1,5 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Bar,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  type MessageValues,
+} from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
@@ -29,8 +36,50 @@ const stateTone = (state: string) =>
       ? ("info" as const)
       : ("neutral" as const);
 
-const percent = (value: number | null) =>
-  value === null ? "no data" : `${Math.round(value)}%`;
+type Translate = (key: string, values?: MessageValues) => string;
+
+const percent = (value: number | null, t: Translate) =>
+  value === null ? t("kpis.recovery.noData") : `${Math.round(value)}%`;
+
+/**
+ * The line under a recovery objective: how many key results it has, where it
+ * was launched and, when the displayed health is above the real number, both
+ * figures. Each variant is a whole message with holes, so no sentence is
+ * assembled from English pieces.
+ */
+function recoverySummary(
+  recovery: {
+    readonly keyResults: number;
+    readonly startedPct: number | null;
+  },
+  effectivePct: number | null,
+  achievementPct: number | null,
+  t: Translate,
+): string {
+  const keyResults =
+    recovery.keyResults === 1
+      ? t("common.count.keyResultOne", { count: recovery.keyResults })
+      : t("common.count.keyResultOther", { count: recovery.keyResults });
+  const summary =
+    recovery.startedPct === null
+      ? keyResults
+      : t("kpis.recovery.keyResultsLaunchedAt", {
+          keyResults,
+          startedPct: Math.round(recovery.startedPct),
+        });
+  if (
+    effectivePct === null ||
+    achievementPct === null ||
+    effectivePct <= achievementPct
+  ) {
+    return summary;
+  }
+  return t("kpis.recovery.displayedHealthReal", {
+    summary,
+    displayed: percent(effectivePct, t),
+    real: percent(achievementPct, t),
+  });
+}
 
 export default async function RecoveryBoardPage() {
   const { t } = await getTranslations();
@@ -61,10 +110,14 @@ export default async function RecoveryBoardPage() {
             </h1>
             <p className="text-xs text-ink-3">
               {board.cards.length === 0
-                ? "All KPIs healthy."
-                : `${board.cards.length} measure${
-                    board.cards.length === 1 ? "" : "s"
-                  } below the corridor or under recovery.`}
+                ? t("kpis.recovery.allKpisHealthy")
+                : board.cards.length === 1
+                  ? t("kpis.recovery.measuresBelowOne", {
+                      count: board.cards.length,
+                    })
+                  : t("kpis.recovery.measuresBelowOther", {
+                      count: board.cards.length,
+                    })}
             </p>
           </div>
         </CardHeader>
@@ -92,16 +145,18 @@ export default async function RecoveryBoardPage() {
                   {card.title}
                 </h2>
                 <Chip tone={stateTone(card.state)} dot>
-                  {card.state === "recovering" ? "recovering" : "unhealthy"}
+                  {card.state === "recovering"
+                    ? t("kpis.recovery.stateRecovering")
+                    : t("kpis.recovery.stateUnhealthy")}
                 </Chip>
               </div>
               <p className="text-xs text-ink-3">
-                {card.treeName ?? "No tree yet"}
+                {card.treeName ?? t("kpis.recovery.noTreeYet")}
               </p>
             </div>
             <div className="flex flex-none flex-col items-end">
               <span className="text-sm font-bold text-ink tabular-nums">
-                {percent(card.achievementPct)}
+                {percent(card.achievementPct, t)}
               </span>
               <span className="text-xs text-ink-4">
                 {t("common.healthyAt", {
@@ -131,20 +186,12 @@ export default async function RecoveryBoardPage() {
                 </div>
                 <Bar value={card.recovery.progressPct} max={ceiling} />
                 <p className="text-xs text-ink-3">
-                  {t("common.keyResult4", {
-                    keyResults: card.recovery.keyResults,
-                    keyResults2: card.recovery.keyResults === 1 ? "" : "s",
-                    startedPct:
-                      card.recovery.startedPct === null
-                        ? ""
-                        : `, launched at ${Math.round(card.recovery.startedPct)}%`,
-                    achievementPct:
-                      card.effectivePct === null ||
-                      card.achievementPct === null ||
-                      card.effectivePct <= card.achievementPct
-                        ? ""
-                        : `. Displayed health ${percent(card.effectivePct)}, real ${percent(card.achievementPct)}`,
-                  })}
+                  {recoverySummary(
+                    card.recovery,
+                    card.effectivePct,
+                    card.achievementPct,
+                    t,
+                  )}
                 </p>
                 {card.recovery.closeProposed && !card.recovery.closed ? (
                   <p className="text-xs font-semibold text-ok">

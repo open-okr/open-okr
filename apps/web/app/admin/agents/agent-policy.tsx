@@ -35,28 +35,34 @@ import { bindAgentScopeAction, setAgentAutonomyAction } from "./actions";
  * a server component and passes what it already holds.
  */
 
-/** §6's three policies, in the order they widen. */
-const POLICY: Record<string, { label: string; means: string }> = {
-  sandbox: {
-    label: "Sandbox",
-    means: "runs and records, commits nothing at all",
-  },
-  propose: {
-    label: "Propose",
-    means: "writes proposals into the review queue for somebody to approve",
-  },
-  scoped_direct: {
-    label: "Scoped direct",
-    means:
-      "writes directly, but only inside the scopes bound below. Nothing else",
-  },
-};
+/**
+ * §6's three policies, in the order they widen. A function of `t` so the
+ * wording comes from the catalogue in the reader's language.
+ */
+function policies(
+  t: (key: string) => string,
+): Record<string, { label: string; means: string }> {
+  return {
+    sandbox: {
+      label: t("admin.agents.agentPolicy.sandbox"),
+      means: t("admin.agents.agentPolicy.sandboxMeans"),
+    },
+    propose: {
+      label: t("admin.agents.agentPolicy.propose"),
+      means: t("admin.agents.agentPolicy.proposeMeans"),
+    },
+    scoped_direct: {
+      label: t("admin.agents.agentPolicy.scopedDirect"),
+      means: t("admin.agents.agentPolicy.scopedDirectMeans"),
+    },
+  };
+}
 
 /** What an agent can be bound to. The workspace is deliberately absent. */
 const BINDABLE = [
-  { type: "space", label: "Space" },
-  { type: "goal", label: "Goal" },
-  { type: "kpi_tree", label: "KPI tree" },
+  { type: "space", labelKey: "initiatives.space" },
+  { type: "goal", labelKey: "admin.agents.agentPolicy.goal" },
+  { type: "kpi_tree", labelKey: "admin.agents.agentPolicy.kpiTree" },
 ] as const;
 
 export function AgentPolicy({
@@ -78,6 +84,7 @@ export function AgentPolicy({
   }[];
 }) {
   const { t } = useTranslations();
+  const POLICY = policies(t);
 
   const [pending, start] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -105,7 +112,9 @@ export function AgentPolicy({
                   if (
                     option === "scoped_direct" &&
                     !window.confirm(
-                      `Let ${name} write directly? It will commit inside the scopes bound to it without anybody approving each change. Everything it writes is still audited, and it can be moved back at any time.`,
+                      t("admin.agents.agentPolicy.confirmScopedDirect", {
+                        name,
+                      }),
                     )
                   ) {
                     return;
@@ -159,7 +168,7 @@ export function AgentPolicy({
             >
               {BINDABLE.map((one) => (
                 <option key={one.type} value={one.type}>
-                  {one.label}
+                  {t(one.labelKey)}
                 </option>
               ))}
             </select>
@@ -187,7 +196,9 @@ export function AgentPolicy({
             </select>
           </label>
           <Button type="submit" size="sm" disabled={pending}>
-            {pending ? "Binding…" : "Bind"}
+            {pending
+              ? t("admin.agents.agentPolicy.binding")
+              : t("admin.agents.agentPolicy.bind")}
           </Button>
           <Button
             type="button"

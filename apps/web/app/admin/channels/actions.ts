@@ -10,6 +10,7 @@ import { callAction, openConnection, parseWhatsAppSecret } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { FormResult } from "./form-state.ts";
 
@@ -45,6 +46,7 @@ export async function connectProvider(
   _previous: FormResult | null,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const provider = String(form.get("provider") ?? "");
   const botToken = String(form.get("botToken") ?? "").trim();
   const signingSecret = String(form.get("signingSecret") ?? "").trim();
@@ -53,8 +55,7 @@ export async function connectProvider(
   if (!botToken || !signingSecret || !teamId) {
     return {
       ok: false,
-      message:
-        "All three are needed: the bot token to send with, the signing secret to verify what arrives, and the workspace id to route it to.",
+      message: t("admin.channels.actions.allThreeAreNeeded"),
     };
   }
 
@@ -93,7 +94,10 @@ export async function connectProvider(
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "That did not work.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
 
@@ -112,6 +116,7 @@ export async function disconnectProvider(
   _previous: FormResult | null,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const provider = String(form.get("provider") ?? "");
   try {
     await callAction(await context(), "channels.disconnect", {
@@ -120,14 +125,20 @@ export async function disconnectProvider(
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "That did not work.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
   revalidatePath("/admin/channels");
   // The member's own page offers a provider to link only while the workspace
   // has it connected, so installing or removing one changes that page too.
   revalidatePath("/account/channels");
-  return { ok: true, message: `${provider} is disconnected.` };
+  return {
+    ok: true,
+    message: t("admin.channels.actions.providerIsDisconnected", { provider }),
+  };
 }
 
 /**
@@ -141,6 +152,7 @@ export async function sendTest(
   _previous: FormResult | null,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const attempt = String(form.get("attempt") ?? "").trim();
   try {
     await callAction(await context(), "channels.testSend", {
@@ -149,7 +161,10 @@ export async function sendTest(
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "That did not work.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
   revalidatePath("/admin/channels");
@@ -158,8 +173,7 @@ export async function sendTest(
   revalidatePath("/account/channels");
   return {
     ok: true,
-    message:
-      "Queued. The relay delivers it within the minute; the log below says what happened.",
+    message: t("admin.channels.actions.queuedTheRelayDelivers"),
   };
 }
 
@@ -184,6 +198,7 @@ export async function syncTemplates(
   // one, and a form component per arity would be a component per arity.
   _form?: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const acting = await context();
 
   const connection = await openConnection(getPool(), getKeyRing(), {
@@ -195,13 +210,15 @@ export async function syncTemplates(
   const businessAccountId = connection?.config.businessAccountId;
 
   if (!secret || typeof phoneNumberId !== "string") {
-    return { ok: false, message: "WhatsApp is not connected." };
+    return {
+      ok: false,
+      message: t("admin.channels.actions.whatsappIsNotConnected"),
+    };
   }
   if (typeof businessAccountId !== "string") {
     return {
       ok: false,
-      message:
-        "This number has not received a message yet, so the business account it belongs to is not known. Send anything to it and try again.",
+      message: t("admin.channels.actions.numberHasNotReceivedAMessage"),
     };
   }
 
@@ -220,8 +237,10 @@ export async function syncTemplates(
       ok: false,
       message:
         error instanceof Error
-          ? `Meta refused the template list: ${error.message}`
-          : "Meta refused the template list.",
+          ? t("admin.channels.actions.metaRefusedTheListBecause", {
+              reason: error.message,
+            })
+          : t("admin.channels.actions.metaRefusedTheList"),
     };
   }
 
@@ -247,8 +266,18 @@ export async function syncTemplates(
     ok: true,
     message:
       outcome.withdrawn > 0
-        ? `${outcome.recorded} templates, and ${outcome.withdrawn} Meta no longer lists.`
-        : `${outcome.recorded} templates.`,
+        ? t(
+            outcome.recorded === 1
+              ? "admin.channels.actions.templatesWithdrawnOne"
+              : "admin.channels.actions.templatesWithdrawnOther",
+            { count: outcome.recorded, withdrawn: outcome.withdrawn },
+          )
+        : t(
+            outcome.recorded === 1
+              ? "admin.channels.actions.templatesOne"
+              : "admin.channels.actions.templatesOther",
+            { count: outcome.recorded },
+          ),
   };
 }
 
@@ -264,10 +293,14 @@ export async function saveTemplateMapping(
   _previous: FormResult | null,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const ruleKey = String(form.get("ruleKey") ?? "").trim();
   const templateId = String(form.get("templateId") ?? "").trim();
   if (ruleKey === "" || templateId === "") {
-    return { ok: false, message: "Choose a reminder and a template." };
+    return {
+      ok: false,
+      message: t("admin.channels.actions.chooseAReminderAndATemplate"),
+    };
   }
 
   const bindings: string[] = [];
@@ -291,12 +324,12 @@ export async function saveTemplateMapping(
       message:
         error instanceof Error
           ? error.message
-          : "That mapping could not be saved.",
+          : t("admin.channels.actions.mappingCouldNotBeSaved"),
     };
   }
 
   revalidatePath("/admin/channels");
-  return { ok: true, message: "Saved." };
+  return { ok: true, message: t("admin.rhythm.actions.saved") };
 }
 
 /** Forgets one mapping, so the rule has no template again. */
@@ -304,9 +337,10 @@ export async function removeTemplateMapping(
   _previous: FormResult | null,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const ruleKey = String(form.get("ruleKey") ?? "").trim();
   if (ruleKey === "") {
-    return { ok: false, message: "Nothing to remove." };
+    return { ok: false, message: t("admin.channels.actions.nothingToRemove") };
   }
 
   try {
@@ -317,10 +351,12 @@ export async function removeTemplateMapping(
     return {
       ok: false,
       message:
-        error instanceof Error ? error.message : "That could not be removed.",
+        error instanceof Error
+          ? error.message
+          : t("admin.channels.actions.couldNotBeRemoved"),
     };
   }
 
   revalidatePath("/admin/channels");
-  return { ok: true, message: "Removed." };
+  return { ok: true, message: t("admin.ai.actions.removed") };
 }

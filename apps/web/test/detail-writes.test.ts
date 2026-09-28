@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import { withMessages } from "./screen-text.ts";
 
 /**
  * The detail-page writes that had no browser caller (P6-G27, GAP-AUDIT §5).
@@ -39,8 +40,8 @@ describe("delete", () => {
   test("states the soft-delete semantics on the confirmation", () => {
     // The thing worth telling somebody is not "are you sure" but what a delete
     // is in this product, and that does not fit in a dialog title.
-    expect(deleteControl).toContain("Nothing is destroyed");
-    expect(deleteControl).toContain("the history stays readable");
+    expect(withMessages(deleteControl)).toContain("Nothing is destroyed");
+    expect(withMessages(deleteControl)).toContain("the history stays readable");
     // Two presses, so the sentence is read before the second one.
     expect(deleteControl).toContain("armed ? (");
   });

@@ -149,11 +149,11 @@ export async function Capacity({
                                 }
                                 dot
                               >
-                                {
+                                {t(
                                   CAPACITY_LABEL[
                                     initiative.capacity ?? "unjudged"
-                                  ]
-                                }
+                                  ] ?? "initiatives.capacity.unjudged",
+                                )}
                               </Chip>
                             </Link>
                           </li>
@@ -166,7 +166,10 @@ export async function Capacity({
                   tone={CAPACITY_TONE[keyResult.capacity ?? "unjudged"]}
                   dot
                 >
-                  {CAPACITY_LABEL[keyResult.capacity ?? "unjudged"]}
+                  {t(
+                    CAPACITY_LABEL[keyResult.capacity ?? "unjudged"] ??
+                      "initiatives.capacity.unjudged",
+                  )}
                 </Chip>
               </li>
             ))}

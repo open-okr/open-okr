@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import { withMessages } from "./screen-text.ts";
 
 /**
  * The feed reaches all four scopes S-31 names (P6-G11b, GAP-AUDIT G-01).
@@ -71,7 +72,8 @@ describe("the feed at every scope", () => {
     // A renderer describes the subject and never the actor, so a page that
     // read the actor's name off the row would print nothing.
     expect(panel).toContain("names.get(item.actorMemberId)");
-    expect(panel).toContain('"OpenOKR"');
+    // The fallback name for a system actor, now a catalogue entry.
+    expect(withMessages(panel)).toContain("OpenOKR");
   });
 
   test("the older link carries the last row's own key", () => {

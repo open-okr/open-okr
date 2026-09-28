@@ -45,10 +45,14 @@ export async function SubjectDocuments({
         </h2>
         <span className="text-xs text-ink-3" data-testid="document-count">
           {documents.length === 0
-            ? "None yet"
-            : `${documents.length} ${
-                documents.length === 1 ? "document" : "documents"
-              }`}
+            ? t("board.noneYet")
+            : documents.length === 1
+              ? t("documents.subjectDocuments.documentCountOne", {
+                  count: documents.length,
+                })
+              : t("documents.subjectDocuments.documentCountOther", {
+                  count: documents.length,
+                })}
         </span>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
@@ -74,18 +78,25 @@ export async function SubjectDocuments({
                     {document.title}
                   </Link>
                   <span className="truncate text-xs text-ink-3">
-                    {document.authorName}
                     {document.versionCount > 0
-                      ? ` · ${document.versionCount} version${
-                          document.versionCount === 1 ? "" : "s"
-                        }`
-                      : ""}
+                      ? t("documents.subjectDocuments.authorAndVersions", {
+                          name: document.authorName,
+                          versions:
+                            document.versionCount === 1
+                              ? t("common.count.versionOne", {
+                                  count: document.versionCount,
+                                })
+                              : t("common.count.versionOther", {
+                                  count: document.versionCount,
+                                }),
+                        })
+                      : document.authorName}
                   </span>
                 </div>
                 <Chip tone={document.state === "draft" ? "warn" : "ok"} dot>
                   {document.state === "draft"
-                    ? "Draft, yours only"
-                    : "Published"}
+                    ? t("documents.subjectDocuments.draftYoursOnly")
+                    : t("documents.subjectDocuments.published")}
                 </Chip>
               </li>
             ))}

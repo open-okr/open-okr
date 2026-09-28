@@ -34,8 +34,8 @@ export interface ExportOutcome {
 export type ExportFormat = "csv" | "xlsx";
 
 const LABELS: Record<ExportFormat, string> = {
-  csv: "CSV",
-  xlsx: "Excel",
+  csv: "search.exportButton.csv",
+  xlsx: "search.exportButton.excel",
 };
 
 const CONTENT_TYPES: Record<ExportFormat, string> = {
@@ -44,7 +44,7 @@ const CONTENT_TYPES: Record<ExportFormat, string> = {
 };
 
 export function ExportButton({
-  label = "Export",
+  label,
   onExport,
 }: {
   readonly label?: string;
@@ -76,7 +76,7 @@ export function ExportButton({
         >
           {(Object.keys(LABELS) as ExportFormat[]).map((one) => (
             <option key={one} value={one}>
-              {LABELS[one]}
+              {t(LABELS[one])}
             </option>
           ))}
         </select>
@@ -95,19 +95,34 @@ export function ExportButton({
               const bytes = decode(outcome, format);
               if (outcome.queued || !bytes) {
                 setMessage(
-                  `${outcome.rowCount} rows is too many to build here. It is being prepared and will appear under Your exports.`,
+                  t("search.exportButton.tooManyToBuild", {
+                    rows:
+                      outcome.rowCount === 1
+                        ? t("common.count.rowOne", { count: outcome.rowCount })
+                        : t("common.count.rowOther", {
+                            count: outcome.rowCount,
+                          }),
+                  }),
                 );
                 return;
               }
               download(outcome.filename, bytes, CONTENT_TYPES[format]);
               setMessage(
-                `${outcome.rowCount} ${outcome.rowCount === 1 ? "row" : "rows"} downloaded.`,
+                outcome.rowCount === 1
+                  ? t("search.exportButton.rowsDownloadedOne", {
+                      count: outcome.rowCount,
+                    })
+                  : t("search.exportButton.rowsDownloadedOther", {
+                      count: outcome.rowCount,
+                    }),
               );
             });
           }}
           className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand disabled:text-ink-4"
         >
-          {pending ? "Preparing…" : label}
+          {pending
+            ? t("search.exportButton.preparing")
+            : (label ?? t("search.exportButton.export"))}
         </button>
       </span>
       {message ? (

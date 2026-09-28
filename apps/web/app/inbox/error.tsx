@@ -7,5 +7,5 @@ export default function InboxError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="your inbox" />;
+  return <SegmentError {...props} headingKey="segmentError.inbox" />;
 }

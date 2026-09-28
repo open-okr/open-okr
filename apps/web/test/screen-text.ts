@@ -27,3 +27,23 @@ export function readScreen(path: string): string {
     (whole, key: string) => en[key] ?? whole,
   );
 }
+
+/**
+ * A source file followed by the English of every catalogue key it names,
+ * with or without values (completeness review M-15).
+ *
+ * `readScreen` only fills a `t("key")` that takes no values. The sweep that
+ * moved the last 461 hardcoded strings into the catalogue turned sentences
+ * several tests asserted on into keys with holes, and some into one/other
+ * pairs. A test that asks "does this screen say X" asks it of this; a test
+ * about the code itself keeps reading the source.
+ */
+export function withMessages(source: string): string {
+  const en = CATALOGUES.en;
+  const named = [
+    ...source.matchAll(/"([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+)"/g),
+  ]
+    .map((match) => match[1] ?? "")
+    .filter((key) => key in en);
+  return [source, ...named.map((key) => en[key])].join("\n");
+}

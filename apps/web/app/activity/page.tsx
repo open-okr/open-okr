@@ -110,8 +110,8 @@ export default async function ActivityPage({
           {items.length === 0 ? (
             <p className="text-sm text-ink-3">
               {cursor
-                ? "Nothing further back than this."
-                : "Nothing yet. Every check-in, goal, session and setting change lands here as it happens."}
+                ? t("activity.nothingFurtherBack")
+                : t("activity.nothingYet")}
             </p>
           ) : (
             <ul className="flex flex-col gap-2.5">
@@ -124,8 +124,9 @@ export default async function ActivityPage({
                     <span className="text-sm text-ink">{item.rendered}</span>
                     <span className="text-xs text-ink-4">
                       {item.actorMemberId
-                        ? (names.get(item.actorMemberId) ?? "A member")
-                        : "OpenOKR"}
+                        ? (names.get(item.actorMemberId) ??
+                          t("activity.aMember"))
+                        : t("activity.openOkr")}
                       {" · "}
                       {when(item.at, timeZone)}
                     </span>

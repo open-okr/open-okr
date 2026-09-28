@@ -1,5 +1,6 @@
 import { Card, CardBody, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { getTranslations } from "./translations";
 
 /**
  * What a workspace that is not taking writes tells its members (P6-G25).
@@ -24,7 +25,7 @@ import Link from "next/link";
  * workspace is being used, the other is a state an instance operator put it
  * in. Saying "frozen" for both would make the first sound like a fault.
  */
-export function WorkspaceStateBanner({
+export async function WorkspaceStateBanner({
   state,
   canRecover,
 }: {
@@ -36,29 +37,32 @@ export function WorkspaceStateBanner({
     return null;
   }
 
+  const { t } = await getTranslations();
   const frozen = state === "frozen";
 
   return (
     <Card data-testid="workspace-state-banner">
       <CardBody className="flex flex-wrap items-baseline gap-2.5">
         <Chip tone={frozen ? "bad" : "warn"}>
-          {frozen ? "Frozen" : "Read only"}
+          {frozen
+            ? t("workspaceState.frozen")
+            : t("admin.support.grant.readOnly")}
         </Chip>
         <span className="min-w-0 flex-1 text-sm text-ink-2">
           {frozen
-            ? "This workspace is frozen. Nothing can be written until it is lifted, and everything already here is still readable."
-            : "This workspace is read only. Everything is still readable; nothing new can be written."}
+            ? t("workspaceState.frozenExplained")
+            : t("workspaceState.readOnlyExplained")}
         </span>
         {canRecover ? (
           <Link
             href="/admin/general"
             className="text-xs font-semibold text-brand-text hover:underline"
           >
-            Change it in Admin
+            {t("workspaceState.changeItInAdmin")}
           </Link>
         ) : (
           <span className="text-xs text-ink-4">
-            A workspace administrator can lift it.
+            {t("workspaceState.anAdministratorCanLiftIt")}
           </span>
         )}
       </CardBody>

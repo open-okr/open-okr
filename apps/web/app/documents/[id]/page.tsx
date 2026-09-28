@@ -109,14 +109,18 @@ export default async function DocumentPage({
               )}
               <h1 className="text-lg font-bold text-ink">{document.title}</h1>
               <p className="text-xs text-ink-3">
-                {document.authorName}
                 {document.publishedAt
-                  ? ` · published ${document.publishedAt.slice(0, 10)}`
-                  : ""}
+                  ? t("documents.detail.authorPublished", {
+                      authorName: document.authorName,
+                      publishedAt: document.publishedAt.slice(0, 10),
+                    })
+                  : document.authorName}
               </p>
             </div>
             <Chip tone={document.state === "draft" ? "warn" : "ok"} dot>
-              {document.state === "draft" ? "Draft" : "Published"}
+              {document.state === "draft"
+                ? t("documents.detail.draft")
+                : t("documents.detail.published")}
             </Chip>
             <WatchControl
               subjectType="document"
@@ -161,10 +165,14 @@ export default async function DocumentPage({
             </h2>
             <span className="text-xs text-ink-3">
               {document.versionCount === 0
-                ? "Never published"
-                : `${document.versionCount} version${
-                    document.versionCount === 1 ? "" : "s"
-                  }`}
+                ? t("documents.detail.neverPublished")
+                : document.versionCount === 1
+                  ? t("common.count.versionOne", {
+                      count: document.versionCount,
+                    })
+                  : t("common.count.versionOther", {
+                      count: document.versionCount,
+                    })}
             </span>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
@@ -255,12 +263,7 @@ export default async function DocumentPage({
         />
 
         {level >= ACCESS_LEVELS.full ? (
-          <DeleteControl
-            subject="document"
-            id={id}
-            what="this document"
-            returnTo="/"
-          />
+          <DeleteControl subject="document" id={id} returnTo="/" />
         ) : null}
       </div>
     </div>

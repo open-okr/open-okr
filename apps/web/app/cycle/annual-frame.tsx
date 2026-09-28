@@ -94,7 +94,9 @@ export async function AnnualFrame({
           </div>
           {frame ? (
             <Chip tone={frame.agreed ? "ok" : "warn"}>
-              {frame.agreed ? "agreed" : "not agreed yet"}
+              {frame.agreed
+                ? t("cycle.annualFrame.agreedChip")
+                : t("cycle.annualFrame.notAgreedYet")}
             </Chip>
           ) : (
             <Chip tone="neutral">{t("cycle.annualFrame.notWritten")}</Chip>
@@ -143,17 +145,25 @@ export async function AnnualFrame({
 
               {(
                 [
-                  ["mission", "Mission", "Why this organisation exists."],
-                  ["vision", "Vision", "What it is trying to become."],
+                  [
+                    "mission",
+                    t("common.mission"),
+                    t("cycle.annualFrame.missionHint"),
+                  ],
+                  [
+                    "vision",
+                    t("cycle.annualFrame.vision"),
+                    t("cycle.annualFrame.visionHint"),
+                  ],
                   [
                     "strategy",
-                    "Mid-term strategy",
-                    "How it intends to get there, over the horizon above.",
+                    t("cycle.annualFrame.midTermStrategy"),
+                    t("cycle.annualFrame.strategyHint"),
                   ],
                   [
                     "notDoing",
-                    "Not doing this year",
-                    "The list that makes the rest credible. The method asks for it by name.",
+                    t("cycle.annualFrame.notDoingThisYear"),
+                    t("cycle.annualFrame.notDoingHint"),
                   ],
                 ] as const
               ).map(([name, label, hint]) => (
@@ -184,7 +194,9 @@ export async function AnnualFrame({
                     <input
                       name="strategyText"
                       defaultValue={strategies[index]?.text ?? ""}
-                      placeholder={`Strategy ${index + 1}`}
+                      placeholder={t("cycle.annualFrame.strategyNumber", {
+                        number: index + 1,
+                      })}
                       className="w-72 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                     />
                     <input
@@ -198,7 +210,9 @@ export async function AnnualFrame({
               </fieldset>
 
               <Button type="submit" variant="default" size="sm">
-                {frame ? "Replace the frame" : "Write the frame"}
+                {frame
+                  ? t("cycle.annualFrame.replaceTheFrame")
+                  : t("cycle.annualFrame.writeTheFrame")}
               </Button>
             </ActionForm>
           ) : (
@@ -221,10 +235,10 @@ async function ReadOnlyFrame({ frame }: { readonly frame: Frame | null }) {
     );
   }
   const fields: readonly (readonly [string, string])[] = [
-    ["Mission", asText(frame.mission)],
-    ["Vision", asText(frame.vision)],
-    ["Mid-term strategy", asText(frame.strategy)],
-    ["Not doing this year", asText(frame.notDoing)],
+    [t("common.mission"), asText(frame.mission)],
+    [t("cycle.annualFrame.vision"), asText(frame.vision)],
+    [t("cycle.annualFrame.midTermStrategy"), asText(frame.strategy)],
+    [t("cycle.annualFrame.notDoingThisYear"), asText(frame.notDoing)],
   ];
   return (
     <div className="flex flex-col gap-2.5">
@@ -232,7 +246,7 @@ async function ReadOnlyFrame({ frame }: { readonly frame: Frame | null }) {
         <div key={label} className="flex flex-col gap-0.5">
           <span className="text-xs font-semibold text-ink-3">{label}</span>
           <p className="whitespace-pre-line text-sm text-ink-2">
-            {text === "" ? "Not written yet." : text}
+            {text === "" ? t("cycle.annualFrame.notWrittenYet") : text}
           </p>
         </div>
       ))}

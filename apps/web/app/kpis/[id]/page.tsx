@@ -145,9 +145,9 @@ export default async function KpiDetailPage({
             </div>
             <p className="text-xs text-ink-3">
               {[
-                kpi.categoryName ?? "Uncategorised",
-                kpi.treeName ?? "no tree",
-                kpi.ownerName ?? "workspace owned",
+                kpi.categoryName ?? t("kpis.detail.uncategorised"),
+                kpi.treeName ?? t("kpis.detail.noTree"),
+                kpi.ownerName ?? t("kpis.detail.workspaceOwned"),
                 kpi.frequency,
                 `${kpi.indicatorType} · ${kpi.tier}`,
               ].join(" · ")}
@@ -156,7 +156,7 @@ export default async function KpiDetailPage({
           <div className="flex flex-none flex-col items-end">
             <span className="text-lg font-bold text-ink tabular-nums">
               {kpi.achievementPct === null
-                ? "no data"
+                ? t("kpis.detail.noData")
                 : `${Math.round(kpi.achievementPct)}%`}
             </span>
             <span className="text-xs text-ink-4">
@@ -177,16 +177,22 @@ export default async function KpiDetailPage({
               {t("kpis.detail.recoveryObjective")}
             </Link>
             <span className="text-xs text-ink-3">
-              {t("kpis.detail.launchedAt", {
-                recoveryStartedPct:
-                  kpi.recoveryStartedPct === null
-                    ? "an unknown point"
-                    : `${Math.round(kpi.recoveryStartedPct)}%`,
-                achievementPct:
-                  kpi.effectivePct === null || kpi.achievementPct === null
-                    ? ""
-                    : `, displayed health ${Math.round(kpi.effectivePct)}% against a real ${Math.round(kpi.achievementPct)}%`,
-              })}
+              {kpi.effectivePct === null || kpi.achievementPct === null
+                ? kpi.recoveryStartedPct === null
+                  ? t("kpis.detail.launchedAtAnUnknownPoint")
+                  : t("kpis.detail.launchedAtPct", {
+                      recoveryStartedPct: Math.round(kpi.recoveryStartedPct),
+                    })
+                : kpi.recoveryStartedPct === null
+                  ? t("kpis.detail.launchedAtAnUnknownPointDisplayed", {
+                      effectivePct: Math.round(kpi.effectivePct),
+                      achievementPct: Math.round(kpi.achievementPct),
+                    })
+                  : t("kpis.detail.launchedAtPctDisplayed", {
+                      recoveryStartedPct: Math.round(kpi.recoveryStartedPct),
+                      effectivePct: Math.round(kpi.effectivePct),
+                      achievementPct: Math.round(kpi.achievementPct),
+                    })}
             </span>
           </CardBody>
         ) : null}
@@ -208,9 +214,29 @@ export default async function KpiDetailPage({
               viewBox={`0 0 ${width} ${height}`}
               className="h-36 w-full min-w-[32rem]"
               role="img"
-              aria-label={`${kpi.title} over ${series.length} periods, with the healthy and watch bands`}
+              aria-label={
+                series.length === 1
+                  ? t("kpis.detail.chartLabelOne", {
+                      title: kpi.title,
+                      count: series.length,
+                    })
+                  : t("kpis.detail.chartLabelOther", {
+                      title: kpi.title,
+                      count: series.length,
+                    })
+              }
             >
-              <title>{`${kpi.title} over ${series.length} periods`}</title>
+              <title>
+                {series.length === 1
+                  ? t("kpis.detail.chartTitleOne", {
+                      title: kpi.title,
+                      count: series.length,
+                    })
+                  : t("kpis.detail.chartTitleOther", {
+                      title: kpi.title,
+                      count: series.length,
+                    })}
+              </title>
               {/* The two bands, drawn from the target rather than from the
                   achievement, because a reader compares the value they typed
                   against the value they aimed at. */}
@@ -364,7 +390,7 @@ export default async function KpiDetailPage({
                       </span>
                       <Chip tone={stateTone(child.state)} dot>
                         {child.achievementPct === null
-                          ? "no data"
+                          ? t("kpis.detail.noData")
                           : `${Math.round(child.achievementPct)}%`}
                       </Chip>
                     </li>
@@ -413,8 +439,8 @@ export default async function KpiDetailPage({
           ) : (
             <p className="text-sm text-ink-3">
               {kpi.isCalculated
-                ? "This KPI is calculated from other measures."
-                : "This KPI is entered by hand."}
+                ? t("kpis.detail.thisKpiIsCalculated")
+                : t("kpis.detail.thisKpiIsEnteredByHand")}
             </p>
           )}
         </CardBody>

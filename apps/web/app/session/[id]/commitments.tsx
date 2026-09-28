@@ -137,7 +137,9 @@ function LastWeek({
         disabled={pending}
         className="self-start"
       >
-        {pending ? "Closing…" : "Close what was answered"}
+        {pending
+          ? t("session.detail.commitments.closing")
+          : t("session.detail.commitments.closeWhatWasAnswered")}
       </Button>
       <Problem state={state} />
     </form>
@@ -196,7 +198,10 @@ function ThisWeek({
           <div key={index} className="flex flex-wrap gap-2">
             <input
               name="text"
-              placeholder={`What will move by next week (${index + 1})`}
+              placeholder={t(
+                "session.detail.commitments.whatWillMoveByNextWeek",
+                { number: index + 1 },
+              )}
               className="w-80 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             />
             <select
@@ -239,10 +244,10 @@ function ThisWeek({
           className="self-start"
         >
           {pending
-            ? "Saving…"
+            ? t("session.detail.saving")
             : already.length === 0
-              ? "Set this week's commitments"
-              : "Add one more"}
+              ? t("session.detail.commitments.setThisWeekS")
+              : t("session.detail.commitments.addOneMore")}
         </Button>
         <Problem state={state} />
       </form>
@@ -288,7 +293,11 @@ export function Commitments({
             </p>
           </div>
           <Chip tone={carried.length > 0 ? "warn" : "ok"}>
-            {carried.length === 0 ? "all closed" : `${carried.length} open`}
+            {carried.length === 0
+              ? t("session.detail.commitments.allClosed")
+              : t("session.detail.countOpen", {
+                  count: carried.length,
+                })}
           </Chip>
         </CardHeader>
         <CardBody>

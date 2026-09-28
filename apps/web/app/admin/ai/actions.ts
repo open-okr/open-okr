@@ -26,6 +26,7 @@ import type {
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { FormResult } from "./form-state.ts";
 
@@ -49,12 +50,16 @@ async function context() {
   };
 }
 
-const reason = (error: unknown): string =>
-  error instanceof OperationError
-    ? error.message
-    : error instanceof Error
-      ? error.message
-      : "Something went wrong.";
+async function reason(error: unknown): Promise<string> {
+  if (error instanceof OperationError) {
+    return error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  const { t } = await getTranslations();
+  return t("admin.agents.proposalQueue.somethingWentWrong");
+}
 
 function done(message: string): FormResult {
   revalidatePath("/admin/ai");
@@ -65,6 +70,7 @@ export async function saveProvider(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const provider = String(form.get("provider") ?? "") as Provider;
   const baseUrlRaw = String(form.get("baseUrl") ?? "").trim();
   try {
@@ -76,9 +82,9 @@ export async function saveProvider(
       baseUrl: baseUrlRaw === "" ? null : baseUrlRaw,
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Saved.");
+  return done(t("admin.rhythm.actions.saved"));
 }
 
 /**
@@ -93,6 +99,7 @@ export async function saveWorkspaceKey(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const provider = String(form.get("provider") ?? "") as Provider;
   const apiKey = String(form.get("apiKey") ?? "");
   try {
@@ -101,26 +108,25 @@ export async function saveWorkspaceKey(
       apiKey,
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done(
-    "Stored. Nothing has called the provider yet, so it is unverified rather than working.",
-  );
+  return done(t("admin.ai.actions.storedUnverified"));
 }
 
 export async function removeWorkspaceKey(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const provider = String(form.get("provider") ?? "") as Provider;
   try {
     await callAction(await context(), "ai.removeWorkspaceCredential", {
       provider,
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Removed.");
+  return done(t("admin.ai.actions.removed"));
 }
 
 /**
@@ -133,6 +139,7 @@ export async function rotateKeys(
   _previous: FormResult,
   _form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   try {
     const result = await callAction(
       await context(),
@@ -140,10 +147,13 @@ export async function rotateKeys(
       {},
     );
     return done(
-      `Examined ${result.examined}, re-wrapped ${result.rewrapped}. Nothing lost access.`,
+      t("admin.ai.actions.examinedRewrapped", {
+        examined: result.examined,
+        rewrapped: result.rewrapped,
+      }),
     );
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
 }
 
@@ -151,6 +161,7 @@ export async function addModel(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const number = (name: string, fallback: number): number => {
     const raw = String(form.get(name) ?? "").trim();
     return raw === "" ? fallback : Number(raw);
@@ -173,29 +184,31 @@ export async function addModel(
       tiers: form.getAll("tiers").map((value) => String(value) as Tier),
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Added.");
+  return done(t("admin.ai.actions.added"));
 }
 
 export async function removeModel(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   try {
     await callAction(await context(), "ai.removeCustomModel", {
       id: String(form.get("id") ?? ""),
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Removed.");
+  return done(t("admin.ai.actions.removed"));
 }
 
 export async function saveTier(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const temperature = String(form.get("temperature") ?? "").trim();
   const maxTokens = String(form.get("maxTokens") ?? "").trim();
   try {
@@ -209,29 +222,31 @@ export async function saveTier(
       maxTokens: maxTokens === "" ? null : Number(maxTokens),
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Routed.");
+  return done(t("admin.ai.actions.routed"));
 }
 
 export async function clearTier(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   try {
     await callAction(await context(), "ai.removeTierPolicy", {
       tier: String(form.get("tier") ?? "") as Tier,
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Back to the seeded default.");
+  return done(t("admin.ai.actions.backToTheSeededDefault"));
 }
 
 export async function saveFeature(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const tier = String(form.get("tierOverride") ?? "").trim();
   try {
     await callAction(await context(), "ai.updateFeatureSetting", {
@@ -242,9 +257,9 @@ export async function saveFeature(
       tierOverride: tier === "" ? null : (tier as Tier),
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Saved.");
+  return done(t("admin.rhythm.actions.saved"));
 }
 
 /**
@@ -259,14 +274,17 @@ export async function savePrompt(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   try {
     const updated = await callAction(await context(), "ai.updatePrompt", {
       promptKey: String(form.get("promptKey") ?? ""),
       systemPrompt: String(form.get("systemPrompt") ?? ""),
     });
-    return done(`Saved as version ${updated.version}.`);
+    return done(
+      t("admin.ai.actions.savedAsVersion", { version: updated.version }),
+    );
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
 }
 
@@ -274,20 +292,22 @@ export async function restoreDefaultPrompt(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   try {
     await callAction(await context(), "ai.restorePrompt", {
       promptKey: String(form.get("promptKey") ?? ""),
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Back to the built-in prompt.");
+  return done(t("admin.ai.actions.backToTheBuiltInPrompt"));
 }
 
 export async function saveBudget(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   const scopeRef = String(form.get("scopeRef") ?? "").trim();
   try {
     await callAction(await context(), "ai.setBudget", {
@@ -300,21 +320,22 @@ export async function saveBudget(
       limitValue: Number(form.get("limitValue") ?? 0),
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Set.");
+  return done(t("admin.ai.actions.set"));
 }
 
 export async function removeBudget(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
+  const { t } = await getTranslations();
   try {
     await callAction(await context(), "ai.removeBudget", {
       id: String(form.get("id") ?? ""),
     });
   } catch (error) {
-    return { ok: false, message: reason(error) };
+    return { ok: false, message: await reason(error) };
   }
-  return done("Removed.");
+  return done(t("admin.ai.actions.removed"));
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { type MessageValues, useTranslations } from "@openokr/ui";
 import { useState } from "react";
 import {
   CHANNEL_NAME_KEYS,
@@ -51,13 +51,29 @@ function channelName(channel: string, t: (key: string) => string): string {
   return named === undefined ? channel : t(named);
 }
 
-const REASON: Record<string, string> = {
-  dedup: "you already heard about this today",
-  quiet_hours: "it arrived during your quiet hours",
-  snooze: "you snoozed it",
-  disabled: "an administrator turned this rule off",
-  ceiling: "you had already had a week's worth",
+/**
+ * Why a nudge was held back, as one whole sentence per reason. A reason with
+ * no sentence here falls back to the general one with the raw reason in it.
+ */
+const HELD_BACK: Record<string, string> = {
+  dedup: "review.nudgeProvenance.heldBackDedup",
+  quiet_hours: "review.nudgeProvenance.heldBackQuietHours",
+  snooze: "review.nudgeProvenance.heldBackSnooze",
+  disabled: "review.nudgeProvenance.heldBackDisabled",
+  ceiling: "review.nudgeProvenance.heldBackCeiling",
 };
+
+function heldBack(
+  reason: string,
+  t: (key: string, values?: MessageValues) => string,
+): string {
+  const key = HELD_BACK[reason];
+  return key === undefined
+    ? t("review.nudgeProvenance.heldBackBecauseItIs", {
+        suppressedReason: reason,
+      })
+    : t(key);
+}
 
 export function NudgeProvenance({
   nudges,
@@ -103,10 +119,7 @@ export function NudgeProvenance({
 
           {nudge.suppressedReason ? (
             <p className="text-xs text-ink-3">
-              {t("review.nudgeProvenance.heldBackBecauseItIs", {
-                suppressedReason:
-                  REASON[nudge.suppressedReason] ?? nudge.suppressedReason,
-              })}
+              {heldBack(nudge.suppressedReason, t)}
             </p>
           ) : (
             <p className="text-xs text-ink-3">
@@ -140,7 +153,9 @@ export function NudgeProvenance({
               }}
               className="rounded-md border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
             >
-              {busy === nudge.id ? "Snoozing…" : "Snooze for a week"}
+              {busy === nudge.id
+                ? t("review.nudgeProvenance.snoozing")
+                : t("review.nudgeProvenance.snoozeForAWeek")}
             </button>
             <span className="text-xs text-ink-4">
               {t("review.nudgeProvenance.snoozingStopsTheMessages")}

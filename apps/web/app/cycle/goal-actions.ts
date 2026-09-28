@@ -10,6 +10,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
 
@@ -51,7 +52,8 @@ export async function createGoal(
   const reviewerId = String(formData.get("reviewerId") ?? "");
 
   if (title === "") {
-    return { error: "An objective needs a sentence saying what changes." };
+    const { t } = await getTranslations();
+    return { error: t("cycle.actions.objectiveNeedsASentence") };
   }
 
   return run((context) =>
@@ -80,16 +82,15 @@ export async function addKeyResult(
   const unit = String(formData.get("unit") ?? "").trim();
   const baselineValue = Number(formData.get("baselineValue"));
   const targetValue = Number(formData.get("targetValue"));
+  const { t } = await getTranslations();
 
   if (title === "") {
-    return { error: "A key result needs a sentence saying what is measured." };
+    return { error: t("cycle.actions.keyResultNeedsASentence") };
   }
   if (!Number.isFinite(baselineValue) || !Number.isFinite(targetValue)) {
     // METHOD.md KR-3: both are required. A missing baseline is the second most
     // common defect in a draft, so the refusal says which one is missing.
-    return {
-      error: "A key result needs a baseline and a target, both as numbers.",
-    };
+    return { error: t("cycle.actions.keyResultNeedsBaselineAndTarget") };
   }
 
   const ownerId = String(formData.get("ownerId") ?? "");
@@ -127,7 +128,8 @@ export async function recordValue(
   const id = String(formData.get("id") ?? "");
   const value = Number(formData.get("value"));
   if (!Number.isFinite(value)) {
-    return { error: "A value has to be a number." };
+    const { t } = await getTranslations();
+    return { error: t("cycle.actions.valueHasToBeANumber") };
   }
   return run((context) =>
     callAction(context, "goals.recordValue", { id, value }),

@@ -159,24 +159,38 @@ export default async function InitiativePage({
                 <InlineSelect
                   label="Status"
                   value={initiative.status}
-                  options={STATUS_OPTIONS}
+                  options={STATUS_OPTIONS.map((one) => ({
+                    value: one.value,
+                    label: t(one.labelKey),
+                  }))}
                   onSave={setStatusAction.bind(null, initiative.id)}
                 />
                 <InlineSelect
                   label="Capacity"
                   value={initiative.capacity ?? ""}
-                  options={CAPACITY_OPTIONS}
+                  options={CAPACITY_OPTIONS.map((one) => ({
+                    value: one.value,
+                    label: t(one.labelKey),
+                  }))}
                   onSave={setCapacityAction.bind(null, initiative.id)}
                 />
               </>
             ) : (
               <>
-                <Chip tone="neutral">{STATUS_LABEL[initiative.status]}</Chip>
+                <Chip tone="neutral">
+                  {t(
+                    STATUS_LABEL[initiative.status] ??
+                      "initiatives.status.planned",
+                  )}
+                </Chip>
                 <Chip
                   tone={CAPACITY_TONE[initiative.capacity ?? "unjudged"]}
                   dot
                 >
-                  {CAPACITY_LABEL[initiative.capacity ?? "unjudged"]}
+                  {t(
+                    CAPACITY_LABEL[initiative.capacity ?? "unjudged"] ??
+                      "initiatives.capacity.unjudged",
+                  )}
                 </Chip>
               </>
             )}
@@ -337,12 +351,7 @@ export default async function InitiativePage({
       />
 
       {level >= ACCESS_LEVELS.full ? (
-        <DeleteControl
-          subject="initiative"
-          id={id}
-          what="this initiative"
-          returnTo="/initiatives"
-        />
+        <DeleteControl subject="initiative" id={id} returnTo="/initiatives" />
       ) : null}
     </div>
   );

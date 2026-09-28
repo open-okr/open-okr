@@ -27,6 +27,7 @@ import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
 import { getKeyRing } from "../../../lib/secrets";
 import { getStorage } from "../../../lib/storage";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /** One column of a file, as the mapping step draws it. */
@@ -69,7 +70,7 @@ export interface ReportView {
 /** Either an answer or a sentence to show. Never a stack trace. */
 export type Answer<T> = { ok: true; value: T } | { ok: false; error: string };
 
-function refusal(error: unknown): { ok: false; error: string } {
+async function refusal(error: unknown): Promise<{ ok: false; error: string }> {
   if (error instanceof OperationError) {
     return { ok: false, error: error.message };
   }
@@ -78,7 +79,8 @@ function refusal(error: unknown): { ok: false; error: string } {
     // reader: an unreadable extension, a mapping missing a required field.
     return { ok: false, error: error.message };
   }
-  return { ok: false, error: "That file could not be read." };
+  const { t } = await getTranslations();
+  return { ok: false, error: t("admin.imports.actions.fileCouldNotBeRead") };
 }
 
 async function context() {
@@ -114,10 +116,11 @@ async function rowLimit(): Promise<number> {
 export async function readUploadAction(
   formData: FormData,
 ): Promise<Answer<UploadResult>> {
+  const { t } = await getTranslations();
   const entity = String(formData.get("entity") ?? "");
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "Choose a file first." };
+    return { ok: false, error: t("attachments.chooseFirst") };
   }
 
   try {
@@ -128,14 +131,17 @@ export async function readUploadAction(
     if (table.rows.length === 0) {
       return {
         ok: false,
-        error: "That file has a header row and nothing under it.",
+        error: t("admin.imports.actions.headerRowAndNothingUnderIt"),
       };
     }
     const limit = await rowLimit();
     if (table.rows.length > limit) {
       return {
         ok: false,
-        error: `That file has ${table.rows.length} rows and this workspace imports at most ${limit} in one run. Split it, raise the limit, or use the command line, which reads a file from disk and has no bound.`,
+        error: t("admin.imports.actions.tooManyRows", {
+          rows: table.rows.length,
+          limit,
+        }),
       };
     }
 

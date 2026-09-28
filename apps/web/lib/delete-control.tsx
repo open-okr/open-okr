@@ -1,9 +1,35 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { type DeletableSubject, deleteSubject } from "./delete-action.ts";
+
+/**
+ * The two sentences for each subject, whole, so a translator never has to fit
+ * "this goal" into the middle of somebody else's sentence.
+ */
+const WORDS: Record<
+  DeletableSubject,
+  { readonly explain: string; readonly confirm: string }
+> = {
+  goal: {
+    explain: "deleteControl.explainGoal",
+    confirm: "deleteControl.deleteGoal",
+  },
+  initiative: {
+    explain: "deleteControl.explainInitiative",
+    confirm: "deleteControl.deleteInitiative",
+  },
+  task: {
+    explain: "deleteControl.explainTask",
+    confirm: "deleteControl.deleteTask",
+  },
+  document: {
+    explain: "deleteControl.explainDocument",
+    confirm: "deleteControl.deleteDocument",
+  },
+};
 
 /**
  * Deleting one thing, and saying what that means (P6-G27).
@@ -22,16 +48,14 @@ import { type DeletableSubject, deleteSubject } from "./delete-action.ts";
 export function DeleteControl({
   subject,
   id,
-  what,
   returnTo,
 }: {
   readonly subject: DeletableSubject;
   readonly id: string;
-  /** What is being deleted, in words: "this goal", "this document". */
-  readonly what: string;
   /** Where the reader goes once it is gone, because this page will not exist. */
   readonly returnTo: string;
 }) {
+  const { t } = useTranslations();
   const router = useRouter();
   const [armed, setArmed] = useState(false);
   const [pending, start] = useTransition();
@@ -42,9 +66,7 @@ export function DeleteControl({
       {armed ? (
         <>
           <span className="text-xs text-ink-3">
-            Deleting {what} takes it off every list and out of every search.
-            Nothing is destroyed: the history stays readable, and an
-            administrator can bring it back.
+            {t(WORDS[subject].explain)}
           </span>
           <div className="flex flex-wrap gap-2.5">
             <Button
@@ -68,7 +90,7 @@ export function DeleteControl({
                 })
               }
             >
-              Delete {what}
+              {t(WORDS[subject].confirm)}
             </Button>
             <Button
               type="button"
@@ -79,7 +101,7 @@ export function DeleteControl({
                 setProblem(null);
               }}
             >
-              Keep it
+              {t("deleteControl.keepIt")}
             </Button>
           </div>
         </>
@@ -92,7 +114,7 @@ export function DeleteControl({
             data-testid={`delete-${subject}-arm`}
             onClick={() => setArmed(true)}
           >
-            Delete
+            {t("common.delete")}
           </Button>
         </div>
       )}

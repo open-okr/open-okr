@@ -18,24 +18,32 @@ import type { MapNode } from "./work-map.tsx";
  * questions, one row shape.
  */
 
+/** The translate function a server page already holds. */
+type Translate = (
+  key: string,
+  values?: Readonly<Record<string, string | number>>,
+) => string;
+
 type Goal = Awaited<
   ReturnType<typeof callAction<"goals.list">>
 >["goals"][number];
 
 /** What happens next on this goal, in the words the cadence already uses. */
-function nextStepFor(goal: Goal): string {
+function nextStepFor(t: Translate, goal: Goal): string {
   if (goal.closedAt) {
-    return `closed · ${goal.successStatus ?? "no outcome"}`;
+    return goal.successStatus
+      ? t("goalNodes.closed", { outcome: goal.successStatus })
+      : t("goalNodes.closedNoOutcome");
   }
   if (goal.daysPastDue !== null && goal.daysPastDue > 0) {
-    return `check-in ${goal.daysPastDue} day${
-      goal.daysPastDue === 1 ? "" : "s"
-    } overdue`;
+    return goal.daysPastDue === 1
+      ? t("goalNodes.checkInOverdueOne", { count: goal.daysPastDue })
+      : t("goalNodes.checkInOverdueOther", { count: goal.daysPastDue });
   }
   if (goal.nextCheckInOn) {
-    return `check in by ${goal.nextCheckInOn}`;
+    return t("goalNodes.checkInBy", { date: goal.nextCheckInOn });
   }
-  return "no cadence set";
+  return t("goalNodes.noCadence");
 }
 
 /**
@@ -46,6 +54,7 @@ function nextStepFor(goal: Goal): string {
  * to be a chip in a card that no longer exists.
  */
 export function mapNodesFor(
+  t: Translate,
   goal: Goal,
   depth: number,
   note?: string,
@@ -72,9 +81,12 @@ export function mapNodesFor(
           : confidences.reduce((sum, value) => sum + value, 0) /
             confidences.length,
       timeframe: goal.timeframe
-        ? `${goal.timeframe.startsOn} to ${goal.timeframe.endsOn}`
+        ? t("goalNodes.timeframe", {
+            startsOn: goal.timeframe.startsOn,
+            endsOn: goal.timeframe.endsOn,
+          })
         : null,
-      nextStep: nextStepFor(goal),
+      nextStep: nextStepFor(t, goal),
       goalId: goal.id,
       keyResultId: null,
       currentValue: null,
@@ -96,9 +108,16 @@ export function mapNodesFor(
       progressPct: keyResult.progressPct,
       confidence: keyResult.confidence,
       timeframe: keyResult.dueOn,
-      nextStep: `${keyResult.currentValue} of ${keyResult.targetValue}${
-        keyResult.unit ? ` ${keyResult.unit}` : ""
-      }`,
+      nextStep: keyResult.unit
+        ? t("goalNodes.progressWithUnit", {
+            current: keyResult.currentValue,
+            target: keyResult.targetValue,
+            unit: keyResult.unit,
+          })
+        : t("goalNodes.progress", {
+            current: keyResult.currentValue,
+            target: keyResult.targetValue,
+          }),
       goalId: goal.id,
       keyResultId: keyResult.id,
       currentValue: keyResult.currentValue,

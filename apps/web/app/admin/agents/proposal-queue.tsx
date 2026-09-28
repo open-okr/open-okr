@@ -51,7 +51,10 @@ export interface QueuedProposal {
 }
 
 /** A payload as a reviewer can read it, without a renderer per action. */
-function describe(payload: Record<string, unknown>): string {
+function describe(
+  payload: Record<string, unknown>,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
   const parts = Object.entries(payload)
     .filter(([, value]) => value !== null && value !== undefined)
     .map(([key, value]) => {
@@ -64,11 +67,19 @@ function describe(payload: Record<string, unknown>): string {
               // reviewer needs to know something is there, and the run log is
               // where the whole thing lives.
               Array.isArray(value)
-              ? `${value.length} items`
-              : "an object";
+              ? value.length === 1
+                ? t("admin.agents.proposalQueue.itemsOne", {
+                    count: value.length,
+                  })
+                : t("admin.agents.proposalQueue.itemsOther", {
+                    count: value.length,
+                  })
+              : t("admin.agents.proposalQueue.anObject");
       return `${key}: ${rendered}`;
     });
-  return parts.length === 0 ? "no fields" : parts.join(" · ");
+  return parts.length === 0
+    ? t("admin.agents.proposalQueue.noFields")
+    : parts.join(" · ");
 }
 
 export function ProposalQueue({
@@ -109,12 +120,14 @@ export function ProposalQueue({
           router.refresh();
         } catch (error) {
           setOutcome(
-            error instanceof Error ? error.message : "Something went wrong.",
+            error instanceof Error
+              ? error.message
+              : t("admin.agents.proposalQueue.somethingWentWrong"),
           );
         }
       });
     },
-    [router],
+    [router, t],
   );
 
   const ids = [...chosen];
@@ -164,12 +177,17 @@ export function ProposalQueue({
                       {proposal.action}
                     </span>
                     <span className="text-sm text-ink">
-                      {describe(proposal.payload)}
+                      {describe(proposal.payload, t)}
                     </span>
                     <span className="text-xs text-ink-4">
                       {proposal.subjectType
-                        ? `on a ${proposal.subjectType.replace(/_/g, " ")}`
-                        : "workspace-wide"}
+                        ? t("admin.agents.proposalQueue.onASubject", {
+                            subjectType: proposal.subjectType.replace(
+                              /_/g,
+                              " ",
+                            ),
+                          })
+                        : t("admin.agents.proposalQueue.workspaceWide")}
                     </span>
                   </label>
                 </li>
@@ -184,7 +202,10 @@ export function ProposalQueue({
                   run(async () => {
                     const result = await applyProposalsAction(ids);
                     setRefusals(result.failed);
-                    return `Applied ${result.applied} of ${ids.length}.`;
+                    return t("admin.agents.proposalQueue.appliedOf", {
+                      applied: result.applied,
+                      total: ids.length,
+                    });
                   })
                 }
               >
@@ -197,7 +218,9 @@ export function ProposalQueue({
                 onClick={() =>
                   run(async () => {
                     const result = await dismissProposalsAction(ids);
-                    return `Dismissed ${result.dismissed}.`;
+                    return t("admin.agents.proposalQueue.dismissedCount", {
+                      dismissed: result.dismissed,
+                    });
                   })
                 }
               >

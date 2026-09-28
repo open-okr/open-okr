@@ -4,6 +4,7 @@ import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /**
@@ -215,10 +216,10 @@ export async function bindAgentScopeAction(input: {
 }): Promise<{ error: string | null }> {
   const { session, workspace } = await requireWorkspace();
   if (input.resourceType === "workspace") {
-    return {
-      error:
-        "An agent is bound to named spaces, goals and KPI trees, never to the whole workspace.",
-    };
+    // Named spaces, goals and KPI trees only, never to the whole workspace:
+    // the refusal says so in the reader's own language.
+    const { t } = await getTranslations();
+    return { error: t("admin.agents.actions.neverTheWholeWorkspace") };
   }
   try {
     await callAction(

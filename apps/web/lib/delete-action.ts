@@ -21,6 +21,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./auth";
+import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace";
 
 export type DeletableSubject = "goal" | "initiative" | "task" | "document";
@@ -42,7 +43,8 @@ export async function deleteSubject(input: {
 }): Promise<DeleteResult> {
   const action = ACTION[input.subject];
   if (!action) {
-    return { error: "That is not something this control deletes." };
+    const { t } = await getTranslations();
+    return { error: t("deleteAction.notSomethingThisControlDeletes") };
   }
 
   const { session, workspace } = await requireWorkspace();

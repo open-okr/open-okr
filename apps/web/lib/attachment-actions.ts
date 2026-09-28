@@ -27,6 +27,7 @@ import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./auth";
 import { getStorage } from "./storage";
+import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace";
 
 export interface AttachResult {
@@ -56,10 +57,12 @@ export async function uploadAttachment(
   const subjectType = String(formData.get("subjectType") ?? "");
   const subjectId = String(formData.get("subjectId") ?? "");
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Choose a file first." };
+    const { t } = await getTranslations();
+    return { error: t("attachments.chooseFirst") };
   }
   if (subjectType === "" || subjectId === "") {
-    return { error: "That upload names nothing to attach to." };
+    const { t } = await getTranslations();
+    return { error: t("attachmentActions.uploadNamesNothing") };
   }
 
   const ctx = await context();

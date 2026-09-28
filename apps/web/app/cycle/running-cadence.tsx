@@ -1,4 +1,10 @@
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  type MessageValues,
+} from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
 
@@ -60,21 +66,27 @@ export interface ConfidenceRow {
   readonly previousConfidence: number | null;
 }
 
-function trend(row: ConfidenceRow): {
+function trend(
+  row: ConfidenceRow,
+  t: (key: string, values?: MessageValues) => string,
+): {
   readonly word: string;
   readonly tone: "ok" | "warn" | "bad" | "neutral";
 } {
   if (row.confidence === null || row.previousConfidence === null) {
-    return { word: "no trend yet", tone: "neutral" };
+    return { word: t("cycle.runningCadence.noTrendYet"), tone: "neutral" };
   }
   const move = row.confidence - row.previousConfidence;
   if (move > 0) {
-    return { word: `up ${move}`, tone: "ok" };
+    return { word: t("cycle.runningCadence.up", { move }), tone: "ok" };
   }
   if (move < 0) {
-    return { word: `down ${Math.abs(move)}`, tone: "bad" };
+    return {
+      word: t("cycle.runningCadence.down", { move: Math.abs(move) }),
+      tone: "bad",
+    };
   }
-  return { word: "flat", tone: "neutral" };
+  return { word: t("cycle.runningCadence.flat"), tone: "neutral" };
 }
 
 export async function RunningCadence({
@@ -153,9 +165,11 @@ export async function RunningCadence({
                 <span className="flex items-center gap-2 text-xs text-ink-3">
                   {session.scheduledFor
                     ? session.scheduledFor.slice(0, 10)
-                    : "unscheduled"}
+                    : t("cycle.runningCadence.unscheduled")}
                   <Chip tone={session.closed ? "ok" : "neutral"}>
-                    {session.closed ? "held" : "to come"}
+                    {session.closed
+                      ? t("cycle.runningCadence.held")
+                      : t("cycle.runningCadence.toCome")}
                   </Chip>
                 </span>
               </Link>
@@ -180,7 +194,7 @@ export async function RunningCadence({
             </p>
           ) : (
             confidence.map((row) => {
-              const moved = trend(row);
+              const moved = trend(row, t);
               return (
                 <div
                   key={row.id}
@@ -211,7 +225,11 @@ export async function RunningCadence({
             {t("common.openBlockers")}
           </h3>
           <Chip tone={blockers.length > 0 ? "warn" : "ok"}>
-            {blockers.length === 0 ? "none open" : `${blockers.length} open`}
+            {blockers.length === 0
+              ? t("cycle.runningCadence.noneOpen")
+              : t("cycle.runningCadence.countOpen", {
+                  count: blockers.length,
+                })}
           </Chip>
         </CardHeader>
         <CardBody className="flex flex-col gap-1.5">
@@ -233,8 +251,13 @@ export async function RunningCadence({
                   </span>
                 </span>
                 <Chip tone={blocker.ageDays >= 14 ? "bad" : "warn"}>
-                  {t("cycle.runningCadence.daysOld", {
-                    ageDays: blocker.ageDays,
+                  {t("cycle.runningCadence.ageOld", {
+                    days:
+                      blocker.ageDays === 1
+                        ? t("common.count.dayOne", { count: blocker.ageDays })
+                        : t("common.count.dayOther", {
+                            count: blocker.ageDays,
+                          }),
                   })}
                 </Chip>
               </div>

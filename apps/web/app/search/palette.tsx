@@ -90,7 +90,9 @@ export function CommandPalette() {
           {
             key: "jump",
             title: answer.jump.title,
-            snippet: `Jump to this ${answer.jump.entityType}`,
+            snippet: t("search.palette.jumpToThis", {
+              entityType: answer.jump.entityType,
+            }),
             href: answer.jump.href,
             semantic: false,
           },
@@ -171,10 +173,10 @@ export function CommandPalette() {
           ) : rows.length === 0 ? (
             <p className="px-3 py-4 text-sm text-ink-3">
               {text.trim() === ""
-                ? "Type to search goals, key results, KPIs, initiatives, tasks, documents and more."
+                ? t("search.palette.typeToSearch")
                 : pending
-                  ? "Looking…"
-                  : "Nothing matches. Only what you can already open is here."}
+                  ? t("search.palette.looking")
+                  : t("search.palette.nothingMatches")}
             </p>
           ) : (
             <ul data-testid="palette-results">

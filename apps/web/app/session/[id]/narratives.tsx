@@ -79,12 +79,14 @@ function ObjectiveRow({
           router.refresh();
         } catch (error) {
           onProblem(
-            error instanceof Error ? error.message : "That did not save.",
+            error instanceof Error
+              ? error.message
+              : t("session.detail.thatDidNotSave"),
           );
         }
       });
     },
-    [onProblem, router],
+    [onProblem, router, t],
   );
 
   return (
@@ -148,10 +150,10 @@ function ObjectiveRow({
             onClick={() => setOpen((was) => !was)}
           >
             {open
-              ? "Cancel"
+              ? t("common.cancel")
               : objective.excerpt === null
-                ? "Add what the number does not show"
-                : "Change the note"}
+                ? t("session.detail.narratives.addWhatTheNumber")
+                : t("session.detail.narratives.changeTheNote")}
           </Button>
         ) : null}
       </span>
@@ -270,8 +272,8 @@ export function NarrativesPanel({
         {narratives.objectives.length === 0 ? null : (
           <p className="text-xs text-ink-4">
             {narratives.complete
-              ? "Every objective has had its turn. The stage can end."
-              : "The mic moves on when an owner finishes, and that is what marks their objective spoken for."}
+              ? t("session.detail.narratives.everyObjectiveHasHadItsTurn")
+              : t("session.detail.narratives.theMicMovesOn")}
           </p>
         )}
       </CardBody>

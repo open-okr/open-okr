@@ -84,7 +84,7 @@ export async function Direction({
                 </span>
                 <span className="text-xs text-ink-3">
                   {priority.successStatement ??
-                    "No success statement, so nobody can tell whether it worked"}
+                    t("cycle.direction.noSuccessStatement")}
                 </span>
               </li>
             ))}

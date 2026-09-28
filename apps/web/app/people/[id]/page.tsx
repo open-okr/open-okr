@@ -26,12 +26,12 @@ import { ProfileForm } from "./profile-form.tsx";
  */
 
 const CHANNEL_LABELS: Record<string, string> = {
-  app: "In-app",
-  email: "Email",
-  slack: "Slack",
-  teams: "Teams",
-  whatsapp: "WhatsApp",
-  telegram: "Telegram",
+  app: "people.detail.profileForm.inApp",
+  email: "people.detail.profileForm.email",
+  slack: "people.detail.profileForm.slack",
+  teams: "people.detail.profileForm.teams",
+  whatsapp: "people.detail.profileForm.whatsapp",
+  telegram: "people.detail.profileForm.telegram",
 };
 
 export default async function MemberProfilePage({
@@ -158,7 +158,10 @@ export default async function MemberProfilePage({
 
             <dt className="text-ink-3">{t("people.detail.prefers")}</dt>
             <dd className="text-ink">
-              {CHANNEL_LABELS[member.primaryChannel ?? "app"] ?? "In-app"}
+              {t(
+                CHANNEL_LABELS[member.primaryChannel ?? "app"] ??
+                  "people.detail.profileForm.inApp",
+              )}
             </dd>
 
             {manager ? (
@@ -388,7 +391,7 @@ export default async function MemberProfilePage({
       </p>
       <FeedPanel
         title={t("common.whatTheyDid")}
-        explains="This member's own activity, filtered to what you can see. Not what was done to them: being assigned a task is somebody else acting."
+        explains={t("people.detail.feedExplains")}
         items={feedItems}
         names={feedNames}
         timeZone={String(feedSettings.settings.timezone ?? "UTC")}

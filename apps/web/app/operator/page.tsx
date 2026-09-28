@@ -64,12 +64,13 @@ export default async function OperatorWorkspacesPage() {
           {t("operator.workspaces.title")}
         </h1>
         <p className="text-ink-2 text-sm">
-          {t("operator.workspaces.countsAreFromTheLast", {
-            instance:
-              tenants.length === 1
-                ? "1 tenant on this instance."
-                : `${tenants.length} tenants on this instance.`,
-          })}
+          {tenants.length === 1
+            ? t("operator.workspaces.tenantsCountedOne", {
+                count: tenants.length,
+              })
+            : t("operator.workspaces.tenantsCountedOther", {
+                count: tenants.length,
+              })}
         </p>
       </header>
 
@@ -138,17 +139,23 @@ export default async function OperatorWorkspacesPage() {
                       </Chip>
                     </td>
                     <td className="p-3 text-ink-2">
-                      {tenant.planKey ?? "free"}
+                      {tenant.planKey ?? t("operator.workspace.planFree")}
                     </td>
                     <td className="p-3 text-right tabular-nums">
-                      {rows ? rows.memberCount : "not measured"}
+                      {rows
+                        ? rows.memberCount
+                        : t("operator.workspaces.notMeasured")}
                       {tenant.seats === null ? "" : ` / ${tenant.seats}`}
                     </td>
                     <td className="p-3 text-right tabular-nums">
-                      {rows ? rows.goalCount : "not measured"}
+                      {rows
+                        ? rows.goalCount
+                        : t("operator.workspaces.notMeasured")}
                     </td>
                     <td className="p-3 text-right tabular-nums">
-                      {rows ? formatBytes(rows.storageBytes) : "not measured"}
+                      {rows
+                        ? formatBytes(rows.storageBytes)
+                        : t("operator.workspaces.notMeasured")}
                     </td>
                     <td className="p-3 text-ink-2">{tenant.region}</td>
                   </tr>

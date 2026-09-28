@@ -133,8 +133,8 @@ export default function SignInPage() {
       // password is wrong: saying which would confirm who has an account.
       setError(
         failure.status === 429
-          ? "Too many attempts. Wait a minute and try again."
-          : "Those details did not match. Check them and try again.",
+          ? t("auth.signIn.tooManyAttempts")
+          : t("auth.signIn.thoseDetailsDidNotMatch"),
       );
       return;
     }
@@ -154,7 +154,7 @@ export default function SignInPage() {
     setPending(false);
 
     if (failure) {
-      setError("That code was not right. Codes change every 30 seconds.");
+      setError(t("auth.signIn.thatCodeWasNotRight"));
       return;
     }
     router.push("/");
@@ -164,7 +164,7 @@ export default function SignInPage() {
     setError("");
     const result = await authClient.signIn.passkey();
     if (result?.error) {
-      setError("That passkey did not work. Try your password instead.");
+      setError(t("auth.signIn.thatPasskeyDidNotWork"));
       return;
     }
     router.push("/");
@@ -174,11 +174,11 @@ export default function SignInPage() {
     return (
       <AuthCard
         title={t("auth.signIn.enterYourCode")}
-        description="Open your authenticator app and enter the six-digit code."
+        description={t("auth.signIn.openYourAuthenticatorApp")}
       >
         <form onSubmit={verify} className="flex flex-col gap-3">
           <Field
-            label="Six-digit code"
+            label={t("auth.signIn.sixDigitCode")}
             name="code"
             inputMode="numeric"
             autoComplete="one-time-code"
@@ -187,7 +187,7 @@ export default function SignInPage() {
             onChange={(event) => setCode(event.target.value)}
           />
           <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? "Checking…" : "Verify"}
+            {pending ? t("auth.signIn.checking") : t("auth.signIn.verify")}
           </Button>
         </form>
         <FormError>{error}</FormError>
@@ -228,7 +228,7 @@ export default function SignInPage() {
     >
       <form onSubmit={signIn} className="flex flex-col gap-3">
         <Field
-          label="Email"
+          label={t("people.detail.profileForm.email")}
           name="email"
           type="email"
           autoComplete="username webauthn"
@@ -241,14 +241,14 @@ export default function SignInPage() {
           }}
         />
         <Field
-          label="Password"
+          label={t("auth.signIn.password")}
           name="password"
           type="password"
           autoComplete="current-password"
           required
         />
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? "Signing in…" : "Sign in"}
+          {pending ? t("auth.signIn.signingIn") : t("setup.account.signIn")}
         </Button>
       </form>
 
@@ -258,7 +258,9 @@ export default function SignInPage() {
 
       {ssoProviders.length > 0 && (
         <div className="flex flex-col gap-2 border-t border-ink/10 pt-3">
-          <p className="text-center text-xs text-ink-3">or sign in with</p>
+          <p className="text-center text-xs text-ink-3">
+            {t("auth.signIn.orSignInWith")}
+          </p>
           {ssoProviders.map((provider) => (
             <Button
               key={provider.id}
@@ -282,8 +284,9 @@ export default function SignInPage() {
                       });
                 if (result?.error) {
                   setError(
-                    `${provider.displayName} could not be reached. Try again, ` +
-                      "or ask an administrator to check the configuration.",
+                    t("auth.signIn.providerCouldNotBeReached", {
+                      provider: provider.displayName,
+                    }),
                   );
                 }
               }}
@@ -300,8 +303,7 @@ export default function SignInPage() {
           data-testid="demo-personas"
         >
           <p className="text-xs text-ink-3">
-            This is a demonstration instance. Sign in as anybody here; the
-            workspace is rebuilt on a schedule and nothing in it is real.
+            {t("auth.signIn.thisIsADemonstrationInstance")}
           </p>
           <div className="flex flex-col gap-1">
             {personas.map((persona) => (
@@ -323,9 +325,9 @@ export default function SignInPage() {
           </div>
           {demoPassword ? (
             <p className="text-xs text-ink-3">
-              The password is{" "}
-              <code className="font-mono text-ink-2">{demoPassword}</code> for
-              all of them.
+              {t("auth.signIn.thePasswordIsForAllOfThem", {
+                password: demoPassword,
+              })}
             </p>
           ) : null}
         </div>

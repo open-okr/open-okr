@@ -66,18 +66,35 @@ export interface ScoringStatus {
   readonly complete: boolean;
 }
 
-/** `120 → 300 teams, landed 210`, with whatever of that is known. */
-function evidence(keyResult: ScoringKeyResult): string {
+type Translate = ReturnType<typeof useTranslations>["t"];
+
+/**
+ * `120 → 300 teams, landed 210`, with whatever of that is known.
+ *
+ * One whole message per combination rather than pieces joined here, so a
+ * translator sees each sentence as it is read.
+ */
+function evidence(keyResult: ScoringKeyResult, t: Translate): string {
   const unit = keyResult.unit ? ` ${keyResult.unit}` : "";
-  const bounds =
-    keyResult.baseline === null || keyResult.target === null
-      ? null
-      : `${formatMeasure(keyResult.baseline)} to ${formatMeasure(keyResult.target)}${unit}`;
-  const landed =
-    keyResult.current === null
-      ? null
-      : `landed ${formatMeasure(keyResult.current)}${unit}`;
-  return [bounds, landed].filter(Boolean).join(", ") || "No numbers recorded";
+  const hasBounds = keyResult.baseline !== null && keyResult.target !== null;
+  const baseline =
+    keyResult.baseline === null ? "" : formatMeasure(keyResult.baseline);
+  const target =
+    keyResult.target === null ? "" : formatMeasure(keyResult.target);
+  if (keyResult.current === null) {
+    return hasBounds
+      ? t("session.detail.scoring.evidenceBounds", { baseline, target, unit })
+      : t("session.detail.scoring.noNumbersRecorded");
+  }
+  const current = formatMeasure(keyResult.current);
+  return hasBounds
+    ? t("session.detail.scoring.evidenceBoundsLanded", {
+        baseline,
+        target,
+        current,
+        unit,
+      })
+    : t("session.detail.scoring.evidenceLanded", { current, unit });
 }
 
 function ScoreRow({
@@ -104,9 +121,7 @@ function ScoreRow({
   const save = useCallback(() => {
     onProblem(null);
     if (reason.trim().length === 0) {
-      onProblem(
-        "One line on why is asked for. A score with no reason is refused.",
-      );
+      onProblem(t("session.detail.scoring.oneLineOnWhyScore"));
       return;
     }
     startTransition(async () => {
@@ -120,11 +135,13 @@ function ScoreRow({
         router.refresh();
       } catch (error) {
         onProblem(
-          error instanceof Error ? error.message : "That did not save.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.thatDidNotSave"),
         );
       }
     });
-  }, [keyResult.keyResultId, onProblem, reason, router, score, sessionId]);
+  }, [keyResult.keyResultId, onProblem, reason, router, score, sessionId, t]);
 
   return (
     <li className="flex flex-col gap-2 rounded-md border border-line p-2.5">
@@ -145,7 +162,7 @@ function ScoreRow({
       </span>
 
       {/* §8.3's evidence: grade against the key result as written. */}
-      <span className="text-xs text-ink-3">{evidence(keyResult)}</span>
+      <span className="text-xs text-ink-3">{evidence(keyResult, t)}</span>
 
       {canScore ? (
         <>
@@ -190,7 +207,9 @@ function ScoreRow({
           </label>
           <span>
             <Button type="button" size="sm" disabled={pending} onClick={save}>
-              {keyResult.score === null ? "Save the grade" : "Change it"}
+              {keyResult.score === null
+                ? t("session.detail.scoring.saveTheGrade")
+                : t("session.detail.changeIt")}
             </Button>
           </span>
         </>
@@ -230,11 +249,13 @@ function Reveal({
         router.refresh();
       } catch (error) {
         onProblem(
-          error instanceof Error ? error.message : "That did not reveal.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.scoring.thatDidNotReveal"),
         );
       }
     });
-  }, [objective.goalId, onProblem, router, sessionId]);
+  }, [objective.goalId, onProblem, router, sessionId, t]);
 
   if (objective.revealed && objective.score !== null) {
     return (
@@ -258,8 +279,8 @@ function Reveal({
     <span className="flex flex-wrap items-center gap-2">
       <span className="flex-1 text-xs text-ink-4">
         {objective.scored === 0
-          ? "Nothing is graded yet, so there is no score to reveal."
-          : "This objective's score stays hidden until the room reveals it together."}
+          ? t("session.detail.scoring.nothingIsGradedYet")
+          : t("session.detail.scoring.scoreStaysHidden")}
       </span>
       {canReveal && objective.scored > 0 ? (
         <Button type="button" size="sm" disabled={pending} onClick={reveal}>
@@ -375,8 +396,8 @@ export function Scoring({
           <p className="text-xs text-ink-4">
             {t("session.detail.scoring.gradesLandOnTheKey", {
               ends: status.complete
-                ? "Every key result is graded. The stage can end."
-                : "Every key result needs a grade and one line on why before the stage ends.",
+                ? t("session.detail.scoring.everyKeyResultIsGraded")
+                : t("session.detail.scoring.everyKeyResultNeedsAGrade"),
             })}
           </p>
         </>

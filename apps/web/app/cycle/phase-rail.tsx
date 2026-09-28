@@ -21,7 +21,7 @@ export interface PhaseSummary {
   readonly conditions: { readonly met: number; readonly total: number };
 }
 
-function Mark({
+async function Mark({
   phase,
   state,
   current,
@@ -30,6 +30,7 @@ function Mark({
   readonly state: PhaseSummary["state"];
   readonly current: boolean;
 }) {
+  const { t } = await getTranslations();
   const base =
     "flex size-6 flex-none items-center justify-center rounded-full text-xs font-bold";
   if (state === "pass") {
@@ -37,7 +38,7 @@ function Mark({
       <span
         role="img"
         className={`${base} bg-ok text-white`}
-        aria-label={`Phase ${phase} is complete`}
+        aria-label={t("cycle.phaseRail.phaseIsComplete", { phase })}
       >
         ✓
       </span>
@@ -48,7 +49,7 @@ function Mark({
       <span
         role="img"
         className={`${base} bg-raised text-ink-4`}
-        aria-label={`Phase ${phase} does not apply to this cycle`}
+        aria-label={t("cycle.phaseRail.phaseDoesNotApply", { phase })}
       >
         –
       </span>
@@ -62,7 +63,7 @@ function Mark({
           ? `${base} bg-brand text-white`
           : `${base} border border-line bg-surface text-ink-3`
       }
-      aria-label={`Phase ${phase} is not complete`}
+      aria-label={t("cycle.phaseRail.phaseIsNotComplete", { phase })}
     >
       {phase}
     </span>
@@ -122,7 +123,7 @@ export async function PhaseRail({
                 </span>
                 <span className="text-xs text-ink-3">
                   {entry.state === "not_applicable"
-                    ? "Annual cycles only"
+                    ? t("cycle.phaseRail.annualCyclesOnly")
                     : (guidance?.output ?? "")}
                 </span>
                 {current && total > 0 ? (

@@ -136,13 +136,15 @@ export function DraftCoach({
             verdict,
             titles,
             verdict.keyResults.map(
-              (index) => keyResults[index]?.title ?? `key result ${index + 1}`,
+              (index) =>
+                keyResults[index]?.title ??
+                t("cycle.draftCoach.keyResultNumber", { number: index + 1 }),
             ),
           ),
         ),
       ],
     };
-  }, [objective, keyResults, thresholds, title, titles]);
+  }, [objective, keyResults, thresholds, title, titles, t]);
 
   // Counted with a mutable local rather than a spread into the accumulator:
   // the spread rebuilt the whole record once per verdict, which is O(n²) on a
@@ -195,7 +197,9 @@ export function DraftCoach({
           />
           {firing > 0 ? (
             <span className="inline-flex h-5 flex-none items-center rounded-full bg-bad-bg px-2 text-xs font-bold text-bad">
-              {firing === 1 ? "1 rule firing" : `${firing} rules firing`}
+              {firing === 1
+                ? t("cycle.draftCoach.rulesFiringOne", { count: firing })
+                : t("cycle.draftCoach.rulesFiringOther", { count: firing })}
             </span>
           ) : null}
         </span>

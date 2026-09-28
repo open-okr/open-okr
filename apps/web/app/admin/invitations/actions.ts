@@ -4,6 +4,7 @@ import { loadEnv } from "@openokr/config";
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /**
@@ -59,8 +60,13 @@ export interface InviteResult {
   readonly error?: string;
 }
 
-const reason = (error: unknown): string =>
-  error instanceof Error ? error.message : "Something went wrong.";
+async function reason(error: unknown): Promise<string> {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  const { t } = await getTranslations();
+  return t("admin.agents.proposalQueue.somethingWentWrong");
+}
 
 export async function createWorkspaceLinkAction(
   formData: FormData,
@@ -94,7 +100,7 @@ export async function createWorkspaceLinkAction(
       },
     };
   } catch (error) {
-    return { error: reason(error) };
+    return { error: await reason(error) };
   }
 }
 
@@ -128,7 +134,7 @@ export async function createPersonalLinkAction(
       },
     };
   } catch (error) {
-    return { error: reason(error) };
+    return { error: await reason(error) };
   }
 }
 

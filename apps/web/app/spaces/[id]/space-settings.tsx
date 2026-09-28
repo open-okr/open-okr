@@ -39,11 +39,18 @@ export interface SpaceSettings {
 }
 
 /** What each strictness does, rather than three words to guess between. */
-const STRICTNESS_MEANING: Record<string, string> = {
-  advisory: "the Coach comments and refuses nothing",
-  warn: "the Coach warns, and the six publish gates still refuse",
-  strict: "the Coach refuses what it warns about",
-};
+function strictnessMeaning(option: string, t: (key: string) => string): string {
+  switch (option) {
+    case "advisory":
+      return t("spaces.detail.spaceSettings.strictnessAdvisory");
+    case "warn":
+      return t("spaces.detail.spaceSettings.strictnessWarn");
+    case "strict":
+      return t("spaces.detail.spaceSettings.strictnessStrict");
+    default:
+      return "";
+  }
+}
 
 export function SpaceSettingsCard({
   spaceId,
@@ -74,23 +81,30 @@ export function SpaceSettingsCard({
             {t("spaces.detail.spaceSettings.spaceSettings")}
           </h2>
           <Chip tone={settings.teamVoting ? "ok" : "neutral"}>
-            {settings.teamVoting ? "team voting on" : "team voting off"}
+            {settings.teamVoting
+              ? t("spaces.detail.spaceSettings.teamVotingOn")
+              : t("spaces.detail.spaceSettings.teamVotingOff")}
           </Chip>
         </CardHeader>
         <CardBody className="flex flex-col gap-1 text-sm text-ink-2">
           <p>
-            {t("spaces.detail.spaceSettings.coachingStrictness3", {
-              workspaceStrictness:
-                settings.coachStrictness ??
-                `the workspace's (${workspaceStrictness})`,
-            })}
+            {settings.coachStrictness !== null
+              ? t("spaces.detail.spaceSettings.coachingStrictness3", {
+                  workspaceStrictness: settings.coachStrictness,
+                })
+              : t("spaces.detail.spaceSettings.coachingStrictnessInherited", {
+                  workspaceStrictness,
+                })}
           </p>
           <p>
-            {t("spaces.detail.spaceSettings.defaultCheckInFrequency3", {
-              workspaceFrequency:
-                settings.defaultCheckInFrequency ??
-                `the workspace's (${workspaceFrequency})`,
-            })}
+            {settings.defaultCheckInFrequency !== null
+              ? t("spaces.detail.spaceSettings.defaultCheckInFrequency3", {
+                  workspaceFrequency: settings.defaultCheckInFrequency,
+                })
+              : t(
+                  "spaces.detail.spaceSettings.defaultCheckInFrequencyInherited",
+                  { workspaceFrequency },
+                )}
           </p>
           <p className="text-xs text-ink-3">
             {t("spaces.detail.spaceSettings.changingTheseIsThe")}
@@ -151,7 +165,7 @@ export function SpaceSettingsCard({
               </option>
               {COACH_STRICTNESS.map((option) => (
                 <option key={option} value={option}>
-                  {option}: {STRICTNESS_MEANING[option] ?? ""}
+                  {option}: {strictnessMeaning(option, t)}
                 </option>
               ))}
             </select>
@@ -187,7 +201,9 @@ export function SpaceSettingsCard({
 
           <div className="flex flex-col gap-1">
             <Button type="submit" disabled={pending} className="self-start">
-              {pending ? "Saving…" : "Save space settings"}
+              {pending
+                ? t("spaces.detail.spaceSettings.saving")
+                : t("spaces.detail.spaceSettings.saveSpaceSettings")}
             </Button>
             {state.error ? (
               <p

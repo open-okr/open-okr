@@ -86,6 +86,11 @@ export function ImportWizard({
     .filter((field) => field.required && !claimed.has(field.field))
     .map((field) => field.field);
 
+  const rowsPhrase = (count: number) =>
+    count === 1
+      ? t("common.count.rowOne", { count })
+      : t("common.count.rowOther", { count });
+
   const mappingOf = (): Record<string, string | null> =>
     Object.fromEntries(columns.map((c) => [c.header, c.field]));
 
@@ -197,7 +202,9 @@ export function ImportWizard({
             </p>
             <div>
               <Button type="submit" variant="primary" disabled={pending}>
-                {pending ? "Reading" : "Read the file"}
+                {pending
+                  ? t("admin.imports.wizard.reading")
+                  : t("admin.imports.wizard.readTheFile")}
               </Button>
             </div>
           </form>
@@ -206,10 +213,9 @@ export function ImportWizard({
         {step === "mapping" && loaded && template ? (
           <div className="flex flex-col gap-3">
             <p className="text-xs text-ink-3">
-              {t("admin.imports.wizard.sayWhatEachColumnIs", {
+              {t("admin.imports.wizard.fileRowsSayWhatEachColumnIs", {
                 filename: loaded.filename,
-                length: loaded.rows.length,
-                rows: loaded.rows.length === 1 ? "row" : "rows",
+                rows: rowsPhrase(loaded.rows.length),
               })}
             </p>
             {aiOn && loaded.notes ? (
@@ -237,7 +243,7 @@ export function ImportWizard({
                       {column.header}
                     </p>
                     <p className="truncate text-xs text-ink-3">
-                      {column.sample || "empty"}
+                      {column.sample || t("admin.imports.wizard.empty")}
                     </p>
                   </div>
                   {aiOn && column.proposed ? (
@@ -246,7 +252,9 @@ export function ImportWizard({
                     </Chip>
                   ) : null}
                   <select
-                    aria-label={`What ${column.header} is`}
+                    aria-label={t("admin.imports.wizard.whatColumnIs", {
+                      header: column.header,
+                    })}
                     value={column.field ?? ""}
                     onChange={(event) => {
                       const field = event.target.value || null;
@@ -269,8 +277,11 @@ export function ImportWizard({
                     </option>
                     {template.fields.map((field) => (
                       <option key={field.field} value={field.field}>
-                        {field.field}
-                        {field.required ? " (required)" : ""}
+                        {field.required
+                          ? t("admin.imports.wizard.fieldRequired", {
+                              field: field.field,
+                            })
+                          : field.field}
                       </option>
                     ))}
                   </select>
@@ -282,10 +293,13 @@ export function ImportWizard({
                 data-testid="import-missing"
                 className="rounded-md bg-warn-bg px-2.5 py-2 text-xs text-warn"
               >
-                {t("admin.imports.wizard.nothingCarriesAndRequired", {
-                  missing: missing.join(", "),
-                  are: missing.length === 1 ? "it is" : "they are",
-                })}
+                {missing.length === 1
+                  ? t("admin.imports.wizard.nothingCarriesRequiredOne", {
+                      missing: missing.join(", "),
+                    })
+                  : t("admin.imports.wizard.nothingCarriesRequiredOther", {
+                      missing: missing.join(", "),
+                    })}
               </p>
             ) : null}
             <div className="flex gap-2">
@@ -295,7 +309,9 @@ export function ImportWizard({
                 onClick={() => run(false)}
                 data-testid="import-preview"
               >
-                {pending ? "Checking" : "Preview"}
+                {pending
+                  ? t("admin.imports.wizard.checking")
+                  : t("admin.imports.preview")}
               </Button>
               <Button onClick={restart} disabled={pending}>
                 {t("admin.imports.wizard.chooseAnotherFile")}
@@ -324,10 +340,10 @@ export function ImportWizard({
                   data-testid="import-confirm"
                 >
                   {pending
-                    ? "Importing"
-                    : `Import ${report.created + report.updated} ${
-                        report.created + report.updated === 1 ? "row" : "rows"
-                      }`}
+                    ? t("admin.imports.wizard.importing")
+                    : t("admin.imports.wizard.importRows", {
+                        rows: rowsPhrase(report.created + report.updated),
+                      })}
                 </Button>
                 <Button
                   onClick={() => {
@@ -360,13 +376,25 @@ export function ImportWizard({
 }
 
 function Counts({ report }: { readonly report: ReportView }) {
+  const { t } = useTranslations();
+
   return (
     <dl className="flex gap-6" data-testid="import-counts">
       {[
-        ["Read", report.rowsRead],
-        [report.mode === "real" ? "Created" : "To create", report.created],
-        [report.mode === "real" ? "Updated" : "To update", report.updated],
-        ["Skipped", report.skipped],
+        [t("admin.imports.wizard.read"), report.rowsRead],
+        [
+          report.mode === "real"
+            ? t("admin.imports.wizard.created")
+            : t("admin.imports.wizard.toCreate"),
+          report.created,
+        ],
+        [
+          report.mode === "real"
+            ? t("admin.imports.wizard.updated")
+            : t("admin.imports.wizard.toUpdate"),
+          report.updated,
+        ],
+        [t("admin.imports.wizard.skippedCount"), report.skipped],
       ].map(([label, value]) => (
         <div key={String(label)}>
           <dt className="text-xs text-ink-3">{label}</dt>
@@ -426,7 +454,9 @@ function RowTable({ report }: { readonly report: ReportView }) {
                   </span>
                 ) : (
                   <span className="text-ink-2">
-                    {row.outcome === "created" ? "Created" : "Updated"}
+                    {row.outcome === "created"
+                      ? t("admin.imports.wizard.created")
+                      : t("admin.imports.wizard.updated")}
                   </span>
                 )}
               </td>
@@ -439,13 +469,14 @@ function RowTable({ report }: { readonly report: ReportView }) {
 }
 
 const STEPS: readonly { readonly id: Step; readonly label: string }[] = [
-  { id: "upload", label: "File" },
-  { id: "mapping", label: "Columns" },
-  { id: "preview", label: "Preview" },
-  { id: "done", label: "Import" },
+  { id: "upload", label: "admin.imports.exportCard.file" },
+  { id: "mapping", label: "admin.imports.wizard.columns" },
+  { id: "preview", label: "admin.imports.preview" },
+  { id: "done", label: "admin.imports.import" },
 ];
 
 function StepTrail({ step }: { readonly step: Step }) {
+  const { t } = useTranslations();
   const at = STEPS.findIndex((one) => one.id === step);
   return (
     <ol className="flex items-center gap-2 text-xs" data-testid="import-steps">
@@ -461,7 +492,7 @@ function StepTrail({ step }: { readonly step: Step }) {
                 : "text-ink-4"
           }
         >
-          {index + 1}. {one.label}
+          {index + 1}. {t(one.label)}
         </li>
       ))}
     </ol>

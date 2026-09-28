@@ -12,6 +12,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
@@ -46,7 +47,8 @@ export async function recordPerformance(
 ): Promise<WriteState> {
   const cycleId = String(formData.get("cycleId") ?? "").trim();
   if (cycleId === "") {
-    return { error: "Pick the cycle whose result you are recording." };
+    const { t } = await getTranslations();
+    return { error: t("scorecard.actions.pickTheCycle") };
   }
   return run((context) => callAction(context, "cycles.snapshot", { cycleId }));
 }
@@ -58,7 +60,8 @@ export async function handOver(
   const fromCycleId = String(formData.get("fromCycleId") ?? "").trim();
   const toCycleId = String(formData.get("toCycleId") ?? "").trim();
   if (fromCycleId === "" || toCycleId === "") {
-    return { error: "Name the cycle that is closing and the one that opens." };
+    const { t } = await getTranslations();
+    return { error: t("scorecard.actions.nameBothCycles") };
   }
   return run((context) =>
     callAction(context, "cycles.feedForward", { fromCycleId, toCycleId }),

@@ -97,24 +97,24 @@ export default async function KpisPage({
             <h1 className="text-lg font-bold text-ink">{t("common.count")}</h1>
             <p className="text-xs text-ink-3">
               {grid.kpis.length === 0
-                ? "Nothing measured yet."
-                : `${grid.kpis.length} measure${
-                    grid.kpis.length === 1 ? "" : "s"
-                  }, each in its own periods.`}
+                ? t("kpis.nothingMeasuredYet")
+                : grid.kpis.length === 1
+                  ? t("kpis.measuresOne", { count: grid.kpis.length })
+                  : t("kpis.measuresOther", { count: grid.kpis.length })}
             </p>
           </div>
         </CardHeader>
         <CardBody className="flex flex-col gap-2.5">
           {/* S-20's filter row, at last (P6-G30). */}
           <FilterRow
-            label="Frequency"
+            label={t("common.frequency")}
             param="frequency"
             active={filters.frequency ?? ""}
             query={query}
             choices={frequencies.map((one) => ({ value: one, label: one }))}
           />
           <FilterRow
-            label="State"
+            label={t("operator.workspaces.columnState")}
             param="state"
             active={filters.state ?? ""}
             query={query}
@@ -125,7 +125,7 @@ export default async function KpisPage({
           />
           {owners.length > 0 ? (
             <FilterRow
-              label="Owner"
+              label={t("common.owner")}
               param="owner"
               active={filters.owner ?? ""}
               query={query}
@@ -134,7 +134,7 @@ export default async function KpisPage({
           ) : null}
           {grid.categories.length > 0 ? (
             <FilterRow
-              label="Category"
+              label={t("kpis.category")}
               param="category"
               active={filters.category ?? ""}
               query={query}
@@ -205,7 +205,9 @@ export default async function KpisPage({
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="text-xs text-ink-2">{kpi.title}</span>
                         {kpi.isCalculated ? (
-                          <Chip tone="info">{kpi.formula ?? "calculated"}</Chip>
+                          <Chip tone="info">
+                            {kpi.formula ?? t("kpis.grid.calculated")}
+                          </Chip>
                         ) : null}
                       </span>
                       <RowSparkline records={kpi.records} />

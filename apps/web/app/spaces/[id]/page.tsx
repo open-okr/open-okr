@@ -285,7 +285,9 @@ export default async function SpacePage({
                       <Chip tone="brand">{t("common.inProgress")}</Chip>
                     ) : null}
                     <span className="ml-auto flex-none text-xs font-semibold text-brand-text">
-                      {row.state === "running" ? "Rejoin" : "Open"}
+                      {row.state === "running"
+                        ? t("spaces.detail.rejoin")
+                        : t("cycle.drafting.open")}
                     </span>
                   </Link>
                 </li>
@@ -331,10 +333,16 @@ export default async function SpacePage({
                   </span>
                   <p className="text-sm text-ink">{blocker.nextAction}</p>
                   <p className="text-xs text-ink-3">
-                    {blocker.ownerName ?? "No owner named"}
                     {blocker.blockedTitle
-                      ? ` · blocks ${blocker.blockedTitle}`
-                      : ""}
+                      ? blocker.ownerName !== null
+                        ? t("spaces.detail.ownerBlocks", {
+                            owner: blocker.ownerName,
+                            title: blocker.blockedTitle,
+                          })
+                        : t("spaces.detail.noOwnerBlocks", {
+                            title: blocker.blockedTitle,
+                          })
+                      : (blocker.ownerName ?? t("spaces.detail.noOwnerNamed"))}
                   </p>
                 </li>
               ))}
@@ -344,7 +352,7 @@ export default async function SpacePage({
       </Card>
       <FeedPanel
         title={t("common.activity")}
-        explains="What has happened in this space, including its goals, initiatives and tasks."
+        explains={t("spaces.detail.feedExplains")}
         items={feedItems}
         names={feedNames}
         timeZone={String(feedSettings.settings.timezone ?? "UTC")}

@@ -230,7 +230,9 @@ function ProposalCard({
         </span>
         {proposal.status === "applied" ? (
           <Chip tone={proposal.undone ? "neutral" : "ok"}>
-            {proposal.undone ? "Undone" : "Applied"}
+            {proposal.undone
+              ? t("copilot.copilotPanel.undone")
+              : t("copilot.copilotPanel.applied")}
           </Chip>
         ) : null}
         {proposal.status === "dismissed" ? (
@@ -303,7 +305,7 @@ export function CopilotPanel({
     {
       id: "copilot",
       keys: "⌘J",
-      description: "Ask the copilot",
+      description: t("copilot.copilotPanel.askTheCopilot"),
       group: "Global",
     },
     () => setOpen((was) => !was),
@@ -407,7 +409,9 @@ export function CopilotPanel({
         await decision(id);
       } catch (error) {
         setNotice(
-          error instanceof Error ? error.message : "That could not be done.",
+          error instanceof Error
+            ? error.message
+            : t("copilot.copilotPanel.couldNotBeDone"),
         );
       } finally {
         setBusy(false);
@@ -416,7 +420,7 @@ export function CopilotPanel({
         }
       }
     },
-    [loadThread, threadId],
+    [loadThread, t, threadId],
   );
 
   const stop = useCallback(() => {
@@ -460,9 +464,7 @@ export function CopilotPanel({
         signal: controller.signal,
       });
       if (!response.ok || !response.body) {
-        setNotice(
-          "The copilot could not be reached. Your question was not saved.",
-        );
+        setNotice(t("copilot.copilotPanel.couldNotBeReached"));
         return;
       }
 
@@ -511,7 +513,7 @@ export function CopilotPanel({
       // An abort is the stop control working, not a failure. What arrived was
       // recorded by the server, and the re-read below shows it.
       if (!(error instanceof DOMException && error.name === "AbortError")) {
-        setNotice("The answer stopped early. What arrived was saved.");
+        setNotice(t("copilot.copilotPanel.answerStoppedEarly"));
       }
     } finally {
       abort.current = null;
@@ -526,7 +528,7 @@ export function CopilotPanel({
         await loadThread(landedThreadId).catch(() => undefined);
       }
     }
-  }, [busy, loadThread, question, threadId]);
+  }, [busy, loadThread, question, t, threadId]);
 
   if (!open) {
     return (
@@ -609,7 +611,7 @@ export function CopilotPanel({
                             className="text-left text-xs text-ink-2 underline"
                             onClick={() => void loadThread(thread.id)}
                           >
-                            {thread.title ?? "Untitled"}
+                            {thread.title ?? t("copilot.copilotPanel.untitled")}
                           </button>
                         </li>
                       ))}
@@ -673,7 +675,7 @@ export function CopilotPanel({
             {canAsk ? null : (
               <p className="mb-2 text-xs text-ink-3">
                 {availability.reason ??
-                  "The copilot cannot answer in this workspace right now."}
+                  t("copilot.copilotPanel.cannotAnswerRightNow")}
               </p>
             )}
             <div className="flex items-end gap-2">
@@ -695,8 +697,8 @@ export function CopilotPanel({
                   }}
                   placeholder={
                     canAsk
-                      ? "Ask a question"
-                      : "Search your workspace for matching passages"
+                      ? t("copilot.copilotPanel.askAQuestion")
+                      : t("copilot.copilotPanel.searchForMatchingPassages")
                   }
                   className="w-full resize-none rounded-md border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none placeholder:text-ink-4"
                 />

@@ -3,7 +3,14 @@ import {
   confidenceBand,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { Avatar, Bar, Card, CardBody, Chip } from "@openokr/ui";
+import {
+  Avatar,
+  Bar,
+  Card,
+  CardBody,
+  Chip,
+  type MessageValues,
+} from "@openokr/ui";
 import type { ReactNode } from "react";
 import { progressCeiling } from "../lib/ceilings.ts";
 import { getTranslations } from "../lib/translations";
@@ -16,10 +23,17 @@ import { QuickCheckIn } from "./quick-check-in.tsx";
  * The mockup writes OBJ and KR. Initiatives and KPI rows join the same column
  * when their tasks land, and the chip is the only place that has to know.
  */
-function RowKindChip({ kind }: { readonly kind: "goal" | "key_result" }) {
+function RowKindChip({
+  kind,
+  t,
+}: {
+  readonly kind: "goal" | "key_result";
+  /** The caller's `t`, so a row does not resolve the locale once per row. */
+  readonly t: (key: string, values?: MessageValues) => string;
+}) {
   return (
     <Chip tone={kind === "goal" ? "brand" : "neutral"}>
-      {kind === "goal" ? "OBJ" : "KR"}
+      {kind === "goal" ? t("workMap.obj") : t("workMap.kr")}
     </Chip>
   );
 }
@@ -34,9 +48,12 @@ function RowKindChip({ kind }: { readonly kind: "goal" | "key_result" }) {
 function ConfidenceChip({
   confidence,
   thresholds,
+  t,
 }: {
   readonly confidence: number | null;
   readonly thresholds: ResolvedThresholds;
+  /** The caller's `t`, so a row does not resolve the locale once per row. */
+  readonly t: (key: string, values?: MessageValues) => string;
 }) {
   if (confidence === null) {
     return <span className="text-xs text-ink-4">—</span>;
@@ -44,17 +61,14 @@ function ConfidenceChip({
   const verdict = confidenceBand(confidence, thresholds);
   const tone =
     verdict.band === "high" ? "ok" : verdict.band === "medium" ? "warn" : "bad";
+  const value = { confidence: confidence.toFixed(1) };
   const label =
     verdict.band === "high"
-      ? "High"
+      ? t("workMap.confidenceHigh", value)
       : verdict.band === "medium"
-        ? "Med"
-        : "Low";
-  return (
-    <Chip tone={tone}>
-      {label} {confidence.toFixed(1)}
-    </Chip>
-  );
+        ? t("workMap.confidenceMed", value)
+        : t("workMap.confidenceLow", value);
+  return <Chip tone={tone}>{label}</Chip>;
 }
 
 /**
@@ -196,7 +210,7 @@ export async function GoalTable({
                       className="flex items-center gap-2"
                       style={{ paddingLeft: `${node.depth * 18}px` }}
                     >
-                      <RowKindChip kind={node.kind} />
+                      <RowKindChip kind={node.kind} t={t} />
                       <span
                         className={
                           node.kind === "goal"
@@ -220,6 +234,7 @@ export async function GoalTable({
                     <ConfidenceChip
                       confidence={node.confidence}
                       thresholds={thresholds}
+                      t={t}
                     />
                   </td>
                   <td className="hidden px-2 py-2 sm:table-cell">
@@ -310,7 +325,9 @@ export async function WorkMap({
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Chip tone="neutral">
-                  {selected.kind === "goal" ? "objective" : "key result"}
+                  {selected.kind === "goal"
+                    ? t("workMap.objective")
+                    : t("workMap.keyResult")}
                 </Chip>
                 <HealthChip health={selected.health} />
               </div>

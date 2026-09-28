@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import { withMessages } from "./screen-text.ts";
 
 /**
  * The three things S-20 asked for and the grid never had (P6-G30).
@@ -48,8 +49,8 @@ describe("the sparkline", () => {
     // Two points are the fewest a trend can be made of. A single dot stretched
     // across a box reads as a flat trend, which is a claim nobody made.
     expect(extras).toContain("values.length < 2");
-    expect(extras).toContain("One value so far");
-    expect(extras).toContain("No values yet");
+    expect(withMessages(extras)).toContain("One value so far");
+    expect(withMessages(extras)).toContain("No values yet");
   });
 
   test("needs no chart library", () => {

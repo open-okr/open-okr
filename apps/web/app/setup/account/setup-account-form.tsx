@@ -42,8 +42,7 @@ export function SetupAccountForm() {
     if (failure) {
       setPending(false);
       setError(
-        failure.message ??
-          "That did not work. Check your details and try again.",
+        failure.message ?? t("setup.account.setupAccountForm.thatDidNotWork"),
       );
       return;
     }
@@ -58,7 +57,9 @@ export function SetupAccountForm() {
       // The account exists, so say so rather than inviting them to create it
       // again and hit "email already registered".
       setError(
-        `Your account was created, but finishing setup failed: ${result.message} You can sign in and finish from admin.`,
+        t("setup.account.setupAccountForm.createdButFinishingFailed", {
+          message: result.message,
+        }),
       );
       return;
     }
@@ -70,16 +71,21 @@ export function SetupAccountForm() {
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
       <Field
-        label="What should this instance be called?"
+        label={t("setup.account.setupAccountForm.whatShouldThisInstance")}
         name="instanceName"
         defaultValue="OpenOKR"
         autoComplete="off"
       />
 
-      <Field label="Your name" name="name" autoComplete="name" required />
+      <Field
+        label={t("setup.account.setupAccountForm.yourName")}
+        name="name"
+        autoComplete="name"
+        required
+      />
 
       <Field
-        label="Email"
+        label={t("people.detail.profileForm.email")}
         name="email"
         type="email"
         autoComplete="email"
@@ -88,7 +94,7 @@ export function SetupAccountForm() {
 
       <div className="flex flex-col gap-1">
         <PasswordField
-          label="Password"
+          label={t("setup.account.setupAccountForm.password")}
           name="password"
           autoComplete="new-password"
           minLength={12}
@@ -107,7 +113,9 @@ export function SetupAccountForm() {
       */}
 
       <Button type="submit" variant="primary" disabled={pending}>
-        {pending ? "Setting up…" : "Finish setup"}
+        {pending
+          ? t("setup.account.setupAccountForm.settingUp")
+          : t("setup.account.finishSetup")}
       </Button>
 
       <FormError>{error}</FormError>

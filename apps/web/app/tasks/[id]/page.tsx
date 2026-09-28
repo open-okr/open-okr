@@ -31,12 +31,14 @@ import { ChecklistLine, DueDateField, RailButton } from "./controls.tsx";
  *
  * **The key result on the rail is a link, not a number.** Nothing on this page
  * turns a finished task into progress.
+ *
+ * Each status names the catalogue key its label is read from.
  */
 const STATUS_OPTIONS = [
-  { value: "backlog", label: "Backlog" },
-  { value: "todo", label: "To do" },
-  { value: "in_progress", label: "In progress" },
-  { value: "done", label: "Done" },
+  { value: "backlog", label: "board.backlog" },
+  { value: "todo", label: "board.toDo" },
+  { value: "in_progress", label: "common.inProgress" },
+  { value: "done", label: "board.done" },
 ] as const;
 
 export default async function TaskPage({
@@ -83,6 +85,10 @@ export default async function TaskPage({
       )
     : [];
   const assigned = new Set(task.assignees.map((one) => one.id));
+  const statusOptions = STATUS_OPTIONS.map((one) => ({
+    value: one.value,
+    label: t(one.label),
+  }));
 
   return (
     <div className="flex w-full flex-col gap-4.5 xl:flex-row">
@@ -100,14 +106,14 @@ export default async function TaskPage({
             </div>
             {canEdit ? (
               <InlineSelect
-                label="Status"
+                label={t("checkIn.composer.status")}
                 value={task.status}
-                options={STATUS_OPTIONS}
+                options={statusOptions}
                 onSave={setTaskStatusAction.bind(null, task.id)}
               />
             ) : (
               <Chip tone="neutral">
-                {STATUS_OPTIONS.find((one) => one.value === task.status)
+                {statusOptions.find((one) => one.value === task.status)
                   ?.label ?? task.status}
               </Chip>
             )}
@@ -219,8 +225,10 @@ export default async function TaskPage({
                     </span>
                     {canEdit ? (
                       <RailButton
-                        label={`Unassign ${one.name}`}
-                        text="Remove"
+                        label={t("tasks.detail.unassignName", {
+                          name: one.name,
+                        })}
+                        text={t("common.remove")}
                         onRun={unassignTaskAction.bind(null, task.id, one.id)}
                       />
                     ) : null}
@@ -235,8 +243,8 @@ export default async function TaskPage({
                   .map((one) => (
                     <RailButton
                       key={one.id}
-                      label={`Assign ${one.name}`}
-                      text={`Assign ${one.name}`}
+                      label={t("tasks.detail.assignName", { name: one.name })}
+                      text={t("tasks.detail.assignName", { name: one.name })}
                       onRun={assignTaskAction.bind(null, task.id, one.id)}
                     />
                   ))
@@ -251,7 +259,7 @@ export default async function TaskPage({
             </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-2 text-sm">
-            <Row label="Due">
+            <Row label={t("board.due")}>
               {canEdit ? (
                 <DueDateField
                   dueOn={task.dueOn}
@@ -259,22 +267,24 @@ export default async function TaskPage({
                   onSave={setDueOnAction.bind(null, task.id)}
                 />
               ) : (
-                <span className="text-ink-2">{task.dueOn ?? "No date"}</span>
+                <span className="text-ink-2">
+                  {task.dueOn ?? t("tasks.detail.noDate")}
+                </span>
               )}
             </Row>
-            <Row label="Initiative">
+            <Row label={t("tasks.detail.initiative")}>
               {task.initiativeId ? (
                 <Link
                   href={`/initiatives/${task.initiativeId}`}
                   className="text-brand-text hover:underline"
                 >
-                  {task.initiativeTitle ?? "An initiative"}
+                  {task.initiativeTitle ?? t("tasks.detail.anInitiative")}
                 </Link>
               ) : (
                 <span className="text-ink-3">{t("tasks.detail.none")}</span>
               )}
             </Row>
-            <Row label="Key result">
+            <Row label={t("common.keyResult")}>
               {task.keyResultTitle ? (
                 <span className="text-ink-2">{task.keyResultTitle}</span>
               ) : (
@@ -290,12 +300,7 @@ export default async function TaskPage({
          * which `two-column-rows.test.ts` now refuses.
          */}
         {level >= ACCESS_LEVELS.full ? (
-          <DeleteControl
-            subject="task"
-            id={id}
-            what="this task"
-            returnTo="/board"
-          />
+          <DeleteControl subject="task" id={id} returnTo="/board" />
         ) : null}
       </div>
     </div>

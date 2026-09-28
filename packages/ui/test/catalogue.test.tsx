@@ -25,6 +25,119 @@ describe("the message catalogue", () => {
 });
 
 /**
+ * Bahasa Melayu is translated, not stubbed (completeness review M-15).
+ *
+ * 1,494 of 1,578 Malay entries were the English copied across, and the only
+ * check was that the keys existed. An entry may read the same in both only for
+ * a reason written here: a name, a piece of code or an example, a word Malay
+ * uses as it is, or a line made only of holes and punctuation. Anything else
+ * identical to the English is an entry nobody translated.
+ */
+const SAME_IN_MALAY: ReadonlySet<string> = new Set([
+  // Product, vendor and language names.
+  "activity.openOkr",
+  "feedPanel.openOkr",
+  "method.detail.okrChampion",
+  "method.detail.okrCoach",
+  "admin.ai.providerAnthropic",
+  "admin.ai.providerGoogle",
+  "admin.ai.providerOllama",
+  "admin.ai.providerOpenai",
+  "admin.ai.providerOpenrouter",
+  "admin.sso.oidc",
+  "admin.sso.saml2",
+  "admin.sso.ssoForm.oidcOpenIdConnect",
+  "channels.slack",
+  "channels.teams",
+  "channels.telegram",
+  "channels.whatsapp",
+  "people.detail.profileForm.slack",
+  "people.detail.profileForm.teams",
+  "people.detail.profileForm.telegram",
+  "people.detail.profileForm.whatsapp",
+  "search.exportButton.csv",
+  "search.exportButton.excel",
+  "appearance.english",
+  "appearance.bahasaMelayu",
+  "copilot.copilotPanel.copilot",
+  // Code, commands, formats and example values a person types as shown.
+  "activity.pnpmAuditVerify",
+  "admin.audit.actionPlaceholder",
+  "admin.audit.targetTypePlaceholder",
+  "admin.imports.exportCard.kb",
+  "admin.imports.exportCard.sha",
+  "admin.invitations.exampleComExampleOrg",
+  "admin.sso.ssoForm.certificatePlaceholder",
+  "admin.sso.ssoForm.discoveryUrlPlaceholder",
+  "admin.sso.ssoForm.emailDomainsPlaceholder",
+  "admin.sso.ssoForm.issuerPlaceholder",
+  "admin.sso.ssoForm.providerIdPlaceholder",
+  "admin.sso.ssoForm.scopesPlaceholder",
+  "admin.sso.ssoForm.signOnUrlPlaceholder",
+  "admin.sso.ssoForm.urlPlaceholder",
+  "common.esc",
+  // Abbreviations the method keeps in English in every language.
+  "common.ai",
+  "dev.components.ai",
+  "inbox.subject.kpi",
+  "kpis.grid.kpi",
+  "common.count.krOne",
+  "workMap.kr",
+  "workMap.obj",
+  // Words Bahasa Melayu uses as they are.
+  "admin.agents.levelEdit",
+  "admin.agents.proposalQueue.itemsOne",
+  "admin.ai.model",
+  "admin.imports.import",
+  "admin.imports.wizard.importRows",
+  "checkIn.composer.status",
+  "common.edit",
+  "cycle.drafting.unit",
+  "dev.components.neutral",
+  "kpis.detail.formula",
+  "lib.sectionTabs.grid",
+  "people.detail.bio",
+  "session.detail.quarterlyReview.actRetro",
+  "sessions.schedule.kind",
+  // Only holes and punctuation.
+  "admin.plan.planWithSeats",
+  "checkIn.timeline.bylineDate",
+  "checkIn.walkerLine",
+  "cycle.actions.measureRefusedBecause",
+  "documents.subjectDocuments.authorAndVersions",
+  "initiatives.metaKeyResults",
+  "initiatives.metaWindowKeyResults",
+  "workMapHeader.scopeSummary",
+]);
+
+describe("Bahasa Melayu is translated (completeness review M-15)", () => {
+  test("no entry reads the same as the English without a written reason", () => {
+    const untranslated = Object.entries(CATALOGUES.en)
+      .filter(([key, english]) => CATALOGUES.ms[key] === english)
+      .map(([key]) => key)
+      .filter((key) => !SAME_IN_MALAY.has(key));
+    expect(untranslated).toEqual([]);
+  });
+
+  test("every reason on the list still applies", () => {
+    const stale = [...SAME_IN_MALAY].filter(
+      (key) =>
+        !(key in CATALOGUES.en) || CATALOGUES.ms[key] !== CATALOGUES.en[key],
+    );
+    expect(stale).toEqual([]);
+  });
+
+  test("every Malay entry has the holes its English one has", () => {
+    const mismatched = Object.keys(CATALOGUES.en).filter(
+      (key) =>
+        [...messageHoles(CATALOGUES.en[key] ?? "")].sort().join() !==
+        [...messageHoles(CATALOGUES.ms[key] ?? "")].sort().join(),
+    );
+    expect(mismatched).toEqual([]);
+  });
+});
+
+/**
  * A message carries values (P6-G22d).
  *
  * The codemod that moved 1,543 strings in had no way to keep a sentence with a

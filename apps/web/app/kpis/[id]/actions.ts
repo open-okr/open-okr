@@ -10,6 +10,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
 
@@ -43,13 +44,12 @@ export async function setFormula(
 ): Promise<WriteState> {
   const formula = fold(operator, references);
   if (!formula) {
-    return { error: "A formula needs at least one source KPI." };
+    const { t } = await getTranslations();
+    return { error: t("kpis.detail.actions.formulaNeedsASource") };
   }
   if (references.length === 1) {
-    return {
-      error:
-        "One source is a copy, not a calculation. Pick a second, or leave this KPI entered by hand.",
-    };
+    const { t } = await getTranslations();
+    return { error: t("kpis.detail.actions.oneSourceIsACopy") };
   }
   const { session, workspace } = await requireWorkspace();
   try {

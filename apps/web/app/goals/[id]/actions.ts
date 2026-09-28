@@ -17,6 +17,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
 
@@ -62,7 +63,8 @@ export async function editGoal(
   const weight = Number(formData.get("weight"));
 
   if (title === "") {
-    return { error: "An objective needs a title." };
+    const { t } = await getTranslations();
+    return { error: t("goals.detail.actions.objectiveNeedsATitle") };
   }
 
   return run(id, (context) =>
@@ -86,10 +88,8 @@ export async function closeGoal(
   if (isBlankText(body)) {
     // The same refusal the action makes, said before the round trip so the
     // person reads it beside the field they left empty.
-    return {
-      error:
-        "Closing a goal needs a retrospective. What happened, and what would you do differently?",
-    };
+    const { t } = await getTranslations();
+    return { error: t("goals.detail.actions.closingNeedsARetrospective") };
   }
 
   return run(id, (context) =>
@@ -155,7 +155,8 @@ export async function recordValue(
   const keyResultId = String(formData.get("keyResultId") ?? "");
   const value = Number(formData.get("value"));
   if (!Number.isFinite(value)) {
-    return { error: "A value has to be a number." };
+    const { t } = await getTranslations();
+    return { error: t("cycle.actions.valueHasToBeANumber") };
   }
   return run(goalId, async (context) => {
     await callAction(context, "goals.recordValue", { id: keyResultId, value });
@@ -183,11 +184,12 @@ export async function postComment(body: unknown): Promise<WriteState> {
     revalidatePath("/goals/[id]", "page");
     return NO_ERROR;
   } catch (error) {
+    const { t } = await getTranslations();
     return {
       error:
         error instanceof OperationError
           ? error.message
-          : "Failed to post comment.",
+          : t("goals.detail.actions.failedToPostComment"),
     };
   }
 }
@@ -207,11 +209,12 @@ export async function editComment(
     revalidatePath("/goals/[id]", "page");
     return NO_ERROR;
   } catch (error) {
+    const { t } = await getTranslations();
     return {
       error:
         error instanceof OperationError
           ? error.message
-          : "Failed to edit comment.",
+          : t("goals.detail.actions.failedToEditComment"),
     };
   }
 }
@@ -230,11 +233,12 @@ export async function deleteCommentAction(
     revalidatePath("/goals/[id]", "page");
     return NO_ERROR;
   } catch (error) {
+    const { t } = await getTranslations();
     return {
       error:
         error instanceof OperationError
           ? error.message
-          : "Failed to delete comment.",
+          : t("goals.detail.actions.failedToDeleteComment"),
     };
   }
 }
@@ -276,11 +280,12 @@ export async function toggleReaction(
     revalidatePath("/goals/[id]", "page");
     return NO_ERROR;
   } catch (error) {
+    const { t } = await getTranslations();
     return {
       error:
         error instanceof OperationError
           ? error.message
-          : "Failed to change the reaction.",
+          : t("goals.detail.actions.failedToChangeTheReaction"),
     };
   }
 }

@@ -251,7 +251,9 @@ export default async function GoalPage({
             </div>
             <Chip tone={closed ? "neutral" : "brand"}>
               {closed
-                ? `closed · ${goal.successStatus}`
+                ? t("goals.detail.closedStatus", {
+                    status: String(goal.successStatus),
+                  })
                 : goal.health.replace("_", " ")}
             </Chip>
             <WatchControl subjectType="goal" subjectId={id} initial={watch} />
@@ -269,13 +271,21 @@ export default async function GoalPage({
             </div>
             {goal.nextCheckInOn ? (
               <p className="text-xs text-ink-3">
-                {t("goals.detail.nextCheckInDue", {
-                  nextCheckInOn: goal.nextCheckInOn,
-                  overdue:
-                    goal.daysPastDue !== null && goal.daysPastDue > 0
-                      ? ` · ${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
-                      : "",
-                })}
+                {goal.daysPastDue !== null && goal.daysPastDue > 0
+                  ? t("goals.detail.nextCheckInDueOverdue", {
+                      date: goal.nextCheckInOn,
+                      days:
+                        goal.daysPastDue === 1
+                          ? t("common.count.dayOne", {
+                              count: goal.daysPastDue,
+                            })
+                          : t("common.count.dayOther", {
+                              count: goal.daysPastDue,
+                            }),
+                    })
+                  : t("goals.detail.nextCheckInDueOn", {
+                      date: goal.nextCheckInOn,
+                    })}
               </p>
             ) : (
               <p className="text-xs text-ink-3">
@@ -284,7 +294,7 @@ export default async function GoalPage({
             )}
             <p className="text-xs text-ink-3">
               {goal.contributionStatement ??
-                "No parent and no contribution statement, so publish gate 3 is red."}
+                t("goals.detail.noParentNoContribution")}
             </p>
             {goal.progressPct === 0 ? (
               <p className="text-xs text-ink-4">
@@ -594,7 +604,7 @@ export default async function GoalPage({
             <CardBody className="flex flex-col gap-1.5">
               <p className="text-sm text-ink-2">
                 {excerptRichText(goal.retrospective.body as never, 2000) ||
-                  "Written, but empty."}
+                  t("goals.detail.writtenButEmpty")}
               </p>
               <p className="text-xs text-ink-4">
                 {t("goals.detail.keptWhetherTheGoal")}
@@ -607,7 +617,7 @@ export default async function GoalPage({
           <Card>
             <CardHeader>
               <h2 className="text-sm font-bold text-ink">
-                {closed ? "Reopen" : "Close"}
+                {closed ? t("goals.detail.reopen") : t("shell.shortcuts.close")}
               </h2>
             </CardHeader>
             <CardBody>
@@ -744,7 +754,7 @@ export default async function GoalPage({
          */}
         <FeedPanel
           title={t("common.activity")}
-          explains="What has happened to this goal, its key results and its check-ins, newest first."
+          explains={t("goals.detail.feedExplains")}
           items={feedItems}
           names={feedNames}
           timeZone={String(feedSettings.settings.timezone ?? "UTC")}

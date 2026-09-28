@@ -5,10 +5,10 @@ import { useState, useTransition } from "react";
 import { setFormula } from "./actions.ts";
 
 const OPERATORS = [
-  { key: "add" as const, label: "sum" },
-  { key: "sub" as const, label: "difference" },
-  { key: "mul" as const, label: "product" },
-  { key: "div" as const, label: "ratio" },
+  { key: "add" as const, label: "kpis.detail.formulaBuilder.sum" },
+  { key: "sub" as const, label: "kpis.detail.formulaBuilder.difference" },
+  { key: "mul" as const, label: "kpis.detail.formulaBuilder.product" },
+  { key: "div" as const, label: "kpis.detail.formulaBuilder.ratio" },
 ];
 
 /**
@@ -55,7 +55,8 @@ export function FormulaBuilder({
   };
 
   const titleOf = (id: string) =>
-    candidates.find((candidate) => candidate.id === id)?.title ?? "a KPI";
+    candidates.find((candidate) => candidate.id === id)?.title ??
+    t("kpis.detail.formulaBuilder.aKpi");
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -77,7 +78,7 @@ export function FormulaBuilder({
                 : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
             }
           >
-            {entry.label}
+            {t(entry.label)}
           </button>
         ))}
       </div>
@@ -139,7 +140,9 @@ export function FormulaBuilder({
             })
           }
         >
-          {pending ? "Saving" : "Save the formula"}
+          {pending
+            ? t("kpis.detail.formulaBuilder.saving")
+            : t("kpis.detail.formulaBuilder.saveTheFormula")}
         </Button>
         {saved ? (
           <span className="text-xs text-ok">

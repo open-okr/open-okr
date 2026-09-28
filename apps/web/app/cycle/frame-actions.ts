@@ -16,6 +16,7 @@ import type { RichTextDocument } from "@openokr/core";
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
 
@@ -124,10 +125,8 @@ export async function runFeedForward(
   try {
     const next = await callAction(context, "cycles.ensureCurrent", {});
     if (next.id === fromCycleId) {
-      return {
-        error:
-          "The next cycle has not started yet, so there is nowhere to carry these into.",
-      };
+      const { t } = await getTranslations();
+      return { error: t("cycle.actions.nextCycleHasNotStarted") };
     }
     await callAction(context, "cycles.feedForward", {
       fromCycleId,
@@ -177,7 +176,8 @@ export async function sendForward(
   const reviewerId = String(form.get("reviewerId") ?? "");
 
   if (title === "") {
-    return { error: "The quarterly objective needs a title." };
+    const { t } = await getTranslations();
+    return { error: t("cycle.actions.quarterlyObjectiveNeedsATitle") };
   }
 
   try {

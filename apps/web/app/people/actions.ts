@@ -3,6 +3,7 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 
 /**
@@ -32,6 +33,7 @@ export async function updateProfile(
   _previous: ProfileResult | null,
   form: FormData,
 ): Promise<ProfileResult> {
+  const { t } = await getTranslations();
   const memberId = String(form.get("memberId") ?? "");
   try {
     const ctx = await actionContext();
@@ -63,11 +65,14 @@ export async function updateProfile(
 
     await callAction(ctx, "people.updateOwnProfile", input);
     revalidatePath(`/people/${memberId}`);
-    return { ok: true, message: "Profile updated." };
+    return { ok: true, message: t("people.actions.profileUpdated") };
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Update failed.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("people.actions.updateFailed"),
     };
   }
 }
@@ -76,6 +81,7 @@ export async function updateMemberFields(
   _previous: ProfileResult | null,
   form: FormData,
 ): Promise<ProfileResult> {
+  const { t } = await getTranslations();
   const memberId = String(form.get("memberId") ?? "");
   try {
     const ctx = await actionContext();
@@ -99,11 +105,14 @@ export async function updateMemberFields(
 
     await callAction(ctx, "people.updateMember", input);
     revalidatePath(`/people/${memberId}`);
-    return { ok: true, message: "Member updated." };
+    return { ok: true, message: t("people.actions.memberUpdated") };
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Update failed.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("people.actions.updateFailed"),
     };
   }
 }

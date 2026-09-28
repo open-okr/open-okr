@@ -28,6 +28,11 @@ export function AuditPanel() {
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
 
+  const rowsPhrase = (count: number) =>
+    count === 1
+      ? t("common.count.rowOne", { count })
+      : t("common.count.rowOther", { count });
+
   const check = async () => {
     setChecking(true);
     setVerdict(null);
@@ -75,10 +80,13 @@ export function AuditPanel() {
       anchor.click();
       URL.revokeObjectURL(url);
 
+      const count = result.rowCount ?? 0;
       setNote(
         result.truncated
-          ? `${result.rowCount} rows, which is the ceiling. Narrow the range to see the rest.`
-          : `${result.rowCount} rows.`,
+          ? t("admin.audit.rowsAtCeiling", { rows: rowsPhrase(count) })
+          : count === 1
+            ? t("admin.audit.exportedRowsOne", { count })
+            : t("admin.audit.exportedRowsOther", { count }),
       );
     } finally {
       setExporting(false);
@@ -114,8 +122,18 @@ export function AuditPanel() {
             {verdict.error
               ? verdict.error
               : verdict.ok
-                ? `The chain is intact. ${verdict.checked} rows checked, ${verdict.pending} waiting for a position.`
-                : `The chain is broken at position ${verdict.brokenAtSeq ?? "unknown"}. ${verdict.reason ?? ""}`}
+                ? t("admin.audit.chainIntact", {
+                    rows: rowsPhrase(verdict.checked),
+                    pending: verdict.pending,
+                  })
+                : verdict.brokenAtSeq === null
+                  ? t("admin.audit.chainBrokenUnknown", {
+                      reason: verdict.reason ?? "",
+                    })
+                  : t("admin.audit.chainBroken", {
+                      position: verdict.brokenAtSeq,
+                      reason: verdict.reason ?? "",
+                    })}
           </p>
         ) : null}
       </section>

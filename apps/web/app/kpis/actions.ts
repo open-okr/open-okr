@@ -9,6 +9,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
@@ -42,7 +43,8 @@ export async function recordCell(
   actualValue: number | null,
 ): Promise<WriteState> {
   if (actualValue !== null && !Number.isFinite(actualValue)) {
-    return { error: "A value has to be a number, or empty to clear it." };
+    const { t } = await getTranslations();
+    return { error: t("kpis.actions.valueHasToBeANumberOrEmpty") };
   }
   return run((context) =>
     callAction(context, "kpis.record", {
@@ -64,7 +66,8 @@ export async function addKpi(
   const direction = String(formData.get("direction") ?? "higher_better");
   const targetRaw = String(formData.get("targetDefault") ?? "").trim();
   if (title === "") {
-    return { error: "A KPI needs a title. What is being measured?" };
+    const { t } = await getTranslations();
+    return { error: t("kpis.actions.kpiNeedsATitle") };
   }
   const target = Number(targetRaw);
   return run((context) =>
@@ -96,7 +99,8 @@ export async function addCategory(
 ): Promise<WriteState> {
   const name = String(formData.get("name") ?? "").trim();
   if (name === "") {
-    return { error: "A category needs a name." };
+    const { t } = await getTranslations();
+    return { error: t("kpis.actions.categoryNeedsAName") };
   }
   return run((context) => callAction(context, "kpis.createCategory", { name }));
 }

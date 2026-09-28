@@ -116,6 +116,9 @@ export default async function KpiTreesPage({
     tree.treeId !== null && tree.nodes.length === 0
       ? (await callAction(context, "kpis.tree", { treeId: null })).nodes
       : [];
+  const underTitle = params.under
+    ? tree.nodes.find((node) => node.id === params.under)?.title
+    : undefined;
 
   return (
     <div className="flex w-full flex-col gap-3.5">
@@ -164,9 +167,9 @@ export default async function KpiTreesPage({
         <CardHeader>
           <h2 className="text-sm font-bold text-ink">
             {tree.treeId === null
-              ? "KPIs in no tree"
+              ? t("kpis.trees.kpisInNoTree")
               : (tree.trees.find((named) => named.id === tree.treeId)?.name ??
-                "Tree")}
+                t("goals.tree"))}
           </h2>
         </CardHeader>
         <CardBody className="p-0">
@@ -198,7 +201,7 @@ export default async function KpiTreesPage({
                   />
                   <span className="w-12 text-right text-xs text-ink-2 tabular-nums">
                     {node.achievementPct === null
-                      ? "no data"
+                      ? t("kpis.trees.noData")
                       : `${Math.round(node.achievementPct)}%`}
                   </span>
                   <Chip tone={stateTone(node.state)} dot>
@@ -248,11 +251,9 @@ export default async function KpiTreesPage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              {t("kpis.trees.addADriverUnder", {
-                KPI:
-                  tree.nodes.find((node) => node.id === params.under)?.title ??
-                  "this KPI",
-              })}
+              {underTitle === undefined
+                ? t("kpis.trees.addADriverUnderThisKpi")
+                : t("kpis.trees.addADriverUnder", { KPI: underTitle })}
             </h2>
           </CardHeader>
           <CardBody>

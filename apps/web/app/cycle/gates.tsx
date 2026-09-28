@@ -31,24 +31,32 @@ import { publishCycle } from "./actions.ts";
  */
 
 /** Where the work that clears each gate actually happens. Exported so a test
- * can assert no gate sends a facilitator to a screen that cannot clear it. */
+ * can assert no gate sends a facilitator to a screen that cannot clear it.
+ * `label` is the catalogue key of the link's text, so it reads in the
+ * reader's own language. */
 export const FIX: Record<
   number,
   { readonly href: string; readonly label: string }
 > = {
-  1: { href: "/cycle?phase=4", label: "Name the champion and reviewer" },
-  2: { href: "/cycle?phase=4", label: "Open the quality panel" },
-  3: { href: "/goals/studio", label: "Map the alignment" },
+  1: { href: "/cycle?phase=4", label: "cycle.gates.fix.nameTheChampion" },
+  2: { href: "/cycle?phase=4", label: "cycle.gates.fix.openTheQualityPanel" },
+  3: { href: "/goals/studio", label: "cycle.gates.fix.mapTheAlignment" },
   // The register is on this page, so the link is an anchor to it rather than a
   // second visit to the address the reader is already at. It pointed at
   // `/cycle?phase=5` from P4-T03 until P6-G17, which meant gate 4's remedy was
   // "go where you already are", and nothing there could confirm anything.
-  4: { href: "#dependency-register", label: "Confirm the dependencies" },
+  4: {
+    href: "#dependency-register",
+    label: "cycle.gates.fix.confirmTheDependencies",
+  },
   // An anchor for the same reason gate 4 is: the capacity check renders on
   // this page, and gate-remedies.test.ts refuses a remedy that navigates to the
   // address the panel is already at.
-  5: { href: "#capacity-check", label: "Check the capacity" },
-  6: { href: "/admin/rhythm", label: "Set the publication date" },
+  5: { href: "#capacity-check", label: "cycle.gates.fix.checkTheCapacity" },
+  6: {
+    href: "/admin/rhythm",
+    label: "cycle.gates.fix.setThePublicationDate",
+  },
 };
 export interface Gate {
   readonly gateKey: number;
@@ -75,6 +83,7 @@ export async function Gates({
   const { t } = await getTranslations();
 
   const green = gates.filter((gate) => gate.evaluable && gate.passed).length;
+  const unmet = gates.filter((gate) => !gate.evaluable || !gate.passed).length;
 
   return (
     <Card>
@@ -98,10 +107,12 @@ export async function Gates({
                 state={!gate.evaluable ? "todo" : gate.passed ? "pass" : "fail"}
                 label={
                   !gate.evaluable
-                    ? `Gate ${gate.gateKey} cannot be judged yet`
+                    ? t("cycle.gates.gateCannotBeJudged", {
+                        gate: gate.gateKey,
+                      })
                     : gate.passed
-                      ? `Gate ${gate.gateKey} is green`
-                      : `Gate ${gate.gateKey} is red`
+                      ? t("cycle.gates.gateIsGreen", { gate: gate.gateKey })
+                      : t("cycle.gates.gateIsRed", { gate: gate.gateKey })
                 }
               />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -128,7 +139,10 @@ export async function Gates({
                     href={FIX[gate.gateKey]?.href ?? "/cycle?phase=4"}
                     className="w-fit text-xs font-semibold text-brand-text hover:underline"
                   >
-                    {FIX[gate.gateKey]?.label ?? "Go to the drafting screen"}
+                    {t(
+                      FIX[gate.gateKey]?.label ??
+                        "cycle.gates.goToTheDraftingScreen",
+                    )}
                   </a>
                 )}
               </span>
@@ -168,15 +182,11 @@ export async function Gates({
               <input type="hidden" name="cycleId" value={cycleId} />
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-2">
-                  {t("cycle.gates.whyIsThisSetBeing", {
-                    length: gates.filter(
-                      (gate) => !gate.evaluable || !gate.passed,
-                    ).length,
-                    length2:
-                      gates.filter((gate) => !gate.evaluable || !gate.passed)
-                        .length === 1
-                        ? ""
-                        : "s",
+                  {t("cycle.gates.whyIsThisSetPublished", {
+                    gates:
+                      unmet === 1
+                        ? t("common.count.gateOne", { count: unmet })
+                        : t("common.count.gateOther", { count: unmet }),
                   })}
                 </span>
                 <textarea

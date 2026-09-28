@@ -3,6 +3,7 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { TokenResult } from "./token-state.ts";
 
@@ -36,19 +37,24 @@ export async function createToken(
   _previous: TokenResult | null,
   form: FormData,
 ): Promise<TokenResult> {
+  const { t } = await getTranslations();
   const name = String(form.get("name") ?? "").trim();
   const audience = String(form.get("audience") ?? "rest");
   const scopes = SCOPES.filter((scope) => form.get(`scope.${scope}`) === "on");
   const days = String(form.get("expiresInDays") ?? "").trim();
 
   if (name === "") {
-    return { ok: false, token: null, message: "Give the token a name." };
+    return {
+      ok: false,
+      token: null,
+      message: t("account.apiTokens.actions.giveTheTokenAName"),
+    };
   }
   if (scopes.length === 0) {
     return {
       ok: false,
       token: null,
-      message: "Choose at least one scope, or the token could reach nothing.",
+      message: t("account.apiTokens.actions.chooseAtLeastOneScope"),
     };
   }
 
@@ -63,13 +69,16 @@ export async function createToken(
     return {
       ok: true,
       token: created.token,
-      message: "Copy this now. It is not shown again.",
+      message: t("admin.invitations.inviteForm.copyThisNowIt"),
     };
   } catch (error) {
     return {
       ok: false,
       token: null,
-      message: error instanceof Error ? error.message : "That did not work.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
 }
@@ -78,6 +87,7 @@ export async function revokeToken(
   _previous: TokenResult | null,
   form: FormData,
 ): Promise<TokenResult> {
+  const { t } = await getTranslations();
   const id = String(form.get("id") ?? "");
   try {
     await callAction(await context(), "tokens.revoke", { id });
@@ -85,7 +95,10 @@ export async function revokeToken(
     return {
       ok: false,
       token: null,
-      message: error instanceof Error ? error.message : "That did not work.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
   // The revoked stamp on the row is the durable confirmation, so the page

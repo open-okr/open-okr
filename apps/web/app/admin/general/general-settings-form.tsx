@@ -107,12 +107,26 @@ export async function GeneralSettingsForm({
           </label>
           <label htmlFor="language" className={LABEL_CLASS}>
             {t("admin.general.generalSettingsForm.language")}
-            <input
+            {/* A picker of the catalogues that exist, not a text box that
+             * expected somebody to know to type "ms" (completeness review
+             * M-15). A value stored before this that is neither stays
+             * listed, so saving the card never changes it by accident. */}
+            <select
               id="language"
               name="language"
-              defaultValue={String(settings.language ?? "")}
+              defaultValue={String(settings.language ?? "en")}
               className={INPUT_CLASS}
-            />
+            >
+              <option value="en">{t("appearance.english")}</option>
+              <option value="ms">{t("appearance.bahasaMelayu")}</option>
+              {settings.language &&
+              settings.language !== "en" &&
+              settings.language !== "ms" ? (
+                <option value={String(settings.language)}>
+                  {String(settings.language)}
+                </option>
+              ) : null}
+            </select>
           </label>
           <label htmlFor="trustedEmailDomains" className={LABEL_CLASS}>
             {t("admin.general.generalSettingsForm.trustedEmailDomainsComma")}

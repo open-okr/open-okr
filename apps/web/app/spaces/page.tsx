@@ -75,8 +75,13 @@ export default async function SpacesPage() {
                     </span>
                     <span className="flex items-center gap-2">
                       <span className="tabular text-sm text-ink-3">
-                        {space.memberCount}{" "}
-                        {space.memberCount === 1 ? "member" : "members"}
+                        {space.memberCount === 1
+                          ? t("common.count.memberOne", {
+                              count: space.memberCount,
+                            })
+                          : t("common.count.memberOther", {
+                              count: space.memberCount,
+                            })}
                       </span>
                       {space.ownRole ? (
                         <Chip tone="brand">{space.ownRole}</Chip>

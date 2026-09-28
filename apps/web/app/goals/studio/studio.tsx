@@ -113,12 +113,14 @@ export function Studio({
                 setLinkMode((value) => !value);
               }}
             >
-              {linkMode ? "Cancel link" : "Link two goals"}
+              {linkMode
+                ? t("goals.studio.studio.cancelLink")
+                : t("goals.studio.studio.linkTwoGoals")}
             </Button>
             <span className="text-xs text-ink-3">
               {pending
-                ? "Saving the link…"
-                : "A dependency is two-way by meaning, so either end may add it."}
+                ? t("goals.studio.studio.savingTheLink")
+                : t("goals.studio.studio.aDependencyIsTwoWay")}
             </span>
           </div>
         ) : null}
@@ -162,23 +164,27 @@ export function Studio({
                     {selected.title}
                   </a>
                   <dl className="flex flex-col gap-1 text-xs">
-                    <Row label="Level" value={selected.level} />
-                    <Row label="Owner" value={selected.owner} />
+                    <Row label={t("common.level")} value={selected.level} />
+                    <Row label={t("common.owner")} value={selected.owner} />
                     <Row
-                      label="Health"
+                      label={t("workMap.health")}
                       value={selected.health.replace("_", " ")}
                     />
                     <Row
-                      label="Key results"
+                      label={t("cycle.reviewAndLearn.keyResults")}
                       value={String(selected.keyResultCount)}
                     />
                     <Row
-                      label="Dependencies"
+                      label={t("goals.studio.studio.dependencies")}
                       value={String(selected.dependencyCount)}
                     />
                     <Row
-                      label="Aligned"
-                      value={selected.unaligned ? "no parent" : "yes"}
+                      label={t("goals.studio.studio.aligned")}
+                      value={
+                        selected.unaligned
+                          ? t("goals.studio.studio.noParent")
+                          : t("goals.studio.studio.yes")
+                      }
                     />
                   </dl>
                   <span className="flex items-center gap-2">
@@ -227,8 +233,12 @@ export function Studio({
                     <Bar value={score} className="h-1.5" />
                     <p className="text-xs text-ink-3">
                       {healthy
-                        ? `At or above ${threshold}, which METHOD.md §5.2 calls healthy.`
-                        : `Below ${threshold}. Each gap below opens the goal that caused it.`}
+                        ? t("goals.studio.studio.atOrAboveHealthy", {
+                            threshold,
+                          })
+                        : t("goals.studio.studio.belowThreshold", {
+                            threshold,
+                          })}
                     </p>
                   </>
                 )}
@@ -270,7 +280,8 @@ export function Studio({
                             href={`/goals/${finding.subjectGoalId}`}
                             className="text-xs text-brand-text underline"
                           >
-                            {finding.subjectGoalTitle ?? "Open the goal"}
+                            {finding.subjectGoalTitle ??
+                              t("workMap.openTheGoal")}
                           </a>
                         ) : (
                           <span className="text-xs text-ink-4">

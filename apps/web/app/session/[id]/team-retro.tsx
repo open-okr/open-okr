@@ -58,9 +58,10 @@ export interface TeamRetro {
   readonly dotsLeft: number;
 }
 
+/** Catalogue keys, so the words are the reader's language. */
 const COLUMN_TITLES: Record<RetroColumnKey, string> = {
-  worked: "What worked",
-  didnt: "What did not",
+  worked: "session.detail.whatWorked",
+  didnt: "session.detail.whatDidNot",
 };
 
 function NoteRow({
@@ -90,12 +91,14 @@ function NoteRow({
           router.refresh();
         } catch (error) {
           onProblem(
-            error instanceof Error ? error.message : "That did not save.",
+            error instanceof Error
+              ? error.message
+              : t("session.detail.thatDidNotSave"),
           );
         }
       });
     },
-    [onProblem, router],
+    [onProblem, router, t],
   );
 
   // Out of dots is not a reason to hide a note the reader already voted for:
@@ -107,10 +110,12 @@ function NoteRow({
       <span className="text-sm text-ink">{note.text}</span>
       <span className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-ink-4">
-          {note.authorName ?? "anonymous"}
+          {note.authorName ?? t("session.detail.teamRetro.anonymous")}
         </span>
         <Chip tone={note.votes === 0 ? "neutral" : "ok"}>
-          {note.votes} {note.votes === 1 ? "dot" : "dots"}
+          {note.votes === 1
+            ? t("session.detail.dotCountOne", { count: note.votes })
+            : t("session.detail.dotCountOther", { count: note.votes })}
         </Chip>
         {canVote ? (
           <Button
@@ -120,7 +125,9 @@ function NoteRow({
             disabled={pending || !canSpend}
             onClick={() => run(() => castRetroVoteAction(sessionId, note.id))}
           >
-            {note.mine ? "Take my dot back" : "Spend a dot"}
+            {note.mine
+              ? t("session.detail.teamRetro.takeMyDotBack")
+              : t("session.detail.teamRetro.spendADot")}
           </Button>
         ) : null}
         <Button
@@ -160,11 +167,13 @@ function Column({
   const [pending, startTransition] = useTransition();
   const [text, setText] = useState("");
   const [anonymous, setAnonymous] = useState(false);
+  const titleKey = COLUMN_TITLES[columnKey];
+  const title = titleKey ? t(titleKey) : columnKey;
 
   const add = useCallback(() => {
     onProblem(null);
     if (text.trim().length === 0) {
-      onProblem("Write the note first.");
+      onProblem(t("session.detail.teamRetro.writeTheNoteFirst"));
       return;
     }
     startTransition(async () => {
@@ -174,11 +183,13 @@ function Column({
         router.refresh();
       } catch (error) {
         onProblem(
-          error instanceof Error ? error.message : "That did not save.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.thatDidNotSave"),
         );
       }
     });
-  }, [anonymous, columnKey, onProblem, router, sessionId, text]);
+  }, [anonymous, columnKey, onProblem, router, sessionId, t, text]);
 
   return (
     // **A named group, not a bare div.** Both columns carry a note field and a
@@ -194,7 +205,7 @@ function Column({
           id={`retro-column-${columnKey}`}
           className="flex-1 text-xs font-semibold text-ink-2"
         >
-          {COLUMN_TITLES[columnKey] ?? columnKey}
+          {title}
         </h3>
         <Chip tone="neutral">{notes.length}</Chip>
       </span>
@@ -219,9 +230,7 @@ function Column({
       {canWrite ? (
         <div className="flex flex-col gap-1.5">
           <label className="flex flex-col gap-1" htmlFor={`note-${columnKey}`}>
-            <span className="sr-only">
-              {COLUMN_TITLES[columnKey] ?? columnKey}
-            </span>
+            <span className="sr-only">{title}</span>
             <textarea
               id={`note-${columnKey}`}
               rows={2}
@@ -296,14 +305,14 @@ export function TeamRetroPanel({
       const clustered = await clusterRetroAction(sessionId);
       setThemes(clustered?.themes ?? null);
       if (!clustered || clustered.themes.length === 0) {
-        setProblem("No themes came out of that. The board stands on its own.");
+        setProblem(t("session.detail.teamRetro.noThemesCameOut"));
       }
     } catch {
-      setProblem("The assist could not run. The board is unaffected.");
+      setProblem(t("session.detail.teamRetro.theAssistCouldNotRun"));
     } finally {
       setClustering(false);
     }
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   return (
     <Card role="region" aria-labelledby="team-retro-heading">

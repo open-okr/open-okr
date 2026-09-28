@@ -7,5 +7,5 @@ export default function TasksError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="this task" />;
+  return <SegmentError {...props} headingKey="segmentError.tasks" />;
 }

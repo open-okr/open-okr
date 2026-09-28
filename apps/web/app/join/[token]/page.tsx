@@ -96,8 +96,10 @@ export default async function JoinPage({
             </h1>
             <p className="text-sm text-ink-2">
               {invitation.email
-                ? `The invitation is for ${invitation.email}. Create an account with that address and you will land straight in the workspace.`
-                : "Create an account and you will land straight in the workspace."}
+                ? t("join.detail.theInvitationIsFor", {
+                    email: invitation.email,
+                  })
+                : t("join.detail.createAnAccountAndYouWillLand")}
             </p>
             <div className="flex items-center gap-2.5">
               <JoinButton action={startSignUp} token={token}>
@@ -129,13 +131,13 @@ export default async function JoinPage({
             {t("common.join2", { workspaceName: invitation.workspaceName })}
           </h1>
           <p className="text-sm text-ink-2">
-            {t("join.detail.youAreSignedInAs", {
-              email: session.user.email,
-              own:
-                invitation.email && invitation.email !== session.user.email
-                  ? " This invitation was issued to a different address, so it will be refused. Sign in as that person, or ask for one of your own."
-                  : "",
-            })}
+            {invitation.email && invitation.email !== session.user.email
+              ? t("join.detail.youAreSignedInAsSomeoneElse", {
+                  email: session.user.email,
+                })
+              : t("join.detail.youAreSignedInAsEmail", {
+                  email: session.user.email,
+                })}
           </p>
           <JoinButton action={acceptInvitation} token={token}>
             <Button type="submit" variant="default" size="sm">

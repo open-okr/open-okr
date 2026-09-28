@@ -15,6 +15,7 @@ import {
 } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
@@ -70,12 +71,13 @@ export async function createDocumentAction(
   const subjectId = String(formData.get("subjectId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const kind = SUBJECTS.find((one) => one === subjectType);
+  const { t } = await getTranslations();
 
   if (!kind || subjectId === "") {
-    return { error: "A document hangs off something. Which?" };
+    return { error: t("documents.actions.documentHangsOffSomething") };
   }
   if (title === "") {
-    return { error: "A document needs a title. What is it about?" };
+    return { error: t("documents.actions.documentNeedsATitle") };
   }
 
   return run(

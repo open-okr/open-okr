@@ -7,5 +7,5 @@ export default function AdminError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the settings" />;
+  return <SegmentError {...props} headingKey="segmentError.admin" />;
 }

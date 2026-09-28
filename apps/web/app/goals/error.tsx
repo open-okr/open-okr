@@ -7,5 +7,5 @@ export default function GoalsError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the goals" />;
+  return <SegmentError {...props} headingKey="segmentError.goals" />;
 }

@@ -119,10 +119,12 @@ export async function AppShellLayout({
     { memberId: workspace.memberId },
   );
 
+  const { t } = await getTranslations();
   const strip = await loadCycleStrip(
     workspace.workspaceId,
     session.user.id,
     level,
+    t,
   );
   const reviewBadge = await loadReviewBadge(
     workspace.workspaceId,
@@ -140,7 +142,6 @@ export async function AppShellLayout({
   // instead of flashing an input it cannot use.
   const copilot = await copilotAvailabilityAction();
 
-  const { t } = await getTranslations();
   const path = (await headers()).get("x-openokr-path") ?? "/";
   const active = activeItemId(path, [
     ...sidebarItems,
@@ -247,7 +248,7 @@ export async function AppShellLayout({
                 <CycleStrip
                   phase={strip.phaseLabel}
                   blocking={strip.blocking}
-                  dueInDays={strip.dueInDays}
+                  due={strip.due}
                 />
               ) : undefined
             }

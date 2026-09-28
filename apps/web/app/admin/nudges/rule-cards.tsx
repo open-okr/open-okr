@@ -141,7 +141,10 @@ function LadderEditor({
               value={draft[rung] ?? ""}
               disabled={pending}
               placeholder={String(ladder.canon[rung] ?? "")}
-              aria-label={`${rung} for ${label}`}
+              aria-label={t("admin.nudges.ruleCards.rungFor", {
+                rung,
+                rule: label,
+              })}
               onChange={(event) =>
                 setDraft((held) => ({ ...held, [rung]: event.target.value }))
               }
@@ -164,7 +167,9 @@ function LadderEditor({
             )
           }
         >
-          {filled.length === 0 ? "Use the default" : "Save the ladder"}
+          {filled.length === 0
+            ? t("admin.nudges.ruleCards.useTheDefault")
+            : t("admin.nudges.ruleCards.saveTheLadder")}
         </Button>
       </div>
       {partial ? (
@@ -250,7 +255,9 @@ function Rule({
           data-testid={`toggle-${rule.key}`}
           onClick={() => change({ ruleKey: rule.key, enabled: !rule.enabled })}
         >
-          {rule.enabled ? "Turn off" : "Turn on"}
+          {rule.enabled
+            ? t("admin.nudges.ruleCards.turnOff")
+            : t("account.security.securitySettings.turnOn")}
         </Button>
 
         <label className="flex items-center gap-1.5 text-xs text-ink-3">
@@ -258,7 +265,9 @@ function Rule({
           <select
             value={rule.channelOverride ?? ""}
             disabled={pending}
-            aria-label={`Channel for ${label}`}
+            aria-label={t("admin.nudges.ruleCards.channelFor", {
+              rule: label,
+            })}
             onChange={(event) =>
               change({
                 ruleKey: rule.key,
@@ -365,7 +374,9 @@ export function NudgeRuleCards({
               });
             }}
           >
-            {quietMode ? "Quiet mode is on" : "Turn quiet mode on"}
+            {quietMode
+              ? t("admin.nudges.ruleCards.quietModeIsOn")
+              : t("admin.nudges.ruleCards.turnQuietModeOn")}
           </Button>
         </CardHeader>
         {problem ? (

@@ -133,12 +133,7 @@ export function GoalWrites({
         ) : null}
 
         {canAdminister ? (
-          <DeleteControl
-            subject="goal"
-            id={goalId}
-            what="this goal"
-            returnTo="/goals"
-          />
+          <DeleteControl subject="goal" id={goalId} returnTo="/goals" />
         ) : null}
 
         {problem ? (

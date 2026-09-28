@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { cancelRunAction, setAgentEnabledAction } from "./actions";
@@ -27,6 +27,7 @@ export function AgentSwitch({
   readonly enabled: boolean;
   readonly name: string;
 }) {
+  const { t } = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -39,7 +40,7 @@ export function AgentSwitch({
         if (
           enabled &&
           !window.confirm(
-            `Turn ${name} off? It stops speaking and keeps its scope, its persona and its run log. Nothing it already said is undone.`,
+            t("admin.agents.agentSwitch.confirmTurnOff", { name }),
           )
         ) {
           return;
@@ -50,13 +51,18 @@ export function AgentSwitch({
         });
       }}
     >
-      {pending ? "Working…" : enabled ? "Turn off" : "Turn on"}
+      {pending
+        ? t("admin.agents.agentSwitch.working")
+        : enabled
+          ? t("admin.agents.agentSwitch.turnOff")
+          : t("account.security.securitySettings.turnOn")}
     </Button>
   );
 }
 
 /** Stops a run that is still planning or running (P6-G13a). */
 export function CancelRun({ id }: { readonly id: string }) {
+  const { t } = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -72,7 +78,9 @@ export function CancelRun({ id }: { readonly id: string }) {
         });
       }}
     >
-      {pending ? "Stopping…" : "Stop"}
+      {pending
+        ? t("admin.agents.agentSwitch.stopping")
+        : t("copilot.copilotPanel.stop")}
     </Button>
   );
 }

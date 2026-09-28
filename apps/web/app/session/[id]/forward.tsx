@@ -102,12 +102,14 @@ export function ForwardPanel({
           router.refresh();
         } catch (error) {
           setProblem(
-            error instanceof Error ? error.message : "That did not save.",
+            error instanceof Error
+              ? error.message
+              : t("session.detail.thatDidNotSave"),
           );
         }
       });
     },
-    [router],
+    [router, t],
   );
 
   return (
@@ -124,8 +126,13 @@ export function ForwardPanel({
             {t("common.carried2", { carried: forward.carried })}
           </Chip>
           <Chip tone={forward.actions.length === 0 ? "warn" : "ok"}>
-            {forward.actions.length}{" "}
-            {forward.actions.length === 1 ? "action" : "actions"}
+            {forward.actions.length === 1
+              ? t("session.detail.forward.actionCountOne", {
+                  count: forward.actions.length,
+                })
+              : t("session.detail.forward.actionCountOther", {
+                  count: forward.actions.length,
+                })}
           </Chip>
         </span>
       </CardHeader>
@@ -174,7 +181,13 @@ export function ForwardPanel({
                       {note.text}
                     </span>
                     <Chip tone={note.votes === 0 ? "neutral" : "ok"}>
-                      {note.votes} {note.votes === 1 ? "dot" : "dots"}
+                      {note.votes === 1
+                        ? t("session.detail.dotCountOne", {
+                            count: note.votes,
+                          })
+                        : t("session.detail.dotCountOther", {
+                            count: note.votes,
+                          })}
                     </Chip>
                     <Button
                       type="button"
@@ -185,7 +198,9 @@ export function ForwardPanel({
                         run(() =>
                           captureLearningAction(
                             sessionId,
-                            `We learned that ${note.text}`,
+                            t("session.detail.forward.weLearnedThatNote", {
+                              text: note.text,
+                            }),
                             true,
                             note.noteId,
                           ),
@@ -223,7 +238,9 @@ export function ForwardPanel({
                   disabled={pending}
                   onClick={() => {
                     if (learning.trim().length === 0) {
-                      setProblem("Write the learning first.");
+                      setProblem(
+                        t("session.detail.forward.writeTheLearningFirst"),
+                      );
                       return;
                     }
                     run(async () => {
@@ -317,9 +334,7 @@ export function ForwardPanel({
                       draftTitle.trim().length === 0 ||
                       draftWhy.trim().length === 0
                     ) {
-                      setProblem(
-                        "A draft needs a title and a why. Without the why the next cycle cannot prioritise it.",
-                      );
+                      setProblem(t("session.detail.forward.aDraftNeedsATitle"));
                       return;
                     }
                     run(async () => {
@@ -374,11 +389,15 @@ export function ForwardPanel({
                         )
                       }
                     >
-                      {action.done ? "Reopen it" : "Done"}
+                      {action.done
+                        ? t("session.detail.forward.reopenIt")
+                        : t("board.done")}
                     </Button>
                   ) : (
                     <Chip tone={action.done ? "ok" : "warn"}>
-                      {action.done ? "done" : "open"}
+                      {action.done
+                        ? t("session.detail.done")
+                        : t("common.open")}
                     </Chip>
                   )}
                 </li>
@@ -442,12 +461,12 @@ export function ForwardPanel({
                   disabled={pending}
                   onClick={() => {
                     if (what.trim().length === 0) {
-                      setProblem("Say what happens.");
+                      setProblem(t("session.detail.forward.sayWhatHappens"));
                       return;
                     }
                     if (ownerId === "" || dueOn === "") {
                       setProblem(
-                        "Every action has a name and a date, or it is a wish.",
+                        t("session.detail.forward.everyActionHasANameAndADate"),
                       );
                       return;
                     }

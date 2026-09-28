@@ -49,7 +49,7 @@ export function InviteForm({
         disabled={pending}
         className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand disabled:opacity-60"
       >
-        {pending ? "Working…" : submitLabel}
+        {pending ? t("admin.invitations.inviteForm.working") : submitLabel}
       </button>
 
       {state?.link ? (

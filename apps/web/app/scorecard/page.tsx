@@ -85,10 +85,14 @@ export default async function ScorecardPage() {
             </h1>
             <p className="text-xs text-ink-3">
               {scorecard.rows.length === 0
-                ? "No cycle has been archived yet."
-                : `${scorecard.rows.length} archived cycle${
-                    scorecard.rows.length === 1 ? "" : "s"
-                  }, oldest first.`}
+                ? t("scorecard.noCycleHasBeen")
+                : scorecard.rows.length === 1
+                  ? t("scorecard.archivedCyclesOne", {
+                      count: scorecard.rows.length,
+                    })
+                  : t("scorecard.archivedCyclesOther", {
+                      count: scorecard.rows.length,
+                    })}
             </p>
           </div>
           {scorecard.rows.length > 0 ? (
@@ -107,7 +111,11 @@ export default async function ScorecardPage() {
               viewBox={`0 0 ${trendWidth} ${trendHeight}`}
               className="h-10 w-full max-w-sm"
               role="img"
-              aria-label={`The result across ${points.length} scored cycles, from ${points[0]?.value.toFixed(2)} to ${points[points.length - 1]?.value.toFixed(2)}`}
+              aria-label={t("scorecard.resultAcrossScoredCycles", {
+                count: points.length,
+                from: points[0]?.value.toFixed(2) ?? "",
+                to: points[points.length - 1]?.value.toFixed(2) ?? "",
+              })}
             >
               <title>{t("scorecard.resultAcrossCycles")}</title>
               <polyline
@@ -295,8 +303,8 @@ export default async function ScorecardPage() {
         <CardBody>
           <p className="text-sm text-ink-3">
             {scorecard.pointsEnabled
-              ? "The points layer is on for this workspace."
-              : "The points layer is off, and no points exist. It stays off until somebody turns it on."}
+              ? t("scorecard.thePointsLayerIsOn")
+              : t("scorecard.thePointsLayerIsOff")}
           </p>
         </CardBody>
       </Card>

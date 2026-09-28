@@ -20,15 +20,16 @@ import { getTranslations } from "../../../../lib/translations";
 import { requireWorkspace } from "../../../../lib/workspace";
 import type { Minutes } from "./minutes-document";
 
+/** Catalogue keys, so the words are the reader's language. */
 const VERDICTS: Record<string, string> = {
-  results_delivered: "Results delivered",
-  strategy_or_quality: "Strategy or OKR-quality problem",
-  rhythm: "Rhythm problem",
+  results_delivered: "session.detail.minutes.resultsDelivered",
+  strategy_or_quality: "session.detail.minutes.strategyOrOkrQuality",
+  rhythm: "session.detail.minutes.rhythmProblem",
 };
 
 const COLUMNS: Record<string, string> = {
-  worked: "What worked",
-  didnt: "What did not",
+  worked: "session.detail.whatWorked",
+  didnt: "session.detail.whatDidNot",
 };
 
 function Section({
@@ -78,6 +79,12 @@ export default async function MinutesPage({
   }
 
   const summary = minutes.summary;
+  const verdictKey =
+    summary.verdict === null ? undefined : VERDICTS[summary.verdict];
+  const columnLabel = (column: string): string => {
+    const key = COLUMNS[column];
+    return key ? t(key) : column;
+  };
 
   return (
     <div className="flex w-full flex-col gap-4 p-4">
@@ -105,9 +112,11 @@ export default async function MinutesPage({
         </span>
         {minutes.state === "closed" ? (
           <p className="text-xs text-ink-4">
-            {t("session.detail.minutes.held", {
-              recently: minutes.heldOn?.slice(0, 10) ?? "recently",
-            })}
+            {minutes.heldOn === null
+              ? t("session.detail.minutes.heldRecently")
+              : t("session.detail.minutes.held", {
+                  recently: minutes.heldOn.slice(0, 10),
+                })}
           </p>
         ) : (
           <p className="text-xs text-warn">
@@ -137,7 +146,7 @@ export default async function MinutesPage({
                       : "warn"
                 }
               >
-                {VERDICTS[summary.verdict] ?? summary.verdict}
+                {verdictKey ? t(verdictKey) : summary.verdict}
               </Chip>
             )}
           </span>
@@ -146,25 +155,41 @@ export default async function MinutesPage({
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
               [
-                "Cycle score",
+                t("session.detail.diagnostic.cycleScore"),
                 summary.cycleScore === null
-                  ? "not read"
+                  ? t("session.detail.minutes.notRead")
                   : summary.cycleScore.toFixed(2),
               ],
-              ["Objectives", String(summary.objectivesReviewed)],
-              ["Key results", String(summary.keyResultsReviewed)],
               [
-                `Below ${summary.threshold.toFixed(1)}`,
+                t("session.detail.minutes.objectives"),
+                String(summary.objectivesReviewed),
+              ],
+              [
+                t("cycle.reviewAndLearn.keyResults"),
+                String(summary.keyResultsReviewed),
+              ],
+              [
+                t("session.detail.minutes.below", {
+                  threshold: summary.threshold.toFixed(1),
+                }),
                 String(summary.belowThreshold),
               ],
               [
-                "Team pulse",
+                t("session.detail.minutes.teamPulse"),
                 summary.teamPulse === null
-                  ? "none"
-                  : `${summary.teamPulse.toFixed(1)} of 5`,
+                  ? t("admin.rhythm.rhythmForm.noneAdded")
+                  : t("common.of52", {
+                      average: summary.teamPulse.toFixed(1),
+                    }),
               ],
-              ["Learnings carried", String(summary.learningsCarried)],
-              ["Actions agreed", String(summary.actionsAgreed)],
+              [
+                t("session.detail.minutes.learningsCarried"),
+                String(summary.learningsCarried),
+              ],
+              [
+                t("session.detail.minutes.actionsAgreed"),
+                String(summary.actionsAgreed),
+              ],
             ].map(([label, value]) => (
               <div key={label} className="flex flex-col">
                 <dt className="text-xs text-ink-4">{label}</dt>
@@ -240,7 +265,7 @@ export default async function MinutesPage({
                   className="flex flex-wrap items-baseline gap-2 text-sm"
                 >
                   <span className="text-xs text-ink-4">
-                    {COLUMNS[row.columnKey] ?? row.columnKey}
+                    {columnLabel(row.columnKey)}
                   </span>
                   <span className="flex-1 text-ink">{row.text}</span>
                   <Chip tone={row.votes === 0 ? "neutral" : "ok"}>
@@ -363,7 +388,7 @@ export default async function MinutesPage({
                   <span className="text-xs text-ink-3">{row.ownerName}</span>
                   <span className="text-xs text-ink-3">{row.dueOn}</span>
                   <Chip tone={row.done ? "ok" : "warn"}>
-                    {row.done ? "done" : "open"}
+                    {row.done ? t("session.detail.done") : t("common.open")}
                   </Chip>
                 </li>
               ))}

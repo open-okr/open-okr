@@ -123,13 +123,11 @@ export function CommentThread({
           <div className="flex items-center justify-between text-xs text-ink-3">
             <span className="font-medium text-ink">{comment.authorName}</span>
             <span>
-              {new Date(comment.createdAt).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-              {comment.editedAt && " (edited)"}
+              {comment.editedAt
+                ? t("goals.detail.comments.postedEdited", {
+                    date: postedAt(comment.createdAt),
+                  })
+                : postedAt(comment.createdAt)}
             </span>
           </div>
 
@@ -227,6 +225,16 @@ export function CommentThread({
   );
 }
 
+/** When a comment was written, short enough to sit beside the author. */
+function postedAt(createdAt: string): string {
+  return new Date(createdAt).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function CommentBody({ body }: { body: unknown }) {
   const { t } = useTranslations();
 
@@ -261,7 +269,7 @@ function CommentBody({ body }: { body: unknown }) {
                 attrs?: { label?: string };
               };
               if (child.type === "mention") {
-                return `@${child.attrs?.label ?? "someone"}`;
+                return `@${child.attrs?.label ?? t("goals.detail.comments.someone")}`;
               }
               return child.text ?? "";
             })
@@ -302,7 +310,7 @@ function CommentEditor({
     <div className="space-y-2">
       <textarea
         className="w-full min-h-[80px] rounded border border-line bg-surface p-2 text-sm text-ink placeholder:text-ink-4 resize-y focus:outline-none focus:ring-1 focus:ring-brand"
-        placeholder={placeholder ?? "Write something..."}
+        placeholder={placeholder ?? t("goals.detail.comments.writeSomething")}
         defaultValue={initialBody ? extractPlainText(initialBody) : ""}
         onChange={(e) => {
           // Wrap plain text in a minimal rich-text document
@@ -325,7 +333,11 @@ function CommentEditor({
           onClick={() => body && onSave(body)}
           disabled={saving || !body}
         >
-          {saving ? "Posting..." : initialBody ? "Save" : "Post"}
+          {saving
+            ? t("goals.detail.comments.posting")
+            : initialBody
+              ? t("common.save")
+              : t("goals.detail.comments.post")}
         </Button>
         {onCancel && (
           <Button size="sm" variant="ghost" onClick={onCancel}>

@@ -10,7 +10,7 @@
  * "not today" and "not this week", not entering a duration.
  */
 export const SNOOZE_CHOICES = [
-  { minutes: 60, label: "1 hour" },
-  { minutes: 60 * 24, label: "Tomorrow" },
-  { minutes: 60 * 24 * 7, label: "Next week" },
+  { minutes: 60, labelKey: "inbox.snooze.oneHour" },
+  { minutes: 60 * 24, labelKey: "inbox.snooze.tomorrow" },
+  { minutes: 60 * 24 * 7, labelKey: "inbox.snooze.nextWeek" },
 ] as const;

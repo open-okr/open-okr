@@ -85,8 +85,16 @@ export default async function BoardPage({
               <h1 className="text-lg font-bold text-ink">{t("board.board")}</h1>
               <p className="text-xs text-ink-3" data-testid="board-count">
                 {cards.length === 0
-                  ? "No work on this board yet."
-                  : `${cards.length} ${cards.length === 1 ? "task" : "tasks"} in ${space.name}.`}
+                  ? t("board.noWorkYet")
+                  : t("board.tasksInSpace", {
+                      tasks:
+                        cards.length === 1
+                          ? t("common.count.taskOne", { count: cards.length })
+                          : t("common.count.taskOther", {
+                              count: cards.length,
+                            }),
+                      name: space.name,
+                    })}
               </p>
             </div>
             <div className="flex flex-wrap gap-1.5">

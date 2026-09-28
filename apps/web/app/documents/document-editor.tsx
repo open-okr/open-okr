@@ -69,7 +69,7 @@ export function DocumentEditor({
             disabled={pending}
             onClick={() => {
               if (editor.current?.hasUploadsInProgress()) {
-                setError("A file is still uploading. Give it a moment.");
+                setError(t("documents.documentEditor.fileStillUploading"));
                 return;
               }
               // The editor hands back `unknown`, and the action validates it
@@ -89,7 +89,9 @@ export function DocumentEditor({
             onClick={() => run(onPublish, false)}
             className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand disabled:bg-raised disabled:text-ink-4"
           >
-            {state === "draft" ? "Publish" : "Publish a new version"}
+            {state === "draft"
+              ? t("checkIn.composer.publish")
+              : t("documents.documentEditor.publishANewVersion")}
           </button>
           {saved ? (
             <span className="text-xs text-ink-3">

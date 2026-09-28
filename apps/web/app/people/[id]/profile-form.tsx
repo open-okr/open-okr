@@ -110,7 +110,9 @@ export function ProfileForm({
 
           <div className="flex items-center gap-3 pt-1">
             <Button type="submit" variant="primary" disabled={pending}>
-              {pending ? "Saving..." : "Save"}
+              {pending
+                ? t("people.detail.profileForm.saving")
+                : t("common.save")}
             </Button>
             {state?.ok === true ? (
               <span className="text-xs text-good">{state.message}</span>

@@ -79,9 +79,13 @@ export default async function ConnectionsPage() {
 
                   <span className="text-xs text-ink-3">
                     {connection.lastUsedAt
-                      ? `Last used ${connection.lastUsedAt.slice(0, 10)}`
-                      : "Never used"}
-                    {` · connected ${connection.createdAt.slice(0, 10)}`}
+                      ? t("account.connections.lastUsedConnected", {
+                          lastUsed: connection.lastUsedAt.slice(0, 10),
+                          connected: connection.createdAt.slice(0, 10),
+                        })
+                      : t("account.connections.neverUsedConnected", {
+                          connected: connection.createdAt.slice(0, 10),
+                        })}
                   </span>
 
                   {connection.revokedReason ? (

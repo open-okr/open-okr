@@ -16,6 +16,7 @@ import { callAction, richTextFromPlainText } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
 import { drafterFor } from "../../lib/drafter";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 
 async function assistContext() {
@@ -80,6 +81,7 @@ export async function applyDraftedObjectiveAction(input: {
     readonly target: number;
   }[];
 }): Promise<{ readonly goalId: string; readonly refused: readonly string[] }> {
+  const { t } = await getTranslations();
   const context = await assistContext();
   const created = await callAction(context, "goals.create", {
     title: input.title,
@@ -125,7 +127,12 @@ export async function applyDraftedObjectiveAction(input: {
       // Named rather than swallowed. A measure the rules refuse is worth
       // showing, and the objective it belongs to is already there to hold it.
       refused.push(
-        `${measure.title}: ${error instanceof Error ? error.message : "refused"}`,
+        error instanceof Error
+          ? t("cycle.actions.measureRefusedBecause", {
+              title: measure.title,
+              reason: error.message,
+            })
+          : t("cycle.actions.measureRefused", { title: measure.title }),
       );
     }
   }

@@ -278,10 +278,12 @@ export function Canvas({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-ink-3">
-          {t("goals.studio.canvas.nodeDrawn", {
-            length: nodes.length,
-            length2: nodes.length === 1 ? "" : "s",
-            length3: visible.length,
+          {t("goals.studio.canvas.nodesDrawn", {
+            nodes:
+              nodes.length === 1
+                ? t("common.count.nodeOne", { count: nodes.length })
+                : t("common.count.nodeOther", { count: nodes.length }),
+            drawn: visible.length,
           })}
         </span>
         <span className="flex items-center gap-1">
@@ -314,8 +316,8 @@ export function Canvas({
         {linkMode ? (
           <span className="rounded-md bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text">
             {linkFrom
-              ? "Now click the goal it depends on"
-              : "Click the first goal"}
+              ? t("goals.studio.canvas.nowClickTheGoal")
+              : t("goals.studio.canvas.clickTheFirstGoal")}
           </span>
         ) : null}
       </div>
@@ -456,11 +458,13 @@ export function Canvas({
                 </span>
                 <span className="flex items-center gap-1.5 text-[10.5px] text-ink-4">
                   <span>
-                    {t("goals.studio.canvas.kr", {
-                      keyResultCount: entry.node.keyResultCount,
-                      keyResultCount2:
-                        entry.node.keyResultCount === 1 ? "" : "s",
-                    })}
+                    {entry.node.keyResultCount === 1
+                      ? t("common.count.krOne", {
+                          count: entry.node.keyResultCount,
+                        })
+                      : t("common.count.krOther", {
+                          count: entry.node.keyResultCount,
+                        })}
                   </span>
                   <span>·</span>
                   <span>

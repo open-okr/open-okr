@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useState } from "react";
 
 /**
@@ -10,6 +10,7 @@ import { useState } from "react";
  * provider copies it into its SCIM configuration.
  */
 export function DirectoryTokenForm() {
+  const { t } = useTranslations();
   const [pending, setPending] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -32,14 +33,20 @@ export function DirectoryTokenForm() {
         const body = await response.json().catch(() => ({}));
         setError(
           (body as { error?: string }).error ||
-            `Failed to generate token (${response.status})`,
+            t("admin.directory.directoryForm.failedToGenerate", {
+              status: response.status,
+            }),
         );
       } else {
         const data = (await response.json()) as { token: string };
         setToken(data.token);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("admin.directory.directoryForm.networkError"),
+      );
     } finally {
       setPending(false);
     }
@@ -58,7 +65,7 @@ export function DirectoryTokenForm() {
       {token ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-medium text-amber-800">
-            Copy this token now. It will not be shown again.
+            {t("admin.directory.directoryForm.copyThisTokenNow")}
           </p>
           <div className="mt-2 flex items-center gap-2">
             <code
@@ -68,11 +75,13 @@ export function DirectoryTokenForm() {
               {token}
             </code>
             <Button type="button" variant="default" onClick={copyToClipboard}>
-              {copied ? "Copied" : "Copy"}
+              {copied
+                ? t("admin.directory.directoryForm.copied")
+                : t("admin.directory.directoryForm.copy")}
             </Button>
           </div>
           <p className="mt-2 text-xs text-amber-700">
-            Any previous SCIM token for this workspace has been revoked.
+            {t("admin.directory.directoryForm.previousTokenRevoked")}
           </p>
         </div>
       ) : (
@@ -83,10 +92,12 @@ export function DirectoryTokenForm() {
             disabled={pending}
             onClick={generate}
           >
-            {pending ? "Generating..." : "Generate SCIM token"}
+            {pending
+              ? t("admin.directory.directoryForm.generating")
+              : t("admin.directory.directoryForm.generateScimToken")}
           </Button>
           <p className="text-xs text-ink-3">
-            This replaces any existing token for this workspace.
+            {t("admin.directory.directoryForm.replacesExistingToken")}
           </p>
         </div>
       )}
