@@ -1433,6 +1433,7 @@
   "setup.nothingHereNeedsConfiguring": "Nothing here needs configuring. Every setting has a working default, so\n        you can create your account and start. You can change any of it later.",
   "setup.setUpOpenokr": "Set up OpenOKR",
   "setup.thisDeployment": "This deployment",
+  "shell.mobile.more": "Lagi",
   "shell.search.label": "Carian",
   "shell.search.placeholder": "Cari…",
   "shell.shortcuts.close": "Tutup",

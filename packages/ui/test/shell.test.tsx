@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, test } from "vitest";
 import { AppShell } from "../src/shell/app-shell.tsx";
 import { MobileTabBar } from "../src/shell/mobile-tab-bar.tsx";
@@ -41,6 +42,61 @@ describe("responsive shell classes (§3)", () => {
     );
     const nav = container.querySelector("nav");
     expect(nav?.className).toContain("md:hidden");
+  });
+
+  test("More opens every other destination, and a choice or Escape closes it", async () => {
+    const user = userEvent.setup();
+    render(
+      <MobileTabBar
+        items={[{ id: "home", label: "Home", href: "/", icon: <span /> }]}
+        more={{
+          label: "More",
+          icon: <span />,
+          groups: [
+            {
+              id: "work",
+              label: "Work",
+              items: [
+                { id: "kpis", label: "KPIs", href: "/kpis", icon: <span /> },
+                {
+                  id: "spaces",
+                  label: "Spaces",
+                  href: "/spaces",
+                  icon: <span />,
+                },
+              ],
+            },
+            {
+              id: "admin",
+              items: [
+                { id: "admin", label: "Admin", href: "/admin", icon: <span /> },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+    const more = screen.getByRole("button", { name: "More" });
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("link", { name: "KPIs" })).toBeNull();
+
+    await user.click(more);
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+    for (const name of ["KPIs", "Spaces", "Admin"]) {
+      expect(screen.getByRole("link", { name })).toBeTruthy();
+    }
+    expect(screen.getByText("Work")).toBeTruthy();
+
+    await user.keyboard("{Escape}");
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(more);
+
+    await user.click(more);
+    const link = screen.getByRole("link", { name: "Spaces" });
+    // jsdom does not navigate; stopping the default keeps it from trying.
+    link.addEventListener("click", (event) => event.preventDefault());
+    await user.click(link);
+    expect(more.getAttribute("aria-expanded")).toBe("false");
   });
 
   test("a sidebar item's label is hidden until xl, unlike its icon", () => {
