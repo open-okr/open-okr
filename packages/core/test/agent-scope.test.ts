@@ -293,3 +293,71 @@ describe("sandbox mode commits nothing", () => {
     expect(findings.rows).toEqual([]);
   });
 });
+
+/**
+ * The Champion records who an aging blocker was escalated to (completeness
+ * review H-10). Nothing wrote `escalated_to_id`, so the review inbox's
+ * "Escalated to you" never appeared for anybody.
+ */
+describe("blocker escalation", () => {
+  it("stamps the highest rung reached, and the blocker reaches that person's inbox", async () => {
+    const wb = await workerDb();
+    const actor = { pool: wb.appPool, ...context() };
+    const read = (await callAction(actor, "cycles.current", {
+      mode: "quarterly",
+    })) as { id: string };
+    await callAction(actor, "cycles.update", {
+      id: read.id,
+      sponsorId: ownerMemberId,
+    });
+    const keyResult = (await callAction(actor, "goals.addKeyResult", {
+      goalId: spaceGoalId,
+      title: "Raise activation from 41% to 60%",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 41,
+      targetValue: 60,
+      weight: 1,
+    })) as { id: string };
+    const session = (await callAction(actor, "sessions.create", {
+      spaceId,
+      kind: "weekly",
+      title: "Weekly check-in",
+      scheduledFor: new Date().toISOString(),
+      facilitatorId: ownerMemberId,
+    })) as { id: string };
+    const blocker = (await callAction(actor, "sessions.createBlocker", {
+      sessionId: session.id,
+      keyResultId: keyResult.id,
+      type: "resource",
+      ownerId: secondMemberId,
+      nextAction: "Ask finance for the second contractor",
+    })) as { id: string };
+
+    // Past §11's sponsor rung, forty-eight hours by default, on the daily
+    // cadence the blocker ladder runs on.
+    await callAction(actor, "agents.runChampion", {
+      now: new Date(Date.now() + 50 * 3_600_000).toISOString(),
+      cadence: "daily",
+    });
+
+    const { rows } = await wb.admin.query<{
+      escalated_to_id: string | null;
+      escalated_at: Date | null;
+    }>("select escalated_to_id, escalated_at from blockers where id = $1", [
+      blocker.id,
+    ]);
+    expect(rows[0]?.escalated_to_id).toBe(ownerMemberId);
+    expect(rows[0]?.escalated_at).not.toBeNull();
+
+    const inbox = (await callAction(actor, "review.inbox", {})) as {
+      obligations: { kind: string; meta: string }[];
+    };
+    expect(
+      inbox.obligations.some(
+        (item) =>
+          item.kind === "blocker" && item.meta.startsWith("Escalated to you"),
+      ),
+    ).toBe(true);
+  });
+});

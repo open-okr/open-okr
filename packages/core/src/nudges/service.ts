@@ -104,6 +104,14 @@ export interface DueNudge {
    * to correlate.
    */
   readonly proposal?: NudgeProposal;
+  /**
+   * Set on the blocker nudge sent to the highest rung the ladder has reached
+   * (completeness review H-10). The run that records the nudge stamps the
+   * blocker's `escalated_to_id`, which is what puts it in that person's review
+   * inbox as "Escalated to you". Read-only here; the stamp happens where the
+   * nudge is written, so a sandboxed run discards it with everything else.
+   */
+  readonly escalatesBlocker?: boolean;
 }
 
 /**

@@ -17,9 +17,16 @@
  * It takes a transaction and writes on it. Both callers are Operations, so the
  * nudge rows, the inbox rows and the audit row commit together or not at all.
  */
-import { activeOnly, cycles, type WorkspaceTx } from "@openokr/db";
+import { activeOnly, blockers, cycles, type WorkspaceTx } from "@openokr/db";
 import { deferralFor, type SuppressionReason } from "@openokr/method";
-import { desc, eq, ne, TransactionRollbackError } from "drizzle-orm";
+import {
+  desc,
+  eq,
+  isNull,
+  ne,
+  or,
+  TransactionRollbackError,
+} from "drizzle-orm";
 import type { AgentDrafter } from "../agents/drafter.ts";
 import type { AgentScope } from "../agents/scope.ts";
 import { sweepDivergenceInTx } from "../alignment/divergence.ts";
@@ -374,6 +381,7 @@ export async function runDueNudgesInTx(
     at,
     ...(input.runId ? { runId: input.runId } : {}),
   });
+  await stampBlockerEscalations(tx, workspaceId, withNotices, at);
 
   // Routing, the inbox row and the channel message, for everything now due:
   // what this run just wrote, and anything an earlier run deferred into this
@@ -404,6 +412,49 @@ export async function runDueNudgesInTx(
       ),
     ],
   };
+}
+
+/**
+ * Records who each aging blocker has been escalated to (completeness review
+ * H-10), so it reaches their review inbox as "Escalated to you".
+ *
+ * Written whether or not today's nudge was suppressed as a duplicate: the
+ * escalation stands either way. Moves only upward, from the coordinator to the
+ * sponsor, and never rewrites a blocker already escalated to that person.
+ * Inside the run's own transaction, so a sandboxed run discards it.
+ */
+async function stampBlockerEscalations(
+  tx: WorkspaceTx,
+  workspaceId: string,
+  due: readonly DueNudge[],
+  at: Date,
+): Promise<void> {
+  for (const nudge of due) {
+    if (!nudge.escalatesBlocker || nudge.subjectType !== "blocker") {
+      continue;
+    }
+    // openokr:allow-mutation: the run's own transaction, which the Champion's
+    // Operation opened; the escalation commits with the nudge that states it.
+    await tx
+      .update(blockers)
+      .set({
+        escalatedToId: nudge.recipientMemberId,
+        escalatedAt: at,
+        updatedAt: at,
+      })
+      .where(
+        activeOnly(
+          blockers,
+          eq(blockers.workspaceId, workspaceId),
+          eq(blockers.id, nudge.subjectId),
+          isNull(blockers.resolvedAt),
+          or(
+            isNull(blockers.escalatedToId),
+            ne(blockers.escalatedToId, nudge.recipientMemberId),
+          ),
+        ),
+      );
+  }
 }
 
 /**
