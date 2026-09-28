@@ -571,6 +571,60 @@ compare(
   3,
 );
 
+// --- 6. Condition tables, in order (completeness review M-27) ---------------
+//
+// §4's condition tables are first match wins, so their order is part of the
+// rule. OBJ-1's evaluator asked "contains an output verb anywhere" second to
+// last while the table asks it second, and every gate stayed green because
+// nothing compared the rows at all. Each check whose METHOD entry opens a
+// table is compared row by row, condition and status, in both directions.
+
+const QUALITY_CHECKS = [
+  ...OBJECTIVE_CHECKS,
+  ...KEY_RESULT_CHECKS,
+  ...ALIGNMENT_CHECKS,
+  ...CYCLE_CHECKS,
+];
+let tablesCompared = 0;
+for (const check of QUALITY_CHECKS) {
+  const heading = method.indexOf(`**${check.id} `);
+  if (heading === -1) {
+    continue;
+  }
+  const lines = method.slice(heading).split(NEWLINE).slice(1);
+  let at = 0;
+  while (at < lines.length && (lines[at] ?? "").trim() === "") {
+    at += 1;
+  }
+  if (!(lines[at] ?? "").startsWith("| Condition |")) {
+    continue;
+  }
+  const rows: string[] = [];
+  for (const line of lines.slice(at + 2)) {
+    if (!line.startsWith("|")) {
+      break;
+    }
+    const cells = line.split("|").map((cell) => cell.trim());
+    rows.push(`${cells[1]} -> ${cells[2]}`);
+  }
+  const coded = check.conditions.map(
+    (entry) => `${entry.condition} -> ${entry.status}`,
+  );
+  tablesCompared += 1;
+  if (rows.join(" | ") !== coded.join(" | ")) {
+    fail(
+      "condition order",
+      `${check.id} reads [${rows.join("; ")}] in METHOD.md and [${coded.join("; ")}] in the package`,
+    );
+  }
+}
+if (tablesCompared < 3) {
+  fail(
+    "condition order",
+    `only ${tablesCompared} condition tables found in METHOD.md §4; OBJ-1, OBJ-2 and KR-5 have one, so the parse is wrong`,
+  );
+}
+
 // --- Report -----------------------------------------------------------------
 
 if (problems.length > 0) {

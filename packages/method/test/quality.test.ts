@@ -813,3 +813,64 @@ describe("OBJ-1 recognises an end state it has no word for", () => {
     expect(verdict?.status).toBe("warn");
   });
 });
+
+describe("OBJ-1 reads its table top to bottom (completeness review M-27)", () => {
+  const conditionFor = (title: string): string | undefined =>
+    evaluateObjective(
+      {
+        title,
+        hasCycle: true,
+        hasTimeframe: false,
+        championId: "m1",
+        reviewerId: "m2",
+        objectivesInUnit: 1,
+        level: "team",
+      },
+      thresholds,
+    ).find((entry) => entry.id === "OBJ-1")?.condition;
+
+  it("follows the package's own condition order, which method:check ties to METHOD.md", () => {
+    const order =
+      OBJECTIVE_CHECKS.find((check) => check.id === "OBJ-1")?.conditions.map(
+        (row) => row.condition,
+      ) ?? [];
+    expect(order.slice(0, 3)).toEqual([
+      "Starts with an output verb",
+      "Matches an end-state shape",
+      "Contains an output verb anywhere",
+    ]);
+  });
+
+  it("warns on an output verb even when the sentence also gives a why", () => {
+    // Passed on its why before the fix, because the sweep ran second to last.
+    expect(conditionFor("Grow revenue so that we can launch in Europe")).toBe(
+      "Contains an output verb anywhere",
+    );
+  });
+
+  it("warns on an output verb beside a state word", () => {
+    expect(conditionFor("Become the go-to platform teams ship with")).toBe(
+      "Contains an output verb anywhere",
+    );
+  });
+
+  it("still passes METHOD's own shape example, which carries an output verb", () => {
+    expect(
+      conditionFor(
+        "Make onboarding something new customers finish by themselves",
+      ),
+    ).toBe("Matches an end-state shape");
+  });
+
+  it("reaches the movement rows when no output verb is present", () => {
+    expect(conditionFor("Grow revenue 20% this quarter")).toBe(
+      "Bare metric movement, no why",
+    );
+    expect(
+      conditionFor("Grow revenue so that we can hire ahead of demand"),
+    ).toBe("Contains an output verb anywhere");
+    expect(
+      conditionFor("Grow revenue so that the team can breathe again"),
+    ).toBe("Metric movement with a why");
+  });
+});
