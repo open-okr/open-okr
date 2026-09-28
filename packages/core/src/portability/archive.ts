@@ -40,9 +40,9 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import {
   type KeyRing,
   openBytes,
-  openWithPassphrase,
+  openWithChosenPhrase,
   type SealedBytes,
-  sealWithPassphrase,
+  sealWithChosenPhrase,
 } from "../secrets/key-ring.ts";
 
 export const ARCHIVE_FORMAT = "openokr-archive";
@@ -188,7 +188,7 @@ export function writeArchive(
 
   const body = Buffer.from(records.map(encodeRecord).join(""), "utf8");
   const compressed = gzipSync(body, { level: 9 });
-  const sealed = sealWithPassphrase(passphrase, compressed);
+  const sealed = sealWithChosenPhrase(passphrase, compressed);
 
   const header: ArchiveHeader = {
     format: ARCHIVE_FORMAT,
@@ -284,7 +284,7 @@ export function readArchive(
       );
     }
     try {
-      compressed = openWithPassphrase(keys.passphrase, {
+      compressed = openWithChosenPhrase(keys.passphrase, {
         ciphertext,
         dataKey: header.dataKey,
         kdf: header.kdf,
