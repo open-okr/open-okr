@@ -4,6 +4,8 @@
 **Commit reviewed:** `main` at `7bbf31e` (the tree is identical to `agung` at `be1bf49`)
 **Question asked:** Development is believed complete. Is it?
 
+> **Fix progress.** ✅ marks a finding fixed and tested. High: 26 of 27 fixed on branch `fix/review-high`, including H-25 to H-27, which turned up during the fixes (section 5.3a). H-23 is a release, which a human cuts. Medium and Low follow in their own pull requests.
+
 > **Since the review.** `main` moved to `c529177` with PR #85, which changed documentation and a deck script only. No application, package, deployment or test code changed, so every code finding below still applies. PR #85 fixed the stale README (L-05). It also made H-22 more serious, because the install guides now tell self-hosters to build the image themselves.
 
 ---
@@ -151,7 +153,8 @@ This section matters more than any single finding, because the same patterns wil
 
 ### 5.1 High: security and data safety
 
-**H-01. The Compose install runs the app as a Postgres superuser, so row-level security is off.** `Run`
+**H-01. The Compose install runs the app as a Postgres superuser, so row-level security is off.** `Run` ✅
+- **Fixed.** The Compose helper writes two credentials. The server connects as `openokr_app`, which cannot bypass row-level security, and the image's superuser is used by the migrator only. An existing install is moved over on its next `up` or `upgrade`. The boot log, `/api/health` and `/admin/general` say when a role bypasses the floor.
 - **Evidence.**
   - [deploy/docker/openokr:115](../deploy/docker/openokr#L115) sets `POSTGRES_USER=openokr`, and [:126](../deploy/docker/openokr#L126) points `DATABASE_URL` at that role. The Postgres image makes it a superuser.
   - On the running instance: `rolsuper = t`, `rolbypassrls = t`. With no tenant set, `select count(*) from goals` returned rows, although `goals` has security forced.
@@ -159,7 +162,8 @@ This section matters more than any single finding, because the same patterns wil
 - **Why it matters.** The database-enforced tenant floor is the foundation of the security model: "application code cannot leak across tenants even if it is wrong". `can()` still applies, so this removes the second line of defence rather than opening a door. But any query that forgets its filter now leaks. The demo and staging instances run on Compose.
 - **Fix.** Make the migrator create an owner role and a `nosuperuser nobypassrls` application role, and run the app as the application role. Refuse to start, or warn loudly on `/admin`, when the app's role can bypass row-level security. Fix together with H-02.
 
-**H-02. The job scheduler fails silently under a restricted role.** `Run`
+**H-02. The job scheduler fails silently under a restricted role.** `Run` ✅
+- **Fixed.** Migration 0099 creates the `pgboss` schema, and pg-boss starts with `createSchema` off. The scheduler lists workspaces through a system scan the floor allows. `/api/health` and the status page report a scheduler that failed to start.
 - **Evidence.**
   - The end-to-end server logged `scheduler: could not start: permission denied for database openokr_e2e` on both servers.
   - pg-boss creates its own schema when it starts ([pg-boss.ts:28](../packages/adapters/src/drivers/jobs/pg-boss.ts#L28)), which a least-privilege role cannot do.
@@ -167,14 +171,16 @@ This section matters more than any single finding, because the same patterns wil
 - **Why it matters.** The agents, digests, the staleness sweep, audit chaining and the orphan reap all stop, while the instance still reports healthy. Fixing H-01 on its own would cause exactly this in production. The end-to-end suite has never run with a live scheduler.
 - **Fix.** Create the `pgboss` schema in a migration as the owner and grant the application role usage. Report the scheduler's state in `/api/health` and on `/admin`.
 
-**H-03. The public `/api/sso-providers` route lists every workspace's single sign-on setup.** `Code`
+**H-03. The public `/api/sso-providers` route lists every workspace's single sign-on setup.** `Code` ✅
+- **Fixed.** The route takes an email address and returns only the provider its domain matches, with no workspace ids.
 - **Evidence.**
   - [The route](../apps/web/app/api/sso-providers/route.ts) has no authentication and no filter, and [apps/web/proxy.ts:114](../apps/web/proxy.ts#L114) marks it public.
   - [packages/core/src/auth/sso.ts:232](../packages/core/src/auth/sso.ts#L232) returns the workspace id, display name, email domains and enforce flag of every enabled connection.
 - **Why it matters.** On the managed cloud, anyone can list the customers and their identity providers.
 - **Fix.** Take an email address and return only the matching provider, with no workspace ids.
 
-**H-04. The Coach and the Champion run with full workspace authority, and ignore sandbox and propose.** `Code`
+**H-04. The Coach and the Champion run with full workspace authority, and ignore sandbox and propose.** `Code` ✅
+- **Fixed.** Every reader behind both runs is limited to what the agent's bindings reach. A goal or KPI outside any space is bound to both agents by name, so coverage does not drop, and a data change does the same for existing rows. A sandboxed run happens inside a savepoint that is rolled back, so it commits nothing.
 - **Evidence.**
   - Scheduled runs act as `{ kind: "system" }` ([scheduler.ts:381](../apps/web/lib/scheduler.ts#L381)), which resolves to full access.
   - The only code that reads an agent's `autonomy` is [run-executor.ts:248](../packages/agents/src/run-executor.ts#L248), and nothing in production calls it. So a sandboxed agent still writes nudges and proposals, flips goal health and queues messages.
@@ -182,32 +188,37 @@ This section matters more than any single finding, because the same patterns wil
 - **Why it matters.** It breaks three CLAUDE.md hard rules: least privilege, no service account with ambient authority, and "sandbox mode commits nothing at all". It also fails P2-T17's own test plan.
 - **Fix.** Run each agent as its own principal, filtered by its bindings. Branch on `autonomy` inside the Champion and Coach runs.
 
-**H-05. Some session writes skip object authorisation.** `Code`
+**H-05. Some session writes skip object authorisation.** `Code` ✅
+- **Fixed.** `resolveBlocker`, `reassignBlocker` and `closeCommitments` load each row's space and authorise through the access getter. `sessions.read` does too.
 - **Evidence.**
   - `sessions.resolveBlocker` ([sessions.ts:2063](../packages/core/src/actions/sessions.ts#L2063)), `sessions.reassignBlocker` ([:2128](../packages/core/src/actions/sessions.ts#L2128)) and `sessions.closeCommitments` ([:2352](../packages/core/src/actions/sessions.ts#L2352)) check only workspace-level `edit`, then act on a bare id.
   - `sessions.read` joins space membership by hand instead of using the access getter ([:1190](../packages/core/src/actions/sessions.ts#L1190)).
 - **Why it matters.** A member with edit rights anywhere can resolve blockers and close commitments in spaces they cannot see, given an id. It breaks the "one `can()`" rule.
 - **Fix.** Load each row's space and authorise through the access getter. Add session, cycle and KPI-tree resolvers.
 
-**H-06. Slack form submissions read tenant tables with no tenant set.** `Code`
+**H-06. Slack form submissions read tenant tables with no tenant set.** `Code` ✅
+- **Fixed.** `memberForChannelIdentity` resolves the member inside the workspace wrapper, by the same rules as the inbound message path. Three core tests run under the application role, one showing the old bare query returns nothing.
 - **Evidence.** [slack/route.ts:238](../apps/web/app/api/channels/slack/route.ts#L238) runs a raw pool query on `channel_identities`, which has row-level security forced.
 - **Why it matters.** Today it works only because of H-01. Under a correct role, every Slack form check-in is dropped with no reply. Every Slack slash command opens this form, so this is the main Slack path. No test covers the route.
 - **Fix.** Read inside the workspace wrapper, or reuse the inbound identity resolution. Add a route test run under the restricted role.
 
-**H-07. The AI base URL setting lets a cloud admin reach internal addresses (server-side request forgery).** `Audit`
+**H-07. The AI base URL setting lets a cloud admin reach internal addresses (server-side request forgery).** `Audit` ✅
+- **Fixed.** A guarded fetch applies the outbound address rules to every AI request and refuses redirects. It is on for the managed cloud, and private addresses stay allowed on self-host for local models.
 - **Evidence.** [packages/core/src/actions/ai.ts:203](../packages/core/src/actions/ai.ts#L203) accepts any URL, and the drivers fetch it directly rather than through `outboundFetch`. TECHNICAL-PLAN §8.2 names AI base URLs explicitly.
 - **Fix.** Route them through `outboundFetch` when cloud mode is on. Keep private addresses allowed on self-host, for local models.
 
 ### 5.2 High: P0 promises a user cannot reach
 
-**H-08. Sessions cannot be scheduled from the browser.** `Run`
+**H-08. Sessions cannot be scheduled from the browser.** `Run` ✅
+- **Fixed.** A schedule control on `/sessions` and the space home, and "Book the whole cycle" (`sessions.bookCycle`), which books a weekly check-in each week, a monthly review each month and the quarterly review. Phase 6 reads what is booked.
 - **Evidence.**
   - On a fresh instance, no screen has a control to create a session. The only code that creates one is the onboarding template ([templates/apply.ts:208](../packages/core/src/templates/apply.ts#L208)) and the demo builder.
   - The false exemption and the SQL-built spec are described in section 4.
 - **Why it matters.** After week one, nobody can hold a weekly session, a monthly review or a quarterly review. REQUIREMENTS §3.6 and §3.7 cannot be met, and neither can METHOD's "book every check-in and review for the whole cycle" (CY-8).
 - **Fix.** Add a schedule control on `/sessions` and the space home, plus "book the whole cycle".
 
-**H-09. The guided cycle cannot complete from the browser.** `Run` `Code`
+**H-09. The guided cycle cannot complete from the browser.** `Run` `Code` ✅
+- **Fixed.** Phases 4, 6 and 7 compute from real inputs, and `phaseCompletion` passes its thresholds to the gates. Gate 2 also refuses a failing OBJ-1, which a human approved and METHOD.md §4.5 now says. Phases 1, 2, 3 and 5 have their controls, key results drafted in the browser carry an owner and a due date, and drafting in a blocked phase 4 is refused with the reason.
 - **Phases 4, 6 and 7 never compute.** [cycles/workflow.ts:215](../packages/core/src/cycles/workflow.ts#L215) never supplies `qualityChecksPass`, `allKeyResultsScored` or `retrospectiveWritten`. Nothing outside `packages/method` names them.
 - **Gate 2 can never evaluate inside phase completion.** `phaseCompletion` calls `publishGates(input)` without the thresholds it was given ([method/src/workflow.ts:875](../packages/method/src/workflow.ts#L875)). The running instance shows exactly that message on phase 5.
 - **The screens show users stale task IDs.** For example "arrives at P4-T03" and "P4-T04" (section 3.3).
@@ -217,7 +228,8 @@ This section matters more than any single finding, because the same patterns wil
 - **Why it matters.** §3.1 is the spine of the product, and in practice every publish from the browser needs the override.
 - **Fix.** Supply the four inputs, pass the thresholds, add the missing controls, and remove the stale text.
 
-**H-10. Blockers never reach their owner's review inbox, and escalation at 0.3 does not exist.** `Code`
+**H-10. Blockers never reach their owner's review inbox, and escalation at 0.3 does not exist.** `Code` ✅
+- **Fixed.** A blocker takes its goal from its key result, so it reaches its owner's inbox. The top rung of an aging blocker stamps who it was escalated to, and `confidence.critical` has a producer (H-11).
 - **Evidence.**
   - Every blocker, whether raised in a session or from a chat command, is created by `sessions.createBlocker`, which never sets `goal_id` ([sessions.ts:2022](../packages/core/src/actions/sessions.ts#L2022)).
   - The inbox skips any blocker without a goal ([review.ts:438](../packages/core/src/actions/review.ts#L438)).
@@ -225,27 +237,32 @@ This section matters more than any single finding, because the same patterns wil
 - **Why it matters.** Two promises never happen: §3.5 "blockers they own", and Pillar B "escalation at 0.3 and below".
 - **Fix.** Derive `goal_id` from the key result on insert, stamp the escalation, and add the producer.
 
-**H-11. 12 of the 45 proactive triggers never fire.** `Code`
+**H-11. 12 of the 45 proactive triggers never fire.** `Code` ✅
+- **Fixed.** All twelve fire, each decision a pure function in `packages/method` reading the §11 registry. A gate fails when a catalogue key has neither an emitter nor a written exemption.
 - **The twelve:** `confidence.critical`, `digest.weekly`, `commitment.due`, `streak.at_risk`, `cycle.phase_blocked`, `quality.no_not_doing`, `quality.too_many_objectives`, `quality.sandbagging_draft`, `quality.sandbagging_close`, `quality.no_cuts`, `quality.trending_off` and `quality.process_health_low`.
 - **Evidence.** Their only reference outside `packages/method` is a display-name map ([apps/web/lib/identifier-names.ts:45](../apps/web/lib/identifier-names.ts#L45)). `pnpm method:check` passes because it compares the document with the package, not with the code that sends messages.
 - **Why it matters.** REQUIREMENTS §3.8 and Pillar B name several of these: the weekly digest, commitments due, a streak at risk, and sandbagging at draft and at close.
 - **Fix.** Build the emitters, or have a human strike the triggers from AI-NATIVE-PLAN §6.4. Add a gate that fails when a catalogue key has neither an emitter nor a written exemption.
 
-**H-12. Nudges say nothing specific and carry no link.** `Code`
+**H-12. Nudges say nothing specific and carry no link.** `Code` ✅
+- **Fixed.** A nudge names its subject, links to it, and offers a check-in: a button in chat, and a link to the check-in page by email. The links are plain links and carry no sign-in token.
 - **Evidence.** Every nudge other than a blocker, on email, Slack, Teams or Telegram, reads "You have a reminder waiting in OpenOKR. Rule: checkin.due" ([nudges/deliver.ts:56](../packages/core/src/nudges/deliver.ts#L56)). It carries no goal name, no link and no button.
 - **Why it matters.** It fails two requirements: the §3.8 acceptance criterion ("a one-tap check-in") and Pillar E ("one-click check-in links" in email).
 - **Fix.** Per-rule wording from METHOD.md, the goal title, a signed deep link, and a check-in button.
 
-**H-13. Comments and mentions notify nobody.** `Code`
+**H-13. Comments and mentions notify nobody.** `Code` ✅
+- **Fixed.** A comment notifies the people following its subject, and a mention notifies the person mentioned. A published check-in and a closed goal notify their followers. Nobody is notified twice for one change.
 - **Evidence.** The operation fans out notifications only when an activity sets `notify`, and no action does: searching `packages/core/src` for `notify: true` finds nothing. A mention subscribes the person and never tells them ([comments/service.ts:101](../packages/core/src/comments/service.ts#L101)).
 - **Why it matters.** Pillar F P0: "comments, reactions, mentions, subscriptions, notifications ... everywhere".
 
-**H-14. Only the founder can ever be an administrator.** `Code`
+**H-14. Only the founder can ever be an administrator.** `Code` ✅
+- **Fixed.** `people.setAdministrator` makes a member an administrator or returns them to standard access. It refuses the last one, agents, guests and placeholders. The member's page has the control.
 - **Evidence.** No action changes a member's workspace access level, and invitations grant `edit` at most ([actions/invitations.ts](../packages/core/src/actions/invitations.ts)). The profile page tells a sole admin to "hand over first", and there is no way to hand over.
 - **Why it matters.** If that one person leaves, the workspace has no administrator.
 - **Fix.** Add an action that sets the access level, protected by the existing last-owner check.
 
-**H-15. Every server-rendered progress bar draws full.** `Run`
+**H-15. Every server-rendered progress bar draws full.** `Run` ✅
+- **Fixed.** The policy adds `style-src-attr 'unsafe-inline'`, which covers attributes only: a `<style>` element still needs the nonce. An end-to-end spec compares every bar's drawn fill with its value.
 - **Evidence.**
   - The production CSP is `style-src 'self' 'nonce-...'` ([apps/web/proxy.ts:200](../apps/web/proxy.ts#L200)), which blocks inline `style` attributes.
   - On the running instance, a bar declared `width:0%` rendered 1,038 px wide, the whole track. The 79% strength bar also rendered full.
@@ -253,11 +270,13 @@ This section matters more than any single finding, because the same patterns wil
 - **Why it matters.** Users read progress that is not there.
 - **Fix.** Either allow `style-src-attr 'unsafe-inline'` or set widths on the client. Add an end-to-end assertion on a bar's rendered width.
 
-**H-16. Most of the product is unreachable on a phone.** `Run`
+**H-16. Most of the product is unreachable on a phone.** `Run` ✅
+- **Fixed.** A More tab opens a sheet with every screen the sidebar lists. An end-to-end spec walks it at 375 pixels.
 - **Evidence.** At 375 px the tab bar shows four items ([app-shell.tsx:249](../apps/web/lib/app-shell.tsx#L249)). KPIs, Spaces, Board, Initiatives, Search and Admin have no link and no drawer.
 - **Why it matters.** REQUIREMENTS §9 says the responsive web app covers mobile in v1.
 
-**H-17. Method thresholds are hardcoded in nine places.** `Code` `Audit`
+**H-17. Method thresholds are hardcoded in nine places.** `Code` `Audit` ✅
+- **Fixed.** Every place in the table reads the workspace's resolved value. The KPI corridor, the confidence dial, the strength bands, the blocker clock, the carry-forward impact, the strategy bounds and the importer's status cutoffs.
 - **Why it matters.** Each one means a workspace override silently does nothing, which breaks a CLAUDE.md hard rule.
 
 | Where | Hardcoded | Should read |
@@ -270,25 +289,29 @@ This section matters more than any single finding, because the same patterns wil
 | [method/src/workflow.ts](../packages/method/src/workflow.ts) | Annual strategy bounds 2 to 5 | `quality.annualStrategyBounds` |
 | [flowyteam/mappers/check-ins.ts](../packages/importer/src/flowyteam/mappers/check-ins.ts) | Status cutoffs 0.7 / 0.4 | Resolved confidence thresholds |
 
-**H-18. Moving a workspace between instances loses people and files.** `Audit`
+**H-18. Moving a workspace between instances loses people and files.** `Audit` ✅
+- **Fixed.** An archive is sealed with a passphrase chosen at export (scrypt), not the instance's key. It carries each member's email, so a person who signs up on the new instance claims their own member row, and import writes every file's bytes to storage.
 - **Evidence.**
   - The archive carries no email for registered members, and import clears `user_id` ([portability/export.ts](../packages/core/src/portability/export.ts), [portability/import.ts](../packages/core/src/portability/import.ts)). Everyone arrives as an account nobody can claim.
   - Import never passes storage, so files arrive as rows with no bytes ([actions/portability.ts](../packages/core/src/actions/portability.ts)).
   - Reading an archive needs the source instance's root key ([archive.ts](../packages/core/src/portability/archive.ts)). Moving from the cloud to self-host would mean handing over the cloud's key.
 - **Why it matters.** REQUIREMENTS §4 Pillar F promises moves "self-host and cloud in both directions", and [docs/install/cloud.md](install/cloud.md) promises "every uploaded file".
 
-**H-19. Helm backups cannot run, and no restore drill runs in CI.** `Run` `Audit`
+**H-19. Helm backups cannot run, and no restore drill runs in CI.** `Run` `Audit` ✅
+- **Fixed.** The backup and verify jobs use the chart's own secrets and back up files when they live on a volume. The kind test runs a backup and `helm test`. `./openokr restore` exists, and the Compose smoke test ends with a restore drill.
 - **Evidence.**
   - With backups enabled on kind, the backup job failed with `secret "okr-openokr" not found`. The chart creates `okr-openokr-secrets` and `okr-openokr-database`, but [backup-cronjob.yaml:77](../deploy/helm/templates/backup-cronjob.yaml#L77) and the verify job read `okr-openokr`. `check.sh` passes because it only renders.
   - No workflow runs [restore-drill.sh](../deploy/docker/restore-drill.sh).
 - **Why it matters.** It fails REQUIREMENTS §7 and P6-T06 ("a restore drill in continuous integration").
 
-**H-20. A calculated KPI can be blanked by a finer-frequency source.** `Audit`, not reproduced
+**H-20. A calculated KPI can be blanked by a finer-frequency source.** `Audit`, not reproduced ✅
+- **Fixed.** A calculated KPI recomputes for its own period, whatever the source's frequency.
 - **Evidence.** `kpis.record` passes the source's period start to the cascade ([actions/kpis.ts](../packages/core/src/actions/kpis.ts)). The dependent KPI's period is then recomputed as null ([kpis/formula.ts](../packages/core/src/kpis/formula.ts)).
 - **Why it matters.** Recording a daily value on any day but the 1st would clear a monthly total. That is silent data loss.
 - **Reproduce.** Create a daily source and a monthly `sum` formula KPI, then record a value on the 15th.
 
-**H-21. The cloud cannot be operated as designed.** `Audit`
+**H-21. The cloud cannot be operated as designed.** `Audit` ✅
+- **Fixed.** An administrator changes plan on S-49, which also lists who holds each seat. An operator sets a plan, or a seat count of their own, on S-46. Both refuse a plan with fewer seats than are in use and name both numbers. `pnpm cloud:operator` grants and revokes the operator role: never to oneself, only by an operator once one exists, and always recorded on the instance audit chain.
 - **Evidence.**
   - Nothing writes a tenant's plan or seats after creation ([tenancy/store.ts](../packages/core/src/tenancy/store.ts)), so seat limits can never apply.
   - The first operator can only be created with hand-written SQL, and the UAT guide says so.
@@ -296,22 +319,43 @@ This section matters more than any single finding, because the same patterns wil
 
 ### 5.3 High: build, release and first impression
 
-**H-22. The Docker image does not build on a default Docker Desktop, or on the server size the install guide recommends.** `Run`
+**H-22. The Docker image does not build on a default Docker Desktop, or on the server size the install guide recommends.** `Run` ✅
+- **Fixed.** The image build skips Next's own type check (`OPENOKR_SKIP_NEXT_TYPECHECK=1`), which is the step that ran out of memory. `pnpm typecheck` still gates every change and every release tag, and a host `pnpm build` still runs the check.
 - **Evidence.** The stock Dockerfile fails with "JavaScript heap out of memory" during Next's type check, at about 2 GB. Node sizes its heap from total memory: Docker Desktop's default VM has 7.6 GB, while CI runners have more.
 - **Why it matters.** With no released image (H-23), building from source is the only way to self-host. Since PR #85, the [README](../README.md) and [docs/install/compose.md](install/compose.md) tell people to run `docker build` on a server of "2 CPU cores, 4 GB memory". A 4 GB machine gives Node a smaller heap than the 7.6 GB one where the build already failed, so the documented install path fails at its first step. That last point is inferred from how Node sizes its heap, not tested on a 4 GB machine.
 - **Fix.** Either set `NODE_OPTIONS=--max-old-space-size=4096` in the build stage (tested: it builds in 84 seconds with the runtime stage unchanged), or skip Next's type check, since `pnpm typecheck` already gates it.
 
 **H-23. Nothing has ever been released, and the launch task's acceptance was never run.** `Code`
+- **Still open, and it is a human's to close.** The first release is a tag a person pushes. Every High fix is on branch `fix/review-high` with its changeset, so the first `pnpm changeset version` after it merges gathers them. After that release exists, the upgrade half of P8-T14's acceptance can run.
 - **Evidence.** There are no git tags, all 11 packages are at `0.0.0`, and 47 changesets are pending. P8-T14 (Launch) is `done`, but its note says the acceptance checks were not verifiable at the time: a clean-machine install, an upgrade from the previous release, and a chart install.
 - **What this review covered.** It ran two of those three, a clean install and a chart install, and both work apart from the defects above. An upgrade from a previous release cannot be tested until a first release exists. The nightly Upgrade workflow covers upgrading from a pinned 11 September commit (81 migrations to 97), and it is green.
 
-**H-24. The first screen tells self-hosters that channels and AI are "not in this build".** `Run`
+**H-24. The first screen tells self-hosters that channels and AI are "not in this build".** `Run` ✅
+- **Fixed.** The setup page probes the configured channel and AI drivers. No user-facing text names a task. The accessibility walk fails any screen whose text names one, and a unit test scans both catalogues and the generated contracts.
 - **Evidence.**
   - [apps/web/app/setup/page.tsx:61](../apps/web/app/setup/page.tsx#L61) still calls `notInThisBuild("channel", "Phase 5")` and `notInThisBuild("ai", "Phase 6")`. That text was written at P1-T09 on 6 August, and the helper's own comment says a later task would replace it.
   - The end-to-end spec asserts the stale text (section 4).
   - "Phase 6" was never right: AI providers arrived in Phase 2.
   - The same kind of stale wording is visible on cycle phases 4 to 7, on `/scorecard` ("arrives at P6-G16") and on `/account/channels` ("until P6-G08").
 - **Fix.** Real probes for the configured channel and AI drivers. Remove every task ID from user-facing copy, and add a test that fails on the pattern `P[0-9]-[TG][0-9]` in rendered text.
+
+### 5.3a High: found while fixing
+
+The review missed these three. Each turned up while fixing another finding, and each is fixed.
+
+**H-25. Root key rotation left most secrets on the old key.** `Code` ✅
+- **Evidence.** `pnpm keys:rotate` re-wrapped `system_settings` and nothing else. AI provider keys, chat channel credentials and SSO client secrets are sealed under the same root key, and `./openokr rotate-key` drops the previous key as soon as rotation returns.
+- **Why it matters.** After a rotation, every one of those secrets would fail to decrypt.
+- **Fixed.** Rotation re-wraps all three tables in every workspace, deleted rows included. Found while fixing H-01.
+
+**H-26. `/api/status` sent uptime monitors to the sign-in page.** `Run` ✅
+- **Evidence.** P8-T06c built `/api/status` for uptime monitors, and its first acceptance criterion is an unauthenticated request. The path was never added to the proxy's public list, so a monitor got a redirect to the sign-in page, which reads as a 200 and a healthy instance whatever its state.
+- **Fixed.** The path is public, and it still answers with three component states and a time. Found by the instance-health end-to-end spec.
+
+**H-27. Every AI call used OpenRouter, whatever the workspace configured.** `Code` ✅
+- **Evidence.** The drafter (every assist, the copilot and the agents' drafting) and the embedder resolved an OpenRouter credential and built an OpenRouter client. Tier routing named a provider and model for each tier, and its answer was discarded. An enabled Ollama with no key did not resolve at all.
+- **Why it matters.** A workspace that configured its own provider, or an air-gapped Ollama as REQUIREMENTS promises, got nothing.
+- **Fixed.** The provider the route names is built from that provider's own credential and base URL, and a keyless Ollama resolves. Found while fixing H-07.
 
 ### 5.4 Medium
 
