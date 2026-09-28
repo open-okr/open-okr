@@ -118,9 +118,11 @@ export {
 export {
   type CheckedUrl,
   checkUrl,
+  createGuardedFetch,
   isBlockedAddress,
   type OutboundOptions,
   type OutboundRefusal,
+  OutboundRefusedError,
   type OutboundResult,
   outboundFetch,
 } from "./outbound/guard.ts";

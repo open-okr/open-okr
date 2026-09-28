@@ -163,12 +163,22 @@ async function findCredential(
       )
       .limit(1);
     if (!credentialRow) {
-      return undefined;
+      return { providerRow, credentialRow: undefined };
     }
 
     return { providerRow, credentialRow };
   });
 }
+
+/**
+ * Providers that are reached with no key at all (completeness review H-27).
+ *
+ * A local Ollama server answers anybody on its network; that is the
+ * zero-egress configuration REQUIREMENTS names. Every credential lookup here
+ * required a stored key, so an enabled Ollama provider with none resolved to
+ * off, and the one provider the product promises works air-gapped never ran.
+ */
+const KEYLESS_PROVIDERS: ReadonlySet<AIProviderKind> = new Set(["ollama"]);
 
 /**
  * Resolves the credential a call for this exact provider should use, at
@@ -189,7 +199,7 @@ export async function resolveAICredential(
       input.provider,
       input.memberId,
     );
-    if (personal?.providerRow.allowUserKeys) {
+    if (personal?.credentialRow && personal.providerRow.allowUserKeys) {
       return {
         source: "user",
         provider: input.provider,
@@ -206,16 +216,29 @@ export async function resolveAICredential(
     null,
   );
   if (workspace?.providerRow.enabled) {
-    return {
-      source: "workspace",
-      provider: input.provider,
-      apiKey: decryptSecret(ring, sealedFrom(workspace.credentialRow)),
-      baseUrl: workspace.providerRow.baseUrl,
-    };
+    if (workspace.credentialRow) {
+      return {
+        source: "workspace",
+        provider: input.provider,
+        apiKey: decryptSecret(ring, sealedFrom(workspace.credentialRow)),
+        baseUrl: workspace.providerRow.baseUrl,
+      };
+    }
+    if (KEYLESS_PROVIDERS.has(input.provider)) {
+      return {
+        source: "workspace",
+        provider: input.provider,
+        apiKey: "",
+        baseUrl: workspace.providerRow.baseUrl,
+      };
+    }
   }
 
   const deployment = await resolveDeploymentAISettings(pool, ring, environment);
-  if (deployment.provider === input.provider && deployment.apiKey !== "") {
+  if (
+    deployment.provider === input.provider &&
+    (deployment.apiKey !== "" || KEYLESS_PROVIDERS.has(input.provider))
+  ) {
     return {
       source: "deployment",
       provider: input.provider,

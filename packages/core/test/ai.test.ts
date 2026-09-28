@@ -93,6 +93,50 @@ describe("the precedence resolver: user, then workspace, then deployment, then o
     expect(resolved.source).toBe("off");
   });
 
+  it("resolves an enabled local Ollama that has no key, which it never needs (H-27)", async () => {
+    // Every lookup used to require a stored key, so the one provider the
+    // product promises works air-gapped resolved to off and never ran.
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "ai.updateProviderConfig",
+      {
+        provider: "ollama",
+        enabled: true,
+        baseUrl: "http://ollama.internal:11434/v1",
+      },
+    );
+
+    const resolved = await resolveAICredential(
+      wb.appPool,
+      ring,
+      {},
+      { workspaceId, provider: "ollama" },
+    );
+    expect(resolved).toMatchObject({
+      source: "workspace",
+      provider: "ollama",
+      apiKey: "",
+      baseUrl: "http://ollama.internal:11434/v1",
+    });
+  });
+
+  it("still resolves a keyed provider with no key to off", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "ai.updateProviderConfig",
+      { provider: "anthropic", enabled: true },
+    );
+    const resolved = await resolveAICredential(
+      wb.appPool,
+      ring,
+      {},
+      { workspaceId, provider: "anthropic" },
+    );
+    expect(resolved.source).toBe("off");
+  });
+
   it("resolves the workspace's own key once enabled and set", async () => {
     const wb = await workerDb();
     await callAction(
