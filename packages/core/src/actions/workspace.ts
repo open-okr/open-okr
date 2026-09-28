@@ -238,8 +238,7 @@ export const provisionWorkspace = {
 
 export const setWorkspaceLifecycle = defineWriteAction({
   name: "workspace.setLifecycle",
-  summary:
-    "Move a cloud workspace between active, suspended and closed (P8-T02c).",
+  summary: "Move a cloud workspace between active, suspended and closed.",
   input: z.object({
     state: z.enum(["active", "suspended", "closed"]),
   }),

@@ -472,7 +472,7 @@
     "/workspace/setLifecycle": {
       "post": {
         "operationId": "workspace.setLifecycle",
-        "summary": "Move a cloud workspace between active, suspended and closed (P8-T02c).",
+        "summary": "Move a cloud workspace between active, suspended and closed.",
         "tags": [
           "workspace"
         ],

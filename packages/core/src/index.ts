@@ -1036,10 +1036,12 @@ export {
   runConnectionTests,
 } from "./setup/connection-tests.ts";
 export {
+  type AIProbeOptions,
+  aiProbe,
+  channelsProbe,
   databaseProbe,
   type MailProbeOptions,
   mailProbe,
-  notInThisBuild,
   type StorageProbeOptions,
   storageProbe,
 } from "./setup/probes.ts";

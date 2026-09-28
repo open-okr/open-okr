@@ -44,7 +44,7 @@
       "method": "POST",
       "path": "/workspace/setLifecycle",
       "scope": "write",
-      "summary": "Move a cloud workspace between active, suspended and closed (P8-T02c).",
+      "summary": "Move a cloud workspace between active, suspended and closed.",
       "flags": [
         {
           "name": "state",

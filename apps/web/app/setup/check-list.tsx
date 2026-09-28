@@ -12,13 +12,15 @@ import { VerdictDot, type VerdictState } from "@openokr/ui";
 const LABELS: Record<ConnectionTest["outcome"], string> = {
   ok: "Ready",
   failed: "Problem",
-  unavailable: "Not in this build",
+  unavailable: "Not available",
+  optional: "Optional",
 };
 
 const VERDICT_STATES: Record<ConnectionTest["outcome"], VerdictState> = {
   ok: "pass",
   failed: "fail",
   unavailable: "todo",
+  optional: "todo",
 };
 
 const PORT_NAMES: Record<string, string> = {

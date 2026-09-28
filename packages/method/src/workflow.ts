@@ -319,7 +319,7 @@ function phaseZero(input: CycleWorkflowInput): PhaseResult {
   }
 
   if (input.goals === undefined) {
-    blocked.push("Company objectives arrive at P3-T04");
+    blocked.push("The company objectives could not be read");
   } else {
     total += 1;
     const anchored = input.goals.filter(
@@ -533,7 +533,7 @@ function phaseFour(input: CycleWorkflowInput): PhaseResult {
       // flags into one answer for the phase, and that is publish gate 2,
       // which P4-T03 builds. Naming the task that will supply it beats
       // naming the one that already did.
-      blocked: ["Reading the §4 verdicts across the set arrives at P4-T03"],
+      blocked: ["The §4 verdicts across the set could not be read"],
       conditions: { met: 0, total: 0 },
     };
   }
@@ -595,7 +595,7 @@ function phaseSix(input: CycleWorkflowInput): PhaseResult {
       ...base,
       state: "todo",
       missing: [],
-      blocked: ["Sessions and the decision log arrive at P4-T04"],
+      blocked: ["The booked sessions and the decision log could not be read"],
       conditions: { met: 0, total: 0 },
     };
   }
@@ -623,7 +623,7 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
   let total = 0;
 
   if (input.allKeyResultsScored === undefined) {
-    blocked.push("Key result scores arrive at P3-T04");
+    blocked.push("The key result scores could not be read");
   } else {
     total += 1;
     if (!input.allKeyResultsScored) {
@@ -632,7 +632,7 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
   }
 
   if (input.retrospectiveWritten === undefined) {
-    blocked.push("The cycle retrospective arrives at P4-T08");
+    blocked.push("The cycle retrospective could not be read");
   } else {
     total += 1;
     if (!input.retrospectiveWritten) {
@@ -662,7 +662,7 @@ export function publishGates(
   thresholds?: ResolvedThresholds,
 ): readonly GateResult[] {
   const goals = input.goals;
-  const goalsBlocked = "goals and key results arrive at P3-T04";
+  const goalsBlocked = "the goals and key results could not be read";
 
   const gate = (
     gateKey: number,
@@ -796,7 +796,7 @@ export function publishGates(
     )
   ) {
     results.push(
-      unevaluable(4, "the §5.4 dependency register arrives at P3-T09"),
+      unevaluable(4, "the §5.4 dependency register could not be read"),
     );
   } else {
     const missing = goals.flatMap((goal) =>
@@ -822,7 +822,7 @@ export function publishGates(
     // that will move them. Passing on the half that exists would be the exact
     // failure this file's header records from Phase 1.
     results.push(
-      unevaluable(5, "the §5.5 initiative register arrives at P5-T10a"),
+      unevaluable(5, "the §5.5 initiative register could not be read"),
     );
   } else {
     const missing = goals.flatMap((goal) =>

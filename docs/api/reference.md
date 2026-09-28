@@ -599,5 +599,5 @@ the machine-readable document.
 | `workspace.overview`<br/>The current workspace and the member reading it. | `GET /api/v1/workspace/overview` | reads |
 | `workspace.provision`<br/>Create a workspace and its first member for a newly registered person. | `POST /api/v1/workspace/provision` | writes |
 | `workspace.rename`<br/>Change a workspace's display name. | `POST /api/v1/workspace/rename` | writes |
-| `workspace.setLifecycle`<br/>Move a cloud workspace between active, suspended and closed (P8-T02c). | `POST /api/v1/workspace/setLifecycle` | writes |
+| `workspace.setLifecycle`<br/>Move a cloud workspace between active, suspended and closed. | `POST /api/v1/workspace/setLifecycle` | writes |
 | `workspace.setState`<br/>Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay). | `POST /api/v1/workspace/setState` | writes |

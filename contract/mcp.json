@@ -59,7 +59,7 @@
     },
     {
       "name": "workspace.setLifecycle",
-      "description": "Move a cloud workspace between active, suspended and closed (P8-T02c).",
+      "description": "Move a cloud workspace between active, suspended and closed.",
       "inputSchema": {
         "type": "object",
         "properties": {

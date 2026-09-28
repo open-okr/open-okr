@@ -139,9 +139,14 @@ page=$(curl -sL "$BASE/setup")
 echo "$page" | grep -q "PostgreSQL" || fail "the wizard did not detect Postgres"
 pass "the wizard detected the database"
 
+# React puts an empty comment between adjacent pieces of text it renders on
+# the server, so the label and its word arrive as "Chat channels<!-- -->: ".
+# A browser shows them joined; the raw HTML needs the markers taken out.
+echo "$page" | sed 's/<!-- -->//g' | grep -q "Chat channels: Optional" \
+  || fail "the wizard did not say chat channels are optional"
 echo "$page" | grep -q "Not in this build" \
-  || fail "a port with no driver did not say so"
-pass "ports with no driver say so rather than showing a tick"
+  && fail "the wizard still says a shipped feature is not in this build"
+pass "optional ports say so rather than showing a tick"
 
 # --- the proxy is doing its job -------------------------------------------
 headers=$(curl -s -D - -o /dev/null "$BASE/setup")

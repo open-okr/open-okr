@@ -220,6 +220,21 @@ for (const route of CHECKED) {
       timeout: 15_000,
     });
 
+    // **No screen tells a user that part of it arrives at a task**
+    // (completeness review H-24). The first-run wizard said channels and AI
+    // were "not in this build" long after both shipped, and the cycle phases
+    // said "arrives at P4-T03". A plan task's id is a note between the people
+    // building this, and a screen that shows one is showing the build rather
+    // than the product. Checked on every screen this walks.
+    const text = await page.locator("body").innerText();
+    expect(
+      text.match(/\bP[1-8]-[TG]\d+[a-z]?\b/g) ?? [],
+      `${route} shows a plan task id`,
+    ).toEqual([]);
+    expect(text, `${route} says something is not in this build`).not.toMatch(
+      /not in this build/i,
+    );
+
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
       .analyze();

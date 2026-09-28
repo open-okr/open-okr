@@ -121,10 +121,11 @@ describe("phase 0, annual strategy", () => {
     expect(phase(base(), 0)?.state).toBe("not_applicable");
   });
 
-  it("cannot answer without goals, and says which task brings them", () => {
+  it("cannot answer without goals, and says so without naming a task", () => {
     const result = phase(base({ mode: "annual" }), 0);
     expect(result?.state).toBe("todo");
-    expect(result?.blocked.join(" ")).toMatch(/P3-T04/);
+    expect(result?.blocked.join(" ")).toMatch(/company objectives/);
+    expect(result?.blocked.join(" ")).not.toMatch(/P[1-8]-T/);
   });
 
   it("names a missing mission and an out-of-range strategy count", () => {
@@ -382,7 +383,7 @@ describe("phases that cannot answer yet", () => {
     // The task named here moved from P4-T01 to P4-T03 once the catalogue and
     // the stored verdicts existed and only the reading across a set did not.
     // A blocked note that names a task already done sends the reader nowhere.
-    expect(result?.blocked.join(" ")).toMatch(/P4-T03/);
+    expect(result?.blocked.join(" ")).toMatch(/§4 verdicts/);
     // Not a failure: nothing is wrong with the cycle.
     expect(result?.missing).toEqual([]);
   });
@@ -395,7 +396,7 @@ describe("phases that cannot answer yet", () => {
   });
 
   it("phase 6 waits for sessions and the decision log", () => {
-    expect(phase(base(), 6)?.blocked.join(" ")).toMatch(/P4-T04/);
+    expect(phase(base(), 6)?.blocked.join(" ")).toMatch(/booked sessions/);
   });
 
   it("phase 6 answers once they exist", () => {
@@ -415,8 +416,8 @@ describe("phases that cannot answer yet", () => {
 
   it("phase 7 waits for both scores and the retrospective", () => {
     const result = phase(base(), 7);
-    expect(result?.blocked.join(" ")).toMatch(/P3-T04/);
-    expect(result?.blocked.join(" ")).toMatch(/P4-T08/);
+    expect(result?.blocked.join(" ")).toMatch(/key result scores/);
+    expect(result?.blocked.join(" ")).toMatch(/retrospective/);
   });
 });
 
@@ -426,7 +427,7 @@ describe("the six publish gates", () => {
     for (const gateKey of [1, 3, 4, 5]) {
       const gate = gates.find((entry) => entry.gateKey === gateKey);
       expect(gate?.evaluable, `gate ${gateKey}`).toBe(false);
-      expect(gate?.detail.blocked).toMatch(/P3-T04/);
+      expect(gate?.detail.blocked).toMatch(/goals and key results/);
     }
   });
 
@@ -758,7 +759,7 @@ describe("gate 4 and the dependency register", () => {
     expect(gate?.gateKey).toBe(4);
     expect(gate?.evaluable).toBe(false);
     expect(gate?.passed).toBe(false);
-    expect(gate?.detail.blocked).toMatch(/P3-T09/);
+    expect(gate?.detail.blocked).toMatch(/dependency register/);
   });
 
   it("passes once the register exists and holds nothing unconfirmed", () => {

@@ -9,9 +9,10 @@ import {
   runConnectionTests,
 } from "../src/setup/connection-tests.ts";
 import {
+  aiProbe,
+  channelsProbe,
   databaseProbe,
   mailProbe,
-  notInThisBuild,
   storageProbe,
 } from "../src/setup/probes.ts";
 import { readSetupState } from "../src/setup/state.ts";
@@ -66,12 +67,29 @@ describe("connection tests", () => {
     expect(result?.detail).toBe("ECONNREFUSED 10.0.0.1:587");
   });
 
-  it("says a port is not in this build rather than showing an untested tick", async () => {
+  it("says chat channels are optional rather than showing an untested tick", async () => {
+    // Completeness review H-24: this said "Not in this build. Arrives in
+    // Phase 5" long after every channel shipped.
+    const [result] = await runConnectionTests([channelsProbe()]);
+    expect(result?.outcome).toBe("optional");
+    expect(result?.detail).toMatch(/Admin > Channels/);
+    expect(result?.detail).not.toMatch(/Phase|build/);
+  });
+
+  it("names a deployment-wide AI provider without calling it", async () => {
     const [result] = await runConnectionTests([
-      notInThisBuild("channel", "Phase 5"),
+      aiProbe({ provider: "anthropic", configured: true }),
     ]);
-    expect(result?.outcome).toBe("unavailable");
-    expect(result?.detail).toMatch(/Phase 5/);
+    expect(result?.outcome).toBe("optional");
+    expect(result?.detail).toMatch(/^anthropic is configured/);
+  });
+
+  it("says AI is off, and that everything works without it", async () => {
+    const [result] = await runConnectionTests([
+      aiProbe({ provider: "", configured: false }),
+    ]);
+    expect(result?.outcome).toBe("optional");
+    expect(result?.detail).toMatch(/^Off\. Every feature works without one/);
   });
 
   it("proves the database is reachable and migrated", async () => {
@@ -157,10 +175,10 @@ describe("what blocks finishing setup", () => {
     expect(blockingFailures(tests)).toHaveLength(0);
   });
 
-  it("is not a port that has no driver yet", async () => {
+  it("is not an optional port", async () => {
     const tests = await runConnectionTests([
-      notInThisBuild("ai", "Phase 6"),
-      notInThisBuild("channel", "Phase 5"),
+      aiProbe({ provider: "", configured: false }),
+      channelsProbe(),
     ]);
     expect(blockingFailures(tests)).toHaveLength(0);
   });
