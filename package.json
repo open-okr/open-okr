@@ -62,9 +62,9 @@
     "@openokr/test-support": "workspace:*",
     "@playwright/test": "1.63.0",
     "@types/pg": "catalog:",
-    "knip": "6.37.0",
+    "knip": "6.38.0",
     "pg": "catalog:",
-    "turbo": "2.11.2",
+    "turbo": "2.11.4",
     "vitest": "catalog:"
   }
 }
