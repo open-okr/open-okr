@@ -41,6 +41,7 @@ import {
   dispatchOutbox,
   memberEmail,
   memberExternalId,
+  OUTBOX_REDACT_ON_DELIVERY,
   type OutboxDelivery,
   type OutboxHandlerDeps,
   openConnection,
@@ -367,6 +368,9 @@ export function startRelay(): OutboxRelay | null {
 
   const relay = new OutboxRelay(getPool(), {
     leaseSeconds: LEASE_SECONDS,
+    // A delivered invitation keeps neither its token nor its address
+    // (completeness review M-19). Core names the fields per topic.
+    redactOnDelivery: OUTBOX_REDACT_ON_DELIVERY,
     // Passing this also registers the two queue gauges, which are read at
     // scrape time rather than written during a drain (P7-T06b). That is what
     // makes a relay that has stopped legible: counters go quiet and look like

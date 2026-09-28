@@ -912,11 +912,13 @@ export {
   dispatchOutbox,
   memberEmail,
   OUTBOX_HANDLERS,
+  OUTBOX_REDACT_ON_DELIVERY,
   type OutboxDelivery,
   type OutboxHandler,
   type OutboxHandlerDeps,
 } from "./outbox/handlers.ts";
 export { PermanentDispatchError } from "./outbox/permanent.ts";
+export { outboxRetentionDays } from "./outbox/retention.ts";
 export {
   type ErasureExport,
   isLastFullAccessHolder,

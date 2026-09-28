@@ -265,10 +265,10 @@ export const createPersonalLink = defineWriteAction({
             // outbox for the email to be sendable at all, which is a
             // different trade-off than a session token's: single-purpose,
             // expiring, and worth at most one workspace's `edit` level.
-            // Outbox rows are not deleted after delivery today (0001_outbox
-            // .sql has no such job), so this payload remains readable in the
-            // table after the invite is used or expires — worth a look at
-            // P7-T03.
+            // The relay strips `to` and `token` in the statement that marks
+            // the row delivered (OUTBOX_REDACT_ON_DELIVERY), and the daily
+            // purge removes the row after `outbox.retentionDays`
+            // (completeness review M-19).
             topic: "invitation.email",
             payload: {
               linkId: created.id,

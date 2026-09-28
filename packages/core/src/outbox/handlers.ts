@@ -680,6 +680,23 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   "workspace.renamed": acknowledge,
 };
 
+/**
+ * What each topic's payload must lose once it is delivered (completeness
+ * review M-19). The relay strips these fields in the statement that marks the
+ * row delivered.
+ *
+ * An invitation's email carries the raw token and the address, because the row
+ * is the only place either exists once the write commits: the invitation
+ * table holds the token's digest. After the email has gone, both are a secret
+ * and a personal address kept for nothing. Every other topic carries
+ * identifiers only.
+ */
+export const OUTBOX_REDACT_ON_DELIVERY: Readonly<
+  Record<string, readonly string[]>
+> = {
+  "invitation.email": ["to", "token"],
+};
+
 /** Runs one delivery, or refuses it permanently when nothing handles it. */
 export async function dispatchOutbox(
   delivery: OutboxDelivery,

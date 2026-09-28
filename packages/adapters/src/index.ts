@@ -195,6 +195,7 @@ export {
   OutboxRelay,
   type OutboxRelayOptions,
   PermanentDispatchError,
+  purgeSettledOutbox,
   type RelayClient,
   type RelayPool,
 } from "./relay.ts";

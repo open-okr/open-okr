@@ -86,6 +86,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "Days to keep a closed workspace before erasing it. Zero means never erase, because not configured must never mean delete everything (P7-T08c).",
   },
+  {
+    key: "outbox.retentionDays",
+    kind: "number",
+    fallback: 30,
+    environment: "OPENOKR_OUTBOX_RETENTION_DAYS",
+    summary:
+      "Days to keep an outbox row after it was delivered or given up on. Delivery bookkeeping rather than anybody's data, and the scheduler purges it daily. Zero keeps every row (completeness review M-19).",
+  },
   // The two admission limits (P8-T06a). Instance scope, because they
   // describe the deployment rather than any customer, and both default to
   // unlimited so a self-hosted instance is never limited by a number nobody
