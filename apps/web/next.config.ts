@@ -49,6 +49,16 @@ const nextConfig: NextConfig = {
   // Next's own dev-only overlay (route/bundler info, preferences), never
   // shipped to production. Off by explicit request: its own UI is not
   // OpenOKR's design system and is not this codebase's to fix.
+  // **Skipped only in the image build** (completeness review H-22). Next's
+  // own "Running TypeScript" step needs a larger heap than Node gives it on a
+  // machine with 8 GB or less, so `docker build` ran out of memory on a
+  // default Docker Desktop and on the 4 GB server the install guide
+  // recommends. The same check is not lost: `pnpm typecheck` gates every
+  // change in CI and every release tag before an image is built, and a host
+  // `pnpm build` still runs it. This is the remedy Next's memory guide gives.
+  typescript: {
+    ignoreBuildErrors: process.env.OPENOKR_SKIP_NEXT_TYPECHECK === "1",
+  },
   devIndicators: false,
   /**
    * Hostnames other than `localhost` that may request dev-only assets.
