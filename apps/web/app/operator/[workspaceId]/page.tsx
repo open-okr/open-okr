@@ -1,6 +1,7 @@
 import {
   listSupportSessions,
   listTenantsAsOperator,
+  readPlans,
   readUsageAsOperator,
 } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
@@ -10,6 +11,8 @@ import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { LifecycleForm } from "./lifecycle-form";
+import { setPlan } from "./plan-actions";
+import { OperatorPlanForm } from "./plan-form";
 import { SupportRequest } from "./support-request";
 
 /**
@@ -155,6 +158,7 @@ export default async function OperatorWorkspacePage({
       one.grantedAt === null &&
       one.endedAt === null,
   );
+  const plans = await readPlans(pool);
   const consequence = STATE_CONSEQUENCE[tenant.tenantState];
   const { t } = await getTranslations();
 
@@ -293,6 +297,21 @@ export default async function OperatorWorkspacePage({
          * so rather than leaving somebody to find out. */}
         <SupportRequest pending={pending} workspaceId={workspaceId} />
       </section>
+
+      {/* Completeness review H-21: nothing wrote a plan or seats after a
+       * tenant was created, so no seat limit ever applied. */}
+      <OperatorPlanForm
+        action={setPlan}
+        current={tenant.planKey}
+        plans={plans.map((plan) => ({
+          key: plan.key,
+          label: `${plan.name}, ${
+            plan.seats === null ? "unlimited seats" : `${plan.seats} seats`
+          }`,
+        }))}
+        workspaceId={tenant.workspaceId}
+        workspaceName={tenant.name}
+      />
 
       <LifecycleForm
         currentState={tenant.tenantState}

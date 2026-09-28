@@ -298,7 +298,7 @@ export const GUIDE = {
     flow: ["Console is hidden on self-hosted", "Operator lists workspaces", "Suspend and restore a workspace", "Ask for and approve support access", "Show an instance banner"],
     needs: ["M04"],
     gives: "Cloud operations checked",
-    setup: "OPENOKR_CLOUD=true and an operator row added by SQL",
+    setup: "OPENOKR_CLOUD=true and an operator granted with pnpm cloud:operator",
     minutes: 30,
   },
 };

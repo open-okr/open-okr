@@ -58,6 +58,39 @@
       "example": {}
     },
     {
+      "name": "workspace.changePlan",
+      "description": "Move this cloud workspace onto another plan from the catalogue.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "planKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "planKey"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "planKey": {}
+      }
+    },
+    {
       "name": "workspace.setLifecycle",
       "description": "Move a cloud workspace between active, suspended and closed.",
       "inputSchema": {

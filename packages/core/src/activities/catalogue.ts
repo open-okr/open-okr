@@ -52,6 +52,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "workspace.lifecycle_changed": z.object({
     state: z.enum(["active", "suspended", "closed"]),
   }),
+  // Completeness review H-21. In the feed because a plan change can change
+  // what everybody's invitations do.
+  "workspace.plan_changed": z.object({
+    plan: z.string(),
+    seats: z.number().nullable(),
+  }),
   "member.profile_updated": z.object({ name: z.string() }),
   "channel.templatesSynced": z.object({
     recorded: z.number(),

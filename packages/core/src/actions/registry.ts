@@ -426,6 +426,7 @@ import {
   updateTask,
 } from "./tasks.ts";
 import {
+  changeWorkspacePlan,
   finishOnboarding,
   provisionWorkspace,
   renameWorkspace,
@@ -441,6 +442,7 @@ export const ACTION_MAP = {
   "workspace.overview": workspaceOverview,
   "workspace.rename": renameWorkspace,
   "workspace.finishOnboarding": finishOnboarding,
+  "workspace.changePlan": changeWorkspacePlan,
   "workspace.setLifecycle": setWorkspaceLifecycle,
   "workspace.setState": setWorkspaceState,
   "workspace.provision": provisionWorkspace,

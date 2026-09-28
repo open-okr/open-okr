@@ -26,6 +26,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "support.ended": (p) => `Support access ended (${asString(p.reason)})`,
   "workspace.lifecycle_changed": (p) =>
     `Workspace lifecycle set to "${asString(p.state)}"`,
+  "workspace.plan_changed": (p) =>
+    typeof p.seats === "number"
+      ? `Workspace moved to the ${asString(p.plan)} plan, with ${p.seats} seats`
+      : `Workspace moved to the ${asString(p.plan)} plan, with unlimited seats`,
   "member.profile_updated": (p) =>
     `${asString(p.name, "A member")} updated their profile`,
   "channel.templatesSynced": (p) =>

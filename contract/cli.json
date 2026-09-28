@@ -39,6 +39,23 @@
       "pages": false
     },
     {
+      "name": "workspace changePlan",
+      "action": "workspace.changePlan",
+      "method": "POST",
+      "path": "/workspace/changePlan",
+      "scope": "write",
+      "summary": "Move this cloud workspace onto another plan from the catalogue.",
+      "flags": [
+        {
+          "name": "plan-key",
+          "field": "planKey",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "workspace setLifecycle",
       "action": "workspace.setLifecycle",
       "method": "POST",

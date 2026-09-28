@@ -11,7 +11,11 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
-import { setTenantStateInTx } from "../tenancy/index.ts";
+import {
+  applyPlanInTx,
+  planByKey,
+  setTenantStateInTx,
+} from "../tenancy/index.ts";
 import { createWorkspace } from "../workspaces/provisioning.ts";
 import { defineWriteAction } from "./define.ts";
 
@@ -300,6 +304,61 @@ export const setWorkspaceLifecycle = defineWriteAction({
           targetType: "workspace",
           targetId: workspaceId,
           payload: { state: input.state },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * A workspace's administrator moves it onto another plan from S-49
+ * (completeness review H-21).
+ *
+ * The seat count comes from the plan, never from the caller: a custom number
+ * is an operator's decision and goes through `setPlanAsOperator`. Moving to a
+ * plan with fewer seats than are in use is refused naming both numbers.
+ */
+export const changeWorkspacePlan = defineWriteAction({
+  name: "workspace.changePlan",
+  summary: "Move this cloud workspace onto another plan from the catalogue.",
+  input: z.object({
+    /** A key from the operator's catalogue, or null for the free tier. */
+    planKey: z.string().trim().min(1).max(50).nullable(),
+  }),
+  output: z.object({
+    planKey: z.string().nullable(),
+    seats: z.number().int().nullable(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    // Read from the instance setting before the change, outside the
+    // workspace's transaction, because the catalogue belongs to the instance
+    // rather than to any tenant.
+    async load() {
+      return { plan: await planByKey(context.pool, input.planKey) };
+    },
+    async execute({ tx, workspaceId, loaded: { plan } }) {
+      const moved = await applyPlanInTx(tx, { workspaceId, plan });
+      if (!moved) {
+        throw new OperationError(
+          "not_found",
+          "This workspace has no tenant record, so it has no plan to change.",
+        );
+      }
+      const seats = plan?.seats ?? null;
+      return {
+        result: { planKey: plan?.key ?? null, seats },
+        activity: {
+          kind: "workspace.plan_changed",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { plan: plan?.name ?? "Free", seats },
+        },
+        audit: {
+          action: "workspace.changePlan",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { planKey: plan?.key ?? null, seats },
         },
       };
     },
