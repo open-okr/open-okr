@@ -113,6 +113,14 @@ const PUBLIC_PREFIXES = [
   // populated when the deployment says it is a demo.
   "/api/sso-providers",
   "/api/demo-personas",
+  // **The public status surface, the sixth time** (completeness review H-26).
+  // P8-T06c designed `/api/status` for an uptime monitor, unauthenticated, and
+  // its first acceptance criterion is an unauthenticated GET. It was never
+  // added here, so every monitor received a 307 to the sign-in page, which
+  // reads as success at status 200 and reports a healthy instance whatever
+  // state it is in. Found by the first end-to-end request that asked it
+  // anything. It says three component states and a time, by design.
+  "/api/status",
   // The discovery documents are what a client reads *before* it has anything
   // to authenticate with. Gating them behind a session would mean no client
   // could ever find the endpoints it needs to get one.
