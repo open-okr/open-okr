@@ -902,3 +902,30 @@ describe("phase 4 and gate 2 over the drafted set", () => {
     expect(five?.missing).toEqual(["The set is not published"]);
   });
 });
+
+describe("phase 0 reads the workspace's strategy bounds (H-17)", () => {
+  it("asks for the workspace's range, not the canon's two to five", () => {
+    const tuned = {
+      ...thresholds,
+      "quality.annualStrategyBounds": { low: 3, high: 4 },
+    };
+    const zero = phaseCompletion(
+      base({
+        mode: "annual",
+        goals: [goal()],
+        frame: {
+          hasMission: true,
+          hasStrategy: true,
+          strategyCount: 2,
+          notDoingWritten: true,
+          agreed: true,
+          annualKeyResultCount: 0,
+        },
+      }),
+      tuned,
+    )[0];
+    expect(zero?.missing).toContain(
+      "2 annual strategies, and §2.1 asks for 3 to 4",
+    );
+  });
+});

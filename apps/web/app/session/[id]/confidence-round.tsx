@@ -1,5 +1,6 @@
 "use client";
 
+import type { ResolvedThresholds } from "@openokr/method";
 /**
  * The confidence round panel (METHOD.md §7.2 step 1, P4-T07b).
  *
@@ -35,12 +36,15 @@ interface ConfidenceRoundProps {
   readonly sessionId: string;
   readonly krStatuses: readonly KrConfidenceStatus[];
   readonly isFacilitator: boolean;
+  /** The workspace's own §3.2 boundaries, which the dial's bands read. */
+  readonly thresholds: ResolvedThresholds;
 }
 
 export function ConfidenceRound({
   sessionId,
   krStatuses,
   isFacilitator,
+  thresholds,
 }: ConfidenceRoundProps) {
   const { t } = useTranslations();
 
@@ -60,6 +64,7 @@ export function ConfidenceRound({
               sessionId={sessionId}
               kr={kr}
               isFacilitator={isFacilitator}
+              thresholds={thresholds}
             />
           ))}
         </div>
@@ -72,10 +77,12 @@ function KrVoteCard({
   sessionId,
   kr,
   isFacilitator,
+  thresholds,
 }: {
   sessionId: string;
   kr: KrConfidenceStatus;
   isFacilitator: boolean;
+  thresholds: ResolvedThresholds;
 }) {
   const { t } = useTranslations();
 
@@ -134,6 +141,7 @@ function KrVoteCard({
         value={dialValue}
         onChange={setDialValue}
         disabled={isPending}
+        thresholds={thresholds}
       />
 
       {!voted ? (

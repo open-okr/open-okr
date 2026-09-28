@@ -49,17 +49,13 @@ export interface WeeklyDigestInput {
   readonly commitmentCount: number;
   /** What the coordinator added for leadership, or null. */
   readonly coordinatorNote: string | null;
+  /**
+   * §7.2's blocker clock, `cadence.blockerClockHours` as the workspace
+   * resolves it (completeness review H-17). It was a constant of 24 here
+   * while the same clock was a §11 parameter everywhere else.
+   */
+  readonly blockerClockHours: number;
 }
-
-/**
- * §7.2's 24-hour clock, which is the only threshold this file knows about.
- *
- * It is not a configurable number: §7.2 states it in words as part of the ritual
- * ("blockers on the 24-hour clock"), which is why it is a constant here rather
- * than an entry in the §11 registry. A blocker older than this is the thing the
- * digest is meant to make impossible to miss.
- */
-export const BLOCKER_CLOCK_HOURS = 24;
 
 const percent = (value: number): string => `${Math.round(value * 100)}%`;
 
@@ -131,13 +127,13 @@ export function weeklyDigestLines(input: WeeklyDigestInput): readonly string[] {
   } else {
     const named = input.blockers.map((blocker) => {
       const clock =
-        blocker.ageHours >= BLOCKER_CLOCK_HOURS
-          ? `${blocker.ageHours}h, past the ${BLOCKER_CLOCK_HOURS}-hour clock`
+        blocker.ageHours >= input.blockerClockHours
+          ? `${blocker.ageHours}h, past the ${input.blockerClockHours}-hour clock`
           : `${blocker.ageHours}h`;
       return `${blocker.title} (${blocker.ownerName ?? "no owner named"}, ${clock})`;
     });
     const overdue = input.blockers.filter(
-      (blocker) => blocker.ageHours >= BLOCKER_CLOCK_HOURS,
+      (blocker) => blocker.ageHours >= input.blockerClockHours,
     ).length;
     lines.push(
       `${input.blockers.length} blocker${
@@ -175,7 +171,7 @@ export function weeklyDigestNumbers(
     input.atRiskCount,
     input.blockers.length,
     input.commitmentCount,
-    BLOCKER_CLOCK_HOURS,
+    input.blockerClockHours,
   ];
   if (input.previousAverageConfidence !== null) {
     numbers.push(Math.round(input.previousAverageConfidence * 100));

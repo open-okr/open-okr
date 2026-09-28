@@ -23,6 +23,7 @@ import {
   callAction,
   richTextFromPlainText,
 } from "@openokr/core";
+import { confidenceBand, type ResolvedThresholds } from "@openokr/method";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
 import { sourceInstant } from "../time.ts";
@@ -85,22 +86,30 @@ function confidenceOf(raw: number | null): number {
  * The status METHOD.md asks a check-in to carry, from the confidence.
  *
  * FlowyTeam has no status column: it has a 0 to 10 confidence and computes a
- * colour from it. The bands here are the product's own (METHOD.md §3.6 reads
- * confidence the same way), so an imported check-in carries the status this
- * instance would have given it rather than one translated from a colour the old
- * system happened to draw.
+ * colour from it. The bands are this workspace's own §3.2 boundaries, through
+ * `confidenceBand` (completeness review H-17: they were 0.7 and 0.4 written
+ * here), so an imported check-in carries the status this instance would have
+ * given it rather than one translated from a colour the old system drew.
  */
-function statusFor(confidence: number): "on_track" | "caution" | "off_track" {
-  if (confidence >= 0.7) {
-    return "on_track";
-  }
-  return confidence >= 0.4 ? "caution" : "off_track";
+const STATUS_FOR_BAND = {
+  high: "on_track",
+  medium: "caution",
+  low: "off_track",
+} as const;
+
+function statusFor(
+  confidence: number,
+  thresholds: ResolvedThresholds,
+): "on_track" | "caution" | "off_track" {
+  return STATUS_FOR_BAND[confidenceBand(confidence, thresholds).band];
 }
 
 async function importObjectiveCheckIns(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("check-ins");
+  const thresholds = (await callAction(options.context, "rhythm.read", {}))
+    .thresholds as unknown as ResolvedThresholds;
   const rows = await options.source.query<SourceObjectiveCheckIn>(
     `select c.id, c.objective_id, c.user_id, c.checkin_id, c.start_date,
             c.end_date, c.confidence, c.remarks, c.created_at
@@ -180,7 +189,7 @@ async function importObjectiveCheckIns(
       await callAction(options.context, "goals.importCheckIn", {
         goalId,
         authorMemberId: author,
-        status: statusFor(confidenceOf(row.confidence)),
+        status: statusFor(confidenceOf(row.confidence), thresholds),
         confidence: confidenceOf(row.confidence),
         narrative: richTextFromPlainText(remarks),
         values,

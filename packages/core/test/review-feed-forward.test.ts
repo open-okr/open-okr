@@ -197,6 +197,18 @@ describe("the two rows that were waiting", () => {
     expect(carried?.source).toBe("carry_forward");
   });
 
+  it("carries it at the workspace's own impact when §11 is tuned (H-17)", async () => {
+    await call("rhythm.update", {
+      overrides: { "quality.carryForwardIssueImpact": 5 },
+    });
+    await holdTheReview();
+    await feedForward();
+
+    const issues = await issuesIn(toCycleId);
+    const carried = issues.find((row) => row.text.includes("nobody clears"));
+    expect(carried?.impact).toBe(5);
+  });
+
   it("leaves an uncarried learning out", async () => {
     await holdTheReview();
     await feedForward();

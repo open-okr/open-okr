@@ -44,6 +44,8 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { RHYTHM_ASSIST_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { resolveRhythm } from "../cycles/rhythm.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 import { readKpiDetail } from "./kpis.ts";
@@ -266,6 +268,8 @@ async function digestInputFor(
     blockers: stillOpen,
     commitmentCount: body.commitmentCount ?? 0,
     coordinatorNote: row.note ?? null,
+    blockerClockHours: resolveRhythm(await readRhythmRow(tx, workspaceId))
+      .thresholds["cadence.blockerClockHours"],
   };
 }
 

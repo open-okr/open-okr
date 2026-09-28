@@ -303,7 +303,10 @@ const conditionsOf = (
   total,
 });
 
-function phaseZero(input: CycleWorkflowInput): PhaseResult {
+function phaseZero(
+  input: CycleWorkflowInput,
+  thresholds: ResolvedThresholds,
+): PhaseResult {
   const base = { phase: 0, title: PHASE_TITLES[0] } as const;
   if (input.mode !== "annual") {
     // §2.2: "Phase 0 runs only in an annual cycle."
@@ -332,9 +335,12 @@ function phaseZero(input: CycleWorkflowInput): PhaseResult {
     if (!frame.hasStrategy) {
       missing.push("The mid-term strategy is not written");
     }
-    if (frame.strategyCount < 2 || frame.strategyCount > 5) {
+    // §11's `quality.annualStrategyBounds`, not the canon's two and five
+    // written here (completeness review H-17).
+    const bounds = thresholds["quality.annualStrategyBounds"];
+    if (frame.strategyCount < bounds.low || frame.strategyCount > bounds.high) {
       missing.push(
-        `${frame.strategyCount} annual strategies, and §2.1 asks for 2 to 5`,
+        `${frame.strategyCount} annual strategies, and §2.1 asks for ${bounds.low} to ${bounds.high}`,
       );
     }
   }
@@ -1003,7 +1009,7 @@ export function phaseCompletion(
   // (completeness review H-09).
   const gates = publishGates(input, thresholds);
   return [
-    phaseZero(input),
+    phaseZero(input, thresholds),
     phaseOne(input, thresholds),
     phaseTwo(input, thresholds),
     phaseThree(input, thresholds),

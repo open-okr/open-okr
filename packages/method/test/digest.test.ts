@@ -10,7 +10,6 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  BLOCKER_CLOCK_HOURS,
   type WeeklyDigestInput,
   weeklyDigestLines,
   weeklyDigestNumbers,
@@ -39,6 +38,7 @@ const base: WeeklyDigestInput = {
   ],
   commitmentCount: 4,
   coordinatorNote: "Billing is the whole story this week.",
+  blockerClockHours: 24,
 };
 
 describe("all six parts, in §7.2's order", () => {
@@ -124,9 +124,7 @@ describe("the 24-hour clock", () => {
       ],
     })[3];
     expect(line).toContain("2 blockers open, 1 past the clock");
-    expect(line).toContain(
-      `One (Ada, 30h, past the ${BLOCKER_CLOCK_HOURS}-hour clock)`,
-    );
+    expect(line).toContain("One (Ada, 30h, past the 24-hour clock)");
     expect(line).toContain("Two (Ben, 3h)");
   });
 
@@ -192,5 +190,13 @@ describe("the numbers a narration is allowed to state", () => {
         ],
       }),
     ).toEqual(expect.arrayContaining([30, 3]));
+  });
+});
+
+describe("the blocker clock is the workspace's", () => {
+  it("reads cadence.blockerClockHours rather than a constant (H-17)", () => {
+    const lines = weeklyDigestLines({ ...base, blockerClockHours: 36 });
+    expect(lines.join("\n")).toContain("30h)");
+    expect(lines.join("\n")).not.toContain("past the");
   });
 });

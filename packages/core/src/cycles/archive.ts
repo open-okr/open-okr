@@ -24,6 +24,8 @@ import {
 } from "@openokr/method";
 import { desc, eq, inArray, isNull } from "drizzle-orm";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { resolveRhythm } from "./rhythm.ts";
+import { readRhythmRow } from "./service.ts";
 
 /**
  * Closing a cycle and opening the next one (METHOD.md §8.9, TECHNICAL-PLAN §4.6,
@@ -310,6 +312,10 @@ export async function feedForwardInTx(
       "A cycle cannot feed itself. Name the cycle that is closing and the one that is opening.",
     );
   }
+  // §8.9's impact for anything fed forward, as the workspace resolves it
+  // (completeness review H-17). It was the literal 4 in three places.
+  const carriedImpact = resolveRhythm(await readRhythmRow(tx, workspaceId))
+    .thresholds["quality.carryForwardIssueImpact"];
 
   const [source] = await tx
     .select({ id: cycles.id, frameId: cycles.frameId })
@@ -390,7 +396,7 @@ export async function feedForwardInTx(
     priorScores += 1;
   }
 
-  // §8.9: carried work re-enters as an issue at impact four. It has to survive
+  // §8.9: carried work re-enters as an issue at the carry-forward impact. It has to survive
   // the next prioritisation on its merits; it does not get a free pass.
   const carried = written.filter((row) => row.carryForward);
   const existingIssues =
@@ -424,7 +430,7 @@ export async function feedForwardInTx(
       workspaceId,
       cycleId: toCycleId,
       text: row.title,
-      impact: 4,
+      impact: carriedImpact,
       source: "carry_forward",
     });
     issues += 1;
@@ -457,7 +463,7 @@ export async function feedForwardInTx(
     .orderBy(desc(okrSessions.endedAt))
     .limit(1);
 
-  // --- carried learnings join carried key results as issues at impact four ---
+  // --- carried learnings join carried key results at the same impact ---
   //
   // §8.9's row is "every carry-forward item", and a learning marked to carry is
   // one. It re-enters as an issue for the same reason a key result does: it has
@@ -500,7 +506,7 @@ export async function feedForwardInTx(
       workspaceId,
       cycleId: toCycleId,
       text: learning.text,
-      impact: 4,
+      impact: carriedImpact,
       source: "carry_forward",
     });
     issues += 1;
@@ -565,7 +571,7 @@ export async function feedForwardInTx(
             workspaceId,
             cycleId: toCycleId,
             text: lowest.statement,
-            impact: 4,
+            impact: carriedImpact,
             source: "process_health",
           });
           issues += 1;

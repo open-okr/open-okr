@@ -40,7 +40,6 @@ export {
   sessionLifecycleStage,
 } from "./countdown.ts";
 export {
-  BLOCKER_CLOCK_HOURS,
   type DigestBlocker,
   type DigestRisk,
   type WeeklyDigestInput,

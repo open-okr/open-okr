@@ -22,6 +22,7 @@
 
 import { callAction, excerptRichText } from "@openokr/core";
 import {
+  canonThresholds,
   REVIEW_STAGE_KEYS,
   type ResolvedThresholds,
   ROOT_CAUSES,
@@ -127,6 +128,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
     confirmedConfidence: number | null;
     whatChanged: string | null;
   }> = [];
+  // The workspace's own §3.2 boundaries, which the dial colours and names
+  // bands from (completeness review H-17). Canon until the stage is read.
+  let confidenceThresholds = canonThresholds();
   if (sessionRow.stageKey === "confidence") {
     try {
       krStatuses = (await callAction(context, "sessions.confidenceStatus", {
@@ -135,6 +139,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
     } catch {
       // No KRs in this space's cycle, or action not available.
     }
+    confidenceThresholds = (await callAction(context, "rhythm.read", {}))
+      .thresholds as unknown as ResolvedThresholds;
   }
 
   // The weekly figures (P6-G19b). Loaded for every weekly session, running or
@@ -699,6 +705,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           sessionId={id}
           krStatuses={krStatuses}
           isFacilitator={isFacilitator}
+          thresholds={confidenceThresholds}
         />
       )}
 

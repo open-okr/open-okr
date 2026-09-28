@@ -145,9 +145,13 @@ export const kpis = pgTable("kpis", {
   isCalculated: boolean("is_calculated").notNull().default(false),
   formula: jsonb("formula"),
   /**
-   * The corridor, per KPI, defaulting to the §11 registry values. Stored rather
-   * than resolved on every read because a KPI may deviate by design, and the
-   * grid colours thousands of cells from it.
+   * The corridor, per KPI. Stored rather than resolved on every read because a
+   * KPI may deviate by design, and the grid colours thousands of cells from it.
+   *
+   * `kpis.create` always writes both from the workspace's resolved
+   * `kpi.healthyThreshold` and `kpi.watchThreshold` (completeness review
+   * H-17). The column defaults are the canon's values, for a row written some
+   * other way, and are not what a new KPI takes.
    */
   healthyPct: numeric("healthy_pct").notNull().default("90"),
   watchPct: numeric("watch_pct").notNull().default("70"),

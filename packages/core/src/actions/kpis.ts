@@ -173,10 +173,15 @@ export const createKpi = defineWriteAction({
 
       await assertLegacyKeyFree(tx, workspaceId, kpis, input.legacy, "KPI");
 
-      if (
-        (input.healthyPct !== undefined || input.watchPct !== undefined) &&
-        (input.watchPct ?? 70) > (input.healthyPct ?? 90)
-      ) {
+      // The workspace's own corridor where the caller names none (completeness
+      // review H-17). The columns' defaults were the canon's 90 and 70, so a
+      // workspace that moved its thresholds on /admin/rhythm still got those.
+      const thresholds = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      ).thresholds;
+      const healthyPct = input.healthyPct ?? thresholds["kpi.healthyThreshold"];
+      const watchPct = input.watchPct ?? thresholds["kpi.watchThreshold"];
+      if (watchPct > healthyPct) {
         // The corridor reads from below in both bands, so a watch band above the
         // healthy band would put every KPI in `watch` and none in `healthy`. The
         // database refuses it too; this says why.
@@ -209,12 +214,8 @@ export const createKpi = defineWriteAction({
           input.targetDefault === undefined
             ? null
             : String(input.targetDefault),
-        ...(input.healthyPct === undefined
-          ? {}
-          : { healthyPct: String(input.healthyPct) }),
-        ...(input.watchPct === undefined
-          ? {}
-          : { watchPct: String(input.watchPct) }),
+        healthyPct: String(healthyPct),
+        watchPct: String(watchPct),
         ...legacyColumns(input.legacy),
       });
 
