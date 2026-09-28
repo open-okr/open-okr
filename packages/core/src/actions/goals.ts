@@ -70,6 +70,7 @@ import {
   reassignRoleInTx,
   recordValueInTx,
   reopenGoalInTx,
+  requireActiveMember,
   unlinkKpiInTx,
   wouldCloseAlignmentLoop,
 } from "../goals/service.ts";
@@ -100,6 +101,11 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
  * end of the list: the cursor still advances, and the caller asks again.
  */
 const GOAL_PAGE = 200;
+
+/** A key result's due date: a local calendar date, never a free string. */
+const localDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Give the date as YYYY-MM-DD.");
 
 const richText = z
   .unknown()
@@ -1751,7 +1757,7 @@ export const createKeyResult = defineWriteAction({
     baselineValue: z.number(),
     targetValue: z.number(),
     currentValue: z.number().optional(),
-    dueOn: z.string().optional(),
+    dueOn: localDate.optional(),
     ownerId: z.uuid().optional(),
     weight: z.number().default(1),
     kpiId: z.uuid().optional(),
@@ -1856,7 +1862,7 @@ export const updateKeyResult = defineWriteAction({
     indicatorType: z.enum(INDICATOR_TYPES).optional(),
     baselineValue: z.number().optional(),
     targetValue: z.number().optional(),
-    dueOn: z.string().nullable().optional(),
+    dueOn: localDate.nullable().optional(),
     ownerId: z.uuid().nullable().optional(),
     weight: z.number().optional(),
     capacity: z.enum(CAPACITY_VERDICTS).nullable().optional(),
@@ -1892,6 +1898,14 @@ export const updateKeyResult = defineWriteAction({
         owner.goalId,
         ACCESS_LEVELS.edit,
       );
+      if (input.ownerId) {
+        await requireActiveMember(
+          tx,
+          workspaceId,
+          input.ownerId,
+          "key result owner",
+        );
+      }
 
       const patch: Record<string, unknown> = { updatedAt: new Date() };
       if (input.title !== undefined) {

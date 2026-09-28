@@ -262,9 +262,13 @@ export default async function CyclePage({
               includeClosed: false,
             })
           ).goals,
-          members: (await callAction(context, "people.directory", {})).map(
-            (member) => ({ id: member.id, name: member.name }),
-          ),
+          // People only: an agent or an unclaimed placeholder cannot
+          // champion, review or own a key result (H-09).
+          members: (await callAction(context, "people.directory", {}))
+            .filter(
+              (member) => member.kind === "human" || member.kind === "guest",
+            )
+            .map((member) => ({ id: member.id, name: member.name })),
           // The coach runs in the browser and cannot read the settings row, so
           // the resolved thresholds travel with the page. Sending them rather
           // than letting the client fall back to the canon is what keeps a
@@ -503,6 +507,7 @@ export default async function CyclePage({
         {viewing === 4 ? (
           <Drafting
             cycleId={workflow.cycleId}
+            endsOn={workflow.endsOn}
             goals={draft.goals}
             members={draft.members}
             canEdit={canEdit}

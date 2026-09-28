@@ -89,10 +89,17 @@ export async function addKeyResult(
     };
   }
 
+  const ownerId = String(formData.get("ownerId") ?? "");
+  const dueOn = String(formData.get("dueOn") ?? "");
+
   return run((context) =>
     callAction(context, "goals.addKeyResult", {
       goalId,
       title,
+      // KR-3 fails without an owner and a date, and the form used to send
+      // neither, so every key result drafted here failed it (H-09).
+      ...(ownerId === "" ? {} : { ownerId }),
+      ...(dueOn === "" ? {} : { dueOn }),
       direction: String(formData.get("direction") ?? "increase") as
         | "increase"
         | "reduce"
@@ -120,5 +127,21 @@ export async function recordValue(
   }
   return run((context) =>
     callAction(context, "goals.recordValue", { id, value }),
+  );
+}
+
+/** A drafted key result's owner and due date, which KR-3 asks for (H-09). */
+export async function setKeyResultOwnerAndDate(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const ownerId = String(formData.get("ownerId") ?? "");
+  const dueOn = String(formData.get("dueOn") ?? "");
+  return run((context) =>
+    callAction(context, "goals.updateKeyResult", {
+      id: String(formData.get("id") ?? ""),
+      ownerId: ownerId === "" ? null : ownerId,
+      dueOn: dueOn === "" ? null : dueOn,
+    }),
   );
 }

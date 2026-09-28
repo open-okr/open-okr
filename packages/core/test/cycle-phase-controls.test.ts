@@ -220,3 +220,45 @@ describe("baseline health and the cuts, read back as the forms show them", () =>
     );
   });
 });
+
+describe("a key result's owner and due date", () => {
+  it("refuses an owner who is not a member here, and a date that is not one", async () => {
+    const goal = (await call("goals.create", {
+      title: "Make onboarding the reason new customers stay",
+      cycleId: quarterId,
+      level: "company",
+      ownerKind: "workspace",
+      championId: ownerMemberId,
+      reviewerId: ownerMemberId,
+      weight: 1,
+    })) as { id: string };
+    const base = {
+      goalId: goal.id,
+      title: "Raise activation from 41% to 60%",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 41,
+      targetValue: 60,
+      weight: 1,
+    };
+    await expect(
+      call("goals.addKeyResult", { ...base, ownerId: crypto.randomUUID() }),
+    ).rejects.toThrow(/key result owner/);
+    await expect(
+      call("goals.addKeyResult", { ...base, dueOn: "end of quarter" }),
+    ).rejects.toThrow();
+
+    const added = (await call("goals.addKeyResult", {
+      ...base,
+      ownerId: ownerMemberId,
+      dueOn: "2030-03-31",
+    })) as { id: string };
+    await call("goals.updateKeyResult", { id: added.id, dueOn: null });
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select owner_id, due_on from key_results where id = $1",
+      [added.id],
+    );
+    expect(rows[0]).toMatchObject({ owner_id: ownerMemberId, due_on: null });
+  });
+});

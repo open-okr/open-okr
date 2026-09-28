@@ -119,7 +119,7 @@ export interface CreatedGoal {
 }
 
 /** Both role holders have to be real, active members of this workspace. */
-async function requireActiveMember<
+export async function requireActiveMember<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(
   tx: AnyTx<TSchema>,
@@ -634,6 +634,16 @@ export async function createKeyResultInTx<
   const title = input.title.trim();
   if (title === "") {
     throw new OperationError("forbidden", "A key result needs a title.");
+  }
+  if (input.ownerId) {
+    // The foreign key accepts a member of another workspace, because a key
+    // check does not see row-level security (completeness review H-09).
+    await requireActiveMember(
+      tx,
+      input.workspaceId,
+      input.ownerId,
+      "key result owner",
+    );
   }
 
   const current = input.currentValue ?? input.baselineValue;

@@ -176,6 +176,32 @@ describe("the starter template, which is the acceptance criterion", () => {
   });
 });
 
+describe("what the starter set is judged on", () => {
+  it("gives every key result an owner and the cycle's last day, which KR-3 asks for", async () => {
+    // Completeness review H-09: the starter set failed KR-3 on a fresh
+    // instance, because it named neither.
+    const wb = await workerDb();
+    await apply("starter");
+    const { rows } = await wb.admin.query<{
+      owner_id: string | null;
+      due_on: string | null;
+      ends_on: string;
+    }>(
+      `select k.owner_id, k.due_on::text as due_on, c.ends_on::text as ends_on
+         from key_results k
+         join goals g on g.id = k.goal_id
+         join cycles c on c.id = g.cycle_id
+        where k.workspace_id = $1`,
+      [workspaceId],
+    );
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(row.owner_id).not.toBeNull();
+      expect(row.due_on).toBe(row.ends_on);
+    }
+  });
+});
+
 describe("the other two templates", () => {
   it("builds a company's first quarter, three objectives across the shape", async () => {
     const result = await apply("company-onboarding");
