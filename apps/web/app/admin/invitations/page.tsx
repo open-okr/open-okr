@@ -4,7 +4,11 @@ import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
-import { createPersonalLinkAction, createWorkspaceLinkAction } from "./actions";
+import {
+  createGuestLinkAction,
+  createPersonalLinkAction,
+  createWorkspaceLinkAction,
+} from "./actions";
 import { InviteForm } from "./invite-form";
 import { RevokeButton } from "./revoke-button";
 
@@ -25,6 +29,12 @@ import { RevokeButton } from "./revoke-button";
  * an optional domain list. Trusted-domain joining is a third path and lives on
  * the general card, because it is a property of the workspace rather than an
  * invitation somebody issued.
+ *
+ * **A guest is invited here too, since completeness review M-22.** A guest
+ * could only be made by converting a member, which gave an outsider the whole
+ * workspace in between. The guest card issues a personal invitation that
+ * names one space; accepting makes a guest with nothing on the workspace and
+ * `view` on that space.
  *
  * **A token is shown once.** The table holds its digest, which is what makes a
  * leaked list of invitations harmless, so the list below carries no tokens and
@@ -90,15 +100,18 @@ export default async function InvitationsPage() {
     );
   }
 
-  const links = await callAction(
-    {
-      pool: getPool(),
-      workspaceId: workspace.workspaceId,
-      actor: { kind: "human" as const, userId: session.user.id },
-    },
-    "invitations.list",
-    {},
-  );
+  const context = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  const [links, spaces] = await Promise.all([
+    callAction(context, "invitations.list", {}),
+    // The spaces a guest can be invited to, which an administrator sees all of
+    // through the workspace's standard binding on every space.
+    callAction(context, "spaces.list", {}),
+  ]);
+  const spaceNames = new Map(spaces.map((space) => [space.id, space.name]));
 
   return (
     <>
@@ -143,6 +156,74 @@ export default async function InvitationsPage() {
                 />
               </label>
             </InviteForm>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex min-w-0 flex-col">
+              <h2 className="text-sm font-bold text-ink">
+                {t("admin.invitations.inviteAGuest")}
+              </h2>
+              <p className="text-xs text-ink-3">
+                {t("admin.invitations.aGuestSeesOne")}
+              </p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {spaces.length === 0 ? (
+              <p className="text-sm text-ink-3">
+                {t("admin.invitations.noSpaceToInviteAGuestTo")}
+              </p>
+            ) : (
+              <InviteForm
+                action={createGuestLinkAction}
+                submitLabel={t("admin.invitations.inviteTheGuest")}
+              >
+                {/* Its own label, so the page never has two fields a person or
+                    a screen reader would both call "Email address". */}
+                <label className="flex flex-col gap-1 text-xs text-ink-3">
+                  {t("admin.invitations.guestEmailAddress")}
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    placeholder={t("admin.invitations.nameExampleCom")}
+                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                  />
+                </label>
+                <div className="flex flex-wrap gap-2.5">
+                  <label className="flex flex-col gap-1 text-xs text-ink-3">
+                    {t("admin.invitations.guestOf")}
+                    <select
+                      name="spaceId"
+                      required
+                      defaultValue=""
+                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                    >
+                      <option value="" disabled>
+                        {t("admin.invitations.chooseTheSpace")}
+                      </option>
+                      {spaces.map((space) => (
+                        <option key={space.id} value={space.id}>
+                          {space.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-ink-3">
+                    {t("admin.invitations.expiresInDays")}
+                    <input
+                      name="expiresInDays"
+                      type="number"
+                      min={1}
+                      defaultValue={14}
+                      className="w-28 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                    />
+                  </label>
+                </div>
+              </InviteForm>
+            )}
           </CardBody>
         </Card>
 
@@ -223,9 +304,17 @@ export default async function InvitationsPage() {
                   // Each part is a whole phrase of its own, joined by the
                   // separator, so no sentence is assembled from pieces.
                   const details = [
-                    link.mode === "personal"
-                      ? t("admin.invitations.modePersonal")
-                      : t("workspaceSwitcher.workspace"),
+                    link.memberKind === "guest"
+                      ? t("admin.invitations.guestOfSpace", {
+                          space:
+                            (link.spaceId
+                              ? spaceNames.get(link.spaceId)
+                              : undefined) ??
+                            t("admin.invitations.anArchivedSpace"),
+                        })
+                      : link.mode === "personal"
+                        ? t("admin.invitations.modePersonal")
+                        : t("workspaceSwitcher.workspace"),
                     link.maxUses === null
                       ? link.useCount === 1
                         ? t("admin.invitations.usesOne", {

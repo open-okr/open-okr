@@ -731,7 +731,7 @@
     },
     {
       "name": "invitations.createPersonalLink",
-      "description": "Invite one email address, usable once.",
+      "description": "Invite one email address, usable once, as a member or as a guest of one space.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -744,6 +744,11 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
+          },
+          "guestSpaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
         "required": [
@@ -10192,6 +10197,32 @@
         "idempotentHint": true
       },
       "example": {}
+    },
+    {
+      "name": "kpis.spaceTrees",
+      "description": "One space's KPIs, grouped by the driver tree each is filed in. Drives the space home.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "spaceId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "spaceId": "00000000-0000-4000-8000-000000000000"
+      }
     },
     {
       "name": "kpis.detail",

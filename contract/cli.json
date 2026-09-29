@@ -488,7 +488,7 @@
       "method": "POST",
       "path": "/invitations/createPersonalLink",
       "scope": "write",
-      "summary": "Invite one email address, usable once.",
+      "summary": "Invite one email address, usable once, as a member or as a guest of one space.",
       "flags": [
         {
           "name": "email",
@@ -500,6 +500,12 @@
           "name": "expires-in-days",
           "field": "expiresInDays",
           "type": "integer",
+          "required": false
+        },
+        {
+          "name": "guest-space-id",
+          "field": "guestSpaceId",
+          "type": "string",
           "required": false
         }
       ],
@@ -7450,6 +7456,23 @@
           "field": "treeId",
           "type": "string",
           "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "kpis spaceTrees",
+      "action": "kpis.spaceTrees",
+      "method": "GET",
+      "path": "/kpis/spaceTrees",
+      "scope": "read",
+      "summary": "One space's KPIs, grouped by the driver tree each is filed in. Drives the space home.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false

@@ -127,3 +127,50 @@ export function mapNodesFor(
 
   return rows;
 }
+
+/**
+ * The whole set as a tree: parents before children, key results under the
+ * goal that owns them.
+ *
+ * A goal whose parent is not in the set is drawn at the root rather than
+ * dropped, the same way the explorer treats one: a tree that silently omits
+ * work is worse than one that shows it at the wrong indent. Here rather than
+ * in the Work Map's page since completeness review M-22, because the space
+ * home draws a space's goals as the same tree and a second copy would drift.
+ */
+export function goalTreeNodes(t: Translate, goals: readonly Goal[]): MapNode[] {
+  const present = new Set(goals.map((goal) => goal.id));
+  const childrenOf = new Map<string, Goal[]>();
+  const roots: Goal[] = [];
+  for (const goal of goals) {
+    const parent = goal.parentGoalId;
+    if (parent && present.has(parent)) {
+      const siblings = childrenOf.get(parent);
+      if (siblings) {
+        siblings.push(goal);
+      } else {
+        childrenOf.set(parent, [goal]);
+      }
+    } else {
+      roots.push(goal);
+    }
+  }
+
+  const out: MapNode[] = [];
+  const seen = new Set<string>();
+  const walk = (goal: Goal, depth: number): void => {
+    if (seen.has(goal.id)) {
+      // Unreachable through the interface, reachable through a bad import.
+      return;
+    }
+    seen.add(goal.id);
+    out.push(...mapNodesFor(t, goal, depth));
+    for (const child of childrenOf.get(goal.id) ?? []) {
+      walk(child, depth + 1);
+    }
+  };
+  for (const root of roots) {
+    walk(root, 0);
+  }
+  return out;
+}

@@ -214,6 +214,106 @@ test("the same invitation cannot be used twice", async () => {
   await second.close();
 });
 
+/**
+ * A guest invited straight into one space (completeness review M-22).
+ *
+ * A guest could only be made by converting a member, so an outsider held the
+ * whole workspace until somebody remembered to convert them. The guest card
+ * issues a personal invitation naming one space; the join page says what the
+ * guest is agreeing to; and accepting leaves a guest with nothing on the
+ * workspace and the one space they were asked into.
+ */
+const VISITOR_EMAIL = "join-visitor@partner.example";
+let guestToken: string;
+let guestSpaceId: string;
+
+test("the owner invites a guest into one space", async () => {
+  await expect(async () => {
+    await page.goto("/admin/invitations");
+    await expect(page.getByLabel("The guest's email address")).toBeVisible({
+      timeout: 5_000,
+    });
+  }).toPass({ timeout: 30_000 });
+
+  await page.getByLabel("The guest's email address").fill(VISITOR_EMAIL);
+  const space = page.getByLabel("Guest of");
+  // The first real option; the one before it is the "choose" prompt.
+  guestSpaceId =
+    (await space.locator("option").nth(1).getAttribute("value")) ?? "";
+  expect(guestSpaceId).toMatch(/^[0-9a-f-]{36}$/);
+  await space.selectOption(guestSpaceId);
+  await page.getByRole("button", { name: "Invite the guest" }).click();
+
+  const link = page.getByTestId("invite-link");
+  await expect(link).toBeVisible({ timeout: 15_000 });
+  const url = (await link.textContent())?.trim() ?? "";
+  guestToken = url.slice(url.lastIndexOf("/") + 1);
+  expect(guestToken.length).toBeGreaterThan(20);
+
+  // The issued list says whose guest it is.
+  await page.reload();
+  await expect(page.getByText(/Guest of /).first()).toBeVisible();
+});
+
+test("the guest is told what they are joining, and lands with one space", async () => {
+  test.setTimeout(120_000);
+
+  const visitorContext = await context.browser()?.newContext();
+  if (!visitorContext) {
+    throw new Error("no browser to open a guest context in");
+  }
+  const visitor = await visitorContext.newPage();
+  await visitor.goto(`/join/${guestToken}`);
+  await expect(
+    visitor.getByText(/You are invited as a guest of/),
+  ).toBeVisible({ timeout: 15_000 });
+
+  await visitor.getByRole("button", { name: "Create an account" }).click();
+  await visitor.getByLabel("Name").fill("Join Visitor");
+  await visitor.getByLabel("Email").fill(VISITOR_EMAIL);
+  await visitor.getByLabel("Password", { exact: true }).fill(GUEST_PASSWORD);
+  await visitor.getByRole("button", { name: "Create account" }).click();
+  await expect(
+    visitor.getByRole("navigation", { name: "Primary" }),
+  ).toBeVisible({ timeout: 20_000 });
+  // The front door is the whole workspace's, so a guest is sent to the spaces
+  // they can open, and the one they were asked into is there.
+  await expect(visitor).toHaveURL(/\/spaces$/, { timeout: 20_000 });
+  await expect(
+    visitor.locator(`a[href='/spaces/${guestSpaceId}']`),
+  ).toBeVisible();
+
+  // A guest, with no binding on the workspace's own context: the state
+  // converting a member leaves, reached without passing through a member.
+  const member = await pool.query<{ id: string; kind: string }>(
+    `select m.id, m.kind
+       from workspace_members m
+       join users u on u.id = m.user_id
+      where u.email = $1 and m.deleted_at is null`,
+    [VISITOR_EMAIL],
+  );
+  expect(member.rows[0]?.kind).toBe("guest");
+  const onWorkspace = await pool.query<{ n: string }>(
+    `select count(*)::text as n
+       from access_bindings b
+       join access_groups g on g.id = b.group_id
+       join access_contexts c on c.id = b.context_id
+      where g.kind = 'member' and g.member_id = $1
+        and c.resource_type = 'workspace'
+        and b.deleted_at is null`,
+    [member.rows[0]?.id],
+  );
+  expect(onWorkspace.rows[0]?.n).toBe("0");
+
+  // And the space they were asked into opens for them.
+  await visitor.goto(`/spaces/${guestSpaceId}`);
+  await expect(
+    visitor.getByRole("heading", { name: "Goals" }),
+  ).toBeVisible({ timeout: 15_000 });
+
+  await visitorContext.close();
+});
+
 test("the instance is left as the other specs expect it", async () => {
   // Registration back to `auto`, which is what every other spec in this suite
   // runs against. A spec that closed the instance and walked away would break

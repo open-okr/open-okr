@@ -138,6 +138,54 @@ export async function createPersonalLinkAction(
   }
 }
 
+/**
+ * Invites one address as a guest of one space (completeness review M-22).
+ *
+ * The same action as a personal invitation, with the space named, so a guest
+ * is one more kind of invitation rather than a second flow. Accepting makes a
+ * guest with nothing on the workspace and `view` on that space, and nothing
+ * here can widen it: the level is the action's, not the form's.
+ */
+export async function createGuestLinkAction(
+  formData: FormData,
+): Promise<InviteResult> {
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+  const spaceId = String(formData.get("spaceId") ?? "");
+  const expiresInDays = Number(formData.get("expiresInDays"));
+  if (spaceId === "") {
+    const { t } = await getTranslations();
+    return { error: t("admin.invitations.chooseTheSpaceFirst") };
+  }
+
+  try {
+    const link = await callAction(
+      await context(),
+      "invitations.createPersonalLink",
+      {
+        email,
+        guestSpaceId: spaceId,
+        ...(Number.isFinite(expiresInDays) && expiresInDays > 0
+          ? { expiresInDays }
+          : {}),
+      },
+    );
+    revalidatePath("/admin/invitations");
+    return {
+      link: {
+        id: link.id,
+        token: link.token,
+        url: joinUrl(link.token),
+        mode: "personal",
+        email,
+      },
+    };
+  } catch (error) {
+    return { error: await reason(error) };
+  }
+}
+
 export async function revokeLinkAction(linkId: string): Promise<void> {
   await callAction(await context(), "invitations.revokeLink", { linkId });
   revalidatePath("/admin/invitations");

@@ -120,6 +120,89 @@ test("the profile has a timezone field", async () => {
   await expect(timezone).toBeVisible();
 });
 
+/**
+ * A 12 by 8 JPEG, the same picture `s29-documents` uploads. Written out here
+ * so the suite holds no binary file.
+ */
+const PICTURE = Buffer.from(
+  "/9j/4QEqRXhpZgAASUkqAAgAAAAJAA8BAgALAAAAkgAAABABAgAIAAAAigAAABIBAwABAAAAAQAAABoBBQABAAAAegAAABsBBQABAAAAggAAACgBAwABAAAAAgAAABMCAwABAAAAAQAAAGmHBAABAAAAngAAACWIBAABAAAA7AAAAAAAAAA4YwAA6AMAADhjAADoAwAATGVha3kgMQBNMjRUZXN0Q2FtAAAGAACQBwAEAAAAMDIxMAGRBwAEAAAAAQIDAACgBwAEAAAAMDEwMAGgAwABAAAA//8AAAKgBAABAAAADAAAAAOgBAABAAAACAAAAAAAAAACAAEAAgACAAAATgAAAAIABQADAAAACgEAAAAAAAADAAAAAQAAAAgAAAABAAAAAAAAAAEAAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCAAIAAwDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAT/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAABf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIgD4t//2Q==",
+  "base64",
+);
+
+/**
+ * A member sets their own picture and bio (completeness review M-22).
+ *
+ * Neither could be set from any screen, though the action had taken both
+ * since P2-T03. The picture goes through the one upload path and comes back
+ * as the thumbnail in the header; the bio is written in the shared editor and
+ * read back rendered. Both are put back at the end, because the instance is
+ * shared with every spec after this one.
+ */
+test("a member sets their own picture and it shows in the header", async () => {
+  await expect(
+    page.getByRole("heading", { name: "Your picture" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Picture (PNG, JPEG, GIF or WebP)")
+    .setInputFiles({
+      name: "me.jpg",
+      mimeType: "image/jpeg",
+      buffer: PICTURE,
+    });
+  await page.getByRole("button", { name: "Use this picture" }).click();
+  await expect(page.getByText("Picture updated.")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // The header draws the thumbnail, served through the blob's own access
+  // check, once the page is read again.
+  await page.reload();
+  const picture = page.locator("img[src$='/thumbnail']").first();
+  await expect(picture).toBeVisible({ timeout: 15_000 });
+  const response = await page.request.get(
+    (await picture.getAttribute("src")) ?? "",
+  );
+  expect(response.status()).toBe(200);
+});
+
+test("a member writes their own bio and reads it back", async () => {
+  const editor = page.locator(".ProseMirror").first();
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("Runs the growth team from Kuala Lumpur.");
+  const form = page.locator("form").filter({ has: editor });
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Profile updated.")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Bio" })).toBeVisible();
+  await expect(
+    page.getByText("Runs the growth team from Kuala Lumpur.").first(),
+  ).toBeVisible();
+});
+
+test("and both can be taken away again", async () => {
+  const editor = page.locator(".ProseMirror").first();
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  const form = page.locator("form").filter({ has: editor });
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Profile updated.")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.getByRole("button", { name: "Remove picture" }).click();
+  await expect(page.getByText("Picture removed.", { exact: false })).toBeVisible(
+    { timeout: 15_000 },
+  );
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Bio" })).toHaveCount(0);
+  await expect(page.locator("img[src$='/thumbnail']")).toHaveCount(0);
+});
+
 test("the lifecycle card is on the admin's own profile", async () => {
   await goTo(page, "/people");
   await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();

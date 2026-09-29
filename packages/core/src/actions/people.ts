@@ -46,6 +46,11 @@ import {
   possibleManagers,
   wouldCreateManagerCycle,
 } from "../people/manager-chain.ts";
+import {
+  isBlankDocument,
+  requireAvatarImage,
+  shareAvatar,
+} from "../people/profile.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import {
@@ -143,35 +148,93 @@ export const updateOwnProfile = defineWriteAction({
   // reachable by an ordinary member and not just the founding admin.
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId, actor }) {
+    /**
+     * The avatar, checked before anything is written (completeness review
+     * M-22).
+     *
+     * `avatarBlobId` was taken on trust: any id at all, including a file the
+     * member had never been able to open, and the avatar is shown to the whole
+     * workspace. So the file must be one this member can read through the
+     * access getter, and an image that has been through `storeUpload`.
+     */
+    async load({ tx, workspaceId, actor }) {
+      if (!actor.memberId) {
+        throw new OperationError("forbidden", "No member to update.");
+      }
+      const [current] = await tx
+        .select({ avatarBlobId: workspaceMembers.avatarBlobId })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.id, actor.memberId),
+            eq(workspaceMembers.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!current) {
+        throw new OperationError("not_found", "No such member.");
+      }
+      if (!input.avatarBlobId) {
+        return { previousAvatarBlobId: current.avatarBlobId, avatar: null };
+      }
+      return {
+        previousAvatarBlobId: current.avatarBlobId,
+        avatar: await requireAvatarImage(tx, {
+          workspaceId,
+          memberId: actor.memberId,
+          blobId: input.avatarBlobId,
+        }),
+      };
+    },
+    async execute({ tx, workspaceId, actor, loaded }) {
       if (!actor.memberId) {
         throw new OperationError("forbidden", "No member to update.");
       }
       const patch: Record<string, unknown> = { updatedAt: new Date() };
+      // Which facts changed, by name and never by value, for the audit row:
+      // a bio is somebody's own words and does not belong in the trail.
+      const changed: string[] = [];
       if (input.timezone !== undefined) {
         patch.timezone = input.timezone;
+        changed.push("timezone");
       }
       if (input.avatarBlobId !== undefined) {
         patch.avatarBlobId = input.avatarBlobId;
+        changed.push("avatar");
+        await shareAvatar(tx, {
+          workspaceId,
+          previousBlobId: loaded.previousAvatarBlobId,
+          next: loaded.avatar,
+        });
       }
       if (input.bio !== undefined) {
-        patch.bio = input.bio;
+        // An emptied editor clears the bio rather than storing a document with
+        // nothing in it, so "no bio" has one shape whichever surface wrote it.
+        patch.bio =
+          input.bio === null || isBlankDocument(input.bio) ? null : input.bio;
         patch.bioVersion = sql`coalesce(${workspaceMembers.bioVersion}, 0) + 1`;
+        changed.push("bio");
       }
       if (input.primaryChannel !== undefined) {
         patch.primaryChannel = input.primaryChannel;
+        changed.push("primaryChannel");
       }
       if (input.theme !== undefined) {
         patch.theme = input.theme;
+        changed.push("theme");
       }
       if (input.density !== undefined) {
         patch.density = input.density;
+        changed.push("density");
       }
       if (input.language !== undefined) {
         patch.language = input.language;
+        changed.push("language");
       }
       if (input.quietHours !== undefined) {
         patch.quietHours = input.quietHours;
+        changed.push("quietHours");
       }
 
       const [updated] = await tx
@@ -213,6 +276,7 @@ export const updateOwnProfile = defineWriteAction({
           action: "people.updateOwnProfile",
           targetType: "workspace_member",
           targetId: updated.id,
+          payload: { changed },
         },
       };
     },
@@ -732,6 +796,7 @@ export const eraseMember = defineWriteAction({
           title: workspaceMembers.title,
           bio: workspaceMembers.bio,
           timezone: workspaceMembers.timezone,
+          avatarBlobId: workspaceMembers.avatarBlobId,
         })
         .from(workspaceMembers)
         .where(
@@ -798,6 +863,15 @@ export const eraseMember = defineWriteAction({
       const removed = await sweepPersonalData(tx, {
         workspaceId,
         memberId: input.memberId,
+      });
+
+      // Their picture stops being shown to the workspace (completeness review
+      // M-22). Clearing the column alone would leave the file readable by
+      // everybody through the binding that made it an avatar.
+      await shareAvatar(tx, {
+        workspaceId,
+        previousBlobId: loaded.avatarBlobId,
+        next: null,
       });
 
       // The sign-in account, when this was the person's only workspace

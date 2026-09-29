@@ -12,7 +12,14 @@
  * That comment is widened alongside this file rather than left describing
  * only the first of its two callers.
  */
-import { activeOnly, inviteLinks, withWorkspace } from "@openokr/db";
+import {
+  activeOnly,
+  INVITE_MEMBER_KINDS,
+  inviteLinks,
+  spaceMembers,
+  spaces,
+  withWorkspace,
+} from "@openokr/db";
 import { desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -24,9 +31,48 @@ import {
   generateInviteToken,
   hashInviteToken,
 } from "../invitations/tokens.ts";
-import { OperationError } from "../operations/operation.ts";
+import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  addSpaceMemberInTx,
+  resolveSpaceContextId,
+} from "../spaces/service.ts";
 import { requireSeatInTx } from "../tenancy/plans.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+
+/**
+ * The context of a space a guest invitation names, when the space is still
+ * live (completeness review M-22).
+ *
+ * Archiving a space leaves its context in place, so the context alone cannot
+ * say whether a guest would arrive somewhere that still exists. `refusal` is
+ * what the caller says when it does not.
+ */
+async function liveSpaceContext(
+  tx: OperationTx,
+  workspaceId: string,
+  spaceId: string,
+  refusal: string,
+): Promise<string> {
+  const [space] = await tx
+    .select({ id: spaces.id })
+    // openokr:allow-raw-read: whether the space an invitation names is live.
+    // Issuing needs `full` on the workspace, and accepting is a bootstrap
+    // operation whose authorisation is the link itself; no column of the space
+    // is returned to either.
+    .from(spaces)
+    .where(
+      activeOnly(
+        spaces,
+        eq(spaces.id, spaceId),
+        eq(spaces.workspaceId, workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!space) {
+    throw new OperationError("not_found", refusal);
+  }
+  return resolveSpaceContextId(tx, workspaceId, spaceId);
+}
 
 const linkSummary = z.object({
   id: z.uuid(),
@@ -35,6 +81,12 @@ const linkSummary = z.object({
   maxUses: z.number().nullable(),
   expiresAt: z.string().nullable(),
   revokedAt: z.string().nullable(),
+  /**
+   * What accepting makes: a member, or a guest of the one space `spaceId`
+   * names (completeness review M-22).
+   */
+  memberKind: z.enum(INVITE_MEMBER_KINDS),
+  spaceId: z.uuid().nullable(),
 });
 
 /**
@@ -93,6 +145,8 @@ export const listInvitations = defineReadAction({
           maxUses: inviteLinks.maxUses,
           expiresAt: inviteLinks.expiresAt,
           revokedAt: inviteLinks.revokedAt,
+          memberKind: inviteLinks.memberKind,
+          spaceId: inviteLinks.spaceId,
           createdAt: inviteLinks.createdAt,
         })
         .from(inviteLinks)
@@ -113,6 +167,8 @@ export const listInvitations = defineReadAction({
         maxUses: row.maxUses,
         expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
         revokedAt: row.revokedAt ? row.revokedAt.toISOString() : null,
+        memberKind: row.memberKind,
+        spaceId: row.spaceId,
         createdAt: row.createdAt.toISOString(),
       }));
     });
@@ -166,6 +222,8 @@ export const createWorkspaceLink = defineWriteAction({
           maxUses: inviteLinks.maxUses,
           expiresAt: inviteLinks.expiresAt,
           revokedAt: inviteLinks.revokedAt,
+          memberKind: inviteLinks.memberKind,
+          spaceId: inviteLinks.spaceId,
         });
       const created = link as NonNullable<typeof link>;
 
@@ -191,28 +249,63 @@ export const createWorkspaceLink = defineWriteAction({
   }),
 });
 
+/**
+ * Invites one address, to be used once (P2-T04), as a member or as a guest of
+ * one space (completeness review M-22).
+ *
+ * **A guest could only be made by converting a member**, which meant giving
+ * an outsider the whole workspace first and taking it back afterwards. With
+ * `guestSpaceId` the invitation makes a guest directly: accepting creates a
+ * `guest` member with nothing on the workspace itself, and puts them in that
+ * space, where their own group is bound at `view`. The same place
+ * `people.convertToGuest` starts from, with the one space the invitation named.
+ *
+ * **One space, personal only.** A guest is somebody outside the organisation
+ * who was asked in by name, and the plans-and-seats design has a guest seeing
+ * one space. A reusable guest link would admit whoever it reached, which is
+ * the opposite of that.
+ */
 export const createPersonalLink = defineWriteAction({
   name: "invitations.createPersonalLink",
-  summary: "Invite one email address, usable once.",
+  summary:
+    "Invite one email address, usable once, as a member or as a guest of one space.",
   input: z.object({
     email: z.string().trim().toLowerCase().email(),
     expiresInDays: z.number().int().positive().optional(),
+    /**
+     * Makes the invitation a guest's, of this space and nothing else. Absent
+     * invites a member, as every invitation did before.
+     */
+    guestSpaceId: z.uuid().optional(),
   }),
   output: linkSummary.extend({ token: z.string() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
-      // **The seat check that must be kind**, because this is the one a
-      // person can act on. The funnel checks again when somebody actually
-      // joins, and that is the one that must be right; this one exists so
-      // the refusal reaches the administrator who caused it rather than the
-      // colleague who clicked a link.
-      await requireSeatInTx(
-        tx,
-        workspaceId,
-        (used, limit) =>
-          `This workspace has ${used} of ${limit} seats in use. Free one, or add seats, before inviting anybody else.`,
-      );
+      if (input.guestSpaceId) {
+        // The space has to exist now, so a mistake is refused to the
+        // administrator rather than to the guest who clicks the link.
+        await liveSpaceContext(
+          tx,
+          workspaceId,
+          input.guestSpaceId,
+          "No such space to invite a guest to.",
+        );
+      } else {
+        // **The seat check that must be kind**, because this is the one a
+        // person can act on. The funnel checks again when somebody actually
+        // joins, and that is the one that must be right; this one exists so
+        // the refusal reaches the administrator who caused it rather than the
+        // colleague who clicked a link. A guest is not a seat
+        // (p8-t01b-plans-and-seats.md), so a guest invitation is never
+        // refused for one.
+        await requireSeatInTx(
+          tx,
+          workspaceId,
+          (used, limit) =>
+            `This workspace has ${used} of ${limit} seats in use. Free one, or add seats, before inviting anybody else.`,
+        );
+      }
 
       const token = generateInviteToken();
       const expiresAt = input.expiresInDays
@@ -229,6 +322,8 @@ export const createPersonalLink = defineWriteAction({
           invitedByMemberId: actor.memberId,
           maxUses: 1,
           expiresAt,
+          memberKind: input.guestSpaceId ? "guest" : "human",
+          spaceId: input.guestSpaceId ?? null,
         })
         .returning({
           id: inviteLinks.id,
@@ -237,6 +332,8 @@ export const createPersonalLink = defineWriteAction({
           maxUses: inviteLinks.maxUses,
           expiresAt: inviteLinks.expiresAt,
           revokedAt: inviteLinks.revokedAt,
+          memberKind: inviteLinks.memberKind,
+          spaceId: inviteLinks.spaceId,
         });
       const created = link as NonNullable<typeof link>;
 
@@ -256,7 +353,12 @@ export const createPersonalLink = defineWriteAction({
           action: "invitations.createPersonalLink",
           targetType: "invite_link",
           targetId: created.id,
-          payload: { email: input.email },
+          payload: {
+            email: input.email,
+            ...(input.guestSpaceId
+              ? { guest: true, spaceId: input.guestSpaceId }
+              : {}),
+          },
         },
         outbox: [
           {
@@ -407,10 +509,54 @@ export const acceptLink = defineWriteAction({
         );
       }
 
+      // **A guest invitation makes a guest of one space** (completeness review
+      // M-22). Resolved before anybody is provisioned, so an invitation to a
+      // space archived since it was issued refuses with nothing written.
+      const guestSpaceId = link.memberKind === "guest" ? link.spaceId : null;
+      const guestSpaceContextId = guestSpaceId
+        ? await liveSpaceContext(tx, workspaceId, guestSpaceId, REFUSAL)
+        : null;
+
+      // No binding on the workspace for a guest: they reach the space the
+      // invitation named and nothing else, which is where
+      // `people.convertToGuest` leaves a member too. Somebody who is already a
+      // member keeps what they have, because an invitation never demotes.
       const provisioned = await provisionMemberForInvite(tx, {
         workspaceId,
         user: { id: userRow.id, name: userRow.name },
+        ...(guestSpaceId
+          ? { kind: "guest" as const, bindWorkspace: false }
+          : {}),
       });
+
+      if (guestSpaceId && guestSpaceContextId) {
+        // Only when they are not in it already. `addSpaceMemberInTx` sets the
+        // role it is given, and a manager accepting a guest invitation to
+        // their own space must not come out of it a member.
+        const [inSpace] = await tx
+          .select({ id: spaceMembers.id })
+          .from(spaceMembers)
+          .where(
+            activeOnly(
+              spaceMembers,
+              eq(spaceMembers.workspaceId, workspaceId),
+              eq(spaceMembers.spaceId, guestSpaceId),
+              eq(spaceMembers.memberId, provisioned.memberId),
+            ),
+          )
+          .limit(1);
+        if (!inSpace) {
+          // The member role, which for a guest binds their own group at
+          // `view` on the space (`applyRoleBindings`).
+          await addSpaceMemberInTx(tx, {
+            workspaceId,
+            spaceId: guestSpaceId,
+            memberId: provisioned.memberId,
+            role: "member",
+            contextId: guestSpaceContextId,
+          });
+        }
+      }
 
       await tx
         .update(inviteLinks)
@@ -436,6 +582,7 @@ export const acceptLink = defineWriteAction({
           payload: {
             memberId: provisioned.memberId,
             alreadyMember: !provisioned.created,
+            ...(guestSpaceId ? { guestSpaceId } : {}),
           },
         },
       };

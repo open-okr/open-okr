@@ -1,11 +1,14 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
-import type { ResolvedThresholds } from "@openokr/method";
+import { canonThresholds, type ResolvedThresholds } from "@openokr/method";
 import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { SectionBoundary } from "../../../lib/section-boundary.tsx";
+import { SectionLoading } from "../../../lib/segment-loading.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
@@ -14,17 +17,40 @@ import { ScheduleSessions } from "../../sessions/schedule.tsx";
 import { SpaceManagement } from "./manage.tsx";
 import { SpaceMembership } from "./space-membership";
 import { SpaceSettingsCard } from "./space-settings.tsx";
+import { SpaceGoals, SpaceKpiTrees } from "./space-work.tsx";
+
+/**
+ * A workspace-wide read the reader is not allowed, as null.
+ *
+ * **A guest holds nothing on the workspace itself** (completeness review
+ * M-22): they reach the one space they were invited to. The workspace's
+ * calendar and its rhythm settings are workspace-wide reads, so both refuse a
+ * guest with not-found, and without this the one page a guest was invited to
+ * open would not render for them. What the page needs from either has a
+ * default: the feed is dated in UTC and the figures are banded by the canon's
+ * thresholds. Any other failure is still a failure.
+ */
+function refusedAsNull(error: unknown): null {
+  if (error instanceof OperationError && error.code === "not_found") {
+    return null;
+  }
+  throw error;
+}
 
 /**
  * A space home (TECHNICAL-PLAN §4.2, P3-T01).
  *
  * Started as a shell carrying only the membership model. It now answers "how
- * is this team doing": the confidence trend and the streak (P6-G19c), last
- * week's digest as the room read it, the open blocker board (P4-T15b-b), the
- * sessions ahead (P5-T01c) and who is in the space in what role.
+ * is this team doing": the space's open goals and its KPI trees (completeness
+ * review M-22), the confidence trend and the streak (P6-G19c), last week's
+ * digest as the room read it, the open blocker board (P4-T15b-b), the
+ * sessions ahead (P5-T01c) and who is in the space in what role. Sessions are
+ * booked here since H-08.
  *
- * Still absent: the space's goals and its KPI trees, which have their own
- * screens and are reached from the rail. Sessions are booked here since H-08.
+ * **The goals and the KPI trees stream in on their own**, each behind a
+ * Suspense boundary with a skeleton and an error boundary of its own, because
+ * they are the two largest reads on the page and neither should hold up, or
+ * take down, the team's week.
  */
 export default async function SpacePage({
   params,
@@ -59,7 +85,7 @@ export default async function SpacePage({
       ...(feedCursor ? { cursor: feedCursor } : {}),
     }),
     callAction(actor, "people.directory", {}),
-    callAction(actor, "settings.readForMember", {}),
+    callAction(actor, "settings.readForMember", {}).catch(refusedAsNull),
   ]);
   const feedNames = new Map(
     feedDirectory.map((member) => [member.id, member.name]),
@@ -112,7 +138,7 @@ export default async function SpacePage({
       weeks: TREND_WEEKS,
     }),
     callAction(actor, "sessions.readStreak", { spaceId: id }),
-    callAction(actor, "rhythm.read", {}),
+    callAction(actor, "rhythm.read", {}).catch(refusedAsNull),
   ]);
 
   // Last week is the last session this space closed, and its digest is what
@@ -193,15 +219,35 @@ export default async function SpacePage({
         </CardBody>
       </Card>
 
+      {/* The team's own work (completeness review M-22). */}
+      <SectionBoundary headingKey="spaces.detail.goalsFailed">
+        <Suspense fallback={<SectionLoading rows={3} />}>
+          <SpaceGoals context={actor} spaceId={space.id} />
+        </Suspense>
+      </SectionBoundary>
+      <SectionBoundary headingKey="spaces.detail.kpiTreesFailed">
+        <Suspense fallback={<SectionLoading rows={2} />}>
+          <SpaceKpiTrees
+            context={actor}
+            spaceId={space.id}
+            canEdit={level >= ACCESS_LEVELS.edit}
+          />
+        </Suspense>
+      </SectionBoundary>
+
       {/* §4.14's space scope (P6-G18b). Placed under the management card
           because it is the same audience and the rarer thing to change. */}
-      <SpaceSettingsCard
-        spaceId={space.id}
-        settings={space.settings}
-        workspaceStrictness={rhythm.coachStrictness}
-        workspaceFrequency={rhythm.defaultCheckInFrequency}
-        canManage={canManage}
-      />
+      {/* Absent for a reader who cannot read the workspace's rhythm, which is
+          a guest: the card is about what this space inherits from it. */}
+      {rhythm ? (
+        <SpaceSettingsCard
+          spaceId={space.id}
+          settings={space.settings}
+          workspaceStrictness={rhythm.coachStrictness}
+          workspaceFrequency={rhythm.defaultCheckInFrequency}
+          canManage={canManage}
+        />
+      ) : null}
 
       <SpaceManagement
         spaceId={space.id}
@@ -220,7 +266,11 @@ export default async function SpacePage({
         trend={[...trend]}
         streakWeeks={streak.currentWeeks}
         weeks={TREND_WEEKS}
-        thresholds={rhythm.thresholds as unknown as ResolvedThresholds}
+        thresholds={
+          rhythm
+            ? (rhythm.thresholds as unknown as ResolvedThresholds)
+            : canonThresholds()
+        }
       />
 
       {/* Last week's figures, as the digest recorded them (P6-G19c). */}
@@ -355,7 +405,7 @@ export default async function SpacePage({
         explains={t("spaces.detail.feedExplains")}
         items={feedItems}
         names={feedNames}
-        timeZone={String(feedSettings.settings.timezone ?? "UTC")}
+        timeZone={String(feedSettings?.settings.timezone ?? "UTC")}
         basePath={`/spaces/${id}`}
         paged={feedCursor !== undefined}
         live={{ scope: "space", subjectId: id }}

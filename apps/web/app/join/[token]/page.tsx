@@ -56,6 +56,23 @@ async function Refusal() {
   );
 }
 
+/**
+ * What a guest invitation admits, said before anybody joins (completeness
+ * review M-22). A guest sees one space and nothing else in the workspace, and
+ * somebody accepting ought to know that is what they are agreeing to.
+ */
+async function GuestNote({ spaceName }: { readonly spaceName: string | null }) {
+  if (spaceName === null) {
+    return null;
+  }
+  const { t } = await getTranslations();
+  return (
+    <p className="rounded-md bg-brand-weak px-2.5 py-2 text-sm text-brand-text">
+      {t("join.detail.asAGuestOf", { space: spaceName })}
+    </p>
+  );
+}
+
 export default async function JoinPage({
   params,
 }: {
@@ -94,6 +111,7 @@ export default async function JoinPage({
                 workspaceName: invitation.workspaceName,
               })}
             </h1>
+            <GuestNote spaceName={invitation.guestSpaceName} />
             <p className="text-sm text-ink-2">
               {invitation.email
                 ? t("join.detail.theInvitationIsFor", {
@@ -130,6 +148,7 @@ export default async function JoinPage({
           <h1 className="text-lg font-bold text-ink">
             {t("common.join2", { workspaceName: invitation.workspaceName })}
           </h1>
+          <GuestNote spaceName={invitation.guestSpaceName} />
           <p className="text-sm text-ink-2">
             {invitation.email && invitation.email !== session.user.email
               ? t("join.detail.youAreSignedInAsSomeoneElse", {

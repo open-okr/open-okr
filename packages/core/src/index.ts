@@ -519,6 +519,7 @@ export {
 } from "./blobs/upload.ts";
 export {
   ALLOWED_CONTENT_TYPES,
+  IMAGE_CONTENT_TYPES,
   MAX_BLOB_BYTES,
   MAX_IMAGE_PIXELS,
   type ValidationResult,

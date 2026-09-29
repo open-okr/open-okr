@@ -1,5 +1,5 @@
 import { ACCESS_LEVELS, callAction, renderRichTextToHtml } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Avatar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -8,7 +8,13 @@ import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
-import { updateMemberFields, updateProfile } from "../actions.ts";
+import {
+  removeAvatar,
+  updateMemberFields,
+  updateProfile,
+  uploadAvatar,
+} from "../actions.ts";
+import { AvatarForm } from "./avatar-form.tsx";
 import { LifecycleControls } from "./lifecycle-controls.tsx";
 import { ProfileForm } from "./profile-form.tsx";
 
@@ -16,9 +22,13 @@ import { ProfileForm } from "./profile-form.tsx";
  * A member's profile (UIUX-PLAN.md SS6 S-33, P6-G09).
  *
  * Three view modes:
- * - Own profile: editable self fields (timezone, bio, channel, quiet hours)
+ * - Own profile: editable self fields (picture, timezone, bio, channel,
+ *   quiet hours)
  * - Others' profile: read-only
- * - Admin viewing others: editable org fields (name, title, manager)
+ * - Admin viewing others: editable org fields (name, title, manager). The
+ *   picture and the bio stay the member's own, which is P2-T03's
+ *   self-versus-others split: an administrator changes where somebody sits in
+ *   the organisation, never what they say about themselves.
  *
  * Lifecycle controls (suspend, restore, convert, erase) are P6-G10, and sit
  * below the admin edit card: they are the rarer thing to want and the one it
@@ -109,6 +119,11 @@ export default async function MemberProfilePage({
     : null;
 
   const bioHtml = member.bio ? renderRichTextToHtml(member.bio as never) : null;
+  // The thumbnail, through the same access check as the file itself. A reader
+  // the picture is not shared with gets a 404 and the initials instead.
+  const avatarUrl = member.avatarBlobId
+    ? `/api/blobs/${member.avatarBlobId}/thumbnail`
+    : null;
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -116,9 +131,12 @@ export default async function MemberProfilePage({
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-bg-2 text-lg font-bold text-ink-3">
-              {member.name.charAt(0).toUpperCase()}
-            </div>
+            <Avatar
+              name={member.name}
+              src={avatarUrl}
+              size="lg"
+              className="size-12 shrink-0 text-base"
+            />
             <div className="flex min-w-0 flex-col">
               <h1 className="text-lg font-bold text-ink">{member.name}</h1>
               {member.title ? (
@@ -294,12 +312,21 @@ export default async function MemberProfilePage({
         </Card>
       ) : null}
 
-      {/* Self-edit form */}
+      {/* Self-edit: the picture, then the rest (completeness review M-22). */}
+      {isSelf ? (
+        <AvatarForm
+          name={member.name}
+          avatarUrl={avatarUrl}
+          uploadAvatar={uploadAvatar}
+          removeAvatar={removeAvatar}
+        />
+      ) : null}
       {isSelf ? (
         <ProfileForm
           memberId={id}
           timezone={member.timezone}
           primaryChannel={member.primaryChannel}
+          bio={member.bio}
           updateProfile={updateProfile}
         />
       ) : null}
