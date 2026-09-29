@@ -98,40 +98,43 @@ export async function setFrame(
 }
 
 /**
- * Carries this cycle's scores and flagged items into the next one (S-12,
- * P6-G16).
+ * Closes a cycle (S-12, METHOD.md §8.9, completeness review M-05).
  *
- * `cycles.feedForward` has been registered since P3-T15 with no caller. It
- * takes both cycle ids, so the next one has to exist: `cycles.ensureCurrent`
- * is what creates it when the calendar has moved on, and calling that first is
- * why this action can be pressed without choosing anything.
+ * `cycles.close` records the result, marks the cycle closed and feeds the next
+ * cycle in one Operation, which is what §8.9's "at close, the product feeds
+ * the next cycle automatically" asks for. This replaced a feed-forward button
+ * and a separate snapshot on the scorecard, and the feed-forward button never
+ * worked: its form sent no cycle id.
  *
- * Idempotent, which the button's own copy promises. Running it twice changes
- * nothing, so a facilitator unsure whether it worked can press it again rather
- * than going to look in the database.
+ * Shared by phase 7 and the scorecard. Phase 7 draws how the cycle closed from
+ * `workflow.read` once the page reloads, so the sentence returned here matters
+ * on the scorecard, which never draws the next cycle.
  */
-export async function runFeedForward(
+export async function closeCycle(
   _previous: WriteState,
   form: FormData,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
-  const context = {
-    pool: getPool(),
-    workspaceId: workspace.workspaceId,
-    actor: { kind: "human" as const, userId: session.user.id },
-  };
-  const fromCycleId = String(form.get("fromCycleId") ?? "");
+  const cycleId = String(form.get("cycleId") ?? "").trim();
+  const { t } = await getTranslations();
+  if (cycleId === "") {
+    return { error: t("cycle.actions.pickTheCycleToClose") };
+  }
 
+  let notice: string;
   try {
-    const next = await callAction(context, "cycles.ensureCurrent", {});
-    if (next.id === fromCycleId) {
-      const { t } = await getTranslations();
-      return { error: t("cycle.actions.nextCycleHasNotStarted") };
-    }
-    await callAction(context, "cycles.feedForward", {
-      fromCycleId,
-      toCycleId: next.id,
-    });
+    const closed = await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human", userId: session.user.id },
+      },
+      "cycles.close",
+      { cycleId },
+    );
+    notice = closed.fedInto
+      ? t("cycle.actions.closedAndFed", { next: closed.fedInto.name })
+      : t("cycle.actions.closedNothingToFeed");
   } catch (error) {
     if (error instanceof OperationError) {
       return { error: error.message };
@@ -139,7 +142,8 @@ export async function runFeedForward(
     throw error;
   }
   revalidatePath("/cycle");
-  return NO_ERROR;
+  revalidatePath("/scorecard");
+  return { error: null, notice };
 }
 
 /**

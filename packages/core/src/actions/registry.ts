@@ -182,6 +182,7 @@ import {
 } from "./cycle-workflow.ts";
 import {
   archiveCycle,
+  closeCycle,
   createCycle,
   ensureCurrentCycle,
   feedForwardCycle,
@@ -607,6 +608,7 @@ export const ACTION_MAP = {
   "cycles.archive": archiveCycle,
   "cycles.snapshot": snapshotCycle,
   "cycles.feedForward": feedForwardCycle,
+  "cycles.close": closeCycle,
   "cycles.scorecard": readScorecard,
   "rhythm.read": readRhythmSettings,
   "rhythm.update": updateRhythmSettings,

@@ -712,9 +712,15 @@ Acceptance: Given a review that recorded every stage, when a member opens the mi
 ### P4-T12-b: Review feed-forward into the next cycle [M]
 Depends on: P4-T12-a, P3-T15
 Goal: the handover (METHOD.md §8.9).
-Deliverables: the two §8.9 rows `cycles.feedForward` reports as waiting, filled: learnings and the retrospective into the next cycle's input pack, and the lowest process-health statement as an issue; carried learnings joining carried key results as issues at impact 4.
-Test plan: a carried learning becomes an issue at impact 4; the lowest process-health statement becomes an issue with source `process_health`; the feed-forward is idempotent, so running it twice does not double the issues.
-Acceptance: Given a closed review with a carried learning, when the next cycle is fed forward, then that learning is a strategic issue at impact 4, the lowest process-health statement is an issue with source `process_health`, the learnings are in §2.6's item two, and the `waiting` list is empty.
+Deliverables: the two §8.9 rows `cycles.feedForward` reports as waiting, filled: learnings and the retrospective into the next cycle's input pack, and the lowest process-health statement as a Phase 3 process priority; carried learnings joining carried key results as issues at impact 4.
+Test plan: a carried learning becomes an issue at impact 4; the lowest process-health statement becomes a Phase 3 priority and not an issue; the feed-forward is idempotent, so running it twice does not double the issues or the priority.
+Acceptance: Given a closed review with a carried learning, when the next cycle is fed forward, then that learning is a strategic issue at impact 4, the lowest process-health statement is a priority in the next cycle's Phase 3, the learnings are in §2.6's item two, and the `waiting` list is empty.
+
+**Corrected 29 September 2026 (completeness review M-05).** This row said the
+lowest process-health statement became an issue with source `process_health`,
+and the code did that. METHOD.md §8.9's table sends it to "Phase 3, a process
+priority", and METHOD.md outranks this plan, so the row and the code both
+follow the table now. Issues written the old way are left in place.
 
 **Why P4-T12 was split.** The minutes are a read across twelve tables, a screen
 and two export routes; the feed-forward is a change to `cycles.feedForward`,
@@ -730,6 +736,11 @@ and a `toCycleId` and runs when the next cycle is created, which is the only
 shape that works. The original acceptance criterion said "when the facilitator
 closes it... the next cycle's Phase 2 already holds the scores", and that is
 corrected above.
+
+**Nothing pulled it until M-05.** The pull was a button, and nothing ever set a
+cycle to `closed`. `cycles.close` now records the archive, closes the cycle and
+feeds the next one when it exists; when it does not, `cycles.create` and
+`cycles.ensureCurrent` feed it at creation. Both orders end in the same rows.
 
 ### P4-T13a: The embedding table and the outbox worker [M]
 Depends on: P2-T15
@@ -1736,6 +1747,13 @@ Goal: the close has a surface (GAP-AUDIT B-03).
 Deliverables: scoring every key result with the band table highlighted at the portfolio average, carry-forward flags, the retrospective split into business and process questions, and the feed-forward action opening the next cycle with scores and carry-forward items already placed.
 Test plan: the highlighted band matches the computed portfolio average; carry-forward arrives unticked, per METHOD.md §8.9; the feed-forward action is idempotent; the arithmetic matches `packages/method` exactly.
 Acceptance: Given a cycle at its close, when a facilitator scores every key result and runs feed-forward, then the next cycle opens carrying the scores and the flagged items, and running it twice changes nothing.
+
+**Corrected 29 September 2026 (completeness review M-05).** The feed-forward
+action is now the close itself: phase 7's **Close the cycle** records the
+result, closes the cycle and feeds the next one, as METHOD.md §8.9's "at close,
+the product feeds the next cycle automatically" asks. It is disabled with the
+reasons until phase 7 is complete, and a second close is refused rather than
+repeated.
 
 ### P6-G17: The dependency register on phase 5, S-10 [M]
 Depends on: P3-T09, P4-T03

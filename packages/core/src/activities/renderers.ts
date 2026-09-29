@@ -193,7 +193,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "space.joined": () => "Someone joined this space",
   "space.left": () => "Someone left this space",
   "cycle.created": (p) =>
-    `Cycle "${asString(p.name, "a new cycle")}" was created`,
+    p.inheritedFrom
+      ? `Cycle "${asString(p.name, "a new cycle")}" was created, inheriting from "${asString(p.inheritedFrom, "the cycle before")}"`
+      : `Cycle "${asString(p.name, "a new cycle")}" was created`,
   "cycle.resolved": (p) =>
     `Cycle "${asString(p.name, "the current cycle")}" was opened`,
   "cycle.updated": (p) => `Cycle "${asString(p.name, "a cycle")}" was updated`,
@@ -356,6 +358,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     }`,
   "cycle.fed_forward": (p) =>
     `The next cycle inherited ${Number(p.priorScores ?? 0)} prior score(s) and ${Number(p.issues ?? 0)} carried issue(s)`,
+  "cycle.closed": (p) =>
+    `Cycle "${asString(p.name, "a cycle")}" was closed${
+      p.verdict ? `, reading ${String(p.verdict).replace(/_/g, " ")}` : ""
+    }${p.fedInto ? `, and fed "${String(p.fedInto)}"` : ""}`,
   "kpi.updated": (p) =>
     `A KPI was edited (${(p.fields as string[] | undefined)?.join(", ") ?? "no fields"})`,
   "kpi.recovery_launched": (p) =>

@@ -33,6 +33,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { readClosureInTx } from "../cycles/archive.ts";
 import { localDateIn, parseLocalDate } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
@@ -308,6 +309,23 @@ export const readWorkflow = defineReadAction({
         authorName: z.string().nullable(),
       })
       .nullable(),
+    /**
+     * How the cycle closed, or null while it is open (M-05): the result the
+     * scorecard holds, and what the next cycle received. Read back from the
+     * rows the close wrote, so phase 7 can show it on every visit rather than
+     * only in the moment after the button.
+     */
+    closure: z
+      .object({
+        resultValue: z.number().nullable(),
+        verdict: z.string().nullable(),
+        nextCycle: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+        priorScores: z.number().int(),
+        carriedIssues: z.number().int(),
+        processPriority: z.string().nullable(),
+        packNote: z.boolean(),
+      })
+      .nullable(),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -545,6 +563,10 @@ export const readWorkflow = defineReadAction({
                 authorName: calibration.authorName ?? null,
               }
             : null,
+          closure:
+            cycle.status === "closed"
+              ? await readClosureInTx(tx, context.workspaceId, cycle.id)
+              : null,
         };
       },
     );

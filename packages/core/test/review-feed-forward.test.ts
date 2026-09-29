@@ -1,10 +1,12 @@
 /**
- * §8.9's feed-forward, completed (METHOD.md §8.9, P4-T12-b).
+ * §8.9's feed-forward, completed (METHOD.md §8.9, P4-T12-b, M-05).
  *
  * The task's test plan:
  * - a carried learning becomes an issue at impact 4
- * - the lowest process-health statement becomes an issue with source
- *   `process_health`
+ * - the lowest process-health statement becomes a Phase 3 priority, which is
+ *   §8.9's table. P4-T12-b made it a Phase 2 issue with source
+ *   `process_health`; the completeness review found that a practice change
+ *   nobody approved, and M-05 put it back where the table says
  * - the feed-forward is idempotent, so running it twice does not double anything
  *
  * **`cycles.feedForward` existed before this row.** P3-T15 built it with a
@@ -54,7 +56,7 @@ const feedForward = async () =>
     issues: number;
     frameCarried: boolean;
     waiting: string[];
-    processHealthIssue: boolean;
+    processPriority: string | null;
     packNote: boolean;
   };
 
@@ -221,28 +223,27 @@ describe("the two rows that were waiting", () => {
     ).toBe(false);
   });
 
-  it("makes the lowest process-health statement an issue, not a priority", async () => {
+  it("makes the lowest process-health statement a priority, not an issue", async () => {
     await holdTheReview();
     const result = await feedForward();
 
-    expect(result.processHealthIssue).toBe(true);
-    const issues = await issuesIn(toCycleId);
-    const health = issues.find((row) => row.source === "process_health");
     // Statement three scored 2, the lowest of the five.
-    expect(health?.text).toContain("measured outcomes");
-    expect(health?.impact).toBe(4);
-
-    // **An issue rather than a priority, deliberately.** §8.9's table says "a
-    // process priority" and its closing line says carried work re-enters as an
-    // issue and does not get a free pass. `cycle_issues.source` has carried a
-    // `process_health` value since P3-T03 with nothing writing it, so the schema
-    // was built for this reading.
+    expect(result.processPriority).toContain("measured outcomes");
     const wb = await workerDb();
-    const { rows } = await wb.admin.query(
-      "select id from cycle_priorities where cycle_id = $1 and deleted_at is null",
+    const { rows } = await wb.admin.query<{ text: string }>(
+      "select text from cycle_priorities where cycle_id = $1 and deleted_at is null",
       [toCycleId],
     );
-    expect(rows).toHaveLength(0);
+    expect(rows.map((row) => row.text)).toEqual([
+      expect.stringContaining("measured outcomes"),
+    ]);
+
+    // **A priority rather than an issue** (M-05). §8.9's table says "Phase 3, a
+    // process priority". Its closing line, that carried work re-enters as an
+    // issue, is about carried work, and P4-T12-b's reading of it as covering
+    // the statement too was a practice change nobody approved.
+    const issues = await issuesIn(toCycleId);
+    expect(issues.some((row) => row.source === "process_health")).toBe(false);
   });
 
   it("puts the learnings into the next cycle's input pack", async () => {
@@ -283,6 +284,14 @@ describe("idempotence", () => {
     expect(after).toHaveLength(before.length);
     expect(second.issues).toBe(0);
     expect(first.issues).toBeGreaterThan(0);
+
+    // And one process priority, not two.
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select id from cycle_priorities where cycle_id = $1 and deleted_at is null",
+      [toCycleId],
+    );
+    expect(rows).toHaveLength(1);
   });
 
   it("leaves one input-pack note, not two copies of it", async () => {
@@ -304,21 +313,22 @@ describe("idempotence", () => {
 });
 
 describe("what happens with nothing to carry", () => {
-  it("reports nothing waiting and writes no issue when the review never ran", async () => {
+  it("reports nothing waiting and writes no priority when the review never ran", async () => {
     // No review held: no learnings, no survey. §8.9 has nothing to hand over and
     // the mapping says so rather than inventing a handover.
     const result = await feedForward();
     expect(result.waiting).toEqual([]);
-    expect(result.processHealthIssue).toBe(false);
+    expect(result.processPriority).toBeNull();
     expect(result.packNote).toBe(false);
-    expect(
-      (await issuesIn(toCycleId)).filter(
-        (row) => row.source === "process_health",
-      ),
-    ).toHaveLength(0);
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select id from cycle_priorities where cycle_id = $1 and deleted_at is null",
+      [toCycleId],
+    );
+    expect(rows).toHaveLength(0);
   });
 
-  it("writes no process-health issue when the survey went unanswered", async () => {
+  it("writes no process priority when the survey went unanswered", async () => {
     await call("sessions.captureLearning", {
       sessionId,
       text: "We learned something, but nobody answered the survey.",
@@ -329,7 +339,7 @@ describe("what happens with nothing to carry", () => {
     const result = await feedForward();
     // A survey nobody answered has no lowest statement, and inventing one would
     // be the product deciding the team's own process problem for it.
-    expect(result.processHealthIssue).toBe(false);
+    expect(result.processPriority).toBeNull();
     expect(result.packNote).toBe(true);
   });
 });

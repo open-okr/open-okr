@@ -18477,7 +18477,7 @@
     "/cycles/feedForward": {
       "post": {
         "operationId": "cycles.feedForward",
-        "summary": "Hands METHOD.md §8.9's inheritance to the next cycle: prior scores, carried work as issues at impact four, and the annual frame.",
+        "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
         "tags": [
           "cycles"
         ],
@@ -18513,8 +18513,11 @@
                             "type": "string"
                           }
                         },
-                        "processHealthIssue": {
-                          "type": "boolean"
+                        "processPriority": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         },
                         "packNote": {
                           "type": "boolean"
@@ -18525,7 +18528,7 @@
                         "issues",
                         "frameCarried",
                         "waiting",
-                        "processHealthIssue",
+                        "processPriority",
                         "packNote"
                       ],
                       "additionalProperties": false
@@ -18584,6 +18587,172 @@
                 "required": [
                   "fromCycleId",
                   "toCycleId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cycles/close": {
+      "post": {
+        "operationId": "cycles.close",
+        "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+        "tags": [
+          "cycles"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "cycleId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "snapshots": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "resultValue": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "verdict": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "fedInto": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "priorScores": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "issues": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "frameCarried": {
+                                  "type": "boolean"
+                                },
+                                "waiting": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "processPriority": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "packNote": {
+                                  "type": "boolean"
+                                },
+                                "cycleId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "priorScores",
+                                "issues",
+                                "frameCarried",
+                                "waiting",
+                                "processPriority",
+                                "packNote",
+                                "cycleId",
+                                "name"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "cycleId",
+                        "snapshots",
+                        "resultValue",
+                        "verdict",
+                        "fedInto"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cycleId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "cycleId"
                 ]
               }
             }
@@ -20090,6 +20259,84 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "closure": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "resultValue": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "verdict": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "nextCycle": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "name"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "priorScores": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "carriedIssues": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "processPriority": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "packNote": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "resultValue",
+                                "verdict",
+                                "nextCycle",
+                                "priorScores",
+                                "carriedIssues",
+                                "processPriority",
+                                "packNote"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -20119,7 +20366,8 @@
                         "revalidation",
                         "focus",
                         "capacityCuts",
-                        "calibration"
+                        "calibration",
+                        "closure"
                       ],
                       "additionalProperties": false
                     }

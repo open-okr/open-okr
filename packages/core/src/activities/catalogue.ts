@@ -226,7 +226,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "space.joined": z.object({}),
   "space.left": z.object({}),
   // Cycles and the rhythm (P3-T02).
-  "cycle.created": z.object({ name: z.string() }),
+  // `inheritedFrom` names the closed cycle that fed this one at creation
+  // (M-05). Absent when nothing was waiting for it, which is most creations.
+  "cycle.created": z.object({
+    name: z.string(),
+    inheritedFrom: z.string().optional(),
+  }),
   "cycle.resolved": z.object({ name: z.string() }),
   "cycle.updated": z.object({ name: z.string() }),
   "cycle.archived": z.object({ name: z.string() }),
@@ -396,6 +401,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.fed_forward": z.object({
     priorScores: z.number().int(),
     issues: z.number().int(),
+  }),
+  // §8.9's close as one act (M-05). The verdict and the successor's name are
+  // snapshotted, because the line has to read the same after either changes.
+  "cycle.closed": z.object({
+    name: z.string(),
+    verdict: z.string().nullable(),
+    fedInto: z.string().nullable(),
   }),
   "kpi.recovery_launched": z.object({
     goalId: z.string(),

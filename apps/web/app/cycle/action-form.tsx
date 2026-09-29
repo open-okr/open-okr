@@ -38,6 +38,13 @@ export function ActionForm({
         >
           {state.error}
         </p>
+      ) : state.notice ? (
+        <p
+          role="status"
+          className="mt-1.5 rounded-md bg-ok-bg px-2.5 py-1.5 text-xs text-ok"
+        >
+          {state.notice}
+        </p>
       ) : null}
     </form>
   );

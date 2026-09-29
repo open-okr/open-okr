@@ -3636,7 +3636,7 @@
       "method": "POST",
       "path": "/cycles/feedForward",
       "scope": "write",
-      "summary": "Hands METHOD.md §8.9's inheritance to the next cycle: prior scores, carried work as issues at impact four, and the annual frame.",
+      "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
       "flags": [
         {
           "name": "from-cycle-id",
@@ -3647,6 +3647,23 @@
         {
           "name": "to-cycle-id",
           "field": "toCycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "cycles close",
+      "action": "cycles.close",
+      "method": "POST",
+      "path": "/cycles/close",
+      "scope": "write",
+      "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
           "type": "string",
           "required": true
         }

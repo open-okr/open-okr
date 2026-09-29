@@ -5161,7 +5161,7 @@
     },
     {
       "name": "cycles.feedForward",
-      "description": "Hands METHOD.md §8.9's inheritance to the next cycle: prior scores, carried work as issues at impact four, and the annual frame.",
+      "description": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5190,6 +5190,32 @@
       "example": {
         "fromCycleId": "00000000-0000-4000-8000-000000000000",
         "toCycleId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "cycles.close",
+      "description": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "cycleId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "cycleId": "00000000-0000-4000-8000-000000000000"
       }
     },
     {

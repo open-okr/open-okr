@@ -620,8 +620,13 @@ export default async function CyclePage({
                 carryForward: keyResult.carryForward,
               })),
             )}
+            cycleId={workflow.cycleId}
             cycleName={workflow.name}
-            archivedAt={null}
+            closure={workflow.closure}
+            // The same evaluation `cycles.close` refuses on, so the control
+            // is disabled for exactly the reasons the server would give.
+            waitingFor={[...(phase?.missing ?? []), ...(phase?.blocked ?? [])]}
+            // `full`, which is what `cycles.close` requires.
             canEdit={canPublish}
             thresholds={reviewThresholds}
           />

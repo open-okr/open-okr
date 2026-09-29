@@ -98,6 +98,14 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "the alignment studio owns dependencies and removes them through its own canvas write",
   "sessions.votes":
     "a read the session screen does not need: the stage panels carry their own tallies",
+  // M-05. Both were buttons, on phase 7 and on the scorecard, until closing a
+  // cycle became one act. `cycles.close` now records the result and feeds the
+  // next cycle, and creating a cycle after a close feeds it too. Both run the
+  // same functions these two actions run, inside their own Operation.
+  "cycles.snapshot":
+    "another surface owns it: the demo builder and the API, for a result recorded before the close; a person records it by closing the cycle",
+  "cycles.feedForward":
+    "another surface owns it: the API and the command line, as an idempotent re-run; a person feeds the next cycle by closing this one",
   // **A fifth reason, and the first of its kind: the caller is real and this
   // test cannot see it.** `app/operator/[workspaceId]/lifecycle-form.tsx`
   // suspends, closes and reopens a workspace, so a person does press this.
