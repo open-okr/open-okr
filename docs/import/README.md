@@ -218,6 +218,40 @@ records, initiatives, tasks, checklists, task comments and watchers.
 An image sitting inline in comment markup needs no directory: those bytes are
 in MySQL.
 
+### What it does not bring across yet
+
+Some FlowyTeam tables are not read at all. Every run, the dry run included,
+counts each of them for the company and names every one that holds rows, under
+**Not read by this import** in the report, with a sentence on what it holds.
+A table with no rows for the company is not mentioned.
+
+Whether to import each one is an open decision, not a default. Until it is
+made, nothing from these tables is approximated or partly carried: the rows
+stay in FlowyTeam, and the report says so every time.
+
+| Source table | What it holds | Where it could land |
+|---|---|---|
+| `employee_teams` | A second, older list of who belongs to which team. It has no company column, so it is counted through the team | Space membership, beside `other_departments`, if it names anybody that one does not |
+| `performance_settings` | The company's OKR settings: cycle type, which objective levels are allowed, caps on objectives and key results, colour thresholds, terminology labels, and who may edit what | The labels could become this workspace's terminology labels. The caps and thresholds are the method's to set, so a person decides whether any carries across. The edit matrix has no home: access here is granted per goal, space or KPI rather than by role |
+| `objective_accesses` | Who else may see or update each objective | Access on the imported goal |
+| `objective_discussions` | Comment threads on objectives | Comments on the goal, with replies kept |
+| `keyresult_discussions` | Comment threads on key results | Comments on the key result, with replies kept |
+| `keyresult_indicator` | Which KPIs each key result is linked to. It has no company column, so it is counted through the key result | The KPI a key result reads. A key result here reads one KPI, so one linked to several needs a rule for which |
+| `checkins` | Each person's check-in session: a mood score and answers to the check-in questions. The objective and key result check-ins inside it do import | No home for the mood. The answers could be added to the narrative of the check-ins from the same session, which changes what an imported check-in says |
+| `key_result_files` | Files attached to key result check-ins | Attachments on the imported check-in, copied the same way task files are |
+| `indicator_accesses` | Who else may see or update each KPI | KPI shares |
+| `indicator_calculates` | Which KPIs each calculated KPI is worked out from | Already lands: the same links are rebuilt from each KPI's own formula. Nothing to decide unless the two disagree |
+| `task_boards` | The named boards tasks were organised on. Each task still takes its status from its board column | No home: a board here is a view of a space, an initiative or a key result, not something with a name |
+| `task_category` | The category each task was filed under | No home: a task has no category or label, and custom fields are not in this version |
+| `project_time_logs` | Time logged against projects and tasks | No home: time tracking is not in this version |
+| `performance_records` | The score FlowyTeam stored for each owner when a cycle closed | No home by design: this product works out its own results when a cycle closes and never takes them from a source |
+| `reward_settings` | How OKR, KPI and attendance results turned into points | The points layer's settings, only if the points layer is built at all. It is off by default either way |
+| `scores` | The points each person, team or company was awarded | The points ledger, on the same condition |
+
+If you need any of these before a decision is made, keep the FlowyTeam
+database readable after cutover. The report names what is there, and the
+source is where it stays.
+
 ## Afterwards
 
 Read the report before you tell anybody the import worked. Then check three

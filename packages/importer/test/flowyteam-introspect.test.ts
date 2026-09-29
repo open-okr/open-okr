@@ -50,12 +50,12 @@ describe.skipIf(!runnable)("introspecting a FlowyTeam source", () => {
 
   it("reports every domain as complete when every table is there", async () => {
     const found = await introspect(source);
+    // No `rhythm` and no `points`: nothing reads a table in either, so neither
+    // is a domain that could be missing anything (completeness review M-16).
     expect([...found.completeDomains].sort()).toEqual([
       "kpis",
       "okrs",
       "organisation",
-      "points",
-      "rhythm",
       "work",
     ]);
     expect(found.tableCount).toBeGreaterThan(CORE_TABLES.length);
@@ -64,20 +64,35 @@ describe.skipIf(!runnable)("introspecting a FlowyTeam source", () => {
 
 describe.skipIf(!runnable)("an instance that is missing things", () => {
   it("records an absent optional table against its domain, and imports the rest", async () => {
-    // What `flowy_prod` actually looks like: an older instance with no
-    // discussion tables. Every other domain still imports.
+    // An instance from before check-in reviews existed. Every other domain
+    // still imports.
     const seeded = await seedSource("older", {
+      without: ["checkin_reviews"],
+    });
+    const source = await openSource({ url: seeded.url });
+    try {
+      const found = await introspect(source);
+      expect(found.domains.okrs).toEqual(["checkin_reviews"]);
+      expect(found.completeDomains).toContain("work");
+      expect(found.completeDomains).not.toContain("okrs");
+    } finally {
+      await source.close();
+      await seeded.drop();
+    }
+  });
+
+  it("does not call a domain incomplete for a table no domain reads", async () => {
+    // What `flowy_prod` actually looks like: an older instance with no
+    // discussion tables. No domain reads them, so their absence costs nothing
+    // and saying "the okrs domain will import nothing" would be false.
+    const seeded = await seedSource("nodiscussions", {
       without: ["objective_discussions", "keyresult_discussions"],
     });
     const source = await openSource({ url: seeded.url });
     try {
       const found = await introspect(source);
-      expect(found.domains.okrs).toEqual([
-        "objective_discussions",
-        "keyresult_discussions",
-      ]);
-      expect(found.completeDomains).toContain("work");
-      expect(found.completeDomains).not.toContain("okrs");
+      expect(found.domains.okrs).toEqual([]);
+      expect(found.completeDomains).toContain("okrs");
     } finally {
       await source.close();
       await seeded.drop();
