@@ -326,7 +326,7 @@ This section matters more than any single finding, because the same patterns wil
 - **Fix.** Either set `NODE_OPTIONS=--max-old-space-size=4096` in the build stage (tested: it builds in 84 seconds with the runtime stage unchanged), or skip Next's type check, since `pnpm typecheck` already gates it.
 
 **H-23. Nothing has ever been released, and the launch task's acceptance was never run.** `Code`
-- **Still open, and it is a human's to close.** The first release is a tag a person pushes. Every High fix is on branch `fix/review-high` with its changeset, so the first `pnpm changeset version` after it merges gathers them. After that release exists, the upgrade half of P8-T14's acceptance can run.
+- **Still open, and it is a human's to close.** It is the last step of this review, once every other finding is done: section 11 has the checklist. The first release is a tag a person pushes. Every High fix is on branch `fix/review-high` with its changeset, so the first `pnpm changeset version` after it merges gathers them. After that release exists, the upgrade half of P8-T14's acceptance can run.
 - **Evidence.** There are no git tags, all 11 packages are at `0.0.0`, and 47 changesets are pending. P8-T14 (Launch) is `done`, but its note says the acceptance checks were not verifiable at the time: a clean-machine install, an upgrade from the previous release, and a chart install.
 - **What this review covered.** It ran two of those three, a clean install and a chart install, and both work apart from the defects above. An upgrade from a previous release cannot be tested until a first release exists. The nightly Upgrade workflow covers upgrading from a pinned 11 September commit (81 migrations to 97), and it is green.
 
@@ -570,9 +570,11 @@ CLAUDE.md puts these on the "ask the human" list. None should be settled by a de
 3. **Make the cycle completable.** H-09, H-17, H-15.
 4. **Admin and mobile.** H-14, H-16.
 5. **Data safety.** H-18, H-19, H-20, M-16.
-6. **First impression and release.** H-22, H-24, and the README badge (L-05). Then cut the first tag by [the release runbook](runbooks/release.md) and run P8-T14's three checks for real.
+6. **First impression.** H-22, H-24, and the README badge (L-05). The first tag waits until everything else here is done (section 11).
 7. **Close the loopholes that let these ship.** Rewrite the false exemptions (M-30). Add a gate for trigger emitters (H-11), a check for task IDs in rendered text (H-24), and an end-to-end run with a live scheduler under the restricted role (H-02).
 8. **The Medium table**, in the order a user would notice it: M-01, M-13, M-03, M-07, M-08, then the rest.
+9. **The Low table.**
+10. **Last, the first release.** Section 11.
 
 **Rows worth reopening in STATUS.md**, because their own plan text promises what is missing:
 
@@ -585,6 +587,33 @@ CLAUDE.md puts these on the "ask the human" list. None should be settled by a de
 | P6-T05a, P6-T05b | Moves between instances (H-18) |
 | P6-T06 | A restore drill in continuous integration (H-19) |
 | P8-T14 | Its acceptance criterion (H-23) |
+
+---
+
+## 11. Last: the first release
+
+Do this only when everything above is done. It closes H-23. Tagging is a human decision, and Agung makes it.
+
+**Ready when**
+
+| Check | How to tell |
+|---|---|
+| Every finding in section 5 is ✅, or a human has deferred it in writing here | This document |
+| The High, Medium and Low fix branches are merged to `main` | GitHub |
+| CI on `main` is green, every job | `gh run list --branch main` |
+| Every gate in [CI-GATES.md](development-plan/CI-GATES.md) is green locally on `main` | The list in CLAUDE.md, "Committing and pushing" |
+
+**Steps**, by [the release runbook](runbooks/release.md)
+
+1. **Set the version.** On `main`, run `pnpm changeset version`. It uses up the pending changesets, writes the version into every package and writes `CHANGELOG.md`. Every package is at `0.0.0` and minor bumps are pending, so expect `0.1.0`. Read the changelog it writes, commit it with a sign-off, and merge it to `main`.
+2. **Tag it.** `git tag v0.1.0` then `git push origin v0.1.0`. Nothing publishes without a tag.
+3. **Watch the Release workflow to the end.** Every job must be green: verify, build and sign, the signature check, the GitHub release and the chart. `gh run watch` follows it.
+4. **Make the image public.** Go to [the organisation's packages](https://github.com/orgs/open-okr/packages), open `open-okr`, then Package settings, Danger Zone, Change visibility, Public. This cannot be undone. Public packages are already allowed in the organisation's settings (checked on 29 September 2026).
+5. **Check that anyone can pull it.** `docker logout ghcr.io`, then `docker pull ghcr.io/open-okr/open-okr:0.1.0`, with no sign-in.
+6. **Run the runbook's checks after release.** A clean-machine install by [the Compose quickstart](install/compose.md), and a chart install with `deploy/helm/cluster-test.sh`. The third check, upgrading from the previous release, has nothing to upgrade from on a first release. It becomes possible from the second one.
+7. **Check the demo moved.** `demo.okrgoal.com` follows releases. At 03:00 Malaysia time after the tag, it pulls the new image, rebuilds, and rolls back on its own if the release fails to come up. The next morning, its log should say `now running v0.1.0`.
+8. **Announce it** with [the announcement text](runbooks/announcement.md).
+9. **Close the loop.** Mark H-23 ✅ here, and ask a human to review the P8-T14 row in `STATUS.md`.
 
 ---
 
