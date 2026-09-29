@@ -84,12 +84,12 @@ test("the owner issues a personal invitation and the card shows its address", as
   // the suite's idiom for that, used in eight other specs.
   await expect(async () => {
     await page.goto("/admin/invitations");
-    await expect(page.getByLabel("Email address")).toBeVisible({
+    await expect(page.getByLabel("Email address", { exact: true })).toBeVisible({
       timeout: 5_000,
     });
   }).toPass({ timeout: 30_000 });
 
-  await page.getByLabel("Email address").fill(GUEST_EMAIL);
+  await page.getByLabel("Email address", { exact: true }).fill(GUEST_EMAIL);
   await page.getByRole("button", { name: "Create the invitation" }).click();
 
   // The address, not just the token. This card handed out a bare token until

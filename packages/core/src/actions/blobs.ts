@@ -42,6 +42,7 @@ import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_ORPHAN_BLOB_MINUTES } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { readableThroughAttachment } from "./documents.ts";
 
 /** The workspace's own byte ceiling, resolved from its settings. */
 async function readQuotaBytes(
@@ -363,13 +364,29 @@ export const getBlobForDownload = defineReadAction({
         throw new OperationError("not_found", "No such file.");
       }
 
-      await getAccessScoped(tx, {
-        workspaceId: context.workspaceId,
-        memberId: member.id,
-        resourceType: "blob",
-        resourceId: input.blobId,
-        requires: ACCESS_LEVELS.view,
-      });
+      try {
+        await getAccessScoped(tx, {
+          workspaceId: context.workspaceId,
+          memberId: member.id,
+          resourceType: "blob",
+          resourceId: input.blobId,
+          requires: ACCESS_LEVELS.view,
+        });
+      } catch (error) {
+        // Not the uploader's own file, but perhaps one hung on something this
+        // reader reads, which the attachment list already shows them.
+        if (
+          !(error instanceof OperationError) ||
+          !(await readableThroughAttachment(
+            tx as OperationTx,
+            context.workspaceId,
+            member.id,
+            input.blobId,
+          ))
+        ) {
+          throw error;
+        }
+      }
 
       const [row] = await tx
         .select({

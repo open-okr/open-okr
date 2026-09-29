@@ -1159,6 +1159,57 @@ async function requireAttachmentSubject(
   );
 }
 
+/**
+ * Whether a member reads a file through something it hangs on.
+ *
+ * A blob's own context binds only its uploader, which is right while it is
+ * theirs alone. Attaching it to a goal, a task, a check-in or a document is
+ * showing it to whoever reads that subject, and `attachments.list` already
+ * lists it to them, so the download has to agree. Found while fixing
+ * completeness review M-22: the list showed a colleague a file the download
+ * then refused. Checked per attachment through the same subject rule the
+ * attachment itself uses, so a file hung on something you cannot read stays
+ * closed to you.
+ */
+export async function readableThroughAttachment(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  blobId: string,
+): Promise<boolean> {
+  const hangsOn = await tx
+    .select({
+      subjectType: attachments.subjectType,
+      subjectId: attachments.subjectId,
+    })
+    .from(attachments)
+    .where(
+      activeOnly(
+        attachments,
+        eq(attachments.workspaceId, workspaceId),
+        eq(attachments.blobId, blobId),
+      ),
+    );
+  for (const subject of hangsOn) {
+    try {
+      await requireAttachmentSubject(
+        tx,
+        workspaceId,
+        memberId,
+        subject.subjectType as (typeof ATTACHMENT_SUBJECT_TYPES)[number],
+        subject.subjectId,
+        ACCESS_LEVELS.view,
+      );
+      return true;
+    } catch (error) {
+      if (!(error instanceof OperationError)) {
+        throw error;
+      }
+    }
+  }
+  return false;
+}
+
 export const attachFile = defineWriteAction({
   name: "attachments.attach",
   summary: "Hangs an uploaded file on a subject.",

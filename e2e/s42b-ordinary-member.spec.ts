@@ -95,12 +95,12 @@ test("the owner invites somebody", async () => {
   // document navigation issued into a settling client transition is aborted.
   await expect(async () => {
     await ownerPage.goto("/admin/invitations");
-    await expect(ownerPage.getByLabel("Email address")).toBeVisible({
+    await expect(ownerPage.getByLabel("Email address", { exact: true })).toBeVisible({
       timeout: 5_000,
     });
   }).toPass({ timeout: 30_000 });
 
-  await ownerPage.getByLabel("Email address").fill(MEMBER_EMAIL);
+  await ownerPage.getByLabel("Email address", { exact: true }).fill(MEMBER_EMAIL);
   await ownerPage
     .getByRole("button", { name: "Create the invitation" })
     .click();
