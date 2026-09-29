@@ -7,12 +7,14 @@
  * the manifest, members are de-duplicated by email only, a corrupted archive
  * is refused, and a re-import is a no-op.
  */
+import { randomBytes } from "node:crypto";
 import { withWorkspace } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { provisionMemberForInvite } from "../src/invitations/provisioning.ts";
 import { ArchiveError, readArchive } from "../src/portability/archive.ts";
 import { exportWorkspace } from "../src/portability/export.ts";
 import {
@@ -30,6 +32,8 @@ let sourceWorkspaceId: string;
 let targetWorkspaceId: string;
 let targetMemberId: string;
 const ring = parseKeyRing({ current: newRootKey() });
+/** Every archive here is sealed under this (completeness review H-18). */
+const PASSPHRASE = "correct horse battery staple";
 
 beforeEach(async () => {
   const wb = await workerDb();
@@ -71,7 +75,7 @@ async function exportSource() {
     exportWorkspace({
       tx,
       workspaceId: sourceWorkspaceId,
-      ring,
+      passphrase: PASSPHRASE,
       instance: "test-source",
     }),
   );
@@ -81,7 +85,7 @@ async function importIntoTarget(
   archiveBytes: Buffer,
   dryRun: boolean,
 ): Promise<ImportDifference> {
-  const archive = readArchive(ring, archiveBytes);
+  const archive = readArchive(archiveBytes, { passphrase: PASSPHRASE });
   const db = drizzle(pool);
   return withWorkspace(db, targetWorkspaceId, (tx) =>
     importWorkspace({
@@ -97,7 +101,7 @@ async function importIntoTarget(
 describe("importing a workspace archive", () => {
   it("round trip: row counts reconcile against the manifest", async () => {
     const exported = await exportSource();
-    const archive = readArchive(ring, exported.bytes);
+    const archive = readArchive(exported.bytes, { passphrase: PASSPHRASE });
 
     const diff = await importIntoTarget(exported.bytes, false);
 
@@ -207,7 +211,9 @@ describe("importing a workspace archive", () => {
     const idx = corrupted.byteLength - 10;
     corrupted[idx] = (corrupted[idx] ?? 0) ^ 0xff;
 
-    expect(() => readArchive(ring, corrupted)).toThrow(ArchiveError);
+    expect(() => readArchive(corrupted, { passphrase: PASSPHRASE })).toThrow(
+      ArchiveError,
+    );
   });
 
   it("re-import of the same archive via the action is a no-op", async () => {
@@ -223,6 +229,7 @@ describe("importing a workspace archive", () => {
     };
     const first = await callAction(actionCtx, "workspace.importArchive", {
       archiveBase64: exported.bytes.toString("base64"),
+      passphrase: PASSPHRASE,
       dryRun: false,
     });
     expect(first.importId).toBeTruthy();
@@ -238,6 +245,7 @@ describe("importing a workspace archive", () => {
     // Second import of the same archive: should be a no-op
     const second = await callAction(actionCtx, "workspace.importArchive", {
       archiveBase64: exported.bytes.toString("base64"),
+      passphrase: PASSPHRASE,
       dryRun: false,
     });
     expect(second.alreadyImported).toBe(true);
@@ -249,5 +257,123 @@ describe("importing a workspace archive", () => {
       [targetWorkspaceId],
     );
     expect(countAfterSecond.rows[0].n).toBe(countAfterFirst.rows[0].n);
+  });
+});
+
+/**
+ * Moving a workspace keeps its people and its files (completeness review
+ * H-18). Everyone used to arrive as a member nobody could claim, and every
+ * file as a row with no bytes.
+ */
+describe("what a move keeps", () => {
+  it("carries a registered member's address, and they claim their member on joining", async () => {
+    const exported = await exportSource();
+    await importIntoTarget(exported.bytes, false);
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      id: string;
+      user_id: string | null;
+    }>(
+      `select id, user_id from workspace_members
+        where workspace_id = $1 and lower(placeholder_email) = 'source-owner@example.com'`,
+      [targetWorkspaceId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.user_id).toBeNull();
+    const waiting = rows[0]?.id as string;
+
+    // The source's owner joins the target instance's workspace, the way any
+    // invited person arrives.
+    const joined = await withWorkspace(drizzle(pool), targetWorkspaceId, (tx) =>
+      provisionMemberForInvite(tx, {
+        workspaceId: targetWorkspaceId,
+        user: { id: OWNER_A, name: "Source Owner" },
+      }),
+    );
+    expect(joined).toEqual({ memberId: waiting, created: false });
+    const claimed = await wb.admin.query<{
+      user_id: string;
+      placeholder_email: string | null;
+      status: string;
+    }>(
+      "select user_id, placeholder_email, status from workspace_members where id = $1",
+      [waiting],
+    );
+    expect(claimed.rows[0]).toMatchObject({
+      user_id: OWNER_A,
+      placeholder_email: null,
+      status: "active",
+    });
+  });
+
+  it("writes every file's bytes back, under the new workspace", async () => {
+    const contents = randomBytes(48);
+    const source = new Map<string, Buffer>();
+    const actor = {
+      pool,
+      workspaceId: sourceWorkspaceId,
+      actor: { kind: "human" as const, userId: OWNER_A },
+    };
+    const prepared = await callAction(actor, "blobs.prepareUpload", {
+      filename: "brief.pdf",
+      contentType: "application/pdf",
+      declaredSize: contents.byteLength,
+    });
+    source.set(prepared.storageKey, contents);
+    await callAction(actor, "blobs.claimUpload", {
+      blobId: prepared.blobId,
+      actualSize: contents.byteLength,
+      digest: "not-checked-here",
+    });
+
+    const exported = await withWorkspace(
+      drizzle(pool),
+      sourceWorkspaceId,
+      (tx) =>
+        exportWorkspace({
+          tx,
+          workspaceId: sourceWorkspaceId,
+          passphrase: PASSPHRASE,
+          instance: "test-source",
+          storage: {
+            get: async (key: string) => source.get(key) as Buffer,
+          },
+        }),
+    );
+
+    const written = new Map<string, Buffer>();
+    const result = await callAction(
+      {
+        pool,
+        workspaceId: targetWorkspaceId,
+        actor: { kind: "human" as const, userId: OWNER_B },
+        storage: {
+          get: async () => Buffer.alloc(0),
+          delete: async () => undefined,
+          put: async (key: string, body: Buffer) => {
+            written.set(key, body);
+          },
+        },
+      },
+      "workspace.importArchive",
+      {
+        archiveBase64: exported.bytes.toString("base64"),
+        dryRun: false,
+        passphrase: PASSPHRASE,
+      },
+    );
+    expect(result.difference.blobs).toBe(1);
+    expect(written.size).toBe(1);
+    const [key, bytes] = [...written.entries()][0] as [string, Buffer];
+    expect(key.startsWith(`${targetWorkspaceId}/`)).toBe(true);
+    expect(bytes.equals(contents)).toBe(true);
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ storage_key: string }>(
+      "select storage_key from blobs where workspace_id = $1 and filename = 'brief.pdf'",
+      [targetWorkspaceId],
+    );
+    expect(rows.map((row) => row.storage_key)).toEqual([key]);
   });
 });

@@ -50,6 +50,7 @@ export function CoachStrip({
   keyResults,
   drafting,
   canEdit,
+  bands,
 }: {
   readonly goalId: string;
   readonly score: number | null;
@@ -57,6 +58,12 @@ export function CoachStrip({
   readonly keyResults: readonly CoachStripKeyResult[];
   readonly drafting: boolean;
   readonly canEdit: boolean;
+  /**
+   * The workspace's `quality.strengthScoreBands` (completeness review H-17).
+   * They were 75 and 45 written here, so a workspace that moved them saw the
+   * canon's colours on the goal page and its own in the Draft Coach.
+   */
+  readonly bands: { readonly red: number; readonly green: number };
 }) {
   const { t } = useTranslations();
 
@@ -121,7 +128,11 @@ export function CoachStrip({
             {t("goals.detail.coachStrip.whatTheCoachSees")}
           </h2>
           {score === null ? null : (
-            <Chip tone={score >= 75 ? "ok" : score < 45 ? "bad" : "warn"}>
+            <Chip
+              tone={
+                score >= bands.green ? "ok" : score < bands.red ? "bad" : "warn"
+              }
+            >
               {Math.round(score)}%
             </Chip>
           )}

@@ -22,6 +22,15 @@ export {
   rankBlockers,
 } from "./blocker-board.ts";
 export {
+  type BookedRitual,
+  type CadenceCoverage,
+  type CadencePlanOptions,
+  type CadenceWindow,
+  cadenceCoverage,
+  planCycleCadence,
+  type RitualWeekday,
+} from "./cadence-booking.ts";
+export {
   cycleClosingDue,
   cycleStartsDue,
   planningOpensDue,
@@ -31,7 +40,6 @@ export {
   sessionLifecycleStage,
 } from "./countdown.ts";
 export {
-  BLOCKER_CLOCK_HOURS,
   type DigestBlocker,
   type DigestRisk,
   type WeeklyDigestInput,
@@ -259,6 +267,15 @@ export {
   type ValidationResult,
   validateOverrides,
 } from "./thresholds.ts";
+export {
+  closeIsSandbagged,
+  commitmentDueToday,
+  confidenceIsCritical,
+  draftIsSandbagged,
+  objectivesOverCap,
+  phasesClosingToday,
+  streakAtRisk,
+} from "./trigger-conditions.ts";
 export {
   deterministicTriggers,
   isTriggerKey,

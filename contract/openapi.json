@@ -469,10 +469,117 @@
         }
       }
     },
+    "/workspace/changePlan": {
+      "post": {
+        "operationId": "workspace.changePlan",
+        "summary": "Move this cloud workspace onto another plan from the catalogue.",
+        "tags": [
+          "workspace"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "planKey": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "seats": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "planKey",
+                        "seats"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "planKey": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 50
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "planKey"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/setLifecycle": {
       "post": {
         "operationId": "workspace.setLifecycle",
-        "summary": "Move a cloud workspace between active, suspended and closed (P8-T02c).",
+        "summary": "Move a cloud workspace between active, suspended and closed.",
         "tags": [
           "workspace"
         ],
@@ -1314,6 +1421,100 @@
                 },
                 "required": [
                   "memberId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/people/setAdministrator": {
+      "post": {
+        "operationId": "people.setAdministrator",
+        "summary": "Makes a member an administrator with full access to the workspace, or returns them to the standard level.",
+        "tags": [
+          "people"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "administrator": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "administrator"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "memberId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "administrator": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "memberId",
+                  "administrator"
                 ]
               }
             }
@@ -9434,8 +9635,16 @@
                   "includeFiles": {
                     "default": true,
                     "type": "boolean"
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 1024
                   }
-                }
+                },
+                "required": [
+                  "passphrase"
+                ]
               }
             }
           }
@@ -9590,6 +9799,10 @@
                   "dryRun": {
                     "default": true,
                     "type": "boolean"
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "maxLength": 1024
                   }
                 },
                 "required": [
@@ -17612,16 +17825,19 @@
                     "type": "boolean"
                   },
                   "sessionDates": {
+                    "maxItems": 20,
                     "type": "array",
                     "items": {
                       "type": "object",
                       "properties": {
                         "key": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "maxLength": 60
                         },
                         "on": {
-                          "type": "string"
+                          "type": "string",
+                          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
                         }
                       },
                       "required": [
@@ -19271,6 +19487,147 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "sessionDates": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "on": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "on"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "baselineHealth": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "stable": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "declining": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "businessAsUsual": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "stable",
+                                "declining",
+                                "businessAsUsual"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "revalidation": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "holds": {
+                                  "type": "boolean"
+                                },
+                                "changed": {
+                                  "type": "boolean"
+                                },
+                                "changeNote": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "focusNote": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "holds",
+                                "changed",
+                                "changeNote",
+                                "focusNote"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "focus": {
+                          "type": "object",
+                          "properties": {
+                            "chosen": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              }
+                            },
+                            "candidates": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "goalTitle": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "title",
+                                  "goalTitle"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "chosen",
+                            "candidates"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "capacityCuts": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
@@ -19294,7 +19651,12 @@
                         "gates",
                         "packItems",
                         "issues",
-                        "priorities"
+                        "priorities",
+                        "sessionDates",
+                        "baselineHealth",
+                        "revalidation",
+                        "focus",
+                        "capacityCuts"
                       ],
                       "additionalProperties": false
                     }
@@ -20152,6 +20514,108 @@
                 "required": [
                   "cycleId",
                   "cuts"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow/setFocusKeyResults": {
+      "post": {
+        "operationId": "workflow.setFocusKeyResults",
+        "summary": "Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3).",
+        "tags": [
+          "workflow"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "cycleId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "cycleId",
+                        "count"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cycleId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "keyResultIds": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  }
+                },
+                "required": [
+                  "cycleId",
+                  "keyResultIds"
                 ]
               }
             }
@@ -27426,6 +27890,9 @@
                       "type",
                       "id"
                     ]
+                  },
+                  "guided": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -28314,7 +28781,8 @@
                     "type": "number"
                   },
                   "dueOn": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
                   },
                   "ownerId": {
                     "type": "string",
@@ -28358,6 +28826,9 @@
                       "type",
                       "id"
                     ]
+                  },
+                  "guided": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -28489,9 +28960,14 @@
                     "type": "number"
                   },
                   "dueOn": {
-                    "type": [
-                      "string",
-                      "null"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "ownerId": {
@@ -36719,7 +37195,7 @@
     "/sessions/create": {
       "post": {
         "operationId": "sessions.create",
-        "summary": "Creates a scheduled session for a space.",
+        "summary": "Creates a scheduled session for a space. A time with no offset is read in the workspace timezone.",
         "tags": [
           "sessions"
         ],
@@ -36812,7 +37288,8 @@
                     "maxLength": 200
                   },
                   "scheduledFor": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d))|(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?)$"
                   },
                   "facilitatorId": {
                     "type": "string",
@@ -36825,6 +37302,136 @@
                   "kind",
                   "title",
                   "scheduledFor",
+                  "facilitatorId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/bookCycle": {
+      "post": {
+        "operationId": "sessions.bookCycle",
+        "summary": "Books every weekly check-in, monthly review and the quarterly review a space needs for a whole cycle, around what is already booked.",
+        "tags": [
+          "sessions"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "cycleId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "booked": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "sessionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        "missing": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "cycleId",
+                        "booked",
+                        "sessionIds",
+                        "missing"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "spaceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "cycleId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "weekday": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "time": {
+                    "type": "string",
+                    "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$"
+                  },
+                  "facilitatorId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "spaceId",
+                  "weekday",
+                  "time",
                   "facilitatorId"
                 ]
               }

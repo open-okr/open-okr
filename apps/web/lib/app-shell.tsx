@@ -13,7 +13,7 @@ import {
   TopbarSearch,
   UnsavedChangesProvider,
 } from "@openokr/ui";
-import { Settings } from "lucide-react";
+import { Ellipsis, Settings } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
@@ -170,6 +170,14 @@ export async function AppShellLayout({
         : {}),
     })),
   }));
+  const tabItems = sidebarItems.slice(0, 4).map((item) => ({
+    id: item.id,
+    label: item.label,
+    href: item.href,
+    icon: iconFor(item.id),
+    active: item.id === active,
+  }));
+  const tabIds = new Set(tabItems.map((item) => item.id));
   if (adminItems.length > 0) {
     groups.push({
       id: "admin",
@@ -246,13 +254,23 @@ export async function AppShellLayout({
             mobileTabBar={
               <MobileTabBar
                 linkComponent={LinkComponent}
-                items={sidebarItems.slice(0, 4).map((item) => ({
-                  id: item.id,
-                  label: item.label,
-                  href: item.href,
-                  icon: iconFor(item.id),
-                  active: item.id === active,
-                }))}
+                items={tabItems}
+                // Every other destination the sidebar holds, in its own
+                // groups, because the sidebar is hidden at this width and a
+                // phone had no other way to reach them (review H-16).
+                more={{
+                  label: t("shell.mobile.more"),
+                  icon: <Ellipsis className="size-full" />,
+                  groups: groups
+                    .map((group) => ({
+                      id: group.id,
+                      ...(group.label === undefined
+                        ? {}
+                        : { label: group.label }),
+                      items: group.items.filter((item) => !tabIds.has(item.id)),
+                    }))
+                    .filter((group) => group.items.length > 0),
+                }}
               />
             }
           >

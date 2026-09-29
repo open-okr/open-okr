@@ -152,6 +152,11 @@ ten-seat plan,
 **then** the change is refused, naming eighteen and ten, and the screen
 links to the member list so they can suspend eight people first.
 
+Built at completeness review H-21: `workspace.changePlan` for the
+administrator on S-49 and `setPlanAsOperator` on S-46, both through
+`applyPlanInTx`. Until then nothing wrote `plan_key` or `seats` after a tenant
+was created, so this section described a control that did not exist.
+
 A downgrade that does fit applies immediately. There is no proration
 model here, because there is no billing provider here: money is outside
 this design and outside the repository.
@@ -211,4 +216,4 @@ Written as the test plan P8-T05 inherits.
 | 2 | Whether any feature is ever gated. PLAN.md §13 #2 | A human's call, and this design makes the answer no harder to keep: there is no field to gate a feature with |
 | 3 | The free tier's shape | Null `plan_key` and null `seats` means the free tier is currently unlimited, which is almost certainly not what a real free tier does. Named here rather than guessed, because it is a pricing decision |
 | 4 | Billing, payment and invoicing | Entirely outside this design and outside the repository. Nothing here talks to a payment provider, and `tenants` holds no customer or subscription identifier. Adding one is its own task with its own decision about a dependency |
-| 5 | Whether an over-limit workspace can ever exist | Section 5 refuses it at the downgrade. It can still arise if an operator lowers `tenants.seats` directly from the console. The design tolerates the state, refuses new joins in it, and shows the admin the number. Whether the console should refuse the lowering too is a small open question |
+| 5 | Whether an over-limit workspace can ever exist | Section 5 refuses it at the downgrade. It can still arise if an operator lowers `tenants.seats` directly from the console. The design tolerates the state, refuses new joins in it, and shows the admin the number. Whether the console should refuse the lowering too is a small open question. **Answered at completeness review H-21: yes, it refuses.** The operator's plan control and the administrator's both go through `applyPlanInTx`, which holds the headcount rule, so neither can lower seats below the people in use |

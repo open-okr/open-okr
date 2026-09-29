@@ -54,6 +54,7 @@ import {
   unbindGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { bindAgentsToContextInTx } from "../agents/bindings.ts";
 import { type LegacyKey, legacyColumns } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
@@ -118,7 +119,7 @@ export interface CreatedGoal {
 }
 
 /** Both role holders have to be real, active members of this workspace. */
-async function requireActiveMember<
+export async function requireActiveMember<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(
   tx: AnyTx<TSchema>,
@@ -325,6 +326,17 @@ export async function createGoalInTx<
     memberId: input.reviewerId,
     role: "reviewer",
   });
+
+  // A goal that belongs to no space, a company or an individual goal, has no
+  // space binding the built-in agents can see it through, so they are bound
+  // to it by name (completeness review H-04). A space goal is already in
+  // their sight through the space.
+  if (!input.spaceId) {
+    await bindAgentsToContextInTx(tx, {
+      workspaceId: input.workspaceId,
+      contextId,
+    });
+  }
 
   return { id: row.id, title: row.title, contextId };
 }
@@ -622,6 +634,16 @@ export async function createKeyResultInTx<
   const title = input.title.trim();
   if (title === "") {
     throw new OperationError("forbidden", "A key result needs a title.");
+  }
+  if (input.ownerId) {
+    // The foreign key accepts a member of another workspace, because a key
+    // check does not see row-level security (completeness review H-09).
+    await requireActiveMember(
+      tx,
+      input.workspaceId,
+      input.ownerId,
+      "key result owner",
+    );
   }
 
   const current = input.currentValue ?? input.baselineValue;

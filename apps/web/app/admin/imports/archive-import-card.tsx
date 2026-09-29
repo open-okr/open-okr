@@ -31,11 +31,16 @@ export function ArchiveImportCard() {
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The passphrase the archive was exported with (H-18). Kept in the page.
+  const [passphrase, setPassphrase] = useState("");
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      // Cleared, so choosing the same file again after a wrong passphrase
+      // reads it again: an unchanged input fires no change at all.
+      e.target.value = "";
 
       setError(null);
       setPreview(null);
@@ -48,7 +53,7 @@ export function ArchiveImportCard() {
         setArchiveBase64(base64);
 
         startTransition(async () => {
-          const answer = await importWorkspaceArchive(base64, true);
+          const answer = await importWorkspaceArchive(base64, true, passphrase);
           if (!answer.ok) {
             setError(answer.error);
             setStage("idle");
@@ -64,7 +69,7 @@ export function ArchiveImportCard() {
       };
       reader.readAsDataURL(file);
     },
-    [],
+    [passphrase],
   );
 
   const handleConfirm = useCallback(() => {
@@ -73,7 +78,11 @@ export function ArchiveImportCard() {
     setStage("importing");
 
     startTransition(async () => {
-      const answer = await importWorkspaceArchive(archiveBase64, false);
+      const answer = await importWorkspaceArchive(
+        archiveBase64,
+        false,
+        passphrase,
+      );
       if (!answer.ok) {
         setError(answer.error);
         setStage("preview");
@@ -82,7 +91,7 @@ export function ArchiveImportCard() {
       setResult(answer.value);
       setStage("done");
     });
-  }, [archiveBase64]);
+  }, [archiveBase64, passphrase]);
 
   const handleReset = useCallback(() => {
     setStage("idle");
@@ -112,6 +121,21 @@ export function ArchiveImportCard() {
         </p>
 
         {/* Stage: idle or analyzing */}
+        {(stage === "idle" || stage === "analyzing") && (
+          <label className="flex flex-col gap-1 text-xs text-ink-3">
+            {t("admin.imports.archiveImportCard.passphrase")}
+            <input
+              type="password"
+              autoComplete="off"
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+            />
+            <span className="text-ink-4">
+              {t("admin.imports.archiveImportCard.passphraseHint")}
+            </span>
+          </label>
+        )}
         {(stage === "idle" || stage === "analyzing") && (
           <div className="flex items-center gap-3">
             <input

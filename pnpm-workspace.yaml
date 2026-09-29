@@ -18,7 +18,7 @@ catalog:
   # Pinned to 5.9.x by the P1-T01 decision. The 7.x bump (dependabot PR #5)
   # broke typecheck repo-wide; adopting 7.x is its own task, not a bot merge.
   typescript: 5.9.3
-  vitest: 5.0.1
+  vitest: 5.0.2
   "@types/node": 26.6.2
   # 0.45.2 is the first release past GHSA-gpj5-g38j-94v9 (SQL injection via
   # improperly escaped identifiers).
@@ -36,7 +36,7 @@ catalog:
   # dependencies of its own. Confined to packages/adapters like every vendor
   # SDK, behind the Mailer port.
   nodemailer: ^10.0.10
-  "@types/nodemailer": ^8.0.1
+  "@types/nodemailer": ^8.0.2
   # Already used by the environment schema. Shared here so the action contract
   # registry validates against the same version the boundary does.
   zod: 4.6.5
@@ -76,7 +76,7 @@ catalog:
   # human's UI-dependency approval rather than asked separately, because
   # without a DOM testing seam those acceptance tests cannot exist at all.
   # Dev-only, never shipped.
-  jsdom: ^30.1.0
+  jsdom: ^30.1.1
   "@testing-library/react": ^16.3.3
   "@testing-library/user-event": ^14.6.7
   # The rich text editor (P2-T11), approved by the human alongside P2-T10's

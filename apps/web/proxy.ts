@@ -113,6 +113,14 @@ const PUBLIC_PREFIXES = [
   // populated when the deployment says it is a demo.
   "/api/sso-providers",
   "/api/demo-personas",
+  // **The public status surface, the sixth time** (completeness review H-26).
+  // P8-T06c designed `/api/status` for an uptime monitor, unauthenticated, and
+  // its first acceptance criterion is an unauthenticated GET. It was never
+  // added here, so every monitor received a 307 to the sign-in page, which
+  // reads as success at status 200 and reports a healthy instance whatever
+  // state it is in. Found by the first end-to-end request that asked it
+  // anything. It says three component states and a time, by design.
+  "/api/status",
   // The discovery documents are what a client reads *before* it has anything
   // to authenticate with. Gating them behind a session would mean no client
   // could ever find the endpoints it needs to get one.
@@ -186,6 +194,18 @@ function formActionFor(request: NextRequest): string {
   }
 }
 
+/**
+ * The policy every page is served under.
+ *
+ * **`style-src-attr 'unsafe-inline'`, in production too** (completeness
+ * review H-15). A progress bar's width is an inline `style` attribute, and
+ * `style-src` with a nonce and no `unsafe-inline` refuses every attribute,
+ * because an attribute cannot carry a nonce. So on every server-rendered page
+ * a bar at 0% drew at 100%: the browser dropped the width and the element
+ * filled its track. Development allowed `unsafe-inline` for the bundler, which
+ * is why nobody saw it. This allows attributes only; a `<style>` element still
+ * needs the nonce, and an attribute has no selectors to read a page with.
+ */
 function buildContentSecurityPolicy(request?: NextRequest): {
   nonce: string;
   header: string;
@@ -198,6 +218,7 @@ function buildContentSecurityPolicy(request?: NextRequest): {
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""};
     style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    style-src-attr 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
     object-src 'none';

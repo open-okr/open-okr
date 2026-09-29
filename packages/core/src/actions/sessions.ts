@@ -19,6 +19,7 @@ import {
   blockers,
   checkInVotes,
   commitments,
+  cycles,
   DIAGNOSIS_VERDICTS,
   decisions,
   digests,
@@ -55,14 +56,18 @@ import {
 } from "@openokr/db";
 import {
   CLOSE_DECISION_MEANINGS,
+  cadenceCoverage,
   cycleScore,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   objectiveScore,
   PROCESS_HEALTH_STATEMENTS,
+  planCycleCadence,
   portfolioVerdictOf,
   progressSignal,
   REVIEW_STAGE_KEYS,
+  RITUALS,
+  type RitualWeekday,
   ROOT_CAUSES,
   rhythmDiagnostic,
   rhythmScore,
@@ -86,13 +91,24 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
-import { localDateIn } from "../cycles/generation.ts";
+import { localInstant } from "../cadence/engine.ts";
+import {
+  addDays,
+  formatLocalDate,
+  localDateIn,
+  parseLocalDate,
+} from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
-import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import {
+  findCurrentCycle,
+  readRhythmRow,
+  workspaceTimeZone,
+} from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
+import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
 import { sessionChannel } from "../sessions/live.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -181,6 +197,89 @@ async function requireSessionAccess(
   }
 
   return session;
+}
+
+/** The goal a key result belongs to, or null when there is no such row. */
+async function goalOfKeyResult(
+  tx: OperationTx,
+  workspaceId: string,
+  keyResultId: string,
+): Promise<string | null> {
+  const [row] = await tx
+    .select({ goalId: keyResults.goalId })
+    .from(keyResults)
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        eq(keyResults.id, keyResultId),
+      ),
+    )
+    .limit(1);
+  return row?.goalId ?? null;
+}
+
+/**
+ * A blocker, authorised through what it belongs to (completeness review
+ * H-05).
+ *
+ * `sessions.resolveBlocker` and `sessions.reassignBlocker` used to check the
+ * workspace level and then act on a bare id, so anybody with edit rights
+ * anywhere in the workspace could close or take a blocker in a space they
+ * cannot see, given its id. A blocker raised in a session is now authorised
+ * through that session's space, exactly as the session's own writes are, and
+ * one raised elsewhere through its goal. Not-found on refusal, like every
+ * other protected read, so a refused caller learns nothing about the row.
+ */
+async function requireBlockerAccess(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  blockerId: string,
+  requires: number,
+) {
+  const [blocker] = await tx
+    .select()
+    .from(blockers)
+    .where(
+      activeOnly(
+        blockers,
+        eq(blockers.workspaceId, workspaceId),
+        eq(blockers.id, blockerId),
+      ),
+    )
+    .limit(1);
+  if (!blocker) {
+    throw new OperationError("not_found", "No such blocker.");
+  }
+
+  if (blocker.sessionId) {
+    await requireSessionAccess(
+      tx,
+      workspaceId,
+      memberId,
+      blocker.sessionId,
+      requires,
+    );
+    return blocker;
+  }
+
+  const goalId =
+    blocker.goalId ??
+    (blocker.keyResultId
+      ? await goalOfKeyResult(tx, workspaceId, blocker.keyResultId)
+      : null);
+  if (!goalId) {
+    throw new OperationError("not_found", "No such blocker.");
+  }
+  await getAccessScoped(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "goal",
+    resourceId: goalId,
+    requires: requires as never,
+  });
+  return blocker;
 }
 
 /**
@@ -361,15 +460,111 @@ function toOutput(
 // Write actions
 // ---------------------------------------------------------------------------
 
+/**
+ * The facilitator a booking names, refused unless they are an active member
+ * of this workspace (completeness review H-08). The foreign key alone accepts
+ * a suspended member, or a member of another workspace, because a key check
+ * does not see row-level security.
+ */
+async function requireFacilitatorMember(
+  tx: OperationTx,
+  workspaceId: string,
+  facilitatorId: string,
+): Promise<void> {
+  const [member] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.id, facilitatorId),
+        eq(workspaceMembers.status, "active"),
+        // A person runs the room: not an agent, and not a placeholder nobody
+        // has claimed yet.
+        inArray(workspaceMembers.kind, ["human", "guest"]),
+      ),
+    )
+    .limit(1);
+  if (!member) {
+    throw new OperationError(
+      "forbidden",
+      "The facilitator must be an active member of this workspace.",
+    );
+  }
+}
+
+/** A cycle of this workspace that is still open, or a refusal that says so. */
+async function requireOpenCycle(
+  tx: OperationTx,
+  workspaceId: string,
+  cycleId: string,
+) {
+  const [cycle] = await tx
+    .select({
+      id: cycles.id,
+      startsOn: cycles.startsOn,
+      endsOn: cycles.endsOn,
+      status: cycles.status,
+    })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        eq(cycles.id, cycleId),
+      ),
+    )
+    .limit(1);
+  if (!cycle) {
+    throw new OperationError("not_found", "No such cycle.");
+  }
+  if (cycle.status === "closed") {
+    throw new OperationError(
+      "forbidden",
+      "This cycle is closed. Book sessions for an open one.",
+    );
+  }
+  return cycle;
+}
+
+/** `HH:MM`, read as a wall-clock time where the workspace is. */
+const WALL_CLOCK = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/**
+ * An instant from a caller's time. A time with no offset is read in the
+ * workspace timezone, which is what a person typing "Monday 09:00" means.
+ */
+function scheduledInstant(value: string, timeZone: string): Date {
+  const local =
+    /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(value);
+  if (!local) {
+    return new Date(value);
+  }
+  const [, on, hour, minute] = local as unknown as [
+    string,
+    string,
+    string,
+    string,
+  ];
+  return localInstant(
+    parseLocalDate(on),
+    Number(hour),
+    Number(minute),
+    timeZone,
+  );
+}
+
 export const createSession = defineWriteAction({
   name: "sessions.create",
-  summary: "Creates a scheduled session for a space.",
+  summary:
+    "Creates a scheduled session for a space. A time with no offset is read in the workspace timezone.",
   input: z.object({
     spaceId: z.uuid(),
     cycleId: z.uuid().optional(),
     kind: z.enum(SESSION_KINDS),
     title: z.string().trim().min(1).max(200),
-    scheduledFor: z.string(),
+    scheduledFor: z.iso.datetime({ offset: true, local: true }),
     facilitatorId: z.uuid(),
   }),
   output: z.object({ id: z.uuid() }),
@@ -393,6 +588,10 @@ export const createSession = defineWriteAction({
         resourceId: input.spaceId,
         requires: ACCESS_LEVELS.edit,
       });
+      await requireFacilitatorMember(tx, workspaceId, input.facilitatorId);
+      if (input.cycleId) {
+        await requireOpenCycle(tx, workspaceId, input.cycleId);
+      }
 
       const id = crypto.randomUUID();
       await tx.insert(sessions).values({
@@ -402,7 +601,10 @@ export const createSession = defineWriteAction({
         cycleId: input.cycleId ?? null,
         kind: input.kind,
         title: input.title,
-        scheduledFor: new Date(input.scheduledFor),
+        scheduledFor: scheduledInstant(
+          input.scheduledFor,
+          await workspaceTimeZone(tx, workspaceId),
+        ),
         facilitatorId: input.facilitatorId,
         state: "scheduled",
       });
@@ -421,6 +623,154 @@ export const createSession = defineWriteAction({
           targetType: "session",
           targetId: id,
           payload: { kind: input.kind, spaceId: input.spaceId },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Books a whole cycle's rhythm for a space in one write (METHOD.md §7.1:
+ * "Book all of them for the whole cycle before the cycle starts"; completeness
+ * review H-08).
+ *
+ * Fills only the gaps: a week that already holds a check-in, or a month that
+ * already holds a review, is left alone, so pressing it twice books nothing
+ * the second time and a coordinator who booked a few by hand keeps them.
+ * Nothing is booked in the past. `missing` is what the cycle still lacks
+ * afterwards, which is only ever weeks already gone.
+ */
+export const bookCycleSessions = defineWriteAction({
+  name: "sessions.bookCycle",
+  summary:
+    "Books every weekly check-in, monthly review and the quarterly review a space needs for a whole cycle, around what is already booked.",
+  input: z.object({
+    spaceId: z.uuid(),
+    /** The current cycle when omitted. */
+    cycleId: z.uuid().optional(),
+    /** 1 for Monday to 5 for Friday. */
+    weekday: z.number().int().min(1).max(5),
+    /** `HH:MM` where the workspace is. */
+    time: z.string().regex(WALL_CLOCK, "Give the time as HH:MM."),
+    facilitatorId: z.uuid(),
+  }),
+  output: z.object({
+    cycleId: z.uuid(),
+    booked: z.number().int(),
+    sessionIds: z.array(z.uuid()),
+    missing: z.array(z.string()),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const contextId = await resolveSpaceContextId(
+        tx,
+        workspaceId,
+        input.spaceId,
+      );
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "space",
+        resourceId: input.spaceId,
+        requires: ACCESS_LEVELS.edit,
+      });
+      await requireFacilitatorMember(tx, workspaceId, input.facilitatorId);
+
+      const timeZone = await workspaceTimeZone(tx, workspaceId);
+      const now = new Date();
+      const today = localDateOf(now, timeZone);
+      let cycleId = input.cycleId;
+      if (!cycleId) {
+        const current = await findCurrentCycle(tx, workspaceId, today);
+        if (!current) {
+          throw new OperationError(
+            "forbidden",
+            "There is no cycle to book. Create one on the cycle screen first.",
+          );
+        }
+        cycleId = current.id;
+      }
+      const cycle = await requireOpenCycle(tx, workspaceId, cycleId);
+
+      const [, hour, minute] = WALL_CLOCK.exec(input.time) as unknown as [
+        string,
+        string,
+        string,
+      ];
+      const at = (on: string) =>
+        localInstant(
+          parseLocalDate(on),
+          Number(hour),
+          Number(minute),
+          timeZone,
+        );
+      // Today still counts while its hour is ahead.
+      const from =
+        at(today) > now
+          ? today
+          : formatLocalDate(addDays(parseLocalDate(today), 1));
+
+      const bounds = {
+        id: cycle.id,
+        startsOn: cycle.startsOn,
+        endsOn: cycle.endsOn,
+      };
+      const existing =
+        (
+          await bookedRitualsBySpace(tx, workspaceId, bounds, timeZone, [
+            input.spaceId,
+          ])
+        ).get(input.spaceId) ?? [];
+      const plan = planCycleCadence(bounds, {
+        weekday: input.weekday as RitualWeekday,
+        from,
+        existing,
+      });
+
+      const sessionIds: string[] = [];
+      for (const ritual of plan) {
+        const id = crypto.randomUUID();
+        await tx.insert(sessions).values({
+          id,
+          workspaceId,
+          spaceId: input.spaceId,
+          cycleId: cycle.id,
+          kind: ritual.kind,
+          title:
+            RITUALS.find((entry) => entry.kind === ritual.kind)?.name ??
+            ritual.kind,
+          scheduledFor: at(ritual.on),
+          facilitatorId: input.facilitatorId,
+          state: "scheduled",
+        });
+        sessionIds.push(id);
+      }
+
+      const coverage = cadenceCoverage(bounds, [...existing, ...plan]);
+      return {
+        result: {
+          cycleId: cycle.id,
+          booked: sessionIds.length,
+          sessionIds,
+          missing: [...coverage.missing],
+        },
+        activity: {
+          kind: "session.cycleBooked",
+          subjectType: "space",
+          subjectId: input.spaceId,
+          contextId,
+          payload: { cycleId: cycle.id, booked: sessionIds.length },
+        },
+        audit: {
+          action: "sessions.bookCycle",
+          targetType: "space",
+          targetId: input.spaceId,
+          payload: { cycleId: cycle.id, booked: sessionIds.length },
         },
       };
     },
@@ -1187,8 +1537,19 @@ export const readSession = defineReadAction({
           throw new OperationError("not_found", "No such session.");
         }
 
-        // Verify the caller is a member of the session's space.
+        // Through the access getter first (completeness review H-05), so a
+        // revoked binding or a suspended member is refused by the one
+        // enforcement point every other protected read uses. Then the
+        // stricter rule a session keeps on top: it is a room you are in, not
+        // a page you can look at, so the caller must be in the space as well.
         if (row.spaceId) {
+          await getAccessScoped(tx, {
+            workspaceId: context.workspaceId,
+            memberId: member.id,
+            resourceType: "space",
+            resourceId: row.spaceId,
+            requires: ACCESS_LEVELS.view as never,
+          });
           const [spaceMembership] = await tx
             .select({ memberId: spaceMembers.memberId })
             .from(spaceMembers)
@@ -2011,18 +2372,32 @@ export const createSessionBlocker = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
+      // The key result's goal, recorded on the blocker (completeness review
+      // H-10). The review inbox decides who may see a blocker by its goal and
+      // skips one without, so every blocker this wrote, from a session or
+      // from a chat command, reached nobody's inbox. A key result that is not
+      // in this workspace is refused rather than stored with no goal.
+      const goalId = await goalOfKeyResult(tx, workspaceId, input.keyResultId);
+      if (!goalId) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+
       const now = new Date();
-      // 24-hour clock from §11 cadence.blockerClockHours (default 24).
-      const BLOCKER_CLOCK_HOURS = 24;
-      const dueAt = new Date(
-        now.getTime() + BLOCKER_CLOCK_HOURS * 60 * 60 * 1000,
+      // The clock is the workspace's `cadence.blockerClockHours` (§11), not a
+      // literal 24 (completeness review H-17): a workspace that tuned it got
+      // a board and nudges on one clock and blockers due on another.
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
       );
+      const clockHours = thresholds["cadence.blockerClockHours"];
+      const dueAt = new Date(now.getTime() + clockHours * 60 * 60 * 1000);
 
       const id = crypto.randomUUID();
       await tx.insert(blockers).values({
         id,
         workspaceId,
         keyResultId: input.keyResultId,
+        goalId,
         sessionId: input.sessionId,
         type: input.type,
         description: input.description ?? null,
@@ -2072,21 +2447,13 @@ export const resolveSessionBlocker = defineWriteAction({
         throw new OperationError("not_found", "No such workspace.");
       }
 
-      const [blocker] = await tx
-        .select()
-        .from(blockers)
-        .where(
-          activeOnly(
-            blockers,
-            eq(blockers.workspaceId, workspaceId),
-            eq(blockers.id, input.id),
-          ),
-        )
-        .limit(1);
-
-      if (!blocker) {
-        throw new OperationError("not_found", "No such blocker.");
-      }
+      const blocker = await requireBlockerAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
 
       await tx
         .update(blockers)
@@ -2135,6 +2502,13 @@ export const reassignSessionBlocker = defineWriteAction({
       if (!actor.memberId) {
         throw new OperationError("not_found", "No such workspace.");
       }
+      await requireBlockerAccess(
+        tx,
+        workspaceId,
+        actor.memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
 
       const [owner] = await tx
         .select({ id: workspaceMembers.id, name: workspaceMembers.name })
@@ -2367,6 +2741,35 @@ export const closeSessionCommitments = defineWriteAction({
       const memberId = actor.memberId;
       if (!memberId) {
         throw new OperationError("not_found", "No such workspace.");
+      }
+
+      // Each commitment through its own space (completeness review H-05).
+      // This used to update by bare id at the workspace level, so anybody with
+      // edit rights anywhere could close a commitment in a space they cannot
+      // see. An id that is not there, or not the caller's to close, is
+      // refused rather than counted as closed.
+      for (const item of input.items) {
+        const [commitment] = await tx
+          .select({ spaceId: commitments.spaceId })
+          .from(commitments)
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, workspaceId),
+              eq(commitments.id, item.id),
+            ),
+          )
+          .limit(1);
+        if (!commitment) {
+          throw new OperationError("not_found", "No such commitment.");
+        }
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "space",
+          resourceId: commitment.spaceId,
+          requires: ACCESS_LEVELS.edit as never,
+        });
       }
 
       const now = new Date();

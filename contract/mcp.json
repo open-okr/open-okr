@@ -58,8 +58,41 @@
       "example": {}
     },
     {
+      "name": "workspace.changePlan",
+      "description": "Move this cloud workspace onto another plan from the catalogue.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "planKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "planKey"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "planKey": {}
+      }
+    },
+    {
       "name": "workspace.setLifecycle",
-      "description": "Move a cloud workspace between active, suspended and closed (P8-T02c).",
+      "description": "Move a cloud workspace between active, suspended and closed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -395,6 +428,37 @@
       },
       "example": {
         "memberId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "people.setAdministrator",
+      "description": "Makes a member an administrator with full access to the workspace, or returns them to the standard level.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "administrator": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "memberId",
+          "administrator"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "memberId": "00000000-0000-4000-8000-000000000000",
+        "administrator": false
       }
     },
     {
@@ -2637,8 +2701,16 @@
           "includeFiles": {
             "default": true,
             "type": "boolean"
+          },
+          "passphrase": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 1024
           }
-        }
+        },
+        "required": [
+          "passphrase"
+        ]
       },
       "scope": "write",
       "annotations": {
@@ -2646,7 +2718,9 @@
         "destructiveHint": false,
         "idempotentHint": false
       },
-      "example": {}
+      "example": {
+        "passphrase": "…"
+      }
     },
     {
       "name": "workspace.importArchive",
@@ -2660,6 +2734,10 @@
           "dryRun": {
             "default": true,
             "type": "boolean"
+          },
+          "passphrase": {
+            "type": "string",
+            "maxLength": 1024
           }
         },
         "required": [
@@ -4904,16 +4982,19 @@
             "type": "boolean"
           },
           "sessionDates": {
+            "maxItems": 20,
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
                 "key": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "maxLength": 60
                 },
                 "on": {
-                  "type": "string"
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
                 }
               },
               "required": [
@@ -5593,6 +5674,43 @@
       "example": {
         "cycleId": "00000000-0000-4000-8000-000000000000",
         "cuts": {}
+      }
+    },
+    {
+      "name": "workflow.setFocusKeyResults",
+      "description": "Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "keyResultIds": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        },
+        "required": [
+          "cycleId",
+          "keyResultIds"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "cycleId": "00000000-0000-4000-8000-000000000000",
+        "keyResultIds": []
       }
     },
     {
@@ -7625,6 +7743,9 @@
               "type",
               "id"
             ]
+          },
+          "guided": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -8005,7 +8126,8 @@
             "type": "number"
           },
           "dueOn": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "ownerId": {
             "type": "string",
@@ -8049,6 +8171,9 @@
               "type",
               "id"
             ]
+          },
+          "guided": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -8125,9 +8250,14 @@
             "type": "number"
           },
           "dueOn": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "ownerId": {
@@ -10488,7 +10618,7 @@
     },
     {
       "name": "sessions.create",
-      "description": "Creates a scheduled session for a space.",
+      "description": "Creates a scheduled session for a space. A time with no offset is read in the workspace timezone.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10517,7 +10647,8 @@
             "maxLength": 200
           },
           "scheduledFor": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d))|(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?)$"
           },
           "facilitatorId": {
             "type": "string",
@@ -10544,6 +10675,57 @@
         "kind": "planning",
         "title": "…",
         "scheduledFor": "…",
+        "facilitatorId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "sessions.bookCycle",
+      "description": "Books every weekly check-in, monthly review and the quarterly review a space needs for a whole cycle, around what is already booked.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "weekday": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "time": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$"
+          },
+          "facilitatorId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "spaceId",
+          "weekday",
+          "time",
+          "facilitatorId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "spaceId": "00000000-0000-4000-8000-000000000000",
+        "weekday": 0,
+        "time": "…",
         "facilitatorId": "00000000-0000-4000-8000-000000000000"
       }
     },

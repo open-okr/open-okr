@@ -284,6 +284,8 @@ export const publishDraftedCheckIn = defineWriteAction({
             status: input.status,
             valuesWritten: published.valuesWritten,
           },
+          // The goal's watchers hear about it (completeness review H-13).
+          notify: true,
         },
         audit: {
           action: "goals.publishDraftedCheckIn",
@@ -366,6 +368,8 @@ export const publishCheckIn = defineWriteAction({
             status: input.status,
             valuesWritten: published.valuesWritten,
           },
+          // The goal's watchers hear about it (completeness review H-13).
+          notify: true,
         },
         audit: {
           action: "goals.publishCheckIn",

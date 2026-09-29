@@ -2,7 +2,12 @@ import { workerDb } from "@openokr/test-support/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { workspaceMembers, workspaces } from "../src/schema/workspaces.ts";
-import { withContext, withUser, withWorkspace } from "../src/tenant.ts";
+import {
+  withContext,
+  withSystemScan,
+  withUser,
+  withWorkspace,
+} from "../src/tenant.ts";
 
 /**
  * The tenant root and the per-workspace person (TECHNICAL-PLAN §4.1).
@@ -350,6 +355,56 @@ describe("withContext", () => {
       (tx) => tx.select().from(workspaces),
     );
 
+    const after = await wb.appPool.query(
+      "select count(*)::int as n from workspaces",
+    );
+    expect(after.rows[0].n).toBe(0);
+  });
+});
+
+/**
+ * `app.system_scan`: the scheduler listing every tenant (completeness review
+ * H-02, migration 0099).
+ *
+ * Under the restricted application role the scheduler used to find no
+ * workspace at all, so even a scheduler that started ran for nobody. The scan
+ * opens exactly one question, which workspaces exist, and nothing else.
+ */
+describe("app.system_scan: the scheduler listing every workspace", () => {
+  it("lists every workspace, which no setting did before", async () => {
+    const wb = await workerDb();
+    const rows = await withSystemScan(wb.db, (tx) =>
+      tx.select({ id: workspaces.id }).from(workspaces),
+    );
+    expect(rows.map((row) => row.id).sort()).toEqual([
+      WORKSPACE_A,
+      WORKSPACE_B,
+    ]);
+  });
+
+  it("opens no other table across tenants", async () => {
+    const wb = await workerDb();
+    const members = await withSystemScan(wb.db, (tx) =>
+      tx.select().from(workspaceMembers),
+    );
+    expect(members).toEqual([]);
+  });
+
+  it("can read the workspaces and change none of them", async () => {
+    const wb = await workerDb();
+    const renamed = await withSystemScan(wb.db, (tx) =>
+      tx
+        .update(workspaces)
+        .set({ name: "Renamed" })
+        .where(eq(workspaces.id, WORKSPACE_A))
+        .returning({ id: workspaces.id }),
+    );
+    expect(renamed).toEqual([]);
+  });
+
+  it("does not outlive its transaction", async () => {
+    const wb = await workerDb();
+    await withSystemScan(wb.db, (tx) => tx.select().from(workspaces));
     const after = await wb.appPool.query(
       "select count(*)::int as n from workspaces",
     );

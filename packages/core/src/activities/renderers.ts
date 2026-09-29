@@ -26,6 +26,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "support.ended": (p) => `Support access ended (${asString(p.reason)})`,
   "workspace.lifecycle_changed": (p) =>
     `Workspace lifecycle set to "${asString(p.state)}"`,
+  "workspace.plan_changed": (p) =>
+    typeof p.seats === "number"
+      ? `Workspace moved to the ${asString(p.plan)} plan, with ${p.seats} seats`
+      : `Workspace moved to the ${asString(p.plan)} plan, with unlimited seats`,
   "member.profile_updated": (p) =>
     `${asString(p.name, "A member")} updated their profile`,
   "channel.templatesSynced": (p) =>
@@ -45,6 +49,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
   "member.restored": (p) => `${asString(p.name, "A member")} was restored`,
+  "member.administrator_set": (p) =>
+    p.administrator === true
+      ? `${asString(p.name, "A member")} became an administrator`
+      : `${asString(p.name, "A member")} is no longer an administrator`,
   "member.converted_to_guest": (p) =>
     `${asString(p.name, "A member")} was converted to a guest`,
   "member.erased": (p) => `${asString(p.name, "A member")}'s data was erased`,
@@ -208,6 +216,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : "The annual frame was revalidated and holds",
   "cycle.baseline_health_set": () => "Baseline health was recorded",
   "cycle.capacity_recorded": () => "What was cut was recorded",
+  "cycle.focus_set": (p) =>
+    `Chose ${Number(p.count ?? 0)} of the year's key results to focus on`,
   "cycle.calibrated": () => "The cycle was calibrated mid-flight",
   "cycle.published": (p) =>
     `Cycle "${asString(p.name, "a cycle")}" was published`,
@@ -364,6 +374,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   // Sessions (P4-T07a)
   "session.created": (p) =>
     `Created a ${asString(p.kind)} session: ${asString(p.title)}`,
+  "session.cycleBooked": (p) =>
+    `Booked ${Number(p.booked ?? 0)} session(s) for the whole cycle`,
   "session.opened": (p) => `Opened the ${asString(p.kind)} session`,
   "session.stageAdvanced": (p) =>
     `Advanced to the ${asString(p.to, "next")} stage`,

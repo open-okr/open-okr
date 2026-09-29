@@ -21,7 +21,13 @@
  *
  * Pure: no database, no clock beyond what the caller passes, no framework.
  */
-import { applyStrictness, evaluateKeyResults } from "./quality.ts";
+import {
+  applyStrictness,
+  evaluateKeyResults,
+  evaluateObjective,
+  type KeyResultVerdict,
+  type QualityVerdict,
+} from "./quality.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
 export type PredicateState = "pass" | "todo" | "not_applicable";
@@ -168,9 +174,16 @@ export interface CycleWorkflowInput {
     readonly focusNote: string | null;
   } | null;
   readonly focusKeyResultCount: number;
+  /**
+   * How many key results the year this quarter sits in holds, which decides
+   * whether phase 3's focus is a choice among them or a written note. Read on
+   * its own because a year can hold key results before anybody writes the
+   * frame. Falls back to the frame's count when a caller does not supply it.
+   */
+  readonly annualKeyResultCount?: number;
   readonly hasCapacityNotes: boolean;
   readonly frame: FrameSnapshot | null;
-  /** Undefined until P3-T04 ships goals and key results. */
+  /** The cycle's goals and key results. Undefined when not read. */
   readonly goals?: readonly GoalSnapshot[];
   /**
    * The initiatives serving this cycle's key results. Undefined until P5-T10a
@@ -183,16 +196,24 @@ export interface CycleWorkflowInput {
    * §5.5.
    */
   readonly initiatives?: readonly InitiativeSnapshot[];
-  /** Undefined until P4-T01 ships the quality engine. */
+  /**
+   * An answer for phase 4 and gate 2 from a caller that has already judged
+   * the set. Left undefined, both judge the goal snapshots themselves.
+   */
   readonly qualityChecksPass?: boolean;
-  /** Undefined until P4-T04 ships sessions and the decision log. */
+  /**
+   * The §7.1 rhythm as booked, and the decision log. Undefined means nobody
+   * read them, which keeps phase 6 unanswered rather than failed.
+   */
   readonly cadence?: {
     readonly bookedForWholeCycle: boolean;
     readonly decisionCount: number;
+    /** What is not booked, per space, as `cadenceCoverage` words it. */
+    readonly gaps?: readonly string[];
   };
-  /** Undefined until P3-T04 ships key result scores. */
+  /** Every key result in the cycle has its score. Undefined when not read. */
   readonly allKeyResultsScored?: boolean;
-  /** Undefined until P4-T08 ships the cycle retrospective. */
+  /** The quarterly review's retro holds a note. Undefined when not read. */
   readonly retrospectiveWritten?: boolean;
 }
 
@@ -220,7 +241,7 @@ export const PHASE_TITLES = [
 
 export const GATE_TITLES = [
   "Every objective has a title, a champion and a reviewer",
-  "Every key result passes the quality checks",
+  "Every key result passes the quality checks, and every objective names an outcome",
   "Alignment is mapped: each objective states what it contributes to",
   "Every dependency is confirmed, or logged with a named risk owner",
   "Capacity is checked, and nothing is left exceeding it",
@@ -282,7 +303,10 @@ const conditionsOf = (
   total,
 });
 
-function phaseZero(input: CycleWorkflowInput): PhaseResult {
+function phaseZero(
+  input: CycleWorkflowInput,
+  thresholds: ResolvedThresholds,
+): PhaseResult {
   const base = { phase: 0, title: PHASE_TITLES[0] } as const;
   if (input.mode !== "annual") {
     // §2.2: "Phase 0 runs only in an annual cycle."
@@ -311,15 +335,18 @@ function phaseZero(input: CycleWorkflowInput): PhaseResult {
     if (!frame.hasStrategy) {
       missing.push("The mid-term strategy is not written");
     }
-    if (frame.strategyCount < 2 || frame.strategyCount > 5) {
+    // §11's `quality.annualStrategyBounds`, not the canon's two and five
+    // written here (completeness review H-17).
+    const bounds = thresholds["quality.annualStrategyBounds"];
+    if (frame.strategyCount < bounds.low || frame.strategyCount > bounds.high) {
       missing.push(
-        `${frame.strategyCount} annual strategies, and §2.1 asks for 2 to 5`,
+        `${frame.strategyCount} annual strategies, and §2.1 asks for ${bounds.low} to ${bounds.high}`,
       );
     }
   }
 
   if (input.goals === undefined) {
-    blocked.push("Company objectives arrive at P3-T04");
+    blocked.push("The company objectives could not be read");
   } else {
     total += 1;
     const anchored = input.goals.filter(
@@ -502,7 +529,8 @@ function phaseThree(
 
   // "Focus areas chosen": the focus key results, or a written note where the
   // frame has no annual key results to point at.
-  const frameHasAnnualKeyResults = (input.frame?.annualKeyResultCount ?? 0) > 0;
+  const frameHasAnnualKeyResults =
+    (input.annualKeyResultCount ?? input.frame?.annualKeyResultCount ?? 0) > 0;
   if (input.focusKeyResultCount === 0) {
     if (frameHasAnnualKeyResults) {
       missing.push("No focus key results chosen for this quarter");
@@ -521,31 +549,136 @@ function phaseThree(
   };
 }
 
-function phaseFour(input: CycleWorkflowInput): PhaseResult {
+const OBJECTIVE_LEVELS = [
+  "company",
+  "department",
+  "team",
+  "individual",
+] as const;
+
+/**
+ * One objective's §4.1 and §4.2 verdicts, with the workspace's strictness
+ * applied, exactly as the Draft Coach beside it judges them.
+ *
+ * The objective is in a cycle by construction, so OBJ-3 passes, and the count
+ * OBJ-5 reads is the number of objectives at its level in this cycle, which is
+ * the count the drafting surface shows.
+ */
+function goalVerdicts(
+  goal: GoalSnapshot,
+  goals: readonly GoalSnapshot[],
+  thresholds: ResolvedThresholds,
+): {
+  readonly objective: readonly QualityVerdict[];
+  readonly keyResults: readonly KeyResultVerdict[];
+} {
+  const strictness = thresholds["quality.coachStrictness"];
+  const level = (OBJECTIVE_LEVELS as readonly string[]).includes(goal.level)
+    ? (goal.level as (typeof OBJECTIVE_LEVELS)[number])
+    : "team";
+  return {
+    objective: applyStrictness(
+      evaluateObjective(
+        {
+          title: goal.title,
+          hasCycle: true,
+          hasTimeframe: false,
+          championId: goal.championId,
+          reviewerId: goal.reviewerId,
+          objectivesInUnit: goals.filter((other) => other.level === goal.level)
+            .length,
+          level,
+        },
+        thresholds,
+      ),
+      strictness,
+    ),
+    keyResults: applyStrictness(
+      evaluateKeyResults(
+        {
+          keyResults: goal.keyResults.map((keyResult) => ({
+            text: keyResult.title,
+            ...(keyResult.quality as NonNullable<KeyResultSnapshot["quality"]>),
+          })),
+        },
+        thresholds,
+      ),
+      strictness,
+    ),
+  };
+}
+
+const unjudgedIn = (goals: readonly GoalSnapshot[]): boolean =>
+  goals.some((goal) =>
+    goal.keyResults.some((keyResult) => keyResult.quality === undefined),
+  );
+
+/**
+ * §2.3 phase 4: "Every objective and key result passes the §4 quality
+ * checks." Judged over the set here rather than read from a stored flag, so
+ * the phase cannot disagree with the coach or with gate 2 (completeness
+ * review H-09). A fail holds the phase and a warn does not, which is §4's own
+ * reading of the two and the one gate 2 uses; strict strictness makes warns
+ * fail, and then they hold it too.
+ *
+ * One condition per objective: the rail's bar fills as each objective and its
+ * key results come clean.
+ */
+function phaseFour(
+  input: CycleWorkflowInput,
+  thresholds: ResolvedThresholds,
+): PhaseResult {
   const base = { phase: 4, title: PHASE_TITLES[4] } as const;
-  if (input.qualityChecksPass === undefined) {
+  if (input.qualityChecksPass !== undefined) {
+    // A caller that has already decided, which a test may be.
+    const missing = input.qualityChecksPass
+      ? []
+      : ["Some objectives or key results do not pass the §4 quality checks"];
+    return {
+      ...base,
+      state: input.qualityChecksPass ? "pass" : "todo",
+      missing,
+      blocked: [],
+      conditions: conditionsOf(1, missing),
+    };
+  }
+  const goals = input.goals;
+  if (goals === undefined || unjudgedIn(goals)) {
     return {
       ...base,
       state: "todo",
       missing: [],
-      // The catalogue and the stored verdicts both exist since P4-T01 and
-      // P4-T02a. What is missing is the reading that turns a set of stored
-      // flags into one answer for the phase, and that is publish gate 2,
-      // which P4-T03 builds. Naming the task that will supply it beats
-      // naming the one that already did.
-      blocked: ["Reading the §4 verdicts across the set arrives at P4-T03"],
+      blocked: ["The §4 verdicts across the set could not be read"],
       conditions: { met: 0, total: 0 },
     };
   }
-  const missing = input.qualityChecksPass
-    ? []
-    : ["Some objectives or key results do not pass the §4 quality checks"];
+  if (goals.length === 0) {
+    const missing = ["No objective is drafted yet"];
+    return {
+      ...base,
+      state: "todo",
+      missing,
+      blocked: [],
+      conditions: conditionsOf(1, missing),
+    };
+  }
+
+  const missing: string[] = [];
+  for (const goal of goals) {
+    const verdicts = goalVerdicts(goal, goals, thresholds);
+    const failing = [...verdicts.objective, ...verdicts.keyResults]
+      .filter((verdict) => verdict.status === "fail")
+      .map((verdict) => verdict.id);
+    if (failing.length > 0) {
+      missing.push(`"${goal.title}" fails ${failing.join(", ")}`);
+    }
+  }
   return {
     ...base,
-    state: input.qualityChecksPass ? "pass" : "todo",
+    state: missing.length === 0 ? "pass" : "todo",
     missing,
     blocked: [],
-    conditions: conditionsOf(1, missing),
+    conditions: conditionsOf(goals.length, missing),
   };
 }
 
@@ -595,13 +728,19 @@ function phaseSix(input: CycleWorkflowInput): PhaseResult {
       ...base,
       state: "todo",
       missing: [],
-      blocked: ["Sessions and the decision log arrive at P4-T04"],
+      blocked: ["The booked sessions and the decision log could not be read"],
       conditions: { met: 0, total: 0 },
     };
   }
   const missing: string[] = [];
   if (!input.cadence.bookedForWholeCycle) {
-    missing.push("The cadence is not booked for the whole cycle");
+    // One entry, because it is one condition. The gaps say where to look.
+    const gaps = input.cadence.gaps ?? [];
+    missing.push(
+      gaps.length > 0
+        ? `The cadence is not booked for the whole cycle. ${gaps.join(". ")}`
+        : "The cadence is not booked for the whole cycle",
+    );
   }
   if (input.cadence.decisionCount === 0) {
     missing.push("No decision has been recorded");
@@ -623,7 +762,7 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
   let total = 0;
 
   if (input.allKeyResultsScored === undefined) {
-    blocked.push("Key result scores arrive at P3-T04");
+    blocked.push("The key result scores could not be read");
   } else {
     total += 1;
     if (!input.allKeyResultsScored) {
@@ -632,7 +771,7 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
   }
 
   if (input.retrospectiveWritten === undefined) {
-    blocked.push("The cycle retrospective arrives at P4-T08");
+    blocked.push("The cycle retrospective could not be read");
   } else {
     total += 1;
     if (!input.retrospectiveWritten) {
@@ -662,7 +801,7 @@ export function publishGates(
   thresholds?: ResolvedThresholds,
 ): readonly GateResult[] {
   const goals = input.goals;
-  const goalsBlocked = "goals and key results arrive at P3-T04";
+  const goalsBlocked = "the goals and key results could not be read";
 
   const gate = (
     gateKey: number,
@@ -706,12 +845,17 @@ export function publishGates(
     results.push(gate(1, missing.length === 0, missing));
   }
 
-  // 2. Every key result passes the §4.2 checks.
+  // 2. Every key result passes the §4.2 checks, and no objective fails OBJ-1.
   //
   // **A fail blocks and a warn does not**, which is §4's own wording: warn is
   // "worth another look", fail is "fix before publishing". A workspace that
   // wants warnings to block sets strictness to strict, and then they are fails
   // and this gate sees them as such. That is what the setting is for.
+  //
+  // **OBJ-1 joined on 28 September 2026** (completeness review H-09, decided
+  // by a human). REQUIREMENTS §3.2's acceptance has an objective beginning
+  // "Launch the new mobile app" block publishing until it passes or is
+  // overridden with a reason; §4.5 judged key results only, so it never did.
   //
   // `qualityChecksPass` stays supported for a caller that has already decided,
   // and it wins when given. Otherwise the gate evaluates the set itself, so it
@@ -734,31 +878,19 @@ export function publishGates(
       ),
     );
   } else {
-    const unjudged = goals.filter((goal) =>
-      goal.keyResults.some((keyResult) => keyResult.quality === undefined),
-    );
-    if (unjudged.length > 0) {
+    if (unjudgedIn(goals)) {
       results.push(
         unevaluable(2, "some key results carry nothing for §4.2 to judge"),
       );
     } else {
       const failures: string[] = [];
       for (const goal of goals) {
-        const verdicts = applyStrictness(
-          evaluateKeyResults(
-            {
-              keyResults: goal.keyResults.map((keyResult) => ({
-                text: keyResult.title,
-                ...(keyResult.quality as NonNullable<
-                  KeyResultSnapshot["quality"]
-                >),
-              })),
-            },
-            thresholds,
-          ),
-          thresholds["quality.coachStrictness"],
-        );
-        for (const verdict of verdicts.filter(
+        const judged = goalVerdicts(goal, goals, thresholds);
+        const outcome = judged.objective.find((entry) => entry.id === "OBJ-1");
+        if (outcome?.status === "fail") {
+          failures.push(`OBJ-1 on "${goal.title}": ${outcome.prompt}`);
+        }
+        for (const verdict of judged.keyResults.filter(
           (entry) => entry.status === "fail",
         )) {
           const offenders = verdict.keyResults
@@ -796,7 +928,7 @@ export function publishGates(
     )
   ) {
     results.push(
-      unevaluable(4, "the §5.4 dependency register arrives at P3-T09"),
+      unevaluable(4, "the §5.4 dependency register could not be read"),
     );
   } else {
     const missing = goals.flatMap((goal) =>
@@ -822,7 +954,7 @@ export function publishGates(
     // that will move them. Passing on the half that exists would be the exact
     // failure this file's header records from Phase 1.
     results.push(
-      unevaluable(5, "the §5.5 initiative register arrives at P5-T10a"),
+      unevaluable(5, "the §5.5 initiative register could not be read"),
     );
   } else {
     const missing = goals.flatMap((goal) =>
@@ -872,13 +1004,16 @@ export function phaseCompletion(
   input: CycleWorkflowInput,
   thresholds: ResolvedThresholds,
 ): readonly PhaseResult[] {
-  const gates = publishGates(input);
+  // With the thresholds, so gate 2 is judged here exactly as it is at
+  // publication rather than reported as unevaluable on phase 5's rail
+  // (completeness review H-09).
+  const gates = publishGates(input, thresholds);
   return [
-    phaseZero(input),
+    phaseZero(input, thresholds),
     phaseOne(input, thresholds),
     phaseTwo(input, thresholds),
     phaseThree(input, thresholds),
-    phaseFour(input),
+    phaseFour(input, thresholds),
     phaseFive(input, gates),
     phaseSix(input),
     phaseSeven(input),

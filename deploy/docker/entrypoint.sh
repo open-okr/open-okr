@@ -52,7 +52,11 @@ try {
   console.error(`cannot load the postgres driver: ${error.message}`);
   process.exit(2);
 }
-const client = new Client({ connectionString: process.env.DATABASE_URL });
+// The admin connection when there is one: on a first boot the application
+// role does not exist until the migrator creates it, a few lines below.
+const client = new Client({
+  connectionString: process.env.DATABASE_ADMIN_URL || process.env.DATABASE_URL,
+});
 client
   .connect()
   .then(() => client.query("select 1"))
@@ -111,6 +115,11 @@ else
   cd /app && node --experimental-strip-types --no-warnings \
     ./migrator/deploy/docker/migrate.ts
 fi
+
+# The admin connection exists for the migrator and nothing else (completeness
+# review H-01). The server connects as the application role, which row-level
+# security binds, and it has no reason to hold a credential that is not bound.
+unset DATABASE_ADMIN_URL
 
 log "starting"
 exec "$@"

@@ -29,6 +29,57 @@ export interface EnsureRolesOptions {
 
 const ROLE_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
 
+export interface EnsureLoginRoleOptions {
+  readonly role: string;
+  readonly password: string;
+}
+
+/**
+ * The application role a deployment runs as (completeness review H-01).
+ *
+ * `ensureRoles` below is test infrastructure: one password for two roles.
+ * A deployment has an admin connection that runs migrations and one
+ * application role with its own secret, and the application role must never
+ * be able to bypass the tenant floor. So this creates it when missing and,
+ * when it exists, re-states the password and the restrictions: an operator
+ * who rotated the password in the environment gets it applied, and a role
+ * somebody widened by hand is narrowed again rather than trusted.
+ */
+export async function ensureLoginRole(
+  client: SqlRunner,
+  options: EnsureLoginRoleOptions,
+): Promise<void> {
+  if (!ROLE_NAME.test(options.role)) {
+    throw new Error(`Invalid role name: ${JSON.stringify(options.role)}`);
+  }
+  if (options.password === "") {
+    throw new Error(`The ${options.role} role needs a password.`);
+  }
+  const password = options.password.replace(/'/g, "''");
+
+  await client.query(`
+    do $$
+    begin
+      if not exists (select from pg_roles where rolname = '${options.role}') then
+        create role ${options.role}
+          login password '${password}'
+          nosuperuser nobypassrls nocreatedb nocreaterole;
+      else
+        alter role ${options.role} with login password '${password}';
+        -- Only when it needs it: naming SUPERUSER at all is refused to a
+        -- caller that is not one, even to switch it off.
+        if exists (
+          select from pg_roles
+           where rolname = '${options.role}' and (rolsuper or rolbypassrls)
+        ) then
+          alter role ${options.role} nosuperuser nobypassrls;
+        end if;
+      end if;
+    end
+    $$;
+  `);
+}
+
 /** Creates the owner and application roles if they are missing. Idempotent. */
 export async function ensureRoles(
   client: SqlRunner,

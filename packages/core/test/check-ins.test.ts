@@ -298,6 +298,45 @@ describe("publication", () => {
   });
 });
 
+/**
+ * A goal's watchers hear about a published check-in (completeness review
+ * H-13): the activity sets `notify`, and nothing did before.
+ */
+describe("who hears about a check-in", () => {
+  it("tells a member watching the goal once, and never the champion who wrote it", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(REVIEWER) },
+      "subscriptions.toggle",
+      { subjectType: "goal", subjectId: goalId, subscribe: true },
+    );
+    const draft = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.startCheckIn",
+      { goalId },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.publishCheckIn",
+      {
+        id: draft.id,
+        status: "on_track",
+        confidence: 0.7,
+        narrative: richText("Activation is moving."),
+        values: [],
+      },
+    );
+    const { rows } = await wb.admin.query<{ recipient_member_id: string }>(
+      `select recipient_member_id from notifications
+        where workspace_id = $1 and subject_type = 'goal' and subject_id = $2`,
+      [workspaceId, goalId],
+    );
+    // The reviewer watches the goal and owes it a review: one row, the
+    // review, rather than the same event twice.
+    expect(rows.map((row) => row.recipient_member_id)).toEqual([reviewerId]);
+  });
+});
+
 describe("the edit window", () => {
   it("refuses an edit once the next check-in is due", async () => {
     const wb = await workerDb();

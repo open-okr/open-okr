@@ -20,7 +20,11 @@ export {
 } from "./admission.ts";
 export { setTenantStateInTx } from "./lifecycle.ts";
 export {
+  applyPlanInTx,
   countSeats,
+  listSeatHolders,
+  planByKey,
+  readOwnPlan,
   readOwnUsage,
   readPlans,
   seatState,

@@ -121,10 +121,11 @@ describe("phase 0, annual strategy", () => {
     expect(phase(base(), 0)?.state).toBe("not_applicable");
   });
 
-  it("cannot answer without goals, and says which task brings them", () => {
+  it("cannot answer without goals, and says so without naming a task", () => {
     const result = phase(base({ mode: "annual" }), 0);
     expect(result?.state).toBe("todo");
-    expect(result?.blocked.join(" ")).toMatch(/P3-T04/);
+    expect(result?.blocked.join(" ")).toMatch(/company objectives/);
+    expect(result?.blocked.join(" ")).not.toMatch(/P[1-8]-T/);
   });
 
   it("names a missing mission and an out-of-range strategy count", () => {
@@ -382,7 +383,7 @@ describe("phases that cannot answer yet", () => {
     // The task named here moved from P4-T01 to P4-T03 once the catalogue and
     // the stored verdicts existed and only the reading across a set did not.
     // A blocked note that names a task already done sends the reader nowhere.
-    expect(result?.blocked.join(" ")).toMatch(/P4-T03/);
+    expect(result?.blocked.join(" ")).toMatch(/§4 verdicts/);
     // Not a failure: nothing is wrong with the cycle.
     expect(result?.missing).toEqual([]);
   });
@@ -395,7 +396,7 @@ describe("phases that cannot answer yet", () => {
   });
 
   it("phase 6 waits for sessions and the decision log", () => {
-    expect(phase(base(), 6)?.blocked.join(" ")).toMatch(/P4-T04/);
+    expect(phase(base(), 6)?.blocked.join(" ")).toMatch(/booked sessions/);
   });
 
   it("phase 6 answers once they exist", () => {
@@ -415,8 +416,8 @@ describe("phases that cannot answer yet", () => {
 
   it("phase 7 waits for both scores and the retrospective", () => {
     const result = phase(base(), 7);
-    expect(result?.blocked.join(" ")).toMatch(/P3-T04/);
-    expect(result?.blocked.join(" ")).toMatch(/P4-T08/);
+    expect(result?.blocked.join(" ")).toMatch(/key result scores/);
+    expect(result?.blocked.join(" ")).toMatch(/retrospective/);
   });
 });
 
@@ -426,7 +427,7 @@ describe("the six publish gates", () => {
     for (const gateKey of [1, 3, 4, 5]) {
       const gate = gates.find((entry) => entry.gateKey === gateKey);
       expect(gate?.evaluable, `gate ${gateKey}`).toBe(false);
-      expect(gate?.detail.blocked).toMatch(/P3-T04/);
+      expect(gate?.detail.blocked).toMatch(/goals and key results/);
     }
   });
 
@@ -758,7 +759,7 @@ describe("gate 4 and the dependency register", () => {
     expect(gate?.gateKey).toBe(4);
     expect(gate?.evaluable).toBe(false);
     expect(gate?.passed).toBe(false);
-    expect(gate?.detail.blocked).toMatch(/P3-T09/);
+    expect(gate?.detail.blocked).toMatch(/dependency register/);
   });
 
   it("passes once the register exists and holds nothing unconfirmed", () => {
@@ -779,5 +780,152 @@ describe("gate 4 and the dependency register", () => {
     const gate = publishGates(withRegister)[3];
     expect(gate?.evaluable).toBe(true);
     expect(gate?.passed).toBe(true);
+  });
+});
+
+/**
+ * Phase 4 and gate 2 judge the set themselves (completeness review H-09).
+ *
+ * Nothing supplied `qualityChecksPass`, so phase 4 could never be answered,
+ * and `phaseCompletion` called the gates without thresholds, so gate 2 read
+ * as unevaluable on phase 5's rail while the publish action judged it fine.
+ * Since 28 September 2026 a failing OBJ-1 also holds gate 2, by a human's
+ * decision recorded in METHOD.md §4.5.
+ */
+describe("phase 4 and gate 2 over the drafted set", () => {
+  const judged = (title: string, overrides: Partial<GoalSnapshot> = {}) =>
+    goal({
+      title,
+      keyResults: [
+        {
+          id: "k1",
+          title: "Raise activation from 41% to 60%",
+          capacity: "fits",
+          dependencies: [],
+          quality: {
+            baseline: 41,
+            target: 60,
+            dueOn: "2026-09-30",
+            ownerId: "m1",
+            indicatorType: "leading",
+            direction: "increase",
+            confidence: 0.6,
+          },
+        },
+        {
+          id: "k2",
+          title: "Grow mobile revenue from 1.2m to 2m",
+          capacity: "fits",
+          dependencies: [],
+          quality: {
+            baseline: 1.2,
+            target: 2,
+            dueOn: "2026-09-30",
+            ownerId: "m1",
+            indicatorType: "lagging",
+            direction: "increase",
+            confidence: 0.6,
+          },
+        },
+      ],
+      ...overrides,
+    });
+
+  it("passes phase 4 when every objective and key result is clean", () => {
+    const four = phase(base({ goals: [judged(goal().title)] }), 4);
+    expect(four?.state).toBe("pass");
+    expect(four?.conditions).toEqual({ met: 1, total: 1 });
+  });
+
+  it("holds phase 4 on an objective that names an output, and says which", () => {
+    const four = phase(
+      base({ goals: [judged("Launch the new mobile app by end of Q3")] }),
+      4,
+    );
+    expect(four?.state).toBe("todo");
+    expect(four?.missing).toEqual([
+      '"Launch the new mobile app by end of Q3" fails OBJ-1',
+    ]);
+  });
+
+  it("holds phase 4 on a key result with no owner or date", () => {
+    const bare = judged(goal().title);
+    const four = phase(
+      base({
+        goals: [
+          {
+            ...bare,
+            keyResults: bare.keyResults.map((keyResult) => ({
+              ...keyResult,
+              quality: keyResult.quality && {
+                ...keyResult.quality,
+                ownerId: null,
+                dueOn: null,
+              },
+            })),
+          },
+        ],
+      }),
+      4,
+    );
+    expect(four?.missing[0]).toMatch(/fails KR-3/);
+  });
+
+  it("says nothing is drafted yet rather than passing on an empty set", () => {
+    expect(phase(base({ goals: [] }), 4)?.missing).toEqual([
+      "No objective is drafted yet",
+    ]);
+  });
+
+  it("stays unanswered while the set cannot be read", () => {
+    expect(phase(base(), 4)?.blocked).toEqual([
+      "The §4 verdicts across the set could not be read",
+    ]);
+  });
+
+  it("refuses publication on a failing OBJ-1", () => {
+    const gates = publishGates(
+      base({ goals: [judged("Launch the new mobile app by end of Q3")] }),
+      thresholds,
+    );
+    const two = gates.find((entry) => entry.gateKey === 2);
+    expect(two?.passed).toBe(false);
+    expect(two?.detail.missing[0]).toMatch(
+      /^OBJ-1 on "Launch the new mobile app by end of Q3": /,
+    );
+    expect(canPublish(gates)).toBe(false);
+  });
+
+  it("judges gate 2 on phase 5's rail, not only at publication", () => {
+    const five = phase(base({ goals: [judged(goal().title)] }), 5);
+    expect(five?.blocked).toEqual([]);
+    expect(five?.missing).toEqual(["The set is not published"]);
+  });
+});
+
+describe("phase 0 reads the workspace's strategy bounds (H-17)", () => {
+  it("asks for the workspace's range, not the canon's two to five", () => {
+    const tuned = {
+      ...thresholds,
+      "quality.annualStrategyBounds": { low: 3, high: 4 },
+    };
+    const zero = phaseCompletion(
+      base({
+        mode: "annual",
+        goals: [goal()],
+        frame: {
+          hasMission: true,
+          hasStrategy: true,
+          strategyCount: 2,
+          notDoingWritten: true,
+          agreed: true,
+          annualKeyResultCount: 0,
+        },
+      }),
+      tuned,
+    )[0];
+    expect(zero?.missing).toContain(
+      "2 annual strategies, and §2.1 asks for 3 to 4",
+    );
   });
 });

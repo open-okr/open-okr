@@ -93,6 +93,7 @@ export const runNudges = defineWriteAction({
         workspaceId,
         at,
         cadence: "hourly",
+        ...(_context.baseUrl ? { baseUrl: _context.baseUrl } : {}),
       });
       const result = { ...counts, ruleKeys: [...ruleKeys] };
 

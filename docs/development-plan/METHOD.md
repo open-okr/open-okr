@@ -358,11 +358,13 @@ Added 11 September 2026 after the P7-T07 audit measured OBJ-1 against twenty rea
 The set cannot be published until all six are green.
 
 1. Every objective has a title, a named champion and a named reviewer.
-2. Every key result passes the §4.2 checks.
+2. Every key result passes the §4.2 checks, and no objective fails OBJ-1.
 3. Alignment is mapped. Each objective states what it contributes to.
 4. Every dependency is confirmed, or logged with a named risk owner.
 5. Capacity is checked. Nothing is left marked as exceeding capacity.
 6. A publication date is set before day one of the cycle.
+
+OBJ-1 joined gate 2 on 28 September 2026. REQUIREMENTS §3.2 says an objective that names an output, such as "Launch the new mobile app", blocks publishing until it passes or the workspace overrides with a recorded reason, and until then gate 2 judged key results only. A warn still does not block. The override is unchanged.
 
 ### 4.6 Weak and strong examples
 

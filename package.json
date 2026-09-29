@@ -46,6 +46,7 @@
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
     "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep",
+    "cloud:operator": "pnpm --filter @openokr/core cloud:operator",
     "cloud:sweep": "pnpm --filter @openokr/core cloud:sweep",
     "cloud:usage": "pnpm --filter @openokr/core cloud:usage",
     "check:air-gap": "node --experimental-strip-types --no-warnings scripts/check-air-gap.ts",
@@ -61,9 +62,9 @@
     "@openokr/test-support": "workspace:*",
     "@playwright/test": "1.63.0",
     "@types/pg": "catalog:",
-    "knip": "6.37.0",
+    "knip": "6.38.0",
     "pg": "catalog:",
-    "turbo": "2.11.2",
+    "turbo": "2.11.4",
     "vitest": "catalog:"
   }
 }

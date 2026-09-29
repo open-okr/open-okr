@@ -93,3 +93,29 @@ export async function readTenant(
   );
   return row;
 }
+
+/**
+ * Writes a tenant's plan and seats (completeness review H-21). Returns false
+ * when there is no tenant row. `applyPlanInTx` is the only caller: it holds
+ * the rules a plan change has to keep.
+ */
+export async function setTenantPlanInTx(
+  tx: AnyTx,
+  input: {
+    readonly workspaceId: string;
+    readonly planKey: string | null;
+    readonly seats: number | null;
+  },
+): Promise<boolean> {
+  // openokr:allow-mutation: the caller's Operation transaction.
+  const updated = await tx
+    .update(tenants)
+    .set({
+      planKey: input.planKey,
+      seats: input.seats,
+      updatedAt: new Date(),
+    })
+    .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)))
+    .returning({ workspaceId: tenants.workspaceId });
+  return updated.length > 0;
+}

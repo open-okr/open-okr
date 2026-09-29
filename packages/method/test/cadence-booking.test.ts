@@ -1,0 +1,140 @@
+import { describe, expect, it } from "vitest";
+import {
+  type BookedRitual,
+  cadenceCoverage,
+  planCycleCadence,
+} from "../src/cadence-booking.ts";
+
+/**
+ * §7.1: "Book all of them for the whole cycle before the cycle starts"
+ * (completeness review H-08). Q4 2026 runs Thursday 1 October to Thursday
+ * 31 December: it starts and ends mid-week, crosses three months, and holds
+ * fourteen Monday-to-Sunday weeks, which is every edge the planner has.
+ */
+const Q4 = { startsOn: "2026-10-01", endsOn: "2026-12-31" } as const;
+
+describe("planning the whole cycle", () => {
+  const plan = planCycleCadence(Q4, {
+    weekday: 1,
+    from: Q4.startsOn,
+    existing: [],
+  });
+  const of = (kind: BookedRitual["kind"]) =>
+    plan.filter((row) => row.kind === kind).map((row) => row.on);
+
+  it("books one weekly check-in in each of the fourteen weeks", () => {
+    const weekly = of("weekly");
+    expect(weekly).toHaveLength(14);
+    // The first week has no Monday inside the cycle, so the nearest working
+    // day in it is taken; after that every one is a Monday.
+    expect(weekly[0]).toBe("2026-10-01");
+    expect(weekly[1]).toBe("2026-10-05");
+    expect(weekly.at(-1)).toBe("2026-12-28");
+  });
+
+  it("books a monthly review in the months the quarterly review does not cover", () => {
+    // The last Monday of October and of November. December holds the close.
+    expect(of("monthly")).toEqual(["2026-10-26", "2026-11-30"]);
+  });
+
+  it("books the quarterly review on the last chosen weekday of the cycle", () => {
+    expect(of("quarterly")).toEqual(["2026-12-28"]);
+  });
+
+  it("reads as booked, and a second run books nothing", () => {
+    expect(cadenceCoverage(Q4, plan)).toEqual({ booked: true, missing: [] });
+    expect(
+      planCycleCadence(Q4, { weekday: 1, from: Q4.startsOn, existing: plan }),
+    ).toEqual([]);
+  });
+
+  it("fills only the gaps around sessions somebody already booked", () => {
+    const existing: BookedRitual[] = [
+      { kind: "weekly", on: "2026-10-07" },
+      { kind: "monthly", on: "2026-10-21" },
+    ];
+    const gaps = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing,
+    });
+    // The week of 5 October and October's review are already booked.
+    expect(gaps.some((row) => row.on === "2026-10-05")).toBe(false);
+    expect(
+      gaps.some(
+        (row) => row.kind === "monthly" && row.on.startsWith("2026-10"),
+      ),
+    ).toBe(false);
+    expect(cadenceCoverage(Q4, [...existing, ...gaps]).booked).toBe(true);
+  });
+
+  it("books nothing in the past, and the check still names the weeks missed", () => {
+    const late = planCycleCadence(Q4, {
+      weekday: 3,
+      from: "2026-10-20",
+      existing: [],
+    });
+    expect(late.every((row) => row.on >= "2026-10-20")).toBe(true);
+    // The week of 19 October is still booked, on its Wednesday.
+    expect(late.some((row) => row.on === "2026-10-21")).toBe(true);
+    const coverage = cadenceCoverage(Q4, late);
+    expect(coverage.booked).toBe(false);
+    expect(coverage.missing).toEqual([
+      "No weekly check-in is booked in 3 week(s): the weeks from 2026-10-01, 2026-10-05, 2026-10-12",
+    ]);
+  });
+});
+
+describe("reading whether a cycle is booked", () => {
+  it("names all three rituals when nothing is booked", () => {
+    const coverage = cadenceCoverage(Q4, []);
+    expect(coverage.booked).toBe(false);
+    expect(coverage.missing).toEqual([
+      "No weekly check-in is booked in 14 week(s): the weeks from 2026-10-01, 2026-10-05, 2026-10-12 and 11 more",
+      "No monthly review is booked in 3 month(s): 2026-10, 2026-11, 2026-12",
+      "No quarterly review is booked at cycle close, between 2026-12-25 and 2027-01-07",
+    ]);
+  });
+
+  it("accepts a quarterly review in the week after the cycle ends", () => {
+    const plan = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [{ kind: "quarterly", on: "2027-01-05" }],
+    });
+    // December now needs its own monthly review, because the close is in
+    // January.
+    expect(
+      plan.some((row) => row.kind === "monthly" && row.on >= "2026-12-01"),
+    ).toBe(true);
+    expect(
+      cadenceCoverage(Q4, [...plan, { kind: "quarterly", on: "2027-01-05" }])
+        .booked,
+    ).toBe(true);
+  });
+
+  it("does not ask for a check-in in a week the cycle only touches on a weekend", () => {
+    // August 2026 starts on a Saturday.
+    const august = { startsOn: "2026-08-01", endsOn: "2026-08-31" };
+    const plan = planCycleCadence(august, {
+      weekday: 1,
+      from: august.startsOn,
+      existing: [],
+    });
+    expect(plan.some((row) => row.on < "2026-08-03")).toBe(false);
+    expect(cadenceCoverage(august, plan).booked).toBe(true);
+  });
+
+  it("does not count a weekly check-in outside the cycle", () => {
+    const plan = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [],
+    }).filter((row) => row.on !== "2026-10-01");
+    const coverage = cadenceCoverage(Q4, [
+      ...plan,
+      { kind: "weekly", on: "2026-09-30" },
+    ]);
+    expect(coverage.booked).toBe(false);
+  });
+});

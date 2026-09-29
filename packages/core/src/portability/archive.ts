@@ -11,9 +11,9 @@
  *
  * The header is JSON and plaintext because the receiving instance needs three
  * things before it can decrypt: which format this is, the data key wrapped
- * under a root key, and a digest it can check before spending time on a file
- * that is truncated. Nothing in the header is a secret. The data key is
- * useless without a root key the reader must already hold.
+ * under a passphrase's key with how that key is derived, and a digest it can
+ * check before spending time on a file that is truncated. Nothing in the
+ * header is a secret. The data key is useless without the passphrase.
  *
  * **Compress, then encrypt.** The other order is a mistake: sealed bytes are
  * indistinguishable from random and do not compress, so gzip after AES buys
@@ -40,8 +40,9 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import {
   type KeyRing,
   openBytes,
+  openWithChosenPhrase,
   type SealedBytes,
-  sealBytes,
+  sealWithChosenPhrase,
 } from "../secrets/key-ring.ts";
 
 export const ARCHIVE_FORMAT = "openokr-archive";
@@ -53,7 +54,27 @@ export const ARCHIVE_FORMAT = "openokr-archive";
  * this is a decision to break older readers, so it goes with a note here
  * saying what moved.
  */
-export const ARCHIVE_VERSION = 1;
+export const ARCHIVE_VERSION = 2;
+
+/**
+ * Version 2, 28 September 2026 (completeness review H-18): the data key is
+ * wrapped under a key derived from a passphrase chosen at export, with the
+ * derivation's salt and cost in the header, rather than under the writing
+ * instance's root key. A version 1 archive opened only on an instance holding
+ * that root key, so moving from the cloud to a self-hosted install meant
+ * handing over the cloud's key. Version 1 is still read, with the ring.
+ */
+const READABLE_VERSIONS: readonly number[] = [1, 2];
+
+/**
+ * The shortest passphrase an export accepts.
+ *
+ * A security floor rather than a method threshold: the archive holds a whole
+ * workspace and is a file somebody will email to themselves. Twelve characters
+ * of anything is a floor a passphrase manager clears without noticing and a
+ * guessable word does not.
+ */
+export const MIN_PASSPHRASE_LENGTH = 12;
 
 /**
  * 512 MiB of assembled archive.
@@ -112,9 +133,18 @@ interface ArchiveHeader {
   readonly format: typeof ARCHIVE_FORMAT;
   readonly version: number;
   readonly cipher: "aes-256-gcm";
-  /** The data key, wrapped under the writing instance's root key. Base64. */
+  /** The data key, wrapped under the passphrase's key (v2) or a root key (v1). Base64. */
   readonly dataKey: string;
-  readonly keyId: string;
+  /** Version 1: which root key wrapped the data key. */
+  readonly keyId?: string;
+  /** Version 2: how the passphrase became a key. Nothing here is secret. */
+  readonly kdf?: {
+    readonly name: "scrypt";
+    readonly salt: string;
+    readonly N: number;
+    readonly r: number;
+    readonly p: number;
+  };
   /** SHA-256 of the sealed bytes, hex. Checked before decrypting. */
   readonly digest: string;
   readonly bytes: number;
@@ -139,9 +169,14 @@ export interface WriteArchiveResult {
  * the order is the load order and the caller is the only thing that knows it.
  */
 export function writeArchive(
-  ring: KeyRing,
+  passphrase: string,
   records: readonly ArchiveRecord[],
 ): WriteArchiveResult {
+  if (passphrase.length < MIN_PASSPHRASE_LENGTH) {
+    throw new ArchiveError(
+      `An archive's passphrase has at least ${MIN_PASSPHRASE_LENGTH} characters.`,
+    );
+  }
   if (records[0]?.r !== "manifest") {
     throw new ArchiveError("An archive begins with its manifest.");
   }
@@ -153,14 +188,14 @@ export function writeArchive(
 
   const body = Buffer.from(records.map(encodeRecord).join(""), "utf8");
   const compressed = gzipSync(body, { level: 9 });
-  const sealed = sealBytes(ring, compressed);
+  const sealed = sealWithChosenPhrase(passphrase, compressed);
 
   const header: ArchiveHeader = {
     format: ARCHIVE_FORMAT,
     version: ARCHIVE_VERSION,
     cipher: "aes-256-gcm",
     dataKey: sealed.dataKey,
-    keyId: sealed.keyId,
+    kdf: sealed.kdf,
     digest: createHash("sha256").update(sealed.ciphertext).digest("hex"),
     bytes: sealed.ciphertext.byteLength,
   };
@@ -199,7 +234,10 @@ export interface ReadArchiveResult {
  * counts match what was actually read. A file that fails any of these is
  * refused by name rather than half-imported.
  */
-export function readArchive(ring: KeyRing, bytes: Buffer): ReadArchiveResult {
+export function readArchive(
+  bytes: Buffer,
+  keys: { readonly passphrase?: string; readonly ring?: KeyRing },
+): ReadArchiveResult {
   const newline = bytes.indexOf(0x0a);
   if (newline === -1) {
     throw new ArchiveError(
@@ -218,9 +256,9 @@ export function readArchive(ring: KeyRing, bytes: Buffer): ReadArchiveResult {
       `This file says it is "${String(header.format)}" and not an OpenOKR archive.`,
     );
   }
-  if (header.version !== ARCHIVE_VERSION) {
+  if (!READABLE_VERSIONS.includes(header.version)) {
     throw new ArchiveError(
-      `This archive is format version ${String(header.version)} and this instance reads version ${ARCHIVE_VERSION}. ` +
+      `This archive is format version ${String(header.version)} and this instance reads versions ${READABLE_VERSIONS.join(" and ")}. ` +
         "A newer archive needs a newer instance; an older one needs the release that wrote it.",
     );
   }
@@ -238,14 +276,40 @@ export function readArchive(ring: KeyRing, bytes: Buffer): ReadArchiveResult {
     );
   }
 
-  const sealed: SealedBytes = {
-    ciphertext,
-    dataKey: header.dataKey,
-    keyId: header.keyId,
-  };
-  // `openBytes` throws a KeyRingError naming the missing key or the failed
-  // authentication check, which is more use than anything this could add.
-  const compressed = openBytes(ring, sealed);
+  let compressed: Buffer;
+  if (header.kdf) {
+    if (!keys.passphrase) {
+      throw new ArchiveError(
+        "This archive is protected by a passphrase. Give the passphrase it was exported with.",
+      );
+    }
+    try {
+      compressed = openWithChosenPhrase(keys.passphrase, {
+        ciphertext,
+        dataKey: header.dataKey,
+        kdf: header.kdf,
+      });
+    } catch {
+      throw new ArchiveError(
+        "That passphrase does not open this archive. Check it with whoever exported it.",
+      );
+    }
+  } else {
+    // Version 1: sealed under the writing instance's root key.
+    if (!keys.ring || !header.keyId) {
+      throw new ArchiveError(
+        "This archive is sealed under an instance's encryption key, and this instance does not hold one.",
+      );
+    }
+    const sealed: SealedBytes = {
+      ciphertext,
+      dataKey: header.dataKey,
+      keyId: header.keyId,
+    };
+    // `openBytes` throws a KeyRingError naming the missing key or the failed
+    // authentication check, which is more use than anything this could add.
+    compressed = openBytes(keys.ring, sealed);
+  }
 
   let body: Buffer;
   try {

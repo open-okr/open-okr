@@ -33,6 +33,7 @@ import { digestItemsFor } from "../notifications/digest.ts";
 import { primaryChannelSchema } from "../settings/registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { blockerDraft, isBlockerRule } from "./blocker-card.ts";
+import { nudgeDraft } from "./message.ts";
 
 export interface DeliveryResult {
   /** Nudges stamped as sent on this pass. */
@@ -43,37 +44,14 @@ export interface DeliveryResult {
   readonly unreachable: readonly string[];
 }
 
-/**
- * A nudge's own message.
- *
- * **Deliberately one line for every rule.** Per-rule wording is coaching copy,
- * and METHOD.md owns coaching copy: writing forty-five recipient-facing
- * sentences here would put the product's voice outside the one document that
- * is allowed to hold it. So this says the true, minimal thing and carries the
- * rule key, which is what every proactive message is required to carry and what
- * the reader can follow to the rule itself. Per-rule text is a row of its own.
- */
-function draftFor(ruleKey: string): { subject: string; text: string } {
-  return {
-    subject: "OpenOKR: something needs you",
-    text: [
-      "You have a reminder waiting in OpenOKR.",
-      "",
-      `Rule: ${ruleKey}`,
-    ].join("\n"),
-  };
-}
-
 /** The trigger key §6.4 gives the morning summary. */
 const DAILY_DIGEST_RULE = "digest.daily";
 
 /**
  * The morning summary's own message: the member's own unread rows (P6-G01b).
  *
- * Null when there is nothing unread, and the caller falls back to the generic
- * line rather than mailing an empty list. A summary of nothing is still worth
- * sending to somebody who asked for one every day, and saying "you have a
- * reminder waiting" is the honest version of that.
+ * Null when there is nothing unread, and the caller falls back to the rule's
+ * own plain message rather than mailing an empty list.
  *
  * The same builder the batch drain uses, so the two digests cannot describe one
  * event differently, and the access filter is applied once in one place.
@@ -319,6 +297,19 @@ export async function deliverDueNudges(
       // actions worth offering; everything else carries the generic line.
       // Falls back when the blocker has gone or was resolved between the nudge
       // being scheduled and this pass running, which is an ordinary race.
+      // The rule's own name, what it is about, where to open it and, for a
+      // check-in, the check-in itself (completeness review H-12). A blocker
+      // and the morning summary carry more, and fall back to this when the
+      // blocker has gone or the summary is empty.
+      const plain = () =>
+        nudgeDraft(tx, {
+          workspaceId: input.workspaceId,
+          ruleKey: row.ruleKey,
+          subjectType: row.subjectType,
+          subjectId: row.subjectId,
+          provider,
+          ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+        });
       const draft =
         isBlockerRule(row.ruleKey) && row.subjectType === "blocker"
           ? ((await blockerDraft(tx, {
@@ -327,24 +318,17 @@ export async function deliverDueNudges(
               ruleKey: row.ruleKey,
               now: input.now,
               ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
-            })) ?? draftFor(row.ruleKey))
-          : // **The daily summary carries what it is summarising** (P6-G01b).
-            // Every other rule is one line by design, because per-rule wording
-            // is coaching copy and METHOD.md owns that. This rule is the
-            // exception for the opposite reason: `digest.daily` is not a
-            // sentence about a thing, it is a list of things, and a morning
-            // summary that said "you have a reminder waiting" while summarising
-            // nothing was the state of it from P4-T05b until here. Falls back to
-            // the generic line when the list comes back empty, which is what a
-            // member with a quiet day gets.
+            })) ?? (await plain()))
+          : // **The daily summary carries what it is summarising** (P6-G01b):
+            // it is a list of things rather than a sentence about one.
             row.ruleKey === DAILY_DIGEST_RULE && input.baseUrl
             ? ((await dailyDigestDraft(tx, {
                 workspaceId: input.workspaceId,
                 memberId: row.recipientMemberId,
                 baseUrl: input.baseUrl,
                 now: input.now,
-              })) ?? draftFor(row.ruleKey))
-            : draftFor(row.ruleKey);
+              })) ?? (await plain()))
+            : await plain();
       // WhatsApp is the one provider with a clock on it (P5-T04b-b). Outside
       // Meta's twenty-four hour window the body will not go at all, so the
       // rule's approved template and its filled-in variables are looked up and

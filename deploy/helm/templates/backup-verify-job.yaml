@@ -39,6 +39,11 @@ spec:
             - |
               set -eu
 
+              # The owner's address when there is one: creating the scratch
+              # database and reading every table both need more than the
+              # application's role.
+              DB_URL="${DATABASE_ADMIN_URL:-$DATABASE_URL}"
+
               # Find the newest backup directory (timestamp-named, lexicographic).
               BACKUP_DIR="$(ls -1d /backups/*/ 2>/dev/null | sort | tail -1)"
               if [ -z "$BACKUP_DIR" ]; then
@@ -48,7 +53,9 @@ spec:
               echo "verify: checking $BACKUP_DIR"
 
               # Checksum.
-              if ! (cd "$BACKUP_DIR" && sha256sum -c checksum.sha256 --quiet 2>/dev/null); then
+              # Output discarded rather than `--quiet`: the image's busybox
+              # sha256sum has no such option and refused every backup with it.
+              if ! (cd "$BACKUP_DIR" && sha256sum -c checksum.sha256 >/dev/null 2>&1); then
                 echo "verify: FAIL checksum verification failed"
                 exit 2
               fi
@@ -70,15 +77,17 @@ spec:
               echo "verify: decrypted"
 
               # Temporary database with a random suffix.
-              VERIFY_DB="openokr_verify_$$_${RANDOM:-0}"
-              cleanup() { rm -f /tmp/db.dump; psql "$DATABASE_URL" -c "DROP DATABASE IF EXISTS \"$VERIFY_DB\"" 2>/dev/null || true; }
+              # `${$}` rather than `$$_`: busybox sh reads that as `$` then
+              # `$_`, which `set -u` refuses, so the job never got this far.
+              VERIFY_DB="openokr_verify_${$}_$(date +%s)"
+              cleanup() { rm -f /tmp/db.dump; psql "$DB_URL" -c "DROP DATABASE IF EXISTS \"$VERIFY_DB\"" 2>/dev/null || true; }
               trap cleanup EXIT INT TERM
 
               # Derive a connection string for the verify database.
               # Replace the database name at the end of DATABASE_URL.
-              VERIFY_URL="$(echo "$DATABASE_URL" | sed "s|/[^/?]*\([?].*\)\{0,1\}$|/$VERIFY_DB\1|")"
+              VERIFY_URL="$(echo "$DB_URL" | sed "s|/[^/?]*\([?].*\)\{0,1\}$|/$VERIFY_DB\1|")"
 
-              psql "$DATABASE_URL" -c "CREATE DATABASE \"$VERIFY_DB\"" || {
+              psql "$DB_URL" -c "CREATE DATABASE \"$VERIFY_DB\"" || {
                 echo "verify: FAIL could not create temporary database"
                 exit 2
               }
@@ -140,17 +149,10 @@ spec:
                 exit 1
               fi
               echo "verify: PASSED ($WS_COUNT workspace(s), schema $ACTUAL_SCHEMA)"
+          # The chart's own Secrets, through the same helper the application
+          # uses (completeness review H-19).
           env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "openokr.fullname" . }}
-                  key: database-url
-            - name: OPENOKR_ENCRYPTION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "openokr.fullname" . }}
-                  key: encryption-key
+            {{- include "openokr.commonEnv" . | nindent 12 }}
           volumeMounts:
             - name: backups
               mountPath: /backups

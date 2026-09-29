@@ -368,6 +368,59 @@ export async function handleInbound(
 }
 
 /**
+ * The member behind a verified provider account, from a pool (completeness
+ * review H-06).
+ *
+ * For a request that is not a message: a Slack form submission names who
+ * submitted it and carries no text to route, so it never goes through
+ * `handleInbound`. The route used to answer this with a bare pool query on
+ * `channel_identities` and `workspace_members`, both of which force row-level
+ * security. It worked on the Compose install only because that connected as a
+ * superuser; under the application role the query saw nothing, and every form
+ * check-in from Slack was dropped with no reply. Same rules as step 4 and 5 of
+ * `resolveInbound`, inside the workspace's own tenant setting.
+ */
+export async function memberForChannelIdentity(
+  pool: Pool,
+  input: {
+    readonly workspaceId: string;
+    readonly provider: ChannelConnectionKey;
+    readonly externalId: string;
+  },
+): Promise<{ readonly memberId: string; readonly userId: string } | null> {
+  const db = drizzle(pool);
+  return withWorkspace(db, input.workspaceId, async (tx) => {
+    const [row] = await tx
+      .select({
+        memberId: workspaceMembers.id,
+        userId: workspaceMembers.userId,
+        verifiedAt: channelIdentities.verifiedAt,
+      })
+      .from(channelIdentities)
+      .innerJoin(
+        workspaceMembers,
+        eq(workspaceMembers.id, channelIdentities.memberId),
+      )
+      .where(
+        and(
+          activeOnly(
+            channelIdentities,
+            eq(channelIdentities.workspaceId, input.workspaceId),
+            eq(channelIdentities.provider, input.provider),
+            eq(channelIdentities.externalId, input.externalId),
+          ),
+          activeOnly(workspaceMembers, eq(workspaceMembers.status, "active")),
+        ),
+      )
+      .limit(1);
+    if (!row?.verifiedAt || !row.userId) {
+      return null;
+    }
+    return { memberId: row.memberId, userId: row.userId };
+  });
+}
+
+/**
  * Which workspace installed this provider team, or null.
  *
  * **The one read in this product that runs before a tenant is known, and it

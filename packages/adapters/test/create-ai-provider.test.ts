@@ -4,6 +4,7 @@ import {
   createAIProvider,
   defaultTierModelsFor,
 } from "../src/create-ai-provider.ts";
+import { OutboundRefusedError } from "../src/outbound/guard.ts";
 import { AIUnavailableError } from "../src/ports/ai.ts";
 
 /**
@@ -84,4 +85,57 @@ describe("defaultTierModelsFor", () => {
     expect(defaultTierModelsFor("off")).toEqual({});
     expect(defaultTierModelsFor("openai-compatible")).toEqual({});
   });
+});
+
+/**
+ * A base URL an administrator typed, on the managed cloud (completeness
+ * review H-07). The two drivers that take an address are handed the guarded
+ * fetch, so the request is refused before it leaves rather than made on the
+ * administrator's behalf.
+ */
+describe("a provider pointed at an address somebody typed", () => {
+  /** The guard's own refusal, wherever the SDK wrapped it. */
+  const refusalIn = (error: unknown): string | undefined => {
+    let current: unknown = error;
+    for (let depth = 0; depth < 6 && current; depth += 1) {
+      if (current instanceof OutboundRefusedError) {
+        return current.refusal;
+      }
+      current = (current as { cause?: unknown }).cause;
+    }
+    return undefined;
+  };
+
+  const attempt = async (config: AIProviderConfig) => {
+    try {
+      await createAIProvider(config).chat({
+        model: "any",
+        messages: [{ role: "user", content: "hi" }],
+      });
+      return "answered";
+    } catch (error) {
+      return refusalIn(error) ?? "failed without the guard";
+    }
+  };
+
+  it("refuses a metadata address for an OpenAI-compatible endpoint", async () => {
+    expect(
+      await attempt({
+        provider: "openai-compatible",
+        apiKey: "test",
+        baseURL: "http://169.254.169.254/v1",
+        guardOutbound: true,
+      }),
+    ).toBe("address_not_allowed");
+  }, 30_000);
+
+  it("refuses the host's own loopback for Ollama", async () => {
+    expect(
+      await attempt({
+        provider: "ollama",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        guardOutbound: true,
+      }),
+    ).toBe("address_not_allowed");
+  }, 30_000);
 });

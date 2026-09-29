@@ -354,3 +354,58 @@ async function readCapped(
   }
   return Buffer.concat(chunks).toString("utf8");
 }
+
+/** Thrown by `guardedFetch` when an address is refused. */
+export class OutboundRefusedError extends Error {
+  readonly refusal: OutboundRefusal;
+
+  constructor(refusal: OutboundRefusal, detail: string) {
+    super(detail);
+    this.name = "OutboundRefusedError";
+    this.refusal = refusal;
+  }
+}
+
+/**
+ * A `fetch` that refuses what `outboundFetch` refuses, and streams the rest
+ * (completeness review H-07).
+ *
+ * `outboundFetch` reads a whole body under a size cap, which is right for a
+ * discovery document and wrong for a model's answer, which streams and can
+ * run long. This is the same address check and the same refusal of every
+ * redirect, handed to a provider SDK as its `fetch`: every request that SDK
+ * makes is checked before it leaves, including the ones it builds from a
+ * base URL an administrator typed.
+ *
+ * Used for the two drivers that take an address, Ollama and any
+ * OpenAI-compatible endpoint, when the instance is the managed cloud. There a
+ * workspace administrator is not the operator, and a base URL pointed at
+ * `169.254.169.254` or the database host is a request the server would make
+ * on their behalf. On a self-hosted instance a private address is the point:
+ * that is where a local model runs.
+ */
+export function createGuardedFetch(
+  options: Pick<OutboundOptions, "fetchImpl" | "resolve"> = {},
+): typeof fetch {
+  const doFetch = options.fetchImpl ?? fetch;
+  return async (input, init) => {
+    const candidate =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    const checked = await checkUrl(candidate, options);
+    if (!checked.ok) {
+      throw new OutboundRefusedError(checked.refusal, checked.detail);
+    }
+    const response = await doFetch(input, { ...init, redirect: "manual" });
+    if (response.status >= 300 && response.status < 400) {
+      throw new OutboundRefusedError(
+        "redirected",
+        `${candidate} answered ${response.status}, and redirects are not followed.`,
+      );
+    }
+    return response;
+  };
+}

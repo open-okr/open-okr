@@ -4,6 +4,7 @@ import {
   excerptRichText,
   OperationError,
 } from "@openokr/core";
+import type { ResolvedThresholds } from "@openokr/method";
 import {
   Bar,
   Button,
@@ -151,6 +152,11 @@ export default async function GoalPage({
   // `ai.readProviderConfig`, which is declared `full` because it carries every
   // provider's admin configuration and a masked key hint, so the whole screen
   // failed for any member who did not create the workspace.
+  // The strength bands the coach strip colours its score by (H-17).
+  const strengthBands = (
+    (await callAction(context, "rhythm.read", {}))
+      .thresholds as unknown as ResolvedThresholds
+  )["quality.strengthScoreBands"];
   const { available: drafting } = await callAction(
     context,
     "ai.readAvailability",
@@ -299,6 +305,7 @@ export default async function GoalPage({
           }))}
           drafting={drafting}
           canEdit={canEdit && !closed}
+          bands={strengthBands}
         />
 
         <Card>

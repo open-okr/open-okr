@@ -24,6 +24,7 @@
 import { activeOnly, goals, keyResults, spaces } from "@openokr/db";
 import { eq, isNull } from "drizzle-orm";
 import type { AgentDrafter, ReviewableGoal } from "../agents/drafter.ts";
+import { type AgentScope, agentSeesGoal } from "../agents/scope.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { reconcileFindingsInTx, type WantedFinding } from "./service.ts";
@@ -53,6 +54,11 @@ export async function sweepSemanticInTx(
     readonly workspaceId: string;
     readonly cycleId: string;
     readonly drafter?: AgentDrafter;
+    /**
+     * The Coach this reads as (completeness review H-04). It matters most here:
+     * what this reads is sent to the model provider.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<SemanticSweepResult> {
   if (!input.drafter) {
@@ -75,6 +81,7 @@ export async function sweepSemanticInTx(
         eq(goals.workspaceId, input.workspaceId),
         eq(goals.cycleId, input.cycleId),
         isNull(goals.closedAt),
+        input.scope ? agentSeesGoal(input.scope) : undefined,
       ),
     );
 
@@ -177,6 +184,9 @@ export async function sweepSemanticInTx(
       source: "coach",
       kind,
       wanted,
+      ...(input.scope
+        ? { subjectGoalIds: new Set(rows.map((row) => row.id)) }
+        : {}),
     });
   }
 

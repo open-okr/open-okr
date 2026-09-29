@@ -16,7 +16,12 @@ import {
   SuggestParent,
 } from "./assists.tsx";
 import { DraftCoach } from "./draft-coach.tsx";
-import { addKeyResult, createGoal, recordValue } from "./goal-actions.ts";
+import {
+  addKeyResult,
+  createGoal,
+  recordValue,
+  setKeyResultOwnerAndDate,
+} from "./goal-actions.ts";
 
 /**
  * Phase 4's drafting surface (UIUX-PLAN.md §4 S-09, P3-T04).
@@ -71,6 +76,8 @@ const HEALTH_TONE: Readonly<
 
 export async function Drafting({
   cycleId,
+  endsOn,
+  draftingAllowed,
   goals,
   members,
   canEdit,
@@ -80,6 +87,15 @@ export async function Drafting({
   assistsAvailable,
 }: {
   readonly cycleId: string;
+  /** The cycle's last day, which a new key result is due on unless changed. */
+  readonly endsOn: string;
+  /**
+   * False while an earlier phase is incomplete. The add forms give way to the
+   * reason, which the banner above names, and the server refuses a guided
+   * draft regardless (REQUIREMENTS §3.1, H-09). What is already drafted stays
+   * editable: finishing a draft is not starting one.
+   */
+  readonly draftingAllowed: boolean;
   readonly goals: readonly DraftGoal[];
   readonly members: readonly { readonly id: string; readonly name: string }[];
   readonly canEdit: boolean;
@@ -102,10 +118,21 @@ export async function Drafting({
   readonly assistsAvailable: boolean;
 }) {
   const { t } = await getTranslations();
+  const canDraft = canEdit && draftingAllowed;
 
   return (
     <div className="flex flex-col gap-4.5">
-      {assistsAvailable && canEdit ? (
+      {canEdit && !draftingAllowed ? (
+        <Card>
+          <CardBody>
+            <p className="text-sm text-ink-2">
+              {t("cycle.drafting.waitsForEarlierPhases")}
+            </p>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {assistsAvailable && canDraft ? (
         <DraftFromAmbition cycleId={cycleId} memberId={memberId} />
       ) : null}
 
@@ -191,6 +218,7 @@ export async function Drafting({
               <Bar
                 value={goal.progressPct}
                 max={thresholds["scoring.progressCeilingPct"]}
+                label={t("cycle.drafting.progressOf", { title: goal.title })}
                 className="h-1.5 flex-1"
               />
               <span className="text-xs font-semibold text-ink-3">
@@ -278,12 +306,67 @@ export async function Drafting({
                         {t("cycle.drafting.readsItsValueFrom")}
                       </p>
                     ) : null}
+                    {canEdit ? (
+                      <ActionForm
+                        action={setKeyResultOwnerAndDate}
+                        className="flex flex-wrap items-center gap-1.5"
+                      >
+                        <input type="hidden" name="id" value={keyResult.id} />
+                        <label
+                          className="sr-only"
+                          htmlFor={`owner-${keyResult.id}`}
+                        >
+                          {t("cycle.drafting.ownerOf", {
+                            title: keyResult.title,
+                          })}
+                        </label>
+                        <select
+                          id={`owner-${keyResult.id}`}
+                          name="ownerId"
+                          defaultValue={keyResult.ownerId ?? ""}
+                          className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
+                        >
+                          <option value="">
+                            {t("cycle.drafting.noOwner")}
+                          </option>
+                          {members.map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {t("cycle.drafting.ownedBy", {
+                                name: member.name,
+                              })}
+                            </option>
+                          ))}
+                        </select>
+                        <label
+                          className="sr-only"
+                          htmlFor={`due-${keyResult.id}`}
+                        >
+                          {t("cycle.drafting.dueDateOf", {
+                            title: keyResult.title,
+                          })}
+                        </label>
+                        <input
+                          id={`due-${keyResult.id}`}
+                          type="date"
+                          name="dueOn"
+                          defaultValue={keyResult.dueOn ?? ""}
+                          className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
+                        />
+                        <Button
+                          type="submit"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                        >
+                          {t("common.save")}
+                        </Button>
+                      </ActionForm>
+                    ) : null}
                   </li>
                 ))}
               </ul>
             )}
 
-            {canEdit ? (
+            {canDraft ? (
               <ActionForm
                 action={addKeyResult}
                 className="flex flex-col gap-1.5 rounded-md border border-line border-dashed p-2.5"
@@ -358,6 +441,31 @@ export async function Drafting({
                     placeholder={t("common.target")}
                     className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
                   />
+                  <label className="sr-only" htmlFor={`kr-owner-${goal.id}`}>
+                    {t("cycle.drafting.owner")}
+                  </label>
+                  <select
+                    id={`kr-owner-${goal.id}`}
+                    name="ownerId"
+                    defaultValue={goal.champion.id}
+                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                  >
+                    {members.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {t("cycle.drafting.ownedBy", { name: member.name })}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="sr-only" htmlFor={`kr-due-${goal.id}`}>
+                    {t("cycle.drafting.dueOn")}
+                  </label>
+                  <input
+                    id={`kr-due-${goal.id}`}
+                    type="date"
+                    name="dueOn"
+                    defaultValue={endsOn}
+                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                  />
                   <label className="sr-only" htmlFor={`kr-unit-${goal.id}`}>
                     {t("cycle.drafting.unit")}
                   </label>
@@ -375,14 +483,14 @@ export async function Drafting({
               </ActionForm>
             ) : null}
 
-            {assistsAvailable && canEdit ? (
+            {assistsAvailable && canDraft ? (
               <SuggestMeasure goalId={goal.id} />
             ) : null}
           </CardBody>
         </Card>
       ))}
 
-      {canEdit ? (
+      {canDraft ? (
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">

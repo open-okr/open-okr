@@ -31,7 +31,7 @@ An OKR set is not published until all six pass. They are hard: the product
 refuses, rather than warning and letting it through.
 
 1. Every objective has a title, a champion and a reviewer
-2. Every key result passes the quality checks
+2. Every key result passes the quality checks, and every objective names an outcome rather than an output
 3. Alignment is mapped: each objective states what it contributes to
 4. Every dependency is confirmed, or logged with a named risk owner
 5. Capacity is checked, and nothing is left exceeding it

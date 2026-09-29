@@ -16,7 +16,13 @@
  * while inspecting nothing.
  */
 
-export type ConnectionOutcome = "ok" | "failed" | "unavailable";
+/**
+ * `optional` is a port the deployment does not need and has not been tested
+ * (completeness review H-24): chat channels, which are connected per
+ * workspace, and an AI provider, which nothing requires. Not a tick, because
+ * nothing was proved, and not a problem, because nothing is wrong.
+ */
+export type ConnectionOutcome = "ok" | "failed" | "unavailable" | "optional";
 
 export interface ConnectionTest {
   /** The port under test: 'database', 'mail', 'channel' or 'ai'. */

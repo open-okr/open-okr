@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
+import { ScheduleSessions } from "./schedule.tsx";
 
 /**
  * The session list (UIUX-PLAN.md §4 S-22 to S-25, P5-T01c).
@@ -149,6 +150,10 @@ export default async function SessionsPage({
           {includeFinished ? <Group label="Finished" rows={over} /> : null}
         </>
       )}
+
+      {/* The scheduler this page's empty state used to send people looking
+       * for (completeness review H-08). */}
+      <ScheduleSessions />
     </div>
   );
 }

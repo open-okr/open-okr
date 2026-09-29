@@ -33,6 +33,8 @@ import {
   keyResultDependencies,
   keyResults,
   newId,
+  okrSessions,
+  retroNotes,
   type WorkspaceTx,
 } from "@openokr/db";
 import {
@@ -44,10 +46,23 @@ import {
   type InitiativeSnapshot,
   type PhaseResult,
   phaseCompletion,
+  phaseWorkAllowed,
   publishGates,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  or,
+} from "drizzle-orm";
+import { loadCycleCadence } from "../sessions/booking.ts";
+import { workspaceTimeZone } from "./service.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -62,11 +77,11 @@ export interface WorkflowSnapshot {
 /**
  * Everything the workflow reads, in one pass over the cycle's children.
  *
- * The quality engine, sessions and the cycle retrospective are left `undefined`
- * rather than defaulted, because `packages/method` treats "no rows" and "no such
- * table yet" as different facts and only one of them lets a gate pass. Each
- * becomes a real field as its task lands: P4-T01, P4-T04 and P4-T08. Goals
- * stopped being one of them at P3-T04.
+ * Every input is read here since the completeness review (H-08, H-09): the
+ * booked cadence, the scores and the retrospective. `packages/method` still
+ * treats "no rows" and "not read" as different facts, so a field left
+ * `undefined` by a caller reports its phase as unanswered rather than passed.
+ * Phase 4 judges the goal snapshots itself, so it needs no field of its own.
  */
 export async function loadWorkflowInput<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -198,7 +213,7 @@ export async function loadWorkflowInput<
     )
     .limit(1);
 
-  const frame = await loadFrameSnapshot(tx, workspaceId, cycle.frameId);
+  const frame = await loadFrameSnapshot(tx, workspaceId, cycle);
 
   // The earliest booked session, which is what the §2.6 pack lead is measured
   // against. `session_dates` is a jsonb array rather than a table because
@@ -233,10 +248,90 @@ export async function loadWorkflowInput<
     priorities,
     revalidation: revalidation ?? null,
     focusKeyResultCount: focusRows.length,
+    annualKeyResultCount: (await loadFocusCandidates(tx, workspaceId, cycle))
+      .length,
     hasCapacityNotes: Boolean(capacity?.cuts),
     frame,
     goals: await loadGoalSnapshots(tx, workspaceId, cycleId),
     initiatives: await loadInitiativeSnapshots(tx, workspaceId, cycleId),
+    // Phase 7: every key result scored, and the retrospective written
+    // (completeness review H-09).
+    ...(await loadReviewAndLearn(tx, workspaceId, cycle)),
+    // Phase 6: the §7.1 rhythm booked for the whole cycle, and at least one
+    // decision recorded (completeness review H-08).
+    cadence: await loadCycleCadence(
+      tx,
+      workspaceId,
+      { id: cycleId, startsOn: cycle.startsOn, endsOn: cycle.endsOn },
+      await workspaceTimeZone(tx, workspaceId),
+    ),
+  };
+}
+
+/**
+ * Phase 7's two conditions (METHOD.md §2.3: "Every key result scored and the
+ * retrospective written"; completeness review H-09).
+ *
+ * **Scored** means `key_results.score` is set, which the quarterly review
+ * writes back when it closes (P4-T10b-a). A cycle with no key results has
+ * nothing scored, not everything.
+ *
+ * **The retrospective** is §8.1 stage five, the team retro, held in a
+ * quarterly review of this cycle: one note in either column is a retro that
+ * happened. A review booked before sessions carried a cycle counts when it
+ * falls inside the cycle or the week after its close, the same reading
+ * `sessions/booking.ts` gives "at cycle close".
+ */
+async function loadReviewAndLearn<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  cycle: Pick<Cycle, "id" | "startsOn" | "endsOn">,
+): Promise<{ allKeyResultsScored: boolean; retrospectiveWritten: boolean }> {
+  const [tally] = await tx
+    .select({ total: count(), scored: count(keyResults.score) })
+    .from(keyResults)
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        eq(goals.cycleId, cycle.id),
+        isNull(goals.deletedAt),
+      ),
+    );
+  const total = Number(tally?.total ?? 0);
+
+  const earliest = new Date(`${cycle.startsOn}T00:00:00Z`);
+  earliest.setUTCDate(earliest.getUTCDate() - 1);
+  const latest = new Date(`${cycle.endsOn}T00:00:00Z`);
+  latest.setUTCDate(latest.getUTCDate() + 9);
+  const [note] = await tx
+    .select({ id: retroNotes.id })
+    .from(retroNotes)
+    .innerJoin(okrSessions, eq(okrSessions.id, retroNotes.sessionId))
+    .where(
+      activeOnly(
+        retroNotes,
+        eq(retroNotes.workspaceId, workspaceId),
+        isNull(okrSessions.deletedAt),
+        eq(okrSessions.kind, "quarterly"),
+        or(
+          eq(okrSessions.cycleId, cycle.id),
+          and(
+            isNull(okrSessions.cycleId),
+            gte(okrSessions.scheduledFor, earliest),
+            lte(okrSessions.scheduledFor, latest),
+          ),
+        ),
+      ),
+    )
+    .limit(1);
+
+  return {
+    allKeyResultsScored: total > 0 && Number(tally?.scored ?? 0) === total,
+    retrospectiveWritten: Boolean(note),
   };
 }
 
@@ -432,7 +527,12 @@ async function loadGoalSnapshots<
 
 async function loadFrameSnapshot<
   TSchema extends Record<string, unknown> = Record<string, never>,
->(tx: AnyTx<TSchema>, workspaceId: string, frameId: string | null) {
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  cycle: Pick<Cycle, "frameId" | "startsOn" | "endsOn">,
+) {
+  const frameId = cycle.frameId;
   const [frame] = await tx
     .select({
       id: annualFrames.id,
@@ -468,23 +568,11 @@ async function loadFrameSnapshot<
       ),
     );
 
-  // The key results of the annual cycles that sit under this frame. §2.3's
-  // quarterly phase 3 reads this to decide whether "focus areas chosen" means
-  // picking annual key results or writing a focus note: with nothing to point at,
-  // a note is the only honest answer (P3-T04).
-  const annualKeyResults = await tx
-    .select({ id: keyResults.id })
-    .from(keyResults)
-    .innerJoin(goals, eq(goals.id, keyResults.goalId))
-    .innerJoin(cycles, eq(cycles.id, goals.cycleId))
-    .where(
-      and(
-        activeOnly(keyResults, eq(keyResults.workspaceId, workspaceId)),
-        isNull(goals.deletedAt),
-        eq(cycles.frameId, frame.id),
-        eq(cycles.mode, "annual"),
-      ),
-    );
+  // The key results of the year this cycle sits in. §2.3's quarterly phase 3
+  // reads this to decide whether "focus areas chosen" means picking annual key
+  // results or writing a focus note: with nothing to point at, a note is the
+  // only honest answer (P3-T04, read by the calendar since H-09).
+  const annualKeyResults = await loadFocusCandidates(tx, workspaceId, cycle);
 
   return {
     hasMission: Boolean(frame.mission),
@@ -494,6 +582,46 @@ async function loadFrameSnapshot<
     agreed: frame.agreed,
     annualKeyResultCount: annualKeyResults.length,
   };
+}
+
+/**
+ * The year's key results a quarter may choose its focus from (METHOD.md §2.3
+ * phase 3: "focus areas chosen"; completeness review H-09): every key result
+ * of an annual cycle that overlaps the quarter.
+ *
+ * **By the calendar, not by `cycles.frame_id`.** Nothing has ever written that
+ * column, so reading the year through it found no key results on any
+ * workspace, and phase 3 accepted a focus note from a quarter whose year had
+ * key results to point at. `frame.annualObjectives` reads the year the same
+ * way: an annual objective is one in an annual cycle.
+ */
+export async function loadFocusCandidates<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  quarter: { readonly startsOn: string; readonly endsOn: string },
+) {
+  return tx
+    .select({
+      id: keyResults.id,
+      title: keyResults.title,
+      goalTitle: goals.title,
+    })
+    .from(keyResults)
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .innerJoin(cycles, eq(cycles.id, goals.cycleId))
+    .where(
+      and(
+        activeOnly(keyResults, eq(keyResults.workspaceId, workspaceId)),
+        isNull(goals.deletedAt),
+        isNull(cycles.deletedAt),
+        eq(cycles.mode, "annual"),
+        lte(cycles.startsOn, quarter.endsOn),
+        gte(cycles.endsOn, quarter.startsOn),
+      ),
+    )
+    .orderBy(asc(goals.title), asc(keyResults.title));
 }
 
 /** The cycle row the loader needs, by id. */
@@ -547,6 +675,34 @@ export async function evaluateWorkflow<
     gates,
     publishable: canPublish(gates),
   };
+}
+
+/**
+ * Why drafting in a cycle's phase 4 is refused, or null when it is not
+ * (REQUIREMENTS §3.1: "drafting in Phase 4 is refused with the reason";
+ * METHOD.md §2.6; completeness review H-09).
+ *
+ * Phase 4 waits for every earlier phase that applies, and the reason is each
+ * condition still missing, in the words the rail shows. A closed or unknown
+ * cycle is not this function's to refuse: the write that names it does.
+ */
+export async function draftingRefusal<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  cycleId: string,
+  thresholds: ResolvedThresholds,
+): Promise<string | null> {
+  const cycle = await loadCycleForWorkflow(tx, workspaceId, cycleId);
+  if (!cycle) {
+    return null;
+  }
+  const { phases } = await evaluateWorkflow(tx, workspaceId, cycle, thresholds);
+  const work = phaseWorkAllowed(4, phases);
+  return work.allowed
+    ? null
+    : `Drafting waits until the earlier phases are complete. ${work.because.join(". ")}.`;
 }
 
 /**

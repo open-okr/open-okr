@@ -145,6 +145,88 @@ afterAll(async () => {
   await wb.close();
 });
 
+/**
+ * What a nudge says (completeness review H-12). It read "You have a reminder
+ * waiting in OpenOKR" on every channel, with no goal, no link and no button.
+ */
+describe("what a nudge says", () => {
+  const BASE = "https://okr.example.com/";
+  const runWithLinks = async (iso: string) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context(), baseUrl: BASE },
+      "nudges.run",
+      { now: iso },
+    );
+  };
+
+  it("names the goal by email, and the button opens its check-in", async () => {
+    await runWithLinks(`${dueOn}T09:00:00Z`);
+    const messages = await messageRows();
+    const checkIn = messages.find((row) =>
+      String(row.payload.text).includes("Rule: checkin.due"),
+    );
+    expect(checkIn).toBeDefined();
+    const text = String(checkIn?.payload.text);
+    expect(text).toContain(
+      "Check-in due today: Become the preferred platform for mid-market teams",
+    );
+    expect(text).not.toContain("reminder waiting");
+    expect(checkIn?.payload.subject).toBe(
+      "OpenOKR: Check-in due today: Become the preferred platform for mid-market teams",
+    );
+    expect(checkIn?.payload.buttons).toEqual([
+      {
+        label: "Check in",
+        url: `https://okr.example.com/check-in?goal=${goalId}`,
+      },
+    ]);
+  });
+
+  it("offers the check-in as a one-tap command in chat, and the page beside it", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set primary_channel = 'slack' where id = $1",
+      [ownerMemberId],
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "channels.connect", {
+      provider: "slack",
+      credentials: "xoxb-token",
+    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.linkIdentity",
+      { provider: "slack", externalId: "U-owner" },
+    );
+    await runWithLinks(`${dueOn}T09:00:00Z`);
+    const slack = (await messageRows()).find(
+      (row) =>
+        row.provider === "slack" &&
+        String(row.payload.text).includes("Rule: checkin.due"),
+    );
+    expect(slack?.payload.buttons).toEqual([
+      { label: "Check in", url: `okr:checkin ${goalId}` },
+      {
+        label: "Open in OpenOKR",
+        url: `https://okr.example.com/check-in?goal=${goalId}`,
+      },
+    ]);
+  });
+
+  it("still names the goal when the host knows no address, with no link", async () => {
+    await runAt(`${dueOn}T09:00:00Z`);
+    const text = String(
+      (await messageRows()).find((row) =>
+        String(row.payload.text).includes("Rule: checkin.due"),
+      )?.payload.text,
+    );
+    expect(text).toContain(
+      "Become the preferred platform for mid-market teams",
+    );
+    expect(text).not.toContain("http");
+  });
+});
+
 describe("where a nudge goes", () => {
   it("takes email by default, and writes one message row per nudge", async () => {
     const result = await runAt(`${dueOn}T09:00:00Z`);

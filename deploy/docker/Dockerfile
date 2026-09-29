@@ -54,6 +54,13 @@ COPY --from=deps /repo/packages ./packages
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+# Next's own type check is skipped here and nowhere else (completeness review
+# H-22). It needs more heap than Node gives it on an 8 GB machine, so this
+# build ran out of memory on a default Docker Desktop and on the 4 GB server
+# the install guide recommends. `pnpm typecheck` gates every change and every
+# release tag before an image is built, so the same check still stands in
+# front of anything this produces. See apps/web/next.config.ts.
+ENV OPENOKR_SKIP_NEXT_TYPECHECK=1
 # A build must not depend on a reachable database. This value is parsed by the
 # environment schema and never connected to; the real one arrives at runtime.
 ENV DATABASE_URL=postgres://build:build@127.0.0.1:5432/build

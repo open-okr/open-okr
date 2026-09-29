@@ -444,7 +444,9 @@ export {
   listSSOProviders,
   loadSSOConnections,
   normaliseCertificate,
+  type PublicSSOProvider,
   providerIdFromCallback,
+  publicSSOProviders,
   type SamlServiceProviderUrls,
   type SSOConnectionProblem,
   SSOConnectionRejected,
@@ -551,6 +553,7 @@ export {
   type InboundOutcome,
   type InboundRequestFacts,
   LINK_CODE_TTL_SECONDS,
+  memberForChannelIdentity,
   resolveInbound,
   workspaceForProviderTeam,
 } from "./channels/inbound.ts";
@@ -886,6 +889,8 @@ export {
   deleteSiteMessage,
   dismissSiteMessage,
   endSupportSession,
+  type GrantOutcome,
+  grantOperator,
   grantSupportSession,
   isLiveOperator,
   listSiteMessages,
@@ -894,10 +899,13 @@ export {
   liveSiteMessagesFor,
   liveSupportSession,
   measureAllWorkspaces,
+  OperatorGrantError,
   readInstanceFlags,
   readUsageAsOperator,
   requestSupportSession,
+  revokeOperator,
   setLifecycleAsOperator,
+  setPlanAsOperator,
   sweepExpiredSessions,
 } from "./operator/index.ts";
 export {
@@ -1033,10 +1041,12 @@ export {
   runConnectionTests,
 } from "./setup/connection-tests.ts";
 export {
+  type AIProbeOptions,
+  aiProbe,
+  channelsProbe,
   databaseProbe,
   type MailProbeOptions,
   mailProbe,
-  notInThisBuild,
   type StorageProbeOptions,
   storageProbe,
 } from "./setup/probes.ts";
@@ -1089,6 +1099,8 @@ export {
   countSeats,
   currentConcurrentActions,
   isCloudEnabled,
+  listSeatHolders,
+  readOwnPlan,
   readOwnUsage,
   readPlans,
   resolveAdmissionLimits,
@@ -1115,3 +1127,7 @@ export {
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
 } from "./workspaces/registration.ts";
+export {
+  type LiveWorkspace,
+  listLiveWorkspaces,
+} from "./workspaces/scan.ts";

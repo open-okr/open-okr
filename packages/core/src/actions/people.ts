@@ -15,12 +15,14 @@
  * (`isLastFullAccessHolder` in `../people/lifecycle.ts`).
  */
 import {
+  accessBindings,
   activeOnly,
+  softDeleteRows,
   withContext,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, type SQL, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
@@ -348,6 +350,141 @@ export const suspendMember = defineWriteAction({
           action: "people.suspend",
           targetType: "workspace_member",
           targetId: updated.id,
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Makes a member an administrator, or returns one to the standard level
+ * (completeness review H-14).
+ *
+ * Nothing could: provisioning gives the founder `full`, invitations grant
+ * `edit` at most, and the profile page told a sole administrator to hand over
+ * first with no way to do it. So a workspace whose founder left had no
+ * administrator, for good.
+ *
+ * **Full, or the standard level, and nothing between.** Every human member
+ * already holds `edit` through the workspace's standard group, and a level is
+ * the highest binding, so a personal binding can only raise it. This grants
+ * or removes the one that raises it to `full`.
+ *
+ * People only. An agent never holds workspace-wide access (CLAUDE.md: least
+ * privilege, no ambient authority), a guest is outside the organisation by
+ * definition, and a placeholder has nobody behind it. Stepping down is
+ * refused to the last administrator, by the same rule suspension uses.
+ */
+export const setAdministrator = defineWriteAction({
+  name: "people.setAdministrator",
+  summary:
+    "Makes a member an administrator with full access to the workspace, or returns them to the standard level.",
+  input: z.object({ memberId: z.uuid(), administrator: z.boolean() }),
+  output: z.object({ id: z.uuid(), administrator: z.boolean() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [member] = await tx
+        .select({
+          id: workspaceMembers.id,
+          name: workspaceMembers.name,
+          kind: workspaceMembers.kind,
+          status: workspaceMembers.status,
+        })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.id, input.memberId),
+            eq(workspaceMembers.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!member) {
+        throw new OperationError("not_found", "No such member.");
+      }
+      if (input.administrator && member.kind !== "human") {
+        throw new OperationError(
+          "forbidden",
+          member.kind === "agent"
+            ? "An agent never holds workspace-wide access. Bind it to named spaces and goals instead."
+            : member.kind === "guest"
+              ? "A guest cannot administer the workspace. Convert them to a member first."
+              : "Nobody has claimed this member yet, so there is nobody to make an administrator.",
+        );
+      }
+      if (input.administrator && member.status !== "active") {
+        throw new OperationError(
+          "forbidden",
+          "Only an active member can be made an administrator.",
+        );
+      }
+
+      const context = await resolveSubjectContext(
+        tx,
+        "workspace",
+        workspaceId,
+        workspaceId,
+      );
+      if (!context) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const groupId = await ensureMemberGroup(tx, {
+        workspaceId,
+        memberId: member.id,
+      });
+      const level = await resolveMemberAccessLevel(tx, {
+        workspaceId,
+        memberId: member.id,
+        contextId: context.contextId,
+      });
+
+      if (!input.administrator) {
+        refuseIfLastOwner(
+          await isLastFullAccessHolder(tx, workspaceId, member.id),
+        );
+      }
+      const wanted = input.administrator
+        ? ACCESS_LEVELS.full
+        : ACCESS_LEVELS.edit;
+      const alreadyThere = input.administrator
+        ? level >= ACCESS_LEVELS.full
+        : level < ACCESS_LEVELS.full;
+      if (!alreadyThere) {
+        // A group holds one live untagged binding per context, so the old one
+        // is retired and the new one written: the level changes at once and
+        // the history of who held what survives, as `unbindGroup` keeps it.
+        await softDeleteRows(
+          tx,
+          accessBindings,
+          and(
+            eq(accessBindings.workspaceId, workspaceId),
+            eq(accessBindings.groupId, groupId),
+            eq(accessBindings.contextId, context.contextId),
+            isNull(accessBindings.tag),
+          ) as SQL,
+        );
+        await bindGroup(tx, {
+          workspaceId,
+          groupId,
+          contextId: context.contextId,
+          level: wanted,
+        });
+      }
+
+      return {
+        result: { id: member.id, administrator: input.administrator },
+        activity: {
+          kind: "member.administrator_set",
+          subjectType: "workspace_member",
+          subjectId: member.id,
+          payload: { name: member.name, administrator: input.administrator },
+        },
+        audit: {
+          action: "people.setAdministrator",
+          targetType: "workspace_member",
+          targetId: member.id,
+          payload: { administrator: input.administrator },
         },
       };
     },

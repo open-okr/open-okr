@@ -36,6 +36,15 @@ service_log() {
 app_log() { service_log app; }
 proxy_log() { service_log proxy; }
 
+# One value from the bundled database, asked as its admin role.
+db_query() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -p openokr exec -T db psql -U openokr -d openokr -tAc "$1"
+  else
+    docker-compose -p openokr exec -T db psql -U openokr -d openokr -tAc "$1"
+  fi
+}
+
 cleanup() {
   # Volumes too. "From nothing" has to include the database volume: Postgres
   # sets its password only when it initialises an empty data directory, so a
@@ -88,6 +97,36 @@ app_log | grep -qE "applied [0-9]+ migration" \
   || fail "migrations did not run on boot"
 pass "migrations ran on boot"
 
+# --- the server runs as a role the tenant floor binds ----------------------
+# Completeness review H-01. The server used to connect as the Postgres image's
+# own role, which is a superuser, so row-level security never applied to the
+# running product and every check here still passed. Asked of the database
+# itself, and of the running server, because either can be wrong alone.
+grep -q '^DATABASE_URL=postgres://openokr_app:' secrets/app.env \
+  || fail "the server does not connect as openokr_app"
+attrs="$(db_query "select rolsuper::text || ',' || rolbypassrls::text from pg_roles where rolname = 'openokr_app'")"
+[ "$attrs" = "false,false" ] \
+  || fail "openokr_app is '$attrs', expected neither superuser nor bypassrls"
+pass "the server's role cannot bypass row-level security"
+
+# --- the scheduler starts under that role ----------------------------------
+# Completeness review H-02. Under a restricted role pg-boss used to fail to
+# create its schema, the scheduler logged one line and the product went
+# quiet while the health check stayed green. The health check says so now.
+health=""
+for _ in $(seq 1 30); do
+  health="$(curl -s "$BASE/api/health" || true)"
+  case "$health" in
+    *'"scheduler":"running"'*) break ;;
+  esac
+  sleep 2
+done
+case "$health" in
+  *'"scheduler":"running"'*'"tenantFloor":"enforced"'*) ;;
+  *) fail "expected a running scheduler and an enforced floor, got: $health" ;;
+esac
+pass "the scheduler is running and the tenant floor is enforced"
+
 # --- an unconfigured instance leads to the wizard --------------------------
 location=$(curl -s -o /dev/null -w '%{redirect_url}' "$BASE/sign-in")
 case "$location" in
@@ -100,9 +139,14 @@ page=$(curl -sL "$BASE/setup")
 echo "$page" | grep -q "PostgreSQL" || fail "the wizard did not detect Postgres"
 pass "the wizard detected the database"
 
+# React puts an empty comment between adjacent pieces of text it renders on
+# the server, so the label and its word arrive as "Chat channels<!-- -->: ".
+# A browser shows them joined; the raw HTML needs the markers taken out.
+echo "$page" | sed 's/<!-- -->//g' | grep -q "Chat channels: Optional" \
+  || fail "the wizard did not say chat channels are optional"
 echo "$page" | grep -q "Not in this build" \
-  || fail "a port with no driver did not say so"
-pass "ports with no driver say so rather than showing a tick"
+  && fail "the wizard still says a shipped feature is not in this build"
+pass "optional ports say so rather than showing a tick"
 
 # --- the proxy is doing its job -------------------------------------------
 headers=$(curl -s -D - -o /dev/null "$BASE/setup")
@@ -269,5 +313,38 @@ pass "the previous key was removed once rotation completed"
 curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
   || fail "the instance stopped working after rotation"
 pass "the instance still works after rotation"
+
+# --- the restore drill (completeness review H-19) --------------------------
+# REQUIREMENTS §7 and P6-T06 ask for a restore drill in continuous
+# integration, and none ran: the old restore-drill.sh needed host
+# Postgres tools and swallowed its own seeding errors. This one uses the
+# shipped path on the instance this script just built: back up, prove the
+# backup would restore, change something, restore, and find the backup's
+# state again with the instance still serving.
+./openokr backup >/dev/null 2>&1 || fail "the backup failed"
+drill="$(ls -1dt ./backups/*/ | head -1)"
+pass "a backup was taken ($drill)"
+
+./openokr verify-backup "$drill" >/dev/null 2>&1 \
+  || fail "verify-backup refused the backup it had just taken"
+pass "the backup verified without touching the live database"
+
+rows_before="$(db_query "select (select count(*) from workspaces) || ',' || (select count(*) from workspace_members) || ',' || (select count(*) from audit_events)")"
+name_before="$(db_query "select name from workspaces order by created_at limit 1")"
+db_query "update workspaces set name = 'Changed after the backup'" >/dev/null
+
+./openokr restore "$drill" >/dev/null 2>&1 || fail "the restore failed"
+pass "the backup restored"
+
+rows_after="$(db_query "select (select count(*) from workspaces) || ',' || (select count(*) from workspace_members) || ',' || (select count(*) from audit_events)")"
+[ "$rows_after" = "$rows_before" ] \
+  || fail "the restored rows differ (before $rows_before, after $rows_after)"
+[ "$(db_query "select name from workspaces order by created_at limit 1")" = "$name_before" ] \
+  || fail "the change made after the backup survived the restore"
+pass "the restore brought back the backup's state and nothing after it"
+
+curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
+  || fail "the instance does not serve its admin after the restore"
+pass "the instance serves its admin after the restore"
 
 echo "openokr: all checks passed in ${elapsed}s"

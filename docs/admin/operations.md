@@ -66,9 +66,16 @@ mid-way.
 
 ## Taking the whole workspace out
 
-An administrator can export a workspace as one signed, checksummed archive
-holding every row and every uploaded file, and import it into another instance.
-That is the exit, and it is part of the product rather than a support request.
+An administrator can export a workspace as one checksummed archive holding
+every row and every uploaded file, and import it into another instance. That is
+the exit, and it is part of the product rather than a support request.
+
+The archive is sealed with a passphrase chosen at export, at least 12
+characters. Any instance given the passphrase can import it, and no instance
+can without it. It is not stored anywhere, so keep it with the file. People in
+the archive arrive on the other side as members waiting to be claimed: when a
+person joins with the same email address, the member and everything they wrote
+becomes theirs.
 
 ## Scheduled work
 

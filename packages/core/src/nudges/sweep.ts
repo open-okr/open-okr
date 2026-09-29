@@ -47,6 +47,11 @@ import {
 } from "@openokr/method";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import {
+  type AgentScope,
+  agentSeesBlocker,
+  agentSeesKpi,
+} from "../agents/scope.ts";
 import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
@@ -186,6 +191,11 @@ export async function dueKpiCorridorNudges(
     readonly cycleId?: string;
     /** Language for the recovery objective's title (P4-T05c-b). */
     readonly drafter?: AgentDrafter;
+    /**
+     * The agent this reads as, when it is an agent's run (completeness review
+     * H-04). Absent reads everything, which is what a person's own run does.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<readonly DueNudge[]> {
   const rows = await tx
@@ -204,7 +214,13 @@ export async function dueKpiCorridorNudges(
       recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
     })
     .from(kpis)
-    .where(activeOnly(kpis, eq(kpis.workspaceId, input.workspaceId)));
+    .where(
+      activeOnly(
+        kpis,
+        eq(kpis.workspaceId, input.workspaceId),
+        input.scope ? agentSeesKpi(input.scope) : undefined,
+      ),
+    );
 
   const delay = input.thresholds["kpi.recoveryProposalDelayPeriods"];
   const due: DueNudge[] = [];
@@ -584,10 +600,11 @@ const RULE_FOR_BLOCKER_STEP: Record<number, string> = {
  * when it was opened. Escalating a blocker to a goal's champion instead would
  * send it past the one person who agreed to the next action.
  *
- * **Nothing stamps `escalated_at`.** That column and `escalated_to_id` are
- * P4-T07c's, on a table it owns, and a nudge reader that wrote to them would be
- * recording an escalation as though somebody had acted on it. The nudge row
- * already carries the step, which is the record of what the product said.
+ * **This reader stamps nothing.** It marks the nudge to the highest rung it
+ * has reached with `escalatesBlocker`, and the run that records the nudge
+ * writes `escalated_to_id` and `escalated_at`, so the blocker reaches that
+ * person's review inbox (completeness review H-10: nothing had ever written
+ * either column, so no blocker was ever "Escalated to you").
  *
  * A resolved blocker owes nobody anything, whatever its clock says.
  */
@@ -597,6 +614,11 @@ export async function dueBlockerNudges(
     readonly workspaceId: string;
     readonly now: Date;
     readonly thresholds: ResolvedThresholds;
+    /**
+     * The agent this reads as, when it is an agent's run (completeness review
+     * H-04). Absent reads everything, which is what a person's own run does.
+     */
+    readonly scope?: AgentScope;
   },
 ): Promise<readonly DueNudge[]> {
   const rows = await tx
@@ -613,6 +635,7 @@ export async function dueBlockerNudges(
         blockers,
         eq(blockers.workspaceId, input.workspaceId),
         isNull(blockers.resolvedAt),
+        input.scope ? agentSeesBlocker(input.scope) : undefined,
       ),
     );
 
@@ -641,6 +664,10 @@ export async function dueBlockerNudges(
       : null;
 
     const recipients = new Set<string>();
+    // The last rung that resolved to somebody other than the owner. The
+    // ladder lists its targets lowest first, so the last one found is who the
+    // blocker has been escalated to.
+    let escalatedTo: string | null = null;
     for (const role of step.targets) {
       if (role === "champion") {
         // The blocker's own owner, for the reason in the note above.
@@ -653,6 +680,9 @@ export async function dueBlockerNudges(
       const memberId = await memberForRole(tx, roles, role);
       if (memberId) {
         recipients.add(memberId);
+        if (memberId !== blocker.ownerId) {
+          escalatedTo = memberId;
+        }
       }
     }
 
@@ -670,6 +700,7 @@ export async function dueBlockerNudges(
         // does not earn a quiet hour. Anybody else hearing about it is, and
         // §6.4 marks these two steps as escalating.
         urgent: urgentFor(ruleKey, recipient === blocker.ownerId),
+        ...(recipient === escalatedTo ? { escalatesBlocker: true } : {}),
       });
     }
   }

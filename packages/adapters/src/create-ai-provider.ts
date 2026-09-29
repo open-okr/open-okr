@@ -12,6 +12,7 @@
  * provider is a new driver behind the same port, never a change to feature
  * code" (AI-NATIVE-PLAN §3.2) true in practice and not just in wording.
  */
+
 import {
   ANTHROPIC_DEFAULT_TIER_MODELS,
   AnthropicProvider,
@@ -35,6 +36,7 @@ import {
   OpenRouterProvider,
 } from "./drivers/ai/openrouter.ts";
 import type { TierModelMap } from "./drivers/ai/tier-map.ts";
+import { createGuardedFetch } from "./outbound/guard.ts";
 import type { AIProvider } from "./ports/ai.ts";
 
 export type AIProviderConfig =
@@ -48,11 +50,18 @@ export type AIProviderConfig =
       readonly appUrl?: string;
       readonly appName?: string;
     }
-  | { readonly provider: "ollama"; readonly baseUrl?: string }
+  | {
+      readonly provider: "ollama";
+      readonly baseUrl?: string;
+      /** Refuse private and reserved addresses (completeness review H-07). */
+      readonly guardOutbound?: boolean;
+    }
   | {
       readonly provider: "openai-compatible";
       readonly apiKey: string;
       readonly baseURL: string;
+      /** Refuse private and reserved addresses (completeness review H-07). */
+      readonly guardOutbound?: boolean;
     };
 
 export function createAIProvider(config: AIProviderConfig): AIProvider {
@@ -72,11 +81,15 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
         appName: config.appName,
       });
     case "ollama":
-      return new OllamaProvider({ baseUrl: config.baseUrl });
+      return new OllamaProvider({
+        baseUrl: config.baseUrl,
+        ...(config.guardOutbound ? { fetch: createGuardedFetch() } : {}),
+      });
     case "openai-compatible":
       return new OpenAiCompatibleProvider({
         apiKey: config.apiKey,
         baseURL: config.baseURL,
+        ...(config.guardOutbound ? { fetch: createGuardedFetch() } : {}),
       });
   }
 }

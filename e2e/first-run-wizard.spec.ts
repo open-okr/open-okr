@@ -53,10 +53,13 @@ test("it reports the deployment honestly, including what is not built yet", asyn
   await expect(page.getByText(/Database: Ready/)).toBeVisible();
   await expect(page.getByText(/PostgreSQL/)).toBeVisible();
 
-  // Not tested, and said so rather than ticked. A green tick for an untested
-  // connection is the fail-open shape this project has already been bitten by.
-  await expect(page.getByText(/Chat channels: Not in this build/)).toBeVisible();
-  await expect(page.getByText(/AI provider: Not in this build/)).toBeVisible();
+  // Not needed, not tested, and said so rather than ticked. A green tick for
+  // an untested connection is the fail-open shape this project has already
+  // been bitten by. These said "Not in this build" until completeness review
+  // H-24, long after both shipped.
+  await expect(page.getByText(/Chat channels: Optional/)).toBeVisible();
+  await expect(page.getByText(/AI provider: Optional/)).toBeVisible();
+  await expect(page.getByText(/Not in this build/)).toHaveCount(0);
 
   // No mail server is a working default, not a warning.
   await expect(page.getByText(/Mail: Ready/)).toBeVisible();

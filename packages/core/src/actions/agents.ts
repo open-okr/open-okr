@@ -38,7 +38,7 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
 import { championInTx } from "../agents/champion.ts";
 import { coachInTx } from "../agents/coach.ts";
-import { type NudgeCadence, runDueNudgesInTx } from "../nudges/run.ts";
+import { type NudgeCadence, runAgentNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_AGENT_RUN_COST_CAP_USD } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -799,6 +799,22 @@ export const bulkDismissProposedChanges = defineWriteAction({
 });
 
 /**
+ * A sandboxed run's log (completeness review H-04). The same entries, marked
+ * as what they were: things that would have happened and did not.
+ */
+function asSimulated(log: readonly AgentRunLogEntry[]): AgentRunLogEntry[] {
+  return log.map((entry) =>
+    entry.kind === "applied"
+      ? {
+          ...entry,
+          kind: "simulated",
+          message: `${entry.message} (sandbox: simulated, nothing was committed)`,
+        }
+      : entry,
+  );
+}
+
+/**
  * The Champion's hourly run (P4-T05a).
  *
  * AI-NATIVE-PLAN.md §6.2: "Hourly: the nudge queue, what is due now, per
@@ -849,7 +865,11 @@ export const runChampion = defineWriteAction({
         );
       }
       const [agent] = await tx
-        .select({ id: agents.id, enabled: agents.enabled })
+        .select({
+          id: agents.id,
+          enabled: agents.enabled,
+          autonomy: agents.autonomy,
+        })
         .from(agents)
         .where(activeOnly(agents, eq(agents.id, champion.agentId)))
         .limit(1);
@@ -867,6 +887,8 @@ export const runChampion = defineWriteAction({
       const stored = workspace?.settings?.agentRunCostCapUsd;
       return {
         agentId: agent.id,
+        memberId: champion.memberId,
+        sandbox: agent.autonomy === "sandbox",
         // A workspace provisioned before the setting existed has no key to
         // read, and falls back to the same constant a fresh one stores.
         costCapUsd:
@@ -965,14 +987,20 @@ export const runChampion = defineWriteAction({
         .returning({ id: agentRuns.id });
       const runId = (started as { id: string }).id;
 
-      const run = await runDueNudgesInTx(tx as WorkspaceTx, {
+      // As the Champion, through its own bindings, and in sandbox mode
+      // committing nothing (completeness review H-04).
+      const run = await runAgentNudgesInTx(tx as WorkspaceTx, {
         workspaceId,
         at,
         cadence,
         runId,
+        scope: { memberId: loaded.memberId },
+        sandbox: loaded.sandbox,
         // Absent unless the host has a provider, which is the normal case and
         // is what makes every assertion in the deterministic suites true.
         ...(_context.drafter ? { drafter: _context.drafter } : {}),
+        // Links in the messages it sends, when the host knows its address.
+        ...(_context.baseUrl ? { baseUrl: _context.baseUrl } : {}),
       });
 
       // One entry per rule, because a log that said "3 nudges" could not
@@ -1028,7 +1056,7 @@ export const runChampion = defineWriteAction({
         .update(agentRuns)
         .set({
           status: "completed",
-          log,
+          log: loaded.sandbox ? asSimulated(log) : log,
           finishedAt: at,
           cost: String(spent),
         })
@@ -1113,14 +1141,22 @@ export const runCoach = defineWriteAction({
         throw new OperationError("not_found", "This workspace has no Coach.");
       }
       const [agent] = await tx
-        .select({ id: agents.id, enabled: agents.enabled })
+        .select({
+          id: agents.id,
+          enabled: agents.enabled,
+          autonomy: agents.autonomy,
+        })
         .from(agents)
         .where(activeOnly(agents, eq(agents.id, coach.agentId)))
         .limit(1);
       if (!agent?.enabled) {
         throw new OperationError("not_found", "The Coach is turned off.");
       }
-      return { agentId: agent.id };
+      return {
+        agentId: agent.id,
+        memberId: coach.memberId,
+        sandbox: agent.autonomy === "sandbox",
+      };
     },
     async execute({ tx, workspaceId, loaded }) {
       const at = input.now ? new Date(input.now) : new Date();
@@ -1146,12 +1182,20 @@ export const runCoach = defineWriteAction({
         .returning({ id: agentRuns.id });
       const runId = (started as { id: string }).id;
 
-      const run = await runDueNudgesInTx(tx as WorkspaceTx, {
+      // As the Coach, through its own bindings, and in sandbox mode
+      // committing nothing (completeness review H-04). The semantic review
+      // sends what it reads to the model provider, which is the read that
+      // most needed a scope.
+      const run = await runAgentNudgesInTx(tx as WorkspaceTx, {
         workspaceId,
         at,
         cadence: "quality",
         runId,
+        scope: { memberId: loaded.memberId },
+        sandbox: loaded.sandbox,
         ...(_context.drafter ? { drafter: _context.drafter } : {}),
+        // Links in the messages it sends, when the host knows its address.
+        ...(_context.baseUrl ? { baseUrl: _context.baseUrl } : {}),
       });
 
       for (const [index, ruleKey] of run.ruleKeys.entries()) {
@@ -1193,7 +1237,7 @@ export const runCoach = defineWriteAction({
         .update(agentRuns)
         .set({
           status: "completed",
-          log,
+          log: loaded.sandbox ? asSimulated(log) : log,
           finishedAt: at,
           // Zero without a provider, which is why the note above about this
           // run never spending held until §5.3's review arrived.

@@ -14,18 +14,10 @@
  * Null means the provider is off, which is the normal case and a complete
  * product: every trigger, ladder, gate and corridor works without it.
  */
-import { createAIProvider } from "@openokr/adapters";
 import { createProviderDrafter } from "@openokr/agents";
-import { loadEnv } from "@openokr/config";
-import {
-  type AgentDrafter,
-  findSeededModel,
-  resolveAgentRunCostCap,
-  resolveAICredential,
-  resolveTierRoute,
-} from "@openokr/core";
+import { type AgentDrafter, resolveAgentRunCostCap } from "@openokr/core";
+import { providerForTier } from "./ai-provider";
 import { getPool } from "./auth";
-import { getKeyRing } from "./secrets";
 
 /**
  * §4.14's per-run spend cap for this workspace.
@@ -52,47 +44,25 @@ export async function drafterFor(
   workspaceId: string,
 ): Promise<AgentDrafter | null> {
   const pool = getPool();
-  // The application's own ring rather than one built here, so a credential
-  // sealed by any other surface opens with the same key.
-  const ring = getKeyRing();
   const costCapUsd = await runCostCapFor(pool, workspaceId);
-  const resolved = await resolveAICredential(pool, ring, process.env, {
-    workspaceId,
-    provider: "openrouter",
-  });
-  if (resolved.source === "off") {
-    return null;
-  }
 
   // `balanced` rather than `fast`: a check-in somebody publishes under their
   // own name is worth a better model than the cheapest one, and the run cap
-  // bounds what that can cost.
-  const route = await resolveTierRoute(pool, { workspaceId, tier: "balanced" });
-  if (!route) {
-    return null;
-  }
-  // Prices come from the catalogue rather than from the route, because a
-  // workspace may point a tier at a model the seed list prices and the policy
-  // does not. An unpriced model meters as zero, which would make the cap
-  // meaningless, so it is refused instead.
-  const priced = findSeededModel(route.provider, route.modelId);
-  if (!priced) {
+  // bounds what that can cost. Whichever provider the workspace routes that
+  // tier to, not OpenRouter always (completeness review H-27).
+  const routed = await providerForTier(workspaceId, "balanced");
+  if (!routed) {
     return null;
   }
 
   return createProviderDrafter({
-    provider: createAIProvider({
-      provider: "openrouter",
-      apiKey: resolved.apiKey,
-      appName: "OpenOKR",
-      appUrl: loadEnv().BETTER_AUTH_URL,
-    }),
-    model: route.modelId,
+    provider: routed.provider,
+    model: routed.modelId,
     // §4.14's `agentRunCostCapUsd`, read from the workspace rather than from a
     // constant, so a workspace that lowered it stops the drafter mid-run
     // rather than only being refused at the door.
     costCapUsd,
-    costInPerMillion: priced.costInPerMillion,
-    costOutPerMillion: priced.costOutPerMillion,
+    costInPerMillion: routed.costInPerMillion,
+    costOutPerMillion: routed.costOutPerMillion,
   });
 }

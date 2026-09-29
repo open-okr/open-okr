@@ -86,10 +86,11 @@ are already members of it.
 
 | Step | Detail |
 |---|---|
-| Generated secrets | A session secret and a root encryption key, into `./secrets/`. **Back that directory up.** The root key is what makes stored credentials readable |
+| Generated secrets | A session secret, a root encryption key and two database passwords, into `./secrets/`. **Back that directory up.** The root key is what makes stored credentials readable |
+| Split the database roles | The server connects as `openokr_app`, which row-level security binds, so one workspace can never read another's rows even if the code forgets to ask. The Postgres image's own role is kept for migrations and backups only, and the server never holds it. An instance installed before this split is moved over on its next `up` or `upgrade`, and its previous `app.env` is kept beside the new one |
 | Started PostgreSQL | In a container, on a named volume. Nothing is exposed outside the machine |
 | Ran migrations | From the image, at boot. An upgrade re-runs them the same way |
-| Started the application | Then waited for it to report healthy, rather than reporting success at the moment it started a process |
+| Started the application | Then waited for it to report healthy, rather than reporting success at the moment it started a process. `/api/health` also says whether the scheduler started and whether the tenant floor is enforced, and `/admin/general` warns if either is not |
 | Started the proxy | Caddy, which terminates TLS and fetches a certificate when you named a domain |
 | Checked the proxy is running | An application that is healthy behind a crash-looping proxy is not a reachable instance, and saying "ready" there would be a check that checks nothing |
 

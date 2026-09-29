@@ -27,19 +27,22 @@ export function ExportCard() {
   const [result, setResult] = useState<ExportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [includeFiles, setIncludeFiles] = useState(true);
+  // What the archive is sealed under (H-18). Held in the page only: the server
+  // uses it to seal and keeps nothing.
+  const [passphrase, setPassphrase] = useState("");
 
   const handleExport = useCallback(() => {
     setError(null);
     setResult(null);
     startTransition(async () => {
-      const answer = await exportWorkspaceArchive(includeFiles);
+      const answer = await exportWorkspaceArchive(includeFiles, passphrase);
       if (!answer.ok) {
         setError(answer.error);
         return;
       }
       setResult(answer.value);
     });
-  }, [includeFiles]);
+  }, [includeFiles, passphrase]);
 
   const handleDownload = useCallback(() => {
     if (!result) return;
@@ -72,7 +75,21 @@ export function ExportCard() {
         </p>
 
         {!result ? (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1 text-xs text-ink-3">
+              {t("admin.imports.exportCard.passphrase")}
+              <input
+                type="password"
+                autoComplete="new-password"
+                minLength={12}
+                value={passphrase}
+                onChange={(e) => setPassphrase(e.target.value)}
+                className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+              />
+              <span className="text-ink-4">
+                {t("admin.imports.exportCard.passphraseHint")}
+              </span>
+            </label>
             <label className="flex items-center gap-2 text-sm text-ink-3">
               <input
                 type="checkbox"
@@ -81,7 +98,11 @@ export function ExportCard() {
               />
               {t("admin.imports.exportCard.includeFiles")}
             </label>
-            <Button variant="primary" onClick={handleExport} disabled={pending}>
+            <Button
+              variant="primary"
+              onClick={handleExport}
+              disabled={pending || passphrase.length < 12}
+            >
               {pending ? "Exporting..." : "Export workspace"}
             </Button>
           </div>

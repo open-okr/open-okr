@@ -12,6 +12,7 @@ import {
   convertToGuestAction,
   eraseMemberAction,
   restoreMemberAction,
+  setAdministratorAction,
   suspendMemberAction,
 } from "../lifecycle-actions.ts";
 import { IDLE, type LifecycleState } from "../lifecycle-state.ts";
@@ -79,6 +80,7 @@ function ConfirmedControl({
   busyLabel,
   question,
   hint,
+  fields,
 }: {
   readonly action: (
     previous: LifecycleState,
@@ -89,6 +91,8 @@ function ConfirmedControl({
   readonly busyLabel: string;
   readonly question: string;
   readonly hint: string;
+  /** Extra fields the action reads, such as which way a toggle goes. */
+  readonly fields?: Readonly<Record<string, string>>;
 }) {
   const [state, submit, pending] = useActionState(action, IDLE);
   return (
@@ -103,6 +107,9 @@ function ConfirmedControl({
       }}
     >
       <input type="hidden" name="memberId" value={memberId} />
+      {Object.entries(fields ?? {}).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       <div className="flex items-baseline gap-2.5">
         <Button type="submit" variant="default" size="sm" disabled={pending}>
           {pending ? busyLabel : label}
@@ -214,12 +221,15 @@ export function LifecycleControls({
   status,
   kind,
   isSelf,
+  isAdministrator,
 }: {
   readonly memberId: string;
   readonly memberName: string;
   readonly status: string;
   readonly kind: string;
   readonly isSelf: boolean;
+  /** Whether this member holds full access (completeness review H-14). */
+  readonly isAdministrator: boolean;
 }) {
   const { t } = useTranslations();
 
@@ -257,6 +267,33 @@ export function LifecycleControls({
             hint="Stops every access. Nothing they wrote is removed."
           />
         )}
+
+        {/* Handing over administration (H-14). A person only: an agent never
+            holds workspace-wide access and a guest is outside the
+            organisation, and the action refuses both regardless. */}
+        {kind === "human" && status === "active" ? (
+          isAdministrator ? (
+            <ConfirmedControl
+              action={setAdministratorAction}
+              memberId={memberId}
+              fields={{ administrator: "false" }}
+              label={t("people.detail.admin.remove")}
+              busyLabel={t("people.detail.admin.removing")}
+              question={t("people.detail.admin.removeQuestion")}
+              hint={t("people.detail.admin.removeHint")}
+            />
+          ) : (
+            <ConfirmedControl
+              action={setAdministratorAction}
+              memberId={memberId}
+              fields={{ administrator: "true" }}
+              label={t("people.detail.admin.make")}
+              busyLabel={t("people.detail.admin.making")}
+              question={t("people.detail.admin.makeQuestion")}
+              hint={t("people.detail.admin.makeHint")}
+            />
+          )
+        ) : null}
 
         {kind === "guest" ? (
           <p className="text-xs text-ink-3">

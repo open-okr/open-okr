@@ -1,12 +1,23 @@
+import {
+  aiCredentials,
+  channelConnections,
+  includeDeleted,
+  ssoConnections,
+  withWorkspace,
+} from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { readSecret, writeSettings } from "../src/secrets/instance-settings.ts";
 import {
+  decryptSecret,
+  encryptSecret,
   KeyRingError,
   newRootKey,
   parseKeyRing,
 } from "../src/secrets/key-ring.ts";
 import { rotateInstanceSecrets } from "../src/secrets/rotate.ts";
+import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
 /**
  * Root key rotation against real stored secrets.
@@ -25,7 +36,10 @@ const newRingOnly = parseKeyRing({ current: SECOND });
 
 beforeEach(async () => {
   const wb = await workerDb();
-  await wb.admin.query("delete from system_settings");
+  // Every table, not only the settings: rotation reads the workspace tables
+  // too, and a credential another suite sealed under its own key would be a
+  // secret this ring cannot open.
+  await wb.truncateAllTables();
 });
 
 afterAll(async () => {
@@ -126,6 +140,134 @@ describe("rotating", () => {
     ]);
 
     const report = await rotateInstanceSecrets(wb.appPool, rotatingRing);
-    expect(report).toEqual({ examined: 0, rewrapped: 0, current: 0 });
+    expect(report).toEqual({
+      examined: 0,
+      rewrapped: 0,
+      current: 0,
+      workspaceSecrets: 0,
+    });
+  });
+});
+
+/**
+ * Workspace secrets (completeness review H-25).
+ *
+ * AI provider keys, chat channel credentials and SSO client secrets are sealed
+ * under the same root key as the instance settings. Rotation re-wrapped only
+ * the instance settings, and `./openokr rotate-key` drops the previous key as
+ * soon as rotation returns, so a routine rotation left every one of them
+ * unreadable. This suite connects as the restricted application role, which
+ * is also what the command runs as now.
+ */
+describe("rotating the secrets workspaces hold", () => {
+  const seedWorkspace = async (userId: string) => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      [userId, userId, `${userId}@example.com`],
+    );
+    const { workspaceId } = await createWorkspace(wb.appPool, {
+      user: { id: userId, name: userId },
+    });
+    const ai = encryptSecret(oldRing, `ai-${userId}`);
+    const chat = encryptSecret(oldRing, `chat-${userId}`);
+    const sso = encryptSecret(oldRing, `sso-${userId}`);
+    await withWorkspace(wb.db, workspaceId, async (tx) => {
+      await tx.insert(aiCredentials).values({
+        workspaceId,
+        provider: "anthropic",
+        keyHint: "sk-...abcd",
+        ...ai,
+      });
+      await tx.insert(channelConnections).values({
+        workspaceId,
+        provider: "slack",
+        ...chat,
+      });
+      await tx.insert(ssoConnections).values({
+        workspaceId,
+        providerId: `idp-${userId}`,
+        displayName: "Company sign-in",
+        clientId: "client",
+        secretCiphertext: sso.ciphertext,
+        secretDataKey: sso.dataKey,
+        secretKeyId: sso.keyId,
+      });
+    });
+    return workspaceId;
+  };
+
+  const openAll = async (workspaceId: string) => {
+    const wb = await workerDb();
+    return withWorkspace(wb.db, workspaceId, async (tx) => {
+      const [ai] = await tx
+        .select()
+        .from(aiCredentials)
+        .where(includeDeleted(aiCredentials));
+      const [chat] = await tx
+        .select()
+        .from(channelConnections)
+        .where(includeDeleted(channelConnections));
+      const [sso] = await tx
+        .select()
+        .from(ssoConnections)
+        .where(includeDeleted(ssoConnections));
+      if (!ai || !chat || !sso) {
+        throw new Error("a seeded secret is missing");
+      }
+      return [
+        decryptSecret(newRingOnly, ai),
+        decryptSecret(newRingOnly, chat),
+        decryptSecret(newRingOnly, {
+          ciphertext: sso.secretCiphertext,
+          dataKey: sso.secretDataKey,
+          keyId: sso.secretKeyId,
+        }),
+      ];
+    });
+  };
+
+  it("re-wraps every one, in every workspace, so the old key can go", async () => {
+    const wb = await workerDb();
+    const first = await seedWorkspace("rotate-a");
+    const second = await seedWorkspace("rotate-b");
+
+    const report = await rotateInstanceSecrets(wb.appPool, rotatingRing);
+    expect(report.workspaceSecrets).toBe(6);
+    expect(report.rewrapped).toBe(6);
+
+    expect(await openAll(first)).toEqual([
+      "ai-rotate-a",
+      "chat-rotate-a",
+      "sso-rotate-a",
+    ]);
+    expect(await openAll(second)).toEqual([
+      "ai-rotate-b",
+      "chat-rotate-b",
+      "sso-rotate-b",
+    ]);
+  });
+
+  it("includes a credential that was deleted, which a restore can bring back", async () => {
+    const wb = await workerDb();
+    const workspaceId = await seedWorkspace("rotate-c");
+    await withWorkspace(wb.db, workspaceId, (tx) =>
+      tx
+        .update(aiCredentials)
+        .set({ deletedAt: new Date() })
+        .where(eq(aiCredentials.workspaceId, workspaceId)),
+    );
+
+    await rotateInstanceSecrets(wb.appPool, rotatingRing);
+    expect(await openAll(workspaceId)).toContain("ai-rotate-c");
+  });
+
+  it("does nothing to them on a second run", async () => {
+    const wb = await workerDb();
+    await seedWorkspace("rotate-d");
+    await rotateInstanceSecrets(wb.appPool, rotatingRing);
+    const second = await rotateInstanceSecrets(wb.appPool, rotatingRing);
+    expect(second.rewrapped).toBe(0);
+    expect(second.current).toBe(3);
   });
 });
