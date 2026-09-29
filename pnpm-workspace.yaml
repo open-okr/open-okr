@@ -22,15 +22,15 @@ catalog:
   "@types/node": 26.6.2
   # 0.45.2 is the first release past GHSA-gpj5-g38j-94v9 (SQL injection via
   # improperly escaped identifiers).
-  drizzle-orm: ^0.45.2
+  drizzle-orm: ^0.45.3
   pg: ^8.23.0
   "@types/pg": ^8.23.1
-  pg-boss: ^12.33.2
+  pg-boss: ^12.34.0
   ws: ^8.21.3
   "@types/ws": ^8.18.1
-  better-auth: ^1.7.5
-  "@better-auth/passkey": ^1.7.5
-  "@better-auth/sso": ^1.7.4
+  better-auth: ^1.7.6
+  "@better-auth/passkey": ^1.7.6
+  "@better-auth/sso": ^1.7.6
   samlify: ^2.13.1
   # The SMTP client, approved in P1-T09. MIT-0, and it carries no runtime
   # dependencies of its own. Confined to packages/adapters like every vendor
@@ -45,9 +45,9 @@ catalog:
   # openrouter, ollama and openai-compatible: all three speak the same
   # OpenAI-shaped chat completions API, just a different base URL and key,
   # so one client covers four of the six real drivers.
-  "@anthropic-ai/sdk": ^0.127.0
-  openai: ^7.20.0
-  "@google/genai": ^2.23.0
+  "@anthropic-ai/sdk": ^0.128.0
+  openai: ^7.23.0
+  "@google/genai": ^2.24.0
   # The design system (P2-T10), approved by the human alongside P2-T11's
   # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
   # SmoothUI on Motion; these are the concrete packages that stack resolves
@@ -60,17 +60,17 @@ catalog:
   "@tailwindcss/postcss": ^4.3.3
   postcss: ^8.5.28
   "@base-ui-components/react": 1.0.0-rc.0
-  motion: ^13.4.0
-  lucide-react: ^1.47.0
+  motion: ^13.4.4
+  lucide-react: ^1.48.0
   clsx: ^2.1.1
   tailwind-merge: ^3.7.0
   class-variance-authority: ^0.7.1
   # The persisted client cache (P2-T10 item 9), part of the locked stack's
   # "TanStack Query, Table and Virtual" line — its own persistence add-ons,
   # not a new stack decision.
-  "@tanstack/react-query": ^5.103.1
-  "@tanstack/react-query-persist-client": ^5.103.1
-  "@tanstack/query-sync-storage-persister": ^5.103.1
+  "@tanstack/react-query": ^5.104.0
+  "@tanstack/react-query-persist-client": ^5.104.0
+  "@tanstack/query-sync-storage-persister": ^5.104.0
   # Test tooling for P2-T10's own required "keyboard and focus component
   # tests" and accessibility checks (UIUX-PLAN.md §9) — inferred from the
   # human's UI-dependency approval rather than asked separately, because
