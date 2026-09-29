@@ -292,6 +292,22 @@ export const readWorkflow = defineReadAction({
       ),
     }),
     capacityCuts: z.string().nullable(),
+    /**
+     * The one mid-cycle calibration METHOD.md §7.6 allows, or null while it is
+     * unused (completeness review M-06).
+     *
+     * `workflow.calibrate` wrote this row and nothing read it back, so phase 6
+     * rendered "not calibrated" whatever had been recorded. The reason is the
+     * whole record: §7.6 asks for a written reason naming the external change,
+     * and a date alone would say a target moved without saying why.
+     */
+    calibration: z
+      .object({
+        reason: z.string(),
+        at: z.string(),
+        authorName: z.string().nullable(),
+      })
+      .nullable(),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -423,6 +439,25 @@ export const readWorkflow = defineReadAction({
               eq(cycleFocusKeyResults.cycleId, input.cycleId),
             ),
           );
+        const [calibration] = await tx
+          .select({
+            reason: cycleCalibrations.reason,
+            at: cycleCalibrations.at,
+            authorName: workspaceMembers.name,
+          })
+          .from(cycleCalibrations)
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, cycleCalibrations.authorMemberId),
+          )
+          .where(
+            activeOnly(
+              cycleCalibrations,
+              eq(cycleCalibrations.workspaceId, context.workspaceId),
+              eq(cycleCalibrations.cycleId, input.cycleId),
+            ),
+          )
+          .limit(1);
         const sessionDates = (
           Array.isArray(cycle.sessionDates) ? cycle.sessionDates : []
         )
@@ -503,6 +538,13 @@ export const readWorkflow = defineReadAction({
                 : [],
           },
           capacityCuts: plainOf(capacity?.cuts),
+          calibration: calibration
+            ? {
+                reason: calibration.reason,
+                at: new Date(calibration.at).toISOString(),
+                authorName: calibration.authorName ?? null,
+              }
+            : null,
         };
       },
     );
@@ -1128,6 +1170,12 @@ export const calibrateCycle = defineWriteAction({
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
+      // Through the same door as every other write in this file (M-06). It
+      // skipped it, so an unknown cycle reached the insert and failed on the
+      // foreign key rather than as "No such cycle", and a closed cycle could be
+      // calibrated after its archive, when the record is meant to be settled.
+      await withGateRecompute(tx, workspaceId, input.cycleId);
+
       const [existing] = await tx
         .select({ id: cycleCalibrations.id })
         .from(cycleCalibrations)

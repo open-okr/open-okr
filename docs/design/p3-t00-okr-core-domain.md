@@ -145,6 +145,8 @@ guessed at read time.
 |---|---|
 | Naming | `quarterly` reads `Q3 2026`, `semiannual` reads `H2 2026`, `monthly` reads `August 2026`, `annual` reads `2026`. Overridable per cycle |
 | The active cycle is created on demand | Resolving "the current cycle" for a workspace with none creates the one containing today, in `planning`, inside the same transaction |
+| The cadence a new cycle takes | Named by the caller, or else the most recent quarterly-mode cycle's, then the most recent annual one's, then `quarterly`. Corrected at completeness review M-06: it read the newest cycle of either mode, so opening next year's annual cycle made every later bare create or ensure build a year. An annual cycle is §2.1's second horizon, not a change of rhythm |
+| Creating by horizon | `cycles.create` takes `mode` as well as `cadence`. `annual` makes the year; `quarterly` makes the workspace's quarterly-horizon cadence, falling back to `quarterly`. A cadence and a mode that disagree are refused (M-06) |
 | Generation is idempotent | Unique on `(workspace_id, mode, starts_on)` |
 | The fiscal year is calendar | No fiscal-year-offset setting is introduced. A workspace whose year starts in April is a deferred requirement, recorded here rather than half-built |
 
@@ -263,6 +265,34 @@ with a count of the rest; the panel on the page lists them all.
 sponsor named, **when** any authenticated page renders, **then** the strip reads
 the phase, the first blocking reason, and nineteen days to publish, and it
 disappears once the set is published.
+
+**Which cycle is open, and both horizons** (completeness review M-06). Until
+M-06 the page read the current quarter and nothing else, so an annual cycle
+could exist and never be opened, and the create control could only make a
+quarter.
+
+| Address | Opens |
+|---|---|
+| `/cycle?cycle=<id>` | That cycle, in whichever mode it is. The Work Map has linked this way since P6-G11 |
+| `/cycle?mode=annual` | The annual cycle containing today, else the soonest ahead, else the most recent behind |
+| `/cycle` | The same for the quarterly horizon. Every other screen links here |
+
+| Part | Rule |
+|---|---|
+| Header | S-04's mode toggle (Quarterly, Annual) where a chip used to name the mode, and a picker of every cycle in the chosen horizon when there is more than one. Planning happens before a period starts (§2.4), which is when the cycle being planned is not the one containing today |
+| Links inside the screen | A cycle opened by id or through the annual horizon travels with every phase link and every gate remedy that points back at `/cycle`. The quarter keeps the short address |
+| Create | Makes a cycle in the horizon being read, then opens it. The empty annual horizon says what the annual cycle holds and offers the create to a member with full access |
+| Phase 6 calibration | The §7.6 record, or the form that makes it: a written reason, offered at full access while the cycle is open and unused. The rule shown above it is §7.6's own sentences from `packages/method`, which `pnpm method:check` compares word for word |
+
+**Given** a workspace with only its provisioned quarter, **when** a member with
+full access opens the annual horizon, enters a day in this year and presses
+Create, **then** the annual cycle for this year exists at phase 0 and the page
+opens it, and phase 4 in the rail stays on that cycle.
+
+**Given** an open cycle with no calibration, **when** a member with full access
+records one with its reason on phase 6, **then** the reason, its author and its
+date replace the form, and a second attempt through the action is refused in
+words.
 
 ## 4. Goals
 
@@ -551,7 +581,7 @@ applied, because the section was approved in its wrong form:
 |---|---|---|
 | A `spaces.default_space_name` setting defaulting to "General" | **No setting.** The default space is named after the workspace, with the first member as its manager, who covers the coordinator's duties until one is named | §4.14's provisioning-defaults table says exactly that. A setting would be a second answer to a question already answered |
 | `goals.default_check_in_frequency` and `goals.check_in_anchor_day` as workspace settings | **§11 registry parameters in `rhythm_settings`** | §4.14 routes "frequency, anchor day, grace, clocks, ladders, bands, corridors, caps, boundaries and timings" to `rhythm_settings`. They are in §11 already, so they were never §4.14's to hold |
-| A `cycles.cadence` workspace setting, and a `cycles.auto_generate` toggle | **Neither.** Cadence is a column on the cycle. Generation reads the most recent cycle's cadence, falling back to `quarterly` when a workspace has none | §11 holds no cadence parameter and §4.14 holds no cycle settings. Inventing one would put the same fact in two places. A generation toggle is a setting nobody asked for |
+| A `cycles.cadence` workspace setting, and a `cycles.auto_generate` toggle | **Neither.** Cadence is a column on the cycle. Generation reads the most recent cycle's cadence, falling back to `quarterly` when a workspace has none. Narrowed at M-06 to the most recent quarterly-mode cycle, see §3.3 | §11 holds no cadence parameter and §4.14 holds no cycle settings. Inventing one would put the same fact in two places. A generation toggle is a setting nobody asked for |
 | A `kpis.weekly_period_start` setting | **No setting.** Monday, fixed | Decision D-12 already says KPI periods are calendar buckets. A fixed value is not a setting |
 
 What is actually left, then, is one entry:

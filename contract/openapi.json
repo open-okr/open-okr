@@ -17935,6 +17935,13 @@
                       "monthly"
                     ]
                   },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "annual",
+                      "quarterly"
+                    ]
+                  },
                   "firstCycle": {
                     "default": false,
                     "type": "boolean"
@@ -20053,6 +20060,36 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "calibration": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "reason": {
+                                  "type": "string"
+                                },
+                                "at": {
+                                  "type": "string"
+                                },
+                                "authorName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "reason",
+                                "at",
+                                "authorName"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -20081,7 +20118,8 @@
                         "baselineHealth",
                         "revalidation",
                         "focus",
-                        "capacityCuts"
+                        "capacityCuts",
+                        "calibration"
                       ],
                       "additionalProperties": false
                     }

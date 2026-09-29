@@ -5,6 +5,7 @@ import {
   CLOSE_DECISION_MEANINGS,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
+  MID_CYCLE_CALIBRATION,
   PROCESS_HEALTH_STATEMENTS,
   REVIEW_STAGE_KEYS,
   REVIEW_STAGES,
@@ -112,6 +113,21 @@ describe("§7.2's four steps", () => {
     expect(WEEKLY_STEPS.map((entry) => entry.step)).toEqual([1, 2, 3, 4]);
     for (const step of WEEKLY_STEPS) {
       expect(method).toContain(step.title);
+    }
+  });
+});
+
+describe("§7.6's mid-cycle calibration", () => {
+  it("is the document's paragraph, word for word and in order", () => {
+    // Phase 6 renders these sentences beside the calibration form (M-06), so
+    // a screen that paraphrased the rule would be a second source of it.
+    const paragraph = `${MID_CYCLE_CALIBRATION.join(". ")}.`;
+    expect(method).toContain(`### 7.6 Mid-cycle calibration\n\n${paragraph}`);
+  });
+
+  it("leaves the final punctuation to whoever renders it", () => {
+    for (const sentence of MID_CYCLE_CALIBRATION) {
+      expect(sentence.endsWith(".")).toBe(false);
     }
   });
 });

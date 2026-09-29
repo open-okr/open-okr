@@ -3483,6 +3483,16 @@
           ]
         },
         {
+          "name": "mode",
+          "field": "mode",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "annual",
+            "quarterly"
+          ]
+        },
+        {
           "name": "first-cycle",
           "field": "firstCycle",
           "type": "boolean",

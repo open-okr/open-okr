@@ -301,12 +301,13 @@ export const ensureCurrentCycle = defineWriteAction({
      * Which cadence's period to ensure, defaulting to the workspace's own
      * (P6-G14b).
      *
-     * **The default is the most recent cycle's cadence, and that surprised a
-     * caller.** A workspace that opens an annual cycle for §2.1's frame has an
-     * annual cycle as its most recent, so the next bare `ensureCurrent` builds
-     * the annual period containing today rather than the quarter. Phase 0's
-     * "send this into the quarter" wants a quarter whatever the frame did, and
-     * says so here instead of hoping.
+     * **The default used to be the most recent cycle's cadence, and that
+     * surprised a caller.** A workspace that opened an annual cycle for §2.1's
+     * frame had an annual cycle as its most recent, so the next bare
+     * `ensureCurrent` built the annual period containing today rather than the
+     * quarter. The default now reads the quarterly-mode cycles first
+     * (completeness review M-06), and phase 0's "send this into the quarter"
+     * still names the quarter, because it wants one whatever the frame did.
      */
     cadence: z.enum(CYCLE_CADENCES).optional(),
   }),
@@ -358,6 +359,18 @@ export const createCycle = defineWriteAction({
     /** A date inside the period to create, not the period's own start. */
     on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     cadence: z.enum(CYCLE_CADENCES).optional(),
+    /**
+     * Which of METHOD.md §2.1's two horizons to create, when no cadence is
+     * named (completeness review M-06).
+     *
+     * The cycle screen asks for a horizon, not a cadence: "the annual cycle
+     * containing this date" or "the quarterly one". Annual has one cadence,
+     * and the quarterly horizon takes whichever the workspace already
+     * practises, so a workspace running half-years gets a half-year. A
+     * cadence and a mode that disagree are refused rather than one of them
+     * being quietly ignored.
+     */
+    mode: z.enum(["annual", "quarterly"]).optional(),
     firstCycle: z.boolean().default(false),
     sponsorId: z.uuid().nullable().optional(),
     facilitatorId: z.uuid().nullable().optional(),
@@ -382,8 +395,19 @@ export const createCycle = defineWriteAction({
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       await assertLegacyKeyFree(tx, workspaceId, cycles, input.legacy, "cycle");
+      if (
+        input.cadence &&
+        input.mode &&
+        (input.cadence === "annual") !== (input.mode === "annual")
+      ) {
+        throw new OperationError(
+          "forbidden",
+          `A ${input.cadence} cadence does not make a ${input.mode} cycle. Name one or the other.`,
+        );
+      }
       const cadence =
-        input.cadence ?? (await resolveWorkspaceCadence(tx, workspaceId));
+        input.cadence ??
+        (await resolveWorkspaceCadence(tx, workspaceId, input.mode));
       const period = cyclePeriodFor(cadence, parseLocalDate(input.on));
       const timeZone = await workspaceTimeZone(tx, workspaceId);
       const created = await createCycleInTx(tx, {

@@ -154,11 +154,13 @@ export async function runFeedForward(
  * agreed the annual objective is the room deciding this, and a blank form in
  * front of them is a worse start than an editable copy.
  *
- * **The quarter is asked for by name.** `cycles.ensureCurrent` defaults to the
- * most recent cycle's cadence, and a workspace that has just opened an annual
- * cycle for its frame has an annual one as its most recent, so a bare call
- * here built the annual period containing today and put "this quarter's
- * objective" in it. Found by the test that counted what came back.
+ * **The quarter is asked for by name.** `cycles.ensureCurrent` defaulted to
+ * the most recent cycle's cadence, and a workspace that has just opened an
+ * annual cycle for its frame has an annual one as its most recent, so a bare
+ * call here built the annual period containing today and put "this quarter's
+ * objective" in it. Found by the test that counted what came back. The
+ * default reads the quarterly cycles first since completeness review M-06,
+ * and the name stays: this wants a quarter whatever the default does.
  */
 export async function sendForward(
   _previous: WriteState,

@@ -2,6 +2,7 @@ import { PHASE_GUIDANCE } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
+import { phaseHref } from "./cycle-href.ts";
 
 /**
  * The eight phases down the left of the cycle workspace (UIUX-PLAN.md §4 S-04:
@@ -73,9 +74,12 @@ async function Mark({
 export async function PhaseRail({
   phases,
   currentPhase,
+  pinnedCycleId,
 }: {
   readonly phases: readonly PhaseSummary[];
   readonly currentPhase: number;
+  /** The cycle the reader opened by name, which every phase link keeps. */
+  readonly pinnedCycleId: string | null;
 }) {
   const { t } = await getTranslations();
 
@@ -102,7 +106,7 @@ export async function PhaseRail({
           return (
             <Link
               key={entry.phase}
-              href={`/cycle?phase=${entry.phase}`}
+              href={phaseHref(entry.phase, pinnedCycleId)}
               aria-current={current ? "step" : undefined}
               className={
                 current

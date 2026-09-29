@@ -7,7 +7,7 @@ import {
   phaseWorkAllowed,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
@@ -17,6 +17,8 @@ import { AnnualObjectives } from "./annual-objectives.tsx";
 import { assistsAvailableAction } from "./assist-actions.ts";
 import { Capacity } from "./capacity.tsx";
 import { CycleAdmin } from "./cycle-admin.tsx";
+import { phaseHref } from "./cycle-href.ts";
+import { CycleSwitcher } from "./cycle-switcher.tsx";
 import { DependencyRegister } from "./dependency-register.tsx";
 import { Diagnose } from "./diagnose.tsx";
 import { Direction } from "./direction.tsx";
@@ -51,12 +53,19 @@ import { RunningCadence } from "./running-cadence.tsx";
  *
  * The phases whose surfaces need goals and key results (4, 6 and 7) say what they
  * are waiting for rather than pretending to be empty.
+ *
+ * **Which cycle is open is the reader's choice** (completeness review M-06).
+ * `?cycle=<id>` opens that one, and the Work Map has linked here that way since
+ * P6-G11 while this page ignored it. Otherwise `?mode=annual` opens the annual
+ * cycle, and no parameter at all opens the quarter, which is what every other
+ * screen's link means. Before this the page read the quarter and nothing else,
+ * so an annual cycle could exist and never be opened.
  */
 
 export default async function CyclePage({
   searchParams,
 }: {
-  searchParams: Promise<{ phase?: string }>;
+  searchParams: Promise<{ phase?: string; cycle?: string; mode?: string }>;
 }) {
   const { t } = await getTranslations();
 
@@ -74,26 +83,47 @@ export default async function CyclePage({
   const canEdit = level >= ACCESS_LEVELS.edit;
   const canPublish = level >= ACCESS_LEVELS.full;
 
-  // The cycle containing today, else the soonest ahead. A workspace always has
-  // one: provisioning creates it, because a planning tool with no time box to
-  // plan in is not usable (P3-T02).
-  const cycle = await callAction(context, "cycles.current", {
-    mode: "quarterly",
-  });
+  const query = await searchParams;
+  const everyCycle = await callAction(context, "cycles.list", {});
+  const named = everyCycle.find((one) => one.id === query.cycle) ?? null;
+  const mode: "annual" | "quarterly" =
+    named?.mode ?? (query.mode === "annual" ? "annual" : "quarterly");
+
+  // The cycle containing today, else the soonest ahead, in the horizon being
+  // read. A workspace always has a quarterly one: provisioning creates it,
+  // because a planning tool with no time box to plan in is not usable
+  // (P3-T02). An annual one exists once somebody makes it.
+  const cycle =
+    named ?? (await callAction(context, "cycles.current", { mode }));
+
+  // A cycle the reader chose travels with every link on this screen; the
+  // quarter keeps the bare address every other screen links to.
+  const pinnedCycleId =
+    cycle && (named !== null || mode === "annual") ? cycle.id : null;
 
   if (!cycle) {
     return (
       <div className="flex flex-col gap-4.5">
         <Card>
-          <CardHeader>
+          <CardHeader className="justify-between">
             <h1 className="text-lg font-bold text-ink">
-              {t("cycle.noCycleYet")}
+              {mode === "annual"
+                ? t("cycle.noAnnualCycleYet")
+                : t("cycle.noCycleYet")}
             </h1>
+            <CycleSwitcher mode={mode} cycles={everyCycle} currentId={null} />
           </CardHeader>
-          <CardBody>
+          <CardBody className="flex flex-col gap-1.5">
             <p className="text-sm text-ink-3">
-              {t("cycle.thisWorkspaceHasNo")}
+              {mode === "annual"
+                ? t("cycle.theAnnualCycleHolds")
+                : t("cycle.thisWorkspaceHasNo")}
             </p>
+            {canPublish ? null : (
+              <p className="text-xs text-ink-3">
+                {t("cycle.creatingACycleNeedsFullAccess")}
+              </p>
+            )}
           </CardBody>
         </Card>
         {/*
@@ -101,10 +131,12 @@ export default async function CyclePage({
          * it** ("an administrator can create one from the rhythm settings"),
          * because `cycles.create` had no browser caller at all. The control
          * is here now, which is where somebody who has just been told there
-         * is no cycle already is (P6-G27b).
+         * is no cycle already is (P6-G27b), and it makes the horizon the
+         * reader is looking at (M-06).
          */}
         {canPublish ? (
           <CycleAdmin
+            mode={mode}
             currentCycleId={null}
             currentName={null}
             publicationDeadline={null}
@@ -139,7 +171,7 @@ export default async function CyclePage({
     keyResultTitle: string | null;
   }>;
 
-  const requested = Number((await searchParams).phase ?? Number.NaN);
+  const requested = Number(query.phase ?? Number.NaN);
   const viewing =
     Number.isInteger(requested) && requested >= 0 && requested <= 7
       ? requested
@@ -336,7 +368,11 @@ export default async function CyclePage({
   return (
     <div className="flex flex-col gap-4.5 xl:flex-row">
       <div className="w-full flex-none xl:w-72">
-        <PhaseRail phases={workflow.phases} currentPhase={viewing} />
+        <PhaseRail
+          phases={workflow.phases}
+          currentPhase={viewing}
+          pinnedCycleId={pinnedCycleId}
+        />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-4.5">
@@ -355,9 +391,11 @@ export default async function CyclePage({
                 })}
               </p>
             </div>
-            <Chip tone={workflow.mode === "annual" ? "brand" : "neutral"}>
-              {t("common.mode3", { mode: workflow.mode })}
-            </Chip>
+            <CycleSwitcher
+              mode={workflow.mode}
+              cycles={everyCycle}
+              currentId={cycle.id}
+            />
           </CardHeader>
           {work.allowed ? null : (
             <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">
@@ -370,7 +408,7 @@ export default async function CyclePage({
                 ))}
               </ul>
               <p className="text-xs text-warn">
-                <a className="underline" href="/cycle?phase=1">
+                <a className="underline" href={phaseHref(1, pinnedCycleId)}>
                   {t("cycle.goAndGatherWhat")}
                 </a>
               </p>
@@ -501,6 +539,7 @@ export default async function CyclePage({
             publishable={workflow.publishable}
             publishedAt={workflow.publishedAt}
             canPublish={canPublish}
+            pinnedCycleId={pinnedCycleId}
           />
         ) : null}
 
@@ -540,6 +579,7 @@ export default async function CyclePage({
 
         {viewing === 6 && cadence ? (
           <RunningCadence
+            cycleId={workflow.cycleId}
             sessions={cadence.sessions}
             blockers={cadence.blockers}
             decisions={cycleDecisions.map((decision) => ({
@@ -562,7 +602,10 @@ export default async function CyclePage({
               })),
             )}
             streak={cadence.streak}
-            calibratedAt={null}
+            calibration={workflow.calibration}
+            // `workflow.calibrate` is declared at full, the same as publishing.
+            canCalibrate={canPublish}
+            closed={workflow.status === "closed"}
           />
         ) : null}
 
@@ -662,6 +705,7 @@ export default async function CyclePage({
          */}
         {canPublish ? (
           <CycleAdmin
+            mode={workflow.mode}
             currentCycleId={cycle.id}
             currentName={cycle.name}
             publicationDeadline={cycle.publicationDeadline ?? null}

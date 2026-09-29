@@ -36,6 +36,7 @@ import {
   GATE_TITLES,
   KEY_RESULT_CHECKS,
   MANAGEMENT_RETRO_QUESTIONS,
+  MID_CYCLE_CALIBRATION,
   OBJECTIVE_CHECKS,
   PHASE_TITLES,
   PROCESS_HEALTH_STATEMENTS,
@@ -309,7 +310,7 @@ for (const documentedRead of documentedReads) {
  * saying what it looked at is a suite nobody notices has stopped looking.
  * Raise it when you add a list.
  */
-const ENUMERATIONS_CHECKED = 19;
+const ENUMERATIONS_CHECKED = 20;
 
 // --- 5. The enumerations (P7-T07) -------------------------------------------
 //
@@ -479,6 +480,22 @@ compare(
     ),
   ].map((match) => (match[1] ?? "").trim()),
   WEEKLY_STEPS.map((step) => step.title),
+  4,
+);
+
+// §7.6. One paragraph, compared sentence by sentence (completeness review
+// M-06). Phase 6 shows it beside the form that records the calibration, so
+// the rule a facilitator reads there is the document's and nobody's gloss.
+compare(
+  "the mid-cycle calibration",
+  section(method, "### 7.6 Mid-cycle calibration", `${NEWLINE}---`)
+    .split(NEWLINE)
+    .slice(1)
+    .join(" ")
+    .split(/\.\s+|\.$/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence !== ""),
+  MID_CYCLE_CALIBRATION,
   4,
 );
 

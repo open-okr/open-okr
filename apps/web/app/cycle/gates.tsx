@@ -9,6 +9,7 @@ import {
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { publishCycle } from "./actions.ts";
+import { keepCycle } from "./cycle-href.ts";
 
 /**
  * The six publish gates (METHOD.md §4.5, UIUX-PLAN.md §4 S-10).
@@ -73,12 +74,19 @@ export async function Gates({
   publishable,
   publishedAt,
   canPublish,
+  pinnedCycleId,
 }: {
   readonly cycleId: string;
   readonly gates: readonly Gate[];
   readonly publishable: boolean;
   readonly publishedAt: string | null;
   readonly canPublish: boolean;
+  /**
+   * The cycle the reader opened by name. A remedy on this screen stays on it,
+   * or gate 1's "go and name the champion" in the annual cycle would open the
+   * quarter's drafting instead (M-06).
+   */
+  readonly pinnedCycleId: string | null;
 }) {
   const { t } = await getTranslations();
 
@@ -136,7 +144,10 @@ export async function Gates({
                 )}
                 {gate.evaluable && gate.passed ? null : (
                   <a
-                    href={FIX[gate.gateKey]?.href ?? "/cycle?phase=4"}
+                    href={keepCycle(
+                      FIX[gate.gateKey]?.href ?? "/cycle?phase=4",
+                      pinnedCycleId,
+                    )}
                     className="w-fit text-xs font-semibold text-brand-text hover:underline"
                   >
                     {t(
