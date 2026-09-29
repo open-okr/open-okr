@@ -178,6 +178,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `${Number(p.appliedCount ?? 0)} proposed change(s) were applied`,
   "proposed_change.bulk_dismissed": (p) =>
     `${Number(p.dismissedCount ?? 0)} proposed change(s) were dismissed`,
+  "proposed_change.applied": () => "Applied an agent's proposed change",
+  "proposed_change.dismissed": () => "Dismissed an agent's proposed change",
   "space.created": (p) =>
     `Space "${asString(p.name, "New space")}" was created`,
   "space.updated": (p) => `Space "${asString(p.name, "A space")}" was updated`,

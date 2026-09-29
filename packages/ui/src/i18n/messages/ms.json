@@ -2041,6 +2041,8 @@
   "review.nudgeProvenance.snoozing": "Menunda…",
   "review.nudgeProvenance.snoozingStopsTheMessages": "Menunda menghentikan mesej. Ia tidak menyelesaikan tanggungjawab anda, dan senarai di atas tidak akan berubah.",
   "review.nudgeProvenance.via": "melalui {channel}",
+  "review.proposalDecision.applyingMakesThisChange": "Menggunakan cadangan ini membuat perubahan atas nama anda.",
+  "review.proposalDecision.draftedByAi": "Didraf oleh AI",
   "review.theseSourcesOfObligation": "Sumber tanggungjawab ini dinamakan di sini dan bukan ditinggalkan, supaya halaman ini tidak kelihatan lengkap sedangkan diam-diam gagal memberitahu anda tentang sesuatu yang anda miliki.",
   "review.whyYouGotNudged": "Mengapa anda menerima peringatan",
   "review.youAreAllCaught": "Semuanya sudah selesai.",

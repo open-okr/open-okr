@@ -201,6 +201,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "agent.run_failed": z.object({}).catchall(z.unknown()),
   "proposed_change.bulk_applied": z.object({}).catchall(z.unknown()),
   "proposed_change.bulk_dismissed": z.object({}).catchall(z.unknown()),
+  // One proposal decided from the review inbox (completeness review M-08).
+  // The action name travels so the feed can say what kind of change it was;
+  // what the change did is the applied action's own activity row.
+  "proposed_change.applied": z.object({ action: z.string() }),
+  "proposed_change.dismissed": z.object({ action: z.string() }),
   // Spaces (P3-T01). The name is snapshotted for the same reason a member's is:
   // a feed entry saying "renamed Marketing" has to keep saying that after the
   // space is renamed again.

@@ -67,8 +67,9 @@ import { resolveCoordinator } from "../spaces/roles.ts";
 /**
  * A change the agent would make, offered rather than made (P4-T05c-a).
  *
- * `action` and `payload` are exactly what `proposals.bulkApply` will call, so a
- * proposal is a deferred action call and nothing more. That is what keeps
+ * `action` and `payload` are exactly what `proposals.apply` and
+ * `proposals.bulkApply` will call, so a proposal is a deferred action call and
+ * nothing more. That is what keeps
  * "propose by default" honest: there is no second write path an agent could
  * take, only an action a human runs later under their own name.
  */

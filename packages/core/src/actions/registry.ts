@@ -315,6 +315,10 @@ import {
   updateOwnProfile,
 } from "./people.ts";
 import { exportArchive, importArchive } from "./portability.ts";
+import {
+  applyAgentProposal,
+  dismissAgentProposal,
+} from "./proposal-decisions.ts";
 import { reviewInbox } from "./review.ts";
 import {
   clusterRetroNotes,
@@ -576,6 +580,8 @@ export const ACTION_MAP = {
   "proposals.list": listProposedChanges,
   "proposals.bulkApply": bulkApplyProposedChanges,
   "proposals.bulkDismiss": bulkDismissProposedChanges,
+  "proposals.apply": applyAgentProposal,
+  "proposals.dismiss": dismissAgentProposal,
   "spaces.list": listSpaces,
   "spaces.read": readSpace,
   "spaces.create": createSpace,

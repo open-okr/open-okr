@@ -3091,6 +3091,40 @@
       "pages": false
     },
     {
+      "name": "proposals apply",
+      "action": "proposals.apply",
+      "method": "POST",
+      "path": "/proposals/apply",
+      "scope": "write",
+      "summary": "Applies one agent proposal the caller may decide, running the proposed action as them.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "proposals dismiss",
+      "action": "proposals.dismiss",
+      "method": "POST",
+      "path": "/proposals/dismiss",
+      "scope": "write",
+      "summary": "Dismisses one agent proposal the caller may decide, without applying it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "spaces list",
       "action": "spaces.list",
       "method": "GET",

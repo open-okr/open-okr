@@ -2041,6 +2041,8 @@
   "review.nudgeProvenance.snoozing": "Snoozing…",
   "review.nudgeProvenance.snoozingStopsTheMessages": "Snoozing stops the messages. It does not clear what you owe, and\n              the list above will not move.",
   "review.nudgeProvenance.via": "via {channel}",
+  "review.proposalDecision.applyingMakesThisChange": "Applying makes this change in your name.",
+  "review.proposalDecision.draftedByAi": "Drafted by AI",
   "review.theseSourcesOfObligation": "These sources of obligation are named here rather than left out,\n              so this page cannot look complete while quietly failing to tell\n              you about something you own.",
   "review.whyYouGotNudged": "Why you got nudged",
   "review.youAreAllCaught": "You are all caught up.",

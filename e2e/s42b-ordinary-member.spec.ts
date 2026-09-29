@@ -241,3 +241,167 @@ test("the admin section is absent for them, which is the level working", async (
       .getByRole("link", { name: "Admin" }),
   ).toHaveCount(0);
 });
+
+/**
+ * An agent's proposal, decided by the member it was for (completeness review
+ * M-08).
+ *
+ * The review row linked to `/admin/agents`, which refuses this member, so they
+ * were told they owed a decision and had nowhere to make it. A KPI they own is
+ * the Champion's recovery proposal in its ordinary form: raised by a run and
+ * carried by the owner's own nudge.
+ *
+ * **Written with SQL, for the reason `s39b-copilot-proposals` records.** The
+ * Champion raises a recovery only after two unhealthy periods of recorded
+ * history, which a browser cannot produce here, and that path is proved in
+ * `packages/core/test/proposal-decisions.test.ts`. What only a browser can
+ * prove is that this member sees the row and both buttons do what they say.
+ */
+const RECOVERY_KPI = "Weekly active teams";
+const DISMISSED_KPI = "Support first response";
+let recoveryProposalId = "";
+let dismissedProposalId = "";
+
+/** A KPI this member owns, and the Champion's recovery proposal for it. */
+async function proposeRecoveryTo(title: string): Promise<string> {
+  const member = (
+    await pool.query<{ id: string; workspace_id: string }>(
+      `select m.id, m.workspace_id
+         from workspace_members m
+         join users u on u.id = m.user_id
+        where u.email = $1
+        limit 1`,
+      [MEMBER_EMAIL],
+    )
+  ).rows[0];
+  if (!member) {
+    throw new Error("The invited member is not in the workspace.");
+  }
+  // The cycle running today, as the Champion's own run resolves it.
+  const cycle = (
+    await pool.query<{ id: string }>(
+      `select id from cycles
+        where workspace_id = $1 and deleted_at is null
+        order by (current_date between starts_on and ends_on) desc, starts_on desc
+        limit 1`,
+      [member.workspace_id],
+    )
+  ).rows[0];
+  if (!cycle) {
+    throw new Error("No cycle for a recovery objective to live in.");
+  }
+  const kpi = (
+    await pool.query<{ id: string }>(
+      `insert into kpis (id, workspace_id, short_id, title, owner_kind, member_id, frequency)
+       values (gen_random_uuid(), $1, $2, $3, 'member', $4, 'monthly')
+       returning id`,
+      [
+        member.workspace_id,
+        `m08-${Math.random().toString(36).slice(2, 10)}`,
+        title,
+        member.id,
+      ],
+    )
+  ).rows[0];
+  const run = (
+    await pool.query<{ id: string }>(
+      `insert into agent_runs (id, workspace_id, agent_id, trigger, status)
+       select gen_random_uuid(), workspace_id, id, 'schedule', 'completed'
+         from agents
+        where workspace_id = $1 and kind = 'champion' and deleted_at is null
+        limit 1
+       returning id`,
+      [member.workspace_id],
+    )
+  ).rows[0];
+  if (!kpi || !run) {
+    throw new Error("The KPI or the Champion's run was not written.");
+  }
+  const proposal = (
+    await pool.query<{ id: string }>(
+      `insert into proposed_changes
+         (id, workspace_id, run_id, action, payload, subject_type, subject_id, status)
+       values (gen_random_uuid(), $1, $2, 'kpis.launchRecovery', $3::jsonb, 'kpi', $4, 'pending')
+       returning id`,
+      [
+        member.workspace_id,
+        run.id,
+        JSON.stringify({ kpiId: kpi.id, cycleId: cycle.id }),
+        kpi.id,
+      ],
+    )
+  ).rows[0];
+  if (!proposal) {
+    throw new Error("The proposal was not written.");
+  }
+  // The nudge is what makes it theirs: `nudges.proposal_id` names the member
+  // the Champion asked. Already sent, so the delivery worker leaves it alone.
+  await pool.query(
+    `insert into nudges
+       (id, workspace_id, rule_key, kind, subject_type, subject_id,
+        recipient_member_id, channel, scheduled_for, sent_at, proposal_id)
+     values (gen_random_uuid(), $1, 'kpi.recovery_proposed', 'rhythm', 'kpi', $2,
+             $3, 'in_app', now(), now(), $4)`,
+    [member.workspace_id, kpi.id, member.id, proposal.id],
+  );
+  return proposal.id;
+}
+
+test("a recovery proposal addressed to them is decided on the review screen", async () => {
+  recoveryProposalId = await proposeRecoveryTo(RECOVERY_KPI);
+  dismissedProposalId = await proposeRecoveryTo(DISMISSED_KPI);
+
+  await memberPage.goto("/review");
+  const card = memberPage.locator(`#proposal-${recoveryProposalId}`);
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(
+    card.getByText(`Launch a recovery objective for "${RECOVERY_KPI}"`),
+  ).toBeVisible();
+  await expect(card.getByRole("button", { name: "Apply" })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Dismiss" })).toBeVisible();
+  // No link away to a screen that would refuse them.
+  await expect(card.getByRole("link")).toHaveCount(0);
+});
+
+test("applying it launches the recovery in their name", async () => {
+  const card = memberPage.locator(`#proposal-${recoveryProposalId}`);
+  await card.getByRole("button", { name: "Apply" }).click();
+  await expect(card).toHaveCount(0, { timeout: 20_000 });
+
+  const { rows } = await pool.query<{
+    status: string;
+    decider: string | null;
+    recovery_goal_id: string | null;
+  }>(
+    `select p.status, u.email as decider, k.recovery_goal_id
+       from proposed_changes p
+       join kpis k on k.id = p.subject_id
+       left join workspace_members m on m.id = p.decided_by_member_id
+       left join users u on u.id = m.user_id
+      where p.id = $1`,
+    [recoveryProposalId],
+  );
+  expect(rows[0]?.status).toBe("applied");
+  expect(rows[0]?.decider).toBe(MEMBER_EMAIL);
+  expect(rows[0]?.recovery_goal_id).not.toBeNull();
+});
+
+test("dismissing the other one changes nothing but the proposal", async () => {
+  const card = memberPage.locator(`#proposal-${dismissedProposalId}`);
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await card.getByRole("button", { name: "Dismiss" }).click();
+  await expect(card).toHaveCount(0, { timeout: 20_000 });
+
+  const { rows } = await pool.query<{
+    status: string;
+    recovery_goal_id: string | null;
+  }>(
+    `select p.status, k.recovery_goal_id
+       from proposed_changes p
+       join kpis k on k.id = p.subject_id
+      where p.id = $1`,
+    [dismissedProposalId],
+  );
+  expect(rows[0]?.status).toBe("dismissed");
+  expect(rows[0]?.recovery_goal_id).toBeNull();
+});
