@@ -1,7 +1,15 @@
 import { loadEnv } from "@openokr/config";
-import { ACCESS_LEVELS, callAction, navigationFor } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  navigationFor,
+  OperationError,
+} from "@openokr/core";
 import {
   AppShell,
+  Button,
+  Card,
+  CardBody,
   CycleStrip,
   KeyboardRegistryProvider,
   MobileTabBar,
@@ -16,6 +24,7 @@ import {
 import { Ellipsis, Settings } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { ComponentProps, ReactNode } from "react";
 import { AvatarMenu } from "../app/avatar-menu.tsx";
 import { copilotAvailabilityAction } from "../app/copilot/actions.ts";
@@ -25,6 +34,7 @@ import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
+import { getAuth } from "./auth.ts";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { navBlocks } from "./nav-groups.ts";
@@ -99,25 +109,74 @@ export async function AppShellLayout({
   readonly children: ReactNode;
 }) {
   const { session, workspace, memberships } = await requireWorkspace();
-  const level = await resolveAccessLevelFor(
-    workspace.workspaceId,
-    workspace.memberId,
-  );
+
+  // **A suspended member has a session and no access, and the two reads
+  // below are the first place that finds out** (manual UAT, 29 September
+  // 2026, M06-07): `access()`'s scoped getter correctly excludes them, which
+  // is the design (CLAUDE.md: "returns not-found on forbidden and excludes
+  // suspended members"), but nothing caught the `OperationError` this shell
+  // wraps every authenticated page in, so it fell through to the framework's
+  // generic error boundary. That boundary tells the reader "this is our
+  // fault, not something you did", which is false here: it is a suspension
+  // working exactly as designed, on every page the member tries next, not a
+  // crash on one. Caught here instead, once, for the one thing every
+  // authenticated page shares.
+  async function loadMemberContext() {
+    const resolvedLevel = await resolveAccessLevelFor(
+      workspace.workspaceId,
+      workspace.memberId,
+    );
+    // The member's own theme and density (P6-G23), applied to a browser that
+    // has never seen them. Read here rather than in the root layout, because
+    // the root wraps the signed-out screens too and they have no member.
+    const member = await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human" as const, userId: session.user.id },
+      },
+      "people.readMember",
+      { memberId: workspace.memberId },
+    );
+    return { level: resolvedLevel, me: member };
+  }
+
+  let level: number;
+  let me: Awaited<ReturnType<typeof loadMemberContext>>["me"];
+  try {
+    ({ level, me } = await loadMemberContext());
+  } catch (error) {
+    if (!(error instanceof OperationError)) {
+      throw error;
+    }
+    const { t } = await getTranslations();
+    async function signOutOfSuspendedWorkspace(): Promise<void> {
+      "use server";
+      await getAuth().api.signOut({ headers: await headers() });
+      redirect("/sign-in");
+    }
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-bg p-4.5">
+        <Card className="w-full max-w-sm">
+          <CardBody className="flex flex-col gap-2.5">
+            <h1 className="text-lg font-bold text-ink">
+              {t("shell.suspended.title")}
+            </h1>
+            <p className="text-sm text-ink-2">{t("shell.suspended.body")}</p>
+            <form action={signOutOfSuspendedWorkspace}>
+              <Button type="submit" variant="default" size="sm">
+                {t("shell.suspended.signOut")}
+              </Button>
+            </form>
+          </CardBody>
+        </Card>
+      </main>
+    );
+  }
+
   const sidebarItems = navigationFor("sidebar", level);
   const adminItems = navigationFor("admin", level);
   const accountItems = sidebarItems.filter((item) => item.group === "account");
-  // The member's own theme and density (P6-G23), applied to a browser that
-  // has never seen them. Read here rather than in the root layout, because
-  // the root wraps the signed-out screens too and they have no member.
-  const me = await callAction(
-    {
-      pool: getPool(),
-      workspaceId: workspace.workspaceId,
-      actor: { kind: "human" as const, userId: session.user.id },
-    },
-    "people.readMember",
-    { memberId: workspace.memberId },
-  );
 
   const strip = await loadCycleStrip(
     workspace.workspaceId,

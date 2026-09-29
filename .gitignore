@@ -50,3 +50,11 @@ next-env.d.ts
 # September 2026: these stay local, never in the repo. The blank workbook,
 # docs/testing/OpenOKR-UAT.xlsx, is still tracked and this pattern excludes it.
 docs/testing/OpenOKR-UAT-*.xlsx
+
+# One-off driver scripts and evidence from a manual UAT pass through a real
+# browser (the M01-M08 Group D sweep, 29 September 2026): screenshots, a
+# scratch Postgres database's worth of nothing tracked, and Playwright
+# scripts written to reproduce one case at a time rather than to keep. Real
+# findings from the pass are written up in commits and reports, not left
+# sitting here.
+/.manual-uat-scratch/
