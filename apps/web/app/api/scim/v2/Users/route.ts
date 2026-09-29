@@ -1,4 +1,6 @@
 import {
+  API_RATE_LIMIT,
+  API_RATE_WINDOW_SECONDS,
   type DirectoryMember,
   listDirectoryUsers,
   logSyncOperation,
@@ -14,6 +16,8 @@ import {
 } from "@openokr/core";
 import { NextResponse } from "next/server";
 import { getAuth, getPool } from "../../../../../lib/auth";
+import { getCache } from "../../../../../lib/cache";
+import { retryAfter } from "../../../../../lib/retry-after";
 
 /**
  * SCIM 2.0 Users collection (P8-T08, rewritten at P8-T08a; RFC 7644 §3.3).
@@ -30,6 +34,16 @@ export const dynamic = "force-dynamic";
 
 const SCIM_HEADERS = { "Content-Type": "application/scim+json" };
 
+/**
+ * The workspace a directory token provisions into, or the refusal to send.
+ *
+ * Every SCIM route calls this first, so the rate limit sits here once rather
+ * than in each of them (completeness review M-12). Per directory token, with
+ * the REST surface's allowance: a first sync is a burst, and a 429 that says
+ * how long to wait slows it rather than failing it. What the limit stops is a
+ * runaway connector, or a leaked token, holding the database for everybody
+ * else.
+ */
 export async function authenticateScim(
   request: Request,
 ): Promise<{ workspaceId: string } | NextResponse> {
@@ -45,6 +59,30 @@ export async function authenticateScim(
       status: 401,
     });
   }
+
+  const limited = await getCache().rateLimit(
+    `scim:${resolved.tokenId}`,
+    API_RATE_LIMIT,
+    API_RATE_WINDOW_SECONDS,
+  );
+  if (!limited.allowed) {
+    // RFC 7644 §3.12's error shape, with the status a directory already knows
+    // to back off from.
+    return NextResponse.json(
+      scimError(
+        429,
+        `More than ${API_RATE_LIMIT} requests a minute on this token. Try again shortly.`,
+      ),
+      {
+        status: 429,
+        headers: {
+          ...SCIM_HEADERS,
+          "Retry-After": retryAfter(limited.resetSeconds),
+        },
+      },
+    );
+  }
+
   return { workspaceId: resolved.workspaceId };
 }
 

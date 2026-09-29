@@ -63,6 +63,24 @@ an attacker nothing to present.
 **when** it is presented at the agent endpoint,
 **then** the call is refused as unauthorised, and the reverse is refused too.
 
+**Extended at completeness review M-12, 29 September 2026.** The API token row
+has two audiences of its own, `rest` and `mcp`, and TECHNICAL-PLAN §4 already
+named the second "an agent token". It is the scoped token §5.1 gives a local
+agent, and the agent endpoint now accepts it. The rule above still holds, with
+"API token" read as the `rest` audience:
+
+| Token | `/api/v1` | `/api/mcp` |
+|---|---|---|
+| API token, `rest` audience | Accepted | Refused, and told to mint an agent token |
+| API token, `mcp` audience (an agent token) | Refused | Accepted |
+| MCP access token (OAuth) | Refused | Accepted |
+
+**Given** an agent token with read scope,
+**when** it is presented at the agent endpoint and calls a write tool,
+**then** the call is refused as a tool result naming the scope it needed, as
+for a grant, and the same token presented at `/api/v1` is refused as
+unauthorised.
+
 ## 3. REST, OpenAPI and the command line (P5-T07)
 
 ### 3.1 The mapping
@@ -159,6 +177,42 @@ per-request revalidation has none.
 |---|---|---|
 | Streamable HTTP | Hosted agent clients | OAuth 2.1 with PKCE, the flow above |
 | Standard input and output | Local or air-gapped desktop agents | A scoped token, because there is no browser to redirect |
+
+**Corrected at completeness review M-12, 29 September 2026.** The scoped token
+was not accepted anywhere, so a local agent had no way in that did not need a
+browser. It is now an API token minted for the `mcp` audience on
+`/account/api-tokens`, and the Streamable HTTP endpoint accepts it as a bearer
+beside the OAuth access token. Most local agents speak HTTP with a configured
+header, so this is the path they use today. The standard input and output
+transport itself is still owed, as P5-T09b's row records, for a desktop agent
+that speaks only that.
+
+| | OAuth grant | Agent token |
+|---|---|---|
+| Resolved by | `resolveAccessToken`, via `resolveAgentPrincipal` | `resolveApiToken` with audience `mcp`, via `resolveAgentPrincipal` |
+| Scopes | `read`, `write`, `destructive`, as approved | The same three, as minted |
+| Checked per request | Grant, membership, suspension | Revocation, expiry, membership, suspension |
+| Session | Recorded against the grant at `initialize` | None. A session is recorded against a grant, and the protocol lets a server assign none |
+| Rate limit key | `mcp:grant:<grant>` | `mcp:token:<token>` |
+
+Both are limited to the REST surface's 600 requests a minute, and a full
+window is a 429 with `Retry-After` and a JSON-RPC error. Registration and the
+token endpoint have no token to count against, so they are limited per caller
+address: registration at the device login's 10 a minute, because each call
+writes a row, and the token endpoint at the REST allowance, because an office
+of agents behind one address each refresh hourly. The caller address is the
+one Better Auth counts sign-in attempts under, from the same header list, so a
+forwarded chain whose first entry the caller wrote is not trusted.
+
+**A token cannot administer tokens.** TECHNICAL-PLAN §8 says so, and until
+this change nothing enforced it: a write-scoped grant, REST token or agent token
+could call `tokens.create` and mint itself a destructive one. `tokens.create`,
+`tokens.revoke` and `tokens.approveDevice` now refuse any call that names a
+channel, which every surface except the browser does.
+
+**Given** an agent token with read and write scope,
+**when** it calls `tokens.create` asking for destructive scope,
+**then** the call is refused as a tool result and no token is written.
 
 **The MCP server makes no outbound AI calls of its own.** That is what makes it
 air-gap safe by construction, and it is a property to protect rather than a

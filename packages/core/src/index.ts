@@ -235,6 +235,14 @@ export {
   matchTemplate,
 } from "./api/mcp/dispatch.ts";
 export {
+  type AgentPrincipal,
+  type AgentRejection,
+  type AgentTokenPrincipal,
+  agentRateKey,
+  type GrantPrincipal,
+  resolveAgentPrincipal,
+} from "./api/mcp/principal.ts";
+export {
   canonicalAddress,
   type FetchResult,
   isResearchTool,
@@ -369,6 +377,7 @@ export {
   routeAt,
 } from "./api/surface.ts";
 export {
+  ADDRESS_RATE_LIMIT,
   API_RATE_LIMIT,
   API_RATE_WINDOW_SECONDS,
   audienceFromText,
@@ -415,6 +424,7 @@ export {
 } from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
+export { callerAddress } from "./auth/caller-address.ts";
 export {
   syncAllSamlProviders,
   syncSamlProvider,

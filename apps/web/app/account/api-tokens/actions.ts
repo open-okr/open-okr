@@ -39,7 +39,9 @@ export async function createToken(
 ): Promise<TokenResult> {
   const { t } = await getTranslations();
   const name = String(form.get("name") ?? "").trim();
-  const audience = String(form.get("audience") ?? "rest");
+  // Anything but the agent audience is a REST token, the default a script
+  // expects. The action's own schema refuses anything else as well.
+  const audience = form.get("audience") === "mcp" ? "mcp" : "rest";
   const scopes = SCOPES.filter((scope) => form.get(`scope.${scope}`) === "on");
   const days = String(form.get("expiresInDays") ?? "").trim();
 
@@ -61,7 +63,7 @@ export async function createToken(
   try {
     const created = await callAction(await context(), "tokens.create", {
       name,
-      audience: audience === "mcp" ? "mcp" : "rest",
+      audience,
       scopes: scopes as Scope[],
       expiresInDays: days === "" ? null : Number(days),
     });
@@ -69,7 +71,11 @@ export async function createToken(
     return {
       ok: true,
       token: created.token,
-      message: t("admin.invitations.inviteForm.copyThisNowIt"),
+      audience,
+      message:
+        audience === "mcp"
+          ? t("account.apiTokens.pasteIntoYourAgent")
+          : t("admin.invitations.inviteForm.copyThisNowIt"),
     };
   } catch (error) {
     return {

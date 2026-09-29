@@ -35,6 +35,7 @@ import {
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
 } from "../workspaces/registration.ts";
+import { CALLER_ADDRESS_HEADERS } from "./caller-address.ts";
 import { currentProvisioningAuthority } from "./provisioning-authority.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
 import { providerIdFromCallback } from "./sso.ts";
@@ -337,8 +338,9 @@ export function createAuth(options: AuthOptions) {
         // Every deployment target puts a reverse proxy in front of the app
         // (deploy/docker ships one), so the socket address is the proxy and
         // the caller's address is in this header. Rate limits are keyed on
-        // it, which is why it has to be read rather than ignored.
-        ipAddressHeaders: ["x-forwarded-for", "x-real-ip"],
+        // it, which is why it has to be read rather than ignored. Every other
+        // per-address limit reads the same list (`caller-address.ts`).
+        ipAddressHeaders: [...CALLER_ADDRESS_HEADERS],
       },
     },
 

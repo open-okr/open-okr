@@ -77,6 +77,12 @@ others push people rather than being polled.
 One bearer token per workspace, shown once, hashed at rest. Issuing a new one
 revokes the old.
 
+The token may make 600 requests a minute, the same allowance an API token
+has. Past that the directory is answered 429 with `Retry-After`, which says how
+long to wait, so a large first sync slows down rather than being refused for
+good. The limit is there so a runaway connector, or a leaked token, cannot hold
+the database for everybody else.
+
 Two refusals worth knowing: the directory cannot suspend the last person with
 full access, and losing a group is not leaving the workspace.
 

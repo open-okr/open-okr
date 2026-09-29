@@ -7,10 +7,18 @@
  * either of them runs.
  *
  * **The order is not rearrangeable.** Origin, then token, then version, then the
- * session, then the protocol. Validating the origin first is what stops a page
- * in a browser from being talked into opening a session against a local agent's
- * instance; resolving the token before touching the protocol is what stops an
- * unauthenticated caller from learning which tools exist, one refusal at a time.
+ * rate limit, then the session, then the protocol. Validating the origin first
+ * is what stops a page in a browser from being talked into opening a session
+ * against a local agent's instance; resolving the token before touching the
+ * protocol is what stops an unauthenticated caller from learning which tools
+ * exist, one refusal at a time.
+ *
+ * **Two kinds of bearer, one principal.** A hosted agent holds an OAuth access
+ * token from the consent screen. A local agent that cannot open a browser holds
+ * an agent token its member minted on the tokens screen (completeness review
+ * M-12). Both resolve to one member in one workspace with the same three scopes,
+ * and a REST token is refused here exactly as an agent token is refused at the
+ * REST surface.
  *
  * **The session is this product's record, not the transport's memory.** The
  * transport runs stateless, because a server built per request has no memory to
@@ -19,14 +27,25 @@
  * `initialize`, written against the grant, and checked against that same grant
  * on every later request. It authorises nothing: the token on each request is
  * resolved from scratch, so a grant revoked a second ago is refused a second
- * ago.
+ * ago. **An agent token gets no session**, because a session is recorded
+ * against a grant and a token has none. The protocol lets a server assign no
+ * session identifier, and what a session would record, that the token is in
+ * use, the tokens screen already shows as its last use.
  *
  * **An unauthorised answer carries the challenge.** RFC 9728 §5.1: the header
  * points at the resource metadata, so a client that arrived without a token
  * learns where to go rather than only that it was refused.
+ *
+ * **A limited answer is the protocol's own error.** A 429 with `Retry-After`,
+ * and a JSON-RPC error in the body answering the request's own id, so a client
+ * that reads either learns to wait rather than retry at once.
  */
 import { McpAgentServer } from "@openokr/adapters";
 import {
+  type AgentRejection,
+  API_RATE_LIMIT,
+  API_RATE_WINDOW_SECONDS,
+  agentRateKey,
   bearerFrom,
   challengeHeader,
   closeSessionFor,
@@ -39,15 +58,17 @@ import {
   newSessionId,
   originAllowed,
   recordSessionFor,
-  resolveAccessToken,
+  resolveAgentPrincipal,
   resourceIdentifier,
   SUPPORTED_PROTOCOL_VERSIONS,
   sessionFor,
   stampSessionUse,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
+import { getCache } from "../../../lib/cache";
 import { instanceIssuer } from "../../../lib/issuer";
 import { getPool } from "../../../lib/pool";
+import { retryAfter } from "../../../lib/retry-after";
 import { getKeyRing } from "../../../lib/secrets";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +97,42 @@ function methodOf(body: unknown): string {
   return typeof method === "string" ? method : "";
 }
 
+/**
+ * The id a JSON-RPC request carries, or null.
+ *
+ * Null for a batch, a notification or no body at all, which is what JSON-RPC
+ * 2.0 §5 says an error answers when it cannot name the request.
+ */
+function requestIdOf(body: unknown): string | number | null {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return null;
+  }
+  const id = (body as Record<string, unknown>).id;
+  return typeof id === "string" || typeof id === "number" ? id : null;
+}
+
+/**
+ * What to say about a bearer that did not resolve.
+ *
+ * One sentence for almost everything, because telling a stranger which of their
+ * guesses came close is a map. The exception is a real REST token at the wrong
+ * door: whoever holds it minted it, and saying which kind to mint instead saves
+ * them an afternoon.
+ */
+function refusalFor(reason: AgentRejection): string {
+  return reason === "wrong_audience"
+    ? "That token is for the REST surface, not the agent endpoint. Mint an agent token under Account, then API tokens."
+    : "That token is not one this instance will accept.";
+}
+
+/**
+ * JSON-RPC's code for a server error the specification leaves to the server.
+ *
+ * The same code the transport itself answers with when it refuses a request, so
+ * a client that handles one handles both.
+ */
+const JSON_RPC_SERVER_ERROR = -32000;
+
 async function answer(request: NextRequest): Promise<Response> {
   const issuer = instanceIssuer();
 
@@ -103,7 +160,7 @@ async function answer(request: NextRequest): Promise<Response> {
   }
 
   const pool = getPool();
-  const resolved = await resolveAccessToken(pool, {
+  const resolved = await resolveAgentPrincipal(pool, {
     raw,
     resource: resourceIdentifier(issuer),
     now: new Date(),
@@ -113,7 +170,7 @@ async function answer(request: NextRequest): Promise<Response> {
       401,
       {
         error: "invalid_token",
-        error_description: "That token is not one this instance will accept.",
+        error_description: refusalFor(resolved.reason),
       },
       {
         "www-authenticate": challengeHeader(issuer, { error: "invalid_token" }),
@@ -147,14 +204,41 @@ async function answer(request: NextRequest): Promise<Response> {
     }
   }
 
-  // 4. The session, which is ours rather than the transport's.
+  // 4. The rate limit, per grant or per agent token, with the REST surface's
+  // own allowance. After the body, so the refusal can answer the request's own
+  // id; reading a body is cheap next to running a tool.
+  const limited = await getCache().rateLimit(
+    agentRateKey(resolved),
+    API_RATE_LIMIT,
+    API_RATE_WINDOW_SECONDS,
+  );
+  if (!limited.allowed) {
+    const wait = retryAfter(limited.resetSeconds);
+    return problem(
+      429,
+      {
+        jsonrpc: "2.0",
+        error: {
+          code: JSON_RPC_SERVER_ERROR,
+          message: `That is more than ${API_RATE_LIMIT} requests a minute on this connection. Try again in ${wait} seconds.`,
+          data: { retryAfterSeconds: Number(wait) },
+        },
+        id: requestIdOf(body),
+      },
+      { "retry-after": wait },
+    );
+  }
+
+  // 5. The session, which is ours rather than the transport's.
   const presented = request.headers.get(SESSION_HEADER);
   if (presented) {
-    const found = await sessionFor(pool, presented);
     // A session belonging to another grant, or one already closed, is not a
-    // session at all. A bad request rather than a 401, because the token was
-    // fine and the session was not.
+    // session at all, and an agent token holds none. A bad request rather
+    // than a 401, because the token was fine and the session was not.
+    const found =
+      resolved.via === "grant" ? await sessionFor(pool, presented) : null;
     if (
+      resolved.via !== "grant" ||
       !found ||
       found.closedAt !== null ||
       found.grantId !== resolved.grantId
@@ -223,8 +307,13 @@ async function answer(request: NextRequest): Promise<Response> {
   );
 
   // An `initialize` that worked opens a session, and its identifier goes back
-  // in the header a client sends on everything after it.
-  if (methodOf(body) === "initialize" && answered.status < 400) {
+  // in the header a client sends on everything after it. A grant's only: an
+  // agent token's connection runs without one.
+  if (
+    resolved.via === "grant" &&
+    methodOf(body) === "initialize" &&
+    answered.status < 400
+  ) {
     const sessionId = newSessionId();
     await recordSessionFor(pool, {
       workspaceId: resolved.workspaceId,

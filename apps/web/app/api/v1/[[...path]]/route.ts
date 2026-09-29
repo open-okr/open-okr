@@ -90,7 +90,7 @@ const REJECTIONS: Readonly<Record<TokenRejection, string>> = {
   revoked: "That token has been revoked.",
   expired: "That token has expired.",
   wrong_audience:
-    "That token is for the agent endpoint, not the REST surface. Mint one with the rest audience.",
+    "That token is for the agent endpoint, not the REST surface. Mint a REST token under Account, then API tokens.",
   no_member: "The member that token belongs to is no longer active.",
 };
 
@@ -145,12 +145,14 @@ async function handle(
     API_RATE_WINDOW_SECONDS,
   );
   if (!limited.allowed) {
-    return fail(
-      apiError(
+    return fail({
+      ...apiError(
         "rate_limited",
         `That is more than ${API_RATE_LIMIT} requests a minute on this token. Try again shortly.`,
       ),
-    );
+      // The window knows when it empties, and a client told when waits.
+      retryAfterSeconds: limited.resetSeconds,
+    });
   }
 
   if (segments.length === 0) {

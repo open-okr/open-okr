@@ -60,6 +60,8 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "appearance.english",
   "appearance.bahasaMelayu",
   "copilot.copilotPanel.copilot",
+  // The name of an API style, which the glossary keeps as it is.
+  "account.apiTokens.audienceRest",
   // Code, commands, formats and example values a person types as shown.
   "activity.pnpmAuditVerify",
   "admin.audit.actionPlaceholder",

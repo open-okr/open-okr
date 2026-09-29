@@ -1,9 +1,11 @@
-import { API_BASE, callAction } from "@openokr/core";
+import { API_BASE, callAction, resourceIdentifier } from "@openokr/core";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { instanceIssuer } from "../../../lib/issuer";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { createToken, revokeToken } from "./actions.ts";
+import { agentConfiguration } from "./agent-config.ts";
 import { TokenForm } from "./token-form.tsx";
 
 /**
@@ -17,23 +19,43 @@ import { TokenForm } from "./token-form.tsx";
  * **It is shown once.** The row holds a digest. That is stated on the page,
  * before the button, because "copy this now" after the fact is a worse
  * experience than knowing beforehand.
+ *
+ * **Two doors, chosen here** (completeness review M-12). A REST token opens
+ * `/api/v1` for a script or the command line. An agent token opens the agent
+ * endpoint, for a local agent that cannot open a browser to go through the
+ * consent screen: AI-NATIVE-PLAN §8.1's "scoped tokens remain for local and
+ * scripted use". Each is refused at the other's door, and the page says how
+ * to connect one rather than leaving somebody to find the address.
  */
+
+const AUDIENCES = [
+  {
+    id: "rest",
+    label: "account.apiTokens.forScripts",
+    hint: "account.apiTokens.forScriptsHint",
+  },
+  {
+    id: "mcp",
+    label: "account.apiTokens.forAgent",
+    hint: "account.apiTokens.forAgentHint",
+  },
+] as const;
 
 const SCOPES = [
   {
     id: "read",
-    label: "Read",
-    hint: "Every read action. Nothing changes.",
+    label: "account.apiTokens.scopeRead",
+    hint: "account.apiTokens.scopeReadHint",
   },
   {
     id: "write",
-    label: "Write",
-    hint: "Create and update. Still bounded by what you can do.",
+    label: "account.apiTokens.scopeWrite",
+    hint: "account.apiTokens.scopeWriteHint",
   },
   {
     id: "destructive",
-    label: "Destructive",
-    hint: "Removes things people can see. Grant only when something needs it.",
+    label: "account.apiTokens.scopeDestructive",
+    hint: "account.apiTokens.scopeDestructiveHint",
   },
 ] as const;
 
@@ -53,6 +75,9 @@ export default async function ApiTokensPage() {
     "tokens.mine",
     {},
   );
+  // The address every grant and every agent token is checked against, so the
+  // one an agent is told to use is the one it will be accepted at.
+  const agentEndpoint = resourceIdentifier(instanceIssuer());
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -77,7 +102,11 @@ export default async function ApiTokensPage() {
       <Card>
         <CardHeader>{t("account.apiTokens.newToken")}</CardHeader>
         <CardBody>
-          <TokenForm action={createToken} className="flex flex-col gap-3">
+          <TokenForm
+            action={createToken}
+            agentEndpoint={agentEndpoint}
+            className="flex flex-col gap-3"
+          >
             <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
               {t("common.name")}
               <input
@@ -89,6 +118,32 @@ export default async function ApiTokensPage() {
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm font-normal text-ink"
               />
             </label>
+
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="mb-1 text-xs font-semibold text-ink-2">
+                {t("account.apiTokens.whatItIsFor")}
+              </legend>
+              {AUDIENCES.map((audience) => (
+                <label
+                  key={audience.id}
+                  className="flex items-start gap-2 text-sm text-ink"
+                >
+                  <input
+                    type="radio"
+                    name="audience"
+                    value={audience.id}
+                    defaultChecked={audience.id === "rest"}
+                    className="mt-1"
+                  />
+                  <span className="flex flex-col">
+                    {t(audience.label)}
+                    <span className="text-xs text-ink-3">
+                      {t(audience.hint)}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
 
             <fieldset className="flex flex-col gap-1.5">
               <legend className="mb-1 text-xs font-semibold text-ink-2">
@@ -106,8 +161,8 @@ export default async function ApiTokensPage() {
                     className="mt-1"
                   />
                   <span className="flex flex-col">
-                    {scope.label}
-                    <span className="text-xs text-ink-3">{scope.hint}</span>
+                    {t(scope.label)}
+                    <span className="text-xs text-ink-3">{t(scope.hint)}</span>
                   </span>
                 </label>
               ))}
@@ -125,12 +180,34 @@ export default async function ApiTokensPage() {
               />
             </label>
 
-            <input type="hidden" name="audience" value="rest" />
-
             <Button type="submit" variant="primary" size="sm" className="w-fit">
               {t("account.apiTokens.createToken")}
             </Button>
           </TokenForm>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>{t("account.apiTokens.connectAnAgent")}</CardHeader>
+        <CardBody className="flex flex-col gap-2">
+          <p className="text-sm text-ink-3">
+            {t("account.apiTokens.agentIntro")}
+          </p>
+          <p className="text-sm text-ink-3">
+            {t("account.apiTokens.agentHow", { endpoint: agentEndpoint })}
+          </p>
+          <pre
+            data-testid="agent-configuration"
+            className="whitespace-pre-wrap break-all rounded-md bg-raised px-2.5 py-2 font-mono text-xs text-ink-2"
+          >
+            {agentConfiguration(
+              agentEndpoint,
+              t("account.apiTokens.tokenPlaceholder"),
+            )}
+          </pre>
+          <p className="text-sm text-ink-3">
+            {t("account.apiTokens.agentSameRules")}
+          </p>
         </CardBody>
       </Card>
 
@@ -155,6 +232,11 @@ export default async function ApiTokensPage() {
                   ) : (
                     <Chip tone="ok">{t("common.active")}</Chip>
                   )}
+                  <Chip tone="neutral">
+                    {token.audience === "mcp"
+                      ? t("account.apiTokens.audienceAgent")
+                      : t("account.apiTokens.audienceRest")}
+                  </Chip>
                   <code className="font-mono text-xs text-ink-3">
                     {token.prefix}…
                   </code>
