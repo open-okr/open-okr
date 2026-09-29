@@ -10381,6 +10381,15 @@
                             },
                             "onboardingDone": {
                               "type": "boolean"
+                            },
+                            "branding": {
+                              "type": "object",
+                              "properties": {
+                                "primaryColor": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "additionalProperties": false

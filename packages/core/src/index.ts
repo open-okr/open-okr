@@ -1035,6 +1035,13 @@ export {
   sessionChannel,
 } from "./sessions/live.ts";
 export {
+  BRAND_SURFACES,
+  type BrandPalette,
+  deriveBrandPalette,
+  type StatusHue,
+  statusHueOf,
+} from "./settings/brand-colour.ts";
+export {
   brandingSchema,
   DEFAULT_IMPORT_ROW_LIMIT,
   DEFAULT_QUIET_HOURS,

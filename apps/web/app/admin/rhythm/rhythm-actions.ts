@@ -231,6 +231,11 @@ export async function saveRhythm(
   }
 
   revalidatePath("/admin/rhythm");
+  // A rename is read on every screen, starting with the sidebar and the root
+  // layout's catalogue, so the whole tree is stale rather than this page (M-14).
+  if (sawLabel) {
+    revalidatePath("/", "layout");
+  }
 
   // Counted over this card's thresholds rather than the workspace's, because
   // that is what the sentence sits under. A card carrying no threshold at all

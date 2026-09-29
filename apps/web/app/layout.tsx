@@ -15,6 +15,10 @@ import type { ReactNode } from "react";
 import { getInstanceName } from "../lib/instance-name";
 import { InstanceNameProvider } from "../lib/instance-name-context";
 import { resolveLocale } from "../lib/locale";
+import {
+  workspaceBrandStyleSheet,
+  workspaceTerms,
+} from "../lib/workspace-presentation";
 import "./globals.css";
 
 /**
@@ -83,6 +87,13 @@ export default async function RootLayout({
   // For the client components that name the instance, the sign-in heading
   // first among them (M-33). Never throws, so it cannot take the layout down.
   const instanceName = await getInstanceName();
+  // How the workspace presents itself (M-14): its own words for the method's
+  // terms, for every client component's `t()`, and its brand colour as the
+  // brand tokens. Resolved here, like the locale, so a server component and a
+  // client one on the same screen say the same word in the same colour. Both
+  // never throw, and are empty before sign-in.
+  const renamed = await workspaceTerms();
+  const brandStyle = await workspaceBrandStyleSheet();
 
   return (
     <html
@@ -98,10 +109,17 @@ export default async function RootLayout({
           // biome-ignore lint/security/noDangerouslySetInnerHtml: the no-flash theme bootstrap has to run before hydration, which only a synchronous inline script can do (Next's own documented pattern for this); the string is generated, not user input
           dangerouslySetInnerHTML={{ __html: themeInitScript() }}
         />
+        {/*
+         * The workspace's colour as the brand tokens, on both themes. A style
+         * element rather than an attribute, because the dark values hang off
+         * `[data-theme=dark]` and an inline style cannot say that. The nonce
+         * is proxy.ts's, whose `style-src` refuses an element without one.
+         */}
+        {brandStyle === null ? null : <style nonce={nonce}>{brandStyle}</style>}
       </head>
       <body>
         <ThemeProvider>
-          <TranslationsProvider locale={locale}>
+          <TranslationsProvider locale={locale} renamed={renamed}>
             {/*
              * Here rather than in the shell (M-13). Each top-level screen
              * renders the shell afresh, so a provider inside it was replaced

@@ -9,6 +9,7 @@ import {
   toPseudoLocale,
   translate,
 } from "../src/i18n/catalogue.ts";
+import { isTermHole } from "../src/i18n/terms.ts";
 import {
   TranslationsProvider,
   useTranslations,
@@ -79,8 +80,7 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // Abbreviations the method keeps in English in every language.
   "common.ai",
   "dev.components.ai",
-  "inbox.subject.kpi",
-  "kpis.grid.kpi",
+  "term.kpi.singular",
   "common.count.krOne",
   "workMap.kr",
   "workMap.obj",
@@ -108,6 +108,40 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "initiatives.metaKeyResults",
   "initiatives.metaWindowKeyResults",
   "workMapHeader.scopeSummary",
+  // Only a term, which each language fills with its own word or the
+  // workspace's rename (M-14), sometimes beside a hole or a bracket.
+  "common.champion",
+  "common.confidence",
+  "common.count",
+  "common.count.keyResultOne",
+  "common.count.keyResultOther",
+  "common.count.objectiveOne",
+  "common.count.objectiveOther",
+  "common.keyResult",
+  "common.kpis",
+  "common.reviewer",
+  "cycle.admin.title",
+  "cycle.reviewAndLearn.keyResults",
+  "cycle.setup.facilitator",
+  "cycle.setup.sponsor",
+  "goals.detail.keyResults",
+  "inbox.subject.checkIn",
+  "inbox.subject.cycle",
+  "inbox.subject.kpi",
+  "inbox.subject.space",
+  "initiatives.space",
+  "kpis.grid.kpi",
+  "scorecard.cycle",
+  "search.checkIn",
+  "search.checkIns",
+  "search.objective",
+  "search.objectives",
+  "session.detail.minutes.objectives",
+  "sessions.schedule.facilitator",
+  "sessions.schedule.space",
+  "spaces.spaces",
+  "workMap.keyResult",
+  "workMap.objective",
 ]);
 
 describe("Bahasa Melayu is translated (completeness review M-15)", () => {
@@ -130,12 +164,31 @@ describe("Bahasa Melayu is translated (completeness review M-15)", () => {
   test("every Malay entry has the holes its English one has", () => {
     const mismatched = Object.keys(CATALOGUES.en).filter(
       (key) =>
-        [...messageHoles(CATALOGUES.en[key] ?? "")].sort().join() !==
-        [...messageHoles(CATALOGUES.ms[key] ?? "")].sort().join(),
+        comparableHoles(CATALOGUES.en[key] ?? "").join() !==
+        comparableHoles(CATALOGUES.ms[key] ?? "").join(),
     );
     expect(mismatched).toEqual([]);
   });
 });
+
+/**
+ * A message's holes, with a term hole named for its term and number alone
+ * (M-14).
+ *
+ * Whether a term starts the sentence or sits inside it is the translator's
+ * call, because word order is the language's: "Check-in history" and "Sejarah
+ * kemas kini" hold the same term, first in one and last in the other. Which
+ * term, and in which number, is not a choice, so that half is still compared.
+ */
+function comparableHoles(message: string): readonly string[] {
+  return [
+    ...new Set(
+      messageHoles(message).map((hole) =>
+        isTermHole(hole) ? hole.replace(/Lower$/, "") : hole,
+      ),
+    ),
+  ].sort();
+}
 
 /**
  * A catalogue string names the instance, not the software (completeness review
@@ -277,8 +330,8 @@ describe("a message that carries a value", () => {
     for (const [key, value] of Object.entries(CATALOGUES.en)) {
       // Through the module's own definition of a hole, so a test and the
       // substitution cannot disagree about what one is.
-      const source = [...messageHoles(value)].sort();
-      const target = [...messageHoles(CATALOGUES.ms[key] ?? "")].sort();
+      const source = comparableHoles(value);
+      const target = comparableHoles(CATALOGUES.ms[key] ?? "");
       // A translation that dropped a hole renders a sentence with a gap in it,
       // and one that invented a hole throws at the reader.
       expect([key, target]).toEqual([key, source]);

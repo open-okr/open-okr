@@ -29,9 +29,10 @@
  */
 
 :root {
-  /* Brand: one workspace-themeable hue (§2). This is the product default;
-   * a workspace's own brand colour overrides --brand once branding
-   * settings (S-36) can supply one.
+  /* Brand: one workspace-themeable hue (§2). This is the product default.
+   * A workspace's own colour, from the S-36 branding card, replaces every
+   * --brand token below in both themes: the root layout sets a style sheet
+   * one step more specific than this file (M-14, colour-system.md).
    *
    * --brand is a fill. --brand-text is the one to reach for on text, per
    * rule 5: a fill and a label owe different contrast, so they are

@@ -284,11 +284,11 @@ The only exceptions are the instance connections that describe the deployment it
 |---|---|
 | Workspace name and slug | From the registering member's details, editable immediately |
 | Workspace timezone (`timezone`) | The registering member's browser timezone, falling back to UTC |
-| Branding (`branding`) | The product's own palette, until a brand colour is chosen |
+| Branding (`branding`) | The product's own palette, until a brand colour is chosen. A chosen colour becomes the brand tokens on every signed-in screen of the workspace, in both themes, with each shade weighted to keep its contrast; a red, amber or green hue is refused, because UIUX-PLAN §2 rule 1 reserves them for status (completeness review M-14) |
 | Trusted email domains (`trustedEmailDomains`) | None. Joining is by invitation |
 | Rhythm and thresholds | The METHOD.md §11 canon defaults, stored as an empty override set |
 | Workspace default language (`language`) | The instance default language |
-| Terminology labels | The canon terms in the workspace default language |
+| Terminology labels | The canon terms in the workspace default language. Stored sparse in `rhythm_settings.labels`, so a term nobody renamed reads in each reader's own language, which is the workspace default for anybody who has not chosen one. A rename is one pair of words with no second language, so it reads the same in every language. It fills the catalogue's term holes (`{termObjective}`) and the sidebar; rule names and coaching messages keep the method's words (completeness review M-14) |
 | Coach strictness | Warn, with the six gates hard |
 | Nudge rules | Every rule in the AI-NATIVE-PLAN.md §6.4 catalogue enabled, on the member's primary channel, with the canon ladder. Workspace quiet mode off |
 | Channels | None connected. Email and the in-app inbox carry everything |

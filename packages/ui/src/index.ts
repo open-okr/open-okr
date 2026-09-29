@@ -15,6 +15,7 @@ export * from "./forms/unsaved-changes.tsx";
 export * from "./forms/use-form-dirty.ts";
 export * from "./forms/use-submit-shortcut.ts";
 export * from "./i18n/catalogue.ts";
+export { fillTermHole, renamedTerms } from "./i18n/terms.ts";
 export * from "./i18n/use-translations.tsx";
 export * from "./keyboard/registry.tsx";
 export * from "./keyboard/shortcut-overlay.tsx";

@@ -14,7 +14,7 @@ no administrator overrides it.
 |---|---|---|
 | `timezone` | The registering browser's, falling back to UTC | Almost always, on the first day. Every rhythm date is read in it, so a wrong one sends Monday's nudges on Sunday night |
 | `language` | Inherited from the instance default, which is English | Your workspace works in Bahasa Melayu |
-| `branding` | The product's own palette | You want the workspace to carry your colour |
+| `branding` | The product's own palette | You want the workspace to carry your colour. It becomes the buttons, links, progress bars and focus rings on every screen of the workspace, in light and dark. A colour too light for white text is darkened for buttons, and the card says which shade is used. Red, amber and green are refused, because they mean off track, at risk and on track. The sign-in page and email do not carry it |
 | `trustedEmailDomains` | None | Anybody with a company address should be able to join without being invited. Joining is by invitation until you set this |
 | `requireSecondFactor` | Off | Your organisation mandates a second factor. It holds you too. See [Security](security.md) |
 | `storageQuotaBytes` | 5 GiB | A team whose files outgrow it |
@@ -60,6 +60,19 @@ usable before anybody visits a settings screen.
 rules fire on live in the method specification and are administered on the
 Rhythm and thresholds screen, not invented per instance. That is what keeps a
 coaching message able to cite the rule behind it.
+
+## Terminology
+
+The Terminology card on Rhythm and thresholds renames a term the method
+already has: an objective can be an ambition, a space a team. The rename shows
+in the sidebar and in the main screens' headings, create buttons, counts and
+empty states, for every member and in every language, because it is your
+organisation's own word. A term you have not renamed reads in each person's
+own language.
+
+Coaching messages, rule names and the method page keep the method's words, so
+a message still cites the rule it comes from. Longer explanatory sentences,
+emails and chat messages keep them too for now.
 
 ## Next
 

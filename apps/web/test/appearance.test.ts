@@ -121,6 +121,9 @@ describe("the appearance control", () => {
     );
     const layout = at("../app/layout.tsx");
     expect(layout).toContain("lang={locale}");
-    expect(layout).toContain("<TranslationsProvider locale={locale}>");
+    // With the workspace's own words for the method's terms beside it (M-14).
+    expect(layout).toContain(
+      "<TranslationsProvider locale={locale} renamed={renamed}>",
+    );
   });
 });

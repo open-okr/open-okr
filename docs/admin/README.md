@@ -16,8 +16,8 @@ account has and what an administrator can grant to somebody else.
 | **Single sign-on** | An OIDC provider, which email domains it claims, and whether it is enforced |
 | **Directory sync** | The SCIM endpoint and its bearer token, so an identity provider provisions people |
 | **Audit trail** | Verify the hash chain, and export the trail with a filter |
-| **Branding** | The workspace's own colour |
-| **Rhythm and thresholds** | The cadence, the staleness grace, and the numbers the coaching rules fire on |
+| **Branding** | The workspace's own colour, which every screen of the workspace is drawn in. See [Settings](settings.md) |
+| **Rhythm and thresholds** | The cadence, the staleness grace, the numbers the coaching rules fire on, and the workspace's own words for the method's terms. See [Terminology](settings.md#terminology) |
 | **Channels** | Slack, Microsoft Teams, WhatsApp and Telegram, and the templates each one uses |
 | **Nudge volume** | Which proactive messages are on, and how loudly they escalate |
 | **Invitations** | Links that let somebody join, and what they are worth |

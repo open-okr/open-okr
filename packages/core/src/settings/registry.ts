@@ -1,6 +1,7 @@
 import type { CheckInFrequency, CoachStrictness } from "@openokr/method";
 import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
 import { z } from "zod";
+import { statusHueOf } from "./brand-colour.ts";
 
 /**
  * The settings registry (TECHNICAL-PLAN §4.14).
@@ -158,6 +159,13 @@ export const brandingSchema = z
     primaryColor: z
       .string()
       .regex(/^#[0-9a-fA-F]{6}$/, "not a hex colour")
+      // Refused here rather than by the card, so the REST surface, the
+      // command line and an agent cannot store one either (M-14). A green
+      // brand puts a green pixel that does not mean on track on every screen.
+      .refine((colour) => statusHueOf(colour) === null, {
+        message:
+          "reads as red, amber or green, which mean off track, at risk and on track here, so a brand colour cannot use it (UIUX-PLAN §2, rule 1). Choose a blue, violet, pink or grey",
+      })
       .optional(),
   })
   .catchall(z.unknown());

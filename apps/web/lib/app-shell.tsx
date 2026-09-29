@@ -26,7 +26,7 @@ import { resolveAccessLevelFor } from "./access.ts";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { loadInboxBadge } from "./inbox-badge.ts";
-import { navBlocks } from "./nav-groups.ts";
+import { navBlocks, navLabel } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
 import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
@@ -36,6 +36,7 @@ import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
 import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace.ts";
+import { workspaceTerms } from "./workspace-presentation.ts";
 import { WorkspaceStateBanner } from "./workspace-state.tsx";
 
 /**
@@ -148,32 +149,38 @@ export async function AppShellLayout({
     { id: "admin", href: "/admin" },
   ]);
 
+  // The workspace's own words for the method's terms (M-14), so a workspace
+  // that calls a space a team reads Teams in its sidebar.
+  const renamed = await workspaceTerms();
+
   // §3's separated blocks rather than one flat column. The split is the
   // registry's `group` field, read through `navBlocks` so the ordering and the
   // headings are testable without rendering a server component.
-  const groups: SidebarGroup[] = navBlocks(sidebarItems).map((block) => ({
-    id: block.id,
-    ...(block.label === undefined ? {} : { label: block.label }),
-    items: block.items.map((item) => ({
-      id: item.id,
-      label: item.label,
-      href: item.href,
-      icon: iconFor(item.id),
-      active: item.id === active,
-      // Two badges in the primary block since P6-G07a. Named per item rather
-      // than looked up in a map, because each one comes from a different read
-      // and a map would hide which.
-      ...(item.id === "review" && reviewBadge !== null
-        ? { badge: reviewBadge }
-        : {}),
-      ...(item.id === "inbox" && inboxBadge !== null
-        ? { badge: inboxBadge }
-        : {}),
-    })),
-  }));
+  const groups: SidebarGroup[] = navBlocks(sidebarItems, renamed).map(
+    (block) => ({
+      id: block.id,
+      ...(block.label === undefined ? {} : { label: block.label }),
+      items: block.items.map((item) => ({
+        id: item.id,
+        label: navLabel(item, renamed),
+        href: item.href,
+        icon: iconFor(item.id),
+        active: item.id === active,
+        // Two badges in the primary block since P6-G07a. Named per item rather
+        // than looked up in a map, because each one comes from a different read
+        // and a map would hide which.
+        ...(item.id === "review" && reviewBadge !== null
+          ? { badge: reviewBadge }
+          : {}),
+        ...(item.id === "inbox" && inboxBadge !== null
+          ? { badge: inboxBadge }
+          : {}),
+      })),
+    }),
+  );
   const tabItems = sidebarItems.slice(0, 4).map((item) => ({
     id: item.id,
-    label: item.label,
+    label: navLabel(item, renamed),
     href: item.href,
     icon: iconFor(item.id),
     active: item.id === active,
