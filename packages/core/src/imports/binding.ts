@@ -40,11 +40,14 @@ export interface BindImporterInput {
   readonly memberId: string | null | undefined;
   readonly contextId: string;
   /**
-   * A member already bound to this context by the create itself.
+   * A member the create itself binds to this context, before or after this.
    *
    * A space whose leader did not import falls back to the actor as its
    * manager, and `createSpaceInTx` has already bound their group at full.
-   * Binding it again violates the untagged-binding unique index.
+   * Binding it again violates the untagged-binding unique index. The same
+   * holds for an initiative the actor owns and a task the actor is assigned
+   * (completeness review M-17): each is bound untagged by its create, at a
+   * level at least the one this would grant.
    */
   readonly alreadyBound?: string | null | undefined;
 }

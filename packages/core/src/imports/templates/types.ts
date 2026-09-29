@@ -42,6 +42,19 @@ export interface ColumnSpec {
    */
   readonly aliases: readonly string[];
   readonly required: boolean;
+  /**
+   * What this column holds in the downloadable template's one example row
+   * (completeness review M-17).
+   *
+   * Declared on the column rather than written into a file, so a column added
+   * here is a column the template carries, and a column without an example
+   * does not compile. Empty means the example leaves the cell blank on purpose,
+   * which is how the file shows that an optional column may be left empty. The
+   * examples across the six templates name each other: the key result points
+   * at the objective the goals example creates, the task at the initiative, so
+   * the six files imported in order resolve every reference they make.
+   */
+  readonly example: string;
 }
 
 /** What a template asks the runner to do with one row. */

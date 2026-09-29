@@ -549,11 +549,18 @@ export const createInitiative = defineWriteAction({
       });
 
       // An import can finish writing the row it started. See
-      // .
+      // `packages/core/src/imports/binding.ts`.
+      //
+      // **Unless the importer owns it** (completeness review M-17). The owner
+      // is already bound at full, untagged, and a second untagged binding of
+      // the same group is refused by the unique index, so an import of an
+      // initiative the running member owns failed every time. Found by the
+      // downloadable template, whose example row is exactly that.
       await bindImporterInTx(tx, {
         workspaceId,
         memberId: input.legacy ? actor.memberId : null,
         contextId: created.contextId,
+        alreadyBound: input.ownerId,
       });
 
       for (const keyResultId of input.keyResultIds ?? []) {

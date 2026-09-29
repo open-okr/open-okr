@@ -745,6 +745,12 @@ export {
   resolveImportTarget,
 } from "./imports/target.ts";
 export {
+  TEMPLATE_FORMATS,
+  type TemplateFile,
+  type TemplateFormat,
+  templateFile,
+} from "./imports/template-files.ts";
+export {
   asBoolean,
   asDay,
   asEnum,

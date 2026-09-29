@@ -609,6 +609,30 @@ describe("assignment, which is an access change", () => {
     expect(notified).not.toContain(ownerMemberId);
   });
 
+  it("imports a task assigned to its importer, bound once at edit", async () => {
+    // Completeness review M-17. The importer's binding and the assignee's are
+    // one untagged binding of one group when they are the same person, and
+    // the second insert used to break the unique index.
+    const task = await createTask("Rewrite the first-run screen", {
+      assigneeIds: [ownerMemberId],
+      legacy: { type: "csv", id: "task-own" },
+    });
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ level: number }>(
+      `select b.level from access_bindings b
+         join access_groups g on g.id = b.group_id
+         join access_contexts c on c.id = b.context_id
+        where c.resource_type = 'task'
+          and c.resource_id = $1
+          and g.kind = 'member'
+          and g.member_id = $2
+          and b.deleted_at is null`,
+      [task.id, ownerMemberId],
+    );
+    expect(rows.map((row) => row.level)).toEqual([70]);
+  });
+
   it("assigns the same member twice as one assignment", async () => {
     const task = await createTask("Rewrite the first-run screen");
     const first = (await call("tasks.assign", {

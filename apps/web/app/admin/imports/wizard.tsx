@@ -186,6 +186,14 @@ export function ImportWizard({
             {template ? (
               <p className="text-xs text-ink-3">{template.describe}</p>
             ) : null}
+            {template ? (
+              <TemplateLinks
+                entity={template.entity}
+                required={template.fields
+                  .filter((field) => field.required)
+                  .map((field) => field.field)}
+              />
+            ) : null}
             <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
               {t("admin.imports.wizard.theFile")}
               <input
@@ -372,6 +380,65 @@ export function ImportWizard({
         ) : null}
       </CardBody>
     </Card>
+  );
+}
+
+/**
+ * The chosen entity's template, in both formats, and what it cannot do without
+ * (REQUIREMENTS §6, completeness review M-17).
+ *
+ * **Plain links to a route, not a server action.** The file is the same for
+ * every workspace and the route builds it from the template the runner reads,
+ * so there is nothing to carry back through the browser. The route requires
+ * full access, which is this page's own bar.
+ *
+ * **The required columns are said here because the file cannot say them.** A
+ * header marked `title *` would stop matching the column it names, so the
+ * header row is the field names and nothing else.
+ *
+ * Underlined rather than coloured alone, because they sit inside a sentence
+ * and a link told apart only by its colour is one some readers cannot find.
+ */
+function TemplateLinks({
+  entity,
+  required,
+}: {
+  readonly entity: string;
+  readonly required: readonly string[];
+}) {
+  const { t } = useTranslations();
+  const href = (format: "csv" | "xlsx") =>
+    `/admin/imports/templates/${entity}.${format}`;
+
+  return (
+    <div
+      className="flex flex-col gap-1 text-xs text-ink-3"
+      data-testid="import-template"
+    >
+      <p>
+        {t("admin.imports.wizard.startFromATemplate")}{" "}
+        <a
+          href={href("csv")}
+          download
+          className="font-semibold text-brand-text underline"
+        >
+          {t("admin.imports.wizard.templateCsv")}
+        </a>
+        {" · "}
+        <a
+          href={href("xlsx")}
+          download
+          className="font-semibold text-brand-text underline"
+        >
+          {t("admin.imports.wizard.templateXlsx")}
+        </a>
+      </p>
+      <p>
+        {t("admin.imports.wizard.requiredColumns", {
+          columns: required.join(", "),
+        })}
+      </p>
+    </div>
   );
 }
 

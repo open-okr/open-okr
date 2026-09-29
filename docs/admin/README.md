@@ -21,7 +21,7 @@ account has and what an administrator can grant to somebody else.
 | **Channels** | Slack, Microsoft Teams, WhatsApp and Telegram, and the templates each one uses |
 | **Nudge volume** | Which proactive messages are on, and how loudly they escalate |
 | **Invitations** | Links that let somebody join, and what they are worth |
-| **Import** | Bringing a quarter of history in from a spreadsheet or from FlowyTeam |
+| **Import** | Bringing a quarter of history in from a spreadsheet or from FlowyTeam, starting from a downloadable template. See [Importing](../import/README.md#templates) |
 | **AI** | Whether AI is on at all, whose key, which models, and the cost caps |
 | **Agents and runs** | What the Coach and the Champion may do, and what they have done |
 

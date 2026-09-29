@@ -794,11 +794,21 @@ export const createTask = defineWriteAction({
 
       // An import can finish writing the row it started: without this it
       // creates a task and then cannot add its checklist. See
-      // .
+      // `packages/core/src/imports/binding.ts`.
+      //
+      // **Unless the importer is one of the assignees** (completeness review
+      // M-17). The assignment below binds them at the same level, untagged,
+      // and two untagged bindings of one group break the unique index, so an
+      // import of a task assigned to the running member failed every time.
+      // Found by the downloadable template, whose example row is exactly that.
       await bindImporterInTx(tx, {
         workspaceId,
         memberId: input.legacy ? actor.memberId : null,
         contextId: created.contextId,
+        alreadyBound:
+          actor.memberId && input.assigneeIds?.includes(actor.memberId)
+            ? actor.memberId
+            : null,
       });
 
       const notified: string[] = [];
