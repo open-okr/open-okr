@@ -393,6 +393,74 @@ The review missed these three. Each turned up while fixing another finding, and 
 | M-30 | The coverage tests accept false exemptions (section 4), and the route-coverage test counts `/initiatives/[id]` as visited whenever `/initiatives` is | [action-coverage.test.ts](../apps/web/test/action-coverage.test.ts), [route-coverage.test.ts](../apps/web/test/route-coverage.test.ts) | Code |
 | M-31 | Search is empty after an archive import, because nothing reindexes | `portability/import.ts` | Audit |
 | M-32 | The review badge is not live, although TECHNICAL-PLAN makes the review inbox live | `lib/review-badge.ts` | Audit |
+| M-33 | The instance name cannot be changed. `OPENOKR_INSTANCE_NAME` and the wizard's name are stored and never read, so every screen, email and message says "OpenOKR". Found after the review: section 5.4a | [instance-registry.ts:41](../packages/core/src/secrets/instance-registry.ts#L41) | Run |
+
+### 5.4a Medium: found after the review
+
+**M-33. The instance name cannot be changed. `OPENOKR_INSTANCE_NAME` and the setup wizard's name are stored, and nothing reads them.** `Run` `Code`
+
+- **Found** on 29 September 2026, while deploying the public demo at `demo.okrgoal.com`. The demo overlay sets `OPENOKR_INSTANCE_NAME` to "OpenOKR demo", and every page still says "OpenOKR".
+- **What is wanted.** An operator renames their instance with `OPENOKR_INSTANCE_NAME`, for example to "OKR Goal". Every place a person sees the product's name then shows that name: screens, emails, chat messages and notifications. With the variable unset, everything reads "OpenOKR", as it does today.
+- **Evidence.**
+  - [instance-registry.ts:41](../packages/core/src/secrets/instance-registry.ts#L41) declares `instance.name`, bootstrapped from `OPENOKR_INSTANCE_NAME`, as "what this deployment calls itself in mail and the page title". Apart from the setup wizard, which writes it, no code reads it.
+  - The page title is the literal "OpenOKR" in [layout.tsx:16](../apps/web/app/layout.tsx#L16). `APP_NAME` in [app-info.ts:7](../apps/web/lib/app-info.ts#L7) is declared and used nowhere.
+  - The wizard pre-fills its name field with the literal "OpenOKR" ([setup-account-form.tsx:76](../apps/web/app/setup/account/setup-account-form.tsx#L76)) and stores whatever the field holds ([actions.ts:81](../apps/web/app/setup/account/actions.ts#L81)). A stored value beats the environment ([instance-settings.ts:197](../packages/core/src/secrets/instance-settings.ts#L197)). So an operator who sets the variable and then clicks through the wizard loses it for good.
+  - No admin screen can change the name after setup.
+  - `instance.name` is not in the TECHNICAL-PLAN §4.14 map (see M-25).
+- **Why it matters.** An organisation running its own instance cannot put its own name on it. The registry promises a setting that does nothing, which is the pattern section 4 describes.
+
+**Should show the instance name**
+
+| What a person sees | Where | Today |
+|---|---|---|
+| Browser tab title | [layout.tsx:16](../apps/web/app/layout.tsx#L16) | "OpenOKR" |
+| Sign-in heading | `auth.signIn.signInToOpenokr` in [en.json](../packages/ui/src/i18n/messages/en.json) | "Sign in to OpenOKR" |
+| Setup heading | `setup.setUpOpenokr` | "Set up OpenOKR" |
+| Error page when the app cannot start | `globalError.openokrCouldNotStart` | "OpenOKR could not start" |
+| The system's name in the feed and activity | `activity.openOkr`, `feedPanel.openOkr` | "OpenOKR" |
+| Linking a chat account | `account.channels.actions.sendThisToTheBot`, [channel-inbound.ts:220](../apps/web/lib/channel-inbound.ts#L220) | "Send this to the OpenOKR bot…", "OpenOKR will send your nudges here." |
+| Password reset email | [lib/auth.ts:73](../apps/web/lib/auth.ts#L73) | "Reset your OpenOKR password" |
+| Email address confirmation | [lib/auth.ts:94](../apps/web/lib/auth.ts#L94) | "…setting up your OpenOKR account." |
+| Invitation email | [outbox/handlers.ts:255](../packages/core/src/outbox/handlers.ts#L255) | "You have been invited to OpenOKR" |
+| Nudge subject, by email and chat | [nudges/message.ts:170](../packages/core/src/nudges/message.ts#L170), [nudges/deliver.ts:90](../packages/core/src/nudges/deliver.ts#L90) | "OpenOKR: …", "OpenOKR: 3 updates" |
+| Nudge button | [nudges/message.ts:165](../packages/core/src/nudges/message.ts#L165) | "Open in OpenOKR" |
+| Blocker card | [nudges/blocker-card.ts:149](../packages/core/src/nudges/blocker-card.ts#L149) | "OpenOKR: a blocker needs you" |
+| Channel test message | [actions/channels.ts:1013](../packages/core/src/actions/channels.ts#L1013) | "This is a test from OpenOKR…" |
+| Email subject when none is given | [channel/email.ts:81](../packages/adapters/src/drivers/channel/email.ts#L81) | "OpenOKR" |
+| Entry in an authenticator app (two-factor issuer) | [core/auth/auth.ts:603](../packages/core/src/auth/auth.ts#L603) | "OpenOKR" |
+| Passkey prompt (relying party name) | [core/auth/auth.ts:608](../packages/core/src/auth/auth.ts#L608) | "OpenOKR" |
+| Consent screen for the command line | [oauth/clients.ts:36](../packages/core/src/api/oauth/clients.ts#L36) | "The OpenOKR command line" |
+| Server name shown in an AI client over MCP | [api/mcp/route.ts:193](../apps/web/app/api/mcp/route.ts#L193) | "OpenOKR" |
+| Title of the live API document at `/api/v1/openapi.json` | [api/openapi.ts:224](../packages/core/src/api/openapi.ts#L224) | "OpenOKR" |
+| App name sent to the AI provider, shown in its dashboard | [ai-provider.ts:63](../apps/web/lib/ai-provider.ts#L63) | "OpenOKR" |
+| The same ten catalogue strings in Malay | [ms.json](../packages/ui/src/i18n/messages/ms.json) | "OpenOKR" |
+
+**Should keep "OpenOKR"**, because it names the software or the company running the managed cloud, not this instance
+
+| Text | Where | Why it stays |
+|---|---|---|
+| "Nobody from OpenOKR can enter this workspace…", "OpenOKR support is in this workspace…", and the support session's name "OpenOKR support" | `admin.support.*`, `lib.supportBanner.supportIsHere`, [operator/sessions.ts:224](../packages/core/src/operator/sessions.ts#L224) | Names the operator of the managed cloud, not the customer |
+| "OpenOKR speaks OIDC and SAML 2.0" | `admin.sso.connectAnIdentityProvider` | Describes the software. Rewording it to "This instance speaks…" works too |
+| Importer report lines, such as "OpenOKR spaces do not nest" | [domains.ts](../packages/importer/src/flowyteam/domains.ts), [organisation.ts](../packages/importer/src/flowyteam/mappers/organisation.ts) | Explains the software's model to an operator |
+| Command line help and errors, such as "Is that an OpenOKR instance?" | [packages/cli](../packages/cli/src/run.ts) | Names the software |
+| "not an OpenOKR archive" | [archive.ts](../packages/core/src/portability/archive.ts) | The name of a file format |
+| Server start-up error, Grafana dashboards, the Helm chart description | [instrumentation.node.ts](../apps/web/instrumentation.node.ts), `deploy/` | Read by the operator, not by members |
+| The committed `contract/openapi.json` | [api/openapi.ts](../packages/core/src/api/openapi.ts) | Generated with no instance. Keeping "OpenOKR" keeps `pnpm check:contract` stable |
+| Identifiers: `@openokr/*`, `OPENOKR_*`, `openokr://`, cookie names, the `okr` and `openokr` commands | everywhere | Not display text. Never renamed |
+| The Teams app manifest | [deploy/teams/manifest.json](../deploy/teams/manifest.json) | A static file the operator uploads. The install guide should tell them to edit the name there |
+
+- **Fix.**
+  1. One server-side reader for the resolved name: the stored value, then `OPENOKR_INSTANCE_NAME`, then "OpenOKR". Everything in the first table reads it. Email and nudge builders resolve it when they send, because the outbox relay has no request to read it from.
+  2. Catalogue strings take an `{instanceName}` placeholder instead of the word, in English and in Malay. Rename the keys that carry the brand in their own name, such as `auth.signIn.signInToOpenokr`.
+  3. The page title comes from `generateMetadata` in the root layout. Delete the unused `APP_NAME`.
+  4. The wizard pre-fills the resolved name and stores a row only when the operator changes it, so the environment variable keeps working. Add the name to `/admin/general` so it can change after setup.
+  5. Better Auth reads the two-factor issuer and the passkey name when the auth instance is built, so a change applies after a restart. Say so on the admin screen. Changing either is safe: a passkey is bound to the domain, not to its display name, and an existing authenticator entry keeps the name it was created with.
+  6. Add `instance.name` to the TECHNICAL-PLAN §4.14 map, with its default.
+- **Tests.**
+  - A unit test that fails when a catalogue string contains "OpenOKR", except an allow-list of the texts in the second table. The M-15 test already keeps a brand-word allow-list to extend.
+  - For each email and message builder: given a name, the subject and body use it; given none, they say "OpenOKR".
+  - End to end, with `OPENOKR_INSTANCE_NAME` set on the server: the tab title and the sign-in heading show it.
+  - The wizard stores no name when the field is left as pre-filled.
 
 ### 5.5 Low
 
