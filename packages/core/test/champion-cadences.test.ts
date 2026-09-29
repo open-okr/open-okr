@@ -600,6 +600,35 @@ describe("the daily run: KPI corridors and the morning summary", () => {
     ).toBe(true);
   });
 
+  it("sends the summary under the instance's name when the host gives one (M-33)", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set timezone = 'Asia/Jakarta' where id = $1",
+      [ownerMemberId],
+    );
+    await callAction(
+      {
+        pool: wb.appPool,
+        ...context(),
+        baseUrl: "https://okr.example.com",
+        instanceName: "OKR Goal",
+      },
+      "agents.runChampion",
+      { now: "2026-08-20T01:00:00Z", cadence: "daily" },
+    );
+    const { rows } = await wb.admin.query<{
+      payload: { subject?: string; text?: string };
+    }>(
+      "select payload from channel_messages where workspace_id = $1 and member_id = $2",
+      [workspaceId, ownerMemberId],
+    );
+    const summary = rows.find((row) =>
+      String(row.payload.text).includes("Rule: digest.daily"),
+    );
+    expect(summary?.payload.subject?.startsWith("OKR Goal: ")).toBe(true);
+    expect(JSON.stringify(summary?.payload)).not.toContain("OpenOKR");
+  });
+
   it("never sends the Champion its own morning summary", async () => {
     const wb = await workerDb();
     await wb.admin.query(

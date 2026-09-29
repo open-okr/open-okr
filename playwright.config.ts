@@ -131,6 +131,11 @@ export default defineConfig({
         DATABASE_URL: databaseUrl("openokr_e2e_wizard"),
         // The whole point of this instance: never set up.
         E2E_MARK_CONFIGURED: "0",
+        // Named by its deployment, as the public demo is (completeness review
+        // M-33). Only the wizard spec runs against this server, so the name
+        // changes what that spec reads and nothing else: every other spec
+        // still sees "OpenOKR" on the application server.
+        OPENOKR_INSTANCE_NAME: "OKR Goal",
       },
     },
   ],

@@ -12,13 +12,24 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
+import { getInstanceName } from "../lib/instance-name";
+import { InstanceNameProvider } from "../lib/instance-name-context";
 import { resolveLocale } from "../lib/locale";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "OpenOKR",
-  description: "Your OKR coach, built in. Open source, AI-native.",
-};
+/**
+ * The tab title is the instance's name (completeness review M-33).
+ *
+ * It was the literal "OpenOKR", so an operator who named their instance saw
+ * the software's name on every tab. Resolved per request, like everything
+ * else this layout reads, so a rename shows on the next page load.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: await getInstanceName(),
+    description: "Your OKR coach, built in. Open source, AI-native.",
+  };
+}
 
 /**
  * §2: "Geist, self-hosted." The file is committed at `app/fonts/`, straight
@@ -69,6 +80,9 @@ export default async function RootLayout({
   // signed-out screens too. `resolveLocale` never throws and answers English
   // for a visitor the product does not know yet.
   const locale = await resolveLocale();
+  // For the client components that name the instance, the sign-in heading
+  // first among them (M-33). Never throws, so it cannot take the layout down.
+  const instanceName = await getInstanceName();
 
   return (
     <html
@@ -99,7 +113,9 @@ export default async function RootLayout({
               dismissLabel={translate(CATALOGUES[locale], "common.dismiss")}
             >
               <QueryProvider buildId={loadEnv().APP_BUILD_ID}>
-                {children}
+                <InstanceNameProvider name={instanceName}>
+                  {children}
+                </InstanceNameProvider>
               </QueryProvider>
             </ToastProvider>
           </TranslationsProvider>

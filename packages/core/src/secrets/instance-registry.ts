@@ -29,6 +29,26 @@ export interface InstanceSettingDefinition {
 /** Marks the wizard finished. Its presence is what "configured" means. */
 export const SETUP_COMPLETED_AT = "setup.completed_at";
 
+/**
+ * What an instance is called when nobody has named it: the software's own
+ * name. Every builder that is handed no name falls back to this one, so the
+ * default is written once (completeness review M-33).
+ */
+export const DEFAULT_INSTANCE_NAME = "OpenOKR";
+
+/**
+ * The name a builder that was handed none should use.
+ *
+ * Here rather than beside the reader in `instance-name.ts`, so a message
+ * builder or the contract generator can use it without importing a module
+ * that reaches the database.
+ */
+export function instanceNameOr(name: string | undefined | null): string {
+  return typeof name === "string" && name.trim() !== ""
+    ? name.trim()
+    : DEFAULT_INSTANCE_NAME;
+}
+
 export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   {
     key: SETUP_COMPLETED_AT,
@@ -40,9 +60,10 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   {
     key: "instance.name",
     kind: "string",
-    fallback: "OpenOKR",
+    fallback: DEFAULT_INSTANCE_NAME,
     environment: "OPENOKR_INSTANCE_NAME",
-    summary: "What this deployment calls itself in mail and the page title.",
+    summary:
+      "What this deployment calls itself: the page title, the sign-in and setup headings, every email and chat message, the authenticator entry and the passkey prompt. Changed from the wizard or admin, General.",
   },
   {
     key: "instance.language",

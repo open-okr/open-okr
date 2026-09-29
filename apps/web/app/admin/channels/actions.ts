@@ -8,6 +8,7 @@ import {
 } from "@openokr/adapters";
 import { callAction, openConnection, parseWhatsAppSecret } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { getInstanceName } from "../../../lib/instance-name";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
 import { getTranslations } from "../../../lib/translations";
@@ -155,9 +156,12 @@ export async function sendTest(
   const { t } = await getTranslations();
   const attempt = String(form.get("attempt") ?? "").trim();
   try {
-    await callAction(await context(), "channels.testSend", {
-      attempt: attempt || "manual",
-    });
+    await callAction(
+      // The test names the instance it came from (M-33).
+      { ...(await context()), instanceName: await getInstanceName() },
+      "channels.testSend",
+      { attempt: attempt || "manual" },
+    );
   } catch (error) {
     return {
       ok: false,

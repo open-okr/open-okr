@@ -4,6 +4,7 @@ import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { getInstanceName } from "../../../lib/instance-name";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
@@ -40,6 +41,8 @@ export async function runChampionAction(
       workspaceId: workspace.workspaceId,
       actor: { kind: "human", userId: session.user.id },
       ...(drafter ? { drafter } : {}),
+      // The name what it sends carries, as the scheduler's runs do (M-33).
+      instanceName: await getInstanceName(),
     },
     "agents.runChampion",
     { cadence },
@@ -56,6 +59,7 @@ export async function runCoachAction() {
       workspaceId: workspace.workspaceId,
       actor: { kind: "human", userId: session.user.id },
       ...(drafter ? { drafter } : {}),
+      instanceName: await getInstanceName(),
     },
     "agents.runCoach",
     {},

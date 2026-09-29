@@ -47,6 +47,7 @@ import { digestItemsFor } from "../notifications/digest.ts";
 import { DIGEST_TOPIC } from "../notifications/drain.ts";
 import { renderDigest } from "../notifications/templates.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
+import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
@@ -138,6 +139,13 @@ export interface OutboxHandlerDeps {
   ) => Promise<AgentDrafter | null | undefined>;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
+  /**
+   * What the instance calls itself, for the words around those links
+   * (completeness review M-33). Resolved by the host per delivery, like mail
+   * settings, because a rename should reach the next email. Absent says
+   * "OpenOKR".
+   */
+  readonly instanceName?: string;
   /** Where a skipped delivery is reported. */
   readonly onSkipped?: (delivery: OutboxDelivery, reason: string) => void;
 }
@@ -250,13 +258,14 @@ const sendInvitation: OutboxHandler = async (delivery, deps) => {
   }
 
   const link = `${withoutTrailingSlashes(deps.baseUrl)}/join/${token}`;
+  const name = instanceNameOr(deps.instanceName);
   await deps.sendMail({
     to,
-    subject: "You have been invited to OpenOKR",
+    subject: `You have been invited to ${name}`,
     // Plain text, and short. The link is the message; anything else is
     // decoration around a URL somebody is about to click.
     text: [
-      "You have been invited to a workspace on OpenOKR.",
+      `You have been invited to a workspace on ${name}.`,
       "",
       link,
       "",

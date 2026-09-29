@@ -27,7 +27,12 @@ const resolved = (
   baseUrl: string | null = null,
 ) => ({ source: "workspace" as const, provider, apiKey: "key", baseUrl });
 
-const options = { guardOutbound: true, appUrl: "https://okr.example.com" };
+const options = {
+  guardOutbound: true,
+  appUrl: "https://okr.example.com",
+  // The instance's own name rather than the software's (M-33).
+  appName: "OKR Goal",
+};
 
 describe("providerConfigFor", () => {
   it.each(["anthropic", "openai", "google"] as const)(
@@ -40,11 +45,11 @@ describe("providerConfigFor", () => {
     },
   );
 
-  it("builds OpenRouter with the instance's own address", () => {
+  it("builds OpenRouter with the instance's own address and name", () => {
     expect(providerConfigFor(resolved("openrouter"), options)).toEqual({
       provider: "openrouter",
       apiKey: "key",
-      appName: "OpenOKR",
+      appName: "OKR Goal",
       appUrl: "https://okr.example.com",
     });
   });

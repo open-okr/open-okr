@@ -35,6 +35,11 @@ fill in the Teams card. Nothing is verified at this point: the card says
 `REPLACE_WITH_YOUR_` value, add a `color.png` (192x192) and an `outline.png`
 (32x32, transparent), and zip the three files together with no enclosing folder.
 
+If you named your instance, with `OPENOKR_INSTANCE_NAME` or on General in
+admin, put the same name in the manifest's `name` and `description` fields.
+Teams shows the app by what the manifest says, and the instance cannot change
+a file you upload.
+
 Upload it in Teams under **Apps, Manage your apps, Upload an app**, or hand the
 zip to a Teams administrator to publish for the organisation.
 

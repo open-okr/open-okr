@@ -72,8 +72,10 @@ describe("the feed at every scope", () => {
     // A renderer describes the subject and never the actor, so a page that
     // read the actor's name off the row would print nothing.
     expect(panel).toContain("names.get(item.actorMemberId)");
-    // The fallback name for a system actor, now a catalogue entry.
-    expect(withMessages(panel)).toContain("OpenOKR");
+    // The fallback name for a system actor is the instance's own, not the
+    // software's (completeness review M-33).
+    expect(panel).toContain("await getInstanceName()");
+    expect(withMessages(panel)).not.toContain("OpenOKR");
   });
 
   test("the older link carries the last row's own key", () => {

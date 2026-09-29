@@ -1,7 +1,13 @@
 "use server";
 
-import { completeSetup, readSetupState } from "@openokr/core";
+import {
+  completeSetup,
+  INSTANCE_NAME_MAX_LENGTH,
+  instanceNameToStore,
+  readSetupState,
+} from "@openokr/core";
 import { getPool } from "../../../lib/auth";
+import { getInstanceName } from "../../../lib/instance-name";
 import { getKeyRing } from "../../../lib/secrets";
 import { currentSession } from "../../../lib/session";
 import { getTranslations } from "../../../lib/translations";
@@ -66,7 +72,7 @@ export async function finishSetup(
   // row.
   if (
     typeof input.instanceName !== "string" ||
-    input.instanceName.length > 120
+    input.instanceName.length > INSTANCE_NAME_MAX_LENGTH
   ) {
     return {
       ok: false,
@@ -74,11 +80,17 @@ export async function finishSetup(
     };
   }
 
-  const name = input.instanceName.trim();
+  // **Stored only when the operator changed it** (completeness review M-33).
+  // The field is pre-filled with the name this instance already resolves to,
+  // and a stored value beats `OPENOKR_INSTANCE_NAME`. Storing the untouched
+  // field copied the variable into the database, and changing the variable
+  // afterwards did nothing. Compared against the name resolved here rather
+  // than anything the browser says it pre-filled.
+  const name = instanceNameToStore(input.instanceName, await getInstanceName());
 
   try {
     await completeSetup(pool, getKeyRing(), {
-      settings: name === "" ? [] : [{ key: "instance.name", value: name }],
+      settings: name === null ? [] : [{ key: "instance.name", value: name }],
       // Registration is open until the instance is claimed, and this is the
       // moment it is claimed.
       closeRegistration: true,

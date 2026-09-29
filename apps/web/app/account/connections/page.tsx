@@ -1,5 +1,6 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getInstanceName } from "../../../lib/instance-name";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -28,6 +29,8 @@ export default async function ConnectionsPage() {
       pool: getPool(),
       workspaceId: workspace.workspaceId,
       actor: { kind: "human", userId: session.user.id },
+      // The command line is named for this instance (M-33).
+      instanceName: await getInstanceName(),
     },
     "connections.mine",
     {},

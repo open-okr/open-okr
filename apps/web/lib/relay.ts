@@ -52,6 +52,7 @@ import {
 } from "@openokr/core";
 import { providerForTier } from "./ai-provider";
 import { drafterFor } from "./drafter";
+import { getInstanceName } from "./instance-name";
 import { getMailSettings, mailerFrom } from "./mail";
 import { getPool } from "./pool";
 import { getRealtime } from "./realtime";
@@ -121,9 +122,13 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
   // Never fatal to a delivery: an instance with no mail configured should skip
   // its invitation rows, not fail them.
   const mail = await getMailSettings().catch(() => null);
+  // Resolved when it sends, for the same reason (completeness review M-33):
+  // a rename should reach the next invitation. Never throws.
+  const instanceName = await getInstanceName();
 
   return {
     pool: getPool(),
+    instanceName,
     ...(workspaceId ? { embed: await embedFor(workspaceId) } : {}),
     /**
      * The workspace AI drafter, for a copilot run (P4-T14b-b).
@@ -188,6 +193,8 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
             if (message.provider === "email") {
               const channel = new EmailChannel({
                 mailer: mailerFrom(mail),
+                // The subject a message that brings none is sent under.
+                defaultSubject: instanceName,
                 addressFor: (recipient) =>
                   memberEmail(getPool(), workspaceId, recipient.memberId),
               });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
+import { useInstanceName } from "../../../lib/instance-name-context";
 import { AuthCard, Field, FormError } from "../auth-card";
 
 interface SSOProvider {
@@ -33,6 +34,8 @@ interface DemoPersona {
  */
 export default function SignInPage() {
   const { t } = useTranslations();
+  // The instance this is, not the software it runs (M-33).
+  const instanceName = useInstanceName();
 
   const router = useRouter();
   const [error, setError] = useState("");
@@ -207,7 +210,7 @@ export default function SignInPage() {
 
   return (
     <AuthCard
-      title={t("auth.signIn.signInToOpenokr")}
+      title={t("auth.signIn.heading", { instanceName })}
       footer={
         <>
           <Link

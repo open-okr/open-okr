@@ -21,6 +21,7 @@ import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { clientDisplayName } from "../api/oauth/clients.ts";
 import { REVOCATION_REASONS, revokeGrant } from "../api/oauth/grants.ts";
 import { OperationError } from "../operations/operation.ts";
 import { actingMemberId } from "./api-tokens.ts";
@@ -61,6 +62,7 @@ export const listMyConnections = defineReadAction({
           revokedAt: oauthGrants.revokedAt,
           revokedReason: oauthGrants.revokedReason,
           createdAt: oauthGrants.createdAt,
+          clientId: oauthClients.clientId,
           clientName: oauthClients.name,
         })
         .from(oauthGrants)
@@ -77,7 +79,12 @@ export const listMyConnections = defineReadAction({
       return {
         connections: rows.map((row) => ({
           id: row.id,
-          clientName: row.clientName,
+          // The command line is named for the instance the host says it is
+          // (M-33). A surface that does not say reads "OpenOKR".
+          clientName: clientDisplayName(
+            { clientId: row.clientId, name: row.clientName },
+            context.instanceName,
+          ),
           scopes: row.scopes,
           lastUsedAt: iso(row.lastUsedAt),
           revokedAt: iso(row.revokedAt),

@@ -100,6 +100,13 @@ export interface ActionCallContext {
    */
   readonly baseUrl?: string;
   /**
+   * What the instance calls itself, for the text an action writes that names
+   * it (completeness review M-33): a nudge's subject and button, a channel
+   * test message. Resolved by the host with `resolveInstanceName`, which is
+   * the one reader. Absent, the text says "OpenOKR", as it always did.
+   */
+  readonly instanceName?: string;
+  /**
    * How to turn text into a vector, when the host has a provider that can
    * (P4-T14a-a).
    *

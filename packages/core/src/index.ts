@@ -986,6 +986,16 @@ export {
   RichTextValidationError,
 } from "./rich-text/validate.ts";
 export {
+  deploymentInstanceName,
+  INSTANCE_NAME_MAX_LENGTH,
+  InstanceNameError,
+  instanceNameToStore,
+  readInstanceName,
+  renameInstance,
+  resolveInstanceName,
+} from "./secrets/instance-name.ts";
+export {
+  DEFAULT_INSTANCE_NAME,
   environmentValue,
   getInstanceSetting,
   INSTANCE_SETTINGS,

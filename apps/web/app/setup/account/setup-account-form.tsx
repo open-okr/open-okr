@@ -4,6 +4,7 @@ import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
+import { useInstanceName } from "../../../lib/instance-name-context";
 import { Field, FormError } from "../../(auth)/auth-card.tsx";
 import { PasswordField } from "../../(auth)/password-field.tsx";
 import { finishSetup } from "./actions";
@@ -22,6 +23,7 @@ import { finishSetup } from "./actions";
  */
 export function SetupAccountForm() {
   const { t } = useTranslations();
+  const instanceName = useInstanceName();
 
   const router = useRouter();
   const [error, setError] = useState("");
@@ -70,10 +72,18 @@ export function SetupAccountForm() {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
+      {/*
+        Pre-filled with the name the instance already resolves to, which is
+        `OPENOKR_INSTANCE_NAME` when the deployment set one (M-33). It used to
+        be the literal "OpenOKR", and whatever the field held was stored, so
+        clicking through the wizard replaced the operator's variable for good.
+        Left as it is, nothing is stored and the variable keeps deciding.
+      */}
       <Field
         label={t("setup.account.setupAccountForm.whatShouldThisInstance")}
         name="instanceName"
-        defaultValue="OpenOKR"
+        defaultValue={instanceName}
+        maxLength={120}
         autoComplete="off"
       />
 

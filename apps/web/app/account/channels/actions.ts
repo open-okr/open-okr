@@ -2,6 +2,7 @@
 
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { getInstanceName } from "../../../lib/instance-name";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -46,7 +47,11 @@ export async function startLink(
     return {
       ok: true,
       code: issued.code,
-      message: t("account.channels.actions.sendThisToTheBot", { provider }),
+      message: t("account.channels.actions.sendThisToTheBot", {
+        provider,
+        // The bot is this instance's, so it carries this instance's name.
+        instanceName: await getInstanceName(),
+      }),
     };
   } catch (error) {
     return {

@@ -50,6 +50,7 @@ import {
   outboxRetentionDays,
 } from "@openokr/core";
 import { drafterFor } from "./drafter";
+import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
 import { getStorage } from "./storage";
@@ -434,6 +435,9 @@ async function runOne(
     ...(loadEnv().BETTER_AUTH_URL
       ? { baseUrl: loadEnv().BETTER_AUTH_URL }
       : {}),
+    // And the name those messages carry, read at each run so a rename
+    // reaches the next nudge (completeness review M-33).
+    instanceName: await getInstanceName(),
   };
   if (run.action === "notifications.drainBatches") {
     await callAction(context, "notifications.drainBatches", {});

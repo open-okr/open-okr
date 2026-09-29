@@ -1001,6 +1001,10 @@ export const runChampion = defineWriteAction({
         ...(_context.drafter ? { drafter: _context.drafter } : {}),
         // Links in the messages it sends, when the host knows its address.
         ...(_context.baseUrl ? { baseUrl: _context.baseUrl } : {}),
+        // And the name those messages carry (M-33).
+        ...(_context.instanceName
+          ? { instanceName: _context.instanceName }
+          : {}),
       });
 
       // One entry per rule, because a log that said "3 nudges" could not
@@ -1196,6 +1200,10 @@ export const runCoach = defineWriteAction({
         ...(_context.drafter ? { drafter: _context.drafter } : {}),
         // Links in the messages it sends, when the host knows its address.
         ...(_context.baseUrl ? { baseUrl: _context.baseUrl } : {}),
+        // And the name those messages carry (M-33).
+        ...(_context.instanceName
+          ? { instanceName: _context.instanceName }
+          : {}),
       });
 
       for (const [index, ruleKey] of run.ruleKeys.entries()) {

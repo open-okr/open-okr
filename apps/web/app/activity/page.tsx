@@ -2,6 +2,7 @@ import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { FeedLive } from "../../lib/feed-live.tsx";
+import { getInstanceName } from "../../lib/instance-name";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -76,12 +77,14 @@ export default async function ActivityPage({
   const params = await searchParams;
   const cursor = parseCursor(params.at, params.id);
 
-  const [items, directory, settings] = await Promise.all([
+  const [items, directory, settings, instanceName] = await Promise.all([
     callAction(context, "activities.workspaceFeed", {
       ...(cursor ? { cursor } : {}),
     }),
     callAction(context, "people.directory", {}),
     callAction(context, "settings.readForMember", {}),
+    // A system principal's rows read as the instance acting (M-33).
+    getInstanceName(),
   ]);
 
   const names = new Map(directory.map((member) => [member.id, member.name]));
@@ -126,7 +129,7 @@ export default async function ActivityPage({
                       {item.actorMemberId
                         ? (names.get(item.actorMemberId) ??
                           t("activity.aMember"))
-                        : t("activity.openOkr")}
+                        : instanceName}
                       {" · "}
                       {when(item.at, timeZone)}
                     </span>

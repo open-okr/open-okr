@@ -66,6 +66,7 @@ import {
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getCache } from "../../../lib/cache";
+import { getInstanceName } from "../../../lib/instance-name";
 import { instanceIssuer } from "../../../lib/issuer";
 import { getPool } from "../../../lib/pool";
 import { retryAfter } from "../../../lib/retry-after";
@@ -274,7 +275,9 @@ async function answer(request: NextRequest): Promise<Response> {
   const ring = getKeyRing();
 
   const server = new McpAgentServer({
-    name: "OpenOKR",
+    // What an AI client lists this server as: the instance, not the software
+    // (completeness review M-33).
+    name: await getInstanceName(),
     version: SERVER_VERSION,
     tools: MCP_TOOLS.map((tool) => ({
       name: tool.name,

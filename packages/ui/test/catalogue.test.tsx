@@ -35,8 +35,6 @@ describe("the message catalogue", () => {
  */
 const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // Product, vendor and language names.
-  "activity.openOkr",
-  "feedPanel.openOkr",
   "method.detail.okrChampion",
   "method.detail.okrCoach",
   "admin.ai.providerAnthropic",
@@ -136,6 +134,78 @@ describe("Bahasa Melayu is translated (completeness review M-15)", () => {
         [...messageHoles(CATALOGUES.ms[key] ?? "")].sort().join(),
     );
     expect(mismatched).toEqual([]);
+  });
+});
+
+/**
+ * A catalogue string names the instance, not the software (completeness review
+ * M-33).
+ *
+ * "OpenOKR" was written into the sign-in heading, the setup heading, the root
+ * error page, the chat linking prompt and the feed's name for the product
+ * acting, so an instance its operator had named still said "OpenOKR" on every
+ * one of them. Those strings take `{instanceName}` now.
+ *
+ * The word may stay only where it names the software or the company that runs
+ * the managed cloud rather than this instance: the support session, which is
+ * the cloud operator entering a customer's workspace, and a line describing
+ * what the software speaks. This list is exactly the catalogue half of the
+ * finding's "should keep OpenOKR" table, and adding to it is a decision about
+ * whose name a screen shows.
+ */
+const NAMES_THE_SOFTWARE: ReadonlySet<string> = new Set([
+  // The operator of the managed cloud, not the customer's instance.
+  "admin.support.intro",
+  "admin.support.nobodyHasBeen",
+  "lib.supportBanner.supportIsHere",
+  // What the software speaks, whatever the instance is called.
+  "admin.sso.connectAnIdentityProvider",
+]);
+
+describe("the instance's name is not written into the catalogue (M-33)", () => {
+  test("no entry says OpenOKR unless it names the software", () => {
+    for (const locale of ["en", "ms"] as const) {
+      const branded = Object.entries(CATALOGUES[locale])
+        .filter(([, value]) => value.includes("OpenOKR"))
+        .map(([key]) => key)
+        .filter((key) => !NAMES_THE_SOFTWARE.has(key));
+      expect([locale, branded]).toEqual([locale, []]);
+    }
+  });
+
+  test("every entry on the list still names the software", () => {
+    const stale = [...NAMES_THE_SOFTWARE].filter(
+      (key) => !(CATALOGUES.en[key] ?? "").includes("OpenOKR"),
+    );
+    expect(stale).toEqual([]);
+  });
+
+  test("the strings that name the instance carry the hole in both languages", () => {
+    for (const key of [
+      "auth.signIn.heading",
+      "setup.heading",
+      "globalError.couldNotStart",
+      "account.channels.actions.sendThisToTheBot",
+    ]) {
+      for (const locale of ["en", "ms"] as const) {
+        const holes = messageHoles(CATALOGUES[locale][key] ?? "");
+        expect([locale, key, holes.includes("instanceName")]).toEqual([
+          locale,
+          key,
+          true,
+        ]);
+      }
+    }
+    expect(
+      translate(CATALOGUES.en, "auth.signIn.heading", {
+        instanceName: "OKR Goal",
+      }),
+    ).toBe("Sign in to OKR Goal");
+    expect(
+      translate(CATALOGUES.ms, "auth.signIn.heading", {
+        instanceName: "OKR Goal",
+      }),
+    ).toBe("Log masuk ke OKR Goal");
   });
 });
 

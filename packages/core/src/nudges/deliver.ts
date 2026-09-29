@@ -30,6 +30,7 @@ import { connectedProviders, loadRoutingMembers } from "../channels/members.ts";
 import { type PrimaryChannel, resolveDelivery } from "../channels/routing.ts";
 import { whatsAppEnvelope } from "../channels/whatsapp-window.ts";
 import { digestItemsFor } from "../notifications/digest.ts";
+import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { primaryChannelSchema } from "../settings/registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { blockerDraft, isBlockerRule } from "./blocker-card.ts";
@@ -63,6 +64,7 @@ async function dailyDigestDraft(
     readonly memberId: string;
     readonly baseUrl: string;
     readonly now: Date;
+    readonly instanceName?: string;
   },
 ): Promise<{ subject: string; text: string } | null> {
   const contents = await digestItemsFor(tx, {
@@ -86,8 +88,9 @@ async function dailyDigestDraft(
     // product sends. It is what a reader follows back to METHOD.md.
     `Rule: ${DAILY_DIGEST_RULE}`,
   ];
+  const name = instanceNameOr(input.instanceName);
   return {
-    subject: count === 1 ? "OpenOKR: 1 update" : `OpenOKR: ${count} updates`,
+    subject: count === 1 ? `${name}: 1 update` : `${name}: ${count} updates`,
     text: lines.join("\n"),
   };
 }
@@ -142,8 +145,15 @@ export async function deliverDueNudges(
      * it is not sent.
      */
     readonly baseUrl?: string;
+    /**
+     * What the instance calls itself, for the subject and the button of what
+     * it sends (completeness review M-33). The host resolves it when it runs,
+     * so a rename reaches the next nudge. Absent says "OpenOKR".
+     */
+    readonly instanceName?: string;
   },
 ): Promise<DeliveryResult> {
+  const named = input.instanceName ? { instanceName: input.instanceName } : {};
   const due = await tx
     .select({
       id: nudges.id,
@@ -309,6 +319,7 @@ export async function deliverDueNudges(
           subjectId: row.subjectId,
           provider,
           ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+          ...named,
         });
       const draft =
         isBlockerRule(row.ruleKey) && row.subjectType === "blocker"
@@ -318,6 +329,7 @@ export async function deliverDueNudges(
               ruleKey: row.ruleKey,
               now: input.now,
               ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+              ...named,
             })) ?? (await plain()))
           : // **The daily summary carries what it is summarising** (P6-G01b):
             // it is a list of things rather than a sentence about one.
@@ -327,6 +339,7 @@ export async function deliverDueNudges(
                 memberId: row.recipientMemberId,
                 baseUrl: input.baseUrl,
                 now: input.now,
+                ...named,
               })) ?? (await plain()))
             : await plain();
       // WhatsApp is the one provider with a clock on it (P5-T04b-b). Outside

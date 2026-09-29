@@ -213,6 +213,50 @@ describe("what a nudge says", () => {
     ]);
   });
 
+  it("names the instance it came from, in the subject and on the button (M-33)", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set primary_channel = 'slack' where id = $1",
+      [ownerMemberId],
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "channels.connect", {
+      provider: "slack",
+      credentials: "xoxb-token",
+    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.linkIdentity",
+      { provider: "slack", externalId: "U-owner" },
+    );
+    await callAction(
+      {
+        pool: wb.appPool,
+        ...context(),
+        baseUrl: BASE,
+        instanceName: "OKR Goal",
+      },
+      "nudges.run",
+      { now: `${dueOn}T09:00:00Z` },
+    );
+    const slack = (await messageRows()).find(
+      (row) =>
+        row.provider === "slack" &&
+        String(row.payload.text).includes("Rule: checkin.due"),
+    );
+    expect(slack?.payload.subject).toBe(
+      "OKR Goal: Check-in due today: Become the preferred platform for mid-market teams",
+    );
+    expect(slack?.payload.buttons).toEqual([
+      { label: "Check in", url: `okr:checkin ${goalId}` },
+      {
+        label: "Open in OKR Goal",
+        url: `https://okr.example.com/check-in?goal=${goalId}`,
+      },
+    ]);
+    // Nothing else in it is the software's name.
+    expect(JSON.stringify(slack?.payload)).not.toContain("OpenOKR");
+  });
+
   it("still names the goal when the host knows no address, with no link", async () => {
     await runAt(`${dueOn}T09:00:00Z`);
     const text = String(

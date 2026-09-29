@@ -42,6 +42,7 @@ import {
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getCache } from "../../../../lib/cache";
+import { getInstanceName } from "../../../../lib/instance-name";
 import { getPool } from "../../../../lib/pool";
 
 export const dynamic = "force-dynamic";
@@ -163,8 +164,10 @@ async function handle(
   // the committed artifact (P5-T07b). It therefore describes *this* instance,
   // whatever it is running, and `pnpm check:contract` is what keeps the
   // committed copy honest. Both call the same builder, so they cannot disagree.
+  // The title is this instance's name (M-33); the committed copy is built
+  // with none and says "OpenOKR", so the drift check never sees a rename.
   if (segments.length === 1 && segments[0] === "openapi.json") {
-    return json(buildOpenApiDocument(), 200);
+    return json(buildOpenApiDocument({ title: await getInstanceName() }), 200);
   }
 
   const route = routeAt(segments);

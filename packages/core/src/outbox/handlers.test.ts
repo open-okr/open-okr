@@ -124,6 +124,31 @@ describe("invitation email", () => {
     expect(sent[0]?.text).toContain("https://okr.example.com/join/tok-1");
   });
 
+  it("names the instance it invites somebody to (M-33)", async () => {
+    const { sent, deps } = recorder();
+    await dispatchOutbox(
+      delivery("invitation.email", { to: "sam@example.com", token: "tok-1" }),
+      { ...deps, instanceName: "OKR Goal" },
+    );
+    expect(sent[0]?.subject).toBe("You have been invited to OKR Goal");
+    expect(sent[0]?.text).toContain(
+      "You have been invited to a workspace on OKR Goal.",
+    );
+    expect(JSON.stringify(sent[0])).not.toContain("OpenOKR");
+  });
+
+  it("says OpenOKR when the host gives no name", async () => {
+    const { sent, deps } = recorder();
+    await dispatchOutbox(
+      delivery("invitation.email", { to: "sam@example.com", token: "tok-1" }),
+      deps,
+    );
+    expect(sent[0]?.subject).toBe("You have been invited to OpenOKR");
+    expect(sent[0]?.text).toContain(
+      "You have been invited to a workspace on OpenOKR.",
+    );
+  });
+
   it("fails permanently when the row has no token, because no retry will add one", async () => {
     const { deps } = recorder();
     await expect(

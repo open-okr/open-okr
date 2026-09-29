@@ -7,6 +7,12 @@ What the wizard does, and what is worth doing next.
 An account. Name, email address, and a password of at least twelve characters.
 That account owns the instance.
 
+The screen also asks what the instance should be called. It is filled in with
+`OPENOKR_INSTANCE_NAME` when your deployment sets it, or `OpenOKR` when it does
+not. Leave it as it is and the variable keeps deciding; type another name and
+that one is kept instead. Either way it can be changed later on General in
+admin.
+
 Nothing else on that screen needs configuring, and the screen says so: every
 setting has a working default, so you can create the account and start. Mail,
 AI, chat channels, single sign-on and directory sync are all optional, all off,

@@ -117,6 +117,8 @@ export interface NudgeRunInput {
   readonly scope?: AgentScope;
   /** The instance's address, for the links in what it sends (H-12). */
   readonly baseUrl?: string;
+  /** What the instance calls itself, in what it sends (M-33). */
+  readonly instanceName?: string;
 }
 
 export interface NudgeRunResult {
@@ -455,6 +457,7 @@ export async function runDueNudgesInTx(
     workspaceId,
     now: at,
     ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+    ...(input.instanceName ? { instanceName: input.instanceName } : {}),
   });
 
   const sent = ids.filter((written) => written.sent).length;

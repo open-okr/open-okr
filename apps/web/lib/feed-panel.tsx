@@ -1,6 +1,7 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { FeedLive } from "./feed-live.tsx";
+import { getInstanceName } from "./instance-name";
 import { getTranslations } from "./translations";
 
 /**
@@ -61,6 +62,9 @@ export async function FeedPanel({
   };
 }) {
   const { t } = await getTranslations();
+  // A row with no member behind it is the instance acting, and reads as its
+  // name rather than the software's (M-33).
+  const instanceName = await getInstanceName();
   const last = items.at(-1);
   const join = basePath.includes("?") ? "&" : "?";
   // Paging is a link, and a page the reader has navigated back through is a
@@ -99,7 +103,7 @@ export async function FeedPanel({
                     {item.actorMemberId
                       ? (names.get(item.actorMemberId) ??
                         t("feedPanel.aMember"))
-                      : t("feedPanel.openOkr")}
+                      : instanceName}
                     {" · "}
                     {new Intl.DateTimeFormat("en-GB", {
                       timeZone,

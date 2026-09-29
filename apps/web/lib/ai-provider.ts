@@ -34,6 +34,7 @@ import {
   resolveTierRoute,
 } from "@openokr/core";
 import type { ModelTier } from "@openokr/db";
+import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
 
@@ -49,7 +50,12 @@ type Resolved = Exclude<ResolvedAICredential, { source: "off" }>;
 /** The adapter configuration for a resolved credential, or null. */
 export function providerConfigFor(
   resolved: Resolved,
-  options: { readonly guardOutbound: boolean; readonly appUrl: string },
+  options: {
+    readonly guardOutbound: boolean;
+    readonly appUrl: string;
+    /** What the provider's dashboard lists this app as (M-33). */
+    readonly appName: string;
+  },
 ): AIProviderConfig | null {
   switch (resolved.provider) {
     case "anthropic":
@@ -60,7 +66,7 @@ export function providerConfigFor(
       return {
         provider: "openrouter",
         apiKey: resolved.apiKey,
-        appName: "OpenOKR",
+        appName: options.appName,
         appUrl: options.appUrl,
       };
     case "ollama":
@@ -113,6 +119,7 @@ export async function providerForTier(
   const config = providerConfigFor(resolved, {
     guardOutbound: await isCloudEnabled(pool),
     appUrl: loadEnv().BETTER_AUTH_URL,
+    appName: await getInstanceName(),
   });
   if (!config) {
     return null;
