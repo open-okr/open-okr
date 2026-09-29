@@ -35,7 +35,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import { linkedWorkDivergence } from "@openokr/method";
-import { asc, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -53,6 +53,7 @@ import {
   addChecklistItemInTx,
   assignTaskInTx,
   createTaskInTx,
+  keyResultsServedByInitiatives,
   linkedWorkForKeyResults,
   moveTaskInTx,
   unassignTaskInTx,
@@ -355,7 +356,10 @@ export const readBoard = defineReadAction({
         cards: z.array(taskCard),
       }),
     ),
-    /** The rail: every key result this board's work serves. */
+    /**
+     * The rail: every key result this board's work serves, whether a card
+     * names it or the card's initiative serves it.
+     */
     rail: z.array(
       z.object({
         keyResultId: z.uuid(),
@@ -363,7 +367,10 @@ export const readBoard = defineReadAction({
         goalTitle: z.string(),
         /** The measured value's progress. The one that counts. */
         progressPct: z.number(),
-        /** Completed linked tasks over total. A different fact. */
+        /**
+         * Completed linked tasks over total, an initiative's own tasks
+         * included (M-26). A different fact.
+         */
         linkedWork: z.object({
           done: z.number().int(),
           total: z.number().int(),
@@ -440,14 +447,33 @@ export const readBoard = defineReadAction({
           await readable(tx, context.workspaceId, memberId, rows),
         );
 
+        // The key results the cards name, and the ones their initiatives serve
+        // (M-26): the rail's linked work counts both, so the rail lists both.
+        const served = await keyResultsServedByInitiatives(
+          tx,
+          context.workspaceId,
+          [
+            ...new Set(
+              cards
+                .map((card) => card.initiativeId)
+                .filter((id): id is string => id !== null),
+            ),
+          ],
+        );
         const railIds = [
-          ...new Set(
-            cards
+          ...new Set([
+            ...cards
               .map((card) => card.keyResultId)
               .filter((id): id is string => id !== null),
-          ),
+            ...served,
+          ]),
         ];
-        const rail = await buildRail(tx, context.workspaceId, railIds);
+        const rail = await buildRail(
+          tx,
+          context.workspaceId,
+          memberId,
+          railIds,
+        );
 
         return {
           columns: TASK_STATUSES.map((status) => ({
@@ -470,18 +496,26 @@ export const readBoard = defineReadAction({
  * progress and the share of linked work that is finished. The third field is
  * present only when the second is complete and the first has not moved, which
  * is the divergence TECHNICAL-PLAN §4.9 names.
+ *
+ * **Only the key results this member can see, through their goals.** A key
+ * result inherits its goal's context, which is the rule the rest of the product
+ * follows. The board reaches key results through its cards' initiatives as well
+ * as through the cards themselves (M-26), and a card being visible says
+ * nothing about the goal behind the initiative it belongs to.
  */
 async function buildRail(
   tx: OperationTx,
   workspaceId: string,
+  memberId: string,
   keyResultIds: readonly string[],
 ) {
   if (keyResultIds.length === 0) {
     return [];
   }
-  const rows = await tx
+  const found = await tx
     .select({
       id: keyResults.id,
+      goalId: keyResults.goalId,
       title: keyResults.title,
       goalTitle: goals.title,
       progressPct: keyResults.progressPct,
@@ -489,7 +523,10 @@ async function buildRail(
       baselineValue: keyResults.baselineValue,
     })
     .from(keyResults)
-    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .innerJoin(
+      goals,
+      and(eq(goals.id, keyResults.goalId), isNull(goals.deletedAt)),
+    )
     .where(
       activeOnly(
         keyResults,
@@ -498,6 +535,16 @@ async function buildRail(
       ),
     )
     .orderBy(asc(goals.position), asc(keyResults.position));
+
+  // One statement for the whole set rather than one per row (P7-T01b), and
+  // the goal ids deduplicated first because several key results share a goal.
+  const allowedGoals = await visibleResourceIds(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "goal",
+    ids: [...new Set(found.map((row) => row.goalId))],
+  });
+  const rows = found.filter((row) => allowedGoals.has(row.goalId));
 
   const counts = await linkedWorkForKeyResults(
     tx,
@@ -1329,7 +1376,7 @@ export const readLinkedWork = defineReadAction({
         const memberId = await actingMember(tx, context.workspaceId, userId);
 
         const rows = await tx
-          .select({ id: keyResults.id, goalId: keyResults.goalId })
+          .select({ id: keyResults.id })
           .from(keyResults)
           .innerJoin(goals, eq(goals.id, keyResults.goalId))
           .where(
@@ -1341,20 +1388,15 @@ export const readLinkedWork = defineReadAction({
             ),
           );
 
-        // Through the goal, which is the rule the rest of the product follows: a
-        // key result inherits its goal's context. One statement rather than one
-        // per row (P7-T01b), and the goal ids are deduplicated first because
-        // several key results share one goal.
-        const allowedGoals = await visibleResourceIds(tx, {
-          workspaceId: context.workspaceId,
+        // The rail filters through each key result's goal, which is the rule
+        // the rest of the product follows, so this read and the board's apply
+        // it in one place.
+        return buildRail(
+          tx,
+          context.workspaceId,
           memberId,
-          resourceType: "goal",
-          ids: [...new Set(rows.map((row) => row.goalId))],
-        });
-        const visible = rows
-          .filter((row) => allowedGoals.has(row.goalId))
-          .map((row) => row.id);
-        return buildRail(tx, context.workspaceId, visible);
+          rows.map((row) => row.id),
+        );
       },
     );
   },

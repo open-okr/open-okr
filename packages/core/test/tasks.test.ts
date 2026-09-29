@@ -175,6 +175,166 @@ describe("what finishing work does to a key result, which is nothing", () => {
   });
 });
 
+/**
+ * Initiatives feed the linked work (REQUIREMENTS §4 Pillar C, completeness
+ * review M-26).
+ *
+ * An initiative's progress is the share of its own tasks that are done, so its
+ * tasks are how that progress reaches a key result it serves. Each task counts
+ * once, and the measured value is still the only number that moves.
+ */
+describe("initiatives feed a key result's linked work", () => {
+  const createInitiative = async (title: string) =>
+    (
+      (await call("initiatives.create", {
+        spaceId,
+        title,
+        ownerId: ownerMemberId,
+        keyResultIds: [keyResultId],
+      })) as { id: string }
+    ).id;
+
+  const linkedWork = async () => {
+    const [rail] = (await call("tasks.linkedWork", { cycleId })) as {
+      progressPct: number;
+      linkedWork: { done: number; total: number };
+      divergence: string | null;
+    }[];
+    return rail;
+  };
+
+  it("counts an initiative's tasks, and a task linked both ways once", async () => {
+    const initiativeId = await createInitiative("Rebuild the activation flow");
+    // Only through the initiative.
+    const viaInitiative = await createTask("Rewrite the first-run screen", {
+      initiativeId,
+    });
+    // Both through the initiative and by naming the key result.
+    const bothWays = await createTask("Cut the setup form to three fields", {
+      initiativeId,
+      keyResultId,
+    });
+    // Only by naming the key result.
+    await createTask("Email the dormant teams", { keyResultId });
+    for (const task of [viaInitiative, bothWays]) {
+      await call("tasks.update", { id: task.id, status: "done" });
+    }
+
+    const rail = await linkedWork();
+    expect(rail?.linkedWork).toEqual({ done: 2, total: 3 });
+    // Still a second signal. The measured progress has not moved.
+    expect(rail?.progressPct).toBe(0);
+  });
+
+  it("takes nothing from a dropped initiative", async () => {
+    const initiativeId = await createInitiative("Rebuild the activation flow");
+    const finished = await createTask("Rewrite the first-run screen", {
+      initiativeId,
+    });
+    await call("tasks.update", { id: finished.id, status: "done" });
+    await createTask("Cut the setup form to three fields", { initiativeId });
+    const direct = await createTask("Email the dormant teams", {
+      keyResultId,
+    });
+    await call("tasks.update", { id: direct.id, status: "done" });
+    expect((await linkedWork())?.linkedWork).toEqual({ done: 2, total: 3 });
+
+    await call("initiatives.update", { id: initiativeId, status: "dropped" });
+
+    // The abandoned plan no longer holds the count below complete, so the
+    // divergence can say what it sees.
+    const rail = await linkedWork();
+    expect(rail?.linkedWork).toEqual({ done: 1, total: 1 });
+    expect(rail?.divergence).toContain("1 of 1 linked task complete");
+  });
+
+  it("reports the divergence when an initiative's work is finished and the measure is not", async () => {
+    const initiativeId = await createInitiative("Rebuild the activation flow");
+    const task = await createTask("Rewrite the first-run screen", {
+      initiativeId,
+    });
+    await call("tasks.update", { id: task.id, status: "done" });
+
+    const rail = await linkedWork();
+    expect(rail?.linkedWork).toEqual({ done: 1, total: 1 });
+    expect(rail?.divergence).toContain("1 of 1 linked task complete");
+    expect(rail?.divergence).toContain("41");
+  });
+
+  it("stays quiet while an initiative's task is open, even with every named task done", async () => {
+    const initiativeId = await createInitiative("Rebuild the activation flow");
+    await createTask("Rewrite the first-run screen", { initiativeId });
+    const direct = await createTask("Email the dormant teams", {
+      keyResultId,
+    });
+    await call("tasks.update", { id: direct.id, status: "done" });
+
+    const rail = await linkedWork();
+    expect(rail?.linkedWork).toEqual({ done: 1, total: 2 });
+    expect(rail?.divergence).toBeNull();
+  });
+
+  it("puts a key result on the board's rail when only a card's initiative serves it", async () => {
+    const initiativeId = await createInitiative("Rebuild the activation flow");
+    await createTask("Rewrite the first-run screen", { initiativeId });
+
+    const board = (await call("tasks.board", { spaceId })) as {
+      rail: {
+        keyResultId: string;
+        linkedWork: { done: number; total: number };
+      }[];
+    };
+    expect(board.rail.map((entry) => entry.keyResultId)).toEqual([keyResultId]);
+    expect(board.rail[0]?.linkedWork).toEqual({ done: 0, total: 1 });
+  });
+
+  it("leaves a dropped initiative's key results off the board's rail", async () => {
+    const initiativeId = await createInitiative("Rebuild the activation flow");
+    await createTask("Rewrite the first-run screen", { initiativeId });
+    await call("initiatives.update", { id: initiativeId, status: "dropped" });
+
+    const board = (await call("tasks.board", { spaceId })) as {
+      rail: unknown[];
+    };
+    expect(board.rail).toEqual([]);
+  });
+
+  it("keeps a key result off the rail for a reader who cannot see its goal", async () => {
+    const initiativeId = await createInitiative("Rebuild the activation flow");
+    await createTask("Rewrite the first-run screen", { initiativeId });
+
+    // The goal loses its workspace-wide view binding. Its owner keeps theirs,
+    // and the task is still visible to everybody.
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update access_bindings b set deleted_at = now()
+         from access_contexts c, access_groups g
+        where b.context_id = c.id
+          and b.group_id = g.id
+          and c.workspace_id = $1
+          and c.resource_type = 'goal'
+          and c.resource_id = $2
+          and g.kind = 'workspace_standard'`,
+      [workspaceId, goalId],
+    );
+
+    const boardFor = async (userId: string) => {
+      const board = (await call("tasks.board", { spaceId }, userId)) as {
+        columns: { cards: unknown[] }[];
+        rail: { keyResultId: string }[];
+      };
+      return {
+        cards: board.columns.flatMap((one) => one.cards).length,
+        rail: board.rail.map((entry) => entry.keyResultId),
+      };
+    };
+
+    expect(await boardFor(OWNER)).toEqual({ cards: 1, rail: [keyResultId] });
+    // The card is theirs to see. The measure behind it is not.
+    expect(await boardFor(OTHER)).toEqual({ cards: 1, rail: [] });
+  });
+});
+
 describe("ordering, and the problem it actually solves", () => {
   it("appends a new card at the end of its column", async () => {
     const first = await createTask("First", { status: "todo" });

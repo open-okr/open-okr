@@ -155,10 +155,26 @@ The rail shows, per key result:
 | Shown | Source |
 |---|---|
 | Progress | The measured value. The one that counts |
-| Linked work | Completed linked tasks over total linked tasks |
+| Linked work | Completed linked tasks over total linked tasks. A linked task names the key result, or belongs to an initiative serving it (M-26) |
 | Divergence | Present when the second is complete and the first has not moved |
 
 Two numbers, labelled differently, never added together.
+
+**Initiatives feed the second number, corrected at completeness review M-26.**
+This table counted only the tasks that named the key result, so an initiative
+fed nothing, and REQUIREMENTS §4 Pillar C says an initiative's progress feeds
+the key result's linked-work view. An initiative's progress is the share of its
+own tasks that are done, so its tasks now count as linked work for every key
+result it serves. Each task counts once however many routes reach it, and a
+dropped initiative contributes nothing. TECHNICAL-PLAN §4.9 holds the full rule.
+The rail lists the key results a card's initiative serves as well as the one the
+card names, filtered by what the reader can see of each key result's goal.
+
+**Given** an initiative serving a key result, with every one of its tasks done,
+and a measured value that has not moved,
+**when** the rail is drawn or the Coach's divergence check runs,
+**then** the linked work reads complete and the divergence names both figures,
+and the key result's progress is still the measured one.
 
 **Where the divergence lives, decided at P5-T11.** The rule is
 `packages/method/src/linked-work.ts`, pure, and it names both figures in one

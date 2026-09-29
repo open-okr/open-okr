@@ -199,6 +199,20 @@ Boards are views over `tasks` grouped by status for a space, an initiative or a 
 
 Key result progress from linked work: the ratio of completed to total linked tasks is shown as a separate signal beside the measured progress. It never silently replaces the measured value. A key result whose linked work is complete but whose number has not moved is exactly the divergence the coach reports.
 
+**What counts as a linked task** (REQUIREMENTS §4 Pillar C, corrected at completeness review M-26; this paragraph used to count only tasks that named the key result, so an initiative fed nothing):
+
+| Rule | Why |
+|---|---|
+| A task is linked to a key result when it names the key result itself, or when it belongs to an initiative that serves the key result through `initiative_key_results` | Pillar C: "Progress on an initiative feeds the key result's linked-work view". An initiative's progress is the share of its own tasks that are done, so its tasks are how that progress arrives. Counting tasks keeps one unit on both sides of the fraction, which averaging initiative percentages would not |
+| Each task counts once per key result, however many routes reach it | A task that names the key result and also sits in an initiative serving it is one piece of work, not two |
+| An initiative serving two key results counts its tasks in full for each | The work is behind both measures. The two ratios are separate signals and are never added together |
+| A `dropped` initiative contributes nothing. A task in it that names the key result itself still counts, through that link | Its open tasks are work nobody will finish. Counting them would hold the signal below complete for good, which is the one state in which the divergence can never fire |
+| An initiative with no tasks contributes nothing | Its own progress has nothing under it either |
+
+The divergence check reads this widened count, so a finished initiative behind an unmoved number is reported the same way a finished task is. The board's rail lists every key result its cards name or their initiatives serve, filtered by what the reader can see of each key result's goal. The rule is `countLinkedWork` in `packages/core/src/tasks/linked-work.ts`, pure and tested without a database; `linkedWorkForKeyResults` in `packages/core/src/tasks/service.ts` loads what it counts. It is not in `packages/method` because METHOD.md says nothing about linked work: what the method package holds is the divergence the count feeds.
+
+**Initiative progress does not feed the trend forecast.** Pillar C asks that it should. METHOD.md §3.6 defines the forecast as a linear fit over the key result's own value history, so changing what feeds it is a change to practice, and that is a human decision (completeness review §8, decision 4). Until it is taken, the forecast reads measured values only and the linked-work signal sits beside it.
+
 ### 4.10 Collaboration (domain J)
 
 | Table | Key columns | Notes |

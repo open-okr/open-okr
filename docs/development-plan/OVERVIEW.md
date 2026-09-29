@@ -171,7 +171,7 @@ A workspace with no chat provider connected still works completely. Email and th
 Deliberately OKR-shaped. Enough to answer "what is actually moving this key result", not a project-management suite.
 
 - **Initiatives.** The work that moves a key result: an owner, dates, a status, a confidence and a capacity verdict. The capacity check at commit time reads from these, which is why "nothing was cut" is a gate failure.
-- **Tasks and the board.** A kanban with four columns where every card can link to a key result. The sidebar shows your objectives and key results with progress derived from linked completed tasks, shown beside the measured number rather than instead of it. When all the linked work is done but the number has not moved, that is exactly the divergence the coach reports.
+- **Tasks and the board.** A kanban with four columns where every card can link to a key result. The sidebar shows your objectives and key results with progress derived from linked completed tasks, including the tasks of every initiative that serves the key result, shown beside the measured number rather than instead of it. When all the linked work is done but the number has not moved, that is exactly the divergence the coach reports.
 - **Documents.** Rich documents attached to a goal, a key result, an initiative, a cycle or a session. Drafts, publishing, version history with a visual difference, comments and reactions.
 
 ---

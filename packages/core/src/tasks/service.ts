@@ -35,6 +35,8 @@ import {
   activeOnly,
   checklistItems,
   includeDeleted,
+  initiativeKeyResults,
+  initiatives,
   newId,
   type TaskStatus,
   taskAssignees,
@@ -42,7 +44,8 @@ import {
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
-import { eq, inArray, sql } from "drizzle-orm";
+import type { LinkedWork } from "@openokr/method";
+import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
   bindGroup,
   ensureContext,
@@ -59,6 +62,7 @@ import {
 } from "../notifications/subscriptions.ts";
 import { OperationError } from "../operations/operation.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { countLinkedWork } from "./linked-work.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -724,6 +728,14 @@ export async function addChecklistItemInTx<
  * **A count and a count, never a percentage of a key result.** The caller turns
  * these two numbers into the second signal the rail draws beside the measured
  * progress. Nothing writes either number onto `key_results`.
+ *
+ * **Tasks that name the key result, and the tasks of every initiative serving
+ * it** (REQUIREMENTS §4 Pillar C, completeness review M-26). Two reads: the
+ * initiatives linked to these key results, then every task reached either way
+ * in one statement, so a task reached both ways arrives as one row. The rule
+ * that counts them, once each and nothing from a dropped initiative, is
+ * `countLinkedWork` in `./linked-work.ts`, where it is tested without a
+ * database.
  */
 export async function linkedWorkForKeyResults<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -731,35 +743,117 @@ export async function linkedWorkForKeyResults<
   tx: AnyTx<TSchema>,
   workspaceId: string,
   keyResultIds: readonly string[],
-): Promise<Map<string, { done: number; total: number }>> {
-  const counts = new Map<string, { done: number; total: number }>();
+): Promise<Map<string, LinkedWork>> {
   if (keyResultIds.length === 0) {
-    return counts;
+    return new Map();
   }
+  const links = await tx
+    .select({
+      initiativeId: initiativeKeyResults.initiativeId,
+      keyResultId: initiativeKeyResults.keyResultId,
+      status: initiatives.status,
+    })
+    .from(initiativeKeyResults)
+    .innerJoin(
+      initiatives,
+      and(
+        eq(initiatives.id, initiativeKeyResults.initiativeId),
+        eq(initiatives.workspaceId, workspaceId),
+        isNull(initiatives.deletedAt),
+      ),
+    )
+    .where(
+      activeOnly(
+        initiativeKeyResults,
+        eq(initiativeKeyResults.workspaceId, workspaceId),
+        inArray(initiativeKeyResults.keyResultId, [...keyResultIds]),
+      ),
+    );
+
+  // A dropped initiative's tasks would be thrown away by the rule anyway, so
+  // they are not read. Its links still go to the rule, which is what decides.
+  const initiativeIds = [
+    ...new Set(
+      links
+        .filter((link) => link.status !== "dropped")
+        .map((link) => link.initiativeId),
+    ),
+  ];
+
   const rows = await tx
     .select({
-      keyResultId: tasks.keyResultId,
+      id: tasks.id,
       status: tasks.status,
+      keyResultId: tasks.keyResultId,
+      initiativeId: tasks.initiativeId,
     })
     .from(tasks)
     .where(
       activeOnly(
         tasks,
         eq(tasks.workspaceId, workspaceId),
-        inArray(tasks.keyResultId, [...keyResultIds]),
+        initiativeIds.length === 0
+          ? inArray(tasks.keyResultId, [...keyResultIds])
+          : or(
+              inArray(tasks.keyResultId, [...keyResultIds]),
+              inArray(tasks.initiativeId, initiativeIds),
+            ),
       ),
     );
 
-  for (const row of rows) {
-    if (!row.keyResultId) {
-      continue;
-    }
-    const entry = counts.get(row.keyResultId) ?? { done: 0, total: 0 };
-    entry.total += 1;
-    if (row.status === "done") {
-      entry.done += 1;
-    }
-    counts.set(row.keyResultId, entry);
+  return countLinkedWork({
+    keyResultIds,
+    tasks: rows.map((row) => ({
+      id: row.id,
+      done: row.status === "done",
+      keyResultId: row.keyResultId,
+      initiativeId: row.initiativeId,
+    })),
+    initiatives: links.map((link) => ({
+      initiativeId: link.initiativeId,
+      keyResultId: link.keyResultId,
+      dropped: link.status === "dropped",
+    })),
+  });
+}
+
+/**
+ * The key results these initiatives serve, leaving out dropped initiatives.
+ *
+ * The board's rail lists every key result its cards' work serves, and since
+ * M-26 a card serves the key results of its initiative as well as the one it
+ * names. A dropped initiative serves nothing, which is the same rule
+ * `countLinkedWork` applies, so a card in one does not bring its key results
+ * onto the rail with a count that leaves the card out.
+ */
+export async function keyResultsServedByInitiatives<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  initiativeIds: readonly string[],
+): Promise<string[]> {
+  if (initiativeIds.length === 0) {
+    return [];
   }
-  return counts;
+  const rows = await tx
+    .selectDistinct({ keyResultId: initiativeKeyResults.keyResultId })
+    .from(initiativeKeyResults)
+    .innerJoin(
+      initiatives,
+      and(
+        eq(initiatives.id, initiativeKeyResults.initiativeId),
+        eq(initiatives.workspaceId, workspaceId),
+        isNull(initiatives.deletedAt),
+        ne(initiatives.status, "dropped"),
+      ),
+    )
+    .where(
+      activeOnly(
+        initiativeKeyResults,
+        eq(initiativeKeyResults.workspaceId, workspaceId),
+        inArray(initiativeKeyResults.initiativeId, [...initiativeIds]),
+      ),
+    );
+  return rows.map((row) => row.keyResultId);
 }

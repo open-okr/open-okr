@@ -448,7 +448,7 @@ Both parts of that were measured at P7-T02 and both were wrong before it. The mo
 
 Each task owns an access context (`resourceType: "task"`): `workspace_standard` at view, the owning space's `space_standard` at edit, and each assignee's own `member` group at edit. The third is why a task owns a context rather than inheriting its initiative's: binding an assignee on the initiative would hand them every task under it.
 
-**Nothing here writes `key_results`.** Completing every task under a measure moves no number, and there is no trigger, no derived column and no code path that would. TECHNICAL-PLAN §4.9: the ratio of completed linked tasks is shown beside the measured value and never instead of it.
+**Nothing here writes `key_results`.** Completing every task under a measure moves no number, and there is no trigger, no derived column and no code path that would. TECHNICAL-PLAN §4.9: the ratio of completed linked tasks is shown beside the measured value and never instead of it. A linked task names the key result through `key_result_id`, or belongs through `initiative_id` to an initiative that serves it in `initiative_key_results`, and counts once either way (completeness review M-26).
 
 ### task_assignees *(built at P5-T11)*
 `task_id` to tasks, `member_id` to workspace_members. Unique on `(workspace_id, task_id, member_id)` while live; an unassigned member is revived rather than inserted beside. Assigning grants the edit binding, subscribes the member as `role`, and notifies everybody on the list except the actor. Unassigning takes the binding back. An agent is refused: an agent proposes work and does not carry it (AI-NATIVE-PLAN.md §1.3).
