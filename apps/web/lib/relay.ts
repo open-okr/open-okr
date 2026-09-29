@@ -144,11 +144,27 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
            * before P5-T03 exists should get.
            */
           async sendChannel(message) {
-            if (!workspaceId || !message.memberId) {
+            if (!workspaceId) {
               return {
                 delivered: false,
-                suppressedReason: "the message names no member to reach",
+                suppressedReason: "the message names no workspace",
               };
+            }
+            if (!message.memberId) {
+              // A post to a space's own channel (completeness review M-23),
+              // or nothing at all.
+              return message.target
+                ? postToSpaceChannel(workspaceId, message.provider, {
+                    target: message.target,
+                    text: message.text,
+                    ...(message.subject ? { subject: message.subject } : {}),
+                    ...(message.buttons ? { buttons: message.buttons } : {}),
+                    idempotencyKey: message.idempotencyKey,
+                  })
+                : {
+                    delivered: false,
+                    suppressedReason: "the message names no member to reach",
+                  };
             }
             const outbound = {
               text: message.text,
@@ -313,6 +329,74 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
       // finds out their invitations are going nowhere.
       log(`skipped ${skipped.topic} (${skipped.idempotencyKey}): ${why}`);
     },
+  };
+}
+
+/**
+ * Posts one message to a space's own channel (completeness review M-23).
+ *
+ * Slack and Teams only, the two §5.2 gives channel posts. The connection is
+ * opened per delivery, as it is for a member's message, and the target is the
+ * channel id the space linked. Anything else suppresses with a reason rather
+ * than failing, because a provider that cannot post to a channel is a fact
+ * about the provider and retrying will not change it.
+ */
+async function postToSpaceChannel(
+  workspaceId: string,
+  provider: string,
+  message: {
+    readonly target: string;
+    readonly text: string;
+    readonly subject?: string;
+    readonly buttons?: readonly { label: string; url: string }[];
+    readonly idempotencyKey: string;
+  },
+): Promise<{ delivered: boolean; suppressedReason?: string }> {
+  const { target, ...outbound } = message;
+  if (provider === "slack") {
+    const connection = await openConnection(getPool(), getKeyRing(), {
+      workspaceId,
+      provider: "slack",
+    });
+    const secret = connection ? parseSlackSecret(connection.secret) : null;
+    if (!secret) {
+      return {
+        delivered: false,
+        suppressedReason:
+          "Slack is not connected, or its stored credentials are not readable",
+      };
+    }
+    return new SlackChannel({
+      botToken: secret.botToken,
+      signingSecret: secret.signingSecret,
+      // A channel post has no member to resolve.
+      slackUserFor: () => null,
+    }).sendToChannel(target, outbound);
+  }
+  if (provider === "teams") {
+    const connection = await openConnection(getPool(), getKeyRing(), {
+      workspaceId,
+      provider: "teams",
+    });
+    const secret = connection ? parseTeamsSecret(connection.secret) : null;
+    if (!secret) {
+      return {
+        delivered: false,
+        suppressedReason:
+          "Teams is not connected, or its stored credentials are not readable",
+      };
+    }
+    const serviceUrl = connection?.config.serviceUrl;
+    return new TeamsChannel({
+      appId: secret.appId,
+      appPassword: secret.appPassword,
+      ...(typeof serviceUrl === "string" ? { serviceUrl } : {}),
+      conversationFor: () => null,
+    }).sendToChannel(target, outbound);
+  }
+  return {
+    delivered: false,
+    suppressedReason: `${provider} does not post to a channel`,
   };
 }
 

@@ -60,7 +60,9 @@ export {
   toBlocks,
 } from "./drivers/channel/slack.ts";
 export {
+  checkInCard,
   decodeToken,
+  parseCardSubmission,
   stripMentions,
   TeamsChannel,
   type TeamsChannelOptions,

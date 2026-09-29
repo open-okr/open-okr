@@ -502,6 +502,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "session.commitmentsSet": z.object({ count: z.number() }),
   "session.commitmentsClosed": z.object({ count: z.number() }),
   "session.coordinatorNoteSet": z.object({}),
+  // The week's digest posted to the space's own channel (completeness review
+  // M-23). The providers, never the channel ids.
+  "session.digestPosted": z.object({ channels: z.array(z.string()) }),
   // The monthly review (METHOD.md §7.5, P4-T09). A trend and a decision both
   // hang off the goal rather than the session, because the goal page is where
   // somebody comes looking for them a month later.

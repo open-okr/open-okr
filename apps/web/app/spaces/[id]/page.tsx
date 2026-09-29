@@ -163,6 +163,12 @@ export default async function SpacePage({
     workspace.memberId,
   );
   const canManage = level >= ACCESS_LEVELS.full || space.ownRole === "manager";
+  // Which providers this workspace has connected, so the settings card offers
+  // a channel only where one could post (M-23). The member's own read, which
+  // any member may make; the connections list itself is an administrator's.
+  const connectedProviders = canManage
+    ? (await callAction(actor, "channels.mySettings", {})).connected
+    : [];
   const candidates = canManage
     ? (await callAction(actor, "people.directory", {})).filter(
         (member) =>
@@ -246,6 +252,7 @@ export default async function SpacePage({
           workspaceStrictness={rhythm.coachStrictness}
           workspaceFrequency={rhythm.defaultCheckInFrequency}
           canManage={canManage}
+          connectedProviders={connectedProviders}
         />
       ) : null}
 

@@ -343,6 +343,23 @@ const quietHoursSchema = z.object({
 });
 
 /**
+ * A space's own channel on one provider, or null for none (completeness
+ * review M-23).
+ *
+ * The provider's own identifier for the channel, which is what its API posts
+ * to: `C0123ABCD` on Slack, `19:…@thread.tacv2` on Teams. One word with no
+ * spaces, because a channel's display name is not something either API
+ * accepts and a pasted name would be a link that never posts.
+ */
+export const spaceChannelSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^\S+$/)
+  .nullable();
+
+/**
  * Per-reason routing: a channel per reason, and the member's primary channel
  * for every reason absent (P6-G08).
  *
@@ -524,6 +541,31 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "inherits for the same reason the strictness override does.",
     resolve: () => null,
     schema: z.enum(CHECK_IN_FREQUENCIES).nullable(),
+  },
+  {
+    key: "slackChannel",
+    scope: "space",
+    home: "spaces.settings",
+    why:
+      "Null, meaning this space posts nowhere. AI-NATIVE-PLAN §5.2 gives " +
+      "Slack per-space channel posts and UIUX-PLAN S-22 lets a coordinator " +
+      "post the week's digest to the space's channel; this is which channel " +
+      "that is, as Slack's own channel id. No channel is the only safe " +
+      "default: a guessed one would put a team's figures in front of " +
+      "whoever reads it (completeness review M-23).",
+    resolve: () => null,
+    schema: spaceChannelSchema,
+  },
+  {
+    key: "teamsChannel",
+    scope: "space",
+    home: "spaces.settings",
+    why:
+      "Null, meaning this space posts nowhere. The Teams half of the same " +
+      "link, as the channel's conversation id. Separate from Slack's because " +
+      "a workspace may connect both and a team reads one of them.",
+    resolve: () => null,
+    schema: spaceChannelSchema,
   },
   {
     key: "language",
@@ -817,7 +859,7 @@ export function resolveMemberSettings(context: ProvisioningContext): {
  * has no key to read. One function, so the default a new space stores and the
  * default an old one falls back to cannot drift apart.
  *
- * Takes no provisioning context: none of the three depends on the browser or
+ * Takes no provisioning context: none of them depends on the browser or
  * the instance. The parameter is there so the shape matches its two siblings
  * and a setting that later does need one can have it without changing callers.
  */
@@ -825,6 +867,9 @@ export function resolveSpaceSettings(): {
   readonly teamVoting: boolean;
   readonly coachStrictness: CoachStrictness | null;
   readonly defaultCheckInFrequency: CheckInFrequency | null;
+  /** Where this space posts on Slack and on Teams, or null (M-23). */
+  readonly slackChannel: string | null;
+  readonly teamsChannel: string | null;
 } {
   return Object.fromEntries(
     SETTINGS_REGISTRY.filter(

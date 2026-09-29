@@ -200,6 +200,7 @@ import {
 } from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import { listDeletedItems } from "./deleted-items.ts";
+import { postDigest } from "./digest-posts.ts";
 import {
   attachFile,
   createDocument,
@@ -789,6 +790,7 @@ export const ACTION_MAP = {
   "sessions.confidenceTrend": confidenceTrend,
   "sessions.listCommitments": listSessionCommitments,
   "sessions.setCoordinatorNote": setCoordinatorNote,
+  "sessions.postDigest": postDigest,
   "sessions.readStreak": readStreak,
   "sessions.digest": readDigest,
   "sessions.narrateDigest": narrateDigest,

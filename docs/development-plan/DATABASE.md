@@ -198,7 +198,7 @@ One row is one provider, OIDC or SAML. **This line said SAML arrives through a S
 
 The two legacy columns and their unique partial index arrived at P6-T03a, seventeen migrations after the table: `spaces` was written before there was an importer to write them, and the FlowyTeam mapper is the first thing to map a source table onto it (§7.2, teams).
 
-`settings` holds §4.14's space scope, declared in the settings registry at P6-G18b and written when a space is created: `teamVoting` (default true), `coachStrictness` (default null) and `defaultCheckInFrequency` (default null). Null means the workspace's, not unset, and the two nullable ones store a deviation rather than a resolved value so a workspace that changes its own does not leave every space holding the old one. A space created before the scope existed holds `{}` and every key resolves from the registry, which is what makes the column readable without a backfill.
+`settings` holds §4.14's space scope, declared in the settings registry at P6-G18b and written when a space is created: `teamVoting` (default true), `coachStrictness` (default null) and `defaultCheckInFrequency` (default null). `slackChannel` and `teamsChannel` (default null, completeness review M-23) are the provider's own channel id the space's weekly digest is posted to; null posts nowhere. Null means the workspace's, not unset, and the two nullable ones store a deviation rather than a resolved value so a workspace that changes its own does not leave every space holding the old one. A space created before the scope existed holds `{}` and every key resolves from the registry, which is what makes the column readable without a backfill.
 
 ### space_members
 `space_id` to spaces, `member_id` to workspace_members, `role` (`member` / `manager` / `coordinator`).
@@ -368,6 +368,8 @@ A row is created when somebody takes part, not when the session is made. Seeding
 
 ### digests
 `scope` (`space` / `workspace` / `member`), `scope_id?`, `period` (`daily` / `weekly` / `cycle`), `period_start`, `body jsonb`, `note?`, `generated_at`, `published_at?`, `channels text[]`.
+
+`published_at` and `channels` were written by nothing until completeness review M-23. `sessions.postDigest` now sets both when the facilitator posts a closed weekly session's digest to its space's channel: `published_at` on the first post, and the providers it went to added to `channels`.
 
 ### streaks
 `space_id` to spaces, `current_weeks`, `longest_weeks`, `last_session_week`, `history jsonb`.
@@ -545,6 +547,8 @@ Both directions, because one constraint alone leaves a hole: without the first, 
 
 Unique on `(workspace_id, idempotency_key)`, and deliberately **not** partial on `deleted_at`: soft-deleting the record of a send must not let the send happen again. `error` carries either the provider’s complaint or the reason a send was suppressed, and suppression is a normal state rather than a failure. TECHNICAL-PLAN lists an `at` column; the table uses the repository-wide `created_at` for that and adds `sent_at`, because when the product decided to send and when the provider accepted it are different facts and a support question needs both.
 
+An outbound row with no `member_id` is a post to a space's own channel (completeness review M-23), and its `payload.target` is the provider's channel id. Its idempotency key is `digest.post:<digest id>:<provider>`, so a digest reaches one channel once. A failed channel post does not mark the connection broken, because one space's wrong channel id is not the connection failing.
+
 ### channel_conversations *(built at P5-T06b)*
 `member_id`, `provider`, `external_thread_id?`, `command`, `subject_id?`, `collected jsonb`, `awaiting`, `expires_at`. Unique on `(workspace_id, member_id, provider)`. **Hard-deleted** when a conversation finishes or is abandoned: a tombstone would hold the unique index and the same member could never start another.
 
@@ -569,7 +573,7 @@ The floor is kept rather than lifted. The policy admits a row two ways: `workspa
 ### nudges *(delivery semantics changed at P5-T01b-b)*
 A nudge row is the delivery queue as well as the record. `sent_at is null` with no `suppressed_reason` and a `scheduled_for` that has passed means "owed to somebody and not yet delivered", which is what `deliverDueNudges` reads. The run that decides *whether* the product speaks no longer stamps `sent_at`; the pass that decides *where* does, along with `channel`. Before this, `channel` was written as the literal `in_app` by the run and resolved nowhere.
 
-`kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`, `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
+`kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`, `fallback_reason?` (migration 0102, completeness review M-23: why delivery went somewhere other than where the nudge was routed, null when it did not), `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
 
 ### nudge_rules
 `rule_key`, `enabled bool`, `channel_override?`, `escalation_ladder jsonb?`, `quiet_mode_exempt bool`.

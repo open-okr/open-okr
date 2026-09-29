@@ -3303,7 +3303,7 @@
       "method": "POST",
       "path": "/spaces/updateSettings",
       "scope": "write",
-      "summary": "Sets one space's team voting, strictness override and default check-in frequency.",
+      "summary": "Sets one space's team voting, strictness override, default check-in frequency and the Slack or Teams channel it posts to.",
       "flags": [
         {
           "name": "id",
@@ -3326,6 +3326,18 @@
         {
           "name": "default-check-in-frequency",
           "field": "defaultCheckInFrequency",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "slack-channel",
+          "field": "slackChannel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "teams-channel",
+          "field": "teamsChannel",
           "type": "string",
           "required": false
         }
@@ -8698,6 +8710,23 @@
         {
           "name": "note",
           "field": "note",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions postDigest",
+      "action": "sessions.postDigest",
+      "method": "POST",
+      "path": "/sessions/postDigest",
+      "scope": "write",
+      "summary": "Posts a closed weekly session's digest to the Slack or Teams channel its space is linked to, once per channel.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
           "type": "string",
           "required": true
         }

@@ -41,7 +41,11 @@ export interface DeliveryResult {
   readonly delivered: number;
   /** Of those, the ones that went to a provider rather than in-app only. */
   readonly toChannel: number;
-  /** Recipients whose primary channel could not be reached. */
+  /**
+   * Recipients a routed channel could not reach, their own or a rule's
+   * (M-23). The reconnect notice is not raised from this: it is about the
+   * member's own channel, and `unreachableRecipients` asks that alone.
+   */
   readonly unreachable: readonly string[];
 }
 
@@ -272,11 +276,14 @@ export async function deliverDueNudges(
 
     if (delivery.fallbackReason) {
       unreachable.add(member.memberId);
-      // The reason is a fixed word from the resolver, never a member's
-      // address or a provider's error text.
+      // A fixed word and the channel it landed on. The reason itself is a
+      // sentence naming a provider, and since a rule's own channel can fail
+      // alongside the member's (M-23) it is two sentences; it belongs on the
+      // nudge row below, not in a label kept for the life of the process.
       metrics.count(METRIC.nudgesTotal, {
         rule: row.ruleKey,
-        outcome: `fallback_${delivery.fallbackReason}`,
+        outcome: "fallback",
+        channel: delivery.channel,
       });
     }
 
@@ -402,6 +409,10 @@ export async function deliverDueNudges(
       .set({
         sentAt: input.now,
         channel: delivery.channel,
+        // Why it is not where it was routed, on the row that records the
+        // product speaking (M-23). The message log has it too, but a nudge
+        // that fell back to in-app has no message to carry it.
+        fallbackReason: delivery.fallbackReason ?? null,
         updatedAt: input.now,
       })
       .where(activeOnly(nudges, eq(nudges.id, row.id)));

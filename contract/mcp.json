@@ -4634,7 +4634,7 @@
     },
     {
       "name": "spaces.updateSettings",
-      "description": "Sets one space's team voting, strictness override and default check-in frequency.",
+      "description": "Sets one space's team voting, strictness override, default check-in frequency and the Slack or Teams channel it posts to.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4672,6 +4672,32 @@
                   "monthly",
                   "quarterly"
                 ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "slackChannel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^\\S+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "teamsChannel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^\\S+$"
               },
               {
                 "type": "null"
@@ -11916,6 +11942,32 @@
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
         "note": "…"
+      }
+    },
+    {
+      "name": "sessions.postDigest",
+      "description": "Posts a closed weekly session's digest to the Slack or Teams channel its space is linked to, once per channel.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000"
       }
     },
     {

@@ -426,6 +426,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.commitmentsClosed": (p) =>
     `Closed ${asString(p.count, "0")} commitments from last week`,
   "session.coordinatorNoteSet": () => "Added a coordinator note to the digest",
+  "session.digestPosted": (p) => {
+    const named = (Array.isArray(p.channels) ? p.channels : []).map(
+      (channel) => (channel === "teams" ? "Teams" : "Slack"),
+    );
+    return named.length > 0
+      ? `Posted the week's digest to the channel on ${named.join(" and ")}`
+      : "Posted the week's digest";
+  },
   "session.trendRecorded": (p) =>
     `Recorded the trend for this objective as ${asString(p.trend, "unknown")}`,
   "session.shiftsRecorded": () =>

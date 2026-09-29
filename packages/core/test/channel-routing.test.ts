@@ -101,6 +101,135 @@ describe("which channel", () => {
   });
 });
 
+/**
+ * A rule's own channel (P6-G21, completeness review M-23).
+ *
+ * The override was taken on trust: the reachability check looked at the
+ * member's primary channel and never at the channel the rule named, so a rule
+ * routed to Slack for a member who had never linked Slack was queued to Slack
+ * and suppressed by the driver. No email, and nothing saying why.
+ */
+describe("a rule's own channel", () => {
+  it("is honoured when the member can be reached on it", () => {
+    const delivery = resolveDelivery({
+      member: member({ verifiedProviders: ["slack"] }),
+      urgent: false,
+      connectedProviders: ["slack"],
+      channelOverride: "slack",
+      now: NOW,
+    });
+    expect(delivery.channel).toBe("slack");
+    expect(delivery.fallbackReason).toBeUndefined();
+  });
+
+  it("falls back to email when the member has not linked the override's provider", () => {
+    const delivery = resolveDelivery({
+      member: member(),
+      urgent: false,
+      connectedProviders: ["slack"],
+      channelOverride: "slack",
+      now: NOW,
+    });
+    expect(delivery.channel).toBe("email");
+    expect(delivery.fallbackReason).toMatch(/routed to slack/);
+    expect(delivery.fallbackReason).toMatch(/has not linked their slack/);
+  });
+
+  it("falls back to email when the workspace never connected the override's provider", () => {
+    const delivery = resolveDelivery({
+      member: member({ verifiedProviders: ["teams"] }),
+      urgent: false,
+      connectedProviders: [],
+      channelOverride: "teams",
+      now: NOW,
+    });
+    expect(delivery.channel).toBe("email");
+    expect(delivery.fallbackReason).toMatch(/teams is not connected/);
+  });
+
+  it("falls back to the member's own channel when that one works", () => {
+    // The workspace's choice could not be honoured, so the member's is the
+    // next best thing the product knows. Email is where that route ends, not
+    // where it starts.
+    const delivery = resolveDelivery({
+      member: member({ primaryChannel: "slack", verifiedProviders: ["slack"] }),
+      urgent: false,
+      connectedProviders: ["slack", "teams"],
+      channelOverride: "teams",
+      now: NOW,
+    });
+    expect(delivery.channel).toBe("slack");
+    expect(delivery.fallbackReason).toMatch(/has not linked their teams/);
+  });
+
+  it("ends with email when neither the override nor the member's own channel works", () => {
+    const delivery = resolveDelivery({
+      member: member({ primaryChannel: "telegram" }),
+      urgent: false,
+      connectedProviders: ["slack"],
+      channelOverride: "slack",
+      now: NOW,
+    });
+    expect(delivery.channel).toBe("email");
+    // Both problems, because both are somebody's to fix.
+    expect(delivery.fallbackReason).toMatch(/slack/);
+    expect(delivery.fallbackReason).toMatch(/telegram is not connected/);
+  });
+
+  it("keeps a member who asked for in-app only in the product when the override cannot reach them", () => {
+    const delivery = resolveDelivery({
+      member: member({ primaryChannel: "app" }),
+      urgent: false,
+      connectedProviders: ["slack"],
+      channelOverride: "slack",
+      now: NOW,
+    });
+    expect(delivery.channel).toBe("in_app");
+    expect(delivery.fallbackReason).toMatch(/routed to slack/);
+  });
+
+  it("needs nothing for an override to email, whatever the member's own channel is", () => {
+    // Not a fallback: the rule asked for email and email is what it got. The
+    // member's broken Slack is not this message's problem.
+    const delivery = resolveDelivery({
+      member: member({ primaryChannel: "slack" }),
+      urgent: false,
+      connectedProviders: [],
+      channelOverride: "email",
+      now: NOW,
+    });
+    expect(delivery.channel).toBe("email");
+    expect(delivery.fallbackReason).toBeUndefined();
+  });
+
+  it("keeps an override to in-app inside the product", () => {
+    const delivery = resolveDelivery({
+      member: member({ primaryChannel: "slack", verifiedProviders: ["slack"] }),
+      urgent: false,
+      connectedProviders: ["slack"],
+      channelOverride: "app",
+      now: NOW,
+    });
+    expect(delivery.channel).toBe("in_app");
+    expect(delivery.fallbackReason).toBeUndefined();
+  });
+
+  it("still defers inside quiet hours whichever channel it lands on", () => {
+    const delivery = resolveDelivery({
+      member: member({
+        quietHours: { start: "22:00", end: "07:00" },
+        localTime: { hour: 2, minute: 0 },
+      }),
+      urgent: false,
+      connectedProviders: ["slack"],
+      channelOverride: "slack",
+      now: NOW,
+    });
+    expect(delivery.channel).toBe("email");
+    expect(delivery.sendAt.getTime()).toBeGreaterThan(NOW.getTime());
+  });
+});
+
 describe("when", () => {
   const night = { start: "22:00", end: "07:00" };
 

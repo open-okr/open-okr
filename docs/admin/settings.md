@@ -30,6 +30,7 @@ no administrator overrides it.
 | `teamVoting` | On | The confidence round in the weekly session, with a vote per member |
 | `coachStrictness` | Set by the registry | How hard the Coach pushes on quality |
 | `defaultCheckInFrequency` | Set by the registry | How often a new goal in this space expects a check-in |
+| `slackChannel`, `teamsChannel` | None | The channel the space's weekly digest is posted to, as Slack's or Teams' own channel ID rather than its name. Offered only for a provider the workspace has connected, and the bot has to be a member of the channel. The coordinator posts each closed week's digest from the session, once per channel |
 
 ## Member
 

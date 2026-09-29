@@ -397,6 +397,11 @@ export function NudgeRuleCards({
             <p className="text-sm text-ink-3">
               {t("admin.nudges.ruleCards.everyTriggerMethodMd")}
             </p>
+            {/* What a channel override does when it cannot reach somebody
+                (completeness review M-23), said where the override is set. */}
+            <p className="text-xs text-ink-3">
+              {t("admin.nudges.ruleCards.channelFallsBack")}
+            </p>
           </div>
         </CardHeader>
         <CardBody className="flex flex-col">

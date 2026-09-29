@@ -117,6 +117,12 @@ export interface OutboxHandlerDeps {
     /** The approved template, for a provider that will carry nothing else. */
     readonly templateKey?: string;
     readonly templateParameters?: readonly string[];
+    /**
+     * The provider's own channel id, for a post to a space's channel rather
+     * than to a member (completeness review M-23). Present exactly when
+     * `memberId` is null, and the host sends it with `sendToChannel`.
+     */
+    readonly target?: string;
     readonly idempotencyKey: string;
   }) => Promise<{
     readonly delivered: boolean;
@@ -468,9 +474,14 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     buttons?: unknown;
     templateKey?: unknown;
     templateParameters?: unknown;
+    target?: unknown;
   };
   const text = asString(payload.text);
   const templateKey = asString(payload.templateKey);
+  // A post to a space's own channel names where it goes and nobody it is for
+  // (M-23). Only ever read on a row with no member: a member's message goes to
+  // their own identity, whatever its payload says.
+  const target = row.memberId === null ? asString(payload.target) : null;
   // **A template message has no text, and that is not an empty message**
   // (P5-T04b-b). WhatsApp outside its conversation window carries the approved
   // template and nothing else, so the row is a template name and its filled-in
@@ -503,6 +514,7 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
             templateParameters: payload.templateParameters as readonly string[],
           }
         : {}),
+      ...(target ? { target } : {}),
       idempotencyKey: row.idempotencyKey,
     })
     // A driver that throws is a failed send, not a crashed relay. The row
@@ -555,7 +567,12 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     // anybody on this provider goes to email and its owner is told once that
     // it needs reconnecting. Without this the same send would fail again every
     // hour and nobody would ever be told why.
-    if (row.provider !== "email") {
+    //
+    // **Not for a post to a space's channel** (M-23). The bot not being in
+    // one team's channel is that space's link being wrong, not the
+    // connection: marking it broken would move every member of the workspace
+    // off Slack because one space pasted the wrong id. The row says why.
+    if (row.provider !== "email" && !target) {
       // openokr:allow-mutation: the delivery side of the outbox, recording
       // what a driver just reported. Not a domain write.
       await withWorkspace(db, workspaceId, (tx) =>

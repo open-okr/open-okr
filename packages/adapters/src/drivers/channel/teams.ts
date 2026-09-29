@@ -37,6 +37,7 @@ import type {
   DeliveryResult,
   InboundMessage,
   InboundRequest,
+  InboundSubmission,
 } from "../../ports/channel.ts";
 
 /** Where a bot's outbound token comes from. */
@@ -287,6 +288,35 @@ export class TeamsChannel implements Channel {
     target: string,
     message: ChannelMessage,
   ): Promise<DeliveryResult> {
+    return this.#post(target, toActivity(message));
+  }
+
+  /**
+   * Sends a card the caller built, such as the check-in form (completeness
+   * review M-23).
+   *
+   * Not on the `Channel` port, for the reason Slack's `openView` is not: a
+   * port method two of the four providers cannot honour is a port that lies.
+   * `text` is the preview a notification shows and what a client that cannot
+   * draw the card falls back to.
+   */
+  async sendCard(
+    target: string,
+    card: Record<string, unknown>,
+    text: string,
+  ): Promise<DeliveryResult> {
+    return this.#post(target, {
+      type: "message",
+      textFormat: "markdown",
+      text,
+      attachments: [{ contentType: ADAPTIVE_CARD_TYPE, content: card }],
+    });
+  }
+
+  async #post(
+    target: string,
+    activity: Record<string, unknown>,
+  ): Promise<DeliveryResult> {
     if (!this.#serviceUrl) {
       // Not a failure: a workspace whose bot has never been spoken to has no
       // endpoint to send to, and there is no way to discover one. Saying so is
@@ -306,7 +336,7 @@ export class TeamsChannel implements Channel {
         authorization: `Bearer ${token}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify(toActivity(message)),
+      body: JSON.stringify(activity),
     });
 
     if (response.status === 403 || response.status === 404) {
@@ -530,6 +560,17 @@ export function stripMentions(text: string): string {
 /** The schema version every card below declares. */
 const ADAPTIVE_CARD_VERSION = "1.5";
 
+/** What an activity's attachment says it is when it carries a card. */
+const ADAPTIVE_CARD_TYPE = "application/vnd.microsoft.card.adaptive";
+
+/**
+ * What the check-in card's submit carries to say it is the check-in card.
+ *
+ * The same name Slack's modal uses as its `callback_id`, so the two forms are
+ * recognisably one thing in a log.
+ */
+const CHECK_IN_FORM = "openokr_check_in";
+
 /**
  * One message as an adaptive card (P5-T03b).
  *
@@ -606,10 +647,145 @@ export function toActivity(message: ChannelMessage): Record<string, unknown> {
     text: message.text,
     attachments: [
       {
-        contentType: "application/vnd.microsoft.card.adaptive",
+        contentType: ADAPTIVE_CARD_TYPE,
         content: toAdaptiveCard(message),
       },
     ],
+  };
+}
+
+/**
+ * The check-in form, as an adaptive card (AI-NATIVE-PLAN §5.3, completeness
+ * review M-23).
+ *
+ * §5.3 asks for "a modal on Slack and Teams". Slack's is `checkInView`; this is
+ * Teams' equivalent, the same three questions in METHOD.md §3.2's order in one
+ * card, so a member sees them all at once and can change an answer before
+ * sending. Both end in the one registry write the conversational path uses.
+ *
+ * **The key results are not on the form**, for the reason they are not on
+ * Slack's: a form that dropped a number somebody typed would be worse than
+ * one that never asked, and until both forms carry them the values stay with
+ * the conversational path and the browser.
+ *
+ * **The submit carries the goal.** Teams hands the answers back as an activity
+ * with no memory of which card they came from, so the card says so itself.
+ * Nothing is trusted from it: the write runs as the member who pressed it, and
+ * `can()` decides whether they may check that goal in.
+ *
+ * The words are English, as every chat message this product sends is today.
+ */
+export function checkInCard(input: {
+  readonly goalId: string;
+  readonly goalTitle: string;
+  readonly statuses: readonly string[];
+}): Record<string, unknown> {
+  return {
+    type: "AdaptiveCard",
+    $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+    version: ADAPTIVE_CARD_VERSION,
+    body: [
+      {
+        type: "TextBlock",
+        text: input.goalTitle,
+        weight: "Bolder",
+        wrap: true,
+      },
+      {
+        type: "Input.ChoiceSet",
+        id: "status",
+        label: "How is it going?",
+        style: "compact",
+        isRequired: true,
+        errorMessage: "Choose how it is going.",
+        choices: input.statuses.map((status) => ({
+          title: status.replace(/_/g, " "),
+          value: status,
+        })),
+      },
+      {
+        type: "Input.Number",
+        id: "confidence",
+        label: "How confident are you it lands, 0 to 10?",
+        min: 0,
+        max: 10,
+        isRequired: true,
+        errorMessage: "A number from 0 to 10.",
+      },
+      {
+        type: "Input.Text",
+        id: "narrative",
+        label: "One line on why",
+        isMultiline: true,
+        isRequired: true,
+        errorMessage: "Say a line about why.",
+      },
+    ],
+    actions: [
+      {
+        type: "Action.Submit",
+        title: "Publish",
+        data: { form: CHECK_IN_FORM, goal: input.goalId },
+      },
+    ],
+  };
+}
+
+/**
+ * Reads a submitted check-in card, or null when this activity is not one.
+ *
+ * Teams merges every input's answer into the activity's `value` beside the
+ * submit's own `data`, so `form` and `goal` are the card's markers and the rest
+ * are answers. Flattened to strings here because that is provider knowledge:
+ * a client may send a number input as a number, and `packages/core` should
+ * receive one answer per field in one shape, as it does from Slack.
+ *
+ * Only ever called on bytes `verifyInbound` has accepted.
+ */
+export function parseCardSubmission(payload: string): InboundSubmission | null {
+  let activity: Record<string, unknown>;
+  try {
+    activity = JSON.parse(payload) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (activity.type !== "message") {
+    return null;
+  }
+  const value = activity.value as Record<string, unknown> | undefined;
+  if (
+    !value ||
+    typeof value !== "object" ||
+    value.form !== CHECK_IN_FORM ||
+    typeof value.goal !== "string" ||
+    value.goal === ""
+  ) {
+    return null;
+  }
+  const conversation = activity.conversation as
+    | Record<string, unknown>
+    | undefined;
+  if (typeof conversation?.id !== "string" || conversation.id === "") {
+    return null;
+  }
+
+  const fields: Record<string, string> = {};
+  for (const [name, answer] of Object.entries(value)) {
+    if (name === "form" || name === "goal") {
+      continue;
+    }
+    if (typeof answer === "string") {
+      fields[name] = answer;
+    } else if (typeof answer === "number" && Number.isFinite(answer)) {
+      fields[name] = String(answer);
+    }
+  }
+
+  return {
+    provider: "teams",
+    externalSenderId: conversation.id,
+    reference: value.goal,
+    fields,
   };
 }
 

@@ -22,25 +22,124 @@ import {
   Chip,
   useTranslations,
 } from "@openokr/ui";
-import { Sparkles } from "lucide-react";
-import { useCallback, useState } from "react";
-import { narrateDigestAction } from "./actions";
+import { Send, Sparkles } from "lucide-react";
+import { useCallback, useState, useTransition } from "react";
+import { narrateDigestAction, postDigestAction } from "./actions";
 
 export interface WeeklyDigest {
   readonly weekStart: string;
   readonly lines: readonly string[];
+  /** Providers this digest was posted to on its space's channel (M-23). */
+  readonly postedTo?: readonly string[];
+  /** Providers it can be posted to now: linked on the space and connected. */
+  readonly postableTo?: readonly string[];
+}
+
+/** A provider as a person reads it. Brand names, the same in every language. */
+const providerName = (provider: string): string =>
+  provider === "teams" ? "Teams" : provider === "slack" ? "Slack" : provider;
+
+/**
+ * Posting the digest to the space's own channel (UIUX-PLAN S-22 step 4,
+ * completeness review M-23).
+ *
+ * **Offered only where it will post somewhere.** The read says which providers
+ * the space links a channel on and the workspace has connected, and an empty
+ * list draws no button: a control that can only answer "nowhere to post" is a
+ * question the space settings card asks better. The action refuses on its own
+ * whatever this shows.
+ */
+function PostToChannel({
+  sessionId,
+  postableTo,
+  postedTo,
+}: {
+  readonly sessionId: string;
+  readonly postableTo: readonly string[];
+  readonly postedTo: readonly string[];
+}) {
+  const { t } = useTranslations();
+  const [pending, start] = useTransition();
+  const [said, setSaid] = useState<{
+    readonly tone: "ok" | "bad";
+    readonly text: string;
+  } | null>(null);
+
+  const already = postedTo.map(providerName).join(", ");
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-line pt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          disabled={pending}
+          data-testid="post-digest"
+          onClick={() => {
+            setSaid(null);
+            start(async () => {
+              const result = await postDigestAction(sessionId);
+              if ("error" in result) {
+                setSaid({ tone: "bad", text: result.error });
+                return;
+              }
+              const posted = result.posted.map(providerName).join(", ");
+              const before = result.alreadyPosted.map(providerName).join(", ");
+              setSaid({
+                tone: "ok",
+                text:
+                  posted !== ""
+                    ? t("session.detail.digest.postedTo", { channels: posted })
+                    : t("session.detail.digest.alreadyPostedTo", {
+                        channels: before,
+                      }),
+              });
+            });
+          }}
+        >
+          <Send className="size-3" />
+          {pending
+            ? t("session.detail.digest.posting")
+            : t("session.detail.digest.postToChannel")}
+        </Button>
+        {already !== "" && said === null ? (
+          <span className="text-xs text-ink-3">
+            {t("session.detail.digest.alreadyPostedTo", { channels: already })}
+          </span>
+        ) : null}
+      </div>
+      <p className="text-xs text-ink-4">
+        {t("session.detail.digest.postsTo", {
+          channels: postableTo.map(providerName).join(", "),
+        })}
+      </p>
+      {said ? (
+        <p
+          role={said.tone === "bad" ? "alert" : "status"}
+          data-testid="post-digest-result"
+          className={`text-xs ${said.tone === "bad" ? "text-bad" : "text-ok"}`}
+        >
+          {said.text}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function Digest({
   sessionId,
   digest,
   assistAvailable,
+  canPost = false,
 }: {
   readonly sessionId: string;
   /** Null before step 4 has produced one. */
   readonly digest: WeeklyDigest | null;
   /** Whether a provider can narrate at all. False is the normal case. */
   readonly assistAvailable: boolean;
+  /**
+   * Whether this reader may post it now: the facilitator, after the close
+   * (M-23). The action decides independently.
+   */
+  readonly canPost?: boolean;
 }) {
   const { t } = useTranslations();
 
@@ -122,6 +221,14 @@ export function Digest({
         </ul>
 
         {notice ? <p className="text-xs text-ink-4">{notice}</p> : null}
+
+        {canPost && (digest.postableTo?.length ?? 0) > 0 ? (
+          <PostToChannel
+            sessionId={sessionId}
+            postableTo={digest.postableTo ?? []}
+            postedTo={digest.postedTo ?? []}
+          />
+        ) : null}
       </CardBody>
     </Card>
   );

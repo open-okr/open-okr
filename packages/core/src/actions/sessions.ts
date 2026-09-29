@@ -166,7 +166,13 @@ function stageKeysFor(kind: string): readonly string[] | null {
   }
 }
 
-async function requireSessionAccess(
+/**
+ * One session, authorised through its space, or not-found.
+ *
+ * Exported for `sessions.postDigest` (completeness review M-23), which lives in
+ * its own file and must refuse exactly as the note beside it does.
+ */
+export async function requireSessionAccess(
   tx: OperationTx,
   workspaceId: string,
   memberId: string,

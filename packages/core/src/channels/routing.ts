@@ -73,31 +73,42 @@ export interface Delivery {
 }
 
 /**
- * Whether the member's primary channel can actually be reached.
+ * Whether one channel can actually reach this member.
  *
  * Three separate ways it cannot, and they are different facts: the workspace
  * never connected the provider, the member never linked their account, or the
  * member asked for in-app only. Naming which one is what lets the settings
  * screen tell them the useful half.
+ *
+ * Asked of whichever channel the message is headed for, the member's own or a
+ * rule's (completeness review M-23). It used to be asked of the member's own
+ * channel only, so a rule routed to Slack reached Slack for a member who had
+ * never linked it, and the driver dropped it there with nobody told.
  */
-function primaryChannelProblem(input: RoutingInput): string | null {
-  const primary = input.member.primaryChannel;
-  if (primary === "app") {
+function channelProblem(
+  channel: PrimaryChannel,
+  input: RoutingInput,
+): string | null {
+  if (channel === "app") {
     return null;
   }
-  if (primary === "email") {
+  if (channel === "email") {
     // Email needs no connection and no identity: it is the instance's own mail
     // settings and every member has an address.
     return null;
   }
-  if (!input.connectedProviders.includes(primary)) {
-    return `${primary} is not connected for this workspace`;
+  if (!input.connectedProviders.includes(channel)) {
+    return `${channel} is not connected for this workspace`;
   }
-  if (!input.member.verifiedProviders.includes(primary)) {
-    return `this member has not linked their ${primary} account`;
+  if (!input.member.verifiedProviders.includes(channel)) {
+    return `this member has not linked their ${channel} account`;
   }
   return null;
 }
+
+/** Where a channel that can be reached sends the message. */
+const deliveryChannelOf = (channel: PrimaryChannel): DeliveryChannel =>
+  channel === "app" ? "in_app" : channel;
 
 /**
  * The channel and the time.
@@ -106,22 +117,41 @@ function primaryChannelProblem(input: RoutingInput): string | null {
  * quiet-hours delay is applied to whatever was chosen, so a member whose Slack
  * is unreachable at two in the morning gets an email at seven rather than a
  * Slack message at seven that still cannot be delivered.
+ *
+ * **A rule's own channel is checked exactly as the member's is** (completeness
+ * review M-23). When it can reach them it wins. When it cannot, the message
+ * falls through to the member's own route, which is the default route and
+ * ends where §5.2 says every channel's fallback is: email. The member's own
+ * channel comes before email because it is the one other thing the product
+ * knows about where this person reads, and a member who asked for in-app only
+ * stays in the product rather than being mailed because a rule could not
+ * reach them somewhere else.
  */
 export function resolveDelivery(input: RoutingInput): Delivery {
-  const problem = primaryChannelProblem(input);
-  // The rule's channel when the workspace named one, the member's otherwise.
-  // A rule override is a routing decision about the message; the member's
-  // quiet hours below are a decision about the person, and the override does
-  // not touch those.
-  const primary = input.channelOverride ?? input.member.primaryChannel;
+  const override = input.channelOverride ?? null;
+  const overrideProblem = override ? channelProblem(override, input) : null;
 
-  const channel: DeliveryChannel =
-    primary === "app"
-      ? "in_app"
-      : problem
-        ? // Email, the always-available baseline, rather than nothing.
-          "email"
-        : primary;
+  let channel: DeliveryChannel;
+  const reasons: string[] = [];
+  if (override && !overrideProblem) {
+    // A rule override is a routing decision about the message; the member's
+    // quiet hours below are a decision about the person, and the override
+    // does not touch those.
+    channel = deliveryChannelOf(override);
+  } else {
+    if (override && overrideProblem) {
+      reasons.push(
+        `this rule is routed to ${override}, but ${overrideProblem}`,
+      );
+    }
+    const primary = input.member.primaryChannel;
+    const primaryProblem = channelProblem(primary, input);
+    if (primaryProblem) {
+      reasons.push(primaryProblem);
+    }
+    // Email, the always-available baseline, rather than nothing.
+    channel = primaryProblem ? "email" : deliveryChannelOf(primary);
+  }
 
   const minutes = deferralFor({
     urgent: input.urgent,
@@ -134,7 +164,7 @@ export function resolveDelivery(input: RoutingInput): Delivery {
   return {
     channel,
     sendAt,
-    ...(problem ? { fallbackReason: problem } : {}),
+    ...(reasons.length > 0 ? { fallbackReason: reasons.join("; ") } : {}),
   };
 }
 

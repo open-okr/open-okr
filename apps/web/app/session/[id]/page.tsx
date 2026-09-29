@@ -347,6 +347,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
     lines: string[];
     /** What the coordinator added for leadership (P6-G19b). */
     note: string | null;
+    /** Where it has been posted, and where it could be now (M-23). */
+    postedTo: string[];
+    postableTo: string[];
   }
   let weeklyDigest: WeeklyDigestRead | null = null;
   let digestAssistAvailable = false;
@@ -702,6 +705,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           sessionId={id}
           digest={weeklyDigest}
           assistAvailable={digestAssistAvailable}
+          // After the close, like the note: the digest row is the close's,
+          // and the figures move until then (M-23).
+          canPost={sessionRow.state === "closed" && isFacilitator}
         />
       )}
 

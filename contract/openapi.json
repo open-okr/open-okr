@@ -16499,12 +16499,26 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "slackChannel": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "teamsChannel": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
                             }
                           },
                           "required": [
                             "teamVoting",
                             "coachStrictness",
-                            "defaultCheckInFrequency"
+                            "defaultCheckInFrequency",
+                            "slackChannel",
+                            "teamsChannel"
                           ],
                           "additionalProperties": false
                         }
@@ -16797,7 +16811,7 @@
     "/spaces/updateSettings": {
       "post": {
         "operationId": "spaces.updateSettings",
-        "summary": "Sets one space's team voting, strictness override and default check-in frequency.",
+        "summary": "Sets one space's team voting, strictness override, default check-in frequency and the Slack or Teams channel it posts to.",
         "tags": [
           "spaces"
         ],
@@ -16899,6 +16913,32 @@
                           "monthly",
                           "quarterly"
                         ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "slackChannel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "pattern": "^\\S+$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "teamsChannel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "pattern": "^\\S+$"
                       },
                       {
                         "type": "null"
@@ -42344,6 +42384,108 @@
         }
       }
     },
+    "/sessions/postDigest": {
+      "post": {
+        "operationId": "sessions.postDigest",
+        "summary": "Posts a closed weekly session's digest to the Slack or Teams channel its space is linked to, once per channel.",
+        "tags": [
+          "sessions"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "posted": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "slack",
+                              "teams"
+                            ]
+                          }
+                        },
+                        "alreadyPosted": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "slack",
+                              "teams"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "posted",
+                        "alreadyPosted"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "sessionId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/readStreak": {
       "get": {
         "operationId": "sessions.readStreak",
@@ -42477,13 +42619,27 @@
                                 "string",
                                 "null"
                               ]
+                            },
+                            "postedTo": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "postableTo": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             }
                           },
                           "required": [
                             "weekStart",
                             "lines",
                             "numbers",
-                            "note"
+                            "note",
+                            "postedTo",
+                            "postableTo"
                           ],
                           "additionalProperties": false
                         },

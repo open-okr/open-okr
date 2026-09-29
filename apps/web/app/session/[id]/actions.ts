@@ -1,8 +1,15 @@
 "use server";
 
-import { callAction, richTextFromPlainText } from "@openokr/core";
+import { loadEnv } from "@openokr/config";
+import {
+  callAction,
+  OperationError,
+  richTextFromPlainText,
+} from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getInstanceName } from "../../../lib/instance-name";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 export async function openSessionAction(sessionId: string) {
@@ -667,6 +674,48 @@ export async function narrateDigestAction(sessionId: string) {
     "sessions.narrateDigest",
     { sessionId },
   );
+}
+
+/**
+ * Posts the closed week's digest to the space's own channel (UIUX-PLAN S-22
+ * step 4, completeness review M-23).
+ *
+ * The instance's address and name go on the context so the post carries a
+ * link back to this session under the name the operator gave the instance.
+ * A refusal comes back as its sentence rather than a thrown error, because
+ * "this space links no channel" is something the person pressing should read.
+ */
+export async function postDigestAction(
+  sessionId: string,
+): Promise<
+  | { readonly posted: string[]; readonly alreadyPosted: string[] }
+  | { readonly error: string }
+> {
+  const { session, workspace } = await requireWorkspace();
+  try {
+    const result = await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human", userId: session.user.id },
+        baseUrl: loadEnv().BETTER_AUTH_URL,
+        instanceName: await getInstanceName(),
+      },
+      "sessions.postDigest",
+      { sessionId },
+    );
+    revalidatePath(`/session/${sessionId}`);
+    return {
+      posted: [...result.posted],
+      alreadyPosted: [...result.alreadyPosted],
+    };
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    const { t } = await getTranslations();
+    return { error: t("session.detail.digest.postFailed") };
+  }
 }
 
 /**
