@@ -50,8 +50,8 @@ import {
   parseTelegramSecret,
   parseWhatsAppSecret,
 } from "@openokr/core";
-import { providerForTier } from "./ai-provider";
 import { drafterFor } from "./drafter";
+import { embedFor } from "./embedder";
 import { getInstanceName } from "./instance-name";
 import { getMailSettings, mailerFrom } from "./mail";
 import { getPool } from "./pool";
@@ -74,46 +74,6 @@ const logError = (message: string): void => {
 
 const reason = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
-
-/**
- * The embedding function for one workspace, or null.
- *
- * **Resolved per delivery rather than once at start.** A provider key is a
- * setting somebody can add at three in the afternoon, and a relay that resolved
- * its provider at boot would ignore it until the next restart.
- *
- * Null is an ordinary answer, not a failure: the chunk is stored with no
- * vector, full-text retrieval keeps working, and the vector fills in when a
- * provider arrives and the content next changes.
- */
-async function embedFor(workspaceId: string) {
-  // Whichever provider the workspace routes the embed tier to, rather than
-  // OpenRouter always (completeness review H-27). An unpriced model is still
-  // refused: an unmetered embedding loop is the one place a runaway cost would
-  // not show until the bill.
-  const routed = await providerForTier(workspaceId, "embed");
-  if (!routed) {
-    return undefined;
-  }
-  // Embedding is the search index being built, which a workspace can keep
-  // here (M-10). Asked before the first chunk rather than refused on every
-  // one: the chunk is stored with no vector, full-text search keeps working,
-  // and the guard around the provider would refuse the call regardless.
-  if (!routed.provider.permits("retrieval")) {
-    return undefined;
-  }
-  return async (inputs: readonly string[]) => {
-    const result = await routed.provider.embed({
-      model: routed.modelId,
-      input: [...inputs],
-    });
-    return {
-      vectors: result.vectors,
-      dimensions: result.dimensions,
-      model: routed.modelId,
-    };
-  };
-}
 
 /**
  * What one delivery is handed.

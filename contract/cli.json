@@ -4574,6 +4574,29 @@
       "pages": false
     },
     {
+      "name": "search entities",
+      "action": "search.entities",
+      "method": "GET",
+      "path": "/search/entities",
+      "scope": "read",
+      "summary": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+      "flags": [
+        {
+          "name": "text",
+          "field": "text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "exports list",
       "action": "exports.list",
       "method": "POST",

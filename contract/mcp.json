@@ -6404,6 +6404,37 @@
       }
     },
     {
+      "name": "search.entities",
+      "description": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "text": "…"
+      }
+    },
+    {
       "name": "exports.list",
       "description": "One list as a CSV file, matching the rows and columns the screen shows. Audited.",
       "inputSchema": {

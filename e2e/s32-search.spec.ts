@@ -13,6 +13,12 @@
  * proves is that ⌘K opens on any screen, that the arrows and Enter work, and
  * that the file a person downloads has the rows the screen showed.
  *
+ * **The palette's groups since completeness review M-21:** Go to, the search
+ * results, Related when an AI provider is on, and Actions. What each read
+ * offers a guest or a reader outside a space is proved in
+ * `packages/core/test/search-palette.test.ts`, and the keyboard in jsdom in
+ * `apps/web/test/command-palette.test.tsx`.
+ *
  * **The index is written by the outbox, and a relay drains it.** The specs run
  * against the standalone server, which runs the relay, so the row a write
  * enqueues is indexed a moment later. The waits below are for that, not for the
@@ -150,32 +156,120 @@ async function openPalette() {
   }).toPass({ timeout: 20_000 });
 }
 
+/**
+ * Presses the down arrow until the row the palette has active holds this text,
+ * which is how a keyboard user reaches a row that is not first (M-21).
+ *
+ * The palette now lists a phrase's matches under Go to, then the search
+ * results, then the actions, so the row a spec wants is not always the first
+ * one. Fails rather than pressing Enter on whichever row it stopped at.
+ */
+async function arrowTo(text: string) {
+  const active = page.locator('[role="option"][aria-selected="true"]');
+  for (let presses = 0; presses < 40; presses += 1) {
+    if (((await active.textContent()) ?? "").includes(text)) {
+      return;
+    }
+    await page.keyboard.press("ArrowDown");
+  }
+  throw new Error(`No palette row holds "${text}".`);
+}
+
+const paletteInput = () =>
+  page.getByRole("combobox", { name: "Search everything" });
+
 test("acceptance: the palette opens anywhere, and the keyboard drives it", async () => {
   await goTo(page, "/");
   await openPalette();
 
   const word = goalTitle.split(" ").find((one) => one.length > 4) ?? goalTitle;
-  await page.getByRole("textbox", { name: "Search everything" }).fill(word);
+  await paletteInput().fill(word);
   await expect(page.getByTestId("palette-results")).toContainText(goalTitle, {
     timeout: 15_000,
   });
 
-  // Arrow to the first row and open it, which is the whole point of a palette.
+  // Arrow to the goal's row and open it, which is the whole point of a
+  // palette.
+  await arrowTo(goalTitle);
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/goals\//, { timeout: 15_000 });
   await expect(page.getByTestId("palette")).toHaveCount(0);
 });
 
+test("acceptance: a short identifier opens the KPI it names", async () => {
+  const kpi = (
+    await pool.query<{ id: string; short_id: string; title: string }>(
+      `select id, short_id, title from kpis
+        where workspace_id = $1 and deleted_at is null
+        order by created_at limit 1`,
+      [workspaceId],
+    )
+  ).rows[0];
+  test.skip(!kpi, "No KPI in this instance to jump to.");
+  if (!kpi) {
+    return;
+  }
+
+  await goTo(page, "/");
+  await openPalette();
+  await paletteInput().fill(kpi.short_id);
+  // The code's own answer is the first row under Go to.
+  await expect(page.getByTestId("palette-group-goTo")).toContainText(
+    kpi.title,
+    { timeout: 15_000 },
+  );
+  await arrowTo(kpi.title);
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(new RegExp(`/kpis/${kpi.id}`), {
+    timeout: 15_000,
+  });
+});
+
+test("the jump finds a name before the last letter is typed", async () => {
+  await goTo(page, "/");
+  await openPalette();
+
+  // Full text wants whole words, so this is a phrase only the jump by name
+  // can answer (completeness review M-21). Before it, the palette found a KPI
+  // by its code and nothing else by the start of a name.
+  await paletteInput().fill(goalTitle.slice(0, -1));
+  await expect(page.getByTestId("palette-group-goTo")).toContainText(
+    goalTitle,
+    { timeout: 15_000 },
+  );
+
+  // With no AI provider there is no Related group, and nothing says AI.
+  await expect(page.getByTestId("palette-group-related")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+});
+
+test("before a word is typed the palette offers its actions, and one opens a page", async () => {
+  await goTo(page, "/");
+  await openPalette();
+
+  const actions = page.getByTestId("palette-group-actions");
+  await expect(actions).toBeVisible();
+  await expect(actions).toContainText("Scorecard");
+
+  // Typing narrows the actions to the ones whose name holds every word.
+  await paletteInput().fill("where to reach");
+  await expect(actions).toContainText("Where to reach you", {
+    timeout: 15_000,
+  });
+  await arrowTo("Where to reach you");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/account\/channels/, { timeout: 15_000 });
+  await expect(page.getByTestId("palette")).toHaveCount(0);
+});
+
 test("escape closes it and it forgets what was typed", async () => {
   await openPalette();
-  await page.getByRole("textbox", { name: "Search everything" }).fill("hello");
+  await paletteInput().fill("hello");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("palette")).toHaveCount(0);
 
   await openPalette();
-  await expect(
-    page.getByRole("textbox", { name: "Search everything" }),
-  ).toHaveValue("");
+  await expect(paletteInput()).toHaveValue("");
   await page.keyboard.press("Escape");
 });
 

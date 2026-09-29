@@ -263,13 +263,70 @@ now and can have one from the first migration.
 
 ### 5.3 The palette
 
-Screen S-32. Entity jump by short identifier, actions from the registry, and
-recents. The actions it offers are the same registry entries the chat commands
-and the tools project, filtered by the reader's own access.
+Screen S-32. Entity jump by short identifier or name, actions, and search
+results, every one filtered by what the reader may open.
+
+**As built at completeness review M-21.** P5-T13 shipped a jump that reached a
+KPI by its short code and nothing else, no actions, and a search that never
+asked the semantic index. The palette now draws four groups:
+
+| Group | What it holds | Read | Shown |
+|---|---|---|---|
+| Go to | A KPI its short code names, then things of every kind whose name holds every typed word | `search.jump`, `search.entities` | When something matches |
+| Search results | Full-text matches not already under Go to | `search.query` with no embedding | When something matches |
+| Related | Semantic matches full text missed | `search.query` with the workspace's embedding function | Only when an AI provider is on and found something |
+| Actions | New objective, the theme switch, "search everything for", and every page the sidebar and the admin area offer this reader | None: each navigates, or calls an action that already exists | Always, and alone before anything is typed |
+
+| Kind the jump offers | Opens | Offered to |
+|---|---|---|
+| Goal, key result, KPI, initiative, task, document | Its page. A key result opens its goal at its own row | Whoever the index row's access context lets through |
+| Space | `/spaces/<id>` | View on the space's context, as `spaces.list` |
+| Session | `/session/<id>` | In the space, or a session with no space, as `sessions.read` |
+| Cycle | `/cycle?cycle=<id>` | View on the workspace's context, as `cycles.list` |
+| Person | `/people/<id>` | Every active member, as `people.directory` |
+
+**The actions are not the registry's entries, and that is a deviation from the
+line this section used to hold.** Nearly every registry action needs input a
+palette row cannot collect, so an action row either opens the page whose form
+collects it (New objective opens the drafting phase at its title field) or runs
+an action that needs none (the theme switch calls `people.updateOwnProfile`,
+the same write the avatar menu makes). No palette row is a new write path.
+
+**A session is stricter than the row that finds it.** The search index and the
+retrieval behind Related let a session through to anybody who can view its
+space, which is every member. A session, and a retro note, kudos, a learning or
+a next-cycle draft that opens one, is offered only to a reader in its space.
+The same rule now holds in `search.query`, so the search page follows it too.
+
+**The fast answer never waits on a model.** The jump and full text are one
+server action and the Related group is another, asked beside it, so a slow or
+failing provider delays or empties Related and nothing else. With no provider
+nothing is embedded and no Related group is drawn.
+
+**Not built, and still owed to UIUX-PLAN §3 and S-32:** recent items, and
+recents boosting the ranking, because nothing records what a member opened;
+and scoped tabs inside the palette, which the search page has as type filters.
+
+**A known limit at §13.1's scale.** The jump matches names with `ILIKE`, which
+no index serves. Measured on 29 September 2026 over 1.2 million titles in one
+workspace on the development machine: about 170 ms for a specific word and
+about 210 ms for a word 150,000 titles share, before the access
+filter runs on each match. A broad word can pass the 300 ms suggestion budget.
+A trigram index would serve it, and needs the `pg_trgm` extension, which is a
+deployment decision rather than this row's.
 
 **Given** any screen,
 **when** the palette is opened and a short identifier typed,
 **then** the entity opens inside the budget.
+
+**Given** a guest let into one task,
+**when** it types a word every goal, space, KPI and session in the workspace
+shares,
+**then** the palette offers that task and none of the rest.
+
+**Given** the AI provider is off,
+**when** a phrase is typed,
+**then** no embedding is asked for and no Related group is drawn.
 
 ### 5.4 Exports
 

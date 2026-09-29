@@ -336,7 +336,7 @@ import {
   proposeFromLearnings,
 } from "./review-assists.ts";
 import { narrateDigest, narrateTrend, readDigest } from "./rhythm-assists.ts";
-import { readPaletteJump, runSearch } from "./search.ts";
+import { findEntities, readPaletteJump, runSearch } from "./search.ts";
 import {
   addRetroNote,
   addReviewAction,
@@ -645,6 +645,7 @@ export const ACTION_MAP = {
   "attachments.detach": detachFile,
   "search.query": runSearch,
   "search.jump": readPaletteJump,
+  "search.entities": findEntities,
   "exports.list": exportList,
   "exports.mine": listMyExports,
   "imports.listRuns": listImportRuns,

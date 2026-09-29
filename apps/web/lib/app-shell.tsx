@@ -1,5 +1,10 @@
 import { loadEnv } from "@openokr/config";
-import { ACCESS_LEVELS, callAction, navigationFor } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  isCloudEnabled,
+  navigationFor,
+} from "@openokr/core";
 import {
   AppShell,
   CycleStrip,
@@ -19,12 +24,16 @@ import type { ComponentProps, ReactNode } from "react";
 import { AvatarMenu } from "../app/avatar-menu.tsx";
 import { copilotAvailabilityAction } from "../app/copilot/actions.ts";
 import { CopilotPanel } from "../app/copilot/copilot-panel.tsx";
-import { CommandPalette } from "../app/search/palette.tsx";
+import {
+  CommandPalette,
+  type PaletteDestination,
+} from "../app/search/palette.tsx";
 import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
+import { embedFor } from "./embedder";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { navBlocks, navLabel } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
@@ -142,6 +151,11 @@ export async function AppShellLayout({
   // trip, and so a provider-off workspace renders its own state on the server
   // instead of flashing an input it cannot use.
   const copilot = await copilotAvailabilityAction();
+  // The same question for the palette's Related group (completeness review
+  // M-21): asked here so a workspace with no embedding model, or one whose
+  // egress controls keep retrieval here (M-10), sends no request for it at
+  // all. Nothing is embedded by asking; this only resolves the provider.
+  const semantic = (await embedFor(workspace.workspaceId)) !== undefined;
 
   const path = (await headers()).get("x-openokr-path") ?? "/";
   const active = activeItemId(path, [
@@ -178,6 +192,31 @@ export async function AppShellLayout({
       })),
     }),
   );
+  // The pages the palette offers (completeness review M-21): the sidebar's,
+  // the account's and the administration cards, from the same registry and
+  // filtered by the same level, so the palette can open nothing the sidebar
+  // would not. A cloud-only card is left out on a self-hosted instance, as the
+  // admin layout leaves it out.
+  const cloud = adminItems.some((item) => item.cloudOnly)
+    ? await isCloudEnabled(getPool())
+    : false;
+  const paletteDestinations: PaletteDestination[] = [
+    ...sidebarItems.map((item) => ({
+      id: item.id,
+      label: navLabel(item, renamed),
+      href: item.href,
+      area: item.group === "account" ? ("account" as const) : ("page" as const),
+    })),
+    ...adminItems
+      .filter((item) => cloud || !item.cloudOnly)
+      .map((item) => ({
+        id: item.id,
+        label: item.label,
+        href: item.href,
+        area: "admin" as const,
+      })),
+  ];
+
   const tabItems = sidebarItems.slice(0, 4).map((item) => ({
     id: item.id,
     label: navLabel(item, renamed),
@@ -323,7 +362,11 @@ export async function AppShellLayout({
          * an overlay over the whole page. Mounted once here, so ⌘K works on every
          * screen without each one remembering to render it (P5-T13).
          */}
-        <CommandPalette />
+        <CommandPalette
+          destinations={paletteDestinations}
+          canCreateObjective={level >= ACCESS_LEVELS.edit}
+          semantic={semantic}
+        />
         {/* The Review count, kept current by the workspace's own feed
          * stream (completeness review M-32). Only for somebody who can
          * read the workspace, which is who the badge is drawn for. */}

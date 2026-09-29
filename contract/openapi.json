@@ -23281,6 +23281,121 @@
         ]
       }
     },
+    "/search/entities": {
+      "get": {
+        "operationId": "search.entities",
+        "summary": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+        "tags": [
+          "search"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "entityType": {
+                            "type": "string",
+                            "enum": [
+                              "goal",
+                              "key_result",
+                              "kpi",
+                              "space",
+                              "person",
+                              "initiative",
+                              "task",
+                              "document",
+                              "session",
+                              "cycle"
+                            ]
+                          },
+                          "entityId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "entityType",
+                          "entityId",
+                          "title",
+                          "href"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          }
+        ]
+      }
+    },
     "/exports/list": {
       "post": {
         "operationId": "exports.list",

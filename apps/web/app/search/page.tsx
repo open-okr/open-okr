@@ -5,6 +5,7 @@ import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Snippet } from "./palette.tsx";
+import { KIND_LABEL } from "./palette-groups.ts";
 
 /**
  * The search page (UIUX-PLAN.md §4 S-32, P5-T13).
@@ -19,37 +20,22 @@ import { Snippet } from "./palette.tsx";
  */
 
 /**
- * The types a reader can narrow to, and what to call each one: the plural on
- * the filter chip and the singular on a result. Both are catalogue keys, so a
- * translation never has to be derived by trimming an English plural.
+ * The types a reader can narrow to, and the plural on each filter chip. A
+ * result's singular comes from `KIND_LABEL`, which the palette reads too. Both
+ * are catalogue keys, so a translation never has to be derived by trimming an
+ * English plural.
  */
 const TYPES = [
-  { value: "goal", label: "search.objectives", one: "search.objective" },
-  {
-    value: "key_result",
-    label: "cycle.reviewAndLearn.keyResults",
-    one: "common.keyResult",
-  },
-  { value: "kpi", label: "common.count", one: "kpis.grid.kpi" },
-  {
-    value: "initiative",
-    label: "common.initiatives",
-    one: "search.initiative",
-  },
-  { value: "task", label: "search.tasks", one: "search.task" },
-  {
-    value: "document",
-    label: "documents.subjectDocuments.documents",
-    one: "search.document",
-  },
-  { value: "comment", label: "search.comments", one: "search.comment" },
-  { value: "check_in", label: "search.checkIns", one: "search.checkIn" },
-  { value: "session", label: "common.sessions", one: "search.session" },
+  { value: "goal", label: "search.objectives" },
+  { value: "key_result", label: "cycle.reviewAndLearn.keyResults" },
+  { value: "kpi", label: "common.count" },
+  { value: "initiative", label: "common.initiatives" },
+  { value: "task", label: "search.tasks" },
+  { value: "document", label: "documents.subjectDocuments.documents" },
+  { value: "comment", label: "search.comments" },
+  { value: "check_in", label: "search.checkIns" },
+  { value: "session", label: "common.sessions" },
 ] as const;
-
-const LABEL: Readonly<Record<string, string>> = Object.fromEntries(
-  TYPES.map((one) => [one.value, one.one]),
-);
 
 export default async function SearchPage({
   searchParams,
@@ -79,7 +65,7 @@ export default async function SearchPage({
 
   // A result's type in words, or the raw value for a type with no name here.
   const typeName = (entityType: string): string => {
-    const key = LABEL[entityType];
+    const key = KIND_LABEL[entityType];
     return key === undefined ? entityType : t(key);
   };
 
