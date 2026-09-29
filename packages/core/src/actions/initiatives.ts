@@ -24,6 +24,7 @@ import {
   CAPACITY_VERDICTS,
   goals,
   INITIATIVE_STATUSES,
+  includeDeleted,
   initiativeKeyResults,
   initiatives,
   keyResults,
@@ -874,6 +875,128 @@ export const deleteInitiative = defineWriteAction({
           targetType: "initiative",
           targetId: input.id,
           payload: {},
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * A deleted initiative this member may restore, or not-found (M-13).
+ *
+ * The getter first, against the initiative's own context, which a soft delete
+ * leaves standing. So the level asked here is the one the delete asked, and a
+ * member who could not see the live initiative cannot find the deleted one.
+ */
+async function requireDeletedInitiative(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  initiativeId: string,
+): Promise<{ readonly title: string; readonly deletedAt: Date }> {
+  await getAccessScoped(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "initiative",
+    resourceId: initiativeId,
+    requires: ACCESS_LEVELS.full,
+  });
+  // `includeDeleted` on purpose: this reads the row the default scope hides.
+  const [row] = await tx
+    .select({ title: initiatives.title, deletedAt: initiatives.deletedAt })
+    .from(initiatives)
+    .where(
+      includeDeleted(
+        initiatives,
+        eq(initiatives.workspaceId, workspaceId),
+        eq(initiatives.id, initiativeId),
+      ),
+    )
+    .limit(1);
+  if (!row) {
+    throw new OperationError(
+      "not_found",
+      "No such initiative, or you do not have access to it.",
+    );
+  }
+  if (!row.deletedAt) {
+    throw new OperationError(
+      "forbidden",
+      `The initiative "${row.title}" is not deleted, so there is nothing to restore.`,
+    );
+  }
+  return { title: row.title, deletedAt: row.deletedAt };
+}
+
+/**
+ * Brings a deleted initiative back, with the links it held (M-13).
+ *
+ * The delete stamps the initiative and its live links with one instant, so the
+ * links carrying that instant are the ones that went with it; a link removed
+ * earlier stays removed. Gate five is recomputed afterwards, because an
+ * initiative marked `exceeds` counts again the moment it is back.
+ */
+export const restoreInitiative = defineWriteAction({
+  name: "initiatives.restore",
+  summary:
+    "Brings back a deleted initiative and the key result links that were deleted with it.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid(), links: z.number().int() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async load({ tx, workspaceId, actor }) {
+      return requireDeletedInitiative(
+        tx,
+        workspaceId,
+        requireMemberId(actor.memberId),
+        input.id,
+      );
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      const now = new Date();
+      const links = await tx
+        .update(initiativeKeyResults)
+        .set({ deletedAt: null, updatedAt: now })
+        .where(
+          includeDeleted(
+            initiativeKeyResults,
+            eq(initiativeKeyResults.workspaceId, workspaceId),
+            eq(initiativeKeyResults.initiativeId, input.id),
+            eq(initiativeKeyResults.deletedAt, loaded.deletedAt),
+          ),
+        )
+        .returning({ id: initiativeKeyResults.id });
+      await tx
+        .update(initiatives)
+        .set({ deletedAt: null, updatedAt: now })
+        .where(
+          includeDeleted(
+            initiatives,
+            eq(initiatives.workspaceId, workspaceId),
+            eq(initiatives.id, input.id),
+          ),
+        );
+      // After the links are back, because the join that finds the cycles only
+      // reaches them through a live link.
+      await recomputeGatesBehind(
+        tx,
+        workspaceId,
+        await cyclesBehind(tx, workspaceId, input.id),
+      );
+
+      return {
+        result: { id: input.id, links: links.length },
+        activity: {
+          kind: "initiative.restored",
+          subjectType: "initiative",
+          subjectId: input.id,
+          payload: { title: loaded.title },
+        },
+        audit: {
+          action: "initiatives.restore",
+          targetType: "initiative",
+          targetId: input.id,
+          payload: { title: loaded.title, links: links.length },
         },
       };
     },

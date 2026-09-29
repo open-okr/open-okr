@@ -17,6 +17,21 @@
       "example": {}
     },
     {
+      "name": "workspace.deletedItems",
+      "description": "The goals, initiatives, tasks and documents that were deleted and that the caller could restore, newest first, with who deleted each.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "workspace.rename",
       "description": "Change a workspace's display name.",
       "inputSchema": {
@@ -6085,6 +6100,32 @@
       }
     },
     {
+      "name": "documents.restore",
+      "description": "Brings back a deleted document. Its versions were never removed, so they come back with it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "attachments.list",
       "description": "The files attached to one subject.",
       "inputSchema": {
@@ -7191,6 +7232,32 @@
       }
     },
     {
+      "name": "tasks.restore",
+      "description": "Brings back a deleted task with the assignments and checklist lines deleted with it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "tasks.linkedWork",
       "description": "Linked work per key result for one cycle: two counts, and the sentence when they disagree with the measure.",
       "inputSchema": {
@@ -7489,6 +7556,32 @@
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "initiatives.restore",
+      "description": "Brings back a deleted initiative and the key result links that were deleted with it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
         "idempotentHint": false
       },
       "example": {
@@ -8014,6 +8107,32 @@
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "goals.restore",
+      "description": "Brings back a deleted goal and the key results that were deleted with it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
         "idempotentHint": false
       },
       "example": {

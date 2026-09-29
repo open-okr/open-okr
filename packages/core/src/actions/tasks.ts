@@ -23,6 +23,7 @@ import {
   activeOnly,
   checklistItems,
   goals,
+  includeDeleted,
   initiatives,
   keyResults,
   newId,
@@ -189,7 +190,7 @@ const boardEvent = (
   workspaceId: string,
   spaceId: string,
   taskId: string,
-  change: "created" | "moved" | "updated" | "deleted",
+  change: "created" | "moved" | "updated" | "deleted" | "restored",
 ) => ({
   topic: "board.changed",
   payload: {
@@ -1344,6 +1345,145 @@ export const deleteTask = defineWriteAction({
         },
         audit: {
           action: "tasks.delete",
+          targetType: "task",
+          targetId: input.id,
+          payload: { title: loaded.title },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Brings a deleted task back, with its assignments and its checklist (M-13).
+ *
+ * **The same two gates as the delete.** The pipeline asks `full` on the
+ * workspace and the getter asks `full` on the task's own context, which a soft
+ * delete leaves standing. So whoever could delete it can restore it, and
+ * anybody else is told it does not exist.
+ *
+ * **Only what the delete took.** The delete stamps the task, its live
+ * assignments and its live checklist lines with one instant, so the rows
+ * carrying that instant are the ones that went with it. A line removed earlier
+ * stays removed.
+ *
+ * **Not into a deleted initiative.** A task filed under an initiative is part
+ * of that initiative's work and its page links there, so bringing it back
+ * while the initiative is gone would restore a card whose own parent is a dead
+ * link. The refusal names the initiative, so the reader knows which one to
+ * restore first. Deleting an initiative leaves its tasks where they are, so
+ * the usual order is the reverse of the deletes.
+ */
+export const restoreTask = defineWriteAction({
+  name: "tasks.restore",
+  summary:
+    "Brings back a deleted task with the assignments and checklist lines deleted with it.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async load({ tx, workspaceId, actor }) {
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId: requireMemberId(actor.memberId),
+        resourceType: "task",
+        resourceId: input.id,
+        requires: ACCESS_LEVELS.full,
+      });
+      // `includeDeleted` on purpose: this reads the row the default scope
+      // hides.
+      const [row] = await tx
+        .select({
+          spaceId: tasks.spaceId,
+          initiativeId: tasks.initiativeId,
+          title: tasks.title,
+          deletedAt: tasks.deletedAt,
+        })
+        .from(tasks)
+        .where(
+          includeDeleted(
+            tasks,
+            eq(tasks.workspaceId, workspaceId),
+            eq(tasks.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!row) {
+        throw new OperationError(
+          "not_found",
+          "No such task, or you do not have access to it.",
+        );
+      }
+      if (!row.deletedAt) {
+        throw new OperationError(
+          "forbidden",
+          `The task "${row.title}" is not deleted, so there is nothing to restore.`,
+        );
+      }
+      return { ...row, deletedAt: row.deletedAt };
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      if (loaded.initiativeId) {
+        const [parent] = await tx
+          .select({
+            title: initiatives.title,
+            deletedAt: initiatives.deletedAt,
+          })
+          .from(initiatives)
+          .where(
+            includeDeleted(
+              initiatives,
+              eq(initiatives.workspaceId, workspaceId),
+              eq(initiatives.id, loaded.initiativeId),
+            ),
+          )
+          .limit(1);
+        if (parent?.deletedAt) {
+          throw new OperationError(
+            "forbidden",
+            `This task belongs to the initiative "${parent.title}", which is deleted. Restore the initiative first.`,
+          );
+        }
+      }
+
+      const now = new Date();
+      for (const table of [taskAssignees, checklistItems] as const) {
+        // openokr:allow-mutation: the calling Operation's own transaction.
+        await tx
+          .update(table)
+          .set({ deletedAt: null, updatedAt: now })
+          .where(
+            includeDeleted(
+              table,
+              eq(table.workspaceId, workspaceId),
+              eq(table.taskId, input.id),
+              eq(table.deletedAt, loaded.deletedAt),
+            ),
+          );
+      }
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(tasks)
+        .set({ deletedAt: null, updatedAt: now })
+        .where(
+          includeDeleted(
+            tasks,
+            eq(tasks.workspaceId, workspaceId),
+            eq(tasks.id, input.id),
+          ),
+        );
+
+      return {
+        result: { id: input.id },
+        outbox: [boardEvent(workspaceId, loaded.spaceId, input.id, "restored")],
+        activity: {
+          kind: "task.restored",
+          subjectType: "task",
+          subjectId: input.id,
+          payload: { title: loaded.title },
+        },
+        audit: {
+          action: "tasks.restore",
           targetType: "task",
           targetId: input.id,
           payload: { title: loaded.title },

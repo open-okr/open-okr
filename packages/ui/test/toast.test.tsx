@@ -198,6 +198,43 @@ describe("ToastProvider", () => {
     });
   });
 
+  test("an undo runs once and closes the toast it was in", async () => {
+    // UIUX-PLAN §1's seventh principle: reversible destruction gets an undo
+    // toast rather than a confirmation (M-13). Pressing it closes the toast
+    // first, so a second press has nothing left to press.
+    const run = vi.fn();
+    function Deleter() {
+      const { show } = useToast();
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            show({
+              tone: "ok",
+              message: "Goal deleted.",
+              action: { label: "Undo", run },
+            })
+          }
+        >
+          Delete
+        </button>
+      );
+    }
+    render(
+      <ToastProvider dismissLabel="Dismiss">
+        <Deleter />
+      </ToastProvider>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
+
+    expect(run).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.queryAllByTestId("toast")).toHaveLength(0),
+    );
+  });
+
   test("a component without a provider still renders, and raises nothing", async () => {
     // Throwing instead would make the provider a requirement of rendering any
     // component that might one day want to say something.

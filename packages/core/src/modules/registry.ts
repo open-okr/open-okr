@@ -428,6 +428,15 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-deleted",
+        label: "Deleted items",
+        href: "/admin/deleted",
+        section: "admin",
+        // Every restore on it asks `full` on the workspace before it asks
+        // anything of the row, which is what the deletes asked (M-13).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-imports",
         label: "Import",
         href: "/admin/imports",

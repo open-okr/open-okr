@@ -512,12 +512,11 @@ test("a goal carries the writes that had no browser path", async () => {
   await expect(target).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("move-to-cycle")).toBeDisabled();
 
-  // The delete, which arms before it acts and says what a delete is here.
-  await page.getByTestId("delete-goal-arm").click();
-  await expect(page.getByTestId("delete-goal")).toContainText(
-    "Nothing is destroyed",
-  );
-  // And is stepped back from, because this goal is what six later specs read.
-  await page.getByRole("button", { name: "Keep it" }).click();
-  await expect(page.getByTestId("delete-goal-arm")).toBeVisible();
+  // The delete is offered. It is one press with an undo afterwards (M-13), so
+  // it is not pressed here: this goal is what six later specs read.
+  // `s36k-deleted-items.spec.ts` deletes a goal of its own, undoes it, and
+  // restores it from the admin screen.
+  await expect(
+    page.getByRole("button", { name: "Delete this goal" }),
+  ).toBeVisible();
 });

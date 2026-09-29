@@ -2043,6 +2043,13 @@ are sure.** Nothing is destroyed, the history stays readable, and the row drops
 out of every default-scoped read. That sentence does not fit in a dialog title
 and does fit on a second press.
 
+**Corrected at completeness review M-13: the second press is gone.** UIUX-PLAN
+§1 and §4 give reversible destruction a six second undo toast and keep a
+confirmation for what cannot be undone, and a soft delete can be. The delete is
+now one press, the sentence travels in the toast beside Undo, and Undo calls
+the restore action (`goals.restore`, `initiatives.restore`, `tasks.restore`,
+`documents.restore`). Later restores are on Admin, Deleted items.
+
 Deliverables: delete on goals, initiatives, tasks and documents, with the soft-delete semantics stated on the confirmation rather than implied; checklist item removal, which is not the same gesture as ticking a line; `goals.moveToCycle`, `goals.reviewDecision` and `goals.unlinkKpi` on goal detail; `reactions.remove`, so a reaction given by mistake can be taken back; `workspace.rename` on the general card.
 Test plan: a soft-deleted goal leaves its history readable and drops out of every default-scoped read; a removed reaction is gone for everybody; a delete request naming an entity outside the allow-list is refused; a removed checklist line is distinguishable from a ticked one.
 Acceptance: Given a member with edit access on a goal, when they move it to the next cycle, then the move is audited and both cycles read correctly.

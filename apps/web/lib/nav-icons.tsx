@@ -1,4 +1,5 @@
 import {
+  ArchiveRestore,
   Armchair,
   BarChart3,
   Bell,
@@ -101,6 +102,9 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "admin-channels": <Radio className="size-full" />,
   "admin-nudges": <Bell className="size-full" />,
   "admin-invitations": <UserPlus className="size-full" />,
+  // A box with an arrow out of it, which is what restoring from deleted
+  // items is. Not a bin: nothing on the screen is thrown away.
+  "admin-deleted": <ArchiveRestore className="size-full" />,
   "admin-imports": <Upload className="size-full" />,
   "admin-ai": <Sparkles className="size-full" />,
   "admin-agents": <Bot className="size-full" />,

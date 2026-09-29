@@ -1,9 +1,12 @@
 import { loadEnv } from "@openokr/config";
 import {
+  CATALOGUES,
   QueryProvider,
   ThemeProvider,
+  ToastProvider,
   TranslationsProvider,
   themeInitScript,
+  translate,
 } from "@openokr/ui";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
@@ -85,9 +88,20 @@ export default async function RootLayout({
       <body>
         <ThemeProvider>
           <TranslationsProvider locale={locale}>
-            <QueryProvider buildId={loadEnv().APP_BUILD_ID}>
-              {children}
-            </QueryProvider>
+            {/*
+             * Here rather than in the shell (M-13). Each top-level screen
+             * renders the shell afresh, so a provider inside it was replaced
+             * on every move between screens and its toasts went with it. A
+             * delete's undo is offered on the page that sends you somewhere
+             * else, and has to still be there when you arrive.
+             */}
+            <ToastProvider
+              dismissLabel={translate(CATALOGUES[locale], "common.dismiss")}
+            >
+              <QueryProvider buildId={loadEnv().APP_BUILD_ID}>
+                {children}
+              </QueryProvider>
+            </ToastProvider>
           </TranslationsProvider>
         </ThemeProvider>
       </body>

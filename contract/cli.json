@@ -12,6 +12,16 @@
       "pages": false
     },
     {
+      "name": "workspace deletedItems",
+      "action": "workspace.deletedItems",
+      "method": "GET",
+      "path": "/workspace/deletedItems",
+      "scope": "read",
+      "summary": "The goals, initiatives, tasks and documents that were deleted and that the caller could restore, newest first, with who deleted each.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "workspace rename",
       "action": "workspace.rename",
       "method": "POST",
@@ -4317,6 +4327,23 @@
       "pages": false
     },
     {
+      "name": "documents restore",
+      "action": "documents.restore",
+      "method": "POST",
+      "path": "/documents/restore",
+      "scope": "write",
+      "summary": "Brings back a deleted document. Its versions were never removed, so they come back with it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "attachments list",
       "action": "attachments.list",
       "method": "GET",
@@ -5134,6 +5161,23 @@
       "pages": false
     },
     {
+      "name": "tasks restore",
+      "action": "tasks.restore",
+      "method": "POST",
+      "path": "/tasks/restore",
+      "scope": "write",
+      "summary": "Brings back a deleted task with the assignments and checklist lines deleted with it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tasks linkedWork",
       "action": "tasks.linkedWork",
       "method": "GET",
@@ -5379,6 +5423,23 @@
       "path": "/initiatives/delete",
       "scope": "destructive",
       "summary": "Soft-deletes an initiative and the links it held.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "initiatives restore",
+      "action": "initiatives.restore",
+      "method": "POST",
+      "path": "/initiatives/restore",
+      "scope": "write",
+      "summary": "Brings back a deleted initiative and the key result links that were deleted with it.",
       "flags": [
         {
           "name": "id",
@@ -5807,6 +5868,23 @@
       "path": "/goals/delete",
       "scope": "destructive",
       "summary": "Removes a goal and its key results, which is not the same as closing one.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals restore",
+      "action": "goals.restore",
+      "method": "POST",
+      "path": "/goals/restore",
+      "scope": "write",
+      "summary": "Brings back a deleted goal and the key results that were deleted with it.",
       "flags": [
         {
           "name": "id",

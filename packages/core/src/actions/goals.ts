@@ -24,6 +24,7 @@ import {
   goalRetrospectives,
   goals,
   INDICATOR_TYPES,
+  includeDeleted,
   KEY_RESULT_DIRECTIONS,
   keyResults,
   keyResultValues,
@@ -2301,6 +2302,130 @@ export const deleteGoal = defineWriteAction({
           targetType: "goal",
           targetId: input.id,
           payload: { title: goal.title, level: goal.level },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Brings a deleted goal back, with the key results that went with it
+ * (completeness review M-13).
+ *
+ * **The same two gates as the delete.** `full` on the workspace, which the
+ * pipeline checks, and `full` on the goal, which the getter checks. A soft
+ * delete leaves the goal's context and its bindings where they were, so the
+ * getter answers for a deleted goal exactly as it did for the live one: whoever
+ * could delete it can restore it, and anybody else is told it does not exist.
+ *
+ * **Only what the delete took.** The delete stamps the goal and its live key
+ * results with one instant, so the key results carrying that same instant are
+ * the ones that went with it. A key result that was already gone keeps its own
+ * stamp and stays gone.
+ *
+ * **The numbers are recomputed here.** A goal coming back changes its parent's
+ * roll-up and the alignment picture of its cycle, so both run in this
+ * transaction, as they do for every other write that moves them.
+ *
+ * **A deleted parent goal does not hold it back**, unlike a task's initiative
+ * or a document's subject. A goal is aligned to its parent rather than filed
+ * under it: deleting a parent leaves every child live and aligned where it
+ * was, so a restored child aligned to a deleted parent is a state the delete
+ * already makes, and refusing it would block an undo for nothing.
+ */
+export const restoreGoal = defineWriteAction({
+  name: "goals.restore",
+  summary:
+    "Brings back a deleted goal and the key results that were deleted with it.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid(), keyResults: z.number().int() }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.full,
+      );
+
+      // `includeDeleted` on purpose: the row this reads is one the default
+      // scope hides, and reading it is the whole point.
+      const [goal] = await tx
+        .select({
+          title: goals.title,
+          level: goals.level,
+          deletedAt: goals.deletedAt,
+        })
+        .from(goals)
+        .where(
+          includeDeleted(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!goal) {
+        throw new OperationError("not_found", "No such goal.");
+      }
+      if (!goal.deletedAt) {
+        throw new OperationError(
+          "forbidden",
+          `The goal "${goal.title}" is not deleted, so there is nothing to restore.`,
+        );
+      }
+
+      // openokr:allow-mutation: the operation's own execute.
+      const restored = await tx
+        .update(keyResults)
+        .set({ deletedAt: null })
+        .where(
+          includeDeleted(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.goalId, input.id),
+            eq(keyResults.deletedAt, goal.deletedAt),
+          ),
+        )
+        .returning({ id: keyResults.id });
+      await tx
+        .update(goals)
+        .set({ deletedAt: null })
+        .where(
+          includeDeleted(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        );
+
+      await recompute(tx, workspaceId, input.id);
+      await realign(tx, workspaceId, input.id);
+
+      return {
+        result: { id: input.id, keyResults: restored.length },
+        activity: {
+          kind: "goal.restored",
+          subjectType: "goal",
+          subjectId: input.id,
+          payload: { title: goal.title },
+        },
+        audit: {
+          action: "goals.restore",
+          targetType: "goal",
+          targetId: input.id,
+          payload: {
+            title: goal.title,
+            level: goal.level,
+            keyResults: restored.length,
+          },
         },
       };
     },

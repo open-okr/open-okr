@@ -37,13 +37,35 @@ describe("delete", () => {
     expect(deleteAction).toContain("const ACTION = {");
   });
 
-  test("states the soft-delete semantics on the confirmation", () => {
-    // The thing worth telling somebody is not "are you sure" but what a delete
-    // is in this product, and that does not fit in a dialog title.
+  test("restores through the same kind of allow-list (M-13)", () => {
+    for (const action of [
+      '"goals.restore"',
+      '"initiatives.restore"',
+      '"tasks.restore"',
+      '"documents.restore"',
+    ]) {
+      expect(deleteAction, action).toContain(action);
+    }
+    expect(deleteAction).toContain("const RESTORE = {");
+  });
+
+  test("offers an undo instead of asking twice, and says what a delete is", () => {
+    // UIUX-PLAN §1 and §4: reversible destruction gets a six second undo
+    // toast, not a confirmation. The sentence about what a delete is in this
+    // product travels in that toast, beside the Undo that makes it true.
     expect(withMessages(deleteControl)).toContain("Nothing is destroyed");
     expect(withMessages(deleteControl)).toContain("the history stays readable");
-    // Two presses, so the sentence is read before the second one.
-    expect(deleteControl).toContain("armed ? (");
+    expect(withMessages(deleteControl)).toContain("Deleted items");
+    expect(deleteControl).toContain("restoreSubject(");
+    expect(deleteControl).toContain('t("deleteControl.undo")');
+    expect(deleteControl).not.toContain("armed");
+  });
+
+  test("the toast lives above every page, so the undo survives the move", () => {
+    // A delete sends the reader to another section, and every section renders
+    // its own shell. A provider inside the shell was replaced on that move.
+    expect(at("../app/layout.tsx")).toContain("<ToastProvider");
+    expect(at("../lib/app-shell.tsx")).not.toContain("<ToastProvider");
   });
 
   test("is on all four detail pages, and only above `full`", () => {
@@ -60,6 +82,26 @@ describe("delete", () => {
       // then failed would be the interface lying about what the reader can do.
       expect(source, subject).toMatch(/canAdminister|ACCESS_LEVELS\.full/);
     }
+  });
+});
+
+describe("deleted items (M-13)", () => {
+  const page = at("../app/admin/deleted/page.tsx");
+  const button = at("../app/admin/deleted/restore-button.tsx");
+
+  test("lists through the one read, and restores through the one path", () => {
+    expect(page).toContain('"workspace.deletedItems"');
+    expect(button).toContain("restoreSubject(");
+  });
+
+  test("has its empty and permission-denied states", () => {
+    expect(page).toContain('t("admin.deleted.nothingDeleted")');
+    expect(page).toContain("level < ACCESS_LEVELS.full");
+    expect(page).toContain('t("admin.deleted.onlyAnAdministrator")');
+  });
+
+  test("keeps a refusal beside the row, because it names what to restore first", () => {
+    expect(button).toContain('role="alert"');
   });
 });
 

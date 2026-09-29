@@ -21,6 +21,7 @@ account has and what an administrator can grant to somebody else.
 | **Channels** | Slack, Microsoft Teams, WhatsApp and Telegram, and the templates each one uses |
 | **Nudge volume** | Which proactive messages are on, and how loudly they escalate |
 | **Invitations** | Links that let somebody join, and what they are worth |
+| **Deleted items** | Bringing back a goal, initiative, task or document somebody deleted. See [below](#bringing-something-back) |
 | **Import** | Bringing a quarter of history in from a spreadsheet or from FlowyTeam, starting from a downloadable template. See [Importing](../import/README.md#templates) |
 | **AI** | Whether AI is on at all, whose key, which models, and the cost caps |
 | **Agents and runs** | What the Coach and the Champion may do, and what they have done |
@@ -43,6 +44,34 @@ runs with the provider off, and continuous integration proves it.
 **What happens when somebody leaves.** Suspension removes every access and
 keeps their authorship. Deletion is not the tool for this, and the product
 will not offer it as one. See [People and access](people.md).
+
+## Bringing something back
+
+A delete in OpenOKR destroys nothing. A deleted goal, initiative, task or
+document leaves every list and every search, and its history stays readable.
+
+| When | How |
+|---|---|
+| Straight after the delete | The page you land on shows **Undo** for six seconds. Press it and you are back where you were |
+| Any time later | **Admin**, **Deleted items**, then **Restore** on the row. The list says who deleted each one and when |
+
+What comes back with it:
+
+| Deleted | Comes back with |
+|---|---|
+| A goal | Its key results, except any removed before the goal was deleted |
+| An initiative | Its links to key results. Publish gate five counts it again |
+| A task | Its assignees and its checklist |
+| A document | Its versions, which the delete never touched |
+
+Two limits, both deliberate:
+
+- **You see what you could have deleted.** Restoring asks the same access the
+  delete asked: full access to the workspace and to the item itself. A goal
+  you are not the champion of is not on your list.
+- **A parent comes back first.** A task on a deleted initiative, or a document
+  on a deleted goal or initiative, is refused until that parent is restored,
+  and the refusal names it.
 
 ## What an administrator cannot do
 

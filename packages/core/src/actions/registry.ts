@@ -197,6 +197,7 @@ import {
   updateRhythmSettings,
 } from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
+import { listDeletedItems } from "./deleted-items.ts";
 import {
   attachFile,
   createDocument,
@@ -207,6 +208,7 @@ import {
   publishDocument,
   readDocument,
   readDocumentDifference,
+  restoreDocument,
   updateDocument,
 } from "./documents.ts";
 import { exportList, listMyExports } from "./exports.ts";
@@ -231,6 +233,7 @@ import {
   reassignGoalRole,
   recordKeyResultValue,
   reopenGoal,
+  restoreGoal,
   rewriteKeyResult,
   unlinkKeyResultKpi,
   updateGoal,
@@ -251,6 +254,7 @@ import {
   listInitiatives,
   readCapacity,
   readInitiative,
+  restoreInitiative,
   unlinkInitiativeKeyResult,
   updateInitiative,
 } from "./initiatives.ts";
@@ -426,6 +430,7 @@ import {
   readLinkedWork,
   readTask,
   removeChecklistItem,
+  restoreTask,
   setChecklistItem,
   unassignTask,
   updateTask,
@@ -445,6 +450,7 @@ import {
  */
 export const ACTION_MAP = {
   "workspace.overview": workspaceOverview,
+  "workspace.deletedItems": listDeletedItems,
   "workspace.rename": renameWorkspace,
   "workspace.finishOnboarding": finishOnboarding,
   "workspace.changePlan": changeWorkspacePlan,
@@ -626,6 +632,7 @@ export const ACTION_MAP = {
   "documents.update": updateDocument,
   "documents.publish": publishDocument,
   "documents.delete": deleteDocument,
+  "documents.restore": restoreDocument,
   "attachments.list": listAttachments,
   "attachments.attach": attachFile,
   "attachments.detach": detachFile,
@@ -651,12 +658,14 @@ export const ACTION_MAP = {
   "tasks.setChecklistItem": setChecklistItem,
   "tasks.removeChecklistItem": removeChecklistItem,
   "tasks.delete": deleteTask,
+  "tasks.restore": restoreTask,
   "tasks.linkedWork": readLinkedWork,
   "initiatives.list": listInitiatives,
   "initiatives.read": readInitiative,
   "initiatives.create": createInitiative,
   "initiatives.update": updateInitiative,
   "initiatives.delete": deleteInitiative,
+  "initiatives.restore": restoreInitiative,
   "initiatives.linkKeyResult": linkInitiativeKeyResult,
   "initiatives.unlinkKeyResult": unlinkInitiativeKeyResult,
   "initiatives.capacity": readCapacity,
@@ -666,6 +675,7 @@ export const ACTION_MAP = {
   "goals.update": updateGoal,
   "goals.close": closeGoal,
   "goals.delete": deleteGoal,
+  "goals.restore": restoreGoal,
   "goals.reviewDecision": goalReviewDecision,
   "goals.reopen": reopenGoal,
   "goals.reassignRole": reassignGoalRole,

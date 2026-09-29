@@ -239,6 +239,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
   "goal.reopened": () => "The goal was reopened",
   "goal.deleted": (p) => `Removed the goal "${p.title}"`,
+  "goal.restored": (p) => `Goal "${asString(p.title, "a goal")}" was restored`,
   "goal.role_reassigned": (p) =>
     `The goal's ${asString(p.role, "role")} was reassigned`,
   "goal.moved_to_cycle": (p) =>
@@ -250,6 +251,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "initiative.updated": () => "An initiative was edited",
   "initiative.deleted": (p) =>
     `Initiative "${asString(p.title, "some work")}" was removed`,
+  "initiative.restored": (p) =>
+    `Initiative "${asString(p.title, "some work")}" was restored`,
   "initiative.linked": () =>
     "An initiative was recorded as work that will move a key result",
   "initiative.unlinked": () =>
@@ -281,6 +284,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Document "${asString(p.title, "untitled")}" was published as version ${Number(p.version ?? 1)}`,
   "document.deleted": (p) =>
     `Document "${asString(p.title, "untitled")}" was removed`,
+  "document.restored": (p) =>
+    `Document "${asString(p.title, "untitled")}" was restored`,
   "attachment.added": () => "A file was attached",
   "attachment.removed": () => "A file was detached",
   // Tasks (P5-T11).
@@ -293,6 +298,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "task.checklist_changed": (p) =>
     `A checklist line was ${asString(p.change, "changed")}`,
   "task.deleted": (p) => `Task "${asString(p.title, "a task")}" was removed`,
+  "task.restored": (p) => `Task "${asString(p.title, "a task")}" was restored`,
   "key_result.created": (p) =>
     `Key result "${asString(p.title, "a key result")}" was added`,
   "key_result.updated": () => "A key result was edited",

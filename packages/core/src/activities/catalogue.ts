@@ -280,6 +280,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // The title, because a feed entry about a goal being removed has to read as
   // a sentence after the goal is gone (P4-T14b-a).
   "goal.deleted": z.object({ title: z.string() }),
+  // The counterpart of the line above, and the title travels for the same
+  // reason: a feed line has to read as a sentence on its own (M-13).
+  "goal.restored": z.object({ title: z.string() }),
   "goal.role_reassigned": z.object({ role: z.enum(["champion", "reviewer"]) }),
   "goal.moved_to_cycle": z.object({ title: z.string() }),
   // Initiatives (P5-T10a). The title travels for the same reason a goal's does:
@@ -288,6 +291,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "initiative.created": z.object({ title: z.string(), spaceId: z.uuid() }),
   "initiative.updated": z.object({ fields: z.array(z.string()) }),
   "initiative.deleted": z.object({ title: z.string() }),
+  "initiative.restored": z.object({ title: z.string() }),
   // The key result, because the feed entry a reader wants is "this work is now
   // behind that number" rather than "an initiative changed".
   "initiative.linked": z.object({ keyResultId: z.uuid() }),
@@ -327,6 +331,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     version: z.number().int(),
   }),
   "document.deleted": z.object({ title: z.string() }),
+  "document.restored": z.object({ title: z.string() }),
   "attachment.added": z.object({ duplicate: z.boolean() }),
   "attachment.removed": z.object({}),
   // Tasks (P5-T11). The title travels on create and delete for the reason a
@@ -338,6 +343,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "task.unassigned": z.object({ memberId: z.uuid() }),
   "task.checklist_changed": z.object({ change: z.string() }),
   "task.deleted": z.object({ title: z.string() }),
+  "task.restored": z.object({ title: z.string() }),
   "key_result.created": z.object({ title: z.string() }),
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),

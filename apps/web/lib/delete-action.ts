@@ -1,7 +1,8 @@
 "use server";
 
 /**
- * The one delete path, for the four things that have one (P6-G27).
+ * The one delete path, and the one restore path, for the four things that have
+ * them (P6-G27, completeness review M-13).
  *
  * **`goals.delete`, `initiatives.delete`, `tasks.delete` and
  * `documents.delete` all shipped with their entities and none of them had a
@@ -11,7 +12,9 @@
  * **One server action rather than four**, because the four are the same shape:
  * one id, `full` access, and a soft delete. What differs is the word on the
  * screen and where the reader goes afterwards, and both of those belong to the
- * page rather than to the write.
+ * page rather than to the write. The restore is the same shape again, and is
+ * called from two places: the undo a delete offers, and the Deleted items
+ * screen an administrator reaches later.
  *
  * **The allow-list is the point.** A server action takes whatever the browser
  * sends, so a switch over four literals is what stops this becoming a way to
@@ -33,8 +36,45 @@ const ACTION = {
   document: "documents.delete",
 } as const;
 
+const RESTORE = {
+  goal: "goals.restore",
+  initiative: "initiatives.restore",
+  task: "tasks.restore",
+  document: "documents.restore",
+} as const;
+
 export interface DeleteResult {
   readonly error: string | null;
+}
+
+async function run(
+  action:
+    | (typeof ACTION)[DeletableSubject]
+    | (typeof RESTORE)[DeletableSubject],
+  id: string,
+): Promise<DeleteResult> {
+  const { session, workspace } = await requireWorkspace();
+  try {
+    await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human", userId: session.user.id },
+      },
+      action,
+      { id },
+    );
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  // The whole tree: a deleted goal leaves the Work Map, the board, the feeds
+  // and whatever else was listing it, and none of those are this page. A
+  // restored one comes back to all of them.
+  revalidatePath("/", "layout");
+  return { error: null };
 }
 
 export async function deleteSubject(input: {
@@ -46,26 +86,17 @@ export async function deleteSubject(input: {
     const { t } = await getTranslations();
     return { error: t("deleteAction.notSomethingThisControlDeletes") };
   }
+  return run(action, input.id);
+}
 
-  const { session, workspace } = await requireWorkspace();
-  try {
-    await callAction(
-      {
-        pool: getPool(),
-        workspaceId: workspace.workspaceId,
-        actor: { kind: "human", userId: session.user.id },
-      },
-      action,
-      { id: input.id },
-    );
-  } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+export async function restoreSubject(input: {
+  subject: DeletableSubject;
+  id: string;
+}): Promise<DeleteResult> {
+  const action = RESTORE[input.subject];
+  if (!action) {
+    const { t } = await getTranslations();
+    return { error: t("deleteAction.notSomethingThisControlRestores") };
   }
-  // The whole tree: a deleted goal leaves the Work Map, the board, the feeds
-  // and whatever else was listing it, and none of those are this page.
-  revalidatePath("/", "layout");
-  return { error: null };
+  return run(action, input.id);
 }

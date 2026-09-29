@@ -8,7 +8,6 @@ import {
   ShortcutOverlay,
   Sidebar,
   type SidebarGroup,
-  ToastProvider,
   Topbar,
   TopbarSearch,
   UnsavedChangesProvider,
@@ -204,122 +203,128 @@ export async function AppShellLayout({
        * anything (P8-G11).
        */}
       <UnsavedChangesProvider message={t("common.unsavedChangesLeave")}>
-        <ToastProvider dismissLabel={t("common.dismiss")}>
-          <AppearanceSync theme={me.theme} density={me.density} />
-          <AppShell
-            skipToContentLabel={t("common.skipToContent")}
-            sidebar={
-              <Sidebar
-                groups={groups}
-                linkComponent={LinkComponent}
-                workspaceSwitcher={
-                  <WorkspaceSwitcher
-                    memberships={memberships}
-                    active={workspace}
-                  />
-                }
-              />
-            }
-            topbar={
-              <Topbar
-                breadcrumb={workspace.name}
-                search={<TopbarSearch />}
-                askAi={<CopilotPanel initialAvailability={copilot} />}
-                avatarMenu={
-                  <AvatarMenu
-                    name={workspace.name}
-                    // From the registry rather than a literal list. A literal one
-                    // is how /account/channels shipped unlinked at P5-T02c and how
-                    // /account/connections was still unlinked four tasks later:
-                    // the page and the menu were two places to remember, and only
-                    // one of them ever got opened. reachability.test.ts asserts
-                    // the two agree.
-                    items={accountItems.map((item) => ({
-                      href: item.href,
-                      label: item.label,
-                    }))}
-                    appearance={<AppearanceControl compact />}
-                    signOut={<SignOut />}
-                  />
-                }
-              />
-            }
-            cycleStrip={
-              strip ? (
-                <CycleStrip
-                  phase={strip.phaseLabel}
-                  blocking={strip.blocking}
-                  due={strip.due}
+        {/*
+         * No `ToastProvider` here: it is in the root layout (M-13). Every
+         * top-level screen renders its own copy of this shell, so a provider
+         * here was replaced on every move between screens and took its toasts
+         * with it. An undo offered on a task and shown on the board it sends
+         * you back to has to outlive that move.
+         */}
+
+        <AppearanceSync theme={me.theme} density={me.density} />
+        <AppShell
+          skipToContentLabel={t("common.skipToContent")}
+          sidebar={
+            <Sidebar
+              groups={groups}
+              linkComponent={LinkComponent}
+              workspaceSwitcher={
+                <WorkspaceSwitcher
+                  memberships={memberships}
+                  active={workspace}
                 />
-              ) : undefined
-            }
-            mobileTabBar={
-              <MobileTabBar
-                linkComponent={LinkComponent}
-                items={tabItems}
-                // Every other destination the sidebar holds, in its own
-                // groups, because the sidebar is hidden at this width and a
-                // phone had no other way to reach them (review H-16).
-                more={{
-                  label: t("shell.mobile.more"),
-                  icon: <Ellipsis className="size-full" />,
-                  groups: groups
-                    .map((group) => ({
-                      id: group.id,
-                      ...(group.label === undefined
-                        ? {}
-                        : { label: group.label }),
-                      items: group.items.filter((item) => !tabIds.has(item.id)),
-                    }))
-                    .filter((group) => group.items.length > 0),
-                }}
-              />
-            }
-          >
-            {/*
-             * A workspace that is not taking writes says so on every screen
-             * (P6-G25). Above the content rather than around it: reads are
-             * unaffected by design and the admin recovery list has to stay
-             * reachable, so this explains rather than blocks.
-             */}
-            {/* Somebody from outside the organisation is reading this workspace
-             * right now (P8-T04b). First of the three, because it is the only
-             * one that is about who is looking over the reader's shoulder, and
-             * the only one that cannot be dismissed. */}
-            <SupportBanner workspaceId={workspace.workspaceId} />
-            {/* What the vendor is saying, above the workspace's own state
-             * banner (P8-T03c). A site message is news from outside the
-             * organisation and the state banner is a fact about the workspace,
-             * so the outside one reads first. */}
-            <SiteMessages
-              userId={session.user.id}
-              workspaceId={workspace.workspaceId}
+              }
             />
-            {workspace.state === "active" ? null : (
-              <div className="mb-4.5">
-                <WorkspaceStateBanner
-                  state={workspace.state}
-                  canRecover={level >= ACCESS_LEVELS.full}
+          }
+          topbar={
+            <Topbar
+              breadcrumb={workspace.name}
+              search={<TopbarSearch />}
+              askAi={<CopilotPanel initialAvailability={copilot} />}
+              avatarMenu={
+                <AvatarMenu
+                  name={workspace.name}
+                  // From the registry rather than a literal list. A literal one
+                  // is how /account/channels shipped unlinked at P5-T02c and how
+                  // /account/connections was still unlinked four tasks later:
+                  // the page and the menu were two places to remember, and only
+                  // one of them ever got opened. reachability.test.ts asserts
+                  // the two agree.
+                  items={accountItems.map((item) => ({
+                    href: item.href,
+                    label: item.label,
+                  }))}
+                  appearance={<AppearanceControl compact />}
+                  signOut={<SignOut />}
                 />
-              </div>
-            )}
-            {children}
-          </AppShell>
+              }
+            />
+          }
+          cycleStrip={
+            strip ? (
+              <CycleStrip
+                phase={strip.phaseLabel}
+                blocking={strip.blocking}
+                due={strip.due}
+              />
+            ) : undefined
+          }
+          mobileTabBar={
+            <MobileTabBar
+              linkComponent={LinkComponent}
+              items={tabItems}
+              // Every other destination the sidebar holds, in its own
+              // groups, because the sidebar is hidden at this width and a
+              // phone had no other way to reach them (review H-16).
+              more={{
+                label: t("shell.mobile.more"),
+                icon: <Ellipsis className="size-full" />,
+                groups: groups
+                  .map((group) => ({
+                    id: group.id,
+                    ...(group.label === undefined
+                      ? {}
+                      : { label: group.label }),
+                    items: group.items.filter((item) => !tabIds.has(item.id)),
+                  }))
+                  .filter((group) => group.items.length > 0),
+              }}
+            />
+          }
+        >
           {/*
-           * Beside the shell rather than inside the topbar, because the palette is
-           * an overlay over the whole page. Mounted once here, so ⌘K works on every
-           * screen without each one remembering to render it (P5-T13).
+           * A workspace that is not taking writes says so on every screen
+           * (P6-G25). Above the content rather than around it: reads are
+           * unaffected by design and the admin recovery list has to stay
+           * reachable, so this explains rather than blocks.
            */}
-          <CommandPalette />
-          {/* The Review count, kept current by the workspace's own feed
-           * stream (completeness review M-32). Only for somebody who can
-           * read the workspace, which is who the badge is drawn for. */}
-          {level >= ACCESS_LEVELS.view ? (
-            <ReviewBadgeLive count={reviewBadge} />
-          ) : null}
-          <ShortcutOverlay />
-          <StaleDeploymentWatcher buildId={loadEnv().APP_BUILD_ID} />
-        </ToastProvider>
+          {/* Somebody from outside the organisation is reading this workspace
+           * right now (P8-T04b). First of the three, because it is the only
+           * one that is about who is looking over the reader's shoulder, and
+           * the only one that cannot be dismissed. */}
+          <SupportBanner workspaceId={workspace.workspaceId} />
+          {/* What the vendor is saying, above the workspace's own state
+           * banner (P8-T03c). A site message is news from outside the
+           * organisation and the state banner is a fact about the workspace,
+           * so the outside one reads first. */}
+          <SiteMessages
+            userId={session.user.id}
+            workspaceId={workspace.workspaceId}
+          />
+          {workspace.state === "active" ? null : (
+            <div className="mb-4.5">
+              <WorkspaceStateBanner
+                state={workspace.state}
+                canRecover={level >= ACCESS_LEVELS.full}
+              />
+            </div>
+          )}
+          {children}
+        </AppShell>
+        {/*
+         * Beside the shell rather than inside the topbar, because the palette is
+         * an overlay over the whole page. Mounted once here, so ⌘K works on every
+         * screen without each one remembering to render it (P5-T13).
+         */}
+        <CommandPalette />
+        {/* The Review count, kept current by the workspace's own feed
+         * stream (completeness review M-32). Only for somebody who can
+         * read the workspace, which is who the badge is drawn for. */}
+        {level >= ACCESS_LEVELS.view ? (
+          <ReviewBadgeLive count={reviewBadge} />
+        ) : null}
+        <ShortcutOverlay />
+        <StaleDeploymentWatcher buildId={loadEnv().APP_BUILD_ID} />
       </UnsavedChangesProvider>
     </KeyboardRegistryProvider>
   );

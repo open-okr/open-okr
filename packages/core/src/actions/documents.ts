@@ -28,6 +28,7 @@ import {
   type DocumentSubjectType,
   documents,
   documentVersions,
+  includeDeleted,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
@@ -812,6 +813,202 @@ export const deleteDocument = defineWriteAction({
         },
         audit: {
           action: "documents.delete",
+          targetType: "document",
+          targetId: input.id,
+          payload: { title: loaded.title },
+        },
+      };
+    },
+  }),
+});
+
+export interface RestorableDocument {
+  readonly subjectType: DocumentSubjectType;
+  readonly subjectId: string;
+  readonly title: string;
+  readonly deletedAt: Date;
+}
+
+/**
+ * A deleted document this member may restore, or not-found (M-13).
+ *
+ * **The delete's own rules, read against a deleted row.** `requireWritable`
+ * is what the delete asks: the draft rule, then edit on the subject. Neither
+ * can be reused as it stands, because both begin from the live document, and
+ * a key result's goal is found through a live key result. So this reads the
+ * document with `includeDeleted`, keeps the draft rule in the query, and finds
+ * a key result's goal whether or not the key result is still there: a goal's
+ * context survives its delete, so the answer is the one the live goal gave.
+ *
+ * Exported for `workspace.deletedItems`, so the list shows a document exactly
+ * when this would let its reader restore it.
+ */
+export async function requireRestorableDocument(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  id: string,
+): Promise<RestorableDocument> {
+  const [row] = await tx
+    .select({
+      subjectType: documents.subjectType,
+      subjectId: documents.subjectId,
+      title: documents.title,
+      deletedAt: documents.deletedAt,
+    })
+    .from(documents)
+    .where(
+      and(
+        includeDeleted(
+          documents,
+          eq(documents.workspaceId, workspaceId),
+          eq(documents.id, id),
+        ),
+        readableDocuments(memberId),
+      ),
+    )
+    .limit(1);
+  if (!row) {
+    throw new OperationError("not_found", "No such document.");
+  }
+
+  let resourceId = row.subjectId;
+  if (row.subjectType === "key_result") {
+    const owner = await tx.execute<{ goal_id: string }>(
+      sql`select goal_id from key_results
+           where id = ${row.subjectId}
+             and workspace_id = ${workspaceId}
+           limit 1`,
+    );
+    const goalId = owner.rows[0]?.goal_id;
+    if (!goalId) {
+      throw new OperationError("not_found", "No such document.");
+    }
+    resourceId = goalId;
+  }
+  const resourceType = RESOURCE_FOR[row.subjectType];
+  await getAccessScoped(tx, {
+    workspaceId,
+    memberId,
+    resourceType,
+    resourceId: resourceType === "workspace" ? workspaceId : resourceId,
+    requires: ACCESS_LEVELS.edit,
+  });
+
+  if (!row.deletedAt) {
+    throw new OperationError(
+      "forbidden",
+      `The document "${row.title}" is not deleted, so there is nothing to restore.`,
+    );
+  }
+  return { ...row, deletedAt: row.deletedAt };
+}
+
+/**
+ * Why a document cannot come back yet, or null when it can.
+ *
+ * A document is read through its subject, so one restored onto a deleted goal,
+ * key result or initiative would be back and still unreachable. The sentence
+ * names the subject, so the reader knows what to restore first. A space and a
+ * cycle are archived rather than deleted, and what they held stays readable,
+ * so neither holds a document back.
+ */
+async function deletedSubjectOf(
+  tx: OperationTx,
+  workspaceId: string,
+  document: RestorableDocument,
+): Promise<string | null> {
+  if (
+    document.subjectType === "goal" ||
+    document.subjectType === "key_result"
+  ) {
+    const rows = await tx.execute<{ title: string; gone: boolean }>(
+      document.subjectType === "goal"
+        ? sql`select g.title, g.deleted_at is not null as gone
+                from goals g
+               where g.id = ${document.subjectId}
+                 and g.workspace_id = ${workspaceId}
+               limit 1`
+        : sql`select g.title,
+                     (k.deleted_at is not null or g.deleted_at is not null) as gone
+                from key_results k
+                join goals g on g.id = k.goal_id
+               where k.id = ${document.subjectId}
+                 and k.workspace_id = ${workspaceId}
+               limit 1`,
+    );
+    const goal = rows.rows[0];
+    return goal?.gone
+      ? `This document is on the goal "${goal.title}", which is deleted. Restore the goal first.`
+      : null;
+  }
+  if (document.subjectType === "initiative") {
+    const rows = await tx.execute<{ title: string; gone: boolean }>(
+      sql`select i.title, i.deleted_at is not null as gone
+            from initiatives i
+           where i.id = ${document.subjectId}
+             and i.workspace_id = ${workspaceId}
+           limit 1`,
+    );
+    const initiative = rows.rows[0];
+    return initiative?.gone
+      ? `This document is on the initiative "${initiative.title}", which is deleted. Restore the initiative first.`
+      : null;
+  }
+  return null;
+}
+
+/**
+ * Brings a deleted document back (M-13).
+ *
+ * The delete takes the document alone, so the restore brings back the
+ * document alone: its versions were never touched. It asks what the delete
+ * asked, `full` on the workspace and the document's own write rule, and it
+ * refuses while the thing the document is about is still deleted.
+ */
+export const restoreDocument = defineWriteAction({
+  name: "documents.restore",
+  summary:
+    "Brings back a deleted document. Its versions were never removed, so they come back with it.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async load({ tx, workspaceId, actor }) {
+      return requireRestorableDocument(
+        tx,
+        workspaceId,
+        requireMemberId(actor.memberId),
+        input.id,
+      );
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      const blocked = await deletedSubjectOf(tx, workspaceId, loaded);
+      if (blocked) {
+        throw new OperationError("forbidden", blocked);
+      }
+
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(documents)
+        .set({ deletedAt: null, updatedAt: new Date() })
+        .where(
+          includeDeleted(
+            documents,
+            eq(documents.workspaceId, workspaceId),
+            eq(documents.id, input.id),
+          ),
+        );
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "document.restored",
+          subjectType: "document",
+          subjectId: input.id,
+          payload: { title: loaded.title },
+        },
+        audit: {
+          action: "documents.restore",
           targetType: "document",
           targetId: input.id,
           payload: { title: loaded.title },
