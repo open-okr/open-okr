@@ -3883,6 +3883,58 @@
       }
     },
     {
+      "name": "ai.readPrivacySettings",
+      "description": "The workspace's AI egress controls: context level, personal-data redaction, no-training and the host allow-list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "ai.updatePrivacySettings",
+      "description": "Change what may leave for an AI provider off this network: the context level, redaction, no-training and the host allow-list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contextEgress": {
+            "type": "string",
+            "enum": [
+              "all",
+              "assists",
+              "none"
+            ]
+          },
+          "redactPersonalData": {
+            "type": "boolean"
+          },
+          "noTraining": {
+            "type": "boolean"
+          },
+          "allowedHosts": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "agents.list",
       "description": "Every agent this workspace has, seeded or custom.",
       "inputSchema": {

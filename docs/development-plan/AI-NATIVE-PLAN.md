@@ -130,7 +130,7 @@ Permission `manage_ai`. One admin console:
 | Agents | Create and edit agents: persona, instructions per phase, provider and tier, schedule, access scope, autonomy policy, sandbox toggle, run history and logs |
 | Budgets and limits | Token, cost and call quotas per user, per agent and per workspace. A hard cap that halts runs. A throttle window |
 | Prompts | Versioned system prompt per feature and per agent phase, restore to default, gated by the evaluation set |
-| Privacy and governance | Context egress level, personal-data redaction, no-training assertion, egress allow-list. Greyed out with a zero-egress note on a local provider |
+| Privacy and governance | Context egress level, personal-data redaction, no-training assertion, egress allow-list. Greyed out with a zero-egress note on a local provider. Built at completeness review M-10: the level is `all`, `assists` (retrieval, meaning the copilot's passages and the search index, stays here) or `none`; redaction replaces email addresses and phone numbers; no-training is sent to OpenRouter, the one provider that takes it per request; the allow-list names hosts. All four are enforced around every provider `createAIProvider` builds, none applies to a provider at localhost or a private address, and each request a control refuses or changes is an audit row of counts, never text |
 | Connections | MCP clients and grants with last-used and audit links, revoke |
 | Usage and logs | Token and cost dashboards by user, feature, agent and model. A request log with truncated payloads. Flagged calls. Latest evaluation results |
 

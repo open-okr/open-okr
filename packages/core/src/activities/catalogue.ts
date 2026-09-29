@@ -195,6 +195,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     .catchall(z.unknown()),
   "ai.budget_set": z.object({}).catchall(z.unknown()),
   "ai.budget_removed": z.object({}),
+  // Completeness review M-10. The privacy card's save, and what its controls
+  // did to a request: counts and a host, never the text.
+  "ai.privacy_updated": z.object({ keys: z.array(z.string()) }),
+  "ai.egress_withheld": z.object({
+    provider: z.string(),
+    outcome: z.enum(["refused", "redacted"]),
+  }),
   "agent.created": z.object({}).catchall(z.unknown()),
   "agent.enabled_changed": z.object({ enabled: z.boolean() }),
   "agent.scope_bound": z.object({}).catchall(z.unknown()),
@@ -610,6 +617,10 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   "copilot.proposalApplied",
   "copilot.proposalDismissed",
   "copilot.proposalUndone",
+  // A request one member's assist or question made, withheld or redacted
+  // (M-10). Which member asked is theirs; the audit row is where an
+  // administrator reads that the control acted.
+  "ai.egress_withheld",
 ]);
 
 /**

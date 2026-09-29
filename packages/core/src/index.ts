@@ -150,6 +150,14 @@ export {
 } from "./ai/context-guard.ts";
 export { maskKeyHint, sealCredentialKey } from "./ai/credentials.ts";
 export {
+  AI_PRIVACY_KEYS,
+  type AIPrivacySettings,
+  aiPrivacyFrom,
+  type RecordAIEgressWithheldInput,
+  recordAIEgressWithheld,
+  resolveAIPrivacySettings,
+} from "./ai/egress.ts";
+export {
   findSeededModel,
   SEEDED_MODELS,
   type SeededModel,
@@ -1058,6 +1066,9 @@ export {
   statusHueOf,
 } from "./settings/brand-colour.ts";
 export {
+  AI_CONTEXT_EGRESS_LEVELS,
+  type AIContextEgressLevel,
+  aiEgressAllowListSchema,
   brandingSchema,
   DEFAULT_IMPORT_ROW_LIMIT,
   DEFAULT_QUIET_HOURS,

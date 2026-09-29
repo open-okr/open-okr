@@ -54,6 +54,14 @@ export async function drafterFor(
   if (!routed) {
     return null;
   }
+  // A workspace whose egress controls let nothing reach this provider has no
+  // drafter, exactly as one with no provider has none (M-10): its assists are
+  // hidden and its agents run in their deterministic form, rather than
+  // offering buttons the guard would refuse every time. `assist` is the
+  // narrowest purpose, so nothing is permitted when it is not.
+  if (!routed.provider.permits("assist")) {
+    return null;
+  }
 
   return createProviderDrafter({
     provider: routed.provider,

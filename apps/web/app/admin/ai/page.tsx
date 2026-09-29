@@ -19,6 +19,7 @@ import {
 import { AIForm } from "./ai-form.tsx";
 import {
   BudgetsCard,
+  egressStateOf,
   FeaturesCard,
   PrivacyCard,
   PromptsCard,
@@ -142,20 +143,29 @@ export default async function AdminAIPage() {
     Date.now() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
-  const [providers, models, routes, features, budgets, usage, prompts] =
-    await Promise.all([
-      callAction(context, "ai.readProviderConfig", {}),
-      callAction(context, "ai.readModelCatalog", {}),
-      callAction(context, "ai.readTierRouting", {}),
-      callAction(context, "ai.readFeatureSettings", {}),
-      callAction(context, "ai.readBudgets", {}),
-      callAction(context, "ai.readUsageSummary", { since }),
-      Promise.all(
-        knownPromptKeys().map((promptKey) =>
-          callAction(context, "ai.readPrompt", { promptKey }),
-        ),
+  const [
+    providers,
+    models,
+    routes,
+    features,
+    budgets,
+    usage,
+    prompts,
+    privacy,
+  ] = await Promise.all([
+    callAction(context, "ai.readProviderConfig", {}),
+    callAction(context, "ai.readModelCatalog", {}),
+    callAction(context, "ai.readTierRouting", {}),
+    callAction(context, "ai.readFeatureSettings", {}),
+    callAction(context, "ai.readBudgets", {}),
+    callAction(context, "ai.readUsageSummary", { since }),
+    Promise.all(
+      knownPromptKeys().map((promptKey) =>
+        callAction(context, "ai.readPrompt", { promptKey }),
       ),
-    ]);
+    ),
+    callAction(context, "ai.readPrivacySettings", {}),
+  ]);
 
   const configured = providers.filter((one) => one.hasWorkspaceCredential);
 
@@ -590,7 +600,10 @@ export default async function AdminAIPage() {
       <BudgetsCard budgets={budgets} />
       <FeaturesCard features={features} />
       <PromptsCard prompts={prompts} />
-      <PrivacyCard />
+      <PrivacyCard
+        privacy={privacy}
+        egress={egressStateOf(routes, providers)}
+      />
     </div>
   );
 }

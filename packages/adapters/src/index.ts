@@ -18,9 +18,12 @@ export {
   createAdapters,
 } from "./create-adapters.ts";
 export {
+  type AIEgressOptions,
   type AIProviderConfig,
+  aiEgressTargetOf,
   createAIProvider,
   defaultTierModelsFor,
+  type GuardedAIProvider,
 } from "./create-ai-provider.ts";
 export { createMailer, type MailerConfig } from "./create-mailer.ts";
 export {
@@ -123,6 +126,18 @@ export {
   S3Storage,
   type S3StorageOptions,
 } from "./drivers/storage/s3.ts";
+// The egress guard itself stays private: `createAIProvider` is the only way
+// to be handed one, which is the whole point of it (M-10). What leaves is the
+// vocabulary a host needs to pass a policy in and read an event out.
+export {
+  AI_CONTEXT_EGRESS_LEVELS,
+  type AIContextEgress,
+  type AIEgressEvent,
+  type AIEgressPolicy,
+  type AIEgressRefusal,
+  AIEgressRefusedError,
+  type AIEgressTarget,
+} from "./outbound/ai-egress.ts";
 export {
   type CheckedUrl,
   checkUrl,
@@ -146,6 +161,7 @@ export type {
 } from "./ports/agent.ts";
 export type {
   AIProvider,
+  AIPurpose,
   ChatMessage,
   ChatRequest,
   ChatResponse,

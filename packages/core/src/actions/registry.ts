@@ -73,6 +73,7 @@ import {
   updateFeatureSetting,
   updatePrompt,
 } from "./ai-models.ts";
+import { readPrivacySettings, updatePrivacySettings } from "./ai-privacy.ts";
 import {
   readBudgets,
   readUsageSummary,
@@ -575,6 +576,8 @@ export const ACTION_MAP = {
   "ai.setBudget": setBudget,
   "ai.removeBudget": removeBudget,
   "ai.readUsageSummary": readUsageSummary,
+  "ai.readPrivacySettings": readPrivacySettings,
+  "ai.updatePrivacySettings": updatePrivacySettings,
   "agents.list": readAgents,
   "agents.create": createAgent,
   "agents.setAutonomy": setAgentAutonomy,

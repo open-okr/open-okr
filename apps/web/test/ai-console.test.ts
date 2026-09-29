@@ -106,6 +106,9 @@ describe("the AI console's second half (P6-G12b)", () => {
       "ai.setBudget",
       "ai.removeBudget",
       "ai.readUsageSummary",
+      // The privacy card, which was static text until M-10.
+      "ai.readPrivacySettings",
+      "ai.updatePrivacySettings",
     ];
     const all = `${actionsSource}${pageSource}${governanceSource}`;
     const missing = owned.filter((name) => !all.includes(name));

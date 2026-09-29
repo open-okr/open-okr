@@ -15,7 +15,13 @@
  * whose level changed between the page rendering and the button being pressed
  * is told why.
  */
-import { callAction, OperationError } from "@openokr/core";
+import {
+  AI_CONTEXT_EGRESS_LEVELS,
+  type AIContextEgressLevel,
+  aiEgressAllowListSchema,
+  callAction,
+  OperationError,
+} from "@openokr/core";
 import type {
   AIProviderKind,
   BudgetMetric,
@@ -301,6 +307,71 @@ export async function restoreDefaultPrompt(
     return { ok: false, message: await reason(error) };
   }
   return done(t("admin.ai.actions.backToTheBuiltInPrompt"));
+}
+
+/**
+ * The hosts the allow-list box holds, one per line.
+ *
+ * Commas and spaces separate too, because a list pasted from somewhere else
+ * rarely arrives one per line. A pasted address is reduced to its host, since
+ * that is what the guard compares and what the person meant.
+ */
+function hostsFrom(raw: string): string[] {
+  return raw
+    .split(/[\s,]/)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "")
+    .map((entry) => {
+      if (!entry.includes("://")) {
+        return entry;
+      }
+      try {
+        return new URL(entry).hostname;
+      } catch {
+        return entry;
+      }
+    });
+}
+
+/**
+ * Saves the privacy card: the context level, redaction, no-training and the
+ * allow-list (completeness review M-10).
+ *
+ * Every host is checked here before anything is sent, so a typo is refused by
+ * name rather than as the schema's own message. The action checks the same
+ * schema again, because REST and the command line reach it without this form.
+ */
+export async function savePrivacy(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
+  const { t } = await getTranslations();
+  const allowedHosts = hostsFrom(String(form.get("allowedHosts") ?? ""));
+  const refused = allowedHosts.find(
+    (host) => !aiEgressAllowListSchema.safeParse([host]).success,
+  );
+  if (refused !== undefined) {
+    return {
+      ok: false,
+      message: t("admin.ai.privacy.notAHost", { host: refused }),
+    };
+  }
+  const level = String(form.get("contextEgress") ?? "");
+  try {
+    await callAction(await context(), "ai.updatePrivacySettings", {
+      // A form posted without a level (a radio nobody touched cannot be, but
+      // a hand-built request can) leaves the stored one as it is.
+      ...(AI_CONTEXT_EGRESS_LEVELS.some((one) => one === level)
+        ? { contextEgress: level as AIContextEgressLevel }
+        : {}),
+      redactPersonalData: form.get("redactPersonalData") !== null,
+      noTraining: form.get("noTraining") !== null,
+      allowedHosts,
+    });
+  } catch (error) {
+    return { ok: false, message: await reason(error) };
+  }
+  return done(t("admin.rhythm.actions.saved"));
 }
 
 export async function saveBudget(

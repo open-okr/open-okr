@@ -23,7 +23,7 @@ account has and what an administrator can grant to somebody else.
 | **Invitations** | Links that let somebody join, and what they are worth |
 | **Deleted items** | Bringing back a goal, initiative, task or document somebody deleted. See [below](#bringing-something-back) |
 | **Import** | Bringing a quarter of history in from a spreadsheet or from FlowyTeam, starting from a downloadable template. See [Importing](../import/README.md#templates) |
-| **AI** | Whether AI is on at all, whose key, which models, and the cost caps |
+| **AI** | Whether AI is on at all, whose key, which models, the cost caps, and what may leave for a provider off your network: how much context, whether addresses and phone numbers are replaced first, a no-training request, and which hosts may be reached |
 | **Agents and runs** | What the Coach and the Champion may do, and what they have done |
 
 ## The four decisions that matter most

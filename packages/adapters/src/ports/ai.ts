@@ -29,11 +29,27 @@ export interface ToolCall {
   readonly arguments: Record<string, unknown>;
 }
 
+/**
+ * What kind of content a request carries, for the workspace's egress level
+ * (AI-NATIVE-PLAN §4, completeness review M-10).
+ *
+ * `assist` is the item one assist works on: the goal being drafted, the
+ * sentence being rewritten, the session being summarised. `retrieval` is
+ * content found by search across the workspace: the copilot's passages, and
+ * every item the search index embeds.
+ *
+ * **A request that names neither is treated as `retrieval`**, the wider of the
+ * two, so a call site added without thinking about egress is withheld under a
+ * narrower level rather than let through. Drivers ignore the field.
+ */
+export type AIPurpose = "assist" | "retrieval";
+
 export interface ChatRequest {
   readonly model: string;
   readonly messages: readonly ChatMessage[];
   readonly temperature?: number;
   readonly maxTokens?: number;
+  readonly purpose?: AIPurpose;
 }
 
 export interface TokenUsage {

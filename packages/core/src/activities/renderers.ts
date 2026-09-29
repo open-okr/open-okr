@@ -165,6 +165,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "ai.budget_set": (p) =>
     `An AI budget was set for the "${asString(p.scope, "workspace")}" scope`,
   "ai.budget_removed": () => "An AI budget was removed",
+  "ai.privacy_updated": (p) =>
+    `AI privacy and egress settings were updated (${
+      Array.isArray(p.keys) ? p.keys.join(", ") : "privacy"
+    })`,
+  "ai.egress_withheld": (p) =>
+    p.outcome === "redacted"
+      ? `Personal data was replaced before an AI request to ${asString(p.provider, "a provider")}`
+      : `An AI request to ${asString(p.provider, "a provider")} was withheld by the privacy settings`,
   "agent.created": (p) =>
     `Agent "${asString(p.name, "New agent")}" was created`,
   "agent.enabled_changed": (p) =>

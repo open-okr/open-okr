@@ -95,6 +95,13 @@ async function embedFor(workspaceId: string) {
   if (!routed) {
     return undefined;
   }
+  // Embedding is the search index being built, which a workspace can keep
+  // here (M-10). Asked before the first chunk rather than refused on every
+  // one: the chunk is stored with no vector, full-text search keeps working,
+  // and the guard around the provider would refuse the call regardless.
+  if (!routed.provider.permits("retrieval")) {
+    return undefined;
+  }
   return async (inputs: readonly string[]) => {
     const result = await routed.provider.embed({
       model: routed.modelId,

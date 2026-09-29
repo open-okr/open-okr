@@ -19,18 +19,25 @@
  * request** (H-07). A workspace administrator there is not the operator, and
  * a base URL pointed at a metadata address or the database host would be a
  * request the server makes for them.
+ *
+ * **Every provider carries the workspace's egress controls** (M-10). They are
+ * read here, per build, and handed to `createAIProvider`, which will not build
+ * a provider without them. What a control withholds or replaces is written to
+ * the audit trail as counts and a host, never as text.
  */
 import {
-  type AIProvider,
   type AIProviderConfig,
   createAIProvider,
+  type GuardedAIProvider,
 } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
 import {
   findSeededModel,
   isCloudEnabled,
   type ResolvedAICredential,
+  recordAIEgressWithheld,
   resolveAICredential,
+  resolveAIPrivacySettings,
   resolveTierRoute,
 } from "@openokr/core";
 import type { ModelTier } from "@openokr/db";
@@ -39,7 +46,12 @@ import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
 
 export interface RoutedProvider {
-  readonly provider: AIProvider;
+  /**
+   * Guarded: `permits` says whether a request of a given purpose would be let
+   * through, so a host can leave a feature out rather than offer a button
+   * that can only fail.
+   */
+  readonly provider: GuardedAIProvider;
   readonly modelId: string;
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
@@ -124,8 +136,13 @@ export async function providerForTier(
   if (!config) {
     return null;
   }
+  const policy = await resolveAIPrivacySettings(pool, workspaceId);
   return {
-    provider: createAIProvider(config),
+    provider: createAIProvider(config, {
+      policy,
+      onWithheld: (event) =>
+        recordAIEgressWithheld(pool, { workspaceId, ...event }),
+    }),
     modelId: route.modelId,
     costInPerMillion: priced.costInPerMillion,
     costOutPerMillion: priced.costOutPerMillion,

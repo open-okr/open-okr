@@ -1,9 +1,14 @@
+import { aiEgressTargetOf } from "@openokr/adapters";
 import {
+  AI_CONTEXT_EGRESS_LEVELS,
+  type AIContextEgressLevel,
+  type AIPrivacySettings,
   ASSIST_FEATURE_KEYS,
   REVIEW_ASSIST_KEYS,
   RHYTHM_ASSIST_KEYS,
 } from "@openokr/core";
 import {
+  type AIProviderKind,
   BUDGET_METRICS,
   BUDGET_PERIODS,
   BUDGET_SCOPES,
@@ -20,6 +25,7 @@ import {
   restoreDefaultPrompt,
   saveBudget,
   saveFeature,
+  savePrivacy,
   savePrompt,
 } from "./actions.ts";
 import { AIForm } from "./ai-form.tsx";
@@ -470,20 +476,224 @@ export async function PromptsCard({
   );
 }
 
-export async function PrivacyCard() {
+/**
+ * Whether anything this workspace sends can leave its network.
+ *
+ * `unconfigured` when no tier routes anywhere, `local` when every tier that
+ * does routes to a provider at localhost or a private address, and `remote`
+ * otherwise. Only `local` greys the card out, as AI-NATIVE-PLAN §4 asks: with
+ * nothing configured yet, an administrator may still decide in advance.
+ */
+export type EgressState = "unconfigured" | "local" | "remote";
+
+/**
+ * The egress state from the tier routes and the provider configuration.
+ *
+ * **A row counts only when it is the one a call would use.** The host that
+ * builds a provider reads this workspace's row when it is enabled and holds
+ * a key, or is Ollama, which needs none (`resolveAICredential`). Any other
+ * route answers through the deployment's own key, whose address this page
+ * does not see, so it counts as remote. The card is greyed out only when every
+ * answer is known to stay: a disabled row at localhost must not make the card
+ * say nothing leaves while the deployment's remote provider answers.
+ */
+export function egressStateOf(
+  routes: readonly { readonly provider: string | null }[],
+  providers: readonly {
+    readonly provider: AIProviderKind;
+    readonly baseUrl: string | null;
+    readonly enabled: boolean;
+    readonly hasWorkspaceCredential: boolean;
+  }[],
+): EgressState {
+  const answering = routes.flatMap((route) =>
+    route.provider === null ? [] : [route.provider],
+  );
+  if (answering.length === 0) {
+    return "unconfigured";
+  }
+  const local = answering.every((kind) => {
+    const config = providers.find((one) => one.provider === kind);
+    if (!config?.enabled) {
+      return false;
+    }
+    const used = config.hasWorkspaceCredential || config.provider === "ollama";
+    return used && aiEgressTargetOf(config.provider, config.baseUrl).local;
+  });
+  return local ? "local" : "remote";
+}
+
+/** Catalogue keys for each level's name and what it means. */
+const LEVEL_WORDS: Readonly<
+  Record<
+    AIContextEgressLevel,
+    { readonly label: string; readonly help: string }
+  >
+> = {
+  all: {
+    label: "admin.ai.privacy.levelAll",
+    help: "admin.ai.privacy.levelAllHelp",
+  },
+  assists: {
+    label: "admin.ai.privacy.levelAssists",
+    help: "admin.ai.privacy.levelAssistsHelp",
+  },
+  none: {
+    label: "admin.ai.privacy.levelNone",
+    help: "admin.ai.privacy.levelNoneHelp",
+  },
+};
+
+/**
+ * The privacy and egress card (AI-NATIVE-PLAN §4, completeness review M-10).
+ *
+ * **It was three paragraphs of static text**, one of which was not true: it
+ * said an assist sends only what it drafts from, while the copilot sent its
+ * passages and the search index sent every item's text, and nothing an
+ * administrator could touch changed any of it. Each control here is enforced
+ * around every provider the product builds, in `packages/adapters`, so what
+ * the card says is what the call path does.
+ *
+ * **Every sentence names its limit.** Redaction covers addresses and numbers
+ * and says names are sent. No-training names the one provider that takes the
+ * instruction and says what decides for the rest. A reader who trusts this
+ * card should not be surprised by what it did not say.
+ */
+export async function PrivacyCard({
+  privacy,
+  egress,
+}: {
+  /** As `ai.readPrivacySettings` returns them. */
+  readonly privacy: AIPrivacySettings;
+  readonly egress: EgressState;
+}) {
   const { t } = await getTranslations();
+  const local = egress === "local";
 
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-sm font-bold text-ink">
-          {t("admin.ai.governance.privacyAndEgress")}
-        </h2>
+        <div className="flex min-w-0 flex-col">
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.ai.governance.privacyAndEgress")}
+          </h2>
+          <p className="text-xs text-ink-3">
+            {t("admin.ai.privacy.whatMayLeave")}
+          </p>
+        </div>
       </CardHeader>
-      <CardBody className="flex flex-col gap-1.5 text-xs text-ink-3">
-        <p>{t("admin.ai.governance.withNoProviderConfigured")}</p>
-        <p>{t("admin.ai.governance.withOneConfiguredAn")}</p>
-        <p>{t("admin.ai.governance.aBaseUrlOn")}</p>
+      <CardBody className="flex flex-col gap-3">
+        {egress === "unconfigured" ? (
+          <p className="text-xs text-ink-3">
+            {t("admin.ai.governance.withNoProviderConfigured")}
+          </p>
+        ) : null}
+        {local ? (
+          <p className="rounded-md border border-info-dot bg-info-bg px-2.5 py-1.5 text-xs text-info">
+            {t("admin.ai.privacy.zeroEgress")}
+          </p>
+        ) : null}
+
+        <AIForm action={savePrivacy}>
+          {/* Greyed out rather than hidden on a local provider: the settings
+              are still stored and apply the moment a remote one is routed. */}
+          <fieldset
+            disabled={local}
+            className="flex flex-col gap-3 disabled:opacity-60"
+          >
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="mb-1 text-xs font-semibold text-ink-2">
+                {t("admin.ai.privacy.contextLevel")}
+              </legend>
+              {AI_CONTEXT_EGRESS_LEVELS.map((level) => (
+                <label key={level} className="flex items-start gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="contextEgress"
+                    value={level}
+                    defaultChecked={privacy.contextEgress === level}
+                    className="mt-0.5 size-4"
+                  />
+                  <span className="flex flex-col">
+                    <span className="text-ink">
+                      {t(LEVEL_WORDS[level].label)}
+                    </span>
+                    <span className="text-xs text-ink-3">
+                      {t(LEVEL_WORDS[level].help)}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="redactPersonalData"
+                defaultChecked={privacy.redactPersonalData}
+                className="mt-0.5 size-4"
+              />
+              <span className="flex flex-col">
+                <span className="text-ink">{t("admin.ai.privacy.redact")}</span>
+                <span className="text-xs text-ink-3">
+                  {t("admin.ai.privacy.redactHelp")}
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="noTraining"
+                defaultChecked={privacy.noTraining}
+                className="mt-0.5 size-4"
+              />
+              <span className="flex flex-col">
+                <span className="text-ink">
+                  {t("admin.ai.privacy.noTraining")}
+                </span>
+                <span className="text-xs text-ink-3">
+                  {t("admin.ai.privacy.noTrainingHelp")}
+                </span>
+              </span>
+            </label>
+
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="ai-privacy-hosts"
+                className="text-xs font-semibold text-ink-2"
+              >
+                {t("admin.ai.privacy.allowedHosts")}
+              </label>
+              <textarea
+                id="ai-privacy-hosts"
+                name="allowedHosts"
+                rows={3}
+                defaultValue={privacy.allowedHosts.join("\n")}
+                placeholder={t("admin.ai.privacy.allowedHostsPlaceholder")}
+                aria-describedby="ai-privacy-hosts-help"
+                className="rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-xs text-ink"
+              />
+              <p id="ai-privacy-hosts-help" className="text-xs text-ink-3">
+                {t("admin.ai.privacy.allowedHostsHelp")}
+              </p>
+            </div>
+
+            <div>
+              <Button type="submit" variant="default" size="sm">
+                {t("common.save")}
+              </Button>
+            </div>
+          </fieldset>
+        </AIForm>
+
+        <div className="flex flex-col gap-1.5 border-t border-line pt-3 text-xs text-ink-3">
+          <p>{t("admin.ai.privacy.localExempt")}</p>
+          <p>{t("admin.ai.privacy.fromNowOn")}</p>
+          <p>{t("admin.ai.privacy.recorded")}</p>
+          <p>{t("admin.ai.privacy.keysAtRest")}</p>
+          <p>{t("admin.ai.governance.aBaseUrlOn")}</p>
+        </div>
       </CardBody>
     </Card>
   );

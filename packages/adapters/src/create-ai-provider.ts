@@ -11,33 +11,51 @@
  * `packages/adapters` reaches one, which is also what makes "adding a
  * provider is a new driver behind the same port, never a change to feature
  * code" (AI-NATIVE-PLAN §3.2) true in practice and not just in wording.
+ *
+ * **It is also the one place egress is decided** (completeness review M-10).
+ * Every provider it returns is wrapped in `EgressGuardedProvider`, and the
+ * egress controls are a required argument rather than an option, so there is
+ * no way to be handed a driver that skips them. A caller with no policy to
+ * pass has no business reaching a provider.
  */
 
 import {
+  ANTHROPIC_BASE_URL,
   ANTHROPIC_DEFAULT_TIER_MODELS,
   AnthropicProvider,
 } from "./drivers/ai/anthropic.ts";
 import {
+  GOOGLE_BASE_URL,
   GOOGLE_DEFAULT_TIER_MODELS,
   GoogleProvider,
 } from "./drivers/ai/google.ts";
 import { OffAIProvider } from "./drivers/ai/off.ts";
 import {
+  OLLAMA_DEFAULT_BASE_URL,
   OLLAMA_DEFAULT_TIER_MODELS,
   OllamaProvider,
 } from "./drivers/ai/ollama.ts";
 import {
+  OPENAI_BASE_URL,
   OPENAI_DEFAULT_TIER_MODELS,
   OpenAiProvider,
 } from "./drivers/ai/openai.ts";
 import { OpenAiCompatibleProvider } from "./drivers/ai/openai-compatible.ts";
 import {
+  OPENROUTER_BASE_URL,
   OPENROUTER_DEFAULT_TIER_MODELS,
   OpenRouterProvider,
 } from "./drivers/ai/openrouter.ts";
 import type { TierModelMap } from "./drivers/ai/tier-map.ts";
+import {
+  type AIEgressEvent,
+  type AIEgressPolicy,
+  type AIEgressTarget,
+  aiEgressTargetFromUrl,
+  EgressGuardedProvider,
+} from "./outbound/ai-egress.ts";
 import { createGuardedFetch } from "./outbound/guard.ts";
-import type { AIProvider } from "./ports/ai.ts";
+import type { AIProvider, AIPurpose } from "./ports/ai.ts";
 
 export type AIProviderConfig =
   | { readonly provider: "off" }
@@ -64,7 +82,63 @@ export type AIProviderConfig =
       readonly guardOutbound?: boolean;
     };
 
-export function createAIProvider(config: AIProviderConfig): AIProvider {
+/** What every provider is built with: the workspace's egress controls. */
+export interface AIEgressOptions {
+  readonly policy: AIEgressPolicy;
+  /** Told what a control withheld or replaced. Never given the text. */
+  readonly onWithheld?: (event: AIEgressEvent) => void | Promise<void>;
+}
+
+/** A provider as `createAIProvider` returns it: guarded, and able to say so. */
+export type GuardedAIProvider = AIProvider & {
+  readonly target: AIEgressTarget;
+  permits(purpose: AIPurpose): boolean;
+};
+
+/**
+ * Where a provider's requests go, from its kind and the base URL configured
+ * for it.
+ *
+ * Only Ollama and an OpenAI-compatible endpoint take an address; the other
+ * drivers always call their vendor's own host, whatever a stored base URL
+ * says, so that is the host checked. Exported for the console, which greys
+ * the privacy card out when every tier is answered locally.
+ */
+export function aiEgressTargetOf(
+  provider: AIProviderConfig["provider"],
+  baseUrl: string | null,
+): AIEgressTarget {
+  switch (provider) {
+    case "off":
+      // Nothing is ever sent, which is as local as anything gets.
+      return { host: null, local: true };
+    case "anthropic":
+      return aiEgressTargetFromUrl(ANTHROPIC_BASE_URL);
+    case "openai":
+      return aiEgressTargetFromUrl(OPENAI_BASE_URL);
+    case "google":
+      return aiEgressTargetFromUrl(GOOGLE_BASE_URL);
+    case "openrouter":
+      return aiEgressTargetFromUrl(OPENROUTER_BASE_URL);
+    case "ollama":
+      return aiEgressTargetFromUrl(baseUrl ?? OLLAMA_DEFAULT_BASE_URL);
+    case "openai-compatible":
+      return aiEgressTargetFromUrl(baseUrl);
+  }
+}
+
+function baseUrlOf(config: AIProviderConfig): string | null {
+  switch (config.provider) {
+    case "ollama":
+      return config.baseUrl ?? null;
+    case "openai-compatible":
+      return config.baseURL;
+    default:
+      return null;
+  }
+}
+
+function driverFor(config: AIProviderConfig, noTraining: boolean): AIProvider {
   switch (config.provider) {
     case "off":
       return new OffAIProvider();
@@ -79,6 +153,7 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
         apiKey: config.apiKey,
         appUrl: config.appUrl,
         appName: config.appName,
+        noTraining,
       });
     case "ollama":
       return new OllamaProvider({
@@ -92,6 +167,22 @@ export function createAIProvider(config: AIProviderConfig): AIProvider {
         ...(config.guardOutbound ? { fetch: createGuardedFetch() } : {}),
       });
   }
+}
+
+export function createAIProvider(
+  config: AIProviderConfig,
+  egress: AIEgressOptions,
+): GuardedAIProvider {
+  const target = aiEgressTargetOf(config.provider, baseUrlOf(config));
+  // A no-training instruction to a provider on this machine would be an
+  // instruction to nobody, so it rides only on a request that leaves.
+  const noTraining = egress.policy.noTraining && !target.local;
+  return new EgressGuardedProvider(driverFor(config, noTraining), {
+    provider: config.provider,
+    target,
+    policy: egress.policy,
+    ...(egress.onWithheld ? { onWithheld: egress.onWithheld } : {}),
+  });
 }
 
 /** Every driver's own seed (AI-NATIVE-PLAN §3.4): "a driver added without a

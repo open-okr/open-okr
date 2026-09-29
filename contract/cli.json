@@ -2756,6 +2756,56 @@
       "pages": false
     },
     {
+      "name": "ai readPrivacySettings",
+      "action": "ai.readPrivacySettings",
+      "method": "GET",
+      "path": "/ai/readPrivacySettings",
+      "scope": "read",
+      "summary": "The workspace's AI egress controls: context level, personal-data redaction, no-training and the host allow-list.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "ai updatePrivacySettings",
+      "action": "ai.updatePrivacySettings",
+      "method": "POST",
+      "path": "/ai/updatePrivacySettings",
+      "scope": "write",
+      "summary": "Change what may leave for an AI provider off this network: the context level, redaction, no-training and the host allow-list.",
+      "flags": [
+        {
+          "name": "context-egress",
+          "field": "contextEgress",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "all",
+            "assists",
+            "none"
+          ]
+        },
+        {
+          "name": "redact-personal-data",
+          "field": "redactPersonalData",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "no-training",
+          "field": "noTraining",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "allowed-hosts",
+          "field": "allowedHosts",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "agents list",
       "action": "agents.list",
       "method": "GET",

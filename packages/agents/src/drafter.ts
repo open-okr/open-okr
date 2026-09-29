@@ -905,6 +905,7 @@ export function createProviderDrafter(
       try {
         const drafted = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: CHECK_IN_SHAPE,
           jsonSchema: CHECK_IN_JSON_SCHEMA,
@@ -941,6 +942,7 @@ export function createProviderDrafter(
       try {
         const { title } = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: TITLE_SHAPE,
           jsonSchema: TITLE_JSON_SCHEMA,
@@ -978,6 +980,10 @@ export function createProviderDrafter(
       try {
         const reply = await options.provider.chat({
           model: options.model,
+          // Passages retrieval found across the workspace, which a
+          // workspace on the `assists` egress level keeps here (M-10). The
+          // reader then gets the passages and no prose, §2.4's own fallback.
+          purpose: "retrieval",
           messages: copilotMessages(context),
           maxTokens: COPILOT_MAX_TOKENS,
         });
@@ -1034,6 +1040,7 @@ export function createProviderDrafter(
       try {
         for await (const piece of options.provider.stream({
           model: options.model,
+          purpose: "retrieval",
           messages: copilotMessages(context),
           maxTokens: COPILOT_MAX_TOKENS,
         })) {
@@ -1091,6 +1098,7 @@ export function createProviderDrafter(
       try {
         const reply = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: PROPOSAL_SHAPE,
           jsonSchema: PROPOSAL_JSON_SCHEMA,
@@ -1146,6 +1154,7 @@ export function createProviderDrafter(
       try {
         const drafted = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: OBJECTIVE_SHAPE,
           jsonSchema: OBJECTIVE_JSON_SCHEMA,
@@ -1186,6 +1195,7 @@ export function createProviderDrafter(
       try {
         return await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: MEASURE_SHAPE,
           jsonSchema: MEASURE_JSON_SCHEMA,
@@ -1227,6 +1237,7 @@ export function createProviderDrafter(
       try {
         const picked = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: PARENT_SHAPE,
           jsonSchema: PARENT_JSON_SCHEMA,
@@ -1274,6 +1285,7 @@ export function createProviderDrafter(
       try {
         const { narrative } = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: DIGEST_NARRATION_SHAPE,
           jsonSchema: DIGEST_NARRATION_JSON_SCHEMA,
@@ -1300,6 +1312,7 @@ export function createProviderDrafter(
       try {
         const narrated = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: TREND_SHAPE,
           jsonSchema: TREND_JSON_SCHEMA,
@@ -1345,6 +1358,7 @@ export function createProviderDrafter(
       try {
         const parsed = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: FILTER_SHAPE,
           jsonSchema: FILTER_JSON_SCHEMA,
@@ -1395,6 +1409,7 @@ export function createProviderDrafter(
       try {
         const parsed = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: MAPPING_SHAPE,
           jsonSchema: MAPPING_JSON_SCHEMA,
@@ -1448,6 +1463,7 @@ export function createProviderDrafter(
       try {
         const { summary } = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: BLOCKER_SUMMARY_SHAPE,
           jsonSchema: BLOCKER_SUMMARY_JSON_SCHEMA,
@@ -1485,6 +1501,7 @@ export function createProviderDrafter(
       try {
         const suggested = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: KPI_SHAPE,
           jsonSchema: KPI_JSON_SCHEMA,
@@ -1540,6 +1557,7 @@ export function createProviderDrafter(
       try {
         return await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: THEMES_SHAPE,
           jsonSchema: THEMES_JSON_SCHEMA,
@@ -1575,6 +1593,7 @@ export function createProviderDrafter(
       try {
         const { text } = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: PROSE_SHAPE,
           jsonSchema: PROSE_JSON_SCHEMA,
@@ -1615,6 +1634,7 @@ export function createProviderDrafter(
       try {
         const { text } = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: PROSE_SHAPE,
           jsonSchema: PROSE_JSON_SCHEMA,
@@ -1646,6 +1666,7 @@ export function createProviderDrafter(
       try {
         const { text } = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: PROSE_SHAPE,
           jsonSchema: PROSE_JSON_SCHEMA,
@@ -1688,6 +1709,7 @@ export function createProviderDrafter(
       try {
         const { objectives } = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: OBJECTIVES_SHAPE,
           jsonSchema: OBJECTIVES_JSON_SCHEMA,
@@ -1719,6 +1741,7 @@ export function createProviderDrafter(
       try {
         const { rewritten } = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: REWRITE_SHAPE,
           jsonSchema: REWRITE_JSON_SCHEMA,
@@ -1777,6 +1800,7 @@ export function createProviderDrafter(
       try {
         const { findings } = await extractStructured({
           provider: options.provider,
+          purpose: "assist",
           model: options.model,
           schema: REVIEW_SHAPE,
           jsonSchema: REVIEW_JSON_SCHEMA,
