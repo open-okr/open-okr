@@ -4172,7 +4172,7 @@
     },
     {
       "name": "agents.startRun",
-      "description": "Starts a run for an agent against an already-decomposed task list.",
+      "description": "Starts a run for an agent against an already-decomposed task list, and queues its first step.",
       "inputSchema": {
         "type": "object",
         "properties": {

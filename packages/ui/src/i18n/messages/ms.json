@@ -186,6 +186,7 @@
   "admin.agents.scheduleNightly": "Setiap malam",
   "admin.agents.scheduleWeekly": "Sekali seminggu",
   "admin.agents.shown": "{length} dipaparkan",
+  "admin.agents.stepsDone": "Langkah selesai: {done} daripada {total}",
   "admin.agents.theAgents": "Ejen",
   "admin.agents.thisWorkspaceHasNo": "Ruang kerja ini tiada ejen. Itu luar biasa: Champion dicipta secara automatik semasa penyediaan.",
   "admin.agents.whatTheAgentsDid": "Apa yang dilakukan oleh ejen, dan kepada siapa, dilindungi oleh kebenaran bimbingan. Tanya pentadbir ruang kerja.",

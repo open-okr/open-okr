@@ -87,7 +87,7 @@ the machine-readable document.
 | `agents.runCoach`<br/>Runs the Coach's quality pass once, recording what fired in its run log. | `POST /api/v1/agents/runCoach` | writes |
 | `agents.setAutonomy`<br/>Moves an agent between sandbox, propose and scoped direct. | `POST /api/v1/agents/setAutonomy` | writes |
 | `agents.setEnabled`<br/>Turns an agent on or off. | `POST /api/v1/agents/setEnabled` | writes |
-| `agents.startRun`<br/>Starts a run for an agent against an already-decomposed task list. | `POST /api/v1/agents/startRun` | writes |
+| `agents.startRun`<br/>Starts a run for an agent against an already-decomposed task list, and queues its first step. | `POST /api/v1/agents/startRun` | writes |
 
 ## ai
 

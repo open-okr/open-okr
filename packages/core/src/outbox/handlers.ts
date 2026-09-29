@@ -33,6 +33,12 @@ import type { Pool } from "pg";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
 import {
+  AGENT_RUN_STEP_TOPIC,
+  type AgentRunStepJob,
+  type AgentRunStepOutcome,
+  parseAgentRunStepJob,
+} from "../agents/run-steps.ts";
+import {
   BLOB_SCAN_TOPIC,
   parseScanJob,
   runScanJob,
@@ -165,6 +171,17 @@ export interface OutboxHandlerDeps {
   readonly drafterFor?: (
     workspaceId: string,
   ) => Promise<AgentDrafter | null | undefined>;
+  /**
+   * Takes one step of an agent run (completeness review M-11).
+   *
+   * A function rather than the run executor itself, because the executor
+   * lives in `packages/agents`, which depends on this package. The host joins
+   * the two, and resolves the run's AI provider through its one choke point
+   * while it does. Absent means this process runs no agents.
+   */
+  readonly continueAgentRun?: (
+    job: AgentRunStepJob,
+  ) => Promise<AgentRunStepOutcome>;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
   /**
@@ -726,6 +743,35 @@ const scanBlob: OutboxHandler = async (delivery, deps) => {
   }
 };
 
+/**
+ * Takes the next step of an agent run (completeness review M-11).
+ *
+ * **The run advances one task per delivery.** Each step that leaves tasks
+ * behind enqueues the next one in its own transaction, so a run survives a
+ * restart between any two steps: what is left to do is on the run row, not in
+ * this process.
+ *
+ * **Safe to run twice** by the task index on the row: a step delivered again
+ * after the run moved past it finds a different index and is skipped, and so
+ * is one for a run somebody cancelled in the meantime.
+ */
+const continueAgentRun: OutboxHandler = async (delivery, deps) => {
+  const job = parseAgentRunStepJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not carry a run and a task index, so no step can be taken.`,
+    );
+  }
+  if (!deps.continueAgentRun) {
+    deps.onSkipped?.(delivery, "this process runs no agents");
+    return;
+  }
+  const outcome = await deps.continueAgentRun(job);
+  if (outcome.kind === "skipped") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -766,6 +812,10 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // (P4-T14b-b). Before this, an answer existed only inside one HTTP response
   // and closing the tab took the run with it.
   "copilot.run": runCopilot,
+  // One step of an agent run (completeness review M-11). The executor has
+  // written this topic since P2-T17 and nothing read it, so a run started
+  // through `agents.startRun` sat at its first task forever.
+  [AGENT_RUN_STEP_TOPIC]: continueAgentRun,
   // The virus scan (completeness review M-24). Written by a claim only when a
   // scanner is configured, so an instance without one never sees this topic.
   [BLOB_SCAN_TOPIC]: scanBlob,

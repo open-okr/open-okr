@@ -69,8 +69,11 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "the background run calls it from the outbox handler, with no browser in the picture at all, which is the point of P4-T14b-b",
   "copilot.recordProposal": "the pipeline calls it, from the copilot route",
   "agents.create": "the pipeline calls it, from workspace provisioning",
+  // M-11. A run is a task list, and a screen to write one waits on how a
+  // custom agent plans its own runs, which is a decision still open. The
+  // run it starts is visible on the agents screen as it moves.
   "agents.startRun":
-    "another surface owns it: the agent endpoint and the scheduler",
+    "another surface owns it: the REST surface, the command line and the agent endpoint, which submit a task list; the outbox relay carries the run from there",
   "agents.readRun": "another surface owns it: the agent endpoint",
   "ai.setPersonalCredential":
     "no screen yet, and it is P7's own row for personal keys",

@@ -132,6 +132,12 @@ export type {
   TrendPoint,
 } from "./agents/drafter.ts";
 export {
+  AGENT_RUN_STEP_TOPIC,
+  type AgentRunStepJob,
+  type AgentRunStepOutcome,
+  agentRunStep,
+} from "./agents/run-steps.ts";
+export {
   ASSIST_FEATURE_KEYS,
   REVIEW_ASSIST_KEYS,
   RHYTHM_ASSIST_KEYS,
@@ -141,6 +147,7 @@ export {
   checkBudget,
   checkFeatureAvailability,
   type FeatureAvailability,
+  isOverAgentBudget,
   isOverHardCap,
 } from "./ai/budgets.ts";
 export {

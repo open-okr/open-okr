@@ -237,3 +237,39 @@ export async function isOverHardCap(
   }
   return { over: false };
 }
+
+/**
+ * Whether one agent is over its own budget, on any metric it has configured
+ * (completeness review M-11).
+ *
+ * AI-NATIVE-PLAN §6.5: "Per-agent and per-workspace caps halt a run
+ * mid-flight". The workspace half was `isOverHardCap` above; this is the
+ * other half, and it stops only that agent, which is the lighter consequence
+ * the header of this file gives a smaller scope.
+ */
+export async function isOverAgentBudget(
+  pool: Pool,
+  input: {
+    readonly workspaceId: string;
+    readonly agentId: string;
+    readonly now?: Date;
+  },
+): Promise<{ readonly over: boolean; readonly reason?: string }> {
+  const metrics: BudgetMetric[] = ["cost", "tokens", "calls"];
+  for (const metric of metrics) {
+    const result = await checkBudget(pool, {
+      workspaceId: input.workspaceId,
+      scope: "agent",
+      scopeRef: input.agentId,
+      metric,
+      now: input.now,
+    });
+    if (result.configured && !result.withinLimit) {
+      return {
+        over: true,
+        reason: `This agent's ${metric} budget is at ${result.current} of ${result.limit} for the current ${result.period}.`,
+      };
+    }
+  }
+  return { over: false };
+}

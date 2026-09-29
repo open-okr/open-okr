@@ -7,11 +7,16 @@
  * `agents.startRun` accepts an already-decomposed task list rather than
  * calling a real model to plan one: real planning is `extractStructured`
  * (`packages/agents`) against the agent's own `planningInstructions`, and
- * that has no real feature caller yet, the same "mechanism proven, no live
- * caller" scope P2-T13/T14/T15/T16 already carry. What actually processes
- * a task — the write-policy dispatch, the binding check, the append-only
- * log — is `packages/agents/src/run-executor.ts`, not this file, matching
- * TECHNICAL-PLAN §1's own package table: run state machines live there.
+ * which actions a planner may choose and what it is shown are still open
+ * (completeness review M-11 left them for a person to decide). What actually
+ * processes a task — the write-policy dispatch, the binding check, the
+ * append-only log — is `packages/agents/src/run-executor.ts`, not this file,
+ * matching TECHNICAL-PLAN §1's own package table: run state machines live
+ * there.
+ *
+ * **Starting a run enqueues its first step** (M-11). It wrote the run row and
+ * nothing else from P2-T17 onward, and nothing read the executor's own
+ * continuation rows either, so a run started here never took a step.
  */
 import {
   AGENT_AUTONOMIES,
@@ -30,7 +35,7 @@ import {
   workspaceMembers,
   workspaces,
 } from "@openokr/db";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
@@ -38,11 +43,12 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
 import { championInTx } from "../agents/champion.ts";
 import { coachInTx } from "../agents/coach.ts";
+import { agentRunStep } from "../agents/run-steps.ts";
 import { type NudgeCadence, runAgentNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_AGENT_RUN_COST_CAP_USD } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
-import { callAction } from "./registry.ts";
+import { callAction, getAction } from "./registry.ts";
 
 /**
  * What each run records as its trigger (P4-T05b, P4-T06a).
@@ -436,7 +442,15 @@ const runOutput = z.object({
 });
 
 const taskSchema = z.object({
-  action: z.string().min(1),
+  // One the registry has (M-11). A task naming nothing would reach the run as
+  // an error at best, and in propose mode as a proposal nobody could apply.
+  // Read lazily, because the registry imports this file.
+  action: z
+    .string()
+    .min(1)
+    .refine((name) => getAction(name) !== undefined, {
+      message: "No action has that name.",
+    }),
   input: z.record(z.string(), z.unknown()),
   subjectType: z.string().optional(),
   subjectId: z.uuid().optional(),
@@ -444,7 +458,8 @@ const taskSchema = z.object({
 
 export const startAgentRun = defineWriteAction({
   name: "agents.startRun",
-  summary: "Starts a run for an agent against an already-decomposed task list.",
+  summary:
+    "Starts a run for an agent against an already-decomposed task list, and queues its first step.",
   input: z.object({
     agentId: z.uuid(),
     trigger: z.string().trim().min(1),
@@ -514,6 +529,11 @@ export const startAgentRun = defineWriteAction({
           targetId: loaded.id,
           payload: { trigger: input.trigger, taskCount: input.tasks.length },
         },
+        // The first step, in the transaction that wrote the run (M-11). A run
+        // row with no step queued is a run that says it is running and never
+        // will, which is what every run started here was until now. Each
+        // step queues the next one the same way.
+        outbox: [agentRunStep({ workspaceId, runId: run.id, taskIndex: 0 })],
       };
     },
   }),
@@ -1311,6 +1331,13 @@ export const listAgentRuns = defineReadAction({
       agentName: z.string(),
       trigger: z.string(),
       status: z.string(),
+      /**
+       * How far a run that works through a task list has got (M-11). Zero
+       * and zero for the Coach's and the Champion's runs, which carry no
+       * list: each of those is one step.
+       */
+      currentTaskIndex: z.number().int(),
+      taskCount: z.number().int(),
       log: z.array(
         z.object({
           at: z.string(),
@@ -1336,6 +1363,10 @@ export const listAgentRuns = defineReadAction({
           agentName: agents.name,
           trigger: agentRuns.trigger,
           status: agentRuns.status,
+          currentTaskIndex: agentRuns.currentTaskIndex,
+          // Counted in the database, so a list of twenty runs does not carry
+          // every task's payload across just to be measured.
+          taskCount: sql<number>`jsonb_array_length(${agentRuns.tasks})`,
           log: agentRuns.log,
           cost: agentRuns.cost,
           error: agentRuns.error,
@@ -1350,6 +1381,7 @@ export const listAgentRuns = defineReadAction({
     );
     return rows.map((row) => ({
       ...row,
+      taskCount: Number(row.taskCount),
       log: [...row.log],
       cost: Number(row.cost),
       startedAt: row.startedAt?.toISOString() ?? null,

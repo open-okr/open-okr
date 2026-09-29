@@ -242,6 +242,17 @@ export default async function AgentsPage() {
                       </span>
                     </span>
                     <span className="flex items-center gap-2">
+                      {/* How far a run through a task list has got (M-11).
+                          The Coach's and the Champion's runs carry no list,
+                          so they show none. */}
+                      {run.taskCount > 0 ? (
+                        <span className="text-xs tabular-nums text-ink-3">
+                          {t("admin.agents.stepsDone", {
+                            done: Math.min(run.currentTaskIndex, run.taskCount),
+                            total: run.taskCount,
+                          })}
+                        </span>
+                      ) : null}
                       <Chip tone={STATUS_TONE[run.status] ?? "neutral"}>
                         {run.status}
                       </Chip>

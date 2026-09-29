@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
+import { AGENT_RUN_STEP_TOPIC } from "../agents/run-steps.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import {
   dispatchOutbox,
@@ -195,6 +196,56 @@ describe("embedding", () => {
   });
 });
 
+describe("agent run steps (M-11)", () => {
+  const step = (payload: Record<string, unknown>) =>
+    delivery(AGENT_RUN_STEP_TOPIC, payload);
+  const job = { workspaceId: "w1", runId: "r1", taskIndex: 2 };
+
+  it("hands the step to the host's runner", async () => {
+    const { skipped, deps } = recorder();
+    const taken: unknown[] = [];
+    await dispatchOutbox(step(job), {
+      ...deps,
+      continueAgentRun: async (given) => {
+        taken.push(given);
+        return { kind: "stepped" };
+      },
+    });
+    expect(taken).toEqual([job]);
+    expect(skipped).toEqual([]);
+  });
+
+  it("reports a step the runner skipped, rather than failing it", async () => {
+    const { skipped, deps } = recorder();
+    await dispatchOutbox(step(job), {
+      ...deps,
+      continueAgentRun: async () => ({
+        kind: "skipped",
+        reason: "the run is cancelled",
+      }),
+    });
+    expect(skipped).toEqual([[AGENT_RUN_STEP_TOPIC, "the run is cancelled"]]);
+  });
+
+  it("skips when this process runs no agents", async () => {
+    const { skipped, deps } = recorder();
+    await dispatchOutbox(step(job), deps);
+    expect(skipped).toEqual([
+      [AGENT_RUN_STEP_TOPIC, "this process runs no agents"],
+    ]);
+  });
+
+  it("fails permanently on a row that names no task index", async () => {
+    const { deps } = recorder();
+    await expect(
+      dispatchOutbox(step({ workspaceId: "w1", runId: "r1" }), {
+        ...deps,
+        continueAgentRun: async () => ({ kind: "stepped" }),
+      }),
+    ).rejects.toMatchObject({ name: "PermanentDispatchError" });
+  });
+});
+
 describe("the table against the code that enqueues", () => {
   /**
    * The gate that stops a producer shipping ahead of its consumer.
@@ -240,5 +291,9 @@ describe("the table against the code that enqueues", () => {
     // scan above cannot see.
     expect(EMBED_TOPIC in OUTBOX_HANDLERS).toBe(true);
     expect(CHANNEL_MESSAGE_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    // Enqueued by `agents.startRun` and by the run executor in
+    // `packages/agents`, which this scan does not read (M-11). The executor
+    // wrote it from P2-T17 with nothing to read it.
+    expect(AGENT_RUN_STEP_TOPIC in OUTBOX_HANDLERS).toBe(true);
   });
 });

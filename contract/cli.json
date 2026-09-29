@@ -2996,7 +2996,7 @@
       "method": "POST",
       "path": "/agents/startRun",
       "scope": "write",
-      "summary": "Starts a run for an agent against an already-decomposed task list.",
+      "summary": "Starts a run for an agent against an already-decomposed task list, and queues its first step.",
       "flags": [
         {
           "name": "agent-id",

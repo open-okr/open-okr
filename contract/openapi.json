@@ -14878,7 +14878,7 @@
     "/agents/startRun": {
       "post": {
         "operationId": "agents.startRun",
-        "summary": "Starts a run for an agent against an already-decomposed task list.",
+        "summary": "Starts a run for an agent against an already-decomposed task list, and queues its first step.",
         "tags": [
           "agents"
         ],
@@ -15624,6 +15624,16 @@
                           "status": {
                             "type": "string"
                           },
+                          "currentTaskIndex": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "taskCount": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
                           "log": {
                             "type": "array",
                             "items": {
@@ -15681,6 +15691,8 @@
                           "agentName",
                           "trigger",
                           "status",
+                          "currentTaskIndex",
+                          "taskCount",
                           "log",
                           "cost",
                           "error",

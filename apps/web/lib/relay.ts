@@ -36,6 +36,7 @@ import {
   TelegramChannel,
   WhatsAppChannel,
 } from "@openokr/adapters";
+import { continueAgentRun } from "@openokr/agents";
 import { type Env, loadEnv } from "@openokr/config";
 import {
   dispatchOutbox,
@@ -50,6 +51,7 @@ import {
   parseTelegramSecret,
   parseWhatsAppSecret,
 } from "@openokr/core";
+import { providerForTier } from "./ai-provider";
 import { drafterFor } from "./drafter";
 import { embedFor } from "./embedder";
 import { getInstanceName } from "./instance-name";
@@ -106,6 +108,19 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
      * database and an administrator can change either while this runs.
      */
     drafterFor: (id: string) => drafterFor(id),
+    /**
+     * One step of an agent run (completeness review M-11).
+     *
+     * The model comes from `providerForTier`, the one place a provider is
+     * built, so the workspace's egress controls ride on it. Resolved per
+     * step, for the reason everything else here is resolved per delivery:
+     * an administrator can switch the provider off while a run is going,
+     * and the next step should see that.
+     */
+    continueAgentRun: (job) =>
+      continueAgentRun(getPool(), job, {
+        modelFor: (id, tier) => providerForTier(id, tier),
+      }),
     async publish(channel, event, data) {
       await getRealtime().publish(channel, { name: event, data });
     },

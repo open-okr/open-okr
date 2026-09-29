@@ -186,6 +186,7 @@
   "admin.agents.scheduleNightly": "Nightly",
   "admin.agents.scheduleWeekly": "Once a week",
   "admin.agents.shown": "{length} shown",
+  "admin.agents.stepsDone": "Steps done: {done} of {total}",
   "admin.agents.theAgents": "The agents",
   "admin.agents.thisWorkspaceHasNo": "This workspace has no agents. That is unusual: the Champion is\n              seeded at provisioning.",
   "admin.agents.whatTheAgentsDid": "What the agents did, and to whom, is behind the coaching\n              permission. Ask a workspace administrator.",
