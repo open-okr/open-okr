@@ -386,6 +386,35 @@ describe("access, which is the space's and the owner's", () => {
     expect(rows.map((row) => row.level)).toEqual([100]);
   });
 
+  it("hands an imported initiative to its importer, raising their grant to full", async () => {
+    // Found while fixing M-17. The import bound its actor at edit, and handing
+    // them the initiative later bound the same group again at full, which the
+    // unique index refused.
+    const created = await createInitiative({
+      ownerId: otherMemberId,
+      legacy: { type: "csv", id: "init-later" },
+    });
+    await call(
+      "initiatives.update",
+      { id: created.id, ownerId: ownerMemberId },
+      OTHER,
+    );
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ level: number }>(
+      `select b.level from access_bindings b
+         join access_groups g on g.id = b.group_id
+         join access_contexts c on c.id = b.context_id
+        where c.resource_type = 'initiative'
+          and c.resource_id = $1
+          and g.kind = 'member'
+          and g.member_id = $2
+          and b.deleted_at is null`,
+      [created.id, ownerMemberId],
+    );
+    expect(rows.map((row) => row.level)).toEqual([100]);
+  });
+
   it("asks a destructive action for both gates, exactly as goals.delete does", async () => {
     // Owning a thing does not make somebody able to delete things: the
     // workspace-level `full` is checked first, and an ordinary member does not

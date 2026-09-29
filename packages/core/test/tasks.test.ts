@@ -633,6 +633,34 @@ describe("assignment, which is an access change", () => {
     expect(rows.map((row) => row.level)).toEqual([70]);
   });
 
+  it("assigns the member who imported a task, later", async () => {
+    // Found while fixing M-17. The import binds its actor at edit; assigning
+    // that member afterwards bound the same group again and the unique index
+    // refused the assignment.
+    const task = await createTask("Rewrite the first-run screen", {
+      legacy: { type: "csv", id: "task-later" },
+    });
+    const assigned = (await call("tasks.assign", {
+      id: task.id,
+      memberId: ownerMemberId,
+    })) as { assigned: boolean };
+    expect(assigned.assigned).toBe(true);
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ level: number }>(
+      `select b.level from access_bindings b
+         join access_groups g on g.id = b.group_id
+         join access_contexts c on c.id = b.context_id
+        where c.resource_type = 'task'
+          and c.resource_id = $1
+          and g.kind = 'member'
+          and g.member_id = $2
+          and b.deleted_at is null`,
+      [task.id, ownerMemberId],
+    );
+    expect(rows.map((row) => row.level)).toEqual([70]);
+  });
+
   it("assigns the same member twice as one assignment", async () => {
     const task = await createTask("Rewrite the first-run screen");
     const first = (await call("tasks.assign", {
