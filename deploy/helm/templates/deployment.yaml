@@ -130,6 +130,13 @@ spec:
                   name: {{ .Values.storage.s3.existingSecret }}
                   key: {{ .Values.storage.s3.secretAccessKeyKey }}
             {{- end }}
+            {{- /* The optional virus scan. Absent unless a host is named. */}}
+            {{- with .Values.scan.clamd.host }}
+            - name: OPENOKR_CLAMD_HOST
+              value: {{ . | quote }}
+            - name: OPENOKR_CLAMD_PORT
+              value: {{ $.Values.scan.clamd.port | quote }}
+            {{- end }}
           # Ready means the database answers, not merely that the port is open.
           # A pod that is listening but cannot reach Postgres must not receive
           # traffic during a rollout.

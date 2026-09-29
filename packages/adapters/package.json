@@ -27,6 +27,7 @@
     "openai": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
+    "sharp": "catalog:",
     "ws": "catalog:"
   },
   "devDependencies": {

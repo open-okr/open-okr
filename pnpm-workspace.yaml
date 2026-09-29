@@ -37,6 +37,13 @@ catalog:
   # SDK, behind the Mailer port.
   nodemailer: ^10.0.10
   "@types/nodemailer": ^8.0.2
+  # Image re-encoding and thumbnails (completeness review M-24), approved by
+  # the human on 28 September 2026. Apache-2.0, and its prebuilt libvips
+  # binaries are LGPL-3.0-or-later, which the licence gate already allows.
+  # The same range `next` asks for as its own optional dependency, so the
+  # lockfile holds one copy. Confined to packages/adapters behind the
+  # ImageProcessor port; `pnpm check:boundaries` refuses it anywhere else.
+  sharp: ^0.35.4
   # Already used by the environment schema. Shared here so the action contract
   # registry validates against the same version the boundary does.
   zod: 4.6.5

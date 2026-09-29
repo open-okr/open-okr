@@ -495,8 +495,24 @@ export {
   usedBytes,
 } from "./blobs/quota.ts";
 export {
+  BLOB_SCAN_TOPIC,
+  type ClamdSettings,
+  readSettingsFrom,
+  resolveClamdSettings,
+  type ScanFile,
+  type ScanOutcome,
+} from "./blobs/scan.ts";
+export {
+  type ImageRefusal,
+  ImageRefusedError,
+  type StoredUpload,
+  storeUpload,
+  type UploadPorts,
+} from "./blobs/upload.ts";
+export {
   ALLOWED_CONTENT_TYPES,
   MAX_BLOB_BYTES,
+  MAX_IMAGE_PIXELS,
   type ValidationResult,
   validateUpload,
 } from "./blobs/validation.ts";

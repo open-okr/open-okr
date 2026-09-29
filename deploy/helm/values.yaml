@@ -154,6 +154,16 @@ storage:
     accessKeyIdKey: "access-key-id"
     secretAccessKeyKey: "secret-access-key"
 
+# The optional virus scan. Name a ClamAV daemon (clamd) the pods can reach and
+# every uploaded file waits as "being checked" until clamd has scanned it; a
+# file it flags is held back and never served. Empty is the default and means
+# no scan. clamd is not part of this chart: run it as its own Deployment, or
+# point at one you already have. Its signature updates are its own business.
+scan:
+  clamd:
+    host: ""
+    port: 3310
+
 serviceAccount:
   create: true
   name: ""

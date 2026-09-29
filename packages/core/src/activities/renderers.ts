@@ -71,6 +71,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : "The directory added someone",
   "blob.prepared": () => "A file upload was started",
   "blob.claimed": () => "A file was uploaded",
+  "blob.scanned": (payload) =>
+    (payload as { verdict: string }).verdict === "clean"
+      ? "A file passed its virus scan"
+      : "A file was held back by the virus scan",
   "space.settingsChanged": (payload) =>
     `${(payload as { name: string }).name} changed its own settings`,
   "agent.autonomy_changed": (payload) => {

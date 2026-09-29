@@ -99,6 +99,19 @@ COPY --from=build --chown=openokr:openokr /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=openokr:openokr /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=openokr:openokr /repo/apps/web/public ./apps/web/public
 
+# sharp re-encodes every uploaded image and draws its thumbnail (completeness
+# review M-24), so its native binary for this image's platform has to be in the
+# standalone output. The deps stage ran on Alpine, so pnpm installed the musl
+# builds, `@img/sharp-linuxmusl-*` and its libvips, and Next traces sharp with
+# both into the output it copies above. Proved here rather than assumed: this
+# encodes one pixel with the copy the server will load, so an image that lost
+# its binary fails to build instead of refusing every image upload once it is
+# running. Nothing is fetched: sharp's binaries are packages, not downloads.
+RUN set -e; \
+  sharp="$(ls -d /app/node_modules/.pnpm/sharp@*/node_modules/sharp 2>/dev/null | head -n 1)"; \
+  test -n "$sharp" || { echo "sharp is missing from the standalone output" >&2; exit 1; }; \
+  node -e "require(process.argv[1])({create:{width:1,height:1,channels:3,background:{r:0,g:0,b:0}}}).png().toBuffer().then(()=>console.log('sharp loads and encodes'),(e)=>{console.error(e);process.exit(1)})" "$sharp"
+
 # Migrations run from the image at boot, so the SQL and the runner ship with
 # it. This is what makes an upgrade one `docker compose pull` and restart.
 #

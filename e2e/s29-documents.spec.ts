@@ -238,6 +238,71 @@ test("a document carries files, and one survives a reload", async () => {
   expect(await response.text()).toBe("What this document is about.");
 });
 
+/**
+ * A 12 by 8 JPEG whose EXIF block names a camera, "M24TestCam", and carries a
+ * GPS latitude. Drawn with sharp and written out here so the suite holds no
+ * binary file and the fixture says what it holds.
+ */
+const PHOTO_WITH_EXIF = Buffer.from(
+  "/9j/4QEqRXhpZgAASUkqAAgAAAAJAA8BAgALAAAAkgAAABABAgAIAAAAigAAABIBAwABAAAAAQAAABoBBQABAAAAegAAABsBBQABAAAAggAAACgBAwABAAAAAgAAABMCAwABAAAAAQAAAGmHBAABAAAAngAAACWIBAABAAAA7AAAAAAAAAA4YwAA6AMAADhjAADoAwAATGVha3kgMQBNMjRUZXN0Q2FtAAAGAACQBwAEAAAAMDIxMAGRBwAEAAAAAQIDAACgBwAEAAAAMDEwMAGgAwABAAAA//8AAAKgBAABAAAADAAAAAOgBAABAAAACAAAAAAAAAACAAEAAgACAAAATgAAAAIABQADAAAACgEAAAAAAAADAAAAAQAAAAgAAAABAAAAAAAAAAEAAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCAAIAAwDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAT/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAABf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIgD4t//2Q==",
+  "base64",
+);
+
+/**
+ * An image is re-encoded on the way in and shown as a preview (completeness
+ * review M-24, TECHNICAL-PLAN §8.2).
+ *
+ * The whole path in one pass: the upload decodes the photo and writes it
+ * again, the list shows the thumbnail that made, and the file that comes back
+ * is a JPEG with the camera's name gone.
+ */
+test("an image arrives as a preview, and comes back without its EXIF", async () => {
+  await goTo(page, `/goals/${goalId}`);
+  await page.getByRole("link", { name: TITLE }).click();
+  // On the document before looking for its file control: the goal page has
+  // one of its own since M-01, and an upload made there lands on the goal.
+  await page.waitForURL(/\/documents\//, { timeout: 15_000 });
+  await expect(page.getByTestId("attachment-input")).toBeVisible({
+    timeout: 15_000,
+  });
+  // The fixture really does carry what this test says is removed.
+  expect(PHOTO_WITH_EXIF.includes(Buffer.from("M24TestCam"))).toBe(true);
+
+  await page.getByTestId("attachment-input").setInputFiles({
+    name: "whiteboard.jpg",
+    mimeType: "image/jpeg",
+    buffer: PHOTO_WITH_EXIF,
+  });
+  await page.getByTestId("attachment-upload").click();
+
+  const link = page.getByRole("link", { name: "whiteboard.jpg" });
+  await expect(link).toBeVisible({ timeout: 20_000 });
+
+  // The preview, drawn by the upload and loaded through its own route.
+  const thumbnail = page
+    .getByTestId("attachment-list")
+    .locator("li", { has: link })
+    .getByTestId("attachment-thumbnail");
+  await expect(thumbnail).toHaveAttribute("data-state", "shown", {
+    timeout: 15_000,
+  });
+
+  const target = await link.getAttribute("href");
+  expect(target).toMatch(/^\/api\/blobs\/[0-9a-f-]{36}$/);
+  const preview = await page.request.get(`${target}/thumbnail`);
+  expect(preview.status()).toBe(200);
+  expect(preview.headers()["content-type"]).toBe("image/webp");
+
+  const file = await page.request.get(target as string);
+  expect(file.status()).toBe(200);
+  expect(file.headers()["content-type"]).toBe("image/jpeg");
+  const body = await file.body();
+  // Still a JPEG, and not the bytes that were sent.
+  expect([body[0], body[1]]).toEqual([0xff, 0xd8]);
+  expect(body.includes(Buffer.from("M24TestCam"))).toBe(false);
+  expect(body.equals(PHOTO_WITH_EXIF)).toBe(false);
+});
+
 test("the cycle screen can reach the next quarter", async () => {
   // `cycles.create`, `update` and `archive` had no browser caller, so a
   // workspace could plan exactly one cycle: the one provisioning made. The

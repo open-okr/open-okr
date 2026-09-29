@@ -50,6 +50,8 @@ workspace.
 | `instance.name` | `OpenOKR` | What people see in the tab title, on the sign-in page, and in every email and chat message. Set it with `OPENOKR_INSTANCE_NAME`, in the wizard, or on General in admin. A name saved on General wins over the variable; clear the field to hand the choice back to it. Authenticator apps and passkey prompts show a new name after the next restart. Not on General on a managed cloud, where the name is the operator's |
 | `mail.transport` | `console` | The console driver writes each message to the process log instead of sending it. **Change this.** A password-reset link in a log is a credential, and the General screen shows a banner while it is the case |
 | `registration.policy` | Computed | Open until somebody claims the instance, invitation-only afterwards. A managed cloud stays open. Set it explicitly to override |
+| `scan.clamd.host` | Empty, meaning no virus scan | Name a ClamAV daemon (clamd) with `OPENOKR_CLAMD_HOST` and every uploaded file waits as "being checked" until clamd has scanned it. A file it flags is held back and never served. See [Security](security.md#uploaded-files) |
+| `scan.clamd.port` | `3310` | clamd's own default. Set it with `OPENOKR_CLAMD_PORT` when yours listens elsewhere |
 
 ## The two rules behind all of this
 

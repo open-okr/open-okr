@@ -131,6 +131,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "blob.prepared": z.object({}),
   "blob.claimed": z.object({}).catchall(z.unknown()),
+  /**
+   * A held file's virus scan finished (completeness review M-24). The verdict
+   * only: the signature a scanner named is on the audit row, not in a feed.
+   */
+  "blob.scanned": z.object({
+    verdict: z.enum(["clean", "found", "refused", "missing"]),
+  }),
   /** A space set its own §4.14 settings (P6-G18b). */
   "space.settingsChanged": z.object({ name: z.string() }),
   /** An agent's write policy was moved (P6-G13b). */

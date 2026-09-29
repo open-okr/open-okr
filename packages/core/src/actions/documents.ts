@@ -1034,6 +1034,14 @@ export const listAttachments = defineReadAction({
       contentType: z.string(),
       filesize: z.number().nullable(),
       position: z.number().int(),
+      /**
+       * Whether the file can be opened yet (completeness review M-24). Only
+       * `ok` is served; `scanning` is waiting on the virus scan and
+       * `quarantined` was held back by it.
+       */
+      status: z.enum(["pending", "ok", "scanning", "quarantined"]),
+      /** An image with a stored preview, served by `blobs.getForDownload`. */
+      hasThumbnail: z.boolean(),
     }),
   ),
   access: ACCESS_LEVELS.view,
@@ -1065,6 +1073,8 @@ export const listAttachments = defineReadAction({
             contentType: blobs.contentType,
             filesize: blobs.filesize,
             position: attachments.position,
+            status: blobs.status,
+            thumbnailKey: blobs.thumbnailKey,
           })
           .from(attachments)
           .innerJoin(blobs, eq(blobs.id, attachments.blobId))
@@ -1078,9 +1088,12 @@ export const listAttachments = defineReadAction({
           )
           .orderBy(asc(attachments.position));
 
-        return rows.map((row) => ({
+        // The key stays on the server. A page needs to know a preview exists,
+        // and the route that serves it resolves the key again behind can().
+        return rows.map(({ thumbnailKey, ...row }) => ({
           ...row,
           filesize: row.filesize === null ? null : Number(row.filesize),
+          hasThumbnail: thumbnailKey !== null,
         }));
       },
     );

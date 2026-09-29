@@ -32,6 +32,12 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import {
+  BLOB_SCAN_TOPIC,
+  parseScanJob,
+  runScanJob,
+  type ScanFile,
+} from "../blobs/scan.ts";
 import { parseCopilotRunJob, runCopilotAnswer } from "../copilot/background.ts";
 
 import type { EmbedFunction } from "../embeddings/service.ts";
@@ -126,6 +132,22 @@ export interface OutboxHandlerDeps {
    * skipped rather than failed, the same as mail.
    */
   readonly putFile?: PutFile;
+  /**
+   * Reads one stored file back, or null when the object is gone (completeness
+   * review M-24). What a virus scan reads. A function rather than the port,
+   * for the reason `putFile` is one.
+   */
+  readonly getFile?: (key: string) => Promise<Buffer | null>;
+  /**
+   * The virus scanner this instance is configured with, or null for none
+   * (completeness review M-24).
+   *
+   * A function resolved when a scan is delivered rather than a scanner built
+   * once, because `scan.clamd.host` is a stored setting an administrator can
+   * change while the relay runs, and because every other topic should not pay
+   * for reading it.
+   */
+  readonly scanner?: () => Promise<ScanFile | null>;
   /**
    * The workspace's AI drafter (P4-T14b-b).
    *
@@ -646,6 +668,47 @@ const runCopilot: OutboxHandler = async (delivery, deps) => {
   }
 };
 
+/**
+ * Scans one held file and records the verdict (completeness review M-24).
+ *
+ * **Safe to run twice**: `runScanJob` leaves a file alone once it is no longer
+ * `scanning`, so a redelivery costs one read.
+ *
+ * **Nothing here decides a file is clean.** A scanner that cannot be reached
+ * throws, and so does a relay with no scanner or no storage to read from: the
+ * relay backs off and tries again, and at its ceiling the row is a dead letter
+ * in the log. The file stays held throughout. Releasing it unscanned because
+ * this one process was missing a setting would make the scan a formality
+ * whenever a replica was configured differently from the rest.
+ */
+const scanBlob: OutboxHandler = async (delivery, deps) => {
+  const job = parseScanJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} has no workspace and file on its payload, so nothing can be scanned.`,
+    );
+  }
+  if (!deps.getFile) {
+    throw new Error(
+      "A file is waiting for a virus scan and this relay has no file storage to read it from.",
+    );
+  }
+  const scanFile = await deps.scanner?.();
+  if (!scanFile) {
+    throw new Error(
+      "A file is waiting for a virus scan and no scanner is configured where this relay runs. It stays held until scan.clamd.host names one.",
+    );
+  }
+  const outcome = await runScanJob(job, {
+    pool: deps.pool,
+    getFile: deps.getFile,
+    scanFile,
+  });
+  if (outcome.kind === "skipped") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -686,6 +749,9 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // (P4-T14b-b). Before this, an answer existed only inside one HTTP response
   // and closing the tab took the run with it.
   "copilot.run": runCopilot,
+  // The virus scan (completeness review M-24). Written by a claim only when a
+  // scanner is configured, so an instance without one never sees this topic.
+  [BLOB_SCAN_TOPIC]: scanBlob,
   "workspace.renamed": acknowledge,
 };
 

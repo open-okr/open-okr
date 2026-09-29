@@ -48,6 +48,14 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
   "comments.replaceImportedBody": "another surface owns it: the importers",
   "goals.importCheckIn": "another surface owns it: the importers",
   "blobs.prepareImport": "another surface owns it: the importers",
+  // M-24. The attach button presses both, through `storeUpload` in core,
+  // which runs prepare, re-encode, put and claim in their order so the order
+  // is one function rather than one caller's habit. The same kind of reason
+  // as `workspace.setLifecycle` below: the caller is real and names no string.
+  "blobs.prepareUpload":
+    "the attach button presses it through `storeUpload` in core, which reserves the key before the re-encoded bytes are written",
+  "blobs.claimUpload":
+    "the attach button presses it through `storeUpload` in core, which claims what was written and holds it for a scan when there is a scanner",
   "imports.startRun": "the pipeline calls it, from an import run",
   "imports.finishRun": "the pipeline calls it, from an import run",
   "invitations.joinByTrustedDomain":

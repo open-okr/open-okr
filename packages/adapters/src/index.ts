@@ -87,6 +87,10 @@ export {
   whatsAppDeliveryId,
   whatsAppPhoneNumberId,
 } from "./drivers/channel/whatsapp.ts";
+// The two file drivers the upload path and the relay construct (completeness
+// review M-24). Exported by name, like the storage drivers below: the host
+// builds one, and everything else sees the port.
+export { SharpImageProcessor } from "./drivers/image/sharp.ts";
 // Exported for the scheduler host (P6-G01a), which needs a queue on its own
 // rather than the whole adapter set `createAdapters` builds. Same shape as the
 // channel drivers above: the host constructs the driver, the port is what
@@ -106,6 +110,10 @@ export {
   type RealtimeSocketServerOptions,
   type SocketPrincipal,
 } from "./drivers/realtime/socket-server.ts";
+export {
+  ClamdScanner,
+  type ClamdScannerOptions,
+} from "./drivers/scan/clamd.ts";
 export {
   LocalDiskStorage,
   type LocalDiskStorageOptions,
@@ -163,6 +171,14 @@ export type {
   InboundRequest,
   InboundSubmission,
 } from "./ports/channel.ts";
+export type {
+  EncodedImage,
+  ImageFormat,
+  ImageProcessOptions,
+  ImageProcessor,
+  ImageProcessResult,
+  UnreadableReason,
+} from "./ports/image.ts";
 export type { JobHandler, JobOptions, JobQueue } from "./ports/jobs.ts";
 export type {
   Mailer,
@@ -177,6 +193,8 @@ export type {
   Subscription,
 } from "./ports/realtime.ts";
 export { EventTooLargeError, MAX_EVENT_BYTES } from "./ports/realtime.ts";
+export type { FileScanner, ScanVerdict } from "./ports/scan.ts";
+export { ScannerUnavailableError } from "./ports/scan.ts";
 export type {
   Search,
   SearchDocument,

@@ -1486,6 +1486,12 @@
           "field": "height",
           "type": "integer",
           "required": false
+        },
+        {
+          "name": "thumbnail",
+          "field": "thumbnail",
+          "type": "boolean",
+          "required": false
         }
       ],
       "pages": false
@@ -1503,6 +1509,16 @@
           "field": "blobId",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "variant",
+          "field": "variant",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "file",
+            "thumbnail"
+          ]
         }
       ],
       "pages": false

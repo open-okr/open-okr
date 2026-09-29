@@ -57,8 +57,9 @@ import { getMailSettings, mailerFrom } from "./mail";
 import { getPool } from "./pool";
 import { getRealtime } from "./realtime";
 import { getKeyRing } from "./secrets";
-import { getStorage } from "./storage";
+import { getStorage, readStoredFile } from "./storage";
 import { getTelemetry } from "./telemetry";
+import { getFileScanner } from "./upload-ports";
 
 /** How long one delivery may take before another relay may claim the row. */
 const LEASE_SECONDS = 120;
@@ -153,6 +154,14 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
       const stored = await getStorage().put(key, body, { contentType });
       return { key: stored.key, size: stored.size };
     },
+    // A held file's bytes, read back for its virus scan (completeness review
+    // M-24). Null when the object is gone, which the scan records rather
+    // than retries.
+    getFile: readStoredFile,
+    // Resolved only when a scan is delivered, so no other topic pays for
+    // reading the setting. Null means no scanner, and the handler keeps the
+    // file held rather than releasing it unscanned.
+    scanner: getFileScanner,
     ...(mail
       ? {
           async sendMail(message) {

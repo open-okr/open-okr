@@ -7,7 +7,7 @@
  * `FileStorage.put` with the key this returned. Core stays adapter-agnostic
  * (CLAUDE.md: vendor SDKs and the ports that wrap them live only in
  * `packages/adapters`), so the actual `put`/`delete` calls belong to
- * whichever app route drives an upload, not to this module.
+ * `upload.ts`, which is handed the ports by the host, not to this module.
  */
 
 import { randomUUID } from "node:crypto";
@@ -21,7 +21,7 @@ import {
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { checkQuota, usedBytes } from "./quota.ts";
-import { validateUpload } from "./validation.ts";
+import { thumbnailKeyFor, validateUpload } from "./validation.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -170,10 +170,16 @@ export interface ClaimBlobInput {
   readonly width?: number;
   readonly height?: number;
   /**
-   * Set when a scan hook is configured. No scanner is wired in yet — this is
-   * the flag it will set, so the state machine does not have to change
-   * shape when one lands. Recorded in STATUS.md as scaffolding, not a
-   * built capability.
+   * A thumbnail was written beside the file, at the key `thumbnailKeyFor`
+   * derives from its storage key (completeness review M-24). A flag rather
+   * than a key, so no caller can point a blob's preview at an object of its
+   * own choosing.
+   */
+  readonly thumbnail?: boolean;
+  /**
+   * A virus scanner is configured, so the file waits in `scanning` until the
+   * relay records its verdict (completeness review M-24). `blobs.claimUpload`
+   * decides this from the instance setting, never from its input.
    */
   readonly requiresScan?: boolean;
 }
@@ -188,7 +194,11 @@ export async function claimBlob<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(tx: AnyTx<TSchema>, input: ClaimBlobInput): Promise<ClaimedBlob> {
   const [pending] = await tx
-    .select({ id: blobs.id, contentType: blobs.contentType })
+    .select({
+      id: blobs.id,
+      contentType: blobs.contentType,
+      storageKey: blobs.storageKey,
+    })
     .from(blobs)
     .where(
       activeOnly(
@@ -239,6 +249,9 @@ export async function claimBlob<
       digest: input.digest,
       width: input.width ?? null,
       height: input.height ?? null,
+      thumbnailKey: input.thumbnail
+        ? thumbnailKeyFor(pending.storageKey)
+        : null,
       updatedAt: new Date(),
     })
     .where(activeOnly(blobs, eq(blobs.id, input.blobId)));
@@ -253,6 +266,13 @@ export async function claimBlob<
 export interface OrphanedBlob {
   readonly id: string;
   readonly storageKey: string;
+  /**
+   * Read so the reap knows whether a thumbnail may have been written before
+   * the upload stopped (completeness review M-24). An image's thumbnail goes
+   * into storage between prepare and claim, so an abandoned image can leave
+   * two objects, and nothing else names the second.
+   */
+  readonly contentType: string;
 }
 
 /**
@@ -271,7 +291,11 @@ export async function findOrphanedBlobs<
 ): Promise<OrphanedBlob[]> {
   const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000);
   return tx
-    .select({ id: blobs.id, storageKey: blobs.storageKey })
+    .select({
+      id: blobs.id,
+      storageKey: blobs.storageKey,
+      contentType: blobs.contentType,
+    })
     .from(blobs)
     .where(
       and(

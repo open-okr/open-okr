@@ -7928,6 +7928,9 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "thumbnail": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -8020,6 +8023,18 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "variant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "file",
+                "thumbnail"
+              ]
             }
           }
         ]
@@ -22549,6 +22564,18 @@
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "ok",
+                              "scanning",
+                              "quarantined"
+                            ]
+                          },
+                          "hasThumbnail": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -22557,7 +22584,9 @@
                           "filename",
                           "contentType",
                           "filesize",
-                          "position"
+                          "position",
+                          "status",
+                          "hasThumbnail"
                         ],
                         "additionalProperties": false
                       }

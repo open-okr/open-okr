@@ -33,6 +33,12 @@ export const blobs = pgTable("blobs", {
     .default("pending"),
   width: integer("width"),
   height: integer("height"),
+  /**
+   * The storage key of the image's thumbnail, or null when it has none
+   * (migration 0100, completeness review M-24). Derived by the claim from
+   * `storageKey`, never taken from a request.
+   */
+  thumbnailKey: text("thumbnail_key"),
   legacyType: text("legacy_type"),
   legacyId: text("legacy_id"),
   createdAt: timestamp("created_at", { withTimezone: true })

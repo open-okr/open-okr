@@ -500,9 +500,13 @@ export async function importWorkspace(
 
     const storageKey = generateStorageKey(workspaceId, row.filename);
     await options.storage.put(storageKey, bytes);
+    // The thumbnail key goes too (completeness review M-24). It named an
+    // object under the old workspace's prefix, the archive carries the file
+    // and not the preview made of it, and a restored image showing its type
+    // icon is better than one pointing across a tenant boundary.
     // openokr:allow-mutation: the calling Operation's own transaction.
     await tx.execute(
-      sql`update blobs set storage_key = ${storageKey} where id = ${remappedBlobId}`,
+      sql`update blobs set storage_key = ${storageKey}, thumbnail_key = null where id = ${remappedBlobId}`,
     );
   }
 

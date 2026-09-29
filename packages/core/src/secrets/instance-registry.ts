@@ -135,6 +135,26 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "Actions one workspace may have running at once. Zero means unlimited. This is the one a per-minute window cannot see: sixty calls in one second pass a per-minute limit and empty the connection pool.",
   },
+  // The optional virus scan (completeness review M-24). Off unless a host is
+  // named, because Postgres is the only service the product requires and a
+  // scanner is a second one. With a host, every claimed file waits in
+  // `scanning` until clamd's verdict arrives. Design: packages/core/src/blobs/scan.ts.
+  {
+    key: "scan.clamd.host",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_CLAMD_HOST",
+    summary:
+      "The ClamAV daemon (clamd) that scans every uploaded file before anyone can open it. Empty means no scan, and a file is available as soon as it is uploaded.",
+  },
+  {
+    key: "scan.clamd.port",
+    kind: "number",
+    fallback: 3310,
+    environment: "OPENOKR_CLAMD_PORT",
+    summary:
+      "clamd's TCP port. 3310 is clamd's own default. Read only when a host is named.",
+  },
   {
     key: "instance.telemetry",
     kind: "boolean",
