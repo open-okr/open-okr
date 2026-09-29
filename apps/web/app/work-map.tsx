@@ -1,25 +1,53 @@
 import {
   canonThresholds,
   confidenceBand,
+  type ResolvedTerminology,
   type ResolvedThresholds,
 } from "@openokr/method";
 import { Avatar, Bar, Card, CardBody, Chip } from "@openokr/ui";
 import type { ReactNode } from "react";
 import { progressCeiling } from "../lib/ceilings.ts";
+import { workspaceTerminology } from "../lib/terminology.ts";
 import { getTranslations } from "../lib/translations";
 import { HealthChip } from "./goals/health-chip.tsx";
 import { QuickCheckIn } from "./quick-check-in.tsx";
 
 /**
- * What a row is, in two letters (S-01's uniform node contract).
+ * What a row is, abbreviated to fit the column (S-01's uniform node contract).
  *
- * The mockup writes OBJ and KR. Initiatives and KPI rows join the same column
- * when their tasks land, and the chip is the only place that has to know.
+ * The mockup writes OBJ and KR for the canon terms. A workspace that renames
+ * Objective still gets an abbreviation, built from its own word rather than
+ * the canon's, so the renamed screens are not the one place still abbreviating
+ * the word nobody kept.
+ *
+ * A single word is its own first three letters (Objective -> OBJ, Goal ->
+ * GOA). A multi-word term takes one letter per word instead, which is what
+ * makes the canon's own "Key result" read as KR rather than KEY.
  */
-function RowKindChip({ kind }: { readonly kind: "goal" | "key_result" }) {
+export function rowKindAbbreviation(
+  kind: "goal" | "key_result",
+  terms: ResolvedTerminology,
+): string {
+  const word =
+    kind === "goal" ? terms.objective.singular : terms.keyResult.singular;
+  const parts = word.trim().split(/\s+/);
+  return (
+    parts.length > 1 ? parts.map((part) => part[0]).join("") : word.slice(0, 3)
+  )
+    .slice(0, 3)
+    .toUpperCase();
+}
+
+function RowKindChip({
+  kind,
+  terms,
+}: {
+  readonly kind: "goal" | "key_result";
+  readonly terms: ResolvedTerminology;
+}) {
   return (
     <Chip tone={kind === "goal" ? "brand" : "neutral"}>
-      {kind === "goal" ? "OBJ" : "KR"}
+      {rowKindAbbreviation(kind, terms)}
     </Chip>
   );
 }
@@ -129,6 +157,7 @@ export async function GoalTable({
   // P8-G04. A bar drawn on a 0-to-100 track under a raised ceiling fills
   // early and tells a screen reader 100 is the most there is.
   const ceiling = await progressCeiling();
+  const terms = await workspaceTerminology();
 
   const thresholds = canonThresholds();
 
@@ -196,7 +225,7 @@ export async function GoalTable({
                       className="flex items-center gap-2"
                       style={{ paddingLeft: `${node.depth * 18}px` }}
                     >
-                      <RowKindChip kind={node.kind} />
+                      <RowKindChip kind={node.kind} terms={terms} />
                       <span
                         className={
                           node.kind === "goal"
@@ -269,6 +298,7 @@ export async function WorkMap({
 }) {
   const { t } = await getTranslations();
   const ceiling = await progressCeiling();
+  const terms = await workspaceTerminology();
 
   return (
     <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
@@ -310,7 +340,9 @@ export async function WorkMap({
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Chip tone="neutral">
-                  {selected.kind === "goal" ? "objective" : "key result"}
+                  {selected.kind === "goal"
+                    ? terms.objective.singular.toLowerCase()
+                    : terms.keyResult.singular.toLowerCase()}
                 </Chip>
                 <HealthChip health={selected.health} />
               </div>
