@@ -115,8 +115,9 @@ describe("the goal writes", () => {
 
   test("revalidate the whole tree, because a move changes two cycles", () => {
     // The scorecard, the cycle screen and the Work Map all count by cycle, and
-    // none of them is this page.
-    expect(writes.split('revalidatePath("/", "layout")').length - 1).toBe(2);
+    // none of them is this page. Linking and unlinking a KPI move the goals
+    // above this one and the KPI's own page, so all three writes do it.
+    expect(writes.split('revalidatePath("/", "layout")').length - 1).toBe(3);
   });
 
   test("offer an unlink only where a key result has a KPI", () => {

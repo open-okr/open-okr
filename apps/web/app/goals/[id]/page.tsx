@@ -19,6 +19,7 @@ import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { readKpiOptions } from "../../../lib/kpi-options.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -224,6 +225,19 @@ export default async function GoalPage({
       })),
     );
   }
+
+  // Key results measured by hand, which the writes card can link to a KPI
+  // (M-07). Offered on the same terms as the value form: an editor, on a goal
+  // that is still open. The KPI list is read only when there is something to
+  // link, so a goal page with nothing to offer pays nothing for it.
+  const unlinkedKeyResults =
+    canEdit && !closed
+      ? goal.keyResults
+          .filter((keyResult) => keyResult.kpiId === null)
+          .map((keyResult) => ({ id: keyResult.id, title: keyResult.title }))
+      : [];
+  const kpiOptions =
+    unlinkedKeyResults.length > 0 ? await readKpiOptions(context) : [];
 
   const cycles = await callAction(context, "cycles.list", {});
   const cycleEndsOn =
@@ -737,6 +751,8 @@ export default async function GoalPage({
               id: keyResult.id,
               title: keyResult.title,
             }))}
+          unlinkedKeyResults={unlinkedKeyResults}
+          kpis={kpiOptions}
           canAdminister={canAdminister}
         />
 

@@ -767,6 +767,75 @@ export async function recordValueInTx<
 }
 
 /**
+ * Links a KPI to a key result that had none, taking the value the KPI last
+ * reported (§5.3, completeness review M-07).
+ *
+ * The caller has already found the KPI and read its latest value, because
+ * "the KPI exists and this member may read it" is the action's check, not
+ * this row's. `reading` is null when the KPI has recorded nothing, and then
+ * the key result keeps its own value until the first reading arrives: an
+ * unmeasured KPI is not a zero.
+ *
+ * **A key result that already reads a KPI is refused rather than switched.**
+ * Unlinking writes the frozen value as history, and switching straight from
+ * one KPI to another would skip that row and make the change of source
+ * invisible on the sparkline.
+ */
+export async function linkKpiInTx<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: {
+    workspaceId: string;
+    keyResultId: string;
+    kpiId: string;
+    reading: number | null;
+    authorMemberId?: string | null;
+  },
+): Promise<void> {
+  const [keyResult] = await tx
+    .select({ currentValue: keyResults.currentValue, kpiId: keyResults.kpiId })
+    .from(keyResults)
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, input.workspaceId),
+        eq(keyResults.id, input.keyResultId),
+      ),
+    )
+    .limit(1);
+  if (!keyResult) {
+    throw new OperationError("not_found", "No such key result.");
+  }
+  if (keyResult.kpiId) {
+    throw new OperationError(
+      "forbidden",
+      "This key result already reads a KPI. Unlink it first, so the change of source is on the record.",
+    );
+  }
+
+  // openokr:allow-mutation: the calling Operation's own transaction.
+  await tx
+    .update(keyResults)
+    .set({ kpiId: input.kpiId, updatedAt: new Date() })
+    .where(activeOnly(keyResults, eq(keyResults.id, input.keyResultId)));
+
+  if (
+    input.reading !== null &&
+    input.reading !== asNumber(keyResult.currentValue)
+  ) {
+    await recordValueInTx(tx, {
+      workspaceId: input.workspaceId,
+      keyResultId: input.keyResultId,
+      value: input.reading,
+      source: "kpi",
+      authorMemberId: input.authorMemberId ?? null,
+      note: "KPI linked. The value it last reported",
+    });
+  }
+}
+
+/**
  * Unlinks a KPI, freezing the last value as a manual one (§5.3).
  *
  * The key result keeps the number it had. A history row records the unlink, so

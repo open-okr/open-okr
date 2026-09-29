@@ -95,6 +95,9 @@ export async function addKeyResult(
 
   const ownerId = String(formData.get("ownerId") ?? "");
   const dueOn = String(formData.get("dueOn") ?? "");
+  // Empty is "measured by hand". A KPI named here is checked on the server,
+  // which refuses one this workspace does not hold (completeness review M-07).
+  const kpiId = String(formData.get("kpiId") ?? "");
 
   return run((context) =>
     callAction(context, "goals.addKeyResult", {
@@ -104,6 +107,7 @@ export async function addKeyResult(
       // neither, so every key result drafted here failed it (H-09).
       ...(ownerId === "" ? {} : { ownerId }),
       ...(dueOn === "" ? {} : { dueOn }),
+      ...(kpiId === "" ? {} : { kpiId }),
       guided: true,
       direction: String(formData.get("direction") ?? "increase") as
         | "increase"

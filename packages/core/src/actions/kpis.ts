@@ -48,6 +48,7 @@ import {
   evaluateKpiForPeriod,
   setKpiFormula,
 } from "../kpis/formula.ts";
+import { followKpisInTx } from "../kpis/linked.ts";
 import { draftRecoveryForKpi, launchRecoveryInTx } from "../kpis/recovery.ts";
 import {
   loadKpiRecords,
@@ -337,6 +338,16 @@ export const recordKpiValue = defineWriteAction({
 
       const recomputed = await recomputeKpi(tx, workspaceId, input.kpiId);
 
+      // Then every key result that reads this KPI or one the cascade just
+      // recomputed, and the goals above them (completeness review M-07).
+      // Last, because the progress it sets off reads the achievement stored
+      // by the two steps above.
+      await followKpisInTx(tx, {
+        workspaceId,
+        kpiIds: [input.kpiId, ...touched],
+        authorMemberId: memberId,
+      });
+
       return {
         result: {
           id: record.id,
@@ -535,6 +546,77 @@ export const readKpiGrid = defineReadAction({
   },
 });
 
+/**
+ * Every KPI, one row each, for a picker (completeness review M-07).
+ *
+ * The grid read answers a different question and costs one query per KPI for
+ * its periods, which is a lot to pay for a drop-down on the drafting step and
+ * on every goal page. This is one query, and it reads the same rows the grid
+ * does: KPIs sit at the workspace floor, so a member who can open the grid
+ * can pick any of them, and a member who cannot open this workspace reaches
+ * nothing here either.
+ */
+export const listKpis = defineReadAction({
+  name: "kpis.list",
+  summary:
+    "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+  input: z.object({}),
+  output: z.object({
+    kpis: z.array(
+      z.object({
+        id: z.uuid(),
+        shortId: z.string(),
+        title: z.string(),
+        unit: z.string().nullable(),
+        frequency: z.string(),
+        direction: z.string(),
+        state: z.string(),
+        achievementPct: z.number().nullable(),
+        targetDefault: z.number().nullable(),
+        isCalculated: z.boolean(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const rows = await tx
+          .select({
+            id: kpis.id,
+            shortId: kpis.shortId,
+            title: kpis.title,
+            unit: kpis.unit,
+            frequency: kpis.frequency,
+            direction: kpis.direction,
+            state: kpis.state,
+            achievementPct: kpis.achievementPct,
+            targetDefault: kpis.targetDefault,
+            isCalculated: kpis.isCalculated,
+          })
+          .from(kpis)
+          .where(activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)))
+          .orderBy(asc(kpis.title), asc(kpis.id));
+        return {
+          kpis: rows.map((row) => ({
+            ...row,
+            achievementPct:
+              row.achievementPct === null ? null : Number(row.achievementPct),
+            targetDefault:
+              row.targetDefault === null ? null : Number(row.targetDefault),
+          })),
+        };
+      },
+    );
+  },
+});
+
 export const setKpiFormulaAction = defineWriteAction({
   name: "kpis.setFormula",
   summary:
@@ -594,6 +676,13 @@ export const setKpiFormulaAction = defineWriteAction({
         memberId,
       );
       await recomputeKpi(tx, workspaceId, input.kpiId);
+      // A KPI that has just become calculated has a new value, and whatever
+      // reads it has to see that value rather than the typed one it replaced.
+      await followKpisInTx(tx, {
+        workspaceId,
+        kpiIds: [input.kpiId],
+        authorMemberId: memberId,
+      });
 
       return {
         result: {
@@ -646,7 +735,11 @@ export const updateKpi = defineWriteAction({
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
-      await actingMember(tx, workspaceId, context.actor.userId);
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
 
       const [existing] = await tx
         .select({
@@ -763,6 +856,13 @@ export const updateKpi = defineWriteAction({
       // mean, so the derived columns are recomputed rather than left describing
       // the KPI as it was before the edit.
       const recomputed = await recomputeKpi(tx, workspaceId, input.kpiId);
+      // A new target or direction moves the achievement a linked key result
+      // reads, with no new reading to say so (completeness review M-07).
+      await followKpisInTx(tx, {
+        workspaceId,
+        kpiIds: [input.kpiId],
+        authorMemberId: memberId,
+      });
 
       return {
         result: {

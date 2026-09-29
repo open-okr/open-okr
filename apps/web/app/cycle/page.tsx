@@ -10,6 +10,7 @@ import {
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { readKpiOptions } from "../../lib/kpi-options.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { AnnualFrame } from "./annual-frame.tsx";
@@ -313,12 +314,14 @@ export default async function CyclePage({
           checkTitles: [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].map(
             (check) => ({ id: check.id, title: check.title }),
           ),
+          kpis: await readKpiOptions(context),
         }
       : {
           goals: [],
           members: [],
           thresholds: canonThresholds(),
           checkTitles: [],
+          kpis: [],
         };
 
   // The people a phase 1 role can name, read only there. Agents and
@@ -550,6 +553,7 @@ export default async function CyclePage({
             draftingAllowed={work.allowed}
             goals={draft.goals}
             members={draft.members}
+            kpis={draft.kpis}
             canEdit={canEdit}
             thresholds={draft.thresholds}
             checkTitles={draft.checkTitles}

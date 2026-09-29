@@ -6251,6 +6251,29 @@
       "pages": false
     },
     {
+      "name": "goals linkKpi",
+      "action": "goals.linkKpi",
+      "method": "POST",
+      "path": "/goals/linkKpi",
+      "scope": "write",
+      "summary": "Links a KPI to a key result, which from then on reads its value and progress from it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "kpi-id",
+          "field": "kpiId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals unlinkKpi",
       "action": "goals.unlinkKpi",
       "method": "POST",
@@ -7205,6 +7228,16 @@
           "required": false
         }
       ],
+      "pages": false
+    },
+    {
+      "name": "kpis list",
+      "action": "kpis.list",
+      "method": "GET",
+      "path": "/kpis/list",
+      "scope": "read",
+      "summary": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+      "flags": [],
       "pages": false
     },
     {

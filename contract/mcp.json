@@ -8563,6 +8563,39 @@
       }
     },
     {
+      "name": "goals.linkKpi",
+      "description": "Links a KPI to a key result, which from then on reads its value and progress from it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kpiId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id",
+          "kpiId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "kpiId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "goals.unlinkKpi",
       "description": "Unlinks a KPI, keeping the value it last reported as a manual one.",
       "inputSchema": {
@@ -9870,6 +9903,21 @@
             "maximum": 48
           }
         }
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "kpis.list",
+      "description": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       },
       "scope": "read",
       "annotations": {

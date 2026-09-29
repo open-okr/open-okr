@@ -449,7 +449,8 @@ its `check_in_id` set, and the sparkline shows four points.
 | Manual value entry is refused | The value has one source of truth |
 | Progress reads the KPI's real achievement | Decision D-4. Not the recovery projection |
 | Unlinking freezes the last value | The key result keeps the value it had, as a manual value, and a history row records the unlink |
-| A KPI update cascades to every linked key result | Through the outbox, then into the goal recompute |
+| A KPI update cascades to every linked key result | In the writing Operation, then into the goal recompute. Not through the outbox, which no relay drains yet (completeness review M-07). A closed goal is left as it was closed |
+| Linking after creation | `goals.linkKpi`, on a key result that reads no KPI yet, on a goal that is not closed. The key result takes the KPI's latest reading as a `kpi` history row |
 
 ## 6. Check-ins
 

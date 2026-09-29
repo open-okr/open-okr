@@ -69,6 +69,7 @@ import {
   createGoalInTx,
   createKeyResultInTx,
   type GoalRole,
+  linkKpiInTx,
   reassignRoleInTx,
   recordValueInTx,
   reopenGoalInTx,
@@ -78,6 +79,7 @@ import {
 } from "../goals/service.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
+import { readLinkableKpi } from "../kpis/linked.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import {
   recomputeGoalQualityInTx,
@@ -1877,6 +1879,15 @@ export const createKeyResult = defineWriteAction({
         "key result",
       );
 
+      // A KPI-backed key result starts where the KPI stands (completeness
+      // review M-07). Its value has one source of truth once linked, so the
+      // KPI's reading wins over a typed current value; with nothing recorded
+      // yet, the key result starts at its own baseline like any other.
+      const kpi = input.kpiId
+        ? await readLinkableKpi(tx, workspaceId, input.kpiId)
+        : null;
+      const currentValue = kpi?.reading ?? input.currentValue;
+
       const created = await createKeyResultInTx(tx, {
         workspaceId,
         goalId: input.goalId,
@@ -1886,7 +1897,7 @@ export const createKeyResult = defineWriteAction({
         indicatorType: input.indicatorType,
         baselineValue: input.baselineValue,
         targetValue: input.targetValue,
-        currentValue: input.currentValue,
+        currentValue,
         dueOn: input.dueOn ?? null,
         ownerId: input.ownerId ?? null,
         weight: input.weight,
@@ -2131,6 +2142,103 @@ export const recordKeyResultValue = defineWriteAction({
           targetType: "key_result",
           targetId: input.id,
           payload: { value: input.value },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Links a KPI to a key result drafted without one (completeness review M-07).
+ *
+ * `goals.addKeyResult` has always taken a KPI, and nothing else could add
+ * one afterwards, so a key result measured by hand stayed that way unless it
+ * was deleted and drafted again. The reverse, `goals.unlinkKpi`, existed on
+ * its own.
+ */
+export const linkKeyResultKpi = defineWriteAction({
+  name: "goals.linkKpi",
+  summary:
+    "Links a KPI to a key result, which from then on reads its value and progress from it.",
+  input: z.object({ id: z.uuid(), kpiId: z.uuid() }),
+  output: z.object({ id: z.uuid(), kpiId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [owner] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        owner.goalId,
+        ACCESS_LEVELS.edit,
+      );
+      // After the access check, so somebody who cannot edit the goal learns
+      // nothing about its state. A closed goal takes no new values from a KPI
+      // (design `p3-t00-kpi-engine.md` §10), and linking one would pull the
+      // KPI's reading into a record of how the cycle ended.
+      const [goal] = await tx
+        .select({ closedAt: goals.closedAt })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, owner.goalId),
+          ),
+        )
+        .limit(1);
+      if (goal?.closedAt) {
+        throw new OperationError(
+          "forbidden",
+          "This goal is closed, so its key results take no new values. Reopen it first to link a KPI.",
+        );
+      }
+      const kpi = await readLinkableKpi(tx, workspaceId, input.kpiId);
+
+      await linkKpiInTx(tx, {
+        workspaceId,
+        keyResultId: input.id,
+        kpiId: input.kpiId,
+        reading: kpi.reading,
+        authorMemberId: memberId,
+      });
+
+      // Progress now comes from the KPI's achievement, so the goal and the
+      // goals above it move in the same write.
+      await recompute(tx, workspaceId, owner.goalId);
+
+      return {
+        result: { id: input.id, kpiId: input.kpiId },
+        activity: {
+          kind: "key_result.kpi_linked",
+          subjectType: "goal",
+          subjectId: owner.goalId,
+          payload: { kpiId: input.kpiId },
+        },
+        audit: {
+          action: "goals.linkKpi",
+          targetType: "key_result",
+          targetId: input.id,
+          payload: { kpiId: input.kpiId },
         },
       };
     },

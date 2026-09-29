@@ -18,6 +18,7 @@ import { NO_ERROR, type WriteState } from "./write-state.ts";
 export function ActionForm({
   action,
   className,
+  label,
   children,
 }: {
   readonly action: (
@@ -25,11 +26,22 @@ export function ActionForm({
     formData: FormData,
   ) => Promise<WriteState>;
   readonly className?: string;
+  /**
+   * The form's accessible name, where a page repeats the same form. The
+   * drafting step has one "add a key result" form per objective, and without
+   * a name a screen reader announces six identical forms (M-07).
+   */
+  readonly label?: string;
   readonly children: React.ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(action, NO_ERROR);
   return (
-    <form action={formAction} className={className} aria-busy={pending}>
+    <form
+      action={formAction}
+      className={className}
+      aria-busy={pending}
+      aria-label={label}
+    >
       {children}
       {state.error ? (
         <p
