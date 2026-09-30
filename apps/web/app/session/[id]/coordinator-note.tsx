@@ -72,7 +72,11 @@ export function CoordinatorNote({
             disabled={pending}
             className="self-start"
           >
-            {pending ? "Saving…" : note ? "Replace the note" : "Add the note"}
+            {pending
+              ? t("session.detail.saving")
+              : note
+                ? t("session.detail.coordinatorNote.replaceTheNote")
+                : t("session.detail.coordinatorNote.addTheNote")}
           </Button>
           {state.error === null ? null : (
             <p role="alert" className="text-xs text-bad">

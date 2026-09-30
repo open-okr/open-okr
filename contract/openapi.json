@@ -294,6 +294,109 @@
         }
       }
     },
+    "/workspace/deletedItems": {
+      "get": {
+        "operationId": "workspace.deletedItems",
+        "summary": "The goals, initiatives, tasks and documents that were deleted and that the caller could restore, newest first, with who deleted each.",
+        "tags": [
+          "workspace"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "subjectType": {
+                                "type": "string",
+                                "enum": [
+                                  "goal",
+                                  "initiative",
+                                  "task",
+                                  "document"
+                                ]
+                              },
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "deletedAt": {
+                                "type": "string"
+                              },
+                              "deletedBy": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "subjectType",
+                              "id",
+                              "title",
+                              "deletedAt",
+                              "deletedBy"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
+      }
+    },
     "/workspace/rename": {
       "post": {
         "operationId": "workspace.rename",
@@ -1133,6 +1236,141 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/people/exportMine": {
+      "get": {
+        "operationId": "people.exportMine",
+        "summary": "Everything this workspace holds about the signed-in member, as one document.",
+        "tags": [
+          "people"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "memberId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "takenAt": {
+                          "type": "string"
+                        },
+                        "tables": {
+                          "readOnly": true,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "table": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "rows": {
+                                "readOnly": true,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {}
+                                }
+                              }
+                            },
+                            "required": [
+                              "table",
+                              "label",
+                              "rows"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "omitted": {
+                          "readOnly": true,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "table": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "enum": [
+                                  "structural",
+                                  "access",
+                                  "derived",
+                                  "credential",
+                                  "workspace_record"
+                                ]
+                              },
+                              "because": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "table",
+                              "reason",
+                              "because"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "memberId",
+                        "takenAt",
+                        "tables",
+                        "omitted"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
           }
         }
       }
@@ -2638,6 +2876,25 @@
                               "null"
                             ]
                           },
+                          "memberKind": {
+                            "type": "string",
+                            "enum": [
+                              "human",
+                              "guest"
+                            ]
+                          },
+                          "spaceId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "email": {
                             "type": [
                               "string",
@@ -2661,6 +2918,8 @@
                           "maxUses",
                           "expiresAt",
                           "revokedAt",
+                          "memberKind",
+                          "spaceId",
                           "email",
                           "allowedDomains",
                           "createdAt"
@@ -2756,6 +3015,25 @@
                             "null"
                           ]
                         },
+                        "memberKind": {
+                          "type": "string",
+                          "enum": [
+                            "human",
+                            "guest"
+                          ]
+                        },
+                        "spaceId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "token": {
                           "type": "string"
                         }
@@ -2767,6 +3045,8 @@
                         "maxUses",
                         "expiresAt",
                         "revokedAt",
+                        "memberKind",
+                        "spaceId",
                         "token"
                       ],
                       "additionalProperties": false
@@ -2838,7 +3118,7 @@
     "/invitations/createPersonalLink": {
       "post": {
         "operationId": "invitations.createPersonalLink",
-        "summary": "Invite one email address, usable once.",
+        "summary": "Invite one email address, usable once, as a member or as a guest of one space.",
         "tags": [
           "invitations"
         ],
@@ -2888,6 +3168,25 @@
                             "null"
                           ]
                         },
+                        "memberKind": {
+                          "type": "string",
+                          "enum": [
+                            "human",
+                            "guest"
+                          ]
+                        },
+                        "spaceId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "token": {
                           "type": "string"
                         }
@@ -2899,6 +3198,8 @@
                         "maxUses",
                         "expiresAt",
                         "revokedAt",
+                        "memberKind",
+                        "spaceId",
                         "token"
                       ],
                       "additionalProperties": false
@@ -2952,6 +3253,11 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "guestSpaceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   }
                 },
                 "required": [
@@ -3141,7 +3447,7 @@
     "/invitations/joinByTrustedDomain": {
       "post": {
         "operationId": "invitations.joinByTrustedDomain",
-        "summary": "Join a workspace automatically because your email domain is trusted.",
+        "summary": "Join a workspace because it trusts the domain of your confirmed email address.",
         "tags": [
           "invitations"
         ],
@@ -7690,6 +7996,9 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "thumbnail": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -7782,6 +8091,18 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "variant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "file",
+                "thumbnail"
+              ]
             }
           }
         ]
@@ -10143,6 +10464,15 @@
                             },
                             "onboardingDone": {
                               "type": "boolean"
+                            },
+                            "branding": {
+                              "type": "object",
+                              "properties": {
+                                "primaryColor": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "additionalProperties": false
@@ -10620,7 +10950,7 @@
     "/ai/readAvailability": {
       "get": {
         "operationId": "ai.readAvailability",
-        "summary": "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
+        "summary": "Whether any enabled AI provider holds a key the caller's own requests can use, as one boolean.",
         "tags": [
           "ai"
         ],
@@ -10941,7 +11271,9 @@
                   },
                   "apiKey": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "pattern": "^[\\x21-\\x7E]+$"
                   }
                 },
                 "required": [
@@ -11155,7 +11487,9 @@
                   },
                   "apiKey": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "pattern": "^[\\x21-\\x7E]+$"
                   }
                 },
                 "required": [
@@ -11325,6 +11659,12 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "setAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -11332,7 +11672,8 @@
                           "allowUserKeys",
                           "hasPersonalCredential",
                           "keyHint",
-                          "status"
+                          "status",
+                          "setAt"
                         ],
                         "additionalProperties": false
                       }
@@ -13613,6 +13954,207 @@
         ]
       }
     },
+    "/ai/readPrivacySettings": {
+      "get": {
+        "operationId": "ai.readPrivacySettings",
+        "summary": "The workspace's AI egress controls: context level, personal-data redaction, no-training and the host allow-list.",
+        "tags": [
+          "ai"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "contextEgress": {
+                          "type": "string",
+                          "enum": [
+                            "all",
+                            "assists",
+                            "none"
+                          ]
+                        },
+                        "redactPersonalData": {
+                          "type": "boolean"
+                        },
+                        "noTraining": {
+                          "type": "boolean"
+                        },
+                        "allowedHosts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "contextEgress",
+                        "redactPersonalData",
+                        "noTraining",
+                        "allowedHosts"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
+      }
+    },
+    "/ai/updatePrivacySettings": {
+      "post": {
+        "operationId": "ai.updatePrivacySettings",
+        "summary": "Change what may leave for an AI provider off this network: the context level, redaction, no-training and the host allow-list.",
+        "tags": [
+          "ai"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "contextEgress": {
+                          "type": "string",
+                          "enum": [
+                            "all",
+                            "assists",
+                            "none"
+                          ]
+                        },
+                        "redactPersonalData": {
+                          "type": "boolean"
+                        },
+                        "noTraining": {
+                          "type": "boolean"
+                        },
+                        "allowedHosts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "contextEgress",
+                        "redactPersonalData",
+                        "noTraining",
+                        "allowedHosts"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contextEgress": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "assists",
+                      "none"
+                    ]
+                  },
+                  "redactPersonalData": {
+                    "type": "boolean"
+                  },
+                  "noTraining": {
+                    "type": "boolean"
+                  },
+                  "allowedHosts": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/agents/list": {
       "get": {
         "operationId": "agents.list",
@@ -14347,7 +14889,7 @@
     "/agents/startRun": {
       "post": {
         "operationId": "agents.startRun",
-        "summary": "Starts a run for an agent against an already-decomposed task list.",
+        "summary": "Starts a run for an agent against an already-decomposed task list, and queues its first step.",
         "tags": [
           "agents"
         ],
@@ -15093,6 +15635,16 @@
                           "status": {
                             "type": "string"
                           },
+                          "currentTaskIndex": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "taskCount": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
                           "log": {
                             "type": "array",
                             "items": {
@@ -15150,6 +15702,8 @@
                           "agentName",
                           "trigger",
                           "status",
+                          "currentTaskIndex",
+                          "taskCount",
                           "log",
                           "cost",
                           "error",
@@ -15546,6 +16100,193 @@
         }
       }
     },
+    "/proposals/apply": {
+      "post": {
+        "operationId": "proposals.apply",
+        "summary": "Applies one agent proposal the caller may decide, running the proposed action as them.",
+        "tags": [
+          "proposals"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "result": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {}
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "result"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/proposals/dismiss": {
+      "post": {
+        "operationId": "proposals.dismiss",
+        "summary": "Dismisses one agent proposal the caller may decide, without applying it.",
+        "tags": [
+          "proposals"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/spaces/list": {
       "get": {
         "operationId": "spaces.list",
@@ -15781,12 +16522,26 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "slackChannel": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "teamsChannel": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
                             }
                           },
                           "required": [
                             "teamVoting",
                             "coachStrictness",
-                            "defaultCheckInFrequency"
+                            "defaultCheckInFrequency",
+                            "slackChannel",
+                            "teamsChannel"
                           ],
                           "additionalProperties": false
                         }
@@ -16079,7 +16834,7 @@
     "/spaces/updateSettings": {
       "post": {
         "operationId": "spaces.updateSettings",
-        "summary": "Sets one space's team voting, strictness override and default check-in frequency.",
+        "summary": "Sets one space's team voting, strictness override, default check-in frequency and the Slack or Teams channel it posts to.",
         "tags": [
           "spaces"
         ],
@@ -16181,6 +16936,32 @@
                           "monthly",
                           "quarterly"
                         ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "slackChannel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "pattern": "^\\S+$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "teamsChannel": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "pattern": "^\\S+$"
                       },
                       {
                         "type": "null"
@@ -17510,6 +18291,13 @@
                       "monthly"
                     ]
                   },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "annual",
+                      "quarterly"
+                    ]
+                  },
                   "firstCycle": {
                     "default": false,
                     "type": "boolean"
@@ -18045,7 +18833,7 @@
     "/cycles/feedForward": {
       "post": {
         "operationId": "cycles.feedForward",
-        "summary": "Hands METHOD.md §8.9's inheritance to the next cycle: prior scores, carried work as issues at impact four, and the annual frame.",
+        "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
         "tags": [
           "cycles"
         ],
@@ -18081,8 +18869,11 @@
                             "type": "string"
                           }
                         },
-                        "processHealthIssue": {
-                          "type": "boolean"
+                        "processPriority": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         },
                         "packNote": {
                           "type": "boolean"
@@ -18093,7 +18884,7 @@
                         "issues",
                         "frameCarried",
                         "waiting",
-                        "processHealthIssue",
+                        "processPriority",
                         "packNote"
                       ],
                       "additionalProperties": false
@@ -18152,6 +18943,172 @@
                 "required": [
                   "fromCycleId",
                   "toCycleId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cycles/close": {
+      "post": {
+        "operationId": "cycles.close",
+        "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+        "tags": [
+          "cycles"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "cycleId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "snapshots": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "resultValue": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "verdict": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "fedInto": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "priorScores": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "issues": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "frameCarried": {
+                                  "type": "boolean"
+                                },
+                                "waiting": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "processPriority": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "packNote": {
+                                  "type": "boolean"
+                                },
+                                "cycleId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "priorScores",
+                                "issues",
+                                "frameCarried",
+                                "waiting",
+                                "processPriority",
+                                "packNote",
+                                "cycleId",
+                                "name"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "cycleId",
+                        "snapshots",
+                        "resultValue",
+                        "verdict",
+                        "fedInto"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cycleId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "cycleId"
                 ]
               }
             }
@@ -19628,6 +20585,114 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "calibration": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "reason": {
+                                  "type": "string"
+                                },
+                                "at": {
+                                  "type": "string"
+                                },
+                                "authorName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "reason",
+                                "at",
+                                "authorName"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "closure": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "resultValue": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "verdict": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "nextCycle": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "name"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "priorScores": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "carriedIssues": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "processPriority": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "packNote": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "resultValue",
+                                "verdict",
+                                "nextCycle",
+                                "priorScores",
+                                "carriedIssues",
+                                "processPriority",
+                                "packNote"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -19656,7 +20721,9 @@
                         "baselineHealth",
                         "revalidation",
                         "focus",
-                        "capacityCuts"
+                        "capacityCuts",
+                        "calibration",
+                        "closure"
                       ],
                       "additionalProperties": false
                     }
@@ -21695,6 +22762,92 @@
         }
       }
     },
+    "/documents/restore": {
+      "post": {
+        "operationId": "documents.restore",
+        "summary": "Brings back a deleted document. Its versions were never removed, so they come back with it.",
+        "tags": [
+          "documents"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/attachments/list": {
       "get": {
         "operationId": "attachments.list",
@@ -21743,6 +22896,18 @@
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "ok",
+                              "scanning",
+                              "quarantined"
+                            ]
+                          },
+                          "hasThumbnail": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -21751,7 +22916,9 @@
                           "filename",
                           "contentType",
                           "filesize",
-                          "position"
+                          "position",
+                          "status",
+                          "hasThumbnail"
                         ],
                         "additionalProperties": false
                       }
@@ -22240,6 +23407,121 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 40
+            }
+          }
+        ]
+      }
+    },
+    "/search/entities": {
+      "get": {
+        "operationId": "search.entities",
+        "summary": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+        "tags": [
+          "search"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "entityType": {
+                            "type": "string",
+                            "enum": [
+                              "goal",
+                              "key_result",
+                              "kpi",
+                              "space",
+                              "person",
+                              "initiative",
+                              "task",
+                              "document",
+                              "session",
+                              "cycle"
+                            ]
+                          },
+                          "entityId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "entityType",
+                          "entityId",
+                          "title",
+                          "href"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
             }
           }
         ]
@@ -23518,7 +24800,7 @@
     "/tasks/board": {
       "get": {
         "operationId": "tasks.board",
-        "summary": "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
+        "summary": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
         "tags": [
           "tasks"
         ],
@@ -23535,6 +24817,66 @@
                     "data": {
                       "type": "object",
                       "properties": {
+                        "scope": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "space",
+                                "initiative",
+                                "key_result"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "parentTitle": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "spaceId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "goalId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "title",
+                            "parentTitle",
+                            "spaceId",
+                            "goalId"
+                          ],
+                          "additionalProperties": false
+                        },
                         "columns": {
                           "type": "array",
                           "items": {
@@ -23740,6 +25082,7 @@
                         }
                       },
                       "required": [
+                        "scope",
                         "columns",
                         "rail"
                       ],
@@ -25244,6 +26587,92 @@
         }
       }
     },
+    "/tasks/restore": {
+      "post": {
+        "operationId": "tasks.restore",
+        "summary": "Brings back a deleted task with the assignments and checklist lines deleted with it.",
+        "tags": [
+          "tasks"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/linkedWork": {
       "get": {
         "operationId": "tasks.linkedWork",
@@ -26105,6 +27534,98 @@
                       },
                       "required": [
                         "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/initiatives/restore": {
+      "post": {
+        "operationId": "initiatives.restore",
+        "summary": "Brings back a deleted initiative and the key result links that were deleted with it.",
+        "tags": [
+          "initiatives"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "links": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "links"
                       ],
                       "additionalProperties": false
                     }
@@ -28273,6 +29794,98 @@
         }
       }
     },
+    "/goals/restore": {
+      "post": {
+        "operationId": "goals.restore",
+        "summary": "Brings back a deleted goal and the key results that were deleted with it.",
+        "tags": [
+          "goals"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "keyResults": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "keyResults"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/goals/reviewDecision": {
       "get": {
         "operationId": "goals.reviewDecision",
@@ -29104,6 +30717,104 @@
                 "required": [
                   "id",
                   "value"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goals/linkKpi": {
+      "post": {
+        "operationId": "goals.linkKpi",
+        "summary": "Links a KPI to a key result, which from then on reads its value and progress from it.",
+        "tags": [
+          "goals"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "kpiId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kpiId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "kpiId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "kpiId"
                 ]
               }
             }
@@ -30398,6 +32109,122 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 300
+            }
+          }
+        ]
+      }
+    },
+    "/goals/decomposeKeyResult": {
+      "get": {
+        "operationId": "goals.decomposeKeyResult",
+        "summary": "Drafts initiatives and their first tasks for one key result, as plain drafts a person edits before creating any of them.",
+        "tags": [
+          "goals"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "initiatives": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "description": {
+                                    "type": "string"
+                                  },
+                                  "tasks": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "description",
+                                  "tasks"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "initiatives"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "goalId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "keyResultId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             }
           }
         ]
@@ -33475,6 +35302,129 @@
         ]
       }
     },
+    "/kpis/list": {
+      "get": {
+        "operationId": "kpis.list",
+        "summary": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+        "tags": [
+          "kpis"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "kpis": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "shortId": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "unit": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "frequency": {
+                                "type": "string"
+                              },
+                              "direction": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "type": "string"
+                              },
+                              "achievementPct": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "targetDefault": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "isCalculated": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "shortId",
+                              "title",
+                              "unit",
+                              "frequency",
+                              "direction",
+                              "state",
+                              "achievementPct",
+                              "targetDefault",
+                              "isCalculated"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "kpis"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
+      }
+    },
     "/kpis/setFormula": {
       "post": {
         "operationId": "kpis.setFormula",
@@ -34351,6 +36301,217 @@
         ]
       }
     },
+    "/kpis/spaceTrees": {
+      "get": {
+        "operationId": "kpis.spaceTrees",
+        "summary": "One space's KPIs, grouped by the driver tree each is filed in. Drives the space home.",
+        "tags": [
+          "kpis"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "trees": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "name": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "nodes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    },
+                                    "parentKpiId": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "title": {
+                                      "type": "string"
+                                    },
+                                    "unit": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "indicatorType": {
+                                      "type": "string"
+                                    },
+                                    "tier": {
+                                      "type": "string"
+                                    },
+                                    "direction": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string"
+                                    },
+                                    "achievementPct": {
+                                      "type": [
+                                        "number",
+                                        "null"
+                                      ]
+                                    },
+                                    "effectivePct": {
+                                      "type": [
+                                        "number",
+                                        "null"
+                                      ]
+                                    },
+                                    "healthyPct": {
+                                      "type": "number"
+                                    },
+                                    "watchPct": {
+                                      "type": "number"
+                                    },
+                                    "targetDefault": {
+                                      "type": [
+                                        "number",
+                                        "null"
+                                      ]
+                                    },
+                                    "recoveryGoalId": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "recoveryProgressPct": {
+                                      "type": [
+                                        "number",
+                                        "null"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "parentKpiId",
+                                    "title",
+                                    "unit",
+                                    "indicatorType",
+                                    "tier",
+                                    "direction",
+                                    "state",
+                                    "achievementPct",
+                                    "effectivePct",
+                                    "healthyPct",
+                                    "watchPct",
+                                    "targetDefault",
+                                    "recoveryGoalId",
+                                    "recoveryProgressPct"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "nodes"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "trees"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "spaceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ]
+      }
+    },
     "/kpis/detail": {
       "get": {
         "operationId": "kpis.detail",
@@ -35201,6 +37362,55 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "proposal": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                      },
+                                      "action": {
+                                        "type": "string"
+                                      },
+                                      "aiGenerated": {
+                                        "type": "boolean"
+                                      },
+                                      "preview": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "label": {
+                                              "type": "string"
+                                            },
+                                            "value": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "label",
+                                            "value"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "action",
+                                      "aiGenerated",
+                                      "preview"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -35215,7 +37425,8 @@
                               "href",
                               "actionLabel",
                               "subjectId",
-                              "checkInId"
+                              "checkInId",
+                              "proposal"
                             ],
                             "additionalProperties": false
                           }
@@ -35456,7 +37667,121 @@
                 "check_in",
                 "cycle",
                 "document",
-                "task"
+                "task",
+                "initiative"
+              ]
+            }
+          },
+          {
+            "name": "subjectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ]
+      }
+    },
+    "/comments/summarise": {
+      "get": {
+        "operationId": "comments.summarise",
+        "summary": "Summarises the discussion on a subject and lists what it left open, refusing a summary that quotes words nobody wrote.",
+        "tags": [
+          "comments"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "summary": {
+                              "type": "string"
+                            },
+                            "openQuestions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "commentCount": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "summary",
+                            "openQuestions",
+                            "commentCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "subjectType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "goal",
+                "key_result",
+                "check_in",
+                "cycle",
+                "document",
+                "task",
+                "initiative"
               ]
             }
           },
@@ -35476,7 +37801,7 @@
     "/comments/create": {
       "post": {
         "operationId": "comments.create",
-        "summary": "Post a comment on a goal, key result, check-in, cycle or document",
+        "summary": "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
         "tags": [
           "comments"
         ],
@@ -35552,7 +37877,8 @@
                       "check_in",
                       "cycle",
                       "document",
-                      "task"
+                      "task",
+                      "initiative"
                     ]
                   },
                   "subjectId": {
@@ -35652,7 +37978,8 @@
                       "check_in",
                       "cycle",
                       "document",
-                      "task"
+                      "task",
+                      "initiative"
                     ]
                   },
                   "subjectId": {
@@ -36032,7 +38359,8 @@
                 "check_in",
                 "cycle",
                 "document",
-                "task"
+                "task",
+                "initiative"
               ]
             }
           },
@@ -38912,6 +41240,50 @@
                               "string",
                               "null"
                             ]
+                          },
+                          "teamVoting": {
+                            "type": "boolean"
+                          },
+                          "votesCast": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "revealed": {
+                            "type": "boolean"
+                          },
+                          "votes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "memberId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "confidence": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "memberId",
+                                "confidence"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "average": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "myVote": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -38919,7 +41291,13 @@
                           "title",
                           "confirmed",
                           "confirmedConfidence",
-                          "whatChanged"
+                          "whatChanged",
+                          "teamVoting",
+                          "votesCast",
+                          "revealed",
+                          "votes",
+                          "average",
+                          "myVote"
                         ],
                         "additionalProperties": false
                       }
@@ -40323,6 +42701,108 @@
         }
       }
     },
+    "/sessions/postDigest": {
+      "post": {
+        "operationId": "sessions.postDigest",
+        "summary": "Posts a closed weekly session's digest to the Slack or Teams channel its space is linked to, once per channel.",
+        "tags": [
+          "sessions"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "posted": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "slack",
+                              "teams"
+                            ]
+                          }
+                        },
+                        "alreadyPosted": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "slack",
+                              "teams"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "posted",
+                        "alreadyPosted"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "sessionId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/readStreak": {
       "get": {
         "operationId": "sessions.readStreak",
@@ -40456,13 +42936,27 @@
                                 "string",
                                 "null"
                               ]
+                            },
+                            "postedTo": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "postableTo": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             }
                           },
                           "required": [
                             "weekStart",
                             "lines",
                             "numbers",
-                            "note"
+                            "note",
+                            "postedTo",
+                            "postableTo"
                           ],
                           "additionalProperties": false
                         },

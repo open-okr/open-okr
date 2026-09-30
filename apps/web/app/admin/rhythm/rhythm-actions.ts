@@ -13,6 +13,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
 
@@ -97,6 +98,7 @@ export async function saveRhythm(
   _previous: RhythmState,
   form: FormData,
 ): Promise<RhythmState> {
+  const { t } = await getTranslations();
   const overrides: Record<string, unknown> = {};
   const labels: Record<string, { singular: string; plural: string }> = {};
   /** This workspace's own word list terms, per list (P8-G11b). */
@@ -216,7 +218,7 @@ export async function saveRhythm(
   }
 
   if (Object.keys(patch).length === 0) {
-    return { error: "There was nothing on this card to save.", saved: null };
+    return { error: t("admin.rhythm.actions.nothingToSave"), saved: null };
   }
 
   try {
@@ -229,13 +231,18 @@ export async function saveRhythm(
   }
 
   revalidatePath("/admin/rhythm");
+  // A rename is read on every screen, starting with the sidebar and the root
+  // layout's catalogue, so the whole tree is stale rather than this page (M-14).
+  if (sawLabel) {
+    revalidatePath("/", "layout");
+  }
 
   // Counted over this card's thresholds rather than the workspace's, because
   // that is what the sentence sits under. A card carrying no threshold at all
   // gets the plain confirmation instead of "every threshold is the canon's",
   // which would have been a claim about seven cards it never saw.
   if (!sawThreshold) {
-    return { error: null, saved: "Saved." };
+    return { error: null, saved: t("admin.rhythm.actions.saved") };
   }
   const changed = Object.values(overrides).filter(
     (value) => value !== null,
@@ -244,8 +251,10 @@ export async function saveRhythm(
     error: null,
     saved:
       changed === 0
-        ? "Saved. Every threshold on this card is at its default."
-        : `Saved. ${changed} threshold${changed === 1 ? "" : "s"} on this card differ${changed === 1 ? "s" : ""} from the default.`,
+        ? t("admin.rhythm.actions.savedAllDefault")
+        : changed === 1
+          ? t("admin.rhythm.actions.savedDifferOne", { count: changed })
+          : t("admin.rhythm.actions.savedDifferOther", { count: changed }),
   };
 }
 
@@ -266,9 +275,10 @@ export async function saveRhythm(
 export async function resetGroup(
   keys: readonly string[],
 ): Promise<RhythmState> {
+  const { t } = await getTranslations();
   const wanted = keys.filter((key) => key !== "");
   if (wanted.length === 0) {
-    return { error: "Nothing to reset in this card.", saved: null };
+    return { error: t("admin.rhythm.actions.nothingToReset"), saved: null };
   }
 
   try {
@@ -285,6 +295,9 @@ export async function resetGroup(
   revalidatePath("/admin/rhythm");
   return {
     ...NOTHING_SAVED,
-    saved: `Returned ${wanted.length} threshold${wanted.length === 1 ? "" : "s"} to their defaults.`,
+    saved:
+      wanted.length === 1
+        ? t("admin.rhythm.actions.returnedOne", { count: wanted.length })
+        : t("admin.rhythm.actions.returnedOther", { count: wanted.length }),
   };
 }

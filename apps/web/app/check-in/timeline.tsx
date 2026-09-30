@@ -1,5 +1,12 @@
 import { excerptRichText } from "@openokr/core";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  type MessageValues,
+} from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledgeCheckIn, deleteCheckIn, editCheckIn } from "./actions.ts";
@@ -54,6 +61,37 @@ function difference(value: number, previous: number | null): string {
   return `${previous} → ${value} (${sign}${Math.round(delta * 100) / 100})`;
 }
 
+/**
+ * Who posted a card, and when and how sure they were, as one message.
+ *
+ * Four shapes rather than three pieces, so a translator places the date and
+ * the confidence where their own language puts them.
+ */
+function byline(
+  t: (key: string, values?: MessageValues) => string,
+  entry: TimelineCheckIn,
+): string {
+  const name = entry.author.name;
+  const date = entry.publishedAt
+    ? new Date(entry.publishedAt).toLocaleDateString()
+    : null;
+  const confidence = entry.confidence;
+  if (date !== null && confidence !== null) {
+    return t("checkIn.timeline.bylineDateConfidence", {
+      name,
+      date,
+      confidence,
+    });
+  }
+  if (date !== null) {
+    return t("checkIn.timeline.bylineDate", { name, date });
+  }
+  if (confidence !== null) {
+    return t("checkIn.timeline.bylineConfidence", { name, confidence });
+  }
+  return name;
+}
+
 export async function Timeline({
   checkIns,
   canEdit,
@@ -89,15 +127,7 @@ export async function Timeline({
                   <Chip tone={STATUS_TONE[entry.status ?? ""] ?? "neutral"}>
                     {(entry.status ?? "").replace("_", " ")}
                   </Chip>
-                  <span className="text-xs text-ink-3">
-                    {entry.author.name}
-                    {entry.publishedAt
-                      ? ` · ${new Date(entry.publishedAt).toLocaleDateString()}`
-                      : ""}
-                    {entry.confidence !== null
-                      ? ` · confidence ${entry.confidence}`
-                      : ""}
-                  </span>
+                  <span className="text-xs text-ink-3">{byline(t, entry)}</span>
                 </span>
                 {entry.acknowledgedAt ? (
                   <Chip tone="ok">{t("checkIn.timeline.acknowledged")}</Chip>
@@ -110,7 +140,7 @@ export async function Timeline({
 
               <p className="text-sm text-ink-2">
                 {excerptRichText(entry.narrative as never, 2000) ||
-                  "No narrative recorded."}
+                  t("checkIn.timeline.noNarrativeRecorded")}
               </p>
 
               {entry.entries.length > 0 ? (

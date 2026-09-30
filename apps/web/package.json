@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit --incremental false --singleThreaded"
   },
   "dependencies": {
     "@base-ui-components/react": "catalog:",
@@ -38,6 +38,7 @@
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
+    "typescript5": "catalog:",
     "vitest": "catalog:"
   }
 }

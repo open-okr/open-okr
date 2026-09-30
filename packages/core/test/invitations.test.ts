@@ -259,6 +259,13 @@ describe("trusted-domain automatic joining", () => {
     );
 
     await createUser("trusted-person", "someone@trusted.example", "Trusted");
+    // A confirmed address, which joining by domain requires since
+    // completeness review M-34. The rest of that path, and every refusal, is
+    // in `trusted-domain.test.ts`.
+    await wb.admin.query(
+      "update users set email_verified = true where id = $1",
+      ["trusted-person"],
+    );
     const outcome = await callAction(
       { pool: wb.appPool, ...actingAs("trusted-person") },
       "invitations.joinByTrustedDomain",

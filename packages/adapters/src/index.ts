@@ -18,9 +18,12 @@ export {
   createAdapters,
 } from "./create-adapters.ts";
 export {
+  type AIEgressOptions,
   type AIProviderConfig,
+  aiEgressTargetOf,
   createAIProvider,
   defaultTierModelsFor,
+  type GuardedAIProvider,
 } from "./create-ai-provider.ts";
 export { createMailer, type MailerConfig } from "./create-mailer.ts";
 export {
@@ -57,7 +60,9 @@ export {
   toBlocks,
 } from "./drivers/channel/slack.ts";
 export {
+  checkInCard,
   decodeToken,
+  parseCardSubmission,
   stripMentions,
   TeamsChannel,
   type TeamsChannelOptions,
@@ -87,6 +92,10 @@ export {
   whatsAppDeliveryId,
   whatsAppPhoneNumberId,
 } from "./drivers/channel/whatsapp.ts";
+// The two file drivers the upload path and the relay construct (completeness
+// review M-24). Exported by name, like the storage drivers below: the host
+// builds one, and everything else sees the port.
+export { SharpImageProcessor } from "./drivers/image/sharp.ts";
 // Exported for the scheduler host (P6-G01a), which needs a queue on its own
 // rather than the whole adapter set `createAdapters` builds. Same shape as the
 // channel drivers above: the host constructs the driver, the port is what
@@ -107,6 +116,10 @@ export {
   type SocketPrincipal,
 } from "./drivers/realtime/socket-server.ts";
 export {
+  ClamdScanner,
+  type ClamdScannerOptions,
+} from "./drivers/scan/clamd.ts";
+export {
   LocalDiskStorage,
   type LocalDiskStorageOptions,
 } from "./drivers/storage/local-disk.ts";
@@ -115,6 +128,18 @@ export {
   S3Storage,
   type S3StorageOptions,
 } from "./drivers/storage/s3.ts";
+// The egress guard itself stays private: `createAIProvider` is the only way
+// to be handed one, which is the whole point of it (M-10). What leaves is the
+// vocabulary a host needs to pass a policy in and read an event out.
+export {
+  AI_CONTEXT_EGRESS_LEVELS,
+  type AIContextEgress,
+  type AIEgressEvent,
+  type AIEgressPolicy,
+  type AIEgressRefusal,
+  AIEgressRefusedError,
+  type AIEgressTarget,
+} from "./outbound/ai-egress.ts";
 export {
   type CheckedUrl,
   checkUrl,
@@ -138,6 +163,7 @@ export type {
 } from "./ports/agent.ts";
 export type {
   AIProvider,
+  AIPurpose,
   ChatMessage,
   ChatRequest,
   ChatResponse,
@@ -163,6 +189,14 @@ export type {
   InboundRequest,
   InboundSubmission,
 } from "./ports/channel.ts";
+export type {
+  EncodedImage,
+  ImageFormat,
+  ImageProcessOptions,
+  ImageProcessor,
+  ImageProcessResult,
+  UnreadableReason,
+} from "./ports/image.ts";
 export type { JobHandler, JobOptions, JobQueue } from "./ports/jobs.ts";
 export type {
   Mailer,
@@ -177,6 +211,8 @@ export type {
   Subscription,
 } from "./ports/realtime.ts";
 export { EventTooLargeError, MAX_EVENT_BYTES } from "./ports/realtime.ts";
+export type { FileScanner, ScanVerdict } from "./ports/scan.ts";
+export { ScannerUnavailableError } from "./ports/scan.ts";
 export type {
   Search,
   SearchDocument,
@@ -195,6 +231,7 @@ export {
   OutboxRelay,
   type OutboxRelayOptions,
   PermanentDispatchError,
+  purgeSettledOutbox,
   type RelayClient,
   type RelayPool,
 } from "./relay.ts";

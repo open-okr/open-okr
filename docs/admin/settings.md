@@ -14,14 +14,36 @@ no administrator overrides it.
 |---|---|---|
 | `timezone` | The registering browser's, falling back to UTC | Almost always, on the first day. Every rhythm date is read in it, so a wrong one sends Monday's nudges on Sunday night |
 | `language` | Inherited from the instance default, which is English | Your workspace works in Bahasa Melayu |
-| `branding` | The product's own palette | You want the workspace to carry your colour |
-| `trustedEmailDomains` | None | Anybody with a company address should be able to join without being invited. Joining is by invitation until you set this |
+| `branding` | The product's own palette | You want the workspace to carry your colour. It becomes the buttons, links, progress bars and focus rings on every screen of the workspace, in light and dark. A colour too light for white text is darkened for buttons, and the card says which shade is used. Red, amber and green are refused, because they mean off track, at risk and on track. The sign-in page and email do not carry it |
+| `trustedEmailDomains` | None | Anybody with a company address should be able to join without being invited. Joining is by invitation until you set this. See [Trusted email domains](#trusted-email-domains) for what it takes |
 | `requireSecondFactor` | Off | Your organisation mandates a second factor. It holds you too. See [Security](security.md) |
 | `storageQuotaBytes` | 5 GiB | A team whose files outgrow it |
 | `exportInlineRowLimit` | Set by the registry | A list export is large enough to be built in the background instead of handed over directly |
 | `importRowLimit` | Set by the registry | An import is bigger than the default ceiling |
 | `messageLogRetentionDays` | Set by the registry | Your policy says chat message records live for a different span |
 | `agentRunCostCapUsd` | Set by the registry | You want a harder or softer ceiling on what an agent run may spend |
+
+### Trusted email domains
+
+Somebody whose **confirmed** address is at one of these domains is offered the
+workspace when they sign in, and joins it with one press. Nobody is added
+without pressing it.
+
+| Who | What they see |
+|---|---|
+| Somebody with no workspace yet | A page listing the workspaces their domain admits, and a button to start one of their own instead. Nothing is made for them until they choose |
+| A member of another workspace | The same offer at the top of their Work Map |
+| Somebody whose address is not confirmed | Nothing. Anybody can type an address at your company into a sign-up form |
+| A member you suspended, or one who was removed | Nothing. Only an invitation brings them back |
+
+**Confirming an address needs mail.** An instance with no mail server confirms
+nobody, so a trusted domain admits nobody there.
+
+**It does not open registration.** On an invitation-only instance a trusted
+domain lets people who already have an account join. Creating an account there
+still takes an invitation or single sign-on.
+
+The seat limit still applies: a full workspace refuses the join and says so.
 
 ## Space
 
@@ -30,6 +52,7 @@ no administrator overrides it.
 | `teamVoting` | On | The confidence round in the weekly session, with a vote per member |
 | `coachStrictness` | Set by the registry | How hard the Coach pushes on quality |
 | `defaultCheckInFrequency` | Set by the registry | How often a new goal in this space expects a check-in |
+| `slackChannel`, `teamsChannel` | None | The channel the space's weekly digest is posted to, as Slack's or Teams' own channel ID rather than its name. Offered only for a provider the workspace has connected, and the bot has to be a member of the channel. The coordinator posts each closed week's digest from the session, once per channel |
 
 ## Member
 
@@ -47,8 +70,11 @@ workspace.
 
 | Setting | Default | Detail |
 |---|---|---|
+| `instance.name` | `OpenOKR` | What people see in the tab title, on the sign-in page, and in every email and chat message. Set it with `OPENOKR_INSTANCE_NAME`, in the wizard, or on General in admin. A name saved on General wins over the variable; clear the field to hand the choice back to it. Authenticator apps and passkey prompts show a new name after the next restart. Not on General on a managed cloud, where the name is the operator's |
 | `mail.transport` | `console` | The console driver writes each message to the process log instead of sending it. **Change this.** A password-reset link in a log is a credential, and the General screen shows a banner while it is the case |
 | `registration.policy` | Computed | Open until somebody claims the instance, invitation-only afterwards. A managed cloud stays open. Set it explicitly to override |
+| `scan.clamd.host` | Empty, meaning no virus scan | Name a ClamAV daemon (clamd) with `OPENOKR_CLAMD_HOST` and every uploaded file waits as "being checked" until clamd has scanned it. A file it flags is held back and never served. See [Security](security.md#uploaded-files) |
+| `scan.clamd.port` | `3310` | clamd's own default. Set it with `OPENOKR_CLAMD_PORT` when yours listens elsewhere |
 
 ## The two rules behind all of this
 
@@ -59,6 +85,19 @@ usable before anybody visits a settings screen.
 rules fire on live in the method specification and are administered on the
 Rhythm and thresholds screen, not invented per instance. That is what keeps a
 coaching message able to cite the rule behind it.
+
+## Terminology
+
+The Terminology card on Rhythm and thresholds renames a term the method
+already has: an objective can be an ambition, a space a team. The rename shows
+in the sidebar and in the main screens' headings, create buttons, counts and
+empty states, for every member and in every language, because it is your
+organisation's own word. A term you have not renamed reads in each person's
+own language.
+
+Coaching messages, rule names and the method page keep the method's words, so
+a message still cites the rule it comes from. Longer explanatory sentences,
+emails and chat messages keep them too for now.
 
 ## Next
 

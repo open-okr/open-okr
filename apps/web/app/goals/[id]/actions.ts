@@ -17,6 +17,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
 
@@ -62,7 +63,8 @@ export async function editGoal(
   const weight = Number(formData.get("weight"));
 
   if (title === "") {
-    return { error: "An objective needs a title." };
+    const { t } = await getTranslations();
+    return { error: t("goals.detail.actions.objectiveNeedsATitle") };
   }
 
   return run(id, (context) =>
@@ -86,10 +88,8 @@ export async function closeGoal(
   if (isBlankText(body)) {
     // The same refusal the action makes, said before the round trip so the
     // person reads it beside the field they left empty.
-    return {
-      error:
-        "Closing a goal needs a retrospective. What happened, and what would you do differently?",
-    };
+    const { t } = await getTranslations();
+    return { error: t("goals.detail.actions.closingNeedsARetrospective") };
   }
 
   return run(id, (context) =>
@@ -155,134 +155,12 @@ export async function recordValue(
   const keyResultId = String(formData.get("keyResultId") ?? "");
   const value = Number(formData.get("value"));
   if (!Number.isFinite(value)) {
-    return { error: "A value has to be a number." };
+    const { t } = await getTranslations();
+    return { error: t("cycle.actions.valueHasToBeANumber") };
   }
   return run(goalId, async (context) => {
     await callAction(context, "goals.recordValue", { id: keyResultId, value });
   });
-}
-
-// ── Comments (P3-T16) ─────────────────────────────────────────────────
-
-export async function postComment(body: unknown): Promise<WriteState> {
-  const { session, workspace } = await requireWorkspace();
-  const context = {
-    pool: getPool(),
-    workspaceId: workspace.workspaceId,
-    actor: { kind: "human" as const, userId: session.user.id },
-  };
-  try {
-    // The goalId comes from the page, passed via a hidden field or closure.
-    // For now, the body includes the subjectType and subjectId.
-    const input = body as {
-      subjectType: "goal" | "key_result" | "check_in" | "cycle" | "document";
-      subjectId: string;
-      body: unknown;
-    };
-    await callAction(context, "comments.create", input);
-    revalidatePath("/goals/[id]", "page");
-    return NO_ERROR;
-  } catch (error) {
-    return {
-      error:
-        error instanceof OperationError
-          ? error.message
-          : "Failed to post comment.",
-    };
-  }
-}
-
-export async function editComment(
-  commentId: string,
-  body: unknown,
-): Promise<WriteState> {
-  const { session, workspace } = await requireWorkspace();
-  const context = {
-    pool: getPool(),
-    workspaceId: workspace.workspaceId,
-    actor: { kind: "human" as const, userId: session.user.id },
-  };
-  try {
-    await callAction(context, "comments.update", { commentId, body });
-    revalidatePath("/goals/[id]", "page");
-    return NO_ERROR;
-  } catch (error) {
-    return {
-      error:
-        error instanceof OperationError
-          ? error.message
-          : "Failed to edit comment.",
-    };
-  }
-}
-
-export async function deleteCommentAction(
-  commentId: string,
-): Promise<WriteState> {
-  const { session, workspace } = await requireWorkspace();
-  const context = {
-    pool: getPool(),
-    workspaceId: workspace.workspaceId,
-    actor: { kind: "human" as const, userId: session.user.id },
-  };
-  try {
-    await callAction(context, "comments.delete", { commentId });
-    revalidatePath("/goals/[id]", "page");
-    return NO_ERROR;
-  } catch (error) {
-    return {
-      error:
-        error instanceof OperationError
-          ? error.message
-          : "Failed to delete comment.",
-    };
-  }
-}
-
-/**
- * Reacting, and taking it back (P6-G27).
- *
- * **It was named a toggle and only ever added.** `reactions.remove` shipped
- * with the reaction and had no browser caller, so pressing an emoji a second
- * time did nothing and a reaction given by mistake stayed for good. The read
- * now hands back the caller's own reaction id, which is the one thing this
- * needed.
- */
-export async function toggleReaction(
-  subjectType: string,
-  subjectId: string,
-  emoji: string,
-  /** The caller's existing reaction with this emoji, when there is one. */
-  ownReactionId?: string | null,
-): Promise<WriteState> {
-  const { session, workspace } = await requireWorkspace();
-  const context = {
-    pool: getPool(),
-    workspaceId: workspace.workspaceId,
-    actor: { kind: "human" as const, userId: session.user.id },
-  };
-  try {
-    if (ownReactionId) {
-      await callAction(context, "reactions.remove", {
-        reactionId: ownReactionId,
-      });
-    } else {
-      await callAction(context, "reactions.add", {
-        subjectType,
-        subjectId,
-        emoji,
-      });
-    }
-    revalidatePath("/goals/[id]", "page");
-    return NO_ERROR;
-  } catch (error) {
-    return {
-      error:
-        error instanceof OperationError
-          ? error.message
-          : "Failed to change the reaction.",
-    };
-  }
 }
 
 /**
@@ -301,7 +179,11 @@ export async function rewriteKeyResultAction(
   ruleId: string,
 ) {
   const { session, workspace } = await requireWorkspace();
-  const drafter = await drafterFor(workspace.workspaceId);
+  const drafter = await drafterFor(
+    workspace.workspaceId,
+    "balanced",
+    session.user.id,
+  );
   return callAction(
     {
       pool: getPool(),

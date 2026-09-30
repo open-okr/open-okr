@@ -85,7 +85,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     administrator: z.boolean(),
   }),
   "member.converted_to_guest": z.object({ name: z.string() }),
-  "member.erased": z.object({ name: z.string() }),
+  // No name since completeness review M-18: the event is that somebody was
+  // erased, and writing who into a row every member can read undid it.
+  "member.erased": z.object({}),
   /**
    * A member an import created or claimed (P6-T03a).
    *
@@ -129,6 +131,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "blob.prepared": z.object({}),
   "blob.claimed": z.object({}).catchall(z.unknown()),
+  /**
+   * A held file's virus scan finished (completeness review M-24). The verdict
+   * only: the signature a scanner named is on the audit row, not in a feed.
+   */
+  "blob.scanned": z.object({
+    verdict: z.enum(["clean", "found", "refused", "missing"]),
+  }),
   /** A space set its own §4.14 settings (P6-G18b). */
   "space.settingsChanged": z.object({ name: z.string() }),
   /** An agent's write policy was moved (P6-G13b). */
@@ -186,6 +195,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     .catchall(z.unknown()),
   "ai.budget_set": z.object({}).catchall(z.unknown()),
   "ai.budget_removed": z.object({}),
+  // Completeness review M-10. The privacy card's save, and what its controls
+  // did to a request: counts and a host, never the text.
+  "ai.privacy_updated": z.object({ keys: z.array(z.string()) }),
+  "ai.egress_withheld": z.object({
+    provider: z.string(),
+    outcome: z.enum(["refused", "redacted"]),
+  }),
   "agent.created": z.object({}).catchall(z.unknown()),
   "agent.enabled_changed": z.object({ enabled: z.boolean() }),
   "agent.scope_bound": z.object({}).catchall(z.unknown()),
@@ -199,6 +215,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "agent.run_failed": z.object({}).catchall(z.unknown()),
   "proposed_change.bulk_applied": z.object({}).catchall(z.unknown()),
   "proposed_change.bulk_dismissed": z.object({}).catchall(z.unknown()),
+  // One proposal decided from the review inbox (completeness review M-08).
+  // The action name travels so the feed can say what kind of change it was;
+  // what the change did is the applied action's own activity row.
+  "proposed_change.applied": z.object({ action: z.string() }),
+  "proposed_change.dismissed": z.object({ action: z.string() }),
   // Spaces (P3-T01). The name is snapshotted for the same reason a member's is:
   // a feed entry saying "renamed Marketing" has to keep saying that after the
   // space is renamed again.
@@ -219,7 +240,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "space.joined": z.object({}),
   "space.left": z.object({}),
   // Cycles and the rhythm (P3-T02).
-  "cycle.created": z.object({ name: z.string() }),
+  // `inheritedFrom` names the closed cycle that fed this one at creation
+  // (M-05). Absent when nothing was waiting for it, which is most creations.
+  "cycle.created": z.object({
+    name: z.string(),
+    inheritedFrom: z.string().optional(),
+  }),
   "cycle.resolved": z.object({ name: z.string() }),
   "cycle.updated": z.object({ name: z.string() }),
   "cycle.archived": z.object({ name: z.string() }),
@@ -273,6 +299,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // The title, because a feed entry about a goal being removed has to read as
   // a sentence after the goal is gone (P4-T14b-a).
   "goal.deleted": z.object({ title: z.string() }),
+  // The counterpart of the line above, and the title travels for the same
+  // reason: a feed line has to read as a sentence on its own (M-13).
+  "goal.restored": z.object({ title: z.string() }),
   "goal.role_reassigned": z.object({ role: z.enum(["champion", "reviewer"]) }),
   "goal.moved_to_cycle": z.object({ title: z.string() }),
   // Initiatives (P5-T10a). The title travels for the same reason a goal's does:
@@ -281,6 +310,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "initiative.created": z.object({ title: z.string(), spaceId: z.uuid() }),
   "initiative.updated": z.object({ fields: z.array(z.string()) }),
   "initiative.deleted": z.object({ title: z.string() }),
+  "initiative.restored": z.object({ title: z.string() }),
   // The key result, because the feed entry a reader wants is "this work is now
   // behind that number" rather than "an initiative changed".
   "initiative.linked": z.object({ keyResultId: z.uuid() }),
@@ -320,6 +350,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     version: z.number().int(),
   }),
   "document.deleted": z.object({ title: z.string() }),
+  "document.restored": z.object({ title: z.string() }),
   "attachment.added": z.object({ duplicate: z.boolean() }),
   "attachment.removed": z.object({}),
   // Tasks (P5-T11). The title travels on create and delete for the reason a
@@ -331,9 +362,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "task.unassigned": z.object({ memberId: z.uuid() }),
   "task.checklist_changed": z.object({ change: z.string() }),
   "task.deleted": z.object({ title: z.string() }),
+  "task.restored": z.object({ title: z.string() }),
   "key_result.created": z.object({ title: z.string() }),
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
+  "key_result.kpi_linked": z.object({ kpiId: z.uuid() }),
   "key_result.kpi_unlinked": z.object({}),
   // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing
   // about the goal, because a draft is silent about the goal by design.
@@ -383,6 +416,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.fed_forward": z.object({
     priorScores: z.number().int(),
     issues: z.number().int(),
+  }),
+  // §8.9's close as one act (M-05). The verdict and the successor's name are
+  // snapshotted, because the line has to read the same after either changes.
+  "cycle.closed": z.object({
+    name: z.string(),
+    verdict: z.string().nullable(),
+    fedInto: z.string().nullable(),
   }),
   "kpi.recovery_launched": z.object({
     goalId: z.string(),
@@ -462,6 +502,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "session.commitmentsSet": z.object({ count: z.number() }),
   "session.commitmentsClosed": z.object({ count: z.number() }),
   "session.coordinatorNoteSet": z.object({}),
+  // The week's digest posted to the space's own channel (completeness review
+  // M-23). The providers, never the channel ids.
+  "session.digestPosted": z.object({ channels: z.array(z.string()) }),
   // The monthly review (METHOD.md §7.5, P4-T09). A trend and a decision both
   // hang off the goal rather than the session, because the goal page is where
   // somebody comes looking for them a month later.
@@ -577,6 +620,10 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   "copilot.proposalApplied",
   "copilot.proposalDismissed",
   "copilot.proposalUndone",
+  // A request one member's assist or question made, withheld or redacted
+  // (M-10). Which member asked is theirs; the audit row is where an
+  // administrator reads that the control acted.
+  "ai.egress_withheld",
 ]);
 
 /**

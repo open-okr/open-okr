@@ -48,8 +48,8 @@ export async function Sparkline({
     return (
       <span className="text-xs text-ink-4">
         {history.length === 1
-          ? "One value so far. A trend needs a second."
-          : "No values recorded yet."}
+          ? t("goals.detail.sparkline.oneValueSoFar")
+          : t("goals.detail.sparkline.noValuesRecordedYet")}
       </span>
     );
   }
@@ -104,9 +104,11 @@ export async function Sparkline({
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="flex-none overflow-hidden"
         role="img"
-        aria-label={`${history.length} values, from ${values[0]} to ${
-          values[values.length - 1]
-        }`}
+        aria-label={t("goals.detail.sparkline.valuesFromTo", {
+          count: history.length,
+          first: String(values[0]),
+          last: String(values[values.length - 1]),
+        })}
       >
         <title>{t("goals.detail.sparkline.valueHistory")}</title>
         <path
@@ -127,8 +129,14 @@ export async function Sparkline({
           }
         >
           {forecast.trendingOffTrack
-            ? `Trending off track: ${round(forecast.projected)} by ${horizonOn}`
-            : `On this trend: ${round(forecast.projected)} by ${horizonOn}`}
+            ? t("goals.detail.sparkline.trendingOffTrack", {
+                projected: round(forecast.projected),
+                date: horizonOn,
+              })
+            : t("goals.detail.sparkline.onThisTrend", {
+                projected: round(forecast.projected),
+                date: horizonOn,
+              })}
         </span>
       ) : (
         <span className="text-xs text-ink-4">

@@ -40,7 +40,10 @@ import {
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
-import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
+import {
+  resolveSpaceSettingsFrom,
+  spaceChannelSchema,
+} from "../settings/registry.ts";
 import { resolveCoordinator, wouldStrandSpace } from "../spaces/roles.ts";
 import {
   addSpaceMemberInTx,
@@ -82,6 +85,12 @@ const spaceDetail = spaceSummary.extend({
     teamVoting: z.boolean(),
     coachStrictness: z.enum(COACH_STRICTNESS).nullable(),
     defaultCheckInFrequency: z.enum(CHECK_IN_FREQUENCIES).nullable(),
+    /**
+     * The channel this space posts its digest to, per provider, or null
+     * (completeness review M-23). The provider's own identifier.
+     */
+    slackChannel: z.string().nullable(),
+    teamsChannel: z.string().nullable(),
   }),
 });
 
@@ -372,11 +381,16 @@ export const readSpace = defineReadAction({
  * returns it to the workspace's. That is the difference the two nullable
  * settings exist to express: a space with no opinion is not a space that chose
  * the workspace's current value, because the workspace's can change.
+ *
+ * **The space's own channels are here too** (completeness review M-23): which
+ * Slack or Teams channel this team reads, so the coordinator can post the
+ * week's digest there. A team decides where its own figures go, the same way
+ * it decides its own strictness. Null unlinks it.
  */
 export const updateSpaceSettings = defineWriteAction({
   name: "spaces.updateSettings",
   summary:
-    "Sets one space's team voting, strictness override and default check-in frequency.",
+    "Sets one space's team voting, strictness override, default check-in frequency and the Slack or Teams channel it posts to.",
   input: z.object({
     id: z.uuid(),
     teamVoting: z.boolean().optional(),
@@ -384,6 +398,10 @@ export const updateSpaceSettings = defineWriteAction({
     coachStrictness: z.enum(COACH_STRICTNESS).nullable().optional(),
     /** Null returns this to the workspace's own §11 cadence. */
     defaultCheckInFrequency: z.enum(CHECK_IN_FREQUENCIES).nullable().optional(),
+    /** Slack's channel id for this space. Null posts nowhere on Slack. */
+    slackChannel: spaceChannelSchema.optional(),
+    /** Teams' channel conversation id. Null posts nowhere on Teams. */
+    teamsChannel: spaceChannelSchema.optional(),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -429,6 +447,12 @@ export const updateSpaceSettings = defineWriteAction({
       }
       if (input.defaultCheckInFrequency !== undefined) {
         merged.defaultCheckInFrequency = input.defaultCheckInFrequency;
+      }
+      if (input.slackChannel !== undefined) {
+        merged.slackChannel = input.slackChannel;
+      }
+      if (input.teamsChannel !== undefined) {
+        merged.teamsChannel = input.teamsChannel;
       }
 
       const [updated] = await tx

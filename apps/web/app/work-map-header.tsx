@@ -1,4 +1,4 @@
-import { Chip } from "@openokr/ui";
+import { Chip, type MessageValues } from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../lib/translations";
 
@@ -42,6 +42,13 @@ export interface ScopeTab {
   readonly href: string;
 }
 
+type Translate = (key: string, values?: MessageValues) => string;
+
+const daysPhrase = (count: number, t: Translate): string =>
+  count === 1
+    ? t("common.count.dayOne", { count })
+    : t("common.count.dayOther", { count });
+
 export async function WorkMapContextStrip({
   context,
   cycleHref,
@@ -80,8 +87,14 @@ export async function WorkMapContextStrip({
         // somebody actually reads. The link goes where they are all listed.
         <Link href={cycleHref} className="text-warn hover:underline">
           {context.unmetGates.length === 1
-            ? `1 gate unmet: ${context.unmetGates[0]}`
-            : `${context.unmetGates.length} gates unmet`}
+            ? t("workMapHeader.oneGateUnmet", {
+                gate: context.unmetGates[0] ?? "",
+              })
+            : t("workMapHeader.gatesUnmet", {
+                gates: t("common.count.gateOther", {
+                  count: context.unmetGates.length,
+                }),
+              })}
         </Link>
       )}
 
@@ -94,8 +107,12 @@ export async function WorkMapContextStrip({
           }
         >
           {context.daysToDeadline < 0
-            ? `Publication deadline passed ${Math.abs(context.daysToDeadline)} day${Math.abs(context.daysToDeadline) === 1 ? "" : "s"} ago`
-            : `Publication deadline in ${context.daysToDeadline} day${context.daysToDeadline === 1 ? "" : "s"}`}
+            ? t("workMapHeader.deadlinePassed", {
+                days: daysPhrase(Math.abs(context.daysToDeadline), t),
+              })
+            : t("workMapHeader.deadlineIn", {
+                days: daysPhrase(context.daysToDeadline, t),
+              })}
         </span>
       )}
     </div>
@@ -171,23 +188,39 @@ export async function WorkMapHeader({
         </h1>
         <p className="truncate text-xl font-bold text-ink">{workspaceName}</p>
         <p className="text-xs text-ink-3">
-          {t("common.objectiveKeyResult", {
+          {t("workMapHeader.scopeSummary", {
             scopeLabel,
-            objectiveCount: stats.objectiveCount,
-            objectiveCount2: stats.objectiveCount === 1 ? "" : "s",
-            keyResultCount: stats.keyResultCount,
-            keyResultCount2: stats.keyResultCount === 1 ? "" : "s",
+            objectives:
+              stats.objectiveCount === 1
+                ? t("common.count.objectiveOne", {
+                    count: stats.objectiveCount,
+                  })
+                : t("common.count.objectiveOther", {
+                    count: stats.objectiveCount,
+                  }),
+            keyResults:
+              stats.keyResultCount === 1
+                ? t("common.count.keyResultOne", {
+                    count: stats.keyResultCount,
+                  })
+                : t("common.count.keyResultOther", {
+                    count: stats.keyResultCount,
+                  }),
           })}
         </p>
       </div>
 
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <Stat
-          label="On track"
+          label={t("common.onTrack")}
           value={
             stats.onTrackPct === null ? "—" : `${Math.round(stats.onTrackPct)}%`
           }
-          unit={stats.onTrackPct === null ? "no measures yet" : "of KRs"}
+          unit={
+            stats.onTrackPct === null
+              ? t("workMapHeader.noMeasuresYet")
+              : t("workMapHeader.ofKrs")
+          }
           tone={
             stats.onTrackPct === null
               ? undefined
@@ -199,19 +232,27 @@ export async function WorkMapHeader({
           }
         />
         <Stat
-          label="Outdated"
+          label={t("workMapHeader.outdated")}
           value={String(stats.outdatedGoals)}
-          unit={stats.outdatedGoals === 1 ? "goal" : "goals"}
+          unit={
+            stats.outdatedGoals === 1
+              ? t("workMapHeader.outdatedUnitOne")
+              : t("workMapHeader.outdatedUnitOther")
+          }
           tone={stats.outdatedGoals > 0 ? "warn" : undefined}
         />
         <Stat
-          label="Alignment"
+          label={t("goals.alignment")}
           value={
             stats.alignmentScore === null
               ? "—"
               : String(Math.round(stats.alignmentScore))
           }
-          unit={stats.alignmentScore === null ? "not scored yet" : "/100"}
+          unit={
+            stats.alignmentScore === null
+              ? t("workMapHeader.notScoredYet")
+              : "/100"
+          }
           tone={
             stats.alignmentScore === null
               ? undefined

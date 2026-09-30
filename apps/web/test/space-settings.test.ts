@@ -32,11 +32,33 @@ describe("the space settings card", () => {
     expect(declared.sort()).toEqual([
       "coachStrictness",
       "defaultCheckInFrequency",
+      "slackChannel",
       "teamVoting",
+      "teamsChannel",
     ]);
     for (const key of declared) {
-      expect(card).toContain(`name="${key}"`);
+      // The two channels are drawn from one table of fields, one per
+      // provider, so their name is a property there rather than an attribute.
+      expect(
+        card.includes(`name="${key}"`) || card.includes(`name: "${key}"`),
+        `${key} has no field on the card`,
+      ).toBe(true);
     }
+  });
+
+  test("a channel is offered only for a provider the workspace connected (M-23)", () => {
+    // A channel id on a provider nobody connected is a link that never posts.
+    expect(card).toContain("connected.includes(field.provider)");
+    expect(card).toContain("Neither Slack nor Teams is connected");
+    expect(page).toContain('"channels.mySettings"');
+    expect(page).toContain("connectedProviders={connectedProviders}");
+  });
+
+  test("an absent channel field is left alone, and an empty one unlinks (M-23)", () => {
+    // The card leaves out a provider that is not connected, and that must not
+    // read as the manager clearing a channel they were never shown.
+    expect(actions).toContain("if (value === null) {\n      return {};");
+    expect(actions).toContain('trimmed === "" ? null : trimmed');
   });
 
   test("every default resolves without anybody visiting the card", () => {
@@ -46,6 +68,9 @@ describe("the space settings card", () => {
     expect(defaults.teamVoting).toBe(true);
     expect(defaults.coachStrictness).toBeNull();
     expect(defaults.defaultCheckInFrequency).toBeNull();
+    // And a space posts nowhere until somebody links a channel (M-23).
+    expect(defaults.slackChannel).toBeNull();
+    expect(defaults.teamsChannel).toBeNull();
   });
 
   test("empty means the workspace's, and is never a stored value", () => {

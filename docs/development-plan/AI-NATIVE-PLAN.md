@@ -67,6 +67,21 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Summarise a thread or a document | read | Read it |
 | Map spreadsheet columns to import fields | write | Manual mapping |
 
+**Where each assist sits, since completeness review M-09.** Six assists were built with no browser caller, and two in this table were not built at all. Each is now offered beside the value it helps, only where a provider may run it (a drafter exists, so the egress level allows an assist, and the assist's own switch is on), and each draft lands in fields a person edits before anything is saved.
+
+| Assist | Where | What saving it does |
+|---|---|---|
+| Narrate a KPI trend | KPI detail, under the chart | Nothing: it is a reading |
+| Suggest a KPI from a sentence | KPI grid, under the add form | `kpis.create`, then `kpis.setFormula` if the person kept the formula |
+| Summarise blockers | Space home, above the blocker board | Nothing: it is a reading |
+| Draft the retrospective | Goal detail, the close form | Fills the retrospective field; closing is the person's |
+| Draft the review minutes | Minutes screen | A draft document on the session, private to its author |
+| Propose next-cycle objectives | Quarterly review, learnings stage | Fills the draft form; `sessions.draftNextCycle` is the person's |
+| Summarise a thread (`comments.summarise`) | Goal detail, above the discussion | Nothing: it is a reading, refused if it quotes words nobody wrote |
+| Decompose a key result (`goals.decomposeKeyResult`, `deep` tier) | Goal detail, on each key result | `initiatives.create` and `tasks.create` for the rows left ticked, as the person, in the space they chose |
+
+"Summarise a document" is not built: a document is already one reader's page, and the thread summary is the half REQUIREMENTS names. The copilot may propose four actions (`goals.create`, `goals.addKeyResult`, `initiatives.create`, `tasks.create`), each offered only over spaces, objectives and key results the person may edit.
+
 ## 3. Architecture
 
 ### 3.1 The AIProvider port
@@ -101,6 +116,8 @@ Adding a provider is a new driver behind the same port, never a change to featur
 
 Precedence per call: user key, then workspace configuration, then deployment environment, then off. Keys are envelope-encrypted with per-secret data keys wrapped by a master key ring, so rotation re-wraps data keys only and costs nothing. Keys are never sent to the client and never logged. The interface shows a masked hint and a live connection test.
 
+A user key answers that user's own requests only: the assists they run and the copilot's answers to them, including one the relay writes after the request has ended. It never answers an agent run, the scheduler, or another member, and it is used only for a provider the administrator lets take personal keys and only when the workspace's tier routing chooses that provider. It changes whose account pays and nothing else: the same egress controls wrap it. Embeddings, for the search index and for a search, stay on the workspace's key. Built at completeness review M-36; the member's screen is UIUX-PLAN S-37's note.
+
 ### 3.4 Model catalogue and tier routing
 
 Features request a **tier**, never a model.
@@ -130,7 +147,7 @@ Permission `manage_ai`. One admin console:
 | Agents | Create and edit agents: persona, instructions per phase, provider and tier, schedule, access scope, autonomy policy, sandbox toggle, run history and logs |
 | Budgets and limits | Token, cost and call quotas per user, per agent and per workspace. A hard cap that halts runs. A throttle window |
 | Prompts | Versioned system prompt per feature and per agent phase, restore to default, gated by the evaluation set |
-| Privacy and governance | Context egress level, personal-data redaction, no-training assertion, egress allow-list. Greyed out with a zero-egress note on a local provider |
+| Privacy and governance | Context egress level, personal-data redaction, no-training assertion, egress allow-list. Greyed out with a zero-egress note on a local provider. Built at completeness review M-10: the level is `all`, `assists` (retrieval, meaning the copilot's passages and the search index, stays here) or `none`; redaction replaces email addresses and phone numbers; no-training is sent to OpenRouter, the one provider that takes it per request; the allow-list names hosts. All four are enforced around every provider `createAIProvider` builds, none applies to a provider at localhost or a private address, and each request a control refuses or changes is an audit row of counts, never text |
 | Connections | MCP clients and grants with last-used and audit links, revoke |
 | Usage and logs | Token and cost dashboards by user, feature, agent and model. A request log with truncated payloads. Flagged calls. Latest evaluation results |
 
@@ -307,7 +324,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 - **Identity.** An agent row owns a member record with `kind = 'agent'`. It has a name, an avatar and a profile, and appears in feeds, mentions and audit like anyone. The Coach and the Champion ship as seeded agents; a workspace may create more.
 - **Definition.** A persona, staged instructions (planning and execution) that are versioned like prompts, a provider and tier choice, a schedule, an autonomy policy, a sandbox flag and an access scope.
 - **Least privilege.** The agent's member group gets explicit bindings on named spaces, goals and KPI trees only. Read-only by default with per-resource write grants. Never a workspace-wide grant.
-- **Runs.** A durable state machine: planning, running, then completed, failed or cancelled, with a task list. The planning phase decomposes the work. The execution phase pops one task per job, runs a bounded tool loop, appends a human-readable log, and reschedules itself until done. Runs resume across restarts, and every tool call carries the run identifier.
+- **Runs.** A durable state machine: planning, running, then completed, failed or cancelled, with a task list. The planning phase decomposes the work. The execution phase pops one task per job, runs a bounded tool loop, appends a human-readable log, and reschedules itself until done. Runs resume across restarts, and every tool call carries the run identifier. Built at completeness review M-11 for a run started with its task list already decomposed: `agents.startRun` queues the first step through the outbox in the transaction that writes the run, the relay hands each step to the executor in `packages/agents`, and each step queues the next. A step names its task index, so a redelivered row is skipped rather than taken twice. A custom agent has no deterministic form: at every step the host resolves the agent's tier (default `deep`) through its one provider choke point, and a run with no provider, or whose egress level lets nothing reach it, ends cancelled with the reason in its log. A read task runs as the agent in every mode rather than becoming a proposal. **Not built, and waiting on a decision:** the planning phase itself, meaning which registry actions a custom agent's planner may choose from and what it is shown of its bound resources.
 - **Write policy.** `sandbox` returns simulated results and commits nothing. `propose` (the default) turns every write into a proposal envelope queued to the review inbox, where a human applies or dismisses in bulk. `scoped_direct` commits immediately within the agent's bindings, still fully audited.
 - **Cost.** Every step meters under the agent. Per-agent and per-workspace caps halt a run mid-flight with a clear log line.
 - **Conversation.** An agent is addressable. Mention the Coach on a goal and it reviews that goal and replies in the thread.

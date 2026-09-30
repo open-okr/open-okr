@@ -3,8 +3,9 @@
 /**
  * The studio's writes (P3-T10).
  *
- * Three, and each is one click: link mode connects two goals into a dependency,
- * a finding can be dismissed, and a relink finding can be applied (P4-T06c).
+ * Four, and each is one click: link mode connects two goals into a dependency,
+ * the details panel takes one apart again (M-35), a finding can be dismissed,
+ * and a relink finding can be applied (P4-T06c).
  * Everything else on the panel is a link to the goal page, because editing a
  * goal properly belongs on the screen built for it rather than in a side panel
  * that would drift from it.
@@ -49,6 +50,20 @@ export async function linkGoals(
 ): Promise<WriteState> {
   return run((context) =>
     callAction(context, "goals.addDependency", { fromGoalId, toGoalId }),
+  );
+}
+
+/**
+ * Taking a dependency apart (completeness review M-35).
+ *
+ * Linking two goals was a click here and undoing it was nowhere: the action
+ * existed and the coverage test excused it as "removed through the studio's
+ * own canvas write", which no write did. Either end may remove it, the same as
+ * either end may add it, and `goals.removeDependency` checks that.
+ */
+export async function unlinkGoals(dependencyId: string): Promise<WriteState> {
+  return run((context) =>
+    callAction(context, "goals.removeDependency", { id: dependencyId }),
   );
 }
 

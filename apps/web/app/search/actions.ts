@@ -9,82 +9,141 @@
  */
 import { callAction, OperationError } from "@openokr/core";
 import { getPool } from "../../lib/auth";
+import { embedFor } from "../../lib/embedder";
 import { requireWorkspace } from "../../lib/workspace";
+import {
+  EMPTY_ANSWER,
+  type PaletteAnswer,
+  type PaletteHit,
+} from "./palette-groups.ts";
 
-interface PaletteHit {
-  readonly entityType: string;
-  readonly entityId: string;
-  readonly title: string;
-  readonly snippet: string;
-  readonly href: string;
-  readonly semantic: boolean;
-}
+/** The longest phrase the palette sends, which is the jump's own limit. */
+const PHRASE_LIMIT = 200;
 
-export interface PaletteAnswer {
-  /** Set when the phrase was a short identifier and it resolved. */
-  readonly jump: {
-    readonly title: string;
-    readonly href: string;
-    readonly entityType: string;
-  } | null;
-  readonly hits: readonly PaletteHit[];
-  readonly error: string | null;
-}
+/**
+ * The shortest phrase worth a semantic search. One or two letters carry no
+ * meaning to embed, and each one would be a model call per keystroke.
+ */
+const SEMANTIC_MIN_LENGTH = 3;
 
-const EMPTY: PaletteAnswer = { jump: null, hits: [], error: null };
-
-export async function paletteSearchAction(
-  text: string,
-): Promise<PaletteAnswer> {
-  const phrase = text.trim();
-  if (phrase === "") {
-    return EMPTY;
-  }
-
+async function paletteContext() {
   const { session, workspace } = await requireWorkspace();
-  const context = {
+  return {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
+}
+
+const asHit = (hit: {
+  entityType: string;
+  entityId: string;
+  title: string;
+  snippet: string;
+  href: string;
+}): PaletteHit => ({
+  entityType: hit.entityType,
+  entityId: hit.entityId,
+  title: hit.title,
+  snippet: hit.snippet,
+  href: hit.href,
+});
+
+/**
+ * The palette's fast answer: the jump, by short code and by name, and full
+ * text (completeness review M-21).
+ *
+ * **Never waits on a model.** No embedding function is passed, so this is
+ * Postgres alone and answers with the AI provider off exactly as with it on.
+ * The semantic half is `paletteRelatedAction`, asked beside this one, so a
+ * slow provider delays the Related group and nothing else.
+ */
+export async function paletteSearchAction(
+  text: string,
+): Promise<PaletteAnswer> {
+  const phrase = text.trim().slice(0, PHRASE_LIMIT);
+  if (phrase === "") {
+    return EMPTY_ANSWER;
+  }
+  const context = await paletteContext();
 
   try {
-    // The jump first, because somebody who typed a code wants the thing, not a
-    // list with the thing in it. A phrase that is not a code answers null and
-    // costs one indexed lookup.
-    const jump =
+    // Three reads, independent of one another, so asked together. The short
+    // code comes first in the list because somebody who typed one wants the
+    // thing and not a list with the thing in it; a phrase that is not a code
+    // answers null for the cost of one indexed lookup.
+    const [code, named, hits] = await Promise.all([
       phrase.length <= 40
-        ? await callAction(context, "search.jump", { shortId: phrase })
-        : null;
+        ? callAction(context, "search.jump", { shortId: phrase })
+        : Promise.resolve(null),
+      callAction(context, "search.entities", { text: phrase, limit: 8 }),
+      callAction(context, "search.query", { text: phrase, limit: 12 }),
+    ]);
 
-    const hits = await callAction(context, "search.query", {
+    const goTo = [
+      ...(code ? [code] : []),
+      ...named.filter(
+        (one) =>
+          !(
+            code &&
+            one.entityType === code.entityType &&
+            one.entityId === code.entityId
+          ),
+      ),
+    ].map((one) => ({
+      entityType: one.entityType,
+      entityId: one.entityId,
+      title: one.title,
+      href: one.href,
+    }));
+
+    return { goTo, hits: hits.map(asHit), error: null };
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { ...EMPTY_ANSWER, error: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * The palette's Related group: what the semantic index found and full text
+ * did not (UIUX-PLAN §4 S-32, "semantic results blend in when available").
+ *
+ * **Empty with the provider off, and nothing is asked.** With no embedding
+ * function `search.query` never builds its semantic source, so no model is
+ * called and the embeddings index is not read. The palette then draws no
+ * Related group at all, which is §4's rule for every AI affordance.
+ *
+ * **Access is decided by the retrieval, not here.** Every passage the semantic
+ * index returns is checked against the reader through the access getter before
+ * it is ranked, the same check the copilot's citations use.
+ */
+export async function paletteRelatedAction(
+  text: string,
+): Promise<readonly PaletteHit[]> {
+  const phrase = text.trim().slice(0, PHRASE_LIMIT);
+  if (phrase.length < SEMANTIC_MIN_LENGTH) {
+    return [];
+  }
+  const context = await paletteContext();
+  const embed = await embedFor(context.workspaceId);
+  if (!embed) {
+    return [];
+  }
+  try {
+    const hits = await callAction({ ...context, embed }, "search.query", {
       text: phrase,
       limit: 12,
     });
-
-    return {
-      jump: jump
-        ? {
-            title: jump.title,
-            href: jump.href,
-            entityType: jump.entityType,
-          }
-        : null,
-      hits: hits.map((hit) => ({
-        entityType: hit.entityType,
-        entityId: hit.entityId,
-        title: hit.title,
-        snippet: hit.snippet,
-        href: hit.href,
-        semantic: hit.semantic,
-      })),
-      error: null,
-    };
-  } catch (error) {
-    if (error instanceof OperationError) {
-      return { ...EMPTY, error: error.message };
-    }
-    throw error;
+    return hits.filter((hit) => hit.semantic).map(asHit);
+  } catch {
+    // Any failure, the provider's included, leaves the palette as it would be
+    // with no provider at all (UIUX-PLAN §4, "AI degradation": no dead
+    // buttons, no errors). The words that did match are already on screen
+    // from the fast answer, and a refusal about the reader would have been
+    // said there too.
+    return [];
   }
 }
 

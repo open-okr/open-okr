@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card, CardBody } from "@openokr/ui";
+import { Button, Card, CardBody, useTranslations } from "@openokr/ui";
 import { TriangleAlert } from "lucide-react";
 
 /**
@@ -29,31 +29,36 @@ import { TriangleAlert } from "lucide-react";
 export function SegmentError({
   error,
   reset,
-  what,
+  headingKey,
 }: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
-  /** The screen that failed, in words. "the goals", "this cycle". */
-  readonly what: string;
+  /**
+   * The catalogue key of the whole heading, "We could not load the goals".
+   * A key rather than the words "the goals" since completeness review M-15:
+   * a phrase dropped into another sentence cannot be translated.
+   */
+  readonly headingKey: string;
 }) {
+  const { t } = useTranslations();
   return (
     <div className="flex flex-col gap-4.5">
       <Card>
         <CardBody className="flex flex-col items-start gap-3">
           <span className="flex items-center gap-2">
             <TriangleAlert className="size-5 text-bad" aria-hidden="true" />
-            <h1 className="text-base font-bold text-ink">
-              We could not load {what}
-            </h1>
+            <h1 className="text-base font-bold text-ink">{t(headingKey)}</h1>
           </span>
           <p className="text-sm text-ink-3">
-            This is our fault, not something you did. Nothing was changed.
+            {t("segmentError.thisIsOurFault")}
           </p>
           <Button variant="primary" onClick={reset}>
-            Try again
+            {t("common.tryAgain")}
           </Button>
           {error.digest ? (
-            <p className="text-xs text-ink-4">Reference: {error.digest}</p>
+            <p className="text-xs text-ink-4">
+              {t("common.reference", { digest: error.digest })}
+            </p>
           ) : null}
         </CardBody>
       </Card>

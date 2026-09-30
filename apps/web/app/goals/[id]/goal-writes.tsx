@@ -10,7 +10,12 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
-import { moveGoalToCycle, unlinkKeyResultKpi } from "./write-actions.ts";
+import type { KpiOption } from "../../../lib/kpi-options.ts";
+import {
+  linkKeyResultKpi,
+  moveGoalToCycle,
+  unlinkKeyResultKpi,
+} from "./write-actions.ts";
 
 /**
  * The three goal writes that had no browser caller, and the delete (P6-G27).
@@ -18,7 +23,9 @@ import { moveGoalToCycle, unlinkKeyResultKpi } from "./write-actions.ts";
  * `goals.moveToCycle`, `goals.unlinkKpi` and `goals.delete` all shipped with
  * the goal and none of them could be reached from a screen, which the gap
  * audit recorded in §5. `goals.reviewDecision` is a read and is shown by the
- * page itself rather than here.
+ * page itself rather than here. Linking a KPI sits beside unlinking one since
+ * completeness review M-07: the drafting step can name a KPI for a new key
+ * result, and this is where one measured by hand gets one later.
  *
  * **One card, because the three belong together as "what else can happen to
  * this goal".** Moving it and deleting it are both things somebody does once,
@@ -30,6 +37,8 @@ export function GoalWrites({
   cycles,
   currentCycleId,
   linkedKeyResults,
+  unlinkedKeyResults,
+  kpis,
   canAdminister,
 }: {
   readonly goalId: string;
@@ -40,6 +49,17 @@ export function GoalWrites({
     readonly id: string;
     readonly title: string;
   }[];
+  /**
+   * Key results measured by hand, which is what can be linked (M-07). Empty
+   * when the reader cannot edit the goal or it is closed, so the control is
+   * not offered to somebody the server would refuse.
+   */
+  readonly unlinkedKeyResults: readonly {
+    readonly id: string;
+    readonly title: string;
+  }[];
+  /** What they can be linked to. Null when the list could not be read. */
+  readonly kpis: readonly KpiOption[] | null;
   readonly canAdminister: boolean;
 }) {
   const { t } = useTranslations();
@@ -47,6 +67,19 @@ export function GoalWrites({
   const [pending, start] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
   const [target, setTarget] = useState(currentCycleId ?? "");
+  const [pickedKeyResult, setPickedKeyResult] = useState(
+    unlinkedKeyResults[0]?.id ?? "",
+  );
+  const [pickedKpi, setPickedKpi] = useState(kpis?.[0]?.id ?? "");
+  // Read through the current lists, because a successful link refreshes them:
+  // the key result just linked leaves this list, and a choice still pointing
+  // at it would send a link the server refuses.
+  const linking = unlinkedKeyResults.some((row) => row.id === pickedKeyResult)
+    ? pickedKeyResult
+    : (unlinkedKeyResults[0]?.id ?? "");
+  const kpiId = kpis?.some((kpi) => kpi.id === pickedKpi)
+    ? pickedKpi
+    : (kpis?.[0]?.id ?? "");
 
   const run = (work: () => Promise<{ error: string | null }>) => {
     setProblem(null);
@@ -102,6 +135,71 @@ export function GoalWrites({
           <span className="text-ink-4">{t("goal.writes.moveHelp")}</span>
         </label>
 
+        {unlinkedKeyResults.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-ink-3">
+              {t("goal.writes.linkLabel")}
+            </span>
+            {kpis === null ? (
+              <span role="status" className="text-xs text-warn">
+                {t("goal.writes.kpisUnavailable")}
+              </span>
+            ) : kpis.length === 0 ? (
+              <span className="text-xs text-ink-4">
+                {t("goal.writes.noKpisYet")}{" "}
+                <a className="underline" href="/kpis">
+                  {t("goal.writes.addAKpi")}
+                </a>
+              </span>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <select
+                    value={linking}
+                    disabled={pending}
+                    aria-label={t("goal.writes.linkKeyResult")}
+                    onChange={(event) => setPickedKeyResult(event.target.value)}
+                    className="max-w-64 rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
+                  >
+                    {unlinkedKeyResults.map((keyResult) => (
+                      <option key={keyResult.id} value={keyResult.id}>
+                        {keyResult.title}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={kpiId}
+                    disabled={pending}
+                    aria-label={t("goal.writes.linkKpi")}
+                    onChange={(event) => setPickedKpi(event.target.value)}
+                    className="max-w-64 rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
+                  >
+                    {kpis.map((kpi) => (
+                      <option key={kpi.id} value={kpi.id}>
+                        {kpi.unit ? `${kpi.title} (${kpi.unit})` : kpi.title}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={pending || linking === "" || kpiId === ""}
+                    data-testid="link-kpi"
+                    onClick={() =>
+                      run(() => linkKeyResultKpi({ id: linking, kpiId }))
+                    }
+                  >
+                    {t("goal.writes.link")}
+                  </Button>
+                </div>
+                <span className="text-xs text-ink-4">
+                  {t("goal.writes.linkHelp")}
+                </span>
+              </>
+            )}
+          </div>
+        ) : null}
+
         {linkedKeyResults.length > 0 ? (
           <div className="flex flex-col gap-1.5">
             <span className="text-xs text-ink-3">
@@ -133,12 +231,7 @@ export function GoalWrites({
         ) : null}
 
         {canAdminister ? (
-          <DeleteControl
-            subject="goal"
-            id={goalId}
-            what="this goal"
-            returnTo="/goals"
-          />
+          <DeleteControl subject="goal" id={goalId} returnTo="/goals" />
         ) : null}
 
         {problem ? (

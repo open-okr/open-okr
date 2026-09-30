@@ -66,7 +66,7 @@ export function RoomPulsePanel({
   const submit = useCallback(() => {
     setProblem(null);
     if (chosen === null) {
-      setProblem("Choose a number from one to five first.");
+      setProblem(t("session.detail.roomPulse.chooseANumber"));
       return;
     }
     startTransition(async () => {
@@ -75,11 +75,13 @@ export function RoomPulsePanel({
         router.refresh();
       } catch (error) {
         setProblem(
-          error instanceof Error ? error.message : "That did not save.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.thatDidNotSave"),
         );
       }
     });
-  }, [chosen, router, sessionId, word]);
+  }, [chosen, router, sessionId, t, word]);
 
   // The facilitator gets the read; everybody else gets null from the action, so
   // the absence of a read is the answer rather than a permission check here.
@@ -136,7 +138,9 @@ export function RoomPulsePanel({
           {canGive ? (
             <span className="flex flex-wrap items-center gap-2">
               <Button type="button" disabled={pending} onClick={submit}>
-                {pulse.mine.pulse === null ? "Give my pulse" : "Change it"}
+                {pulse.mine.pulse === null
+                  ? t("session.detail.roomPulse.giveMyPulse")
+                  : t("session.detail.changeIt")}
               </Button>
               {pulse.mine.pulse === null ? null : (
                 <span className="text-xs text-ink-4">

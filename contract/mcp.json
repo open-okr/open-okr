@@ -17,6 +17,21 @@
       "example": {}
     },
     {
+      "name": "workspace.deletedItems",
+      "description": "The goals, initiatives, tasks and documents that were deleted and that the caller could restore, newest first, with who deleted each.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "workspace.rename",
       "description": "Change a workspace's display name.",
       "inputSchema": {
@@ -308,6 +323,21 @@
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
+      "name": "people.exportMine",
+      "description": "Everything this workspace holds about the signed-in member, as one document.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
       },
       "example": {}
     },
@@ -701,7 +731,7 @@
     },
     {
       "name": "invitations.createPersonalLink",
-      "description": "Invite one email address, usable once.",
+      "description": "Invite one email address, usable once, as a member or as a guest of one space.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -714,6 +744,11 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
+          },
+          "guestSpaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
         "required": [
@@ -783,7 +818,7 @@
     },
     {
       "name": "invitations.joinByTrustedDomain",
-      "description": "Join a workspace automatically because your email domain is trusted.",
+      "description": "Join a workspace because it trusts the domain of your confirmed email address.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -2148,6 +2183,9 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
+          },
+          "thumbnail": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -2178,6 +2216,13 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "variant": {
+            "type": "string",
+            "enum": [
+              "file",
+              "thumbnail"
+            ]
           }
         },
         "required": [
@@ -2971,7 +3016,7 @@
     },
     {
       "name": "ai.readAvailability",
-      "description": "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
+      "description": "Whether any enabled AI provider holds a key the caller's own requests can use, as one boolean.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -3052,7 +3097,9 @@
           },
           "apiKey": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[\\x21-\\x7E]+$"
           }
         },
         "required": [
@@ -3122,7 +3169,9 @@
           },
           "apiKey": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[\\x21-\\x7E]+$"
           }
         },
         "required": [
@@ -3843,6 +3892,58 @@
       }
     },
     {
+      "name": "ai.readPrivacySettings",
+      "description": "The workspace's AI egress controls: context level, personal-data redaction, no-training and the host allow-list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "ai.updatePrivacySettings",
+      "description": "Change what may leave for an AI provider off this network: the context level, redaction, no-training and the host allow-list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contextEgress": {
+            "type": "string",
+            "enum": [
+              "all",
+              "assists",
+              "none"
+            ]
+          },
+          "redactPersonalData": {
+            "type": "boolean"
+          },
+          "noTraining": {
+            "type": "boolean"
+          },
+          "allowedHosts": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "agents.list",
       "description": "Every agent this workspace has, seeded or custom.",
       "inputSchema": {
@@ -4075,7 +4176,7 @@
     },
     {
       "name": "agents.startRun",
-      "description": "Starts a run for an agent against an already-decomposed task list.",
+      "description": "Starts a run for an agent against an already-decomposed task list, and queues its first step.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4345,6 +4446,58 @@
       }
     },
     {
+      "name": "proposals.apply",
+      "description": "Applies one agent proposal the caller may decide, running the proposed action as them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "proposals.dismiss",
+      "description": "Dismisses one agent proposal the caller may decide, without applying it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "spaces.list",
       "description": "Every space this member can see, with their own role in each.",
       "inputSchema": {
@@ -4485,7 +4638,7 @@
     },
     {
       "name": "spaces.updateSettings",
-      "description": "Sets one space's team voting, strictness override and default check-in frequency.",
+      "description": "Sets one space's team voting, strictness override, default check-in frequency and the Slack or Teams channel it posts to.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4523,6 +4676,32 @@
                   "monthly",
                   "quarterly"
                 ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "slackChannel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^\\S+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "teamsChannel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^\\S+$"
               },
               {
                 "type": "null"
@@ -4823,6 +5002,13 @@
               "monthly"
             ]
           },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "annual",
+              "quarterly"
+            ]
+          },
           "firstCycle": {
             "default": false,
             "type": "boolean"
@@ -5072,7 +5258,7 @@
     },
     {
       "name": "cycles.feedForward",
-      "description": "Hands METHOD.md §8.9's inheritance to the next cycle: prior scores, carried work as issues at impact four, and the annual frame.",
+      "description": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5101,6 +5287,32 @@
       "example": {
         "fromCycleId": "00000000-0000-4000-8000-000000000000",
         "toCycleId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "cycles.close",
+      "description": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "cycleId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "cycleId": "00000000-0000-4000-8000-000000000000"
       }
     },
     {
@@ -6018,6 +6230,32 @@
       }
     },
     {
+      "name": "documents.restore",
+      "description": "Brings back a deleted document. Its versions were never removed, so they come back with it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "attachments.list",
       "description": "The files attached to one subject.",
       "inputSchema": {
@@ -6198,6 +6436,37 @@
       },
       "example": {
         "shortId": "…"
+      }
+    },
+    {
+      "name": "search.entities",
+      "description": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "text": "…"
       }
     },
     {
@@ -6604,7 +6873,7 @@
     },
     {
       "name": "tasks.board",
-      "description": "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
+      "description": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7124,6 +7393,32 @@
       }
     },
     {
+      "name": "tasks.restore",
+      "description": "Brings back a deleted task with the assignments and checklist lines deleted with it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "tasks.linkedWork",
       "description": "Linked work per key result for one cycle: two counts, and the sentence when they disagree with the measure.",
       "inputSchema": {
@@ -7422,6 +7717,32 @@
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "initiatives.restore",
+      "description": "Brings back a deleted initiative and the key result links that were deleted with it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
         "idempotentHint": false
       },
       "example": {
@@ -7954,6 +8275,32 @@
       }
     },
     {
+      "name": "goals.restore",
+      "description": "Brings back a deleted goal and the key results that were deleted with it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "goals.reviewDecision",
       "description": "The keep/modify/abandon decision the last quarterly review reached for this goal.",
       "inputSchema": {
@@ -8344,6 +8691,39 @@
       }
     },
     {
+      "name": "goals.linkKpi",
+      "description": "Links a KPI to a key result, which from then on reads its value and progress from it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kpiId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id",
+          "kpiId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "kpiId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "goals.unlinkKpi",
       "description": "Unlinks a KPI, keeping the value it last reported as a manual one.",
       "inputSchema": {
@@ -8622,6 +9002,39 @@
       },
       "example": {
         "sentence": "…"
+      }
+    },
+    {
+      "name": "goals.decomposeKeyResult",
+      "description": "Drafts initiatives and their first tasks for one key result, as plain drafts a person edits before creating any of them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "goalId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "keyResultId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "goalId",
+          "keyResultId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "goalId": "00000000-0000-4000-8000-000000000000",
+        "keyResultId": "00000000-0000-4000-8000-000000000000"
       }
     },
     {
@@ -9661,6 +10074,21 @@
       "example": {}
     },
     {
+      "name": "kpis.list",
+      "description": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "kpis.setFormula",
       "description": "Makes a KPI calculated from a formula over other KPIs, refusing self-reference and cycles.",
       "inputSchema": {
@@ -9832,6 +10260,32 @@
         "idempotentHint": true
       },
       "example": {}
+    },
+    {
+      "name": "kpis.spaceTrees",
+      "description": "One space's KPIs, grouped by the driver tree each is filed in. Drives the space home.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "spaceId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "spaceId": "00000000-0000-4000-8000-000000000000"
+      }
     },
     {
       "name": "kpis.detail",
@@ -10063,7 +10517,48 @@
               "check_in",
               "cycle",
               "document",
-              "task"
+              "task",
+              "initiative"
+            ]
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "subjectType",
+          "subjectId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "subjectType": "goal",
+        "subjectId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "comments.summarise",
+      "description": "Summarises the discussion on a subject and lists what it left open, refusing a summary that quotes words nobody wrote.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subjectType": {
+            "type": "string",
+            "enum": [
+              "goal",
+              "key_result",
+              "check_in",
+              "cycle",
+              "document",
+              "task",
+              "initiative"
             ]
           },
           "subjectId": {
@@ -10090,7 +10585,7 @@
     },
     {
       "name": "comments.create",
-      "description": "Post a comment on a goal, key result, check-in, cycle or document",
+      "description": "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10102,7 +10597,8 @@
               "check_in",
               "cycle",
               "document",
-              "task"
+              "task",
+              "initiative"
             ]
           },
           "subjectId": {
@@ -10144,7 +10640,8 @@
               "check_in",
               "cycle",
               "document",
-              "task"
+              "task",
+              "initiative"
             ]
           },
           "subjectId": {
@@ -10319,7 +10816,8 @@
               "check_in",
               "cycle",
               "document",
-              "task"
+              "task",
+              "initiative"
             ]
           },
           "subjectId": {
@@ -11525,6 +12023,32 @@
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
         "note": "…"
+      }
+    },
+    {
+      "name": "sessions.postDigest",
+      "description": "Posts a closed weekly session's digest to the Slack or Teams channel its space is linked to, once per channel.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000"
       }
     },
     {

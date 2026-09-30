@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit --singleThreaded"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "catalog:",
@@ -27,6 +27,7 @@
     "openai": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
+    "sharp": "catalog:",
     "ws": "catalog:"
   },
   "devDependencies": {

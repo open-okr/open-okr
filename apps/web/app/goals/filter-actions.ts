@@ -20,7 +20,11 @@ export async function parseFilterAction(sentence: string) {
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
-  const drafter = await drafterFor(workspace.workspaceId);
+  const drafter = await drafterFor(
+    workspace.workspaceId,
+    "balanced",
+    session.user.id,
+  );
   return callAction(
     drafter ? { ...base, drafter } : base,
     "goals.parseFilter",
@@ -30,6 +34,9 @@ export async function parseFilterAction(sentence: string) {
 
 /** Whether a provider can parse a sentence at all. False is the normal case. */
 export async function filterAssistAvailableAction(): Promise<boolean> {
-  const { workspace } = await requireWorkspace();
-  return (await drafterFor(workspace.workspaceId)) !== null;
+  const { session, workspace } = await requireWorkspace();
+  return (
+    (await drafterFor(workspace.workspaceId, "balanced", session.user.id)) !==
+    null
+  );
 }

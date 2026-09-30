@@ -7,5 +7,5 @@ export default function SearchError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the search results" />;
+  return <SegmentError {...props} headingKey="segmentError.search" />;
 }

@@ -28,6 +28,7 @@ import {
   type DocumentSubjectType,
   documents,
   documentVersions,
+  includeDeleted,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
@@ -821,6 +822,202 @@ export const deleteDocument = defineWriteAction({
   }),
 });
 
+export interface RestorableDocument {
+  readonly subjectType: DocumentSubjectType;
+  readonly subjectId: string;
+  readonly title: string;
+  readonly deletedAt: Date;
+}
+
+/**
+ * A deleted document this member may restore, or not-found (M-13).
+ *
+ * **The delete's own rules, read against a deleted row.** `requireWritable`
+ * is what the delete asks: the draft rule, then edit on the subject. Neither
+ * can be reused as it stands, because both begin from the live document, and
+ * a key result's goal is found through a live key result. So this reads the
+ * document with `includeDeleted`, keeps the draft rule in the query, and finds
+ * a key result's goal whether or not the key result is still there: a goal's
+ * context survives its delete, so the answer is the one the live goal gave.
+ *
+ * Exported for `workspace.deletedItems`, so the list shows a document exactly
+ * when this would let its reader restore it.
+ */
+export async function requireRestorableDocument(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  id: string,
+): Promise<RestorableDocument> {
+  const [row] = await tx
+    .select({
+      subjectType: documents.subjectType,
+      subjectId: documents.subjectId,
+      title: documents.title,
+      deletedAt: documents.deletedAt,
+    })
+    .from(documents)
+    .where(
+      and(
+        includeDeleted(
+          documents,
+          eq(documents.workspaceId, workspaceId),
+          eq(documents.id, id),
+        ),
+        readableDocuments(memberId),
+      ),
+    )
+    .limit(1);
+  if (!row) {
+    throw new OperationError("not_found", "No such document.");
+  }
+
+  let resourceId = row.subjectId;
+  if (row.subjectType === "key_result") {
+    const owner = await tx.execute<{ goal_id: string }>(
+      sql`select goal_id from key_results
+           where id = ${row.subjectId}
+             and workspace_id = ${workspaceId}
+           limit 1`,
+    );
+    const goalId = owner.rows[0]?.goal_id;
+    if (!goalId) {
+      throw new OperationError("not_found", "No such document.");
+    }
+    resourceId = goalId;
+  }
+  const resourceType = RESOURCE_FOR[row.subjectType];
+  await getAccessScoped(tx, {
+    workspaceId,
+    memberId,
+    resourceType,
+    resourceId: resourceType === "workspace" ? workspaceId : resourceId,
+    requires: ACCESS_LEVELS.edit,
+  });
+
+  if (!row.deletedAt) {
+    throw new OperationError(
+      "forbidden",
+      `The document "${row.title}" is not deleted, so there is nothing to restore.`,
+    );
+  }
+  return { ...row, deletedAt: row.deletedAt };
+}
+
+/**
+ * Why a document cannot come back yet, or null when it can.
+ *
+ * A document is read through its subject, so one restored onto a deleted goal,
+ * key result or initiative would be back and still unreachable. The sentence
+ * names the subject, so the reader knows what to restore first. A space and a
+ * cycle are archived rather than deleted, and what they held stays readable,
+ * so neither holds a document back.
+ */
+async function deletedSubjectOf(
+  tx: OperationTx,
+  workspaceId: string,
+  document: RestorableDocument,
+): Promise<string | null> {
+  if (
+    document.subjectType === "goal" ||
+    document.subjectType === "key_result"
+  ) {
+    const rows = await tx.execute<{ title: string; gone: boolean }>(
+      document.subjectType === "goal"
+        ? sql`select g.title, g.deleted_at is not null as gone
+                from goals g
+               where g.id = ${document.subjectId}
+                 and g.workspace_id = ${workspaceId}
+               limit 1`
+        : sql`select g.title,
+                     (k.deleted_at is not null or g.deleted_at is not null) as gone
+                from key_results k
+                join goals g on g.id = k.goal_id
+               where k.id = ${document.subjectId}
+                 and k.workspace_id = ${workspaceId}
+               limit 1`,
+    );
+    const goal = rows.rows[0];
+    return goal?.gone
+      ? `This document is on the goal "${goal.title}", which is deleted. Restore the goal first.`
+      : null;
+  }
+  if (document.subjectType === "initiative") {
+    const rows = await tx.execute<{ title: string; gone: boolean }>(
+      sql`select i.title, i.deleted_at is not null as gone
+            from initiatives i
+           where i.id = ${document.subjectId}
+             and i.workspace_id = ${workspaceId}
+           limit 1`,
+    );
+    const initiative = rows.rows[0];
+    return initiative?.gone
+      ? `This document is on the initiative "${initiative.title}", which is deleted. Restore the initiative first.`
+      : null;
+  }
+  return null;
+}
+
+/**
+ * Brings a deleted document back (M-13).
+ *
+ * The delete takes the document alone, so the restore brings back the
+ * document alone: its versions were never touched. It asks what the delete
+ * asked, `full` on the workspace and the document's own write rule, and it
+ * refuses while the thing the document is about is still deleted.
+ */
+export const restoreDocument = defineWriteAction({
+  name: "documents.restore",
+  summary:
+    "Brings back a deleted document. Its versions were never removed, so they come back with it.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async load({ tx, workspaceId, actor }) {
+      return requireRestorableDocument(
+        tx,
+        workspaceId,
+        requireMemberId(actor.memberId),
+        input.id,
+      );
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      const blocked = await deletedSubjectOf(tx, workspaceId, loaded);
+      if (blocked) {
+        throw new OperationError("forbidden", blocked);
+      }
+
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(documents)
+        .set({ deletedAt: null, updatedAt: new Date() })
+        .where(
+          includeDeleted(
+            documents,
+            eq(documents.workspaceId, workspaceId),
+            eq(documents.id, input.id),
+          ),
+        );
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "document.restored",
+          subjectType: "document",
+          subjectId: input.id,
+          payload: { title: loaded.title },
+        },
+        audit: {
+          action: "documents.restore",
+          targetType: "document",
+          targetId: input.id,
+          payload: { title: loaded.title },
+        },
+      };
+    },
+  }),
+});
+
 // ── Attachments ───────────────────────────────────────────────────────
 
 const attachmentSubject = z.enum(ATTACHMENT_SUBJECT_TYPES);
@@ -837,6 +1034,14 @@ export const listAttachments = defineReadAction({
       contentType: z.string(),
       filesize: z.number().nullable(),
       position: z.number().int(),
+      /**
+       * Whether the file can be opened yet (completeness review M-24). Only
+       * `ok` is served; `scanning` is waiting on the virus scan and
+       * `quarantined` was held back by it.
+       */
+      status: z.enum(["pending", "ok", "scanning", "quarantined"]),
+      /** An image with a stored preview, served by `blobs.getForDownload`. */
+      hasThumbnail: z.boolean(),
     }),
   ),
   access: ACCESS_LEVELS.view,
@@ -868,6 +1073,8 @@ export const listAttachments = defineReadAction({
             contentType: blobs.contentType,
             filesize: blobs.filesize,
             position: attachments.position,
+            status: blobs.status,
+            thumbnailKey: blobs.thumbnailKey,
           })
           .from(attachments)
           .innerJoin(blobs, eq(blobs.id, attachments.blobId))
@@ -881,9 +1088,12 @@ export const listAttachments = defineReadAction({
           )
           .orderBy(asc(attachments.position));
 
-        return rows.map((row) => ({
+        // The key stays on the server. A page needs to know a preview exists,
+        // and the route that serves it resolves the key again behind can().
+        return rows.map(({ thumbnailKey, ...row }) => ({
           ...row,
           filesize: row.filesize === null ? null : Number(row.filesize),
+          hasThumbnail: thumbnailKey !== null,
         }));
       },
     );
@@ -949,6 +1159,57 @@ async function requireAttachmentSubject(
   );
 }
 
+/**
+ * Whether a member reads a file through something it hangs on.
+ *
+ * A blob's own context binds only its uploader, which is right while it is
+ * theirs alone. Attaching it to a goal, a task, a check-in or a document is
+ * showing it to whoever reads that subject, and `attachments.list` already
+ * lists it to them, so the download has to agree. Found while fixing
+ * completeness review M-22: the list showed a colleague a file the download
+ * then refused. Checked per attachment through the same subject rule the
+ * attachment itself uses, so a file hung on something you cannot read stays
+ * closed to you.
+ */
+export async function readableThroughAttachment(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  blobId: string,
+): Promise<boolean> {
+  const hangsOn = await tx
+    .select({
+      subjectType: attachments.subjectType,
+      subjectId: attachments.subjectId,
+    })
+    .from(attachments)
+    .where(
+      activeOnly(
+        attachments,
+        eq(attachments.workspaceId, workspaceId),
+        eq(attachments.blobId, blobId),
+      ),
+    );
+  for (const subject of hangsOn) {
+    try {
+      await requireAttachmentSubject(
+        tx,
+        workspaceId,
+        memberId,
+        subject.subjectType as (typeof ATTACHMENT_SUBJECT_TYPES)[number],
+        subject.subjectId,
+        ACCESS_LEVELS.view,
+      );
+      return true;
+    } catch (error) {
+      if (!(error instanceof OperationError)) {
+        throw error;
+      }
+    }
+  }
+  return false;
+}
+
 export const attachFile = defineWriteAction({
   name: "attachments.attach",
   summary: "Hangs an uploaded file on a subject.",
@@ -999,7 +1260,11 @@ export const attachFile = defineWriteAction({
           result: { id: existing.id, attached: false },
           activity: {
             kind: "attachment.added",
-            subjectType: "document",
+            // What the file hangs on, not always "document" (completeness
+            // review M-01). Written when a document was the only subject with
+            // a files panel, it filed a file on a goal under a document id,
+            // which resolved to no context and so reached no feed.
+            subjectType: input.subjectType,
             subjectId: input.subjectId,
             payload: { duplicate: true },
           },
@@ -1042,7 +1307,7 @@ export const attachFile = defineWriteAction({
         result: { id: row.id, attached: true },
         activity: {
           kind: "attachment.added",
-          subjectType: "document",
+          subjectType: input.subjectType,
           subjectId: input.subjectId,
           payload: { duplicate: false },
         },
@@ -1109,7 +1374,7 @@ export const detachFile = defineWriteAction({
         result: { id: input.id },
         activity: {
           kind: "attachment.removed",
-          subjectType: "document",
+          subjectType: loaded.subjectType,
           subjectId: loaded.subjectId,
           payload: {},
         },

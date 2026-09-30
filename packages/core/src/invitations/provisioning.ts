@@ -47,6 +47,17 @@ export interface ProvisionMemberInput {
    * there is one.
    */
   readonly kind?: "human" | "guest";
+  /**
+   * Whether the new member's own group is bound on the workspace's context.
+   *
+   * True for every joining path but one. A guest invited to a space reaches
+   * that space and nothing on the workspace itself (completeness review M-22),
+   * which is the state `people.convertToGuest` leaves behind: no binding on
+   * the member's own group, and the group kept so the space's binding has
+   * somewhere to attach. A support session is a guest too and keeps its
+   * workspace binding, because the level the owner chose is on the workspace.
+   */
+  readonly bindWorkspace?: boolean;
 }
 
 export interface ProvisionedMember {
@@ -129,7 +140,7 @@ export async function provisionMemberForInvite<
     input.workspaceId,
     input.workspaceId,
   );
-  if (context) {
+  if (context && input.bindWorkspace !== false) {
     await bindGroup(tx, {
       workspaceId: input.workspaceId,
       groupId,

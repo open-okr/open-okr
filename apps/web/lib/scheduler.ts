@@ -29,7 +29,7 @@
  * ordinary state and not an error, and any workspace can fail for its own
  * reasons. Each is run in its own try, and the job reports what it did.
  */
-import { PgBossJobQueue } from "@openokr/adapters";
+import { PgBossJobQueue, purgeSettledOutbox } from "@openokr/adapters";
 import {
   AGENT_SCHEDULES,
   CHAMPION_CYCLE_JOB,
@@ -47,8 +47,10 @@ import {
   defaultMetrics,
   listLiveWorkspaces,
   METRIC,
+  outboxRetentionDays,
 } from "@openokr/core";
 import { drafterFor } from "./drafter";
+import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
 import { getStorage } from "./storage";
@@ -101,6 +103,9 @@ export interface ScheduledRun {
     | "notifications.drainBatches"
     | "blobs.reapOrphans"
     | "channels.sweepMessageLog"
+    // Instance housekeeping, run once rather than per workspace: settled
+    // outbox rows have no tenant to scope to (completeness review M-19).
+    | "outbox.purge"
     // Not a registry action: chaining the audit trail is maintenance, and
     // exposing it over REST, the command line and the agent catalogue would
     // be four surfaces for something only a scheduler and an operator call
@@ -117,6 +122,11 @@ export interface ScheduledRun {
    * cadence AI-NATIVE-PLAN §6.2 gives the Champion (P6-G01b).
    */
   readonly cron?: string;
+  /**
+   * Run once for the instance rather than once per workspace (completeness
+   * review M-19). The outbox purge has no tenant to scope to.
+   */
+  readonly instance?: boolean;
 }
 
 /**
@@ -183,6 +193,14 @@ const MESSAGE_LOG_SWEEP_JOB = "channels.sweepMessageLog";
  */
 const MESSAGE_LOG_SWEEP_CRON = "40 3 * * *";
 
+/**
+ * The settled outbox purge (completeness review M-19). Once a day at four in
+ * the morning UTC, twenty minutes after the message log sweep and for the same
+ * reason: housekeeping takes turns rather than sharing a minute.
+ */
+const OUTBOX_PURGE_JOB = "outbox.purge";
+const OUTBOX_PURGE_CRON = "0 4 * * *";
+
 const AUDIT_CHAIN_JOB = "audit.chain";
 /**
  * Every minute.
@@ -233,6 +251,12 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     action: "channels.sweepMessageLog",
     cron: MESSAGE_LOG_SWEEP_CRON,
   },
+  {
+    job: OUTBOX_PURGE_JOB,
+    action: "outbox.purge",
+    cron: OUTBOX_PURGE_CRON,
+    instance: true,
+  },
 ];
 
 /**
@@ -260,12 +284,15 @@ export function localHourIn(timezone: string, now: Date): number {
 export interface SchedulerDeps {
   listWorkspaces(): Promise<readonly SchedulableWorkspace[]>;
   runOne(workspace: SchedulableWorkspace, run: ScheduledRun): Promise<void>;
+  /** An instance run, which has no workspace to be given. */
+  runInstance?(run: ScheduledRun): Promise<void>;
   now(): Date;
   onWorkspaceError?(
     run: ScheduledRun,
     workspace: SchedulableWorkspace,
     error: unknown,
   ): void;
+  onInstanceError?(run: ScheduledRun, error: unknown): void;
 }
 
 export interface JobOutcome {
@@ -292,7 +319,18 @@ export async function runScheduledJob(
   let skipped = 0;
   let failed = 0;
 
-  for (const workspace of await deps.listWorkspaces()) {
+  const workspaces = run.instance ? [] : await deps.listWorkspaces();
+  if (run.instance) {
+    try {
+      await deps.runInstance?.(run);
+      ran++;
+    } catch (error) {
+      failed++;
+      deps.onInstanceError?.(run, error);
+    }
+  }
+
+  for (const workspace of workspaces) {
     if (
       run.localHour !== undefined &&
       localHourIn(workspace.timezone, now) !== run.localHour
@@ -351,6 +389,26 @@ async function listWorkspaces(): Promise<readonly SchedulableWorkspace[]> {
 }
 
 /**
+ * Runs one instance-wide job (completeness review M-19).
+ *
+ * Straight to the adapter rather than through `callAction`: the purge deletes
+ * delivery bookkeeping, has no workspace and no acting member, and is not a
+ * domain change anybody could audit.
+ */
+async function runInstance(run: ScheduledRun): Promise<void> {
+  if (run.action === "outbox.purge") {
+    const pool = getPool();
+    const purged = await purgeSettledOutbox(
+      pool,
+      await outboxRetentionDays(pool),
+    );
+    if (purged > 0) {
+      log(`outbox.purge removed ${purged} settled row(s)`);
+    }
+  }
+}
+
+/**
  * Runs one agent for one workspace, as the system.
  *
  * `kind: "system"` is the same principal `pnpm cadence:sweep` uses and resolves
@@ -377,6 +435,9 @@ async function runOne(
     ...(loadEnv().BETTER_AUTH_URL
       ? { baseUrl: loadEnv().BETTER_AUTH_URL }
       : {}),
+    // And the name those messages carry, read at each run so a rename
+    // reaches the next nudge (completeness review M-33).
+    instanceName: await getInstanceName(),
   };
   if (run.action === "notifications.drainBatches") {
     await callAction(context, "notifications.drainBatches", {});
@@ -498,11 +559,15 @@ export function startScheduler(): PgBossJobQueue | null {
           const outcome = await runScheduledJob(run, {
             listWorkspaces,
             runOne,
+            runInstance,
             now: () => new Date(),
             onWorkspaceError(job, workspace, error) {
               logError(
                 `${job.job} failed for ${workspace.slug}: ${reason(error)}`,
               );
+            },
+            onInstanceError(job, error) {
+              logError(`${job.job} failed: ${reason(error)}`);
             },
           });
           recordSchedulerHeartbeat();

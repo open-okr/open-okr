@@ -117,7 +117,9 @@ export function TemplateMappingForm({
           key={field.name}
           className="flex flex-col gap-1 text-xs text-ink-2"
         >
-          {`What fills {{${field.placeholder}}}`}
+          {t("admin.channels.templateMappingForm.whatFills", {
+            placeholder: field.placeholder,
+          })}
           <select
             name={field.name}
             className={FIELD}

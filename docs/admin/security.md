@@ -77,6 +77,12 @@ others push people rather than being polled.
 One bearer token per workspace, shown once, hashed at rest. Issuing a new one
 revokes the old.
 
+The token may make 600 requests a minute, the same allowance an API token
+has. Past that the directory is answered 429 with `Retry-After`, which says how
+long to wait, so a large first sync slows down rather than being refused for
+good. The limit is there so a runaway connector, or a leaked token, cannot hold
+the database for everybody else.
+
 Two refusals worth knowing: the directory cannot suspend the last person with
 full access, and losing a group is not leaving the workspace.
 
@@ -115,6 +121,38 @@ verified and never reported as a break.
 carrying each row's position and hash so the file and a later verification can
 be lined up against each other. The export is itself recorded, with the filter
 that was used.
+
+## Uploaded files
+
+Every file is checked against a type list and a 25 MB ceiling. SVG is not on
+the list, because it can carry script.
+
+**Every image is re-encoded before it is stored.** A PNG, JPEG, GIF or WebP is
+decoded and written out again in the type it claimed, so what is kept is
+pixels the instance drew, not the bytes that arrived. The EXIF block goes with
+it, and with that the camera and, from a phone, where the photo was taken. A
+file that claims to be an image and is not one is refused. So is an image of
+more than 100 megapixels, before it is decoded. A small preview is made at the
+same time and shown beside the file in the list.
+
+**A virus scan is optional, and off until you name a scanner.** Set
+`OPENOKR_CLAMD_HOST` to a ClamAV daemon (clamd) the instance can reach, and
+`OPENOKR_CLAMD_PORT` if it is not on 3310. From then on:
+
+| When | What happens |
+|---|---|
+| A file is uploaded | It is listed as "being checked" and cannot be opened |
+| clamd says it is clean | It opens as normal |
+| clamd names a signature | It is "held back" for good. The signature is on the audit row for `blobs.recordScan` |
+| clamd will not scan it, for example over its stream size limit | Held back too, because not checked is not clean. Raise clamd's `StreamMaxLength` to at least 25M |
+| clamd cannot be reached | The file stays held and the scan is tried again. After ten failed tries the relay logs a dead letter |
+
+Files uploaded before the scanner was named are not scanned after the fact.
+Removing the scanner while files are still being checked leaves those files
+held rather than releasing them unscanned, so let the queue clear first.
+Nothing runs clamd for you: it is a second service, and Postgres is the only
+one the product requires. Its signature updates need a connection, or a mirror
+on an isolated network.
 
 ## Reaching out
 

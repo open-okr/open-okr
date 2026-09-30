@@ -58,9 +58,27 @@ const PREFIX_LENGTH = 16;
  * rather than a §4.14 setting, for the same reason the inbound channel limit is
  * one: it bounds abuse of a public door rather than expressing a practice
  * choice, and nobody should have to configure it to be protected.
+ *
+ * The other doors a program uses count against the same allowance
+ * (completeness review M-12): the agent endpoint per grant or per agent token,
+ * SCIM per directory token, and the OAuth token endpoint per caller address. A
+ * directory's first sync is a burst, but a 429 with `Retry-After` slows it
+ * rather than failing it, and an office of agents behind one address each
+ * refreshes once an hour.
  */
 export const API_RATE_LIMIT = 600;
 export const API_RATE_WINDOW_SECONDS = 60;
+
+/**
+ * How many times one address may knock per window on a door that writes a row
+ * for a caller who holds nothing yet: starting a device login, and registering
+ * an OAuth client.
+ *
+ * Lower than the token allowance, because nobody legitimately starts ten logins
+ * or registers ten clients a minute, and each one leaves a row behind. Counted
+ * per `callerAddress`, the address the sign-in lockout counts.
+ */
+export const ADDRESS_RATE_LIMIT = 10;
 
 export interface MintedToken {
   /** Shown once, to the person who asked for it. Never stored. */

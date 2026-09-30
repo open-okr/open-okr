@@ -257,12 +257,14 @@ Statuses: **pass**, **warn** (worth another look), **fail** (fix before publishi
 | Condition | Status | Coaching prompt |
 |---|---|---|
 | Starts with an output verb | fail | "Your objective starts with a deliverable, not a destination. If we do it and nothing changes, did we succeed? Rewrite around the change you want." |
+| Matches an end-state shape | pass | "This names the state you want to be in. Keep the deliverables in your key results." |
 | Contains an output verb anywhere | warn | "There is output language here. What would be true after this is done? Lead with that." |
 | Bare metric movement, no why | fail | "Naming a metric to move is a key result in disguise. The outcome is the why behind the movement. Add the why, or lead with the end state." |
 | Metric movement with a why | pass | "You have paired movement with a why. Stronger still: lead with the end state and let the key results carry the movement." |
 | Names a change in state | pass | "This reads as a change in state, not a to-do. Keep the deliverables in your key results." |
-| Matches an end-state shape | pass | "This names the state you want to be in. Keep the deliverables in your key results." |
 | Cannot tell | warn | "Could you complete this without anything actually improving? If yes, rewrite around the improvement." |
+
+The shape row sits second, above the output-verb sweep, since 28 September 2026. It was sixth, under "Contains an output verb anywhere", and first match wins, so the shape example below ("…something new customers finish by themselves", where *finish* is an output verb) would have warned while this section said it passes. The rows after it keep their order, so an objective that pairs movement or a state word with an output verb anywhere now warns, as the table always said it should. Decided by Akmal at completeness review M-27.
 
 Word lists:
 

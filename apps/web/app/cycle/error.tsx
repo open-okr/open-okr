@@ -7,5 +7,5 @@ export default function CycleError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="this cycle" />;
+  return <SegmentError {...props} headingKey="segmentError.cycle" />;
 }

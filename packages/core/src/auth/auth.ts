@@ -29,12 +29,15 @@ import {
   inviteTokenFromCookies,
 } from "../invitations/pending.ts";
 import { previewInvite } from "../invitations/preview.ts";
+import { domainIsTrusted } from "../invitations/trusted-domain.ts";
+import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
 import {
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
 } from "../workspaces/registration.ts";
+import { CALLER_ADDRESS_HEADERS } from "./caller-address.ts";
 import { currentProvisioningAuthority } from "./provisioning-authority.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
 import { providerIdFromCallback } from "./sso.ts";
@@ -103,6 +106,17 @@ export interface AuthOptions {
   readonly secret: string;
   /** The instance's public origin. Passkeys are bound to it. */
   readonly baseUrl: string;
+  /**
+   * What the instance calls itself, as an authenticator app lists it and a
+   * passkey prompt names it (completeness review M-33).
+   *
+   * Read when the instance is built, because Better Auth reads both off this
+   * options object once per process: a rename reaches them at the next
+   * restart. Changing either is safe. A passkey is bound to the origin, not to
+   * its display name, and an authenticator entry keeps the name it was
+   * created with. Absent says "OpenOKR".
+   */
+  readonly instanceName?: string;
   /**
    * Sends a password reset link. Defaults to writing it to the console,
    * which is what a fresh install does before mail is configured: the link
@@ -337,8 +351,9 @@ export function createAuth(options: AuthOptions) {
         // Every deployment target puts a reverse proxy in front of the app
         // (deploy/docker ships one), so the socket address is the proxy and
         // the caller's address is in this header. Rate limits are keyed on
-        // it, which is why it has to be read rather than ignored.
-        ipAddressHeaders: ["x-forwarded-for", "x-real-ip"],
+        // it, which is why it has to be read rather than ignored. Every other
+        // per-address limit reads the same list (`caller-address.ts`).
+        ipAddressHeaders: [...CALLER_ADDRESS_HEADERS],
       },
     },
 
@@ -596,6 +611,22 @@ export function createAuth(options: AuthOptions) {
               });
             }
 
+            // **A workspace that trusts their domain is offered first**
+            // (completeness review M-34). Their address is not confirmed yet,
+            // so nothing can be offered now; what this decides is only to
+            // hold off making them a workspace of their own. The first page
+            // they open after confirming asks again, offers what their
+            // domain admits, and makes their own workspace only if they
+            // choose it or nothing is on offer. Making it here would leave
+            // everybody who joins their company's workspace holding a stray
+            // empty one. Somebody already joined above loses nothing: the
+            // line below would only have returned that membership.
+            if (
+              await domainIsTrusted(options.pool, user.email).catch(() => false)
+            ) {
+              return;
+            }
+
             await provisionWorkspaceForUser(options.pool, {
               id: user.id,
               name: user.name,
@@ -609,12 +640,12 @@ export function createAuth(options: AuthOptions) {
       // One-time codes with backup codes. The shared secret and the codes are
       // encrypted with the instance secret before they reach the database.
       twoFactor({
-        issuer: "OpenOKR",
+        issuer: instanceNameOr(options.instanceName),
       }),
       // Passkeys, bound to this origin.
       passkey({
         rpID: origin.hostname,
-        rpName: "OpenOKR",
+        rpName: instanceNameOr(options.instanceName),
         origin: options.baseUrl,
       }),
       // SSO providers (P8-T07). Each entry loaded from `sso_connections` at

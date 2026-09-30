@@ -199,6 +199,7 @@ export {
   type DiagnosisKind,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
+  MID_CYCLE_CALIBRATION,
   PROCESS_HEALTH_STATEMENTS,
   REVIEW_STAGE_KEYS,
   REVIEW_STAGES,
@@ -223,6 +224,12 @@ export {
   type WeeklyStageKey,
   type WeeklyStep,
 } from "./sessions.ts";
+export {
+  afterWeeklyCheckIn,
+  currentStreakOn,
+  type StreakState,
+  weekStartOf,
+} from "./streak.ts";
 export {
   deferralFor,
   insideQuietHours,

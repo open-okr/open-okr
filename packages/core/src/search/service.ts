@@ -23,7 +23,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { accessFilterMember, accessScopeFilter } from "../access/reads.ts";
-import { EmbeddingService } from "../embeddings/service.ts";
+import {
+  EmbeddingService,
+  type RetrievalHit,
+  type RetrievalInput,
+} from "../embeddings/service.ts";
 import type { OperationTx } from "../operations/operation.ts";
 
 export interface SearchInput {
@@ -138,6 +142,20 @@ export async function searchWorkspace(
 }
 
 /**
+ * Where the semantic half reads from: whether vectors can answer here at all,
+ * and the retrieval that filters every passage by who is asking.
+ *
+ * `EmbeddingService` is the one implementation. The seam exists because the
+ * test database has no pgvector, so the blending below could never run under
+ * test; a test hands a source that says yes and still filters through the real
+ * retrieval (completeness review M-21).
+ */
+export interface SemanticSource {
+  hasPgvector(): Promise<boolean>;
+  retrieve(input: RetrievalInput): Promise<RetrievalHit[]>;
+}
+
+/**
  * Full text, with semantic results blended in behind it.
  *
  * **Blended, not merged into one ranking.** The two indexes score on different
@@ -147,26 +165,29 @@ export async function searchWorkspace(
  * marked, and only where they add something full text missed.
  *
  * With no provider or no pgvector this is exactly `searchWorkspace`, which is
- * §2.4's own degradation.
+ * §2.4's own degradation. With no provider the semantic source is never built,
+ * so nothing is asked of the embeddings index and no model is called.
  */
 export async function searchWithSemantic(
   pool: Pool,
   input: SearchInput,
   embed: ConstructorParameters<typeof EmbeddingService>[1] = null,
+  source: SemanticSource | null = embed
+    ? new EmbeddingService(pool, embed)
+    : null,
 ): Promise<SearchHit[]> {
   const limit = input.limit ?? DEFAULT_LIMIT;
   const exact = await searchWorkspace(pool, input);
-  if (exact.length >= limit || !embed) {
+  if (exact.length >= limit || !embed || !source) {
     return exact.slice(0, limit);
   }
 
-  const service = new EmbeddingService(pool, embed);
-  if (!(await service.hasPgvector())) {
+  if (!(await source.hasPgvector())) {
     return exact;
   }
 
   const seen = new Set(exact.map((hit) => `${hit.entityType}:${hit.entityId}`));
-  const passages = await service.retrieve({
+  const passages = await source.retrieve({
     workspaceId: input.workspaceId,
     memberId: input.memberId,
     query: input.text,

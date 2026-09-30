@@ -1,6 +1,7 @@
 import { loadEnv } from "@openokr/config";
 import { createAuth, resolveRequireEmailVerification } from "@openokr/core";
 import { nextCookies } from "better-auth/next-js";
+import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getSSOProviders } from "./sso";
 
@@ -29,6 +30,7 @@ export { getPool };
 const globals = globalThis as typeof globalThis & {
   openokrAuth?: ReturnType<typeof createAuth>;
   openokrRequireEmailVerification?: boolean;
+  openokrAuthInstanceName?: string;
 };
 
 /**
@@ -43,8 +45,14 @@ const globals = globalThis as typeof globalThis & {
  * A failure here is not fatal and leaves the answer false. The question is
  * whether to add a requirement, and an instance that cannot read its own
  * settings should not lock everybody out while it works that out.
+ *
+ * **The instance's name is read here too, for the same reason** (completeness
+ * review M-33). The two-factor issuer and the passkey name are options on the
+ * same object, so a rename reaches an authenticator app and a passkey prompt
+ * at the next restart, and the admin screen says so. The reader never throws.
  */
 export async function resolveSignupPolicy(): Promise<void> {
+  globals.openokrAuthInstanceName = await getInstanceName();
   try {
     globals.openokrRequireEmailVerification =
       await resolveRequireEmailVerification(getPool());
@@ -63,14 +71,19 @@ export function getAuth(): ReturnType<typeof createAuth> {
       pool: getPool(),
       secret: env.BETTER_AUTH_SECRET,
       baseUrl: env.BETTER_AUTH_URL,
+      // Read at boot, so a rename reaches these two after a restart (M-33).
+      ...(globals.openokrAuthInstanceName
+        ? { instanceName: globals.openokrAuthInstanceName }
+        : {}),
       // Through whatever mail is configured right now: SMTP when the instance
       // has it, the console driver otherwise. Imported lazily because this
-      // module and lib/mail.ts import each other's pool accessor.
+      // module and lib/mail.ts import each other's pool accessor. The name in
+      // the mail is read when it is sent, so a rename reaches the next one.
       sendResetPassword: async ({ to, url }) => {
         const { sendMail } = await import("./mail");
         await sendMail({
           to,
-          subject: "Reset your OpenOKR password",
+          subject: `Reset your ${await getInstanceName()} password`,
           text: [
             "Someone asked to reset the password for this address.",
             "",
@@ -91,7 +104,7 @@ export function getAuth(): ReturnType<typeof createAuth> {
               to,
               subject: "Confirm your email address",
               text: [
-                "Confirm this address to finish setting up your OpenOKR account.",
+                `Confirm this address to finish setting up your ${await getInstanceName()} account.`,
                 "",
                 `Confirm it here: ${url}`,
                 "",

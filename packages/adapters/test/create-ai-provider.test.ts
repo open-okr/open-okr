@@ -4,8 +4,22 @@ import {
   createAIProvider,
   defaultTierModelsFor,
 } from "../src/create-ai-provider.ts";
+import {
+  type AIEgressPolicy,
+  AIEgressRefusedError,
+} from "../src/outbound/ai-egress.ts";
 import { OutboundRefusedError } from "../src/outbound/guard.ts";
 import { AIUnavailableError } from "../src/ports/ai.ts";
+
+/** A workspace that has restricted nothing, which is what these tests need. */
+const OPEN: { readonly policy: AIEgressPolicy } = {
+  policy: {
+    contextEgress: "all",
+    redactPersonalData: false,
+    noTraining: false,
+    allowedHosts: [],
+  },
+};
 
 /**
  * The AIProvider composition seam (P2-T13). "Adding a provider is a new
@@ -17,7 +31,7 @@ import { AIUnavailableError } from "../src/ports/ai.ts";
 
 describe("createAIProvider", () => {
   it("returns a refusing provider for 'off'", async () => {
-    const provider = createAIProvider({ provider: "off" });
+    const provider = createAIProvider({ provider: "off" }, OPEN);
     await expect(
       provider.chat({
         model: "any",
@@ -43,7 +57,7 @@ describe("createAIProvider", () => {
   it.each(configs)(
     "constructs a provider satisfying the port for %o",
     (config) => {
-      const provider = createAIProvider(config);
+      const provider = createAIProvider(config, OPEN);
       expect(typeof provider.chat).toBe("function");
       expect(typeof provider.stream).toBe("function");
       expect(typeof provider.chatWithTools).toBe("function");
@@ -53,6 +67,89 @@ describe("createAIProvider", () => {
       expect(typeof provider.stop).toBe("function");
     },
   );
+});
+
+/**
+ * Every provider this builds is behind the egress guard (completeness review
+ * M-10). Proved per driver rather than for one: a branch added to the switch
+ * that returned its driver bare would pass a test that tried only OpenAI.
+ *
+ * An allow-list naming a host no driver uses refuses every provider that
+ * sends anything off the network, before a request is made, so these run with
+ * no network and no key.
+ */
+describe("the egress guard around every provider", () => {
+  const nowhere = {
+    policy: { ...OPEN.policy, allowedHosts: ["nothing.invalid"] },
+  };
+
+  const remote: readonly [AIProviderConfig, string][] = [
+    [{ provider: "anthropic", apiKey: "test" }, "api.anthropic.com"],
+    [{ provider: "openai", apiKey: "test" }, "api.openai.com"],
+    [
+      { provider: "google", apiKey: "test" },
+      "generativelanguage.googleapis.com",
+    ],
+    [{ provider: "openrouter", apiKey: "test" }, "openrouter.ai"],
+    [{ provider: "ollama", baseUrl: "https://ollama.example.com/v1" }, ""],
+    [
+      {
+        provider: "openai-compatible",
+        apiKey: "test",
+        baseURL: "https://llm.example.com/v1",
+      },
+      "",
+    ],
+  ];
+
+  it.each(remote)(
+    "refuses %o before anything is sent",
+    async (config, vendorHost) => {
+      const events: unknown[] = [];
+      const provider = createAIProvider(config, {
+        ...nowhere,
+        onWithheld: (event) => {
+          events.push(event);
+        },
+      });
+      await expect(
+        provider.chat({
+          model: "any",
+          messages: [{ role: "user", content: "hi" }],
+          purpose: "assist",
+        }),
+      ).rejects.toBeInstanceOf(AIEgressRefusedError);
+      await expect(
+        provider.embed({ model: "any", input: ["hi"] }),
+      ).rejects.toBeInstanceOf(AIEgressRefusedError);
+      expect(provider.permits("assist")).toBe(false);
+      expect(events).toHaveLength(2);
+      if (vendorHost !== "") {
+        // The host checked is the vendor's own, whatever a stored base URL
+        // says, because that is where the driver actually sends.
+        expect(provider.target.host).toBe(vendorHost);
+      }
+    },
+  );
+
+  it("lets a local model through untouched, because nothing leaves", () => {
+    const provider = createAIProvider({ provider: "ollama" }, nowhere);
+    expect(provider.target).toEqual({ host: "localhost", local: true });
+    expect(provider.permits("retrieval")).toBe(true);
+  });
+
+  it("counts an address on a private network as local", () => {
+    const provider = createAIProvider(
+      {
+        provider: "openai-compatible",
+        apiKey: "test",
+        baseURL: "http://10.0.0.5:8000/v1",
+      },
+      { policy: { ...OPEN.policy, contextEgress: "none" } },
+    );
+    expect(provider.target.local).toBe(true);
+    expect(provider.permits("assist")).toBe(true);
+  });
 });
 
 describe("defaultTierModelsFor", () => {
@@ -108,7 +205,7 @@ describe("a provider pointed at an address somebody typed", () => {
 
   const attempt = async (config: AIProviderConfig) => {
     try {
-      await createAIProvider(config).chat({
+      await createAIProvider(config, OPEN).chat({
         model: "any",
         messages: [{ role: "user", content: "hi" }],
       });

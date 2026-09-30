@@ -14,7 +14,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit --singleThreaded"
   },
   "dependencies": {
     "@openokr/core": "workspace:*",

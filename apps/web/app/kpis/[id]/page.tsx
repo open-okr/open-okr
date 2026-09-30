@@ -1,14 +1,21 @@
-import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  OperationError,
+  RHYTHM_ASSIST_KEYS,
+} from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { assistOffered } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { FormulaBuilder } from "./formula-builder.tsx";
+import { TrendNarration } from "./trend-narration.tsx";
 
 /**
  * The KPI detail (UIUX-PLAN.md §4 S-21, METHOD.md §6, P3-T14).
@@ -130,6 +137,18 @@ export default async function KpiDetailPage({
     .filter((point): point is string => point !== null)
     .join(" ");
 
+  // §2.2's narration beside the chart (M-09). Offered only for a series with
+  // two measured points, because one point is not a trend, and only where a
+  // provider may write it; with AI off the chart is the whole card.
+  const narrationOffered =
+    values.length >= 2 &&
+    (await assistOffered(
+      workspace.workspaceId,
+      RHYTHM_ASSIST_KEYS.narrateTrend,
+      "balanced",
+      session.user.id,
+    ));
+
   return (
     <div className="flex w-full flex-col gap-3.5">
       <Card>
@@ -145,9 +164,9 @@ export default async function KpiDetailPage({
             </div>
             <p className="text-xs text-ink-3">
               {[
-                kpi.categoryName ?? "Uncategorised",
-                kpi.treeName ?? "no tree",
-                kpi.ownerName ?? "workspace owned",
+                kpi.categoryName ?? t("kpis.detail.uncategorised"),
+                kpi.treeName ?? t("kpis.detail.noTree"),
+                kpi.ownerName ?? t("kpis.detail.workspaceOwned"),
                 kpi.frequency,
                 `${kpi.indicatorType} · ${kpi.tier}`,
               ].join(" · ")}
@@ -156,7 +175,7 @@ export default async function KpiDetailPage({
           <div className="flex flex-none flex-col items-end">
             <span className="text-lg font-bold text-ink tabular-nums">
               {kpi.achievementPct === null
-                ? "no data"
+                ? t("kpis.detail.noData")
                 : `${Math.round(kpi.achievementPct)}%`}
             </span>
             <span className="text-xs text-ink-4">
@@ -177,16 +196,22 @@ export default async function KpiDetailPage({
               {t("kpis.detail.recoveryObjective")}
             </Link>
             <span className="text-xs text-ink-3">
-              {t("kpis.detail.launchedAt", {
-                recoveryStartedPct:
-                  kpi.recoveryStartedPct === null
-                    ? "an unknown point"
-                    : `${Math.round(kpi.recoveryStartedPct)}%`,
-                achievementPct:
-                  kpi.effectivePct === null || kpi.achievementPct === null
-                    ? ""
-                    : `, displayed health ${Math.round(kpi.effectivePct)}% against a real ${Math.round(kpi.achievementPct)}%`,
-              })}
+              {kpi.effectivePct === null || kpi.achievementPct === null
+                ? kpi.recoveryStartedPct === null
+                  ? t("kpis.detail.launchedAtAnUnknownPoint")
+                  : t("kpis.detail.launchedAtPct", {
+                      recoveryStartedPct: Math.round(kpi.recoveryStartedPct),
+                    })
+                : kpi.recoveryStartedPct === null
+                  ? t("kpis.detail.launchedAtAnUnknownPointDisplayed", {
+                      effectivePct: Math.round(kpi.effectivePct),
+                      achievementPct: Math.round(kpi.achievementPct),
+                    })
+                  : t("kpis.detail.launchedAtPctDisplayed", {
+                      recoveryStartedPct: Math.round(kpi.recoveryStartedPct),
+                      effectivePct: Math.round(kpi.effectivePct),
+                      achievementPct: Math.round(kpi.achievementPct),
+                    })}
             </span>
           </CardBody>
         ) : null}
@@ -208,9 +233,29 @@ export default async function KpiDetailPage({
               viewBox={`0 0 ${width} ${height}`}
               className="h-36 w-full min-w-[32rem]"
               role="img"
-              aria-label={`${kpi.title} over ${series.length} periods, with the healthy and watch bands`}
+              aria-label={
+                series.length === 1
+                  ? t("kpis.detail.chartLabelOne", {
+                      title: kpi.title,
+                      count: series.length,
+                    })
+                  : t("kpis.detail.chartLabelOther", {
+                      title: kpi.title,
+                      count: series.length,
+                    })
+              }
             >
-              <title>{`${kpi.title} over ${series.length} periods`}</title>
+              <title>
+                {series.length === 1
+                  ? t("kpis.detail.chartTitleOne", {
+                      title: kpi.title,
+                      count: series.length,
+                    })
+                  : t("kpis.detail.chartTitleOther", {
+                      title: kpi.title,
+                      count: series.length,
+                    })}
+              </title>
               {/* The two bands, drawn from the target rather than from the
                   achievement, because a reader compares the value they typed
                   against the value they aimed at. */}
@@ -254,6 +299,11 @@ export default async function KpiDetailPage({
               )}
             </svg>
           )}
+          {narrationOffered ? (
+            <div className="mt-3">
+              <TrendNarration kpiId={kpi.id} />
+            </div>
+          ) : null}
         </CardBody>
       </Card>
 
@@ -364,7 +414,7 @@ export default async function KpiDetailPage({
                       </span>
                       <Chip tone={stateTone(child.state)} dot>
                         {child.achievementPct === null
-                          ? "no data"
+                          ? t("kpis.detail.noData")
                           : `${Math.round(child.achievementPct)}%`}
                       </Chip>
                     </li>
@@ -413,8 +463,8 @@ export default async function KpiDetailPage({
           ) : (
             <p className="text-sm text-ink-3">
               {kpi.isCalculated
-                ? "This KPI is calculated from other measures."
-                : "This KPI is entered by hand."}
+                ? t("kpis.detail.thisKpiIsCalculated")
+                : t("kpis.detail.thisKpiIsEnteredByHand")}
             </p>
           )}
         </CardBody>

@@ -44,6 +44,7 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { RHYTHM_ASSIST_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { spacePostTargets } from "../channels/space-posts.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
@@ -129,8 +130,13 @@ interface DigestBodyNumbers {
   readonly commitmentCount?: number;
 }
 
-/** Assembles §7.2 Step 4's six parts for one session's digest. */
-async function digestInputFor(
+/**
+ * Assembles §7.2 Step 4's six parts for one session's digest.
+ *
+ * Exported for `sessions.postDigest` (completeness review M-23), so the words
+ * a space's channel reads are the words the session screen shows.
+ */
+export async function digestInputFor(
   tx: OperationTx,
   workspaceId: string,
   sessionId: string,
@@ -274,6 +280,44 @@ async function digestInputFor(
 }
 
 /**
+ * Where one session's digest has gone, and where it could go now
+ * (completeness review M-23).
+ *
+ * `postedTo` is the digest's own `channels`, which `sessions.postDigest`
+ * writes. `postableTo` is the providers its space links a channel on and the
+ * workspace has connected, which is what lets the screen offer the button
+ * only when pressing it will post somewhere.
+ */
+async function digestChannelsFor(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+): Promise<{ postedTo: string[]; postableTo: string[] }> {
+  const [row] = await tx
+    .select({ spaceId: okrSessions.spaceId, channels: digests.channels })
+    .from(okrSessions)
+    .innerJoin(
+      digests,
+      activeOnly(digests, eq(digests.id, okrSessions.digestId)),
+    )
+    .where(
+      activeOnly(
+        okrSessions,
+        eq(okrSessions.workspaceId, workspaceId),
+        eq(okrSessions.id, sessionId),
+      ),
+    )
+    .limit(1);
+  const targets = row?.spaceId
+    ? await spacePostTargets(tx, { workspaceId, spaceId: row.spaceId })
+    : [];
+  return {
+    postedTo: [...(row?.channels ?? [])],
+    postableTo: targets.map((one) => one.provider),
+  };
+}
+
+/**
  * The weekly digest, in words, with no provider involved.
  *
  * This is the template the acceptance criterion protects. A workspace with no AI
@@ -300,6 +344,17 @@ export const readDigest = defineReadAction({
        * already there and offered "add" over an existing note.
        */
       note: z.string().nullable(),
+      /**
+       * The providers this digest has been posted to on its space's channel
+       * (completeness review M-23), from `digests.channels`. Empty until the
+       * coordinator posts it.
+       */
+      postedTo: z.array(z.string()),
+      /**
+       * The providers it can be posted to now: a channel linked on the space
+       * and the provider connected. Empty means the button would post nowhere.
+       */
+      postableTo: z.array(z.string()),
     })
     .nullable(),
   access: ACCESS_LEVELS.view,
@@ -326,6 +381,11 @@ export const readDigest = defineReadAction({
           lines: [...weeklyDigestLines(assembled)],
           numbers: [...weeklyDigestNumbers(assembled)],
           note: assembled.coordinatorNote,
+          ...(await digestChannelsFor(
+            tx,
+            context.workspaceId,
+            input.sessionId,
+          )),
         };
       },
     );

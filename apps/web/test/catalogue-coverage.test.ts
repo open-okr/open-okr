@@ -61,15 +61,20 @@ function everyTsx(dir: string): string[] {
   return found;
 }
 
+const webDir = join(appDir, "..");
+const libDir = join(webDir, "lib");
+
 /** `app/admin/nudges/page.tsx`, the shape the exemption list is written in. */
 const relative = (path: string): string =>
-  `app/${path
-    .slice(appDir.length + 1)
+  path
+    .slice(webDir.length + 1)
     .split(sep)
-    .join("/")}`;
+    .join("/");
 
 const exempt = new Set(UNLOCALISED_FILES);
-const files = everyTsx(appDir).sort();
+// `lib` as well as `app` since completeness review M-15: the shell, the
+// delete control and the support banner are screens' text too.
+const files = [...everyTsx(appDir), ...everyTsx(libDir)].sort();
 const EN_CATALOGUE = CATALOGUES.en;
 
 describe("the detector", () => {
@@ -160,15 +165,10 @@ describe("the catalogue gate", () => {
 
   test("the debt counter matches the exemption list", () => {
     // 146 files and 1,543 strings at P6-G22b, all of them in the catalogue at
-    // P6-G22c. P8-T07 and P8-T08 added five files with hardcoded strings that
-    // will move to the catalogue in the i18n sweep. The counter tracks the
-    // regression so it can only shrink.
-    const total = UNLOCALISED_FILES.reduce(
-      (sum, name) => sum + findUnlocalisedIn(join(appDir, "..", name)).length,
-      0,
-    );
-    expect(UNLOCALISED_FILES.length).toBe(5);
-    expect(total).toBeGreaterThan(0);
+    // P6-G22c. P8-T07 and P8-T08 added five files; completeness review M-15
+    // moved them and the 461 strings the expression check found. Nothing is
+    // exempt, and a new line on the list is a regression.
+    expect(UNLOCALISED_FILES).toEqual([]);
   });
 });
 

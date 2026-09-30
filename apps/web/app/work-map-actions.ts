@@ -11,6 +11,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../lib/auth";
+import { getTranslations } from "../lib/translations";
 import { requireWorkspace } from "../lib/workspace";
 import { NO_ERROR, type WriteState } from "./cycle/write-state.ts";
 
@@ -22,7 +23,8 @@ export async function recordFromMap(
   const keyResultId = String(formData.get("keyResultId") ?? "");
   const value = Number(formData.get("value"));
   if (!Number.isFinite(value)) {
-    return { error: "A value has to be a number." };
+    const { t } = await getTranslations();
+    return { error: t("cycle.actions.valueHasToBeANumber") };
   }
 
   const { session, workspace } = await requireWorkspace();

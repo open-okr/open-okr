@@ -99,8 +99,10 @@ export type {
   AmbitionContext,
   CheckInDraftContext,
   ClusterableNote,
+  DecompositionContext,
   DiagnosticContext,
   DraftedCheckIn,
+  DraftedInitiative,
   DraftedKeyResult,
   DraftedObjective,
   FilterContext,
@@ -128,19 +130,29 @@ export type {
   SuggestedKpi,
   SuggestedParent,
   SummarisableBlocker,
+  ThreadComment,
+  ThreadSummary,
   TrendContext,
   TrendPoint,
 } from "./agents/drafter.ts";
 export {
+  AGENT_RUN_STEP_TOPIC,
+  type AgentRunStepJob,
+  type AgentRunStepOutcome,
+  agentRunStep,
+} from "./agents/run-steps.ts";
+export {
   ASSIST_FEATURE_KEYS,
   REVIEW_ASSIST_KEYS,
   RHYTHM_ASSIST_KEYS,
+  THREAD_SUMMARY_MINIMUM,
 } from "./ai/assist-keys.ts";
 export {
   type BudgetCheckResult,
   checkBudget,
   checkFeatureAvailability,
   type FeatureAvailability,
+  isOverAgentBudget,
   isOverHardCap,
 } from "./ai/budgets.ts";
 export {
@@ -148,7 +160,19 @@ export {
   type ContextWindowGuardResult,
   guardContextWindow,
 } from "./ai/context-guard.ts";
-export { maskKeyHint, sealCredentialKey } from "./ai/credentials.ts";
+export {
+  aiApiKeySchema,
+  maskKeyHint,
+  sealCredentialKey,
+} from "./ai/credentials.ts";
+export {
+  AI_PRIVACY_KEYS,
+  type AIPrivacySettings,
+  aiPrivacyFrom,
+  type RecordAIEgressWithheldInput,
+  recordAIEgressWithheld,
+  resolveAIPrivacySettings,
+} from "./ai/egress.ts";
 export {
   findSeededModel,
   SEEDED_MODELS,
@@ -234,6 +258,14 @@ export {
   dispatchTool,
   matchTemplate,
 } from "./api/mcp/dispatch.ts";
+export {
+  type AgentPrincipal,
+  type AgentRejection,
+  type AgentTokenPrincipal,
+  agentRateKey,
+  type GrantPrincipal,
+  resolveAgentPrincipal,
+} from "./api/mcp/principal.ts";
 export {
   canonicalAddress,
   type FetchResult,
@@ -369,6 +401,7 @@ export {
   routeAt,
 } from "./api/surface.ts";
 export {
+  ADDRESS_RATE_LIMIT,
   API_RATE_LIMIT,
   API_RATE_WINDOW_SECONDS,
   audienceFromText,
@@ -415,6 +448,7 @@ export {
 } from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
+export { callerAddress } from "./auth/caller-address.ts";
 export {
   syncAllSamlProviders,
   syncSamlProvider,
@@ -485,8 +519,25 @@ export {
   usedBytes,
 } from "./blobs/quota.ts";
 export {
+  BLOB_SCAN_TOPIC,
+  type ClamdSettings,
+  readSettingsFrom,
+  resolveClamdSettings,
+  type ScanFile,
+  type ScanOutcome,
+} from "./blobs/scan.ts";
+export {
+  type ImageRefusal,
+  ImageRefusedError,
+  type StoredUpload,
+  storeUpload,
+  type UploadPorts,
+} from "./blobs/upload.ts";
+export {
   ALLOWED_CONTENT_TYPES,
+  IMAGE_CONTENT_TYPES,
   MAX_BLOB_BYTES,
+  MAX_IMAGE_PIXELS,
   type ValidationResult,
   validateUpload,
 } from "./blobs/validation.ts";
@@ -745,6 +796,12 @@ export {
   resolveImportTarget,
 } from "./imports/target.ts";
 export {
+  TEMPLATE_FORMATS,
+  type TemplateFile,
+  type TemplateFormat,
+  templateFile,
+} from "./imports/template-files.ts";
+export {
   asBoolean,
   asDay,
   asEnum,
@@ -786,6 +843,10 @@ export {
   generateInviteToken,
   hashInviteToken,
 } from "./invitations/tokens.ts";
+export {
+  type TrustedDomainOffer,
+  trustedDomainOffers,
+} from "./invitations/trusted-domain.ts";
 export {
   findNavigationItem,
   isRouteAllowed,
@@ -912,11 +973,13 @@ export {
   dispatchOutbox,
   memberEmail,
   OUTBOX_HANDLERS,
+  OUTBOX_REDACT_ON_DELIVERY,
   type OutboxDelivery,
   type OutboxHandler,
   type OutboxHandlerDeps,
 } from "./outbox/handlers.ts";
 export { PermanentDispatchError } from "./outbox/permanent.ts";
+export { outboxRetentionDays } from "./outbox/retention.ts";
 export {
   type ErasureExport,
   isLastFullAccessHolder,
@@ -968,6 +1031,16 @@ export {
   RichTextValidationError,
 } from "./rich-text/validate.ts";
 export {
+  deploymentInstanceName,
+  INSTANCE_NAME_MAX_LENGTH,
+  InstanceNameError,
+  instanceNameToStore,
+  readInstanceName,
+  renameInstance,
+  resolveInstanceName,
+} from "./secrets/instance-name.ts";
+export {
+  DEFAULT_INSTANCE_NAME,
   environmentValue,
   getInstanceSetting,
   INSTANCE_SETTINGS,
@@ -1007,6 +1080,16 @@ export {
   sessionChannel,
 } from "./sessions/live.ts";
 export {
+  BRAND_SURFACES,
+  type BrandPalette,
+  deriveBrandPalette,
+  type StatusHue,
+  statusHueOf,
+} from "./settings/brand-colour.ts";
+export {
+  AI_CONTEXT_EGRESS_LEVELS,
+  type AIContextEgressLevel,
+  aiEgressAllowListSchema,
   brandingSchema,
   DEFAULT_IMPORT_ROW_LIMIT,
   DEFAULT_QUIET_HOURS,
@@ -1059,6 +1142,15 @@ export {
   type BoardChangedEvent,
   boardChannel,
 } from "./tasks/live.ts";
+export {
+  boardPresenceChannel,
+  PRESENCE_HEARTBEAT_MS,
+  PresenceRoster,
+  type PresenceSignal,
+  presenceEvent,
+  readPresenceSignal,
+} from "./tasks/presence.ts";
+export { type BoardScope, boardReaders } from "./tasks/scope.ts";
 export {
   assignTaskInTx,
   createTaskInTx,

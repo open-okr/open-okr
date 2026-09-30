@@ -55,7 +55,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : `${asString(p.name, "A member")} is no longer an administrator`,
   "member.converted_to_guest": (p) =>
     `${asString(p.name, "A member")} was converted to a guest`,
-  "member.erased": (p) => `${asString(p.name, "A member")}'s data was erased`,
+  "member.erased": () => "A member's data was erased",
   "member.imported": (p) =>
     p.matched === undefined
       ? `${asString(p.name, "A member")} was imported`
@@ -71,6 +71,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : "The directory added someone",
   "blob.prepared": () => "A file upload was started",
   "blob.claimed": () => "A file was uploaded",
+  "blob.scanned": (payload) =>
+    (payload as { verdict: string }).verdict === "clean"
+      ? "A file passed its virus scan"
+      : "A file was held back by the virus scan",
   "space.settingsChanged": (payload) =>
     `${(payload as { name: string }).name} changed its own settings`,
   "agent.autonomy_changed": (payload) => {
@@ -161,6 +165,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "ai.budget_set": (p) =>
     `An AI budget was set for the "${asString(p.scope, "workspace")}" scope`,
   "ai.budget_removed": () => "An AI budget was removed",
+  "ai.privacy_updated": (p) =>
+    `AI privacy and egress settings were updated (${
+      Array.isArray(p.keys) ? p.keys.join(", ") : "privacy"
+    })`,
+  "ai.egress_withheld": (p) =>
+    p.outcome === "redacted"
+      ? `Personal data was replaced before an AI request to ${asString(p.provider, "a provider")}`
+      : `An AI request to ${asString(p.provider, "a provider")} was withheld by the privacy settings`,
   "agent.created": (p) =>
     `Agent "${asString(p.name, "New agent")}" was created`,
   "agent.enabled_changed": (p) =>
@@ -178,6 +190,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `${Number(p.appliedCount ?? 0)} proposed change(s) were applied`,
   "proposed_change.bulk_dismissed": (p) =>
     `${Number(p.dismissedCount ?? 0)} proposed change(s) were dismissed`,
+  "proposed_change.applied": () => "Applied an agent's proposed change",
+  "proposed_change.dismissed": () => "Dismissed an agent's proposed change",
   "space.created": (p) =>
     `Space "${asString(p.name, "New space")}" was created`,
   "space.updated": (p) => `Space "${asString(p.name, "A space")}" was updated`,
@@ -191,7 +205,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "space.joined": () => "Someone joined this space",
   "space.left": () => "Someone left this space",
   "cycle.created": (p) =>
-    `Cycle "${asString(p.name, "a new cycle")}" was created`,
+    p.inheritedFrom
+      ? `Cycle "${asString(p.name, "a new cycle")}" was created, inheriting from "${asString(p.inheritedFrom, "the cycle before")}"`
+      : `Cycle "${asString(p.name, "a new cycle")}" was created`,
   "cycle.resolved": (p) =>
     `Cycle "${asString(p.name, "the current cycle")}" was opened`,
   "cycle.updated": (p) => `Cycle "${asString(p.name, "a cycle")}" was updated`,
@@ -237,6 +253,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
   "goal.reopened": () => "The goal was reopened",
   "goal.deleted": (p) => `Removed the goal "${p.title}"`,
+  "goal.restored": (p) => `Goal "${asString(p.title, "a goal")}" was restored`,
   "goal.role_reassigned": (p) =>
     `The goal's ${asString(p.role, "role")} was reassigned`,
   "goal.moved_to_cycle": (p) =>
@@ -248,6 +265,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "initiative.updated": () => "An initiative was edited",
   "initiative.deleted": (p) =>
     `Initiative "${asString(p.title, "some work")}" was removed`,
+  "initiative.restored": (p) =>
+    `Initiative "${asString(p.title, "some work")}" was restored`,
   "initiative.linked": () =>
     "An initiative was recorded as work that will move a key result",
   "initiative.unlinked": () =>
@@ -279,6 +298,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Document "${asString(p.title, "untitled")}" was published as version ${Number(p.version ?? 1)}`,
   "document.deleted": (p) =>
     `Document "${asString(p.title, "untitled")}" was removed`,
+  "document.restored": (p) =>
+    `Document "${asString(p.title, "untitled")}" was restored`,
   "attachment.added": () => "A file was attached",
   "attachment.removed": () => "A file was detached",
   // Tasks (P5-T11).
@@ -291,11 +312,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "task.checklist_changed": (p) =>
     `A checklist line was ${asString(p.change, "changed")}`,
   "task.deleted": (p) => `Task "${asString(p.title, "a task")}" was removed`,
+  "task.restored": (p) => `Task "${asString(p.title, "a task")}" was restored`,
   "key_result.created": (p) =>
     `Key result "${asString(p.title, "a key result")}" was added`,
   "key_result.updated": () => "A key result was edited",
   "key_result.value_recorded": (p) =>
     `A key result moved to ${Number(p.value ?? 0)}`,
+  "key_result.kpi_linked": () =>
+    "A key result was linked to a KPI and now reads its value from it",
   "key_result.kpi_unlinked": () =>
     "A key result was unlinked from its KPI and keeps the last value it reported",
   "check_in.draft_opened": (p) =>
@@ -348,6 +372,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     }`,
   "cycle.fed_forward": (p) =>
     `The next cycle inherited ${Number(p.priorScores ?? 0)} prior score(s) and ${Number(p.issues ?? 0)} carried issue(s)`,
+  "cycle.closed": (p) =>
+    `Cycle "${asString(p.name, "a cycle")}" was closed${
+      p.verdict ? `, reading ${String(p.verdict).replace(/_/g, " ")}` : ""
+    }${p.fedInto ? `, and fed "${String(p.fedInto)}"` : ""}`,
   "kpi.updated": (p) =>
     `A KPI was edited (${(p.fields as string[] | undefined)?.join(", ") ?? "no fields"})`,
   "kpi.recovery_launched": (p) =>
@@ -398,6 +426,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.commitmentsClosed": (p) =>
     `Closed ${asString(p.count, "0")} commitments from last week`,
   "session.coordinatorNoteSet": () => "Added a coordinator note to the digest",
+  "session.digestPosted": (p) => {
+    const named = (Array.isArray(p.channels) ? p.channels : []).map(
+      (channel) => (channel === "teams" ? "Teams" : "Slack"),
+    );
+    return named.length > 0
+      ? `Posted the week's digest to the channel on ${named.join(" and ")}`
+      : "Posted the week's digest";
+  },
   "session.trendRecorded": (p) =>
     `Recorded the trend for this objective as ${asString(p.trend, "unknown")}`,
   "session.shiftsRecorded": () =>

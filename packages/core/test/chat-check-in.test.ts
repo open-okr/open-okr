@@ -526,6 +526,51 @@ describe("the same check-in through a form", () => {
     expect(Number(kr.rows[0].current_value)).toBe(100);
   });
 
+  /**
+   * Teams' card (completeness review M-23). The same function the Slack modal
+   * ends in, with the answers a Teams card hands back: the status as the
+   * product's own word, the confidence as a string the card's number input
+   * produced. No new write path, and the channel on the audit row is Teams.
+   */
+  it("takes a Teams card's answers into the same write, with Teams on the audit row", async () => {
+    const wb = await workerDb();
+    const published = await submitCheckIn(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        provider: "teams",
+        memberId: championMemberId,
+        userId: CHAMPION,
+        now: new Date("2026-08-27T09:00:00.000Z"),
+        minutes: 30,
+      },
+      {
+        goalId,
+        fields: {
+          status: "on_track",
+          confidence: "7",
+          narrative: "Two enterprise renewals landed early.",
+        },
+      },
+    );
+    expect(published.kind).toBe("done");
+
+    const [row] = (await checkInRows()).filter(
+      (one) => one.published_at !== null,
+    );
+    expect(row?.status).toBe("on_track");
+    expect(Number(row?.confidence)).toBeCloseTo(0.7, 5);
+
+    const audited = await wb.admin.query(
+      "select payload from audit_events where workspace_id = $1 and action = 'goals.publishCheckIn'",
+      [workspaceId],
+    );
+    expect(audited.rows).toHaveLength(1);
+    expect((audited.rows[0].payload as Record<string, unknown>).channel).toBe(
+      "teams",
+    );
+  });
+
   it("starts no conversation, because a form holds its own state", async () => {
     await submit({
       status: "on track",

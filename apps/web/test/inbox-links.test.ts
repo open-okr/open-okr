@@ -1,10 +1,11 @@
 import { NOTIFICATION_REASONS, NUDGE_SUBJECT_TYPES } from "@openokr/db";
+import { CATALOGUES } from "@openokr/ui";
 import { describe, expect, test } from "vitest";
 import {
   LINKED_SUBJECT_TYPES,
-  REASON_LABELS,
+  REASON_LABEL_KEYS,
   subjectLink,
-  subjectName,
+  subjectNameKey,
 } from "../app/inbox/subject-link.ts";
 
 /**
@@ -79,9 +80,10 @@ describe("subjectLink", () => {
   test("every nudge subject type has a name, linked or not", () => {
     // A nudge row is grouped under its subject's name whether or not it can be
     // linked, so a missing name renders the raw column value as a heading.
-    const unnamed = NUDGE_SUBJECT_TYPES.filter(
-      (subjectType) => subjectName(subjectType) === subjectType,
-    );
+    const unnamed = NUDGE_SUBJECT_TYPES.filter((subjectType) => {
+      const key = subjectNameKey(subjectType);
+      return key === null || !(key in CATALOGUES.en);
+    });
     expect(unnamed).toEqual([]);
   });
 });
@@ -91,14 +93,17 @@ describe("reason chips", () => {
     // `notifications.list` described four of these six until P6-G07a, and the
     // screen would have rendered "check_in" as a chip. Enumerated from the
     // table's own constant, so a seventh reason fails here.
-    const missing = NOTIFICATION_REASONS.filter(
-      (reason) => REASON_LABELS[reason] === undefined,
-    );
+    const missing = NOTIFICATION_REASONS.filter((reason) => {
+      const key = REASON_LABEL_KEYS[reason];
+      return key === undefined || !(key in CATALOGUES.en);
+    });
     expect(missing).toEqual([]);
   });
 
   test("no two reasons share a label", () => {
-    const labels = NOTIFICATION_REASONS.map((reason) => REASON_LABELS[reason]);
+    const labels = NOTIFICATION_REASONS.map(
+      (reason) => CATALOGUES.en[REASON_LABEL_KEYS[reason] ?? ""],
+    );
     expect(new Set(labels).size).toBe(labels.length);
   });
 });

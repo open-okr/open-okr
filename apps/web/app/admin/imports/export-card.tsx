@@ -103,7 +103,9 @@ export function ExportCard() {
               onClick={handleExport}
               disabled={pending || passphrase.length < 12}
             >
-              {pending ? "Exporting..." : "Export workspace"}
+              {pending
+                ? t("admin.imports.exportCard.exporting")
+                : t("admin.imports.exportCard.exportWorkspace")}
             </Button>
           </div>
         ) : (

@@ -19,8 +19,9 @@ named owner, and one concrete action inside twenty-four hours.
 negotiation. Then set two or three for this week, each with an owner and a
 linked key result.
 
-**4. Digest.** The product assembles it. The coordinator adds a note for
-leadership, and it posts to the team's channel.
+**4. Digest.** The product assembles it. Once the session closes, the
+coordinator adds a note for leadership and posts it to the team's Slack or
+Teams channel, when the space has linked one in its settings.
 
 The session ends with a streak. That is deliberate: the thing worth making
 visible is that the team kept the rhythm, not that the numbers were good.

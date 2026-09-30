@@ -12,6 +12,11 @@ export interface TokenResult {
   /** The raw token, once, or null. */
   readonly token: string | null;
   readonly message: string;
+  /**
+   * Which door the minted token opens, so an agent token can be shown already
+   * inside the configuration an agent reads (completeness review M-12).
+   */
+  readonly audience?: "rest" | "mcp";
 }
 
 export const NOTHING_YET: TokenResult = {

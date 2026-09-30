@@ -23,6 +23,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPool } from "../../../lib/pool";
 import { requireSession } from "../../../lib/session";
+import { getTranslations } from "../../../lib/translations";
 import { ACTIVE_WORKSPACE_COOKIE } from "../../../lib/workspace";
 import type { JoinState } from "./join-state.ts";
 
@@ -38,7 +39,8 @@ export async function acceptInvitation(
     now: new Date(),
   });
   if (invitation.kind !== "usable") {
-    return { error: "That invitation cannot be used." };
+    const { t } = await getTranslations();
+    return { error: t("join.detail.actions.invitationCannotBeUsed") };
   }
 
   try {
@@ -94,7 +96,8 @@ export async function startSignUp(
     now: new Date(),
   });
   if (invitation.kind !== "usable") {
-    return { error: "That invitation cannot be used." };
+    const { t } = await getTranslations();
+    return { error: t("join.detail.actions.invitationCannotBeUsed") };
   }
 
   const jar = await cookies();

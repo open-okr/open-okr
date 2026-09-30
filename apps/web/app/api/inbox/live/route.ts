@@ -1,9 +1,9 @@
 /**
  * The inbox's live stream (UIUX-PLAN §4 S-03, P6-G07c).
  *
- * The shape `api/session/[id]/live` set at P4-T07a and `api/board/[spaceId]`
- * followed at P5-T11. A client connects and receives `inbox.added` whenever a
- * notification row is written for it. On receiving one it re-reads the list
+ * The shape `api/session/[id]/live` set at P4-T07a and the board's stream
+ * followed at P5-T11 (`api/board/live` since M-02). A client connects and
+ * receives `inbox.added` whenever a notification row is written for it. On receiving one it re-reads the list
  * through the page's own server render, so row-level security and `can()` stay
  * in the loop and no subject title travels on the wire.
  *

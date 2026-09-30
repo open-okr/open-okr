@@ -24,6 +24,7 @@ import {
   goalRetrospectives,
   goals,
   INDICATOR_TYPES,
+  includeDeleted,
   KEY_RESULT_DIRECTIONS,
   keyResults,
   keyResultValues,
@@ -68,6 +69,7 @@ import {
   createGoalInTx,
   createKeyResultInTx,
   type GoalRole,
+  linkKpiInTx,
   reassignRoleInTx,
   recordValueInTx,
   reopenGoalInTx,
@@ -77,6 +79,7 @@ import {
 } from "../goals/service.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
+import { readLinkableKpi } from "../kpis/linked.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import {
   recomputeGoalQualityInTx,
@@ -1273,6 +1276,50 @@ export const updateGoal = defineWriteAction({
         }
       }
 
+      // The same two checks for a parent key result (completeness review
+      // M-28). A key result is aligned through the goal that owns it, so that
+      // goal is what the writer must be able to see, and what the loop walk
+      // starts from. Before this, a key result anywhere in the workspace could
+      // be named as a parent by its id, and a goal could be hung under one of
+      // its own key results.
+      if (input.parentKeyResultId) {
+        const [owner] = await tx
+          .select({ goalId: keyResults.goalId })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, workspaceId),
+              eq(keyResults.id, input.parentKeyResultId),
+            ),
+          )
+          .limit(1);
+        if (!owner) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+        await requireGoalAccess(
+          tx,
+          workspaceId,
+          memberId,
+          owner.goalId,
+          ACCESS_LEVELS.view,
+        );
+        if (
+          owner.goalId === input.id ||
+          (await wouldCloseAlignmentLoop(
+            tx,
+            workspaceId,
+            input.id,
+            owner.goalId,
+          ))
+        ) {
+          throw new OperationError(
+            "forbidden",
+            "That would make the alignment circular.",
+          );
+        }
+      }
+
       const patch: Record<string, unknown> = { updatedAt: new Date() };
       if (input.title !== undefined) {
         patch.title = input.title;
@@ -1832,6 +1879,15 @@ export const createKeyResult = defineWriteAction({
         "key result",
       );
 
+      // A KPI-backed key result starts where the KPI stands (completeness
+      // review M-07). Its value has one source of truth once linked, so the
+      // KPI's reading wins over a typed current value; with nothing recorded
+      // yet, the key result starts at its own baseline like any other.
+      const kpi = input.kpiId
+        ? await readLinkableKpi(tx, workspaceId, input.kpiId)
+        : null;
+      const currentValue = kpi?.reading ?? input.currentValue;
+
       const created = await createKeyResultInTx(tx, {
         workspaceId,
         goalId: input.goalId,
@@ -1841,7 +1897,7 @@ export const createKeyResult = defineWriteAction({
         indicatorType: input.indicatorType,
         baselineValue: input.baselineValue,
         targetValue: input.targetValue,
-        currentValue: input.currentValue,
+        currentValue,
         dueOn: input.dueOn ?? null,
         ownerId: input.ownerId ?? null,
         weight: input.weight,
@@ -2092,6 +2148,103 @@ export const recordKeyResultValue = defineWriteAction({
   }),
 });
 
+/**
+ * Links a KPI to a key result drafted without one (completeness review M-07).
+ *
+ * `goals.addKeyResult` has always taken a KPI, and nothing else could add
+ * one afterwards, so a key result measured by hand stayed that way unless it
+ * was deleted and drafted again. The reverse, `goals.unlinkKpi`, existed on
+ * its own.
+ */
+export const linkKeyResultKpi = defineWriteAction({
+  name: "goals.linkKpi",
+  summary:
+    "Links a KPI to a key result, which from then on reads its value and progress from it.",
+  input: z.object({ id: z.uuid(), kpiId: z.uuid() }),
+  output: z.object({ id: z.uuid(), kpiId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [owner] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        owner.goalId,
+        ACCESS_LEVELS.edit,
+      );
+      // After the access check, so somebody who cannot edit the goal learns
+      // nothing about its state. A closed goal takes no new values from a KPI
+      // (design `p3-t00-kpi-engine.md` §10), and linking one would pull the
+      // KPI's reading into a record of how the cycle ended.
+      const [goal] = await tx
+        .select({ closedAt: goals.closedAt })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, owner.goalId),
+          ),
+        )
+        .limit(1);
+      if (goal?.closedAt) {
+        throw new OperationError(
+          "forbidden",
+          "This goal is closed, so its key results take no new values. Reopen it first to link a KPI.",
+        );
+      }
+      const kpi = await readLinkableKpi(tx, workspaceId, input.kpiId);
+
+      await linkKpiInTx(tx, {
+        workspaceId,
+        keyResultId: input.id,
+        kpiId: input.kpiId,
+        reading: kpi.reading,
+        authorMemberId: memberId,
+      });
+
+      // Progress now comes from the KPI's achievement, so the goal and the
+      // goals above it move in the same write.
+      await recompute(tx, workspaceId, owner.goalId);
+
+      return {
+        result: { id: input.id, kpiId: input.kpiId },
+        activity: {
+          kind: "key_result.kpi_linked",
+          subjectType: "goal",
+          subjectId: owner.goalId,
+          payload: { kpiId: input.kpiId },
+        },
+        audit: {
+          action: "goals.linkKpi",
+          targetType: "key_result",
+          targetId: input.id,
+          payload: { kpiId: input.kpiId },
+        },
+      };
+    },
+  }),
+});
+
 export const unlinkKeyResultKpi = defineWriteAction({
   name: "goals.unlinkKpi",
   summary: "Unlinks a KPI, keeping the value it last reported as a manual one.",
@@ -2257,6 +2410,130 @@ export const deleteGoal = defineWriteAction({
           targetType: "goal",
           targetId: input.id,
           payload: { title: goal.title, level: goal.level },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Brings a deleted goal back, with the key results that went with it
+ * (completeness review M-13).
+ *
+ * **The same two gates as the delete.** `full` on the workspace, which the
+ * pipeline checks, and `full` on the goal, which the getter checks. A soft
+ * delete leaves the goal's context and its bindings where they were, so the
+ * getter answers for a deleted goal exactly as it did for the live one: whoever
+ * could delete it can restore it, and anybody else is told it does not exist.
+ *
+ * **Only what the delete took.** The delete stamps the goal and its live key
+ * results with one instant, so the key results carrying that same instant are
+ * the ones that went with it. A key result that was already gone keeps its own
+ * stamp and stays gone.
+ *
+ * **The numbers are recomputed here.** A goal coming back changes its parent's
+ * roll-up and the alignment picture of its cycle, so both run in this
+ * transaction, as they do for every other write that moves them.
+ *
+ * **A deleted parent goal does not hold it back**, unlike a task's initiative
+ * or a document's subject. A goal is aligned to its parent rather than filed
+ * under it: deleting a parent leaves every child live and aligned where it
+ * was, so a restored child aligned to a deleted parent is a state the delete
+ * already makes, and refusing it would block an undo for nothing.
+ */
+export const restoreGoal = defineWriteAction({
+  name: "goals.restore",
+  summary:
+    "Brings back a deleted goal and the key results that were deleted with it.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid(), keyResults: z.number().int() }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.full,
+      );
+
+      // `includeDeleted` on purpose: the row this reads is one the default
+      // scope hides, and reading it is the whole point.
+      const [goal] = await tx
+        .select({
+          title: goals.title,
+          level: goals.level,
+          deletedAt: goals.deletedAt,
+        })
+        .from(goals)
+        .where(
+          includeDeleted(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!goal) {
+        throw new OperationError("not_found", "No such goal.");
+      }
+      if (!goal.deletedAt) {
+        throw new OperationError(
+          "forbidden",
+          `The goal "${goal.title}" is not deleted, so there is nothing to restore.`,
+        );
+      }
+
+      // openokr:allow-mutation: the operation's own execute.
+      const restored = await tx
+        .update(keyResults)
+        .set({ deletedAt: null })
+        .where(
+          includeDeleted(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.goalId, input.id),
+            eq(keyResults.deletedAt, goal.deletedAt),
+          ),
+        )
+        .returning({ id: keyResults.id });
+      await tx
+        .update(goals)
+        .set({ deletedAt: null })
+        .where(
+          includeDeleted(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        );
+
+      await recompute(tx, workspaceId, input.id);
+      await realign(tx, workspaceId, input.id);
+
+      return {
+        result: { id: input.id, keyResults: restored.length },
+        activity: {
+          kind: "goal.restored",
+          subjectType: "goal",
+          subjectId: input.id,
+          payload: { title: goal.title },
+        },
+        audit: {
+          action: "goals.restore",
+          targetType: "goal",
+          targetId: input.id,
+          payload: {
+            title: goal.title,
+            level: goal.level,
+            keyResults: restored.length,
+          },
         },
       };
     },

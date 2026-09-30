@@ -79,7 +79,8 @@ export async function Sessions({ userId }: { userId: string }) {
               >
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="break-all text-sm font-medium text-ink">
-                    {session.userAgent ?? "Unknown device"}
+                    {session.userAgent ??
+                      t("account.security.sessions.unknownDevice")}
                   </span>
                   <span className="text-xs text-ink-3">
                     {[session.ipAddress, session.createdAt.toLocaleString()]

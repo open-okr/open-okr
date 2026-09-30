@@ -30,6 +30,7 @@ import {
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getCache } from "./cache";
+import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
 
@@ -217,7 +218,8 @@ export async function runInbound(
       driver,
       message.externalSenderId,
       [
-        "Your account is linked. OpenOKR will send your nudges here.",
+        // The instance's name, not the software's (M-33).
+        `Your account is linked. ${await getInstanceName()} will send your nudges here.`,
         "",
         helpText(),
       ].join("\n"),

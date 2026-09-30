@@ -24,6 +24,7 @@
  * instance and `registration-to-dashboard.spec.ts` claims it, so anything that
  * signs in sorts after `registration-`.
  */
+import { readFile } from "node:fs/promises";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -123,6 +124,57 @@ test("sign in and reach the import card", async () => {
     throw new Error("Member not found. Did the claiming spec run?");
   }
   workspaceId = member.workspace_id;
+});
+
+/**
+ * REQUIREMENTS §6's template downloads (completeness review M-17).
+ *
+ * The file is downloaded from the link the entity step shows and handed
+ * straight back to the same wizard. What only a browser proves is that the
+ * link is there for the entity chosen, that it downloads rather than
+ * navigates, and that the round trip needs no answer from the person: every
+ * column is claimed by its header alone.
+ */
+test("the entity step offers a template the wizard reads back without a question", async () => {
+  await goTo(page, "/admin/imports");
+
+  const offered = page.getByTestId("import-template");
+  // **The choice is retried, not the assertion**, as in `s36-channels`. A
+  // choice made before hydration is undone by it, and the links would go on
+  // offering the goals template however long the assertion waited.
+  await expect(async () => {
+    await page.getByTestId("import-entity").selectOption("key-results");
+    await expect(
+      offered.getByRole("link", { name: "Excel template" }),
+    ).toHaveAttribute("href", "/admin/imports/templates/key-results.xlsx", {
+      timeout: 1_000,
+    });
+  }).toPass({ timeout: 20_000 });
+  await expect(offered).toContainText(
+    "externalId, goal, title, direction, baselineValue, targetValue",
+  );
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    offered.getByRole("link", { name: "CSV template" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe(
+    "openokr-key-results-template.csv",
+  );
+  const bytes = await readFile(await download.path());
+
+  await page.getByTestId("import-file").setInputFiles({
+    name: download.suggestedFilename(),
+    mimeType: "text/csv",
+    buffer: bytes,
+  });
+  await page.getByRole("button", { name: "Read the file" }).click();
+
+  await expect(page.getByTestId("import-columns")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("import-missing")).toHaveCount(0);
+  await expect(page.getByTestId("import-preview")).toBeEnabled();
 });
 
 test("a file with unfamiliar headers arrives at the mapping step unclaimed", async () => {

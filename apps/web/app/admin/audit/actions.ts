@@ -6,6 +6,7 @@ import {
   OperationError,
 } from "@openokr/core";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /**
@@ -38,6 +39,7 @@ export interface ChainResult {
 
 /** Checks the chain and says where it breaks, if it does. */
 export async function verifyChain(): Promise<ChainResult> {
+  const { t } = await getTranslations();
   try {
     return await callAction(await actionContext(), "audit.verify", {});
   } catch (error) {
@@ -50,7 +52,7 @@ export async function verifyChain(): Promise<ChainResult> {
       error:
         error instanceof OperationError
           ? error.message
-          : "The chain could not be checked.",
+          : t("admin.audit.actions.chainCouldNotBeChecked"),
     };
   }
 }
@@ -82,6 +84,7 @@ export interface AuditExportResult {
 export async function exportAudit(
   request: AuditExportRequest,
 ): Promise<AuditExportResult> {
+  const { t } = await getTranslations();
   try {
     const result = await callAction(await actionContext(), "audit.export", {
       limit: AUDIT_EXPORT_CEILING,
@@ -101,7 +104,7 @@ export async function exportAudit(
       error:
         error instanceof OperationError
           ? error.message
-          : "The export could not be built.",
+          : t("admin.audit.actions.exportCouldNotBeBuilt"),
     };
   }
 }

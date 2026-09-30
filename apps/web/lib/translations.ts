@@ -1,5 +1,6 @@
 import { CATALOGUES, type MessageValues, translate } from "@openokr/ui";
 import { resolveLocale } from "./locale";
+import { workspaceTerms } from "./workspace-presentation";
 
 /**
  * The catalogue, for a server component (UIUX-PLAN §8, P6-G25).
@@ -28,11 +29,15 @@ export async function getTranslations(): Promise<{
 }> {
   const locale = await resolveLocale();
   const catalogue = CATALOGUES[locale];
+  // The workspace's own words for the method's terms (M-14), which fill the
+  // catalogue's term holes: "Add ambition" where it renamed the objective.
+  // Empty on a signed-out screen, where the catalogue's own words stand.
+  const renamed = await workspaceTerms();
   // **`values` fills the message's named holes** (P6-G22d). A sentence with
   // a number in the middle of it is one entry with a hole rather than two
   // entries a translator cannot reassemble.
   return {
     t: (key: string, values?: MessageValues) =>
-      translate(catalogue, key, values),
+      translate(catalogue, key, values, renamed),
   };
 }

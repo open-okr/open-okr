@@ -13,6 +13,7 @@ import { backfillMemberTimezone } from "../src/data-changes/0001_backfill_member
 import { seedChampionAgent } from "../src/data-changes/0006_seed_champion_agent.ts";
 import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_goal.ts";
 import { bindAgentsToSpacelessItems } from "../src/data-changes/0009_bind_agents_to_spaceless_items.ts";
+import { scrubErasedMemberNames } from "../src/data-changes/0010_scrub_erased_member_names.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -587,5 +588,68 @@ describe("0009: binding the built-in agents to what belongs to no space", () => 
       scripts: [bindAgentsToSpacelessItems],
     });
     expect(again[0]?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0010: taking erased members' names out of the feed", () => {
+  it("strips the name from member.erased, replaces it on entries about the erased member, and leaves everyone else's", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const { rows } = await client.query<{
+      erased_id: string;
+      kept_id: string;
+      workspace_id: string;
+    }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), erased as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Erased member', 'human', 'suspended' from w
+         returning id, workspace_id
+       ), kept as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Still Here', 'human', 'active' from w
+         returning id
+       )
+       select erased.id as erased_id, kept.id as kept_id,
+              erased.workspace_id
+         from erased, kept`,
+    );
+    const seeded = rows[0] as {
+      erased_id: string;
+      kept_id: string;
+      workspace_id: string;
+    };
+    const insert = (kind: string, subject: string, name: string) =>
+      client.query(
+        `insert into activities (id, workspace_id, kind, payload, actor_kind, subject_type, subject_id)
+         values (gen_random_uuid(), $1, $2, jsonb_build_object('name', $3::text), 'human', 'workspace_member', $4)`,
+        [seeded.workspace_id, kind, name, subject],
+      );
+    await insert("member.erased", seeded.erased_id, "Real Name");
+    await insert("member.updated", seeded.erased_id, "Real Name");
+    await insert("member.updated", seeded.kept_id, "Still Here");
+
+    const [result] = await runDataChanges(client, {
+      scripts: [scrubErasedMemberNames],
+    });
+    expect(result?.rowsChanged).toBe(2);
+
+    const after = await client.query<{ kind: string; payload: object }>(
+      "select kind, payload from activities order by kind, payload::text",
+    );
+    expect(after.rows).toEqual([
+      { kind: "member.erased", payload: {} },
+      { kind: "member.updated", payload: { name: "Erased member" } },
+      { kind: "member.updated", payload: { name: "Still Here" } },
+    ]);
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [scrubErasedMemberNames],
+    });
+    expect(again?.rowsChanged).toBe(0);
   });
 });

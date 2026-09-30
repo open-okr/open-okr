@@ -51,3 +51,29 @@ describe("the inbox stream", () => {
     expect(client).toContain("source.close()");
   });
 });
+
+describe("the review badge is live (completeness review M-32)", () => {
+  const shell = at("../lib/app-shell.tsx");
+  const live = at("../lib/review-badge-live.tsx");
+  const badgeRoute = at("../app/api/review/badge/route.ts");
+
+  test("the shell mounts the listener with the count it rendered", () => {
+    expect(shell).toContain("<ReviewBadgeLive count={reviewBadge} />");
+  });
+
+  test("it listens to the workspace feed and asks for the count alone", () => {
+    expect(live).toContain('new EventSource("/api/feed/live?scope=workspace")');
+    expect(live).toContain('addEventListener("feed.changed"');
+    expect(live).toContain('fetch("/api/review/badge"');
+    // Refreshes only when the number moved, and closes the stream.
+    expect(live).toContain("next !== shown.current");
+    expect(live).toContain("source.close()");
+  });
+
+  test("the count comes from the session's own member and the same read", () => {
+    expect(badgeRoute).toContain("requireWorkspace()");
+    expect(badgeRoute).toContain("loadReviewBadge(");
+    expect(badgeRoute).toContain("status: 401");
+    expect(badgeRoute).not.toContain("params");
+  });
+});

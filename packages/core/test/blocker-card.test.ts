@@ -232,6 +232,13 @@ describe("the draft", () => {
     ]);
   });
 
+  it("names the instance in its subject, and says OpenOKR when given none (M-33)", async () => {
+    expect((await draft({ instanceName: "OKR Goal" }))?.subject).toBe(
+      "OKR Goal: a blocker needs you",
+    );
+    expect((await draft())?.subject).toBe("OpenOKR: a blocker needs you");
+  });
+
   it("leaves the board link out when there is no address to build one from", async () => {
     const built = await draft({ baseUrl: undefined });
     expect((built?.buttons ?? []).map((b) => b.label)).toEqual([

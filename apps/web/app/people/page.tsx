@@ -158,8 +158,8 @@ export default async function PeoplePage({
               {filtered.length === 0 ? (
                 <p className="text-sm text-ink-3">
                   {query
-                    ? "No members match your search."
-                    : "No members in this workspace."}
+                    ? t("people.noMembersMatchYour")
+                    : t("people.noMembersInThis")}
                 </p>
               ) : (
                 <ul className="flex flex-col gap-1">

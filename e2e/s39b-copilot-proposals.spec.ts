@@ -178,7 +178,10 @@ test("the panel shows it with its provenance, its preview and its reason", async
   await expect(card).toBeVisible({ timeout: 15_000 });
   // The provenance chip: a reviewer's first question is who wrote this.
   await expect(card.getByText("AI", { exact: true })).toBeVisible();
-  await expect(card.getByText("goals.create")).toBeVisible();
+  // Named, not keyed: the card says what the change is rather than printing
+  // the registry's name for it (completeness review M-09, P8-G11d's rule).
+  await expect(card.getByText("New objective")).toBeVisible();
+  await expect(card.getByText("goals.create")).toHaveCount(0);
   await expect(card.getByText(TITLE)).toBeVisible();
   await expect(
     card.getByText("You asked for an onboarding objective", { exact: false }),

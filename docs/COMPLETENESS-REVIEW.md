@@ -4,7 +4,7 @@
 **Commit reviewed:** `main` at `7bbf31e` (the tree is identical to `agung` at `be1bf49`)
 **Question asked:** Development is believed complete. Is it?
 
-> **Fix progress.** ✅ marks a finding fixed and tested. High: 26 of 27 fixed on branch `fix/review-high`, including H-25 to H-27, which turned up during the fixes (section 5.3a). H-23 is a release, which a human cuts. Medium and Low follow in their own pull requests.
+> **Fix progress.** ✅ marks a finding fixed and tested. High: 26 of 27 fixed on branch `fix/review-high`, including H-25 to H-27, which turned up during the fixes (section 5.3a). H-23 is a release, which a human cuts. Medium: all 36 fixed on branch `fix/review-medium`, including M-33, found after the review, and M-34 to M-36, which reviewing the coverage exemptions turned up (section 5.4a). Low follows in its own pull request.
 
 > **Since the review.** `main` moved to `c529177` with PR #85, which changed documentation and a deck script only. No application, package, deployment or test code changed, so every code finding below still applies. PR #85 fixed the stale README (L-05). It also made H-22 more serious, because the install guides now tell self-hosters to build the image themselves.
 
@@ -326,7 +326,7 @@ This section matters more than any single finding, because the same patterns wil
 - **Fix.** Either set `NODE_OPTIONS=--max-old-space-size=4096` in the build stage (tested: it builds in 84 seconds with the runtime stage unchanged), or skip Next's type check, since `pnpm typecheck` already gates it.
 
 **H-23. Nothing has ever been released, and the launch task's acceptance was never run.** `Code`
-- **Still open, and it is a human's to close.** The first release is a tag a person pushes. Every High fix is on branch `fix/review-high` with its changeset, so the first `pnpm changeset version` after it merges gathers them. After that release exists, the upgrade half of P8-T14's acceptance can run.
+- **Still open, and it is a human's to close.** It is the last step of this review, once every other finding is done: section 11 has the checklist. The first release is a tag a person pushes. Every High fix is on branch `fix/review-high` with its changeset, so the first `pnpm changeset version` after it merges gathers them. After that release exists, the upgrade half of P8-T14's acceptance can run.
 - **Evidence.** There are no git tags, all 11 packages are at `0.0.0`, and 47 changesets are pending. P8-T14 (Launch) is `done`, but its note says the acceptance checks were not verifiable at the time: a clean-machine install, an upgrade from the previous release, and a chart install.
 - **What this review covered.** It ran two of those three, a clean install and a chart install, and both work apart from the defects above. An upgrade from a previous release cannot be tested until a first release exists. The nightly Upgrade workflow covers upgrading from a pinned 11 September commit (81 migrations to 97), and it is green.
 
@@ -361,38 +361,164 @@ The review missed these three. Each turned up while fixing another finding, and 
 
 | ID | Finding | Evidence | Mark |
 |---|---|---|---|
-| M-01 | Documents attach only from goals, files only to initiatives and documents, comments only on goals. Documents have no comments or reactions | `SubjectDocuments` used once; `Attachments` accepts two subject types | Audit |
-| M-02 | The board has no live presence (a P5-T11 deliverable), exists only per space rather than per initiative or key result, and reordering within a column needs a mouse | `board/page.tsx`, `board.tsx` | Audit |
-| M-03 | Step 1 of the weekly session breaks when team voting is off. Revealed votes and the team average are never shown | `confidence-round.tsx`, `sessions.ts:1513` | Audit |
-| M-04 | Closing a monthly or quarterly session adds a 0.0 point to the weekly trend and extends the streak. A week with no session never breaks the streak. Dates use UTC rather than the workspace timezone | `sessions.ts` close path | Audit |
-| M-05 | Feed-forward and the scorecard snapshot are buttons, not automatic at close. The lowest process-health statement becomes a Phase 2 issue, not a Phase 3 priority: a practice change nobody approved | `cycles/archive.ts` | Audit |
-| M-06 | Annual cycles cannot be opened or created in the browser, and mid-cycle calibration has no UI | `cycle/page.tsx`, `cycle/admin-actions.ts` | Audit |
-| M-07 | KPI-backed key results cannot be created in the browser, and recording a KPI never recomputes the goals that read it | `cycle/goal-actions.ts`, `actions/kpis.ts` | Audit |
-| M-08 | A review-inbox proposal links to `/admin/agents`, which a non-admin cannot open. A champion cannot apply their own drafted check-in | `review.ts`, `agents.ts` | Audit |
-| M-09 | Six assists are built but have no browser caller. "Summarise a thread" and "decompose a key result" are not built. The copilot can propose only `goals.create` | `copilot/proposals.ts` | Audit |
-| M-10 | AI egress controls are missing. The Privacy card is static text | [governance.tsx](../apps/web/app/admin/ai/governance.tsx) | Audit |
-| M-11 | Custom agents cannot run: `agents.startRun` enqueues nothing and no handler continues a run | [actions/agents.ts](../packages/core/src/actions/agents.ts) | Audit |
-| M-12 | MCP has no scoped-token path for local agents, and no rate limit on `/api/mcp`, `/api/mcp/register`, `/api/mcp/token` or `/api/scim/v2` | route handlers | Audit |
-| M-13 | No undo, and no restore for deleted goals, initiatives, tasks or documents. The delete control promises "an administrator can bring it back" | [delete-control.tsx](../apps/web/lib/delete-control.tsx) | Audit |
-| M-14 | Terminology labels and the brand colour are saved and never applied. The branding card says the colour "is in force" | `admin/branding` | Audit |
-| M-15 | Bahasa Melayu (P1) is a stub: 1,494 of 1,578 strings are identical to English. The language setting is a free-text box expecting `ms` | [ms.json](../packages/ui/src/i18n/messages/ms.json) | Run |
-| M-16 | The FlowyTeam importer checks about ten source tables exist and then neither reads nor reports them, including `performance_settings`, `indicator_accesses`, `keyresult_indicator`, `key_result_files` and `scores`. CLAUDE.md forbids silent drops | [introspect.ts](../packages/importer/src/flowyteam/introspect.ts), [report.ts](../packages/importer/src/flowyteam/report.ts) | Audit |
-| M-17 | The spreadsheet importer has no template downloads (REQUIREMENTS §6) | no route found | Audit |
-| M-18 | Personal data export exists only inside erasure. Erasure writes the erased name into a new activity, and the `users` row keeps name and email | `people.ts` | Audit |
-| M-19 | The outbox keeps raw invitation tokens and email addresses forever, with no purge | `invitations.ts` | Audit |
-| M-20 | The accessibility scan excludes 26 detail routes (goal, KPI, space, session, task, person, initiative) | [s43-accessibility.spec.ts](../e2e/s43-accessibility.spec.ts) | Audit |
-| M-21 | Command palette entity jump works for KPIs only. There are no palette actions, and semantic search is never called | `search/palette.tsx` | Audit |
-| M-22 | The space home has no goals or KPI trees. Avatar and bio cannot be edited. Guests can only be made by converting a member | `spaces/[id]/page.tsx` | Audit |
-| M-23 | Teams has no check-in form. No channel posts to a space. A per-rule channel override skips the reachability check and has no email fallback | `routing.ts` | Audit |
-| M-24 | File previews, thumbnails, image re-encoding and the scan hook are still scaffolding. P2-T05 asked for a dependency decision that was never taken | `blobs/provisioning.ts` | Audit |
-| M-25 | Seven settings in the registry are missing from the TECHNICAL-PLAN §4.14 map, and nothing compares the two | settings registry | Audit |
-| M-26 | Initiatives feed neither the key result's linked work nor its forecast (REQUIREMENTS §4 Pillar C), which conflicts with TECHNICAL-PLAN §4.9 | `tasks/service.ts` | Audit |
-| M-27 | OBJ-1 checks its rows in a different order from METHOD.md's "first match wins", so some objectives pass that should warn | `method/src/quality.ts` | Audit |
-| M-28 | Aligning under a parent key result skips both the loop check and the access check | `actions/goals.ts` | Audit |
-| M-29 | KPI recovery misfires: a KPI with only a standing target never gets its proposal, workspace-owned KPIs get no nudges, and "recovered" cannot fire | `nudges/sweep.ts`, `kpis/service.ts` | Audit |
-| M-30 | The coverage tests accept false exemptions (section 4), and the route-coverage test counts `/initiatives/[id]` as visited whenever `/initiatives` is | [action-coverage.test.ts](../apps/web/test/action-coverage.test.ts), [route-coverage.test.ts](../apps/web/test/route-coverage.test.ts) | Code |
-| M-31 | Search is empty after an archive import, because nothing reindexes | `portability/import.ts` | Audit |
-| M-32 | The review badge is not live, although TECHNICAL-PLAN makes the review inbox live | `lib/review-badge.ts` | Audit |
+| M-01 ✅ | Documents attach only from goals, files only to initiatives and documents, comments only on goals. Documents have no comments or reactions | `SubjectDocuments` used once; `Attachments` accepts two subject types | Audit |
+| M-02 ✅ | The board has no live presence (a P5-T11 deliverable), exists only per space rather than per initiative or key result, and reordering within a column needs a mouse | `board/page.tsx`, `board.tsx` | Audit |
+| M-03 ✅ | Step 1 of the weekly session breaks when team voting is off. Revealed votes and the team average are never shown | `confidence-round.tsx`, `sessions.ts:1513` | Audit |
+| M-04 ✅ | Closing a monthly or quarterly session adds a 0.0 point to the weekly trend and extends the streak. A week with no session never breaks the streak. Dates use UTC rather than the workspace timezone | `sessions.ts` close path | Audit |
+| M-05 ✅ | Feed-forward and the scorecard snapshot are buttons, not automatic at close. The lowest process-health statement becomes a Phase 2 issue, not a Phase 3 priority: a practice change nobody approved | `cycles/archive.ts` | Audit |
+| M-06 ✅ | Annual cycles cannot be opened or created in the browser, and mid-cycle calibration has no UI | `cycle/page.tsx`, `cycle/admin-actions.ts` | Audit |
+| M-07 ✅ | KPI-backed key results cannot be created in the browser, and recording a KPI never recomputes the goals that read it | `cycle/goal-actions.ts`, `actions/kpis.ts` | Audit |
+| M-08 ✅ | A review-inbox proposal links to `/admin/agents`, which a non-admin cannot open. A champion cannot apply their own drafted check-in | `review.ts`, `agents.ts` | Audit |
+| M-09 ✅ | Six assists are built but have no browser caller. "Summarise a thread" and "decompose a key result" are not built. The copilot can propose only `goals.create` | `copilot/proposals.ts` | Audit |
+| M-10 ✅ | AI egress controls are missing. The Privacy card is static text | [governance.tsx](../apps/web/app/admin/ai/governance.tsx) | Audit |
+| M-11 ✅ | Custom agents cannot run: `agents.startRun` enqueues nothing and no handler continues a run | [actions/agents.ts](../packages/core/src/actions/agents.ts) | Audit |
+| M-12 ✅ | MCP has no scoped-token path for local agents, and no rate limit on `/api/mcp`, `/api/mcp/register`, `/api/mcp/token` or `/api/scim/v2` | route handlers | Audit |
+| M-13 ✅ | No undo, and no restore for deleted goals, initiatives, tasks or documents. The delete control promises "an administrator can bring it back" | [delete-control.tsx](../apps/web/lib/delete-control.tsx) | Audit |
+| M-14 ✅ | Terminology labels and the brand colour are saved and never applied. The branding card says the colour "is in force" | `admin/branding` | Audit |
+| M-15 ✅ | Bahasa Melayu (P1) is a stub: 1,494 of 1,578 strings are identical to English. The language setting is a free-text box expecting `ms` | [ms.json](../packages/ui/src/i18n/messages/ms.json) | Run |
+| M-16 ✅ | The FlowyTeam importer checks about ten source tables exist and then neither reads nor reports them, including `performance_settings`, `indicator_accesses`, `keyresult_indicator`, `key_result_files` and `scores`. CLAUDE.md forbids silent drops | [introspect.ts](../packages/importer/src/flowyteam/introspect.ts), [report.ts](../packages/importer/src/flowyteam/report.ts) | Audit |
+| M-17 ✅ | The spreadsheet importer has no template downloads (REQUIREMENTS §6) | no route found | Audit |
+| M-18 ✅ | Personal data export exists only inside erasure. Erasure writes the erased name into a new activity, and the `users` row keeps name and email | `people.ts` | Audit |
+| M-19 ✅ | The outbox keeps raw invitation tokens and email addresses forever, with no purge | `invitations.ts` | Audit |
+| M-20 ✅ | The accessibility scan excludes 26 detail routes (goal, KPI, space, session, task, person, initiative) | [s43-accessibility.spec.ts](../e2e/s43-accessibility.spec.ts) | Audit |
+| M-21 ✅ | Command palette entity jump works for KPIs only. There are no palette actions, and semantic search is never called | `search/palette.tsx` | Audit |
+| M-22 ✅ | The space home has no goals or KPI trees. Avatar and bio cannot be edited. Guests can only be made by converting a member | `spaces/[id]/page.tsx` | Audit |
+| M-23 ✅ | Teams has no check-in form. No channel posts to a space. A per-rule channel override skips the reachability check and has no email fallback | `routing.ts` | Audit |
+| M-24 ✅ | File previews, thumbnails, image re-encoding and the scan hook are still scaffolding. P2-T05 asked for a dependency decision that was never taken | `blobs/provisioning.ts` | Audit |
+| M-25 ✅ | Seven settings in the registry are missing from the TECHNICAL-PLAN §4.14 map, and nothing compares the two | settings registry | Audit |
+| M-26 ✅ | Initiatives feed neither the key result's linked work nor its forecast (REQUIREMENTS §4 Pillar C), which conflicts with TECHNICAL-PLAN §4.9 | `tasks/service.ts` | Audit |
+| M-27 ✅ | OBJ-1 checks its rows in a different order from METHOD.md's "first match wins", so some objectives pass that should warn | `method/src/quality.ts` | Audit |
+| M-28 ✅ | Aligning under a parent key result skips both the loop check and the access check | `actions/goals.ts` | Audit |
+| M-29 ✅ | KPI recovery misfires: a KPI with only a standing target never gets its proposal, workspace-owned KPIs get no nudges, and "recovered" cannot fire | `nudges/sweep.ts`, `kpis/service.ts` | Audit |
+| M-30 ✅ | The coverage tests accept false exemptions (section 4), and the route-coverage test counts `/initiatives/[id]` as visited whenever `/initiatives` is | [action-coverage.test.ts](../apps/web/test/action-coverage.test.ts), [route-coverage.test.ts](../apps/web/test/route-coverage.test.ts) | Code |
+| M-31 ✅ | Search is empty after an archive import, because nothing reindexes | `portability/import.ts` | Audit |
+| M-32 ✅ | The review badge is not live, although TECHNICAL-PLAN makes the review inbox live | `lib/review-badge.ts` | Audit |
+| M-33 ✅ | The instance name cannot be changed. `OPENOKR_INSTANCE_NAME` and the wizard's name are stored and never read, so every screen, email and message says "OpenOKR". Found after the review: section 5.4a | [instance-registry.ts:41](../packages/core/src/secrets/instance-registry.ts#L41) | Run |
+| M-34 ✅ | Trusted-domain auto-join never happens. The trusted domains are saved on `/admin/general` and `invitations.joinByTrustedDomain` exists, but nothing calls it. Found while fixing M-30: section 5.4a | [invitations.ts](../packages/core/src/actions/invitations.ts) | Code |
+| M-35 ✅ | A goal dependency is added in the alignment studio and can never be removed in the browser. Found while fixing M-30: section 5.4a | [studio/actions.ts](../apps/web/app/goals/studio/actions.ts) | Code |
+| M-36 ✅ | A member cannot set their own AI key, which P2-T14's acceptance needs. The three actions exist and no screen calls them. Found while fixing M-30: section 5.4a | [actions/ai.ts](../packages/core/src/actions/ai.ts) | Code |
+
+**How each Medium finding was fixed**, on branch `fix/review-medium`, in the order of the table above.
+
+| Finding | What is true now |
+|---|---|
+| M-01 | Documents, files, comments and reactions are on every page the plans name, and a comment is read and written by whoever reads what it hangs on |
+| M-02 | The board shows who else has it open, there is one per initiative and per key result, and a card moves anywhere with the keyboard |
+| M-03 | The confidence round works with team voting off, and shows what it revealed |
+| M-04 | The streak counts weeks of check-ins, and a skipped week breaks it |
+| M-05 | Closing a cycle records its result and feeds the next cycle, and the lowest process-health statement is a Phase 3 priority |
+| M-06 | An annual cycle can be made and opened from the cycle screen, and the calibration is recorded on phase 6 |
+| M-07 | A key result can read a KPI from the browser, and recording the KPI moves it and the goals above it |
+| M-08 | An agent's proposal is decided in the review inbox, by the person it is for |
+| M-09 | Every assist is offered where it helps, summarise-a-thread and decompose-a-key-result exist, and the copilot proposes four planning writes |
+| M-10 | An administrator decides what may leave for an AI provider, and every AI request passes one guard that obeys it |
+| M-11 | A custom agent's run is queued when it starts and the relay carries it step by step to its end. How a custom agent plans its own work is left for a person to decide |
+| M-12 | A local agent connects with a scoped token, every public door is rate limited, and a token can no longer mint a wider one |
+| M-13 | A deleted goal, initiative, task or document can be undone at once or restored later from Admin, Deleted items |
+| M-14 | A workspace's brand colour and its own words for the method's terms reach its screens |
+| M-15 | Bahasa Melayu is translated, and the catalogue gates hold it. A native reader has not yet reviewed it |
+| M-16 | The FlowyTeam importer names every source table it does not read, with its row count for the company. Whether to import each is a question for a person |
+| M-17 | The spreadsheet importer offers a CSV and an Excel template for each kind of row, and importing work the importer owns no longer fails |
+| M-18 | Erasure takes the name out of the feed and, when it was their only workspace, anonymises the account |
+| M-19 | A delivered invitation loses its token and address, and settled outbox rows are purged after `outbox.retentionDays` |
+| M-20 | The accessibility scan opens every detail page on a real record and the sign-in pages signed out. It found and fixed two unnamed controls |
+| M-21 | The command palette jumps to anything by name, offers actions, and asks the semantic index when AI is on |
+| M-22 | A space home shows its goals and KPI trees, members edit their own picture and bio, a guest can be invited into one space, and an attached file opens for whoever reads what it hangs on |
+| M-23 | A rule's channel falls back when it cannot reach somebody, Teams checks in with a card, and a space posts its digest to its own channel |
+| M-24 | Uploaded images are re-encoded with a thumbnail through `sharp`, and files can be held for an optional clamd scan |
+| M-25 | The §4.14 settings map names every registered setting, and a test holds it |
+| M-26 | An initiative's tasks count as linked work for every key result it serves. Whether initiatives feed the forecast is decision 4 |
+| M-27 | OBJ-1 reads its table top to bottom, METHOD.md §4.1 is reordered to match, and `method:check` holds the order |
+| M-28 | Aligning under a parent key result checks access and loops |
+| M-29 | KPI recovery messages reach a person in all three cases |
+| M-30 | Both coverage tests check their own excuses: every reason makes a claim the test verifies. The review of them found M-34 to M-36 |
+| M-31 | An archive import queues its rows for the search and embedding indexes |
+| M-32 | The Review badge is live |
+| M-33 | An instance carries the name its operator gave it, on every screen, email and message |
+| M-34 | A trusted email domain lets people join, offered with one press to a confirmed address |
+| M-35 | A dependency between two goals can be removed in the alignment studio |
+| M-36 | A member keeps their own AI key under Your AI keys, and their own assists and copilot answers use it |
+
+The questions these fixes raised for a person are listed in the pull request.
+
+### 5.4a Medium: found after the review
+
+**M-33. The instance name cannot be changed. `OPENOKR_INSTANCE_NAME` and the setup wizard's name are stored, and nothing reads them.** `Run` `Code` ✅
+
+- **Found** on 29 September 2026, while deploying the public demo at `demo.okrgoal.com`. The demo overlay sets `OPENOKR_INSTANCE_NAME` to "OpenOKR demo", and every page still says "OpenOKR".
+- **What is wanted.** An operator renames their instance with `OPENOKR_INSTANCE_NAME`, for example to "OKR Goal". Every place a person sees the product's name then shows that name: screens, emails, chat messages and notifications. With the variable unset, everything reads "OpenOKR", as it does today.
+- **Evidence.**
+  - [instance-registry.ts:41](../packages/core/src/secrets/instance-registry.ts#L41) declares `instance.name`, bootstrapped from `OPENOKR_INSTANCE_NAME`, as "what this deployment calls itself in mail and the page title". Apart from the setup wizard, which writes it, no code reads it.
+  - The page title is the literal "OpenOKR" in [layout.tsx:16](../apps/web/app/layout.tsx#L16). `APP_NAME` in [app-info.ts:7](../apps/web/lib/app-info.ts#L7) is declared and used nowhere.
+  - The wizard pre-fills its name field with the literal "OpenOKR" ([setup-account-form.tsx:76](../apps/web/app/setup/account/setup-account-form.tsx#L76)) and stores whatever the field holds ([actions.ts:81](../apps/web/app/setup/account/actions.ts#L81)). A stored value beats the environment ([instance-settings.ts:197](../packages/core/src/secrets/instance-settings.ts#L197)). So an operator who sets the variable and then clicks through the wizard loses it for good.
+  - No admin screen can change the name after setup.
+  - `instance.name` is not in the TECHNICAL-PLAN §4.14 map (see M-25).
+- **Why it matters.** An organisation running its own instance cannot put its own name on it. The registry promises a setting that does nothing, which is the pattern section 4 describes.
+
+**Should show the instance name**
+
+| What a person sees | Where | Today |
+|---|---|---|
+| Browser tab title | [layout.tsx:16](../apps/web/app/layout.tsx#L16) | "OpenOKR" |
+| Sign-in heading | `auth.signIn.signInToOpenokr` in [en.json](../packages/ui/src/i18n/messages/en.json) | "Sign in to OpenOKR" |
+| Setup heading | `setup.setUpOpenokr` | "Set up OpenOKR" |
+| Error page when the app cannot start | `globalError.openokrCouldNotStart` | "OpenOKR could not start" |
+| The system's name in the feed and activity | `activity.openOkr`, `feedPanel.openOkr` | "OpenOKR" |
+| Linking a chat account | `account.channels.actions.sendThisToTheBot`, [channel-inbound.ts:220](../apps/web/lib/channel-inbound.ts#L220) | "Send this to the OpenOKR bot…", "OpenOKR will send your nudges here." |
+| Password reset email | [lib/auth.ts:73](../apps/web/lib/auth.ts#L73) | "Reset your OpenOKR password" |
+| Email address confirmation | [lib/auth.ts:94](../apps/web/lib/auth.ts#L94) | "…setting up your OpenOKR account." |
+| Invitation email | [outbox/handlers.ts:255](../packages/core/src/outbox/handlers.ts#L255) | "You have been invited to OpenOKR" |
+| Nudge subject, by email and chat | [nudges/message.ts:170](../packages/core/src/nudges/message.ts#L170), [nudges/deliver.ts:90](../packages/core/src/nudges/deliver.ts#L90) | "OpenOKR: …", "OpenOKR: 3 updates" |
+| Nudge button | [nudges/message.ts:165](../packages/core/src/nudges/message.ts#L165) | "Open in OpenOKR" |
+| Blocker card | [nudges/blocker-card.ts:149](../packages/core/src/nudges/blocker-card.ts#L149) | "OpenOKR: a blocker needs you" |
+| Channel test message | [actions/channels.ts:1013](../packages/core/src/actions/channels.ts#L1013) | "This is a test from OpenOKR…" |
+| Email subject when none is given | [channel/email.ts:81](../packages/adapters/src/drivers/channel/email.ts#L81) | "OpenOKR" |
+| Entry in an authenticator app (two-factor issuer) | [core/auth/auth.ts:603](../packages/core/src/auth/auth.ts#L603) | "OpenOKR" |
+| Passkey prompt (relying party name) | [core/auth/auth.ts:608](../packages/core/src/auth/auth.ts#L608) | "OpenOKR" |
+| Consent screen for the command line | [oauth/clients.ts:36](../packages/core/src/api/oauth/clients.ts#L36) | "The OpenOKR command line" |
+| Server name shown in an AI client over MCP | [api/mcp/route.ts:193](../apps/web/app/api/mcp/route.ts#L193) | "OpenOKR" |
+| Title of the live API document at `/api/v1/openapi.json` | [api/openapi.ts:224](../packages/core/src/api/openapi.ts#L224) | "OpenOKR" |
+| App name sent to the AI provider, shown in its dashboard | [ai-provider.ts:63](../apps/web/lib/ai-provider.ts#L63) | "OpenOKR" |
+| The same ten catalogue strings in Malay | [ms.json](../packages/ui/src/i18n/messages/ms.json) | "OpenOKR" |
+
+**Should keep "OpenOKR"**, because it names the software or the company running the managed cloud, not this instance
+
+| Text | Where | Why it stays |
+|---|---|---|
+| "Nobody from OpenOKR can enter this workspace…", "OpenOKR support is in this workspace…", and the support session's name "OpenOKR support" | `admin.support.*`, `lib.supportBanner.supportIsHere`, [operator/sessions.ts:224](../packages/core/src/operator/sessions.ts#L224) | Names the operator of the managed cloud, not the customer |
+| "OpenOKR speaks OIDC and SAML 2.0" | `admin.sso.connectAnIdentityProvider` | Describes the software. Rewording it to "This instance speaks…" works too |
+| Importer report lines, such as "OpenOKR spaces do not nest" | [domains.ts](../packages/importer/src/flowyteam/domains.ts), [organisation.ts](../packages/importer/src/flowyteam/mappers/organisation.ts) | Explains the software's model to an operator |
+| Command line help and errors, such as "Is that an OpenOKR instance?" | [packages/cli](../packages/cli/src/run.ts) | Names the software |
+| "not an OpenOKR archive" | [archive.ts](../packages/core/src/portability/archive.ts) | The name of a file format |
+| Server start-up error, Grafana dashboards, the Helm chart description | [instrumentation.node.ts](../apps/web/instrumentation.node.ts), `deploy/` | Read by the operator, not by members |
+| The committed `contract/openapi.json` | [api/openapi.ts](../packages/core/src/api/openapi.ts) | Generated with no instance. Keeping "OpenOKR" keeps `pnpm check:contract` stable |
+| Identifiers: `@openokr/*`, `OPENOKR_*`, `openokr://`, cookie names, the `okr` and `openokr` commands | everywhere | Not display text. Never renamed |
+| The Teams app manifest | [deploy/teams/manifest.json](../deploy/teams/manifest.json) | A static file the operator uploads. The install guide should tell them to edit the name there |
+
+- **Fix.**
+  1. One server-side reader for the resolved name: the stored value, then `OPENOKR_INSTANCE_NAME`, then "OpenOKR". Everything in the first table reads it. Email and nudge builders resolve it when they send, because the outbox relay has no request to read it from.
+  2. Catalogue strings take an `{instanceName}` placeholder instead of the word, in English and in Malay. Rename the keys that carry the brand in their own name, such as `auth.signIn.signInToOpenokr`.
+  3. The page title comes from `generateMetadata` in the root layout. Delete the unused `APP_NAME`.
+  4. The wizard pre-fills the resolved name and stores a row only when the operator changes it, so the environment variable keeps working. Add the name to `/admin/general` so it can change after setup.
+  5. Better Auth reads the two-factor issuer and the passkey name when the auth instance is built, so a change applies after a restart. Say so on the admin screen. Changing either is safe: a passkey is bound to the domain, not to its display name, and an existing authenticator entry keeps the name it was created with.
+  6. Add `instance.name` to the TECHNICAL-PLAN §4.14 map, with its default.
+- **Tests.**
+  - A unit test that fails when a catalogue string contains "OpenOKR", except an allow-list of the texts in the second table. The M-15 test already keeps a brand-word allow-list to extend.
+  - For each email and message builder: given a name, the subject and body use it; given none, they say "OpenOKR".
+  - End to end, with `OPENOKR_INSTANCE_NAME` set on the server: the tab title and the sign-in heading show it.
+  - The wizard stores no name when the field is left as pre-filled.
+
+**M-34, M-35 and M-36. Three gaps the action-coverage exemptions hid.** `Code` ✅
+
+- **Found** on 30 September 2026, while fixing M-30 by checking every exemption in [action-coverage.test.ts](../apps/web/test/action-coverage.test.ts) against the code. Each was excused by a reason that named a caller which does not exist, which is the pattern section 4.1 describes.
+
+| Finding | What the exemption said | What is true | Plan that asks for it |
+|---|---|---|---|
+| M-34 | `invitations.joinByTrustedDomain`: "the pipeline calls it, from the join route once the domain matches" | Nothing calls it. An administrator can save trusted domains and they change nothing | REQUIREMENTS §4 People and org (P0) "trusted-domain auto-join"; IMPLEMENTATION-PLAN P2 invitations, "trusted-domain joining works" |
+| M-35 | `goals.removeDependency`: "the alignment studio removes them through its own canvas write" | The studio adds a dependency and has no way to remove one | UIUX-PLAN S-16 |
+| M-36 | `ai.setPersonalCredential`, `ai.removePersonalCredential`, `ai.readOwnCredentialStatus`: "no screen yet, and it is P7's own row" | No P7 row builds it | P2-T14 acceptance, "their own key is used"; S-37's deliverables name the personal credential flow |
+
+- **Fix.** Give each its caller, and remove its exemption. M-30 makes the exemption list check its own claims so the next false reason fails the build.
 
 ### 5.5 Low
 
@@ -502,9 +628,11 @@ CLAUDE.md puts these on the "ask the human" list. None should be settled by a de
 3. **Make the cycle completable.** H-09, H-17, H-15.
 4. **Admin and mobile.** H-14, H-16.
 5. **Data safety.** H-18, H-19, H-20, M-16.
-6. **First impression and release.** H-22, H-24, and the README badge (L-05). Then cut the first tag by [the release runbook](runbooks/release.md) and run P8-T14's three checks for real.
+6. **First impression.** H-22, H-24, and the README badge (L-05). The first tag waits until everything else here is done (section 11).
 7. **Close the loopholes that let these ship.** Rewrite the false exemptions (M-30). Add a gate for trigger emitters (H-11), a check for task IDs in rendered text (H-24), and an end-to-end run with a live scheduler under the restricted role (H-02).
 8. **The Medium table**, in the order a user would notice it: M-01, M-13, M-03, M-07, M-08, then the rest.
+9. **The Low table.**
+10. **Last, the first release.** Section 11.
 
 **Rows worth reopening in STATUS.md**, because their own plan text promises what is missing:
 
@@ -517,6 +645,33 @@ CLAUDE.md puts these on the "ask the human" list. None should be settled by a de
 | P6-T05a, P6-T05b | Moves between instances (H-18) |
 | P6-T06 | A restore drill in continuous integration (H-19) |
 | P8-T14 | Its acceptance criterion (H-23) |
+
+---
+
+## 11. Last: the first release
+
+Do this only when everything above is done. It closes H-23. Tagging is a human decision, and Agung makes it.
+
+**Ready when**
+
+| Check | How to tell |
+|---|---|
+| Every finding in section 5 is ✅, or a human has deferred it in writing here | This document |
+| The High, Medium and Low fix branches are merged to `main` | GitHub |
+| CI on `main` is green, every job | `gh run list --branch main` |
+| Every gate in [CI-GATES.md](development-plan/CI-GATES.md) is green locally on `main` | The list in CLAUDE.md, "Committing and pushing" |
+
+**Steps**, by [the release runbook](runbooks/release.md)
+
+1. **Set the version.** On `main`, run `pnpm changeset version`. It uses up the pending changesets, writes the version into every package and writes `CHANGELOG.md`. Every package is at `0.0.0` and minor bumps are pending, so expect `0.1.0`. Read the changelog it writes, commit it with a sign-off, and merge it to `main`.
+2. **Tag it.** `git tag v0.1.0` then `git push origin v0.1.0`. Nothing publishes without a tag.
+3. **Watch the Release workflow to the end.** Every job must be green: verify, build and sign, the signature check, the GitHub release and the chart. `gh run watch` follows it.
+4. **Make the image public.** Go to [the organisation's packages](https://github.com/orgs/open-okr/packages), open `open-okr`, then Package settings, Danger Zone, Change visibility, Public. This cannot be undone. Public packages are already allowed in the organisation's settings (checked on 29 September 2026).
+5. **Check that anyone can pull it.** `docker logout ghcr.io`, then `docker pull ghcr.io/open-okr/open-okr:0.1.0`, with no sign-in.
+6. **Run the runbook's checks after release.** A clean-machine install by [the Compose quickstart](install/compose.md), and a chart install with `deploy/helm/cluster-test.sh`. The third check, upgrading from the previous release, has nothing to upgrade from on a first release. It becomes possible from the second one.
+7. **Check the demo moved.** `demo.okrgoal.com` follows releases. At 03:00 Malaysia time after the tag, it pulls the new image, rebuilds, and rolls back on its own if the release fails to come up. The next morning, its log should say `now running v0.1.0`.
+8. **Announce it** with [the announcement text](runbooks/announcement.md).
+9. **Close the loop.** Mark H-23 ✅ here, and ask a human to review the P8-T14 row in `STATUS.md`.
 
 ---
 

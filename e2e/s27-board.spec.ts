@@ -99,7 +99,7 @@ test("the sidebar reaches the board, and it says so when empty", async () => {
 test("a card added against a key result lands in its column", async () => {
   await goTo(page, "/board");
   await page.getByLabel("What has to happen").fill(TASK);
-  await page.getByLabel("Column").selectOption("todo");
+  await page.getByRole("combobox", { name: /^Column/ }).selectOption("todo");
   // The instance's own cycle has key results from the claiming spec; whichever
   // one is first is the one this work is recorded against.
   await page.getByLabel("Key result it moves").selectOption({ index: 1 });
@@ -218,6 +218,160 @@ test("an unfinished one with a due date is, and it names the task", async () => 
   await expect(page.getByText(`Finish "${TASK}"`)).toBeVisible({
     timeout: 15_000,
   });
+});
+
+/**
+ * S-28's comments, and the files beside them (completeness review M-01).
+ *
+ * The page used to say that comments and files were not kept on a task,
+ * although both actions took one. It carries the goal page's own two panels
+ * now.
+ */
+test("a task carries a discussion and files", async () => {
+  await goTo(page, `/tasks/${await taskId()}`);
+  const thread = page.getByTestId("comment-thread");
+  await expect(thread).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("attachment-input")).toBeVisible();
+
+  await thread
+    .getByPlaceholder("Write a comment...")
+    .fill("The copy is with legal.");
+  await thread.getByRole("button", { name: "Post" }).click();
+  await expect(thread).toContainText("The copy is with legal.", {
+    timeout: 15_000,
+  });
+
+  await expect(async () => {
+    const { rows } = await pool.query<{ subject_type: string }>(
+      `select c.subject_type from comments c
+         join tasks t on t.id = c.subject_id
+        where t.workspace_id = $1 and t.title = $2 and c.deleted_at is null`,
+      [workspaceId, TASK],
+    );
+    expect(rows.map((row) => row.subject_type)).toEqual(["task"]);
+  }).toPass({ timeout: 15_000 });
+});
+
+/**
+ * Reordering within a column without a mouse (UIUX-PLAN §9, completeness
+ * review M-02).
+ *
+ * The column buttons above move a card a whole column and to its top, so a
+ * card's place inside a column could only be changed by dragging. This picks a
+ * card up with Space, carries it with an arrow key, and puts it down with
+ * Space: one `tasks.move`, the same write a drag makes.
+ */
+const SECOND = "Draft the pricing copy";
+
+test("a card moves within its column with the keyboard alone, and stays there", async () => {
+  await goTo(page, "/board");
+  await page.getByLabel("What has to happen").fill(SECOND);
+  await page.getByRole("combobox", { name: /^Column/ }).selectOption("todo");
+  await page.getByRole("button", { name: "Add" }).click();
+
+  const todo = page.getByRole("region", { name: "To do" });
+  await expect(todo).toContainText(SECOND, { timeout: 15_000 });
+
+  // The first task is in To do from the case above, and the new one lands
+  // under it. Picked up, carried up one place, and put down.
+  const announcer = page.getByTestId("board-announcer");
+  await page.getByRole("button", { name: `Reorder ${SECOND}` }).focus();
+  await page.keyboard.press("Space");
+  await expect(announcer).toContainText(`Picked up ${SECOND}`);
+  await page.keyboard.press("ArrowUp");
+  await expect(announcer).toContainText("To do, position 1 of");
+  await page.keyboard.press("Space");
+  await expect(announcer).toContainText(`Dropped ${SECOND}`);
+
+  await expect(async () => {
+    const { rows } = await pool.query<{ title: string }>(
+      `select title from tasks
+        where workspace_id = $1 and status = 'todo' and deleted_at is null
+          and title = any($2)
+        order by position`,
+      [workspaceId, [TASK, SECOND]],
+    );
+    expect(rows.map((row) => row.title)).toEqual([SECOND, TASK]);
+  }).toPass({ timeout: 15_000 });
+
+  // And a fresh read draws it there, which is the server's order and not the
+  // browser's optimistic one.
+  await goTo(page, "/board");
+  await expect(
+    page
+      .getByRole("region", { name: "To do" })
+      .getByTestId("board-card")
+      .first(),
+  ).toContainText(SECOND, { timeout: 15_000 });
+});
+
+/**
+ * A board per key result and per initiative (REQUIREMENTS §4 Pillar C,
+ * completeness review M-02). The read answered all three scopes from P5-T11 and
+ * the screen drew only a space's.
+ */
+test("a key result's board holds the work behind it, one click from its goal", async () => {
+  const { rows } = await pool.query<{ goal_id: string; title: string }>(
+    `select k.goal_id, k.title from key_results k
+       join tasks t on t.key_result_id = k.id
+      where t.workspace_id = $1 and t.title = $2 and t.deleted_at is null`,
+    [workspaceId, TASK],
+  );
+  const keyResult = rows[0];
+  if (!keyResult) {
+    throw new Error("the task this file created names no key result");
+  }
+
+  await goTo(page, `/goals/${keyResult.goal_id}`);
+  await page
+    .getByRole("link", { name: `The board of work behind ${keyResult.title}` })
+    .click();
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: keyResult.title }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("link", { name: "Key result board" })).toBeVisible();
+  await expect(
+    page.getByTestId("board-card").filter({ hasText: TASK }),
+  ).toBeVisible();
+  // The second card names no key result, so it is not this board's work.
+  await expect(
+    page.getByTestId("board-card").filter({ hasText: SECOND }),
+  ).toHaveCount(0);
+});
+
+const THIRD = "Sketch the new first screen";
+
+test("an initiative's board is one click from the initiative, and work added there is part of it", async () => {
+  const { rows } = await pool.query<{ id: string; title: string }>(
+    `select id, title from initiatives
+      where workspace_id = $1 and deleted_at is null
+      order by created_at limit 1`,
+    [workspaceId],
+  );
+  const initiative = rows[0];
+  if (!initiative) {
+    throw new Error("No initiative. Did s26-initiatives.spec.ts run?");
+  }
+
+  await goTo(page, `/initiatives/${initiative.id}`);
+  await page.getByRole("link", { name: "Open the board" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: initiative.title }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("link", { name: "Initiative board" })).toBeVisible();
+
+  await page.getByLabel("What has to happen").fill(THIRD);
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(
+    page.getByTestId("board-card").filter({ hasText: THIRD }),
+  ).toBeVisible({ timeout: 15_000 });
+
+  const made = await pool.query<{ initiative_id: string | null }>(
+    "select initiative_id from tasks where workspace_id = $1 and title = $2 and deleted_at is null",
+    [workspaceId, THIRD],
+  );
+  expect(made.rows[0]?.initiative_id).toBe(initiative.id);
 });
 
 /** The task this file works on, by its title. */

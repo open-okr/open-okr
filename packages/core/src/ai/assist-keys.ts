@@ -29,7 +29,24 @@ export const ASSIST_FEATURE_KEYS = {
   parseFilter: "assists.parseFilter",
   /** §7.1 step 2's column mapping for a spreadsheet import (P6-T01b-a). */
   proposeImportMapping: "assists.proposeImportMapping",
+  /** §2.4's thread summary (completeness review M-09). */
+  summariseThread: "assists.summariseThread",
+  /** §2.4's key result decomposition into initiatives and tasks (M-09). */
+  decomposeKeyResult: "assists.decomposeKeyResult",
 } as const;
+
+/**
+ * Fewer comments than this is a thread a reader takes in at a glance, so the
+ * thread summary is neither offered nor run (M-09).
+ *
+ * A product constant rather than a practice threshold: METHOD.md says nothing
+ * about how long a discussion has to be before it is worth summarising, and
+ * the same judgement is made for retro themes, which need three notes. Here
+ * rather than beside the action for the reason this module exists: a screen
+ * offers the assist on the same terms the action runs it, and importing the
+ * action module to learn one number would bring the cycle back.
+ */
+export const THREAD_SUMMARY_MINIMUM = 3;
 
 /** §2.3's review assists (P4-T15c). */
 export const REVIEW_ASSIST_KEYS = {

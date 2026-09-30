@@ -7,5 +7,5 @@ export default function DocumentsError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="this document" />;
+  return <SegmentError {...props} headingKey="segmentError.documents" />;
 }

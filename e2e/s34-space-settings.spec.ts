@@ -50,6 +50,41 @@ test("the card is on the space it belongs to", async () => {
   ).toBeVisible();
 });
 
+/**
+ * The space home shows the team's own work (completeness review M-22).
+ *
+ * It had no goals and no KPI trees; they were reached only from the rail. Each
+ * card streams in behind its own skeleton, so this waits for the heading, and
+ * then for either rows or the sentence that says there are none a reader can
+ * see, whichever this shared instance holds by the time this spec runs.
+ */
+test("the space home shows the space's goals and KPI trees", async () => {
+  await expect(page.getByRole("heading", { name: "Goals" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(
+    page
+      .getByText("has no open goals you can see yet")
+      .or(page.locator("section[aria-labelledby='space-goals'] table"))
+      .first(),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open in the Work Map" })).toHaveAttribute(
+    "href",
+    /^\/\?scope=[0-9a-f-]{36}$/,
+  );
+
+  await expect(page.getByRole("heading", { name: "KPI trees" })).toBeVisible();
+  await expect(
+    page
+      .getByText("No KPIs belong to this space yet.")
+      .or(page.getByRole("link", { name: "open" }))
+      .first(),
+  ).toBeVisible();
+  // Neither card is still loading or has failed.
+  await expect(page.getByTestId("section-loading")).toHaveCount(0);
+  await expect(page.getByText(/We could not load the/)).toHaveCount(0);
+});
+
 test("a space that configured nothing shows its documented defaults", async () => {
   // Voting on, and both overrides following the workspace rather than holding
   // a copy of what the workspace happens to say today.

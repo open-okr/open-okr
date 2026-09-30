@@ -73,13 +73,11 @@ function ObjectiveRow({
   const save = useCallback(() => {
     onProblem(null);
     if (chosen === null) {
-      onProblem("Choose keep, modify or abandon first.");
+      onProblem(t("session.detail.reset.chooseKeepModifyOrAbandon"));
       return;
     }
     if (why.trim().length === 0) {
-      onProblem(
-        "One line on why is asked for. A decision nobody explained is the carry-over it exists to stop.",
-      );
+      onProblem(t("session.detail.reset.oneLineOnWhyDecision"));
       return;
     }
     startTransition(async () => {
@@ -93,11 +91,13 @@ function ObjectiveRow({
         router.refresh();
       } catch (error) {
         onProblem(
-          error instanceof Error ? error.message : "That did not save.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.thatDidNotSave"),
         );
       }
     });
-  }, [chosen, objective.goalId, onProblem, router, sessionId, why]);
+  }, [chosen, objective.goalId, onProblem, router, sessionId, t, why]);
 
   return (
     <li className="flex flex-col gap-2 rounded-md border border-line p-2.5">
@@ -122,7 +122,9 @@ function ObjectiveRow({
       {canDecide ? (
         <>
           <fieldset
-            aria-label={`Decision for ${objective.goalTitle}`}
+            aria-label={t("session.detail.reset.decisionFor", {
+              title: objective.goalTitle,
+            })}
             className="flex flex-wrap gap-1.5 border-0 p-0"
           >
             {DECISIONS.map((decision) => (
@@ -158,8 +160,8 @@ function ObjectiveRow({
           <span>
             <Button type="button" size="sm" disabled={pending} onClick={save}>
               {objective.decision === null
-                ? "Close it deliberately"
-                : "Change the decision"}
+                ? t("session.detail.reset.closeItDeliberately")
+                : t("session.detail.reset.changeTheDecision")}
             </Button>
           </span>
         </>

@@ -189,6 +189,49 @@ test("a second publish shows what changed between the two", async () => {
 });
 
 /**
+ * S-29's comments and reactions (completeness review M-01).
+ *
+ * The goal page was the only page with a thread, and a document had neither.
+ * A draft still has none, which the earlier cases see by its absence: the
+ * thread appears only once there is somebody besides the author to read it.
+ */
+test("a published document carries a discussion and takes reactions", async () => {
+  const thread = page.getByTestId("comment-thread");
+  await expect(thread).toBeVisible({ timeout: 15_000 });
+  await expect(thread).toContainText("No comments yet");
+
+  await thread.getByPlaceholder("Write a comment...").fill("Ready for review.");
+  await thread.getByRole("button", { name: "Post" }).click();
+  await expect(thread).toContainText("Ready for review.", { timeout: 15_000 });
+
+  // A reaction on the document itself, above its thread.
+  const reactions = page.getByTestId("subject-reactions");
+  await reactions.getByRole("button", { name: "+1" }).click();
+  // The emoji and its count, not the "+1" that was already there.
+  await expect(reactions).toContainText("\u{1F44D} 1", { timeout: 15_000 });
+
+  await expect(async () => {
+    const { rows } = await pool.query<{ subject_type: string }>(
+      `select r.subject_type from reactions r
+         join documents d on d.id = r.subject_id
+        where d.workspace_id = $1 and d.title = $2 and r.deleted_at is null`,
+      [workspaceId, TITLE],
+    );
+    expect(rows.map((row) => row.subject_type)).toEqual(["document"]);
+  }).toPass({ timeout: 15_000 });
+});
+
+test("the goal carries files beside its documents", async () => {
+  await goTo(page, `/goals/${goalId}`);
+  await expect(page.getByTestId("document-count")).toBeVisible({
+    timeout: 15_000,
+  });
+  // The files panel the goal never mounted, although the action took a goal.
+  await expect(page.getByTestId("attachment-input")).toBeVisible();
+  await expect(page.getByTestId("comment-thread")).toBeVisible();
+});
+
+/**
  * Files on a document, and the cycle controls (P6-G27b, GAP-AUDIT §5).
  *
  * Seven attachment actions and three cycle actions shipped and none of them
@@ -236,6 +279,71 @@ test("a document carries files, and one survives a reload", async () => {
   const response = await page.request.get(target as string);
   expect(response.status()).toBe(200);
   expect(await response.text()).toBe("What this document is about.");
+});
+
+/**
+ * A 12 by 8 JPEG whose EXIF block names a camera, "M24TestCam", and carries a
+ * GPS latitude. Drawn with sharp and written out here so the suite holds no
+ * binary file and the fixture says what it holds.
+ */
+const PHOTO_WITH_EXIF = Buffer.from(
+  "/9j/4QEqRXhpZgAASUkqAAgAAAAJAA8BAgALAAAAkgAAABABAgAIAAAAigAAABIBAwABAAAAAQAAABoBBQABAAAAegAAABsBBQABAAAAggAAACgBAwABAAAAAgAAABMCAwABAAAAAQAAAGmHBAABAAAAngAAACWIBAABAAAA7AAAAAAAAAA4YwAA6AMAADhjAADoAwAATGVha3kgMQBNMjRUZXN0Q2FtAAAGAACQBwAEAAAAMDIxMAGRBwAEAAAAAQIDAACgBwAEAAAAMDEwMAGgAwABAAAA//8AAAKgBAABAAAADAAAAAOgBAABAAAACAAAAAAAAAACAAEAAgACAAAATgAAAAIABQADAAAACgEAAAAAAAADAAAAAQAAAAgAAAABAAAAAAAAAAEAAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCAAIAAwDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAT/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAABf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIgD4t//2Q==",
+  "base64",
+);
+
+/**
+ * An image is re-encoded on the way in and shown as a preview (completeness
+ * review M-24, TECHNICAL-PLAN §8.2).
+ *
+ * The whole path in one pass: the upload decodes the photo and writes it
+ * again, the list shows the thumbnail that made, and the file that comes back
+ * is a JPEG with the camera's name gone.
+ */
+test("an image arrives as a preview, and comes back without its EXIF", async () => {
+  await goTo(page, `/goals/${goalId}`);
+  await page.getByRole("link", { name: TITLE }).click();
+  // On the document before looking for its file control: the goal page has
+  // one of its own since M-01, and an upload made there lands on the goal.
+  await page.waitForURL(/\/documents\//, { timeout: 15_000 });
+  await expect(page.getByTestId("attachment-input")).toBeVisible({
+    timeout: 15_000,
+  });
+  // The fixture really does carry what this test says is removed.
+  expect(PHOTO_WITH_EXIF.includes(Buffer.from("M24TestCam"))).toBe(true);
+
+  await page.getByTestId("attachment-input").setInputFiles({
+    name: "whiteboard.jpg",
+    mimeType: "image/jpeg",
+    buffer: PHOTO_WITH_EXIF,
+  });
+  await page.getByTestId("attachment-upload").click();
+
+  const link = page.getByRole("link", { name: "whiteboard.jpg" });
+  await expect(link).toBeVisible({ timeout: 20_000 });
+
+  // The preview, drawn by the upload and loaded through its own route.
+  const thumbnail = page
+    .getByTestId("attachment-list")
+    .locator("li", { has: link })
+    .getByTestId("attachment-thumbnail");
+  await expect(thumbnail).toHaveAttribute("data-state", "shown", {
+    timeout: 15_000,
+  });
+
+  const target = await link.getAttribute("href");
+  expect(target).toMatch(/^\/api\/blobs\/[0-9a-f-]{36}$/);
+  const preview = await page.request.get(`${target}/thumbnail`);
+  expect(preview.status()).toBe(200);
+  expect(preview.headers()["content-type"]).toBe("image/webp");
+
+  const file = await page.request.get(target as string);
+  expect(file.status()).toBe(200);
+  expect(file.headers()["content-type"]).toBe("image/jpeg");
+  const body = await file.body();
+  // Still a JPEG, and not the bytes that were sent.
+  expect([body[0], body[1]]).toEqual([0xff, 0xd8]);
+  expect(body.includes(Buffer.from("M24TestCam"))).toBe(false);
+  expect(body.equals(PHOTO_WITH_EXIF)).toBe(false);
 });
 
 test("the cycle screen can reach the next quarter", async () => {

@@ -1,5 +1,11 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  type MessageValues,
+} from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
@@ -124,11 +130,18 @@ export default async function InitiativesPage({
             <p className="text-xs text-ink-3" data-testid="initiative-count">
               {initiatives.length === 0
                 ? filtered
-                  ? "No initiative matches these filters."
-                  : "No work is recorded against a key result yet."
-                : `${initiatives.length} ${
-                    initiatives.length === 1 ? "initiative" : "initiatives"
-                  }, each one work somebody owns.`}
+                  ? t("initiatives.noInitiativeMatches")
+                  : t("initiatives.noWorkRecordedYet")
+                : t("initiatives.eachOneWorkSomebodyOwns", {
+                    initiatives:
+                      initiatives.length === 1
+                        ? t("common.count.initiativeOne", {
+                            count: initiatives.length,
+                          })
+                        : t("common.count.initiativeOther", {
+                            count: initiatives.length,
+                          }),
+                  })}
             </p>
           </div>
         </CardHeader>
@@ -145,8 +158,8 @@ export default async function InitiativesPage({
           {initiatives.length === 0 ? (
             <p className="rounded-md border border-line border-dashed px-3 py-6 text-center text-sm text-ink-3">
               {filtered
-                ? "Clear a filter to see the rest."
-                : "A facilitator records the main initiatives that will move each key result. This is where they go."}
+                ? t("initiatives.clearAFilter")
+                : t("initiatives.aFacilitatorRecords")}
             </p>
           ) : (
             <ul className="flex flex-col divide-y divide-line">
@@ -269,7 +282,7 @@ async function Filters({
 
   return (
     <div className="flex flex-col gap-2">
-      <FilterRow label="Space">
+      <FilterRow label={t("initiatives.space")}>
         <FilterLink href={href({ space: null })} active={activeSpace === null}>
           {t("initiatives.everySpace")}
         </FilterLink>
@@ -284,7 +297,7 @@ async function Filters({
         ))}
       </FilterRow>
 
-      <FilterRow label="Status">
+      <FilterRow label={t("checkIn.composer.status")}>
         <FilterLink
           href={href({ status: null })}
           active={activeStatus === null}
@@ -297,12 +310,12 @@ async function Filters({
             href={href({ status: option.value })}
             active={activeStatus === option.value}
           >
-            {option.label}
+            {t(option.labelKey)}
           </FilterLink>
         ))}
       </FilterRow>
 
-      <FilterRow label="Capacity">
+      <FilterRow label={t("cycle.capacity.capacity")}>
         <FilterLink
           href={href({ capacity: null })}
           active={activeCapacity === null}
@@ -316,7 +329,7 @@ async function Filters({
               href={href({ capacity: option.value })}
               active={activeCapacity === option.value}
             >
-              {option.label}
+              {t(option.labelKey)}
             </FilterLink>
           ),
         )}
@@ -366,16 +379,52 @@ function FilterLink({
   );
 }
 
-function Row({
+/**
+ * The line under an initiative's title: space, owner, the dates it runs
+ * between when it has any, and what it stands behind. One whole message per
+ * shape, so the separators and the words sit where a translator can move them.
+ */
+function metaLine(
+  initiative: Initiative,
+  t: (key: string, values?: MessageValues) => string,
+): string {
+  const dates = [initiative.startsOn, initiative.endsOn].filter(
+    (one): one is string => Boolean(one),
+  );
+  const window =
+    dates.length === 2
+      ? t("initiatives.windowBetween", {
+          start: dates[0] ?? "",
+          end: dates[1] ?? "",
+        })
+      : (dates[0] ?? "");
+  const count = initiative.keyResultIds.length;
+  const base = {
+    space: initiative.spaceName,
+    owner: initiative.ownerName,
+  };
+  if (count === 0) {
+    return window === ""
+      ? t("initiatives.metaNotBehindAKeyResult", base)
+      : t("initiatives.metaWindowNotBehindAKeyResult", { ...base, window });
+  }
+  const keyResults =
+    count === 1
+      ? t("common.count.keyResultOne", { count })
+      : t("common.count.keyResultOther", { count });
+  return window === ""
+    ? t("initiatives.metaKeyResults", { ...base, keyResults })
+    : t("initiatives.metaWindowKeyResults", { ...base, window, keyResults });
+}
+
+async function Row({
   initiative,
   canEdit,
 }: {
   readonly initiative: Initiative;
   readonly canEdit: boolean;
 }) {
-  const window = [initiative.startsOn, initiative.endsOn]
-    .filter((one): one is string => Boolean(one))
-    .join(" to ");
+  const { t } = await getTranslations();
 
   return (
     <li
@@ -395,37 +444,40 @@ function Row({
         >
           {initiative.title}
         </Link>
-        <p className="truncate text-xs text-ink-3">
-          {initiative.spaceName} · {initiative.ownerName}
-          {window === "" ? "" : ` · ${window}`}
-          {initiative.keyResultIds.length === 0
-            ? " · not yet behind a key result"
-            : ` · ${initiative.keyResultIds.length} key result${
-                initiative.keyResultIds.length === 1 ? "" : "s"
-              }`}
-        </p>
+        <p className="truncate text-xs text-ink-3">{metaLine(initiative, t)}</p>
       </div>
 
       {canEdit ? (
         <>
           <InlineSelect
-            label={`Status of ${initiative.title}`}
+            label={t("initiatives.statusOf", { title: initiative.title })}
             value={initiative.status}
-            options={STATUS_OPTIONS}
+            options={STATUS_OPTIONS.map((one) => ({
+              value: one.value,
+              label: t(one.labelKey),
+            }))}
             onSave={setStatusAction.bind(null, initiative.id)}
           />
           <InlineSelect
-            label={`Capacity of ${initiative.title}`}
+            label={t("initiatives.capacityOf", { title: initiative.title })}
             value={initiative.capacity ?? ""}
-            options={CAPACITY_OPTIONS}
+            options={CAPACITY_OPTIONS.map((one) => ({
+              value: one.value,
+              label: t(one.labelKey),
+            }))}
             onSave={setCapacityAction.bind(null, initiative.id)}
           />
         </>
       ) : (
         <>
-          <Chip tone="neutral">{STATUS_LABEL[initiative.status]}</Chip>
+          <Chip tone="neutral">
+            {t(STATUS_LABEL[initiative.status] ?? "initiatives.status.planned")}
+          </Chip>
           <Chip tone={CAPACITY_TONE[initiative.capacity ?? "unjudged"]} dot>
-            {CAPACITY_LABEL[initiative.capacity ?? "unjudged"]}
+            {t(
+              CAPACITY_LABEL[initiative.capacity ?? "unjudged"] ??
+                "initiatives.capacity.unjudged",
+            )}
           </Chip>
         </>
       )}

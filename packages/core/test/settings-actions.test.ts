@@ -238,9 +238,30 @@ describe("settings.readForMember", () => {
       {},
     );
     expect(Object.keys(read.settings).sort()).toEqual([
+      "branding",
       "onboardingDone",
       "timezone",
     ]);
+  });
+
+  it("serves the brand colour every screen is drawn in, and nothing else of the branding", async () => {
+    // Completeness review M-14: the colour was saved and no screen read it.
+    // Every member's screens are drawn in it, so every member may read it.
+    const editor = await addMemberWithUser("Reader4", "settings-reader-4");
+    await grantEditOnWorkspace(editor);
+
+    await callAction(
+      { pool: (await workerDb()).appPool, ...context(OWNER) },
+      "settings.updateWorkspaceBranding",
+      { branding: { primaryColor: "#7c3aed", logoNote: "not for members" } },
+    );
+
+    const read = await callAction(
+      { pool: (await workerDb()).appPool, ...context("settings-reader-4") },
+      "settings.readForMember",
+      {},
+    );
+    expect(read.settings.branding).toEqual({ primaryColor: "#7c3aed" });
   });
 
   it("still refuses somebody who is not a member at all", async () => {
@@ -359,6 +380,33 @@ describe("settings.updateWorkspaceBranding", () => {
         { branding: { primaryColor: "blue" } },
       ),
     ).rejects.toBeTruthy();
+  });
+
+  it.each(["#22c55e", "#f59e0b", "#ef4444"])(
+    "refuses %s, a status hue, and stores nothing (UIUX-PLAN §2, rule 1)",
+    async (colour) => {
+      // Refused by the action's own schema rather than by the card, so the REST
+      // surface and the command line meet the same rule (M-14).
+      await expect(
+        callAction(
+          { pool: (await workerDb()).appPool, ...context(OWNER) },
+          "settings.updateWorkspaceBranding",
+          { branding: { primaryColor: colour } },
+        ),
+      ).rejects.toThrow(/red, amber or green/);
+      expect((await readSettings()).branding).toEqual({});
+    },
+  );
+
+  it("takes a pink, a violet and a grey, none of which is a status", async () => {
+    for (const colour of ["#db2777", "#7c3aed", "#777777"]) {
+      await callAction(
+        { pool: (await workerDb()).appPool, ...context(OWNER) },
+        "settings.updateWorkspaceBranding",
+        { branding: { primaryColor: colour } },
+      );
+      expect((await readSettings()).branding).toEqual({ primaryColor: colour });
+    }
   });
 });
 

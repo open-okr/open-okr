@@ -1,6 +1,8 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { FeedLive } from "./feed-live.tsx";
+import { getInstanceName } from "./instance-name";
+import { getTranslations } from "./translations";
 
 /**
  * A feed, as a panel on the thing it is about (S-31, P6-G11b).
@@ -30,7 +32,7 @@ export interface FeedRow {
   readonly aggregatedCount: number;
 }
 
-export function FeedPanel({
+export async function FeedPanel({
   title,
   explains,
   items,
@@ -59,6 +61,10 @@ export function FeedPanel({
     readonly subjectId: string;
   };
 }) {
+  const { t } = await getTranslations();
+  // A row with no member behind it is the instance acting, and reads as its
+  // name rather than the software's (M-33).
+  const instanceName = await getInstanceName();
   const last = items.at(-1);
   const join = basePath.includes("?") ? "&" : "?";
   // Paging is a link, and a page the reader has navigated back through is a
@@ -80,7 +86,9 @@ export function FeedPanel({
       <CardBody className="flex flex-col gap-2.5">
         {items.length === 0 ? (
           <p className="text-sm text-ink-3">
-            {paged ? "Nothing further back than this." : "Nothing yet."}
+            {paged
+              ? t("feedPanel.nothingFurtherBack")
+              : t("feedPanel.nothingYet")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2.5">
@@ -93,8 +101,9 @@ export function FeedPanel({
                   <span className="text-sm text-ink">{item.rendered}</span>
                   <span className="text-xs text-ink-4">
                     {item.actorMemberId
-                      ? (names.get(item.actorMemberId) ?? "A member")
-                      : "OpenOKR"}
+                      ? (names.get(item.actorMemberId) ??
+                        t("feedPanel.aMember"))
+                      : instanceName}
                     {" · "}
                     {new Intl.DateTimeFormat("en-GB", {
                       timeZone,
@@ -107,7 +116,9 @@ export function FeedPanel({
                 </span>
                 {item.aggregatedCount > 1 ? (
                   <Chip tone="neutral">
-                    {item.aggregatedCount} edits together
+                    {t("activity.editsTogether", {
+                      aggregatedCount: item.aggregatedCount,
+                    })}
                   </Chip>
                 ) : null}
               </li>
@@ -124,7 +135,7 @@ export function FeedPanel({
                 href={basePath}
                 className="text-xs font-semibold text-brand-text hover:underline"
               >
-                Back to the newest
+                {t("activity.backToTheNewest")}
               </Link>
             ) : (
               <span />
@@ -133,7 +144,7 @@ export function FeedPanel({
               href={`${basePath}${join}at=${encodeURIComponent(last.at)}&id=${last.id}`}
               className="text-xs font-semibold text-brand-text hover:underline"
             >
-              Older
+              {t("activity.older")}
             </Link>
           </div>
         ) : null}

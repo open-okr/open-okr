@@ -23,6 +23,7 @@ import {
   activeOnly,
   checklistItems,
   goals,
+  includeDeleted,
   initiatives,
   keyResults,
   newId,
@@ -35,7 +36,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import { linkedWorkDivergence } from "@openokr/method";
-import { asc, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -50,9 +51,17 @@ import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { boardChannel } from "../tasks/live.ts";
 import {
+  BOARD_SCOPE_KINDS,
+  boardScopesOf,
+  describeBoardScope,
+  requireBoardScope,
+} from "../tasks/scope.ts";
+import {
   addChecklistItemInTx,
   assignTaskInTx,
   createTaskInTx,
+  initiativesServingKeyResult,
+  keyResultsServedByInitiatives,
   linkedWorkForKeyResults,
   moveTaskInTx,
   unassignTaskInTx,
@@ -188,7 +197,7 @@ const boardEvent = (
   workspaceId: string,
   spaceId: string,
   taskId: string,
-  change: "created" | "moved" | "updated" | "deleted",
+  change: "created" | "moved" | "updated" | "deleted" | "restored",
 ) => ({
   topic: "board.changed",
   payload: {
@@ -346,16 +355,32 @@ const boardInput = z
 export const readBoard = defineReadAction({
   name: "tasks.board",
   summary:
-    "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
+    "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
   input: boardInput,
   output: z.object({
+    /**
+     * What the board is of (completeness review M-02): the most specific
+     * scope the input named, as its heading draws it, and the space a task
+     * added on it lands in.
+     */
+    scope: z.object({
+      kind: z.enum(BOARD_SCOPE_KINDS),
+      id: z.uuid(),
+      title: z.string(),
+      parentTitle: z.string().nullable(),
+      spaceId: z.uuid().nullable(),
+      goalId: z.uuid().nullable(),
+    }),
     columns: z.array(
       z.object({
         status: z.enum(TASK_STATUSES),
         cards: z.array(taskCard),
       }),
     ),
-    /** The rail: every key result this board's work serves. */
+    /**
+     * The rail: every key result this board's work serves, whether a card
+     * names it or the card's initiative serves it.
+     */
     rail: z.array(
       z.object({
         keyResultId: z.uuid(),
@@ -363,7 +388,10 @@ export const readBoard = defineReadAction({
         goalTitle: z.string(),
         /** The measured value's progress. The one that counts. */
         progressPct: z.number(),
-        /** Completed linked tasks over total. A different fact. */
+        /**
+         * Completed linked tasks over total, an initiative's own tasks
+         * included (M-26). A different fact.
+         */
         linkedWork: z.object({
           done: z.number().int(),
           total: z.number().int(),
@@ -378,8 +406,15 @@ export const readBoard = defineReadAction({
     const input = boardInput.parse(rawInput);
     const db = drizzle(context.pool);
     const userId = context.actor.userId;
-    if (!userId) {
-      return { columns: [], rail: [] };
+    const scopes = boardScopesOf(input);
+    const [scope] = scopes;
+    if (!userId || !scope) {
+      // No member to decide access for, which the getter answers with
+      // not-found. The input's refine already refused a board of nothing.
+      throw new OperationError(
+        "not_found",
+        "No such board, or you do not have access to it.",
+      );
     }
     return withContext(
       db,
@@ -387,6 +422,44 @@ export const readBoard = defineReadAction({
       async (rawTx) => {
         const tx = rawTx as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
+
+        // **The scope through the getter before any card** (M-02). A board
+        // of something the reader cannot see is not-found, not empty.
+        for (const named of scopes) {
+          await requireBoardScope(tx, {
+            workspaceId: context.workspaceId,
+            memberId,
+            scope: named,
+          });
+        }
+        const described = await describeBoardScope(
+          tx,
+          context.workspaceId,
+          scope,
+        );
+
+        // **A key result's board is its linked work** (M-02, M-26): the
+        // cards that name it and the cards of every initiative serving it,
+        // which is exactly the set the rail counts. A board that showed only
+        // the first half would draw fewer cards than the "linked work" chip
+        // beside it says there are.
+        const serving = input.keyResultId
+          ? await initiativesServingKeyResult(
+              tx,
+              context.workspaceId,
+              input.keyResultId,
+            )
+          : [];
+        const keyResultFilter = input.keyResultId
+          ? [
+              serving.length === 0
+                ? eq(tasks.keyResultId, input.keyResultId)
+                : (or(
+                    eq(tasks.keyResultId, input.keyResultId),
+                    inArray(tasks.initiativeId, serving),
+                  ) as SQL),
+            ]
+          : [];
 
         // **A column at a time, each bounded** (P7-T02).
         //
@@ -419,9 +492,7 @@ export const readBoard = defineReadAction({
                     ...(input.initiativeId
                       ? [eq(tasks.initiativeId, input.initiativeId)]
                       : []),
-                    ...(input.keyResultId
-                      ? [eq(tasks.keyResultId, input.keyResultId)]
-                      : []),
+                    ...keyResultFilter,
                   ),
                 )
                 .orderBy(asc(tasks.position), asc(tasks.id))
@@ -440,16 +511,36 @@ export const readBoard = defineReadAction({
           await readable(tx, context.workspaceId, memberId, rows),
         );
 
+        // The key results the cards name, and the ones their initiatives serve
+        // (M-26): the rail's linked work counts both, so the rail lists both.
+        const served = await keyResultsServedByInitiatives(
+          tx,
+          context.workspaceId,
+          [
+            ...new Set(
+              cards
+                .map((card) => card.initiativeId)
+                .filter((id): id is string => id !== null),
+            ),
+          ],
+        );
         const railIds = [
-          ...new Set(
-            cards
+          ...new Set([
+            ...cards
               .map((card) => card.keyResultId)
               .filter((id): id is string => id !== null),
-          ),
+            ...served,
+          ]),
         ];
-        const rail = await buildRail(tx, context.workspaceId, railIds);
+        const rail = await buildRail(
+          tx,
+          context.workspaceId,
+          memberId,
+          railIds,
+        );
 
         return {
+          scope: described,
           columns: TASK_STATUSES.map((status) => ({
             status,
             cards: cards
@@ -470,18 +561,26 @@ export const readBoard = defineReadAction({
  * progress and the share of linked work that is finished. The third field is
  * present only when the second is complete and the first has not moved, which
  * is the divergence TECHNICAL-PLAN §4.9 names.
+ *
+ * **Only the key results this member can see, through their goals.** A key
+ * result inherits its goal's context, which is the rule the rest of the product
+ * follows. The board reaches key results through its cards' initiatives as well
+ * as through the cards themselves (M-26), and a card being visible says
+ * nothing about the goal behind the initiative it belongs to.
  */
 async function buildRail(
   tx: OperationTx,
   workspaceId: string,
+  memberId: string,
   keyResultIds: readonly string[],
 ) {
   if (keyResultIds.length === 0) {
     return [];
   }
-  const rows = await tx
+  const found = await tx
     .select({
       id: keyResults.id,
+      goalId: keyResults.goalId,
       title: keyResults.title,
       goalTitle: goals.title,
       progressPct: keyResults.progressPct,
@@ -489,7 +588,10 @@ async function buildRail(
       baselineValue: keyResults.baselineValue,
     })
     .from(keyResults)
-    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .innerJoin(
+      goals,
+      and(eq(goals.id, keyResults.goalId), isNull(goals.deletedAt)),
+    )
     .where(
       activeOnly(
         keyResults,
@@ -498,6 +600,16 @@ async function buildRail(
       ),
     )
     .orderBy(asc(goals.position), asc(keyResults.position));
+
+  // One statement for the whole set rather than one per row (P7-T01b), and
+  // the goal ids deduplicated first because several key results share a goal.
+  const allowedGoals = await visibleResourceIds(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "goal",
+    ids: [...new Set(found.map((row) => row.goalId))],
+  });
+  const rows = found.filter((row) => allowedGoals.has(row.goalId));
 
   const counts = await linkedWorkForKeyResults(
     tx,
@@ -747,11 +859,21 @@ export const createTask = defineWriteAction({
 
       // An import can finish writing the row it started: without this it
       // creates a task and then cannot add its checklist. See
-      // .
+      // `packages/core/src/imports/binding.ts`.
+      //
+      // **Unless the importer is one of the assignees** (completeness review
+      // M-17). The assignment below binds them at the same level, untagged,
+      // and two untagged bindings of one group break the unique index, so an
+      // import of a task assigned to the running member failed every time.
+      // Found by the downloadable template, whose example row is exactly that.
       await bindImporterInTx(tx, {
         workspaceId,
         memberId: input.legacy ? actor.memberId : null,
         contextId: created.contextId,
+        alreadyBound:
+          actor.memberId && input.assigneeIds?.includes(actor.memberId)
+            ? actor.memberId
+            : null,
       });
 
       const notified: string[] = [];
@@ -1296,6 +1418,145 @@ export const deleteTask = defineWriteAction({
   }),
 });
 
+/**
+ * Brings a deleted task back, with its assignments and its checklist (M-13).
+ *
+ * **The same two gates as the delete.** The pipeline asks `full` on the
+ * workspace and the getter asks `full` on the task's own context, which a soft
+ * delete leaves standing. So whoever could delete it can restore it, and
+ * anybody else is told it does not exist.
+ *
+ * **Only what the delete took.** The delete stamps the task, its live
+ * assignments and its live checklist lines with one instant, so the rows
+ * carrying that instant are the ones that went with it. A line removed earlier
+ * stays removed.
+ *
+ * **Not into a deleted initiative.** A task filed under an initiative is part
+ * of that initiative's work and its page links there, so bringing it back
+ * while the initiative is gone would restore a card whose own parent is a dead
+ * link. The refusal names the initiative, so the reader knows which one to
+ * restore first. Deleting an initiative leaves its tasks where they are, so
+ * the usual order is the reverse of the deletes.
+ */
+export const restoreTask = defineWriteAction({
+  name: "tasks.restore",
+  summary:
+    "Brings back a deleted task with the assignments and checklist lines deleted with it.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async load({ tx, workspaceId, actor }) {
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId: requireMemberId(actor.memberId),
+        resourceType: "task",
+        resourceId: input.id,
+        requires: ACCESS_LEVELS.full,
+      });
+      // `includeDeleted` on purpose: this reads the row the default scope
+      // hides.
+      const [row] = await tx
+        .select({
+          spaceId: tasks.spaceId,
+          initiativeId: tasks.initiativeId,
+          title: tasks.title,
+          deletedAt: tasks.deletedAt,
+        })
+        .from(tasks)
+        .where(
+          includeDeleted(
+            tasks,
+            eq(tasks.workspaceId, workspaceId),
+            eq(tasks.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!row) {
+        throw new OperationError(
+          "not_found",
+          "No such task, or you do not have access to it.",
+        );
+      }
+      if (!row.deletedAt) {
+        throw new OperationError(
+          "forbidden",
+          `The task "${row.title}" is not deleted, so there is nothing to restore.`,
+        );
+      }
+      return { ...row, deletedAt: row.deletedAt };
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      if (loaded.initiativeId) {
+        const [parent] = await tx
+          .select({
+            title: initiatives.title,
+            deletedAt: initiatives.deletedAt,
+          })
+          .from(initiatives)
+          .where(
+            includeDeleted(
+              initiatives,
+              eq(initiatives.workspaceId, workspaceId),
+              eq(initiatives.id, loaded.initiativeId),
+            ),
+          )
+          .limit(1);
+        if (parent?.deletedAt) {
+          throw new OperationError(
+            "forbidden",
+            `This task belongs to the initiative "${parent.title}", which is deleted. Restore the initiative first.`,
+          );
+        }
+      }
+
+      const now = new Date();
+      for (const table of [taskAssignees, checklistItems] as const) {
+        // openokr:allow-mutation: the calling Operation's own transaction.
+        await tx
+          .update(table)
+          .set({ deletedAt: null, updatedAt: now })
+          .where(
+            includeDeleted(
+              table,
+              eq(table.workspaceId, workspaceId),
+              eq(table.taskId, input.id),
+              eq(table.deletedAt, loaded.deletedAt),
+            ),
+          );
+      }
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(tasks)
+        .set({ deletedAt: null, updatedAt: now })
+        .where(
+          includeDeleted(
+            tasks,
+            eq(tasks.workspaceId, workspaceId),
+            eq(tasks.id, input.id),
+          ),
+        );
+
+      return {
+        result: { id: input.id },
+        outbox: [boardEvent(workspaceId, loaded.spaceId, input.id, "restored")],
+        activity: {
+          kind: "task.restored",
+          subjectType: "task",
+          subjectId: input.id,
+          payload: { title: loaded.title },
+        },
+        audit: {
+          action: "tasks.restore",
+          targetType: "task",
+          targetId: input.id,
+          payload: { title: loaded.title },
+        },
+      };
+    },
+  }),
+});
+
 export const readLinkedWork = defineReadAction({
   name: "tasks.linkedWork",
   summary:
@@ -1329,7 +1590,7 @@ export const readLinkedWork = defineReadAction({
         const memberId = await actingMember(tx, context.workspaceId, userId);
 
         const rows = await tx
-          .select({ id: keyResults.id, goalId: keyResults.goalId })
+          .select({ id: keyResults.id })
           .from(keyResults)
           .innerJoin(goals, eq(goals.id, keyResults.goalId))
           .where(
@@ -1341,20 +1602,15 @@ export const readLinkedWork = defineReadAction({
             ),
           );
 
-        // Through the goal, which is the rule the rest of the product follows: a
-        // key result inherits its goal's context. One statement rather than one
-        // per row (P7-T01b), and the goal ids are deduplicated first because
-        // several key results share one goal.
-        const allowedGoals = await visibleResourceIds(tx, {
-          workspaceId: context.workspaceId,
+        // The rail filters through each key result's goal, which is the rule
+        // the rest of the product follows, so this read and the board's apply
+        // it in one place.
+        return buildRail(
+          tx,
+          context.workspaceId,
           memberId,
-          resourceType: "goal",
-          ids: [...new Set(rows.map((row) => row.goalId))],
-        });
-        const visible = rows
-          .filter((row) => allowedGoals.has(row.goalId))
-          .map((row) => row.id);
-        return buildRail(tx, context.workspaceId, visible);
+          rows.map((row) => row.id),
+        );
       },
     );
   },

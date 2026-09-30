@@ -85,6 +85,13 @@ therefore a new runtime dependency and Agung's call. A cheaper partial step
 that needs no dependency is to verify the magic bytes against the declared
 type and refuse a mismatch, which closes the lie without normalising the file.
 
+**Fixed at completeness review M-24.** `sharp` was approved on 28 September
+2026. Every uploaded image is decoded and written again in its claimed type
+through the ImageProcessor port before anything is reserved, so the EXIF block
+is left behind and bytes that are not the image they claim to be are refused
+(`blobs/upload.ts`, `adapters/src/drivers/image/sharp.ts`). Row 5 above records
+the state on the day of this audit and is left as it was.
+
 ### F-3: withdrawn
 
 **This was written as a finding and it was wrong.** The first pass searched

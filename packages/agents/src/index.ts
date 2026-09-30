@@ -11,7 +11,11 @@ export {
   type ProviderDrafterOptions,
 } from "./drafter.ts";
 export {
+  type AgentRunHost,
+  type AgentRunModel,
+  continueAgentRun,
   type ProcessNextTaskInput,
+  type ProcessNextTaskOptions,
   type ProcessNextTaskResult,
   processNextTask,
   readRunState,

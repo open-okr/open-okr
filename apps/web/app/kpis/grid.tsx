@@ -272,7 +272,9 @@ export function KpiGrid({
                           {kpi.frequency} · {kpi.direction.replace("_", " ")} ·{" "}
                           {kpi.indicatorType} · {kpi.tier}
                           {kpi.unit ? ` · ${kpi.unit}` : ""}
-                          {kpi.isCalculated ? " · calculated" : ""}
+                          {kpi.isCalculated ? (
+                            <> · {t("kpis.grid.calculated")}</>
+                          ) : null}
                         </span>
                       </span>
                     </th>
@@ -307,7 +309,10 @@ export function KpiGrid({
                               id={`cell-${kpi.id}-${column}`}
                               defaultValue={original}
                               inputMode="decimal"
-                              aria-label={`${kpi.title}, period beginning ${column}`}
+                              aria-label={t("kpis.grid.periodBeginning", {
+                                title: kpi.title,
+                                period: column,
+                              })}
                               onKeyDown={(event) =>
                                 onKeyDown(event, kpi.id, column, original)
                               }
@@ -338,11 +343,9 @@ export function KpiGrid({
         </table>
       </div>
       <p className="text-xs text-ink-4">
-        {t("kpis.grid.calculatedKpisAreReadOnly", {
-          move: pending
-            ? "Saving…"
-            : "Enter commits and moves down. Arrows move.",
-        })}
+        {pending
+          ? t("kpis.grid.savingCalculatedReadOnly")
+          : t("kpis.grid.enterCommitsCalculatedReadOnly")}
       </p>
     </div>
   );

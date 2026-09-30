@@ -7,6 +7,7 @@ import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { processNextTask, readRunState } from "../src/run-executor.ts";
+import { mockRunModel } from "./mock-model.ts";
 
 /**
  * The run executor state machine (P2-T17 test plan, AI-NATIVE-PLAN.md §6.5,
@@ -44,6 +45,13 @@ const ownerContext = () => ({
   workspaceId,
   actor: { kind: "human" as const, userId: OWNER },
 });
+
+/**
+ * A model the run may use (M-11). Every run needs one now, because a custom
+ * agent has no deterministic form; what these tests are about is what the
+ * run does with its task list once it may run at all.
+ */
+const RUN_OPTIONS = { model: mockRunModel() };
 
 async function createAgent(autonomy: "sandbox" | "propose" | "scoped_direct") {
   // Every field but `name` carries a Zod `.default(...)` on the action's own
@@ -130,10 +138,14 @@ describe("sandbox mode", () => {
     const run = await startRenameRun(agent.id, ["Sandboxed"]);
 
     const wb = await workerDb();
-    const result = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const result = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
 
     expect(result.finished).toBe(true);
     expect(result.status).toBe("completed");
@@ -155,10 +167,14 @@ describe("propose mode", () => {
     const run = await startRenameRun(agent.id, ["Proposed name"]);
 
     const wb = await workerDb();
-    const result = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const result = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
     expect(result.logEntry.kind).toBe("proposed");
     expect(await spaceName()).toBe(originalName);
 
@@ -191,10 +207,14 @@ describe("scoped_direct mode", () => {
     const run = await startRenameRun(agent.id, ["Direct name"]);
 
     const wb = await workerDb();
-    const result = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const result = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
     expect(result.logEntry.kind).toBe("applied");
     expect(await spaceName()).toBe("Direct name");
 
@@ -213,10 +233,14 @@ describe("scoped_direct mode", () => {
     const run = await startRenameRun(agent.id, ["Refused name"]);
 
     const wb = await workerDb();
-    const result = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const result = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
     expect(result.logEntry.kind).toBe("error");
     expect(result.finished).toBe(true);
   });
@@ -231,10 +255,14 @@ describe("bindings", () => {
     const run = await startRenameRun(agent.id, ["Should never land"]);
 
     const wb = await workerDb();
-    const result = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const result = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
     expect(result.logEntry.kind).toBe("denied");
     expect(await spaceName()).toBe(originalName);
   });
@@ -252,10 +280,14 @@ describe("the cost cap", () => {
     const run = await startRenameRun(agent.id, ["First", "Second", "Third"]);
 
     const wb = await workerDb();
-    const first = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const first = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
     expect(first.finished).toBe(false);
     expect(await spaceName()).toBe("First");
 
@@ -287,10 +319,14 @@ describe("the cost cap", () => {
       cost: 0.01,
     });
 
-    const halted = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const halted = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
     expect(halted.finished).toBe(true);
     expect(halted.status).toBe("failed");
     expect(halted.logEntry.kind).toBe("error");
@@ -323,10 +359,14 @@ describe("resume after restart", () => {
 
     const wb = await workerDb();
 
-    const first = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const first = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
     expect(first.finished).toBe(false);
     expect(first.status).toBe("running");
     expect(await spaceName()).toBe("First");
@@ -338,18 +378,27 @@ describe("resume after restart", () => {
     expect(afterFirst?.currentTaskIndex).toBe(1);
     expect(afterFirst?.log).toHaveLength(1);
 
-    const outboxAfterFirst = await wb.admin.query(
-      "select topic from outbox where topic = 'agents.run.continue'",
+    // Two steps queued: the first, by `agents.startRun` (M-11), and the
+    // second, by the step that just ran.
+    const outboxAfterFirst = await wb.admin.query<{ task_index: number }>(
+      `select (payload->>'taskIndex')::int as task_index
+         from outbox
+        where topic = 'agents.run.continue'
+        order by 1`,
     );
-    expect(outboxAfterFirst.rowCount).toBe(1);
+    expect(outboxAfterFirst.rows.map((row) => row.task_index)).toEqual([0, 1]);
 
     // A second, independent call — nothing carried over from the first
     // beyond what is in the database, proving resume needs no in-memory
     // state at all.
-    const second = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const second = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
     expect(second.finished).toBe(true);
     expect(second.status).toBe("completed");
     expect(await spaceName()).toBe("Second");
@@ -371,7 +420,7 @@ describe("resume after restart", () => {
 
     const wb = await workerDb();
     await expect(
-      processNextTask(wb.appPool, { workspaceId, runId: run.id }),
+      processNextTask(wb.appPool, { workspaceId, runId: run.id }, RUN_OPTIONS),
     ).rejects.toThrow();
   });
 });

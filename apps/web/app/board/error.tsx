@@ -7,5 +7,5 @@ export default function BoardError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the board" />;
+  return <SegmentError {...props} headingKey="segmentError.board" />;
 }

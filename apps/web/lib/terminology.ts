@@ -1,8 +1,6 @@
-import { callAction } from "@openokr/core";
 import type { ResolvedTerminology } from "@openokr/method";
 import { cache } from "react";
-import { getPool } from "./auth";
-import { requireWorkspace } from "./workspace";
+import { readRhythmForRequest } from "./rhythm";
 
 /**
  * This workspace's renamed concepts, resolved against the METHOD.md canon
@@ -17,29 +15,19 @@ import { requireWorkspace } from "./workspace";
  * `progressCeiling` (`ceilings.ts`) reads `thresholds` from the same call.
  * Nothing before this called it for that field.
  *
- * **Resolved once per request**, the same reasoning as `progressCeiling`: a
- * screen naming several of the fourteen renameable terms should not cost one
- * `rhythm.read` per mention.
+ * **Resolved once per request, from the one `rhythm.read` every screen
+ * shares** (`rhythm.ts`), so the progress ceiling, the catalogue's term holes
+ * and this cost one call between them.
  *
- * **This wires the Work Map and the goals explorer, which share `WorkMap`
- * and `GoalTable` in `work-map.tsx`.** Every other screen that names
- * "objective", "key result" or one of the other twelve terms still reads the
- * canon word regardless of what a workspace renamed it to; that is a larger,
- * separate piece of work across many screens, not something this fix
- * attempts.
+ * **Most screens do not need this.** A catalogue string that names a term
+ * holds a term hole that `t()` fills from `workspaceTerms()` (completeness
+ * review M-14). This is for the one place a term has to be taken apart
+ * rather than printed: the Work Map's row-kind chip, which abbreviates a
+ * renamed word (`rowKindAbbreviation` in `work-map.tsx`).
  */
 export const workspaceTerminology = cache(
   async (): Promise<ResolvedTerminology> => {
-    const { session, workspace } = await requireWorkspace();
-    const read = await callAction(
-      {
-        pool: getPool(),
-        workspaceId: workspace.workspaceId,
-        actor: { kind: "human" as const, userId: session.user.id },
-      },
-      "rhythm.read",
-      {},
-    );
+    const read = await readRhythmForRequest();
     // Same open-record cast `progressCeiling` makes for `thresholds`, and for
     // the same reason: the contract boundary types this as a plain record.
     return read.terminology as unknown as ResolvedTerminology;

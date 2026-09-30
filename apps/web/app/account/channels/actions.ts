@@ -2,7 +2,9 @@
 
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { getInstanceName } from "../../../lib/instance-name";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { LinkResult } from "./link-state.ts";
 
@@ -35,6 +37,7 @@ export async function startLink(
   _previous: LinkResult | null,
   form: FormData,
 ): Promise<LinkResult> {
+  const { t } = await getTranslations();
   const provider = String(form.get("provider") ?? "");
   try {
     const issued = await callAction(await context(), "channels.startLink", {
@@ -44,13 +47,20 @@ export async function startLink(
     return {
       ok: true,
       code: issued.code,
-      message: `Send this to the OpenOKR bot on ${provider} within ten minutes.`,
+      message: t("account.channels.actions.sendThisToTheBot", {
+        provider,
+        // The bot is this instance's, so it carries this instance's name.
+        instanceName: await getInstanceName(),
+      }),
     };
   } catch (error) {
     return {
       ok: false,
       code: null,
-      message: error instanceof Error ? error.message : "That did not work.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
 }
@@ -59,6 +69,7 @@ export async function unlink(
   _previous: LinkResult | null,
   form: FormData,
 ): Promise<LinkResult> {
+  const { t } = await getTranslations();
   const provider = String(form.get("provider") ?? "");
   try {
     await callAction(await context(), "channels.unlinkIdentity", {
@@ -68,11 +79,18 @@ export async function unlink(
     return {
       ok: false,
       code: null,
-      message: error instanceof Error ? error.message : "That did not work.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
   revalidatePath("/account/channels");
-  return { ok: true, code: null, message: `${provider} is unlinked.` };
+  return {
+    ok: true,
+    code: null,
+    message: t("account.channels.actions.providerIsUnlinked", { provider }),
+  };
 }
 
 /**
@@ -86,6 +104,7 @@ export async function saveDelivery(
   _previous: LinkResult | null,
   form: FormData,
 ): Promise<LinkResult> {
+  const { t } = await getTranslations();
   const primaryChannel = String(form.get("primaryChannel") ?? "");
   const start = String(form.get("quietStart") ?? "").trim();
   const end = String(form.get("quietEnd") ?? "").trim();
@@ -113,7 +132,10 @@ export async function saveDelivery(
     return {
       ok: false,
       code: null,
-      message: error instanceof Error ? error.message : "That did not work.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
   revalidatePath("/account/channels");
@@ -142,6 +164,7 @@ export async function saveCadence(
   _previous: LinkResult | null,
   form: FormData,
 ): Promise<LinkResult> {
+  const { t } = await getTranslations();
   const routing: Record<string, string> = {};
   for (const [field, value] of form.entries()) {
     if (!field.startsWith("routing.")) {
@@ -172,9 +195,12 @@ export async function saveCadence(
     return {
       ok: false,
       code: null,
-      message: error instanceof Error ? error.message : "That did not save.",
+      message:
+        error instanceof Error
+          ? error.message
+          : t("session.detail.thatDidNotSave"),
     };
   }
   revalidatePath("/account/channels");
-  return { ok: true, code: null, message: "Saved." };
+  return { ok: true, code: null, message: t("admin.rhythm.actions.saved") };
 }

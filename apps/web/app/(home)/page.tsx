@@ -4,8 +4,9 @@ import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
-import { mapNodesFor } from "../goal-nodes.ts";
-import { type MapNode, WorkMap } from "../work-map.tsx";
+import { goalTreeNodes } from "../goal-nodes.ts";
+import { TrustedDomainOffers } from "../trusted-domain-offers.tsx";
+import { WorkMap } from "../work-map.tsx";
 import {
   type ScopeTab,
   type WorkMapContext,
@@ -61,6 +62,15 @@ export default async function HomePage({
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+
+  // **Somebody who holds nothing on the workspace itself is a guest**
+  // (completeness review M-22). They were invited into one space, and the Work
+  // Map is the whole workspace's, whose reads refuse them. So the front door
+  // sends them to the spaces they can open, which is the one they were asked
+  // into, rather than to a page that cannot render for them.
+  if (level < ACCESS_LEVELS.view) {
+    redirect("/spaces");
+  }
 
   const welcome = await callAction(context, "settings.readForMember", {});
   // **Only somebody who can finish the setup is sent to it** (P8-G05a). S-34
@@ -120,7 +130,7 @@ export default async function HomePage({
       })
     : null;
 
-  const nodes = flatten(goals);
+  const nodes = goalTreeNodes(t, goals);
   const selected = nodes.find((node) => node.id === query.node) ?? null;
 
   // Health lives on the goal, never on a key result (METHOD.md §3.5), so "on
@@ -203,6 +213,13 @@ export default async function HomePage({
 
   return (
     <div className="flex w-full flex-col gap-3.5">
+      {/* Completeness review M-34: the workspaces this member's domain
+          admits, drawn only when there are some. */}
+      <TrustedDomainOffers
+        userId={session.user.id}
+        email={session.user.email}
+      />
+
       <WorkMapContextStrip
         context={workMapContext}
         cycleHref={cycleId ? `/cycle?cycle=${cycleId}` : "/cycle"}
@@ -260,52 +277,4 @@ export default async function HomePage({
       </p>
     </div>
   );
-}
-
-type Goal = Awaited<
-  ReturnType<typeof callAction<"goals.list">>
->["goals"][number];
-
-/**
- * Parents before children, key results under the goal that owns them.
- *
- * A goal whose parent is not in the set is drawn at the root rather than
- * dropped, the same way the explorer treats one: a tree that silently omits work
- * is worse than one that shows it at the wrong indent.
- */
-function flatten(goals: readonly Goal[]): MapNode[] {
-  const present = new Set(goals.map((goal) => goal.id));
-  const childrenOf = new Map<string, Goal[]>();
-  const roots: Goal[] = [];
-  for (const goal of goals) {
-    const parent = goal.parentGoalId;
-    if (parent && present.has(parent)) {
-      const siblings = childrenOf.get(parent);
-      if (siblings) {
-        siblings.push(goal);
-      } else {
-        childrenOf.set(parent, [goal]);
-      }
-    } else {
-      roots.push(goal);
-    }
-  }
-
-  const out: MapNode[] = [];
-  const seen = new Set<string>();
-  const walk = (goal: Goal, depth: number): void => {
-    if (seen.has(goal.id)) {
-      // Unreachable through the interface, reachable through a bad import.
-      return;
-    }
-    seen.add(goal.id);
-    out.push(...mapNodesFor(goal, depth));
-    for (const child of childrenOf.get(goal.id) ?? []) {
-      walk(child, depth + 1);
-    }
-  };
-  for (const root of roots) {
-    walk(root, 0);
-  }
-  return out;
 }

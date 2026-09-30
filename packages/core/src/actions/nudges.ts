@@ -94,6 +94,9 @@ export const runNudges = defineWriteAction({
         at,
         cadence: "hourly",
         ...(_context.baseUrl ? { baseUrl: _context.baseUrl } : {}),
+        ...(_context.instanceName
+          ? { instanceName: _context.instanceName }
+          : {}),
       });
       const result = { ...counts, ruleKeys: [...ruleKeys] };
 
@@ -140,7 +143,7 @@ export const listNudges = defineReadAction({
          * Null on almost every nudge: a reminder to do something yourself
          * carries no draft. Present, it is what makes "review and apply in one
          * action" possible from the inbox, because the id here is the id
-         * `proposals.bulkApply` takes.
+         * `proposals.apply` takes, and the recipient is who may decide it.
          */
         proposal: z
           .object({

@@ -14,7 +14,7 @@ import {
   activeOnly,
   type WorkspaceTx,
 } from "@openokr/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import type { AccessLevel } from "./levels.ts";
 
 /**
@@ -238,10 +238,46 @@ export interface BindGroupInput {
   readonly tag?: AccessRoleTag;
 }
 
-/** The grant itself: a group holding a level on a context. */
+/**
+ * The grant itself: a group holding a level on a context.
+ *
+ * **A grant the group already holds is raised, not repeated.** The unique
+ * indexes allow one live binding per group, context and tag. The same member
+ * can reach a context twice for two reasons: an import binds its actor at edit,
+ * and the actor is later assigned the task, handed the initiative or made the
+ * space's manager. The second insert used to break the index and fail the
+ * write. Found while fixing completeness review M-17. The binding keeps the
+ * higher of the two levels, which is what both grants together mean.
+ */
 export async function bindGroup<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(tx: AnyTx<TSchema>, input: BindGroupInput): Promise<string> {
+  const [held] = await tx
+    .select({ id: accessBindings.id, level: accessBindings.level })
+    .from(accessBindings)
+    .where(
+      activeOnly(
+        accessBindings,
+        eq(accessBindings.workspaceId, input.workspaceId),
+        eq(accessBindings.groupId, input.groupId),
+        eq(accessBindings.contextId, input.contextId),
+        input.tag
+          ? eq(accessBindings.tag, input.tag)
+          : isNull(accessBindings.tag),
+      ),
+    )
+    .limit(1);
+  if (held) {
+    if (held.level < input.level) {
+      // openokr:allow-mutation: same reason as ensureContext above.
+      await tx
+        .update(accessBindings)
+        .set({ level: input.level })
+        .where(activeOnly(accessBindings, eq(accessBindings.id, held.id)));
+    }
+    return held.id;
+  }
+
   // openokr:allow-mutation: same reason as ensureContext above.
   const [row] = await tx
     .insert(accessBindings)

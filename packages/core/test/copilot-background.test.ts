@@ -125,7 +125,11 @@ const answers = async () => {
 /** Drives the enqueued run the way the relay does, and collects what it published. */
 const drive = async (
   drafter: AgentDrafter | null,
-  options: { readonly skipped?: string[] } = {},
+  options: {
+    readonly skipped?: string[];
+    /** Who the host was asked to build the drafter for (M-36). */
+    readonly askedFor?: (readonly [string, string | undefined])[];
+  } = {},
 ) => {
   const wb = await workerDb();
   const [row] = await enqueued("copilot.run");
@@ -142,7 +146,10 @@ const drive = async (
     },
     {
       pool: wb.appPool,
-      drafterFor: async () => drafter,
+      drafterFor: async (id, forUser) => {
+        options.askedFor?.push([id, forUser]);
+        return drafter;
+      },
       async publish(channel, event) {
         published.push({ channel, event });
       },
@@ -311,6 +318,18 @@ describe("the run, with nobody watching", () => {
     // is a reader waiting for ever.
     expect(answer?.content).toBe("");
     expect(skipped[0]).toContain("did not answer");
+  });
+
+  it("asks the host for the asker's drafter, so their own key answers them", async () => {
+    // Completeness review M-36. The run carries the account that asked, and a
+    // member's own key is used for that member's requests, whether the answer
+    // is written inside the request or after it.
+    await call("copilot.ask", { question: QUESTION, background: true });
+
+    const askedFor: (readonly [string, string | undefined])[] = [];
+    await drive(new FixedDrafter("Yours."), { askedFor });
+
+    expect(askedFor).toEqual([[workspaceId, OWNER]]);
   });
 
   it("says so when there is no provider at all", async () => {

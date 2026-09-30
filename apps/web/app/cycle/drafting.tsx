@@ -8,6 +8,7 @@ import {
   Chip,
   formatMeasure,
 } from "@openokr/ui";
+import type { KpiOption } from "../../lib/kpi-options.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import {
@@ -80,6 +81,7 @@ export async function Drafting({
   draftingAllowed,
   goals,
   members,
+  kpis,
   canEdit,
   thresholds,
   checkTitles,
@@ -98,6 +100,13 @@ export async function Drafting({
   readonly draftingAllowed: boolean;
   readonly goals: readonly DraftGoal[];
   readonly members: readonly { readonly id: string; readonly name: string }[];
+  /**
+   * What a new key result can be measured by, besides a hand-typed value
+   * (TECHNICAL-PLAN §6.2, M-07). Null when the list could not be read, which
+   * leaves the form working for a key result measured by hand and says so,
+   * rather than taking the whole step down with it.
+   */
+  readonly kpis: readonly KpiOption[] | null;
   readonly canEdit: boolean;
   /** Resolved per workspace, so the browser judges by the same numbers. */
   readonly thresholds: ResolvedThresholds;
@@ -369,6 +378,9 @@ export async function Drafting({
             {canDraft ? (
               <ActionForm
                 action={addKeyResult}
+                label={t("cycle.drafting.addKeyResultTo", {
+                  title: goal.title,
+                })}
                 className="flex flex-col gap-1.5 rounded-md border border-line border-dashed p-2.5"
               >
                 <input type="hidden" name="goalId" value={goal.id} />
@@ -384,6 +396,38 @@ export async function Drafting({
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
                 />
                 <div className="flex flex-wrap items-center gap-1.5">
+                  {kpis && kpis.length > 0 ? (
+                    <>
+                      <label className="sr-only" htmlFor={`kr-kpi-${goal.id}`}>
+                        {t("cycle.drafting.measuredBy")}
+                      </label>
+                      {/*
+                       * By hand unless somebody chooses otherwise, because
+                       * that is what every key result was before a KPI could
+                       * be named here, and a default that quietly wired a
+                       * measure to a metric would be a decision nobody made.
+                       */}
+                      <select
+                        id={`kr-kpi-${goal.id}`}
+                        name="kpiId"
+                        defaultValue=""
+                        className="max-w-56 rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                      >
+                        <option value="">
+                          {t("cycle.drafting.measuredByHand")}
+                        </option>
+                        {kpis.map((kpi) => (
+                          <option key={kpi.id} value={kpi.id}>
+                            {t("cycle.drafting.readFromKpi", {
+                              title: kpi.unit
+                                ? `${kpi.title} (${kpi.unit})`
+                                : kpi.title,
+                            })}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : null}
                   <label className="sr-only" htmlFor={`kr-dir-${goal.id}`}>
                     {t("cycle.drafting.direction")}
                   </label>
@@ -480,6 +524,22 @@ export async function Drafting({
                     {t("cycle.drafting.addKeyResult")}
                   </Button>
                 </div>
+                {kpis === null ? (
+                  <p role="status" className="text-xs text-warn">
+                    {t("cycle.drafting.kpisUnavailable")}
+                  </p>
+                ) : kpis.length === 0 ? (
+                  <p className="text-xs text-ink-4">
+                    {t("cycle.drafting.noKpisYet")}{" "}
+                    <a className="underline" href="/kpis">
+                      {t("cycle.drafting.addAKpi")}
+                    </a>
+                  </p>
+                ) : (
+                  <p className="text-xs text-ink-4">
+                    {t("cycle.drafting.readFromKpiHelp")}
+                  </p>
+                )}
               </ActionForm>
             ) : null}
 

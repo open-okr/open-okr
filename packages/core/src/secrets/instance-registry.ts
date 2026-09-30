@@ -29,6 +29,26 @@ export interface InstanceSettingDefinition {
 /** Marks the wizard finished. Its presence is what "configured" means. */
 export const SETUP_COMPLETED_AT = "setup.completed_at";
 
+/**
+ * What an instance is called when nobody has named it: the software's own
+ * name. Every builder that is handed no name falls back to this one, so the
+ * default is written once (completeness review M-33).
+ */
+export const DEFAULT_INSTANCE_NAME = "OpenOKR";
+
+/**
+ * The name a builder that was handed none should use.
+ *
+ * Here rather than beside the reader in `instance-name.ts`, so a message
+ * builder or the contract generator can use it without importing a module
+ * that reaches the database.
+ */
+export function instanceNameOr(name: string | undefined | null): string {
+  return typeof name === "string" && name.trim() !== ""
+    ? name.trim()
+    : DEFAULT_INSTANCE_NAME;
+}
+
 export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   {
     key: SETUP_COMPLETED_AT,
@@ -40,9 +60,10 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   {
     key: "instance.name",
     kind: "string",
-    fallback: "OpenOKR",
+    fallback: DEFAULT_INSTANCE_NAME,
     environment: "OPENOKR_INSTANCE_NAME",
-    summary: "What this deployment calls itself in mail and the page title.",
+    summary:
+      "What this deployment calls itself: the page title, the sign-in and setup headings, every email and chat message, the authenticator entry and the passkey prompt. Changed from the wizard or admin, General.",
   },
   {
     key: "instance.language",
@@ -86,6 +107,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "Days to keep a closed workspace before erasing it. Zero means never erase, because not configured must never mean delete everything (P7-T08c).",
   },
+  {
+    key: "outbox.retentionDays",
+    kind: "number",
+    fallback: 30,
+    environment: "OPENOKR_OUTBOX_RETENTION_DAYS",
+    summary:
+      "Days to keep an outbox row after it was delivered or given up on. Delivery bookkeeping rather than anybody's data, and the scheduler purges it daily. Zero keeps every row (completeness review M-19).",
+  },
   // The two admission limits (P8-T06a). Instance scope, because they
   // describe the deployment rather than any customer, and both default to
   // unlimited so a self-hosted instance is never limited by a number nobody
@@ -105,6 +134,26 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_CLOUD_CONCURRENT_ACTIONS",
     summary:
       "Actions one workspace may have running at once. Zero means unlimited. This is the one a per-minute window cannot see: sixty calls in one second pass a per-minute limit and empty the connection pool.",
+  },
+  // The optional virus scan (completeness review M-24). Off unless a host is
+  // named, because Postgres is the only service the product requires and a
+  // scanner is a second one. With a host, every claimed file waits in
+  // `scanning` until clamd's verdict arrives. Design: packages/core/src/blobs/scan.ts.
+  {
+    key: "scan.clamd.host",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_CLAMD_HOST",
+    summary:
+      "The ClamAV daemon (clamd) that scans every uploaded file before anyone can open it. Empty means no scan, and a file is available as soon as it is uploaded.",
+  },
+  {
+    key: "scan.clamd.port",
+    kind: "number",
+    fallback: 3310,
+    environment: "OPENOKR_CLAMD_PORT",
+    summary:
+      "clamd's TCP port. 3310 is clamd's own default. Read only when a host is named.",
   },
   {
     key: "instance.telemetry",

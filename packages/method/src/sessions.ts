@@ -148,6 +148,24 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
   },
 ];
 
+/**
+ * §7.6, the mid-cycle calibration, sentence by sentence (completeness review
+ * M-06).
+ *
+ * Phase 6 shows it beside the form that records one, because a reason is only
+ * worth reading if it was written against the rule. It is split at the
+ * document's own full stops, the way `PHASE_GUIDANCE` carries §9, so `pnpm
+ * method:check` can compare it word for word. "Once" stays in the text rather
+ * than becoming a number here: §11 has no calibration parameter, and the
+ * schema already holds at most one calibration per cycle.
+ */
+export const MID_CYCLE_CALIBRATION: readonly string[] = [
+  "Once per cycle, optional",
+  "A target may be adjusted only for a verifiable change in external reality, with a written reason",
+  "Not for difficulty, not for mood",
+  "Anything else is moving the goalposts and it destroys the score's meaning",
+];
+
 export type ReviewAct = "open" | "review" | "retro" | "reset";
 
 /**

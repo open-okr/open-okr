@@ -1,29 +1,33 @@
-import { callAction, OperationError } from "@openokr/core";
-import { Button, Card, CardBody } from "@openokr/ui";
-import { revalidatePath } from "next/cache";
-import { getPool } from "../../../lib/auth";
-import { getTranslations } from "../../../lib/translations";
-import { requireWorkspace } from "../../../lib/workspace";
+"use client";
+
+import { Button, Card, CardBody, useTranslations } from "@openokr/ui";
+import { type FormEvent, startTransition, useActionState } from "react";
+import { submitBranding } from "./actions.ts";
+import { NOTHING_SAVED } from "./branding-state.ts";
 
 /**
- * The branding admin card (screen S-36, P2-T08). One field today: the
- * primary colour. Empty means the product's own default theme, not an
- * unanswered question, so clearing the field is a valid save.
+ * The branding admin card (screen S-36, P2-T08). One field: the primary
+ * colour. Empty means the product's own default theme, not an unanswered
+ * question, so clearing the field is a valid save.
  *
- * **It really was a card, and it took until now to look like one** (P8-G08).
- * P2-T08 left this as `<p><label><br><input>` and two browser-default submit
- * buttons. Tailwind's reset strips an input's border, so the one setting on
- * this screen rendered as a line of grey placeholder text with no visible
- * field to type in, and the two buttons rendered as two lines of plain black
- * text. `general-settings-form.tsx` carried the identical defect and was
- * rebuilt; its own docstring says so. This card was the copy that pass missed,
- * and it is rebuilt here to the same pattern rather than to a new one.
+ * **It really was a card, and it took until P8-G08 to look like one.** P2-T08
+ * left this as `<p><label><br><input>` and two browser-default submit buttons,
+ * which Tailwind's reset rendered as a line of grey placeholder text and two
+ * lines of plain black text. It was rebuilt to the pattern
+ * `general-settings-form.tsx` uses.
  *
- * **One form, two actions.** Reset is a second submit button carrying its own
- * `formAction` rather than a second `<form>`, because a form cannot nest
- * inside another and the two controls belong on one row. The old markup used
- * two sibling forms, which is what stacked Save above Reset as though they
- * were a list rather than a primary action and its escape hatch.
+ * **What it says is in force now is in force** (completeness review M-14). The
+ * card said a saved colour was "in force across this workspace" while every
+ * screen stayed indigo, because nothing read the setting. The root layout now
+ * turns it into the brand tokens, so the sentence is true, and the card says
+ * the two things it could otherwise hide: when the colour was too light to
+ * carry white text and a darker shade was used, and when a stored colour is a
+ * status hue and is not applied at all.
+ *
+ * **A client component since M-14**, because a refusal has to reach the
+ * screen. Submitted through a transition, as the plan card is, so a refused
+ * colour stays in the field under the sentence explaining why rather than
+ * being reset out from under it.
  */
 
 const INPUT_CLASS =
@@ -32,74 +36,60 @@ const INPUT_CLASS =
 const LABEL_CLASS =
   "flex w-full max-w-sm flex-col gap-1 text-xs font-semibold text-ink-2";
 
-/**
- * What the settings schema accepts, repeated here on purpose.
- *
- * The same expression is the input's `pattern`, so the browser refuses a value
- * the server would refuse anyway and says so in place, rather than the save
- * appearing to work and quietly changing nothing. It also guards the swatch
- * below: a stored value reaches an inline `style`, and a colour that has not
- * been matched against this is a string from the database going into CSS.
- */
-const HEX = /^#[0-9a-fA-F]{6}$/;
-
-async function save(formData: FormData): Promise<void> {
-  "use server";
-  const { session, workspace } = await requireWorkspace();
-  const primaryColor = String(formData.get("primaryColor") ?? "").trim();
-
-  try {
-    await callAction(
-      {
-        pool: getPool(),
-        workspaceId: workspace.workspaceId,
-        actor: { kind: "human", userId: session.user.id },
-      },
-      "settings.updateWorkspaceBranding",
-      {
-        branding: primaryColor === "" ? {} : { primaryColor },
-      },
-    );
-  } catch (error) {
-    if (!(error instanceof OperationError)) {
-      throw error;
-    }
-    return;
-  }
-  revalidatePath("/admin/branding");
+export interface BrandingStatus {
+  /** The stored colour when it is a six-digit hex, otherwise null. */
+  readonly stored: string | null;
+  /** `--brand` as the layout applies it, or null when nothing is applied. */
+  readonly fill: string | null;
+  /** The chosen colour was too light for white text and was darkened. */
+  readonly adjusted: boolean;
 }
 
-async function reset(): Promise<void> {
-  "use server";
-  const { session, workspace } = await requireWorkspace();
-  await callAction(
-    {
-      pool: getPool(),
-      workspaceId: workspace.workspaceId,
-      actor: { kind: "human", userId: session.user.id },
-    },
-    "settings.resetWorkspaceSettings",
-    { card: "branding" },
+export function BrandingSettingsForm({ status }: { status: BrandingStatus }) {
+  const { t } = useTranslations();
+  const [state, formAction, pending] = useActionState(
+    submitBranding,
+    NOTHING_SAVED,
   );
-  revalidatePath("/admin/branding");
-}
 
-export async function BrandingSettingsForm({
-  branding,
-}: {
-  branding: Record<string, unknown>;
-}) {
-  const { t } = await getTranslations();
+  // Carries the pressed button's `intent`, which a FormData built from the
+  // form alone would leave out.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const data = new FormData(event.currentTarget, submitter);
+    startTransition(() => formAction(data));
+  };
 
-  const stored = String(branding.primaryColor ?? "");
-  // Matched before it is used, never after. An unmatched value renders no
-  // swatch at all rather than a swatch of something unknown.
-  const swatch = HEX.test(stored) ? stored : null;
+  const { stored, fill, adjusted } = status;
+  const statusLine =
+    stored === null
+      ? t("admin.branding.brandingSettingsForm.emptyIsTheDefault")
+      : fill === null
+        ? t("admin.branding.brandingSettingsForm.notApplied", {
+            colour: stored,
+          })
+        : adjusted
+          ? t("admin.branding.brandingSettingsForm.adjusted", {
+              colour: stored,
+              fill,
+            })
+          : t("admin.branding.brandingSettingsForm.inForce", {
+              colour: stored,
+            });
 
   return (
     <Card>
       <CardBody>
-        <form action={save} className="flex flex-col gap-3">
+        <form
+          // Keyed on what is stored, so a save or a reset shows the new value
+          // rather than the field's first one.
+          key={stored ?? ""}
+          action={formAction}
+          onSubmit={submit}
+          aria-busy={pending}
+          className="flex flex-col gap-3"
+        >
           <label htmlFor="primaryColor" className={LABEL_CLASS}>
             {t("admin.branding.brandingSettingsForm.primaryColourHex")}
             <span className="flex items-center gap-2">
@@ -107,39 +97,62 @@ export async function BrandingSettingsForm({
                 id="primaryColor"
                 name="primaryColor"
                 placeholder="#336699"
-                defaultValue={stored}
+                defaultValue={stored ?? ""}
                 pattern="#[0-9a-fA-F]{6}"
                 title={t("admin.branding.brandingSettingsForm.sixHexDigits")}
                 spellCheck={false}
                 autoComplete="off"
+                aria-invalid={state.error === null ? undefined : true}
+                aria-describedby="primaryColorStatus"
                 className={`${INPUT_CLASS} flex-1 font-mono`}
               />
               {/*
                * The colour in force, drawn rather than described. A hex code
                * is not something a person can picture, and this card exists to
-               * choose one. `aria-hidden` because the value beside it is the
-               * same fact in text: announcing it twice is noise, and a colour
-               * is not information a screen reader can convey anyway.
+               * choose one. It is the fill the layout applies, which is not the
+               * typed colour when that one was darkened. `aria-hidden` because
+               * the sentence below says the same in text.
                */}
               <span
                 aria-hidden
+                data-testid="brand-swatch"
                 className="size-7 flex-none rounded-control border border-line-2"
-                style={swatch ? { backgroundColor: swatch } : undefined}
+                style={fill === null ? undefined : { backgroundColor: fill }}
               />
             </span>
           </label>
-          <p className="max-w-sm text-xs text-ink-3">
-            {swatch === null
-              ? t("admin.branding.brandingSettingsForm.emptyIsTheDefault")
-              : t("admin.branding.brandingSettingsForm.inForce", {
-                  colour: swatch,
-                })}
+          <p id="primaryColorStatus" className="max-w-sm text-xs text-ink-3">
+            {statusLine}
           </p>
+          {state.error === null ? null : (
+            <p role="alert" className="max-w-sm text-xs font-medium text-bad">
+              {state.error}
+            </p>
+          )}
+          {state.saved === null ? null : (
+            <p role="status" className="max-w-sm text-xs text-ink-2">
+              {state.saved}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-3">
-            <Button type="submit" variant="primary" size="sm">
+            <Button
+              type="submit"
+              name="intent"
+              value="save"
+              variant="primary"
+              size="sm"
+              disabled={pending}
+            >
               {t("common.save")}
             </Button>
-            <Button type="submit" formAction={reset} variant="ghost" size="sm">
+            <Button
+              type="submit"
+              name="intent"
+              value="reset"
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+            >
               {t("common.resetToDefaults")}
             </Button>
           </div>

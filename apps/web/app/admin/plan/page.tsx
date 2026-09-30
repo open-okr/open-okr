@@ -59,10 +59,17 @@ export default async function PlanPage() {
     plans.find((plan) => plan.key === currentKey)?.name ??
     currentKey ??
     t("admin.plan.free");
+  const seatsOf = (count: number | null): string =>
+    count === null
+      ? t("admin.plan.unlimitedSeats")
+      : count === 1
+        ? t("admin.plan.seatCountOne", { count })
+        : t("admin.plan.seatCountOther", { count });
   const describe = (plan: (typeof plans)[number]): string =>
-    `${plan.name}, ${
-      plan.seats === null ? "unlimited seats" : `${plan.seats} seats`
-    }`;
+    t("admin.plan.planWithSeats", {
+      name: plan.name,
+      seats: seatsOf(plan.seats),
+    });
 
   return (
     <div className="flex flex-col gap-8">
@@ -97,15 +104,22 @@ export default async function PlanPage() {
         <div className="rounded-lg border border-line bg-surface px-4 py-3">
           <p className="font-semibold text-ink text-xl tabular-nums">
             {seats.limit === null
-              ? `${seats.used} people`
-              : `${seats.used} of ${seats.limit}`}
+              ? seats.used === 1
+                ? t("common.count.personOne", { count: seats.used })
+                : t("common.count.personOther", { count: seats.used })
+              : t("admin.plan.seatsUsedOf", {
+                  used: seats.used,
+                  limit: seats.limit,
+                })}
           </p>
           <p className="mt-1 text-ink-2 text-sm">
             {seats.limit === null
-              ? "This workspace has no seat limit."
+              ? t("admin.plan.noSeatLimit")
               : seats.full
-                ? "Every seat is taken. Free one, or move to a larger plan, before inviting anybody else."
-                : `${seats.limit - seats.used} free.`}
+                ? t("admin.plan.everySeatTaken")
+                : t("admin.plan.seatsFree", {
+                    count: seats.limit - seats.used,
+                  })}
           </p>
           {/* Said here rather than left to surprise somebody: an invitation
            * holds a seat from the moment it is sent. */}
@@ -161,16 +175,18 @@ export default async function PlanPage() {
             </span>
           </div>
           <div className="grid grid-cols-2 divide-x divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface sm:grid-cols-3 sm:divide-y-0">
-            {[
-              ["goals", usage.goalCount],
-              ["check-ins", usage.checkInCount],
-              ["members", usage.memberCount],
-            ].map(([label, value]) => (
-              <div className="flex flex-col gap-0.5 px-4 py-3" key={label}>
+            {(
+              [
+                ["admin.plan.usageGoals", usage.goalCount],
+                ["admin.plan.usageCheckIns", usage.checkInCount],
+                ["admin.plan.usageMembers", usage.memberCount],
+              ] as const
+            ).map(([labelKey, value]) => (
+              <div className="flex flex-col gap-0.5 px-4 py-3" key={labelKey}>
                 <span className="font-semibold text-ink text-2xl tabular-nums leading-none">
                   {value}
                 </span>
-                <span className="text-ink-3 text-xs">{label}</span>
+                <span className="text-ink-3 text-xs">{t(labelKey)}</span>
               </div>
             ))}
           </div>
@@ -196,12 +212,12 @@ export default async function PlanPage() {
                   {plan.name}
                 </span>
                 <span className="text-ink-2 text-sm">
-                  {plan.seats === null
-                    ? "unlimited seats"
-                    : `${plan.seats} seats`}
                   {plan.aiMonthlyUsd === null
-                    ? ""
-                    : `, ${plan.aiMonthlyUsd} US dollars of AI a month`}
+                    ? seatsOf(plan.seats)
+                    : t("admin.plan.seatsWithAiSpend", {
+                        seats: seatsOf(plan.seats),
+                        usd: plan.aiMonthlyUsd,
+                      })}
                 </span>
               </li>
             ))}

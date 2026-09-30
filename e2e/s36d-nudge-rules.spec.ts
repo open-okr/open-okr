@@ -53,6 +53,15 @@ test("every rule in the catalogue is listed, with its volume", async () => {
   await expect(page.getByTestId(`volume-${RULE}`)).toContainText("sent");
 });
 
+test("the card says where a rule goes when its own channel cannot reach somebody", async () => {
+  // Completeness review M-23: an override to a channel a member never linked
+  // was sent there and dropped. It now falls back, and the card where the
+  // override is chosen says so.
+  await expect(
+    page.getByText("reaches them on their own channel instead"),
+  ).toBeVisible();
+});
+
 test("a rule can be turned off, and says what that means", async () => {
   const toggle = page.getByTestId(`toggle-${RULE}`);
   await expect(toggle).toHaveText("Turn off");

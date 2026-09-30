@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { launchRecovery } from "./actions.ts";
 
@@ -11,6 +11,7 @@ import { launchRecovery } from "./actions.ts";
  * instead of nothing happening.
  */
 export function LaunchRecovery({ kpiId }: { readonly kpiId: string }) {
+  const { t } = useTranslations();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +28,9 @@ export function LaunchRecovery({ kpiId }: { readonly kpiId: string }) {
           })
         }
       >
-        {pending ? "Launching" : "Launch recovery"}
+        {pending
+          ? t("kpis.recovery.launch.launching")
+          : t("kpis.recovery.launch.launchRecovery")}
       </Button>
       {error ? <p className="text-xs text-bad">{error}</p> : null}
     </div>

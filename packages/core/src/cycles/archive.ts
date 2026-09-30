@@ -2,6 +2,7 @@ import {
   activeOnly,
   cycleIssues,
   cyclePackItems,
+  cyclePriorities,
   cyclePriorScores,
   cycles,
   goals,
@@ -22,22 +23,30 @@ import {
   type ScoreBand,
   scoreBand,
 } from "@openokr/method";
-import { desc, eq, inArray, isNull } from "drizzle-orm";
+import { asc, count, desc, eq, gt, inArray, isNull, lt, ne } from "drizzle-orm";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { resolveRhythm } from "./rhythm.ts";
 import { readRhythmRow } from "./service.ts";
+import { evaluateWorkflow, loadCycleForWorkflow } from "./workflow.ts";
 
 /**
  * Closing a cycle and opening the next one (METHOD.md §8.9, TECHNICAL-PLAN §4.6,
- * P3-T15).
+ * P3-T15, completeness review M-05).
  *
- * Two operations that are deliberately separate. Archiving records what
- * happened; the feed-forward decides what the next cycle inherits. A team may
- * archive without having opened the next cycle yet, and running the two
- * together would make the second impossible.
+ * §8.9: "At close, the product feeds the next cycle automatically." So closing
+ * is one act, `closeCycleInTx`: it records the archive, marks the cycle closed
+ * and feeds the next cycle of the same mode, all in one transaction. Until M-05
+ * the archive and the feed-forward were two buttons and nothing ever set a
+ * cycle to `closed`, so the inheritance happened only when somebody remembered.
  *
- * Both are idempotent. A facilitator who clicks twice, or a job that retries,
- * must not double the trend or the issue list.
+ * **The next cycle often does not exist at close.** §8.10 holds the review
+ * before anybody drafts the next cycle, so a cycle created afterwards is fed at
+ * creation instead, by `feedFromClosedPredecessorInTx`. Either order ends in
+ * the same rows.
+ *
+ * The archive and the feed-forward stay separate functions, because each is
+ * also its own action for a re-run from the API. Both are idempotent: a retry
+ * must not double the trend, the issue list or the priorities.
  */
 
 interface Scored {
@@ -141,6 +150,14 @@ export async function archiveCycleInTx(
     .limit(1);
   if (!cycle) {
     throw new OperationError("not_found", "No such cycle.");
+  }
+  // The archive is what the cycle achieved when it closed. Rewriting it later
+  // would let the scorecard drift from the result the review agreed on.
+  if (cycle.status === "closed") {
+    throw new OperationError(
+      "forbidden",
+      "This cycle is closed. Its result was recorded when it closed.",
+    );
   }
 
   const scored = await loadScores(tx, workspaceId, cycleId);
@@ -286,10 +303,85 @@ export interface FeedForwardResult {
   readonly frameCarried: boolean;
   /** Rows of §8.9's mapping this build cannot fill, each naming its task. */
   readonly waiting: readonly string[];
-  /** Whether the lowest process-health statement became an issue (P4-T12-b). */
-  readonly processHealthIssue: boolean;
+  /**
+   * The process-health statement the next cycle holds as a Phase 3 priority,
+   * or null when the survey went unanswered (§8.5, §8.9; M-05). Reported
+   * whether this run wrote it or an earlier one did.
+   */
+  readonly processPriority: string | null;
   /** Whether the learnings reached the next cycle's input pack (P4-T12-b). */
   readonly packNote: boolean;
+}
+
+/**
+ * The review §8.9 feeds from: the latest closed quarterly session on the cycle.
+ *
+ * Found rather than passed in: §8.10 holds the review before the next cycle is
+ * drafted, so by the time anything feeds forward the review is a closed
+ * session on the cycle being left behind.
+ */
+async function findClosedReview(
+  tx: OperationTx,
+  workspaceId: string,
+  cycleId: string,
+): Promise<{ readonly id: string } | undefined> {
+  const [review] = await tx
+    .select({ id: okrSessions.id })
+    .from(okrSessions)
+    .where(
+      activeOnly(
+        okrSessions,
+        eq(okrSessions.workspaceId, workspaceId),
+        eq(okrSessions.cycleId, cycleId),
+        eq(okrSessions.kind, "quarterly"),
+        eq(okrSessions.state, "closed"),
+      ),
+    )
+    .orderBy(desc(okrSessions.endedAt))
+    .limit(1);
+  return review;
+}
+
+/**
+ * §8.5's lowest-scoring statement for a review, or null when nobody answered.
+ *
+ * A survey nobody answered has no lowest statement, and inventing one would be
+ * the product deciding the team's own process problem for it.
+ */
+async function lowestStatementOf(
+  tx: OperationTx,
+  workspaceId: string,
+  reviewId: string,
+): Promise<string | null> {
+  const responses = await tx
+    .select({
+      statementKey: processHealthResponses.statementKey,
+      score: processHealthResponses.score,
+    })
+    .from(processHealthResponses)
+    .where(
+      activeOnly(
+        processHealthResponses,
+        eq(processHealthResponses.workspaceId, workspaceId),
+        eq(processHealthResponses.sessionId, reviewId),
+      ),
+    );
+  if (responses.length === 0) {
+    return null;
+  }
+  const averages = PROCESS_HEALTH_STATEMENTS.map((_statement, index) => {
+    const forStatement = responses.filter(
+      (row) => row.statementKey === index + 1,
+    );
+    return forStatement.length === 0
+      ? null
+      : forStatement.reduce((sum, row) => sum + row.score, 0) /
+          forStatement.length;
+  });
+  // From `packages/method`, including how a tie is broken: strictly lower, so
+  // the earlier statement wins and the answer does not depend on iteration
+  // order.
+  return lowestProcessHealthStatement(averages)?.statement ?? null;
 }
 
 /**
@@ -329,7 +421,12 @@ export async function feedForwardInTx(
     )
     .limit(1);
   const [target] = await tx
-    .select({ id: cycles.id, frameId: cycles.frameId })
+    .select({
+      id: cycles.id,
+      frameId: cycles.frameId,
+      status: cycles.status,
+      previousCycleId: cycles.previousCycleId,
+    })
     .from(cycles)
     .where(
       activeOnly(
@@ -341,6 +438,14 @@ export async function feedForwardInTx(
     .limit(1);
   if (!source || !target) {
     throw new OperationError("not_found", "No such cycle.");
+  }
+  // Everything below writes into the target's phases, and a closed cycle's
+  // record does not change after its archive.
+  if (target.status === "closed") {
+    throw new OperationError(
+      "forbidden",
+      "That cycle is closed. Its record does not change after the archive.",
+    );
   }
 
   const written = await tx
@@ -444,24 +549,9 @@ export async function feedForwardInTx(
    * survey at P4-T11b. The `waiting` list is what made their absence visible
    * instead of letting a half-done mapping read as complete, and it is empty now.
    *
-   * The review is found rather than passed in: §8.10 holds the review before the
-   * next cycle is drafted, so by the time anything feeds forward the review is a
-   * closed session on the cycle being left behind.
+   * The review is found rather than passed in, by `findClosedReview`.
    */
-  const [review] = await tx
-    .select({ id: okrSessions.id })
-    .from(okrSessions)
-    .where(
-      activeOnly(
-        okrSessions,
-        eq(okrSessions.workspaceId, workspaceId),
-        eq(okrSessions.cycleId, fromCycleId),
-        eq(okrSessions.kind, "quarterly"),
-        eq(okrSessions.state, "closed"),
-      ),
-    )
-    .orderBy(desc(okrSessions.endedAt))
-    .limit(1);
+  const review = await findClosedReview(tx, workspaceId, fromCycleId);
 
   // --- carried learnings join carried key results at the same impact ---
   //
@@ -512,72 +602,57 @@ export async function feedForwardInTx(
     issues += 1;
   }
 
-  // --- the lowest process-health statement becomes an issue ---
+  // --- the lowest process-health statement becomes a Phase 3 priority ---
   //
-  // **§8.9 calls this "a process priority" and it lands as an issue, which is a
-  // deliberate reading.** `cycle_issues.source` has carried a `process_health`
-  // value since P3-T03 with nothing writing it, so the schema was built for this.
-  // §8.9's own closing line settles the disagreement: carried work re-enters as
-  // an issue and does not get a free pass, and a statement promoted straight to a
-  // priority would be exactly that free pass.
-  let processHealthIssue = false;
-  if (review) {
-    const responses = await tx
-      .select({
-        statementKey: processHealthResponses.statementKey,
-        score: processHealthResponses.score,
-      })
-      .from(processHealthResponses)
+  // §8.9's table: "The lowest process-health statement | Phase 3, a process
+  // priority", and §8.5: it "becomes next cycle's process OKR". From P4-T12-b
+  // until M-05 it landed as a Phase 2 issue instead, on a reading of §8.9's
+  // closing line that the table itself does not support: that line is about
+  // carried work, and a process statement is not carried work. Changing the
+  // practice was never this file's to decide, so it follows the table.
+  //
+  // Matched on its text, because a priority has no source column. The text is
+  // the canon statement, so a facilitator's own priority cannot collide with it
+  // unless it says the same thing, in which case one row is right anyway.
+  const lowest = review
+    ? await lowestStatementOf(tx, workspaceId, review.id)
+    : null;
+  if (lowest) {
+    const [duplicate] = await tx
+      .select({ id: cyclePriorities.id })
+      .from(cyclePriorities)
       .where(
         activeOnly(
-          processHealthResponses,
-          eq(processHealthResponses.workspaceId, workspaceId),
-          eq(processHealthResponses.sessionId, review.id),
+          cyclePriorities,
+          eq(cyclePriorities.workspaceId, workspaceId),
+          eq(cyclePriorities.cycleId, toCycleId),
+          eq(cyclePriorities.text, lowest),
         ),
-      );
-
-    if (responses.length > 0) {
-      const averages = PROCESS_HEALTH_STATEMENTS.map((_statement, index) => {
-        const forStatement = responses.filter(
-          (row) => row.statementKey === index + 1,
-        );
-        return forStatement.length === 0
-          ? null
-          : forStatement.reduce((sum, row) => sum + row.score, 0) /
-              forStatement.length;
+      )
+      .limit(1);
+    if (!duplicate) {
+      // Last in the list, the way `workflow.addPriority` places a new one. The
+      // facilitator ranks it in Phase 3 like any other.
+      const [last] = await tx
+        .select({ position: cyclePriorities.position })
+        .from(cyclePriorities)
+        .where(
+          activeOnly(
+            cyclePriorities,
+            eq(cyclePriorities.workspaceId, workspaceId),
+            eq(cyclePriorities.cycleId, toCycleId),
+          ),
+        )
+        .orderBy(desc(cyclePriorities.position))
+        .limit(1);
+      // openokr:allow-mutation: same transaction.
+      await tx.insert(cyclePriorities).values({
+        id: newId(),
+        workspaceId,
+        cycleId: toCycleId,
+        text: lowest,
+        position: (last?.position ?? -1) + 1,
       });
-      // From `packages/method`, including how a tie is broken: strictly lower, so
-      // the earlier statement wins and the answer does not depend on iteration
-      // order.
-      const lowest = lowestProcessHealthStatement(averages);
-      if (lowest) {
-        const [duplicate] = await tx
-          .select({ id: cycleIssues.id })
-          .from(cycleIssues)
-          .where(
-            activeOnly(
-              cycleIssues,
-              eq(cycleIssues.workspaceId, workspaceId),
-              eq(cycleIssues.cycleId, toCycleId),
-              eq(cycleIssues.source, "process_health"),
-              eq(cycleIssues.text, lowest.statement),
-            ),
-          )
-          .limit(1);
-        if (!duplicate) {
-          // openokr:allow-mutation: same transaction.
-          await tx.insert(cycleIssues).values({
-            id: newId(),
-            workspaceId,
-            cycleId: toCycleId,
-            text: lowest.statement,
-            impact: carriedImpact,
-            source: "process_health",
-          });
-          issues += 1;
-        }
-        processHealthIssue = true;
-      }
     }
   }
 
@@ -646,12 +721,24 @@ export async function feedForwardInTx(
   // The annual frame carries forward as a reference. The focus flags clear
   // themselves: `cycle_focus_key_results` is per cycle, so a new cycle starts
   // with none and there is nothing to unset.
-  let frameCarried = false;
-  if (source.frameId && target.frameId !== source.frameId) {
+  const frameCarried = Boolean(
+    source.frameId && target.frameId !== source.frameId,
+  );
+  // `previous_cycle_id` records which cycle fed this one (M-05). It is how a
+  // closed cycle knows it already has a successor, so a cycle created later is
+  // not fed from the same close twice, and how its phase 7 names where its
+  // inheritance went. The first feed wins: a manual re-run from elsewhere adds
+  // rows but does not rewrite the lineage.
+  const linkLineage = target.previousCycleId === null;
+  if (frameCarried || linkLineage) {
     // openokr:allow-mutation: same transaction.
     await tx
       .update(cycles)
-      .set({ frameId: source.frameId, updatedAt: now })
+      .set({
+        ...(frameCarried ? { frameId: source.frameId } : {}),
+        ...(linkLineage ? { previousCycleId: fromCycleId } : {}),
+        updatedAt: now,
+      })
       .where(
         activeOnly(
           cycles,
@@ -659,7 +746,6 @@ export async function feedForwardInTx(
           eq(cycles.id, toCycleId),
         ),
       );
-    frameCarried = true;
   }
 
   return {
@@ -676,7 +762,372 @@ export async function feedForwardInTx(
      * it the same way.
      */
     waiting: [],
-    processHealthIssue,
+    processPriority: lowest,
     packNote,
+  };
+}
+
+export interface CloseResult {
+  readonly name: string;
+  readonly archive: ArchiveResult;
+  /** The cycle fed at close, or null when the next one does not exist yet. */
+  readonly fedInto: {
+    readonly cycleId: string;
+    readonly name: string;
+    readonly result: FeedForwardResult;
+  } | null;
+}
+
+/**
+ * §8.9's close, as one act: archive, mark closed, feed the next cycle.
+ *
+ * **Refused until phase 7 is complete** (METHOD.md §2.3: "Every key result
+ * scored and the retrospective written"; §2.2: "Phase 7 closes it and feeds the
+ * next one"). The refusal names what is missing, in the words the phase rail
+ * uses. There is no override: §4.5's publish gates have one, because REQUIREMENTS
+ * §3.2 gives them one, and nothing in METHOD or REQUIREMENTS gives phase 7 one.
+ * A cycle closed unscored would put a result on the scorecard nobody agreed.
+ *
+ * **The next cycle is the earliest one of the same mode starting after this one
+ * ends.** A quarter feeds the next quarter and a year the next year, never
+ * across. When it does not exist yet, or is itself closed, nothing is fed now;
+ * `feedFromClosedPredecessorInTx` feeds it when it is created.
+ */
+export async function closeCycleInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  cycleId: string,
+  thresholds: ResolvedThresholds,
+  now: Date = new Date(),
+): Promise<CloseResult> {
+  // **Locked before the status is read.** Two closes arriving together would
+  // otherwise both see an open cycle and both feed the next one, and the prior
+  // scores have no unique index to refuse the second copy. The second close
+  // now waits, then reads `closed` and is refused. The same lock is what
+  // `feedFromClosedPredecessorInTx` takes, so a close and the next cycle's
+  // creation cannot each miss the other.
+  await tx
+    .select({ id: cycles.id })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        eq(cycles.id, cycleId),
+      ),
+    )
+    .for("update");
+  const cycle = await loadCycleForWorkflow(tx, workspaceId, cycleId);
+  if (!cycle) {
+    throw new OperationError("not_found", "No such cycle.");
+  }
+  if (cycle.status === "closed") {
+    throw new OperationError("forbidden", "This cycle is already closed.");
+  }
+
+  // Evaluated here rather than read from anything stored, the same reason
+  // publication re-evaluates its gates: a cached answer is how a cycle closes
+  // on a condition that stopped holding.
+  const { phases } = await evaluateWorkflow(tx, workspaceId, cycle, thresholds);
+  const review = phases.find((result) => result.phase === 7);
+  if (review?.state !== "pass") {
+    const reasons = [...(review?.missing ?? []), ...(review?.blocked ?? [])];
+    throw new OperationError(
+      "forbidden",
+      `This cycle cannot close until phase 7 is complete. ${reasons.join(". ")}.`,
+    );
+  }
+
+  const archive = await archiveCycleInTx(
+    tx,
+    workspaceId,
+    cycleId,
+    thresholds,
+    now,
+  );
+
+  // Phase 7 as well as closed, so the cycle opens on the phase that shows
+  // how it closed rather than wherever the pointer was left.
+  // openokr:allow-mutation: the calling Operation's own transaction.
+  await tx
+    .update(cycles)
+    .set({ status: "closed", phase: 7, updatedAt: now })
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        eq(cycles.id, cycleId),
+      ),
+    );
+
+  const [next] = await tx
+    .select({ id: cycles.id, name: cycles.name, status: cycles.status })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        eq(cycles.mode, cycle.mode),
+        gt(cycles.startsOn, cycle.endsOn),
+      ),
+    )
+    .orderBy(asc(cycles.startsOn))
+    .limit(1);
+  if (!next || next.status === "closed") {
+    return { name: cycle.name, archive, fedInto: null };
+  }
+
+  const result = await feedForwardInTx(tx, workspaceId, cycleId, next.id, now);
+  return {
+    name: cycle.name,
+    archive,
+    fedInto: { cycleId: next.id, name: next.name, result },
+  };
+}
+
+/**
+ * Feeds a newly created cycle from the closed cycle just before it (M-05).
+ *
+ * The other half of `closeCycleInTx`: a close that found no next cycle leaves
+ * the inheritance waiting, and this is where it lands. Called by the actions
+ * that create a cycle, in the same transaction as the insert.
+ *
+ * **Only the cycle immediately before, only if it is closed, and only if it has
+ * fed nothing yet.** Reaching past an open cycle to an older closed one would
+ * hand a quarter the inheritance of a quarter two back. A closed cycle that
+ * already fed a successor has given its inheritance away, which is what stops
+ * a cycle created out of order from being fed twice from one close.
+ */
+export async function feedFromClosedPredecessorInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  cycleId: string,
+  now: Date = new Date(),
+): Promise<{
+  readonly fromCycleId: string;
+  readonly fromName: string;
+  readonly result: FeedForwardResult;
+} | null> {
+  const [cycle] = await tx
+    .select({ id: cycles.id, mode: cycles.mode, startsOn: cycles.startsOn })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        eq(cycles.id, cycleId),
+      ),
+    )
+    .limit(1);
+  if (!cycle) {
+    return null;
+  }
+
+  // Locked, for the reason `closeCycleInTx` locks the cycle it closes. Without
+  // it a close and this creation running together each miss the other: the
+  // close finds no next cycle yet, this finds a cycle not yet closed, and the
+  // inheritance lands nowhere. With it, whichever waits reads what the other
+  // committed.
+  const [previous] = await tx
+    .select({ id: cycles.id, name: cycles.name, status: cycles.status })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        eq(cycles.mode, cycle.mode),
+        lt(cycles.endsOn, cycle.startsOn),
+      ),
+    )
+    .orderBy(desc(cycles.startsOn))
+    .limit(1)
+    .for("update");
+  if (previous?.status !== "closed") {
+    return null;
+  }
+
+  const [successor] = await tx
+    .select({ id: cycles.id })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        eq(cycles.previousCycleId, previous.id),
+        ne(cycles.id, cycleId),
+      ),
+    )
+    .limit(1);
+  if (successor) {
+    return null;
+  }
+
+  const result = await feedForwardInTx(
+    tx,
+    workspaceId,
+    previous.id,
+    cycleId,
+    now,
+  );
+  return { fromCycleId: previous.id, fromName: previous.name, result };
+}
+
+export interface ClosureSummary {
+  readonly resultValue: number | null;
+  readonly verdict: string | null;
+  /** The cycle this one fed, or null while it has not been created. */
+  readonly nextCycle: { readonly id: string; readonly name: string } | null;
+  readonly priorScores: number;
+  readonly carriedIssues: number;
+  readonly processPriority: string | null;
+  readonly packNote: boolean;
+}
+
+/**
+ * How a closed cycle closed, read back from the rows the close wrote (M-05).
+ *
+ * Read rather than stored: the snapshot holds the result, `previous_cycle_id`
+ * names the successor, and the successor's own phases hold what it received.
+ * A second copy of those facts on the closed cycle would be one more thing to
+ * keep in step, and the successor may not exist until long after the close.
+ *
+ * Null for a cycle that is not closed.
+ */
+export async function readClosureInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  cycleId: string,
+): Promise<ClosureSummary | null> {
+  const [cycle] = await tx
+    .select({ status: cycles.status })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        eq(cycles.id, cycleId),
+      ),
+    )
+    .limit(1);
+  if (cycle?.status !== "closed") {
+    return null;
+  }
+
+  const [snapshot] = await tx
+    .select({
+      resultValue: performanceSnapshots.resultValue,
+      verdict: performanceSnapshots.verdict,
+    })
+    .from(performanceSnapshots)
+    .where(
+      activeOnly(
+        performanceSnapshots,
+        eq(performanceSnapshots.workspaceId, workspaceId),
+        eq(performanceSnapshots.cycleId, cycleId),
+        eq(performanceSnapshots.ownerKind, "workspace"),
+      ),
+    )
+    .limit(1);
+  const figures = {
+    resultValue:
+      snapshot?.resultValue === null || snapshot?.resultValue === undefined
+        ? null
+        : Number(snapshot.resultValue),
+    verdict: snapshot?.verdict ?? null,
+  };
+
+  const [next] = await tx
+    .select({ id: cycles.id, name: cycles.name })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        eq(cycles.previousCycleId, cycleId),
+      ),
+    )
+    .orderBy(asc(cycles.startsOn))
+    .limit(1);
+  if (!next) {
+    return {
+      ...figures,
+      nextCycle: null,
+      priorScores: 0,
+      carriedIssues: 0,
+      processPriority: null,
+      packNote: false,
+    };
+  }
+
+  // The prior scores that came from this cycle's key results, including one
+  // deleted since: its score was handed on while it existed.
+  const [scores] = await tx
+    .select({ total: count() })
+    .from(cyclePriorScores)
+    .innerJoin(
+      keyResults,
+      eq(keyResults.id, cyclePriorScores.sourceKeyResultId),
+    )
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        cyclePriorScores,
+        eq(cyclePriorScores.workspaceId, workspaceId),
+        eq(cyclePriorScores.cycleId, next.id),
+        eq(goals.cycleId, cycleId),
+      ),
+    );
+
+  const [carried] = await tx
+    .select({ total: count() })
+    .from(cycleIssues)
+    .where(
+      activeOnly(
+        cycleIssues,
+        eq(cycleIssues.workspaceId, workspaceId),
+        eq(cycleIssues.cycleId, next.id),
+        eq(cycleIssues.source, "carry_forward"),
+      ),
+    );
+
+  const review = await findClosedReview(tx, workspaceId, cycleId);
+  const lowest = review
+    ? await lowestStatementOf(tx, workspaceId, review.id)
+    : null;
+  const [priority] = lowest
+    ? await tx
+        .select({ text: cyclePriorities.text })
+        .from(cyclePriorities)
+        .where(
+          activeOnly(
+            cyclePriorities,
+            eq(cyclePriorities.workspaceId, workspaceId),
+            eq(cyclePriorities.cycleId, next.id),
+            eq(cyclePriorities.text, lowest),
+          ),
+        )
+        .limit(1)
+    : [];
+
+  const [pack] = await tx
+    .select({ note: cyclePackItems.note })
+    .from(cyclePackItems)
+    .where(
+      activeOnly(
+        cyclePackItems,
+        eq(cyclePackItems.workspaceId, workspaceId),
+        eq(cyclePackItems.cycleId, next.id),
+        eq(cyclePackItems.itemKey, 2),
+      ),
+    )
+    .limit(1);
+
+  return {
+    ...figures,
+    nextCycle: { id: next.id, name: next.name },
+    priorScores: Number(scores?.total ?? 0),
+    carriedIssues: Number(carried?.total ?? 0),
+    processPriority: priority?.text ?? null,
+    packNote: Boolean(pack?.note),
   };
 }

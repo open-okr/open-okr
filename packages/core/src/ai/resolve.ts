@@ -23,8 +23,9 @@ import {
   aiCredentials,
   aiProviders,
   withWorkspace,
+  workspaceMembers,
 } from "@openokr/db";
-import { eq, isNull, sql } from "drizzle-orm";
+import { eq, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import {
@@ -61,6 +62,17 @@ export interface ResolveAICredentialInput {
   readonly provider: AIProviderKind;
   /** Omit for a workspace-only resolution (an agent run, a background job). */
   readonly memberId?: string;
+  /**
+   * The same person by their account, for a host that knows who signed in
+   * rather than which member row that is (completeness review M-36). A copilot
+   * run the relay picks up carries only the account, and every screen has the
+   * session to hand.
+   *
+   * Omit it, and `memberId`, for anything an agent or the scheduler asks: a
+   * member's key is used for that member's own requests and never for the
+   * Coach's, the Champion's or anybody else's.
+   */
+  readonly userId?: string;
 }
 
 const definition = (key: string): InstanceSettingDefinition => {
@@ -171,6 +183,37 @@ async function findCredential(
 }
 
 /**
+ * The active person a signed-in account is in this workspace, or undefined.
+ *
+ * A person only: an agent row never holds a personal key, and a suspended
+ * member's key waits for them rather than answering a request queued before
+ * the suspension.
+ */
+async function activePersonFor(
+  pool: Pool,
+  workspaceId: string,
+  userId: string,
+): Promise<string | undefined> {
+  const db = drizzle(pool);
+  return withWorkspace(db, workspaceId, async (tx) => {
+    const [member] = await tx
+      .select({ id: workspaceMembers.id })
+      .from(workspaceMembers)
+      .where(
+        activeOnly(
+          workspaceMembers,
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, userId),
+          eq(workspaceMembers.status, "active"),
+          inArray(workspaceMembers.kind, ["human", "guest"]),
+        ),
+      )
+      .limit(1);
+    return member?.id;
+  });
+}
+
+/**
  * Providers that are reached with no key at all (completeness review H-27).
  *
  * A local Ollama server answers anybody on its network; that is the
@@ -192,12 +235,17 @@ export async function resolveAICredential(
   environment: Record<string, string | undefined>,
   input: ResolveAICredentialInput,
 ): Promise<ResolvedAICredential> {
-  if (input.memberId) {
+  const memberId =
+    input.memberId ??
+    (input.userId
+      ? await activePersonFor(pool, input.workspaceId, input.userId)
+      : undefined);
+  if (memberId) {
     const personal = await findCredential(
       pool,
       input.workspaceId,
       input.provider,
-      input.memberId,
+      memberId,
     );
     if (personal?.credentialRow && personal.providerRow.allowUserKeys) {
       return {

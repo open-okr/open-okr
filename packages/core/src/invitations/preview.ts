@@ -2,6 +2,7 @@ import {
   activeOnly,
   type InviteLink,
   inviteLinks,
+  spaces,
   withInviteToken,
   withWorkspace,
   workspaces,
@@ -53,6 +54,12 @@ export interface InvitePreview {
   readonly email: string | null;
   /** The domains a shareable link is bounded to, empty when unbounded. */
   readonly allowedDomains: readonly string[];
+  /**
+   * The space a guest invitation admits its guest to, by name, so the page
+   * can say so before anybody joins (completeness review M-22). Null for an
+   * invitation that makes a member.
+   */
+  readonly guestSpaceName: string | null;
 }
 
 export type InviteResolution =
@@ -106,7 +113,25 @@ export async function previewInvite(
       .from(workspaces)
       .where(activeOnly(workspaces, eq(workspaces.id, link.workspaceId)))
       .limit(1);
-    return found;
+    if (!found || link.memberKind !== "guest" || !link.spaceId) {
+      return found ? { ...found, space: null } : undefined;
+    }
+    const [space] = await tx
+      .select({ name: spaces.name })
+      // openokr:allow-raw-read: the one space this token admits its guest to,
+      // by the id the token itself named, for the same reason as above.
+      .from(spaces)
+      .where(
+        activeOnly(
+          spaces,
+          eq(spaces.id, link.spaceId),
+          eq(spaces.workspaceId, link.workspaceId),
+        ),
+      )
+      .limit(1);
+    // An archived space refuses the invitation, as acceptance does, so the
+    // page never offers a join that then fails.
+    return space ? { ...found, space: space.name } : undefined;
   });
   if (!workspace) {
     // The workspace was deleted after the invitation was issued. Refused as
@@ -123,6 +148,7 @@ export async function previewInvite(
     mode: link.mode,
     email: link.email ?? null,
     allowedDomains: link.allowedDomains ?? [],
+    guestSpaceName: workspace.space,
   };
 }
 

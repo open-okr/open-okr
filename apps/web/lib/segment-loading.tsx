@@ -67,6 +67,37 @@ export function SegmentLoading({
 }
 
 /**
+ * One card of a screen still loading, while the rest of the screen is already
+ * drawn (completeness review M-22).
+ *
+ * The space home reads its goals and its KPI trees behind their own Suspense
+ * boundaries, so the team's week can paint first. `SegmentLoading` is the
+ * whole panel's shape; this is one card's, with the same pulse and no copy,
+ * for the same reason.
+ */
+export function SectionLoading({
+  rows = 3,
+}: {
+  /** How many placeholder rows the card wants. */
+  readonly rows?: number;
+}) {
+  const placeholders = Array.from(
+    { length: rows },
+    (_, index) => `row-${index}`,
+  );
+  return (
+    <Card aria-busy="true" data-testid="section-loading">
+      <CardBody className="flex flex-col gap-2.5">
+        <div className="h-4 w-40 animate-pulse rounded bg-raised" />
+        {placeholders.map((key) => (
+          <div key={key} className="h-8 animate-pulse rounded bg-raised" />
+        ))}
+      </CardBody>
+    </Card>
+  );
+}
+
+/**
  * One route segment's loading state, for a screen that draws its own frame.
  *
  * **`SegmentLoading` above is the wrong shape outside the shell.** It renders

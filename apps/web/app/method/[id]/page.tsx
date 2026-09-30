@@ -34,11 +34,12 @@ const ALL: readonly QualityCheck[] = [
   ...CYCLE_CHECKS,
 ];
 
+/** The catalogue key naming each group, read through `t` where it renders. */
 const GROUP_LABEL: Record<QualityCheck["group"], string> = {
-  objective: "Objective check",
-  key_result: "Key result check",
-  alignment: "Alignment check",
-  cycle: "Cycle check",
+  objective: "method.detail.objectiveCheck",
+  key_result: "method.detail.keyResultCheck",
+  alignment: "method.detail.alignmentCheck",
+  cycle: "method.detail.cycleCheck",
 };
 
 const TONE = {
@@ -81,12 +82,12 @@ export default async function RulePage({
             <h1 className="text-lg font-bold text-ink">
               {check.id} · {check.title}
             </h1>
-            <p className="text-xs text-ink-3">{GROUP_LABEL[check.group]}</p>
+            <p className="text-xs text-ink-3">{t(GROUP_LABEL[check.group])}</p>
           </div>
           <Chip tone={check.feedsStrengthScore ? "info" : "neutral"}>
             {check.feedsStrengthScore
-              ? "counts towards the strength score"
-              : "feeds the publish gates"}
+              ? t("method.detail.countsTowardsTheStrengthScore")
+              : t("method.detail.feedsThePublishGates")}
           </Chip>
         </CardHeader>
       </Card>
@@ -187,12 +188,16 @@ async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
             <p className="text-xs text-ink-3">
               {t("method.detail.proactiveMessageAiNativePlan", {
                 Champion:
-                  trigger.owner === "coach" ? "OKR Coach" : "OKR Champion",
+                  trigger.owner === "coach"
+                    ? t("method.detail.okrCoach")
+                    : t("method.detail.okrChampion"),
               })}
             </p>
           </div>
           <Chip tone={trigger.escalates ? "warn" : "neutral"}>
-            {trigger.escalates ? "climbs a ladder" : "does not escalate"}
+            {trigger.escalates
+              ? t("method.detail.climbsALadder")
+              : t("method.detail.doesNotEscalate")}
           </Chip>
         </CardHeader>
         <CardBody className="flex flex-col gap-2">
@@ -210,8 +215,8 @@ async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
           </p>
           <p className="text-xs text-ink-3">
             {trigger.deterministic
-              ? "Fires with the AI provider switched off. Every rule in this catalogue but one does."
-              : "Needs the AI provider. It is a judgement about meaning, so with the provider off it does not fire rather than guessing."}
+              ? t("method.detail.firesWithTheAiProviderOff")
+              : t("method.detail.needsTheAiProvider")}
           </p>
         </CardBody>
       </Card>

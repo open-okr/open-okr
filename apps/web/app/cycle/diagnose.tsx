@@ -24,12 +24,20 @@ export interface Issue {
   readonly promotedToPriorityId: string | null;
 }
 
-const SOURCE_LABEL: Readonly<Record<string, string>> = {
-  manual: "Raised here",
-  carry_forward: "Carried forward",
-  process_health: "Process health",
-  coach: "Proposed by the Coach",
-};
+function sourceLabel(source: string, t: (key: string) => string): string {
+  switch (source) {
+    case "manual":
+      return t("cycle.diagnose.source.manual");
+    case "carry_forward":
+      return t("cycle.diagnose.source.carryForward");
+    case "process_health":
+      return t("session.detail.minutes.processHealth");
+    case "coach":
+      return t("cycle.diagnose.source.coach");
+    default:
+      return source;
+  }
+}
 
 export async function Diagnose({
   cycleId,
@@ -72,10 +80,11 @@ export async function Diagnose({
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-sm text-ink">{issue.text}</span>
                   <span className="text-xs text-ink-3">
-                    {SOURCE_LABEL[issue.source] ?? issue.source}
                     {issue.promotedToPriorityId
-                      ? " · promoted to a priority"
-                      : ""}
+                      ? t("cycle.diagnose.promotedToAPriority", {
+                          source: sourceLabel(issue.source, t),
+                        })
+                      : sourceLabel(issue.source, t)}
                   </span>
                 </span>
                 {canEdit ? (

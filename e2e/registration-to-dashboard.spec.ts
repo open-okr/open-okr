@@ -128,8 +128,15 @@ test("hydrates, so a write happens without loading a new document", async () => 
   // which P3-T11 replaced. Admin general is where a workspace setting is edited
   // now, and it is the same kind of proof: a real form, a real write, and the
   // page still standing afterwards without the browser fetching a document.
-  await page.getByLabel("Language").fill("en");
-  await page.getByRole("button", { name: "Save" }).click();
+  // A picker since completeness review M-15, which offers the languages the
+  // catalogue has rather than taking any text.
+  await page.getByLabel("Language").selectOption("en");
+  // The general form's own Save: the instance card beside it has one too
+  // since completeness review M-33.
+  await page
+    .locator("form", { has: page.getByLabel("Language") })
+    .getByRole("button", { name: "Save" })
+    .click();
 
   await expect(page.getByLabel("Language")).toBeVisible();
   expect(documentLoads).toBe(0);

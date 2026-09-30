@@ -14,6 +14,14 @@
  * **Revoking is not deleting.** The row stays, marked, so the list can say "you
  * revoked that one on Tuesday" instead of quietly losing it. A person debugging
  * a service that stopped working needs to see that.
+ *
+ * **A token cannot administer tokens** (TECHNICAL-PLAN §8, enforced at
+ * completeness review M-12). Minting, revoking and approving a terminal are
+ * refused to any caller that arrived through a token, a grant or a chat link.
+ * Otherwise a token with read and write scope could call `tokens.create` and
+ * hand itself destructive scope, which is the one thing a scope exists to stop.
+ * Listing stays open: it shows names and prefixes, and nothing on it can be
+ * presented anywhere.
  */
 import {
   activeOnly,
@@ -32,7 +40,28 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { hashDeviceCode, pendingDevice } from "../api/device.ts";
 import { mintApiToken } from "../api/tokens.ts";
 import { OperationError } from "../operations/operation.ts";
-import { defineReadAction, defineWriteAction } from "./define.ts";
+import {
+  type ActionCallContext,
+  defineReadAction,
+  defineWriteAction,
+} from "./define.ts";
+
+/**
+ * Refuses a call that did not come from the browser.
+ *
+ * The browser is the one surface that names no channel. Every other one, REST,
+ * the agent endpoint and chat, arrives holding a credential already, and a new
+ * token must not be a way for that credential to become wider. Checked before
+ * the transaction opens, like every other authorisation.
+ */
+function refuseUnlessSignedIn(
+  context: ActionCallContext,
+  message: string,
+): void {
+  if (context.channel !== undefined) {
+    throw new OperationError("forbidden", message);
+  }
+}
 
 /** What a list shows. Never the token, and never a hash. */
 const tokenSummary = z.object({
@@ -150,54 +179,63 @@ export const createApiToken = defineWriteAction({
   // workspace's own context. The token cannot exceed what the member can
   // already do, so nothing here is an escalation.
   access: ACCESS_LEVELS.edit,
-  operation: (_context, input) => ({
-    async execute({ tx, workspaceId, actor }) {
-      if (!actor.memberId) {
-        throw new OperationError("forbidden", "No member to mint a token for.");
-      }
-      const minted = mintApiToken(input.audience);
-      const now = new Date();
-      const expiresAt =
-        input.expiresInDays === null
-          ? null
-          : new Date(now.getTime() + input.expiresInDays * 86_400_000);
+  operation: (context, input) => {
+    refuseUnlessSignedIn(
+      context,
+      "A token is made on the tokens screen, by you, signed in. It cannot be made through another token, so no token can give itself more scope.",
+    );
+    return {
+      async execute({ tx, workspaceId, actor }) {
+        if (!actor.memberId) {
+          throw new OperationError(
+            "forbidden",
+            "No member to mint a token for.",
+          );
+        }
+        const minted = mintApiToken(input.audience);
+        const now = new Date();
+        const expiresAt =
+          input.expiresInDays === null
+            ? null
+            : new Date(now.getTime() + input.expiresInDays * 86_400_000);
 
-      const [row] = await tx
-        .insert(apiTokens)
-        .values({
-          workspaceId,
-          memberId: actor.memberId,
-          name: input.name,
-          audience: input.audience,
-          tokenHash: minted.hash,
-          prefix: minted.prefix,
-          scopes: [...input.scopes],
-          expiresAt,
-        })
-        .returning({ id: apiTokens.id });
-      if (!row) {
-        throw new OperationError("not_found", "Could not mint that token.");
-      }
+        const [row] = await tx
+          .insert(apiTokens)
+          .values({
+            workspaceId,
+            memberId: actor.memberId,
+            name: input.name,
+            audience: input.audience,
+            tokenHash: minted.hash,
+            prefix: minted.prefix,
+            scopes: [...input.scopes],
+            expiresAt,
+          })
+          .returning({ id: apiTokens.id });
+        if (!row) {
+          throw new OperationError("not_found", "Could not mint that token.");
+        }
 
-      return {
-        result: { id: row.id, token: minted.raw, prefix: minted.prefix },
-        activity: {
-          kind: "api_token.created",
-          subjectType: "api_token",
-          subjectId: row.id,
-          // The name and audience, not the prefix: a feed entry says which
-          // token this was without being a step towards presenting it.
-          payload: { name: input.name, audience: input.audience },
-        },
-        audit: {
-          action: "tokens.create",
-          targetType: "api_token",
-          targetId: row.id,
-          payload: { audience: input.audience, scopes: input.scopes },
-        },
-      };
-    },
-  }),
+        return {
+          result: { id: row.id, token: minted.raw, prefix: minted.prefix },
+          activity: {
+            kind: "api_token.created",
+            subjectType: "api_token",
+            subjectId: row.id,
+            // The name and audience, not the prefix: a feed entry says which
+            // token this was without being a step towards presenting it.
+            payload: { name: input.name, audience: input.audience },
+          },
+          audit: {
+            action: "tokens.create",
+            targetType: "api_token",
+            targetId: row.id,
+            payload: { audience: input.audience, scopes: input.scopes },
+          },
+        };
+      },
+    };
+  },
 });
 
 export const revokeApiToken = defineWriteAction({
@@ -209,52 +247,58 @@ export const revokeApiToken = defineWriteAction({
   // Destructive: it takes away a capability something is currently using, and
   // there is no undo. A scope for that is the point of having three.
   safety: "destructive",
-  operation: (_context, input) => ({
-    async execute({ tx, workspaceId, actor }) {
-      if (!actor.memberId) {
-        throw new OperationError("forbidden", "No member.");
-      }
-      // openokr:allow-mutation: revoking is this action's whole purpose and it
-      // runs inside the Operation pipeline's transaction.
-      const [row] = await tx
-        .update(apiTokens)
-        .set({ revokedAt: new Date(), updatedAt: new Date() })
-        .where(
-          activeOnly(
-            apiTokens,
-            eq(apiTokens.workspaceId, workspaceId),
-            eq(apiTokens.id, input.id),
-            // Your own, and only your own. Somebody else's token is not
-            // yours to revoke, and this returns not-found rather than
-            // refusing, so a probe learns nothing about which ids exist.
-            eq(apiTokens.memberId, actor.memberId),
-            isNull(apiTokens.revokedAt),
-          ),
-        )
-        .returning({ id: apiTokens.id, name: apiTokens.name });
-      if (!row) {
-        throw new OperationError(
-          "not_found",
-          "No such token, or it is already revoked.",
-        );
-      }
+  operation: (context, input) => {
+    refuseUnlessSignedIn(
+      context,
+      "A token is revoked on the tokens screen, by you, signed in. A token cannot revoke tokens, so a leaked one cannot switch off the ones you still use.",
+    );
+    return {
+      async execute({ tx, workspaceId, actor }) {
+        if (!actor.memberId) {
+          throw new OperationError("forbidden", "No member.");
+        }
+        // openokr:allow-mutation: revoking is this action's whole purpose and it
+        // runs inside the Operation pipeline's transaction.
+        const [row] = await tx
+          .update(apiTokens)
+          .set({ revokedAt: new Date(), updatedAt: new Date() })
+          .where(
+            activeOnly(
+              apiTokens,
+              eq(apiTokens.workspaceId, workspaceId),
+              eq(apiTokens.id, input.id),
+              // Your own, and only your own. Somebody else's token is not
+              // yours to revoke, and this returns not-found rather than
+              // refusing, so a probe learns nothing about which ids exist.
+              eq(apiTokens.memberId, actor.memberId),
+              isNull(apiTokens.revokedAt),
+            ),
+          )
+          .returning({ id: apiTokens.id, name: apiTokens.name });
+        if (!row) {
+          throw new OperationError(
+            "not_found",
+            "No such token, or it is already revoked.",
+          );
+        }
 
-      return {
-        result: row,
-        activity: {
-          kind: "api_token.revoked",
-          subjectType: "api_token",
-          subjectId: row.id,
-          payload: { name: row.name },
-        },
-        audit: {
-          action: "tokens.revoke",
-          targetType: "api_token",
-          targetId: row.id,
-        },
-      };
-    },
-  }),
+        return {
+          result: row,
+          activity: {
+            kind: "api_token.revoked",
+            subjectType: "api_token",
+            subjectId: row.id,
+            payload: { name: row.name },
+          },
+          audit: {
+            action: "tokens.revoke",
+            targetType: "api_token",
+            targetId: row.id,
+          },
+        };
+      },
+    };
+  },
 });
 
 /**
@@ -312,72 +356,78 @@ export const decideDevice = defineWriteAction({
   }),
   output: z.object({ clientName: z.string(), approved: z.boolean() }),
   access: ACCESS_LEVELS.edit,
-  operation: (_context, input) => ({
-    deviceCodeHash: hashDeviceCode(input.userCode),
-    async execute({ tx, workspaceId, actor }) {
-      if (!actor.memberId) {
-        throw new OperationError("forbidden", "No member to authorise as.");
-      }
-      const now = new Date();
-      // openokr:allow-mutation: deciding the request is this action's whole
-      // purpose, and it runs inside the Operation pipeline's transaction.
-      const [row] = await tx
-        .update(deviceAuthorisations)
-        .set({
-          workspaceId,
-          approvedMemberId: input.approve ? actor.memberId : null,
-          approvedAt: input.approve ? now : null,
-          deniedAt: input.approve ? null : now,
-          updatedAt: now,
-        })
-        .where(
-          activeOnly(
-            deviceAuthorisations,
-            eq(
-              deviceAuthorisations.userCodeHash,
-              hashDeviceCode(input.userCode),
+  operation: (context, input) => {
+    refuseUnlessSignedIn(
+      context,
+      "A terminal is approved in the browser, by you, signed in. It cannot be approved through a token, so no token can hand a terminal more scope than it holds.",
+    );
+    return {
+      deviceCodeHash: hashDeviceCode(input.userCode),
+      async execute({ tx, workspaceId, actor }) {
+        if (!actor.memberId) {
+          throw new OperationError("forbidden", "No member to authorise as.");
+        }
+        const now = new Date();
+        // openokr:allow-mutation: deciding the request is this action's whole
+        // purpose, and it runs inside the Operation pipeline's transaction.
+        const [row] = await tx
+          .update(deviceAuthorisations)
+          .set({
+            workspaceId,
+            approvedMemberId: input.approve ? actor.memberId : null,
+            approvedAt: input.approve ? now : null,
+            deniedAt: input.approve ? null : now,
+            updatedAt: now,
+          })
+          .where(
+            activeOnly(
+              deviceAuthorisations,
+              eq(
+                deviceAuthorisations.userCodeHash,
+                hashDeviceCode(input.userCode),
+              ),
+              // Undecided and still live. A decided row is not re-decidable and an
+              // expired one is not decidable at all.
+              isNull(deviceAuthorisations.approvedAt),
+              isNull(deviceAuthorisations.deniedAt),
+              gt(deviceAuthorisations.expiresAt, now),
             ),
-            // Undecided and still live. A decided row is not re-decidable and an
-            // expired one is not decidable at all.
-            isNull(deviceAuthorisations.approvedAt),
-            isNull(deviceAuthorisations.deniedAt),
-            gt(deviceAuthorisations.expiresAt, now),
-          ),
-        )
-        .returning({
-          id: deviceAuthorisations.id,
-          clientName: deviceAuthorisations.clientName,
-          requestedScopes: deviceAuthorisations.requestedScopes,
-        });
+          )
+          .returning({
+            id: deviceAuthorisations.id,
+            clientName: deviceAuthorisations.clientName,
+            requestedScopes: deviceAuthorisations.requestedScopes,
+          });
 
-      if (!row) {
-        throw new OperationError(
-          "not_found",
-          "No such code, or it has expired or already been answered.",
-        );
-      }
+        if (!row) {
+          throw new OperationError(
+            "not_found",
+            "No such code, or it has expired or already been answered.",
+          );
+        }
 
-      return {
-        result: { clientName: row.clientName, approved: input.approve },
-        activity: {
-          kind: input.approve ? "device.approved" : "device.denied",
-          subjectType: "device_authorisation",
-          subjectId: row.id,
-          // The name the terminal gave, snapshotted: the row is a ten-minute
-          // artefact and the feed entry has to keep reading sensibly after it.
-          payload: { clientName: row.clientName },
-        },
-        audit: {
-          action: "tokens.approveDevice",
-          targetType: "device_authorisation",
-          targetId: row.id,
-          payload: {
-            clientName: row.clientName,
-            approved: input.approve,
-            scopes: row.requestedScopes,
+        return {
+          result: { clientName: row.clientName, approved: input.approve },
+          activity: {
+            kind: input.approve ? "device.approved" : "device.denied",
+            subjectType: "device_authorisation",
+            subjectId: row.id,
+            // The name the terminal gave, snapshotted: the row is a ten-minute
+            // artefact and the feed entry has to keep reading sensibly after it.
+            payload: { clientName: row.clientName },
           },
-        },
-      };
-    },
-  }),
+          audit: {
+            action: "tokens.approveDevice",
+            targetType: "device_authorisation",
+            targetId: row.id,
+            payload: {
+              clientName: row.clientName,
+              approved: input.approve,
+              scopes: row.requestedScopes,
+            },
+          },
+        };
+      },
+    };
+  },
 });

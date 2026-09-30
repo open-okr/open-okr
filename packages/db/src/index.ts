@@ -360,6 +360,7 @@ export {
   instanceOperators,
 } from "./schema/instance-operators.ts";
 export {
+  INVITE_MEMBER_KINDS,
   type InviteLink,
   type InviteMode,
   inviteLinks,
@@ -606,6 +607,7 @@ export {
   withProviderTeam,
   withSSOLookup,
   withSystemScan,
+  withTrustedEmailDomain,
   withUser,
   withWorkspace,
 } from "./tenant.ts";

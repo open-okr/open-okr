@@ -64,7 +64,7 @@ function QuestionRow({
   const save = useCallback(() => {
     onProblem(null);
     if (body.trim().length === 0) {
-      onProblem("An unanswered question is better left unanswered than blank.");
+      onProblem(t("session.detail.managementRetro.anUnansweredQuestion"));
       return;
     }
     startTransition(async () => {
@@ -78,11 +78,13 @@ function QuestionRow({
         router.refresh();
       } catch (error) {
         onProblem(
-          error instanceof Error ? error.message : "That did not save.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.thatDidNotSave"),
         );
       }
     });
-  }, [body, onProblem, question.questionKey, router, sessionId]);
+  }, [body, onProblem, question.questionKey, router, sessionId, t]);
 
   return (
     <li className="flex flex-col gap-1.5 rounded-md border border-line p-2.5">
@@ -121,7 +123,9 @@ function QuestionRow({
             disabled={pending}
             onClick={() => setOpen(true)}
           >
-            {question.body === null ? "Answer it" : "Change the answer"}
+            {question.body === null
+              ? t("session.detail.managementRetro.answerIt")
+              : t("session.detail.managementRetro.changeTheAnswer")}
           </Button>
         </span>
       ) : null}

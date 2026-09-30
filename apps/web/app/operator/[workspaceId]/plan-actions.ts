@@ -4,6 +4,7 @@ import { OperationError, setPlanAsOperator } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * The operator's plan change on S-46 (completeness review H-21).
@@ -20,6 +21,7 @@ export interface OperatorPlanState {
 
 export async function setPlan(formData: FormData): Promise<OperatorPlanState> {
   const operator = await requireOperator();
+  const { t } = await getTranslations();
   const workspaceId = String(formData.get("workspaceId") ?? "");
   const planKey = String(formData.get("planKey") ?? "");
   const seatsRaw = String(formData.get("seats") ?? "").trim();
@@ -28,10 +30,10 @@ export async function setPlan(formData: FormData): Promise<OperatorPlanState> {
   // Checked here so the operator reads a sentence rather than an error page.
   // The domain door validates both again.
   if (seats !== undefined && !(Number.isInteger(seats) && seats >= 1)) {
-    return { error: "Seats must be a whole number of at least 1." };
+    return { error: t("operator.plan.seatsWhole") };
   }
   if (reason === "") {
-    return { error: "A plan change needs a reason." };
+    return { error: t("operator.plan.needsReason") };
   }
   try {
     await setPlanAsOperator(getPool(), {

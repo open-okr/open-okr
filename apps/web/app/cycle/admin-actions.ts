@@ -16,6 +16,8 @@ import { requireWorkspace } from "../../lib/workspace";
 
 export interface CycleResult {
   readonly error: string | null;
+  /** The cycle a create made, so the screen can open it. */
+  readonly id?: string;
 }
 
 async function context() {
@@ -34,22 +36,30 @@ const refused = (error: unknown): CycleResult => {
   throw error;
 };
 
-export async function createCycle(input: { on: string }): Promise<CycleResult> {
+export async function createCycle(input: {
+  on: string;
+  mode: "annual" | "quarterly";
+}): Promise<CycleResult> {
+  let id: string;
   try {
-    // The cadence is deliberately not passed: the workspace's own rhythm
-    // decides it, and a picker here would be a second place to answer a
-    // question §4.14 already answers.
-    await callAction(await context(), "cycles.create", {
+    // **The horizon is passed, the cadence is not** (completeness review
+    // M-06). Passing neither made the quarter every time, so an annual cycle
+    // could not be made from the browser at all. The screen knows which of
+    // §2.1's two horizons the reader is looking at; the cadence inside the
+    // quarterly one is the workspace's own, and the action reads it.
+    const created = await callAction(await context(), "cycles.create", {
       on: input.on,
+      mode: input.mode,
       // Not the first cycle: provisioning made that one, and claiming it here
       // would change how the period is anchored.
       firstCycle: false,
     });
+    id = created.id;
   } catch (error) {
     return refused(error);
   }
   revalidatePath("/", "layout");
-  return { error: null };
+  return { error: null, id };
 }
 
 export async function updateCycleDates(input: {

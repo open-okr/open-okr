@@ -25,11 +25,12 @@ import { ScheduleSessions } from "./schedule.tsx";
 
 type Row = Awaited<ReturnType<typeof callAction<"sessions.mine">>>[number];
 
+/** Catalogue keys, one per ritual kind. */
 const KIND_LABEL: Record<string, string> = {
-  weekly: "Weekly",
-  monthly: "Monthly",
-  quarterly: "Quarterly",
-  annual: "Annual",
+  weekly: "welcome.rhythm.weekly",
+  monthly: "welcome.rhythm.monthly",
+  quarterly: "sessions.kindQuarterly",
+  annual: "sessions.kindAnnual",
 };
 
 /** The date a member reads, in the workspace's own words rather than an ISO string. */
@@ -45,6 +46,7 @@ async function SessionRow({ row }: { readonly row: Row }) {
   const { t } = await getTranslations();
 
   const running = row.state === "running";
+  const kindKey = KIND_LABEL[row.kind];
   return (
     <Link
       href={`/session/${row.id}`}
@@ -65,14 +67,16 @@ async function SessionRow({ row }: { readonly row: Row }) {
           ) : null}
         </div>
         <p className="truncate text-xs text-ink-3">
-          {KIND_LABEL[row.kind] ?? row.kind}
+          {kindKey ? t(kindKey) : row.kind}
           {row.spaceName ? ` · ${row.spaceName}` : ""}
           {` · ${whenLabel(row.scheduledFor)}`}
-          {running && row.stageKey ? ` · on ${row.stageKey}` : ""}
+          {running && row.stageKey ? (
+            <> · {t("sessions.onStage", { stage: row.stageKey })}</>
+          ) : null}
         </p>
       </div>
       <span className="ml-auto flex-none text-xs font-semibold text-brand-text">
-        {running ? "Rejoin" : "Open"}
+        {running ? t("sessions.rejoin") : t("cycle.drafting.open")}
       </span>
     </Link>
   );
@@ -121,7 +125,9 @@ export default async function SessionsPage({
             className={buttonVariants({ variant: "ghost", size: "sm" })}
             href={includeFinished ? "/sessions" : "/sessions?finished=1"}
           >
-            {includeFinished ? "Hide finished" : "Show finished"}
+            {includeFinished
+              ? t("sessions.hideFinished")
+              : t("sessions.showFinished")}
           </Link>
         </CardHeader>
       </Card>
@@ -145,9 +151,11 @@ export default async function SessionsPage({
         </Card>
       ) : (
         <>
-          <Group label="In progress" rows={running} />
-          <Group label="Ahead" rows={ahead} />
-          {includeFinished ? <Group label="Finished" rows={over} /> : null}
+          <Group label={t("common.inProgress")} rows={running} />
+          <Group label={t("sessions.ahead")} rows={ahead} />
+          {includeFinished ? (
+            <Group label={t("sessions.finished")} rows={over} />
+          ) : null}
         </>
       )}
 

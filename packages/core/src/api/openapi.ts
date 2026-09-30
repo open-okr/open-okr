@@ -26,6 +26,7 @@
  * early rather than at the server.
  */
 import { type ZodType, z } from "zod";
+import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { API_ERROR_CODES, statusFor } from "./errors.ts";
 import {
   API_BASE,
@@ -209,8 +210,17 @@ function operationFor(route: RestRoute): JsonObject {
  * Deterministic: the routes are in registry order and every object is built in
  * a fixed key order, so two runs over the same registry produce byte-identical
  * JSON. The drift check depends on that.
+ *
+ * **The title is the instance's name when one is given** (completeness review
+ * M-33). The live document at `/api/v1/openapi.json` describes the instance
+ * serving it, so it carries that instance's name. The committed
+ * `contract/openapi.json` is generated with no instance and says "OpenOKR",
+ * which keeps `pnpm check:contract` stable whatever anybody calls their
+ * deployment. The description names the software and stays as it is.
  */
-export function buildOpenApiDocument(): JsonObject {
+export function buildOpenApiDocument(
+  options: { readonly title?: string } = {},
+): JsonObject {
   const paths: JsonObject = {};
   for (const route of REST_ROUTES) {
     paths[route.path] = {
@@ -221,7 +231,7 @@ export function buildOpenApiDocument(): JsonObject {
   return {
     openapi: "3.1.0",
     info: {
-      title: "OpenOKR",
+      title: instanceNameOr(options.title),
       version: DOCUMENT_VERSION,
       description: [
         "Every read and write in OpenOKR, projected from one action registry.",
