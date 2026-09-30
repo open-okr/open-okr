@@ -25,6 +25,12 @@ const RECOVERY_ACTIONS: ReadonlySet<string> = new Set([
   // is lifting, and a cloud workspace could be suspended and never
   // reactivated.
   "workspace.setLifecycle",
+  // Turning a single sign-on connection off, and on again. A compromised
+  // identity provider has to be shut out whatever state the workspace is in,
+  // and a freeze is exactly when somebody is dealing with an incident.
+  // Changing or removing a connection is not recovery and stays refused.
+  // Akmal's decision, 30 September 2026.
+  "sso.setConnectionEnabled",
 ]);
 
 const RECOVERY_PREFIXES: readonly string[] = ["people.", "settings."];

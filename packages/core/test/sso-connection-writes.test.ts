@@ -384,6 +384,48 @@ describe("turning a connection off and on", () => {
   });
 });
 
+/**
+ * A compromised identity provider has to be switched off whatever state the
+ * workspace is in. A freeze collapses every write to view-only except the
+ * recovery list, and turning a connection off is on it; changing or removing
+ * one is not.
+ */
+describe.each(["frozen", "read_only"] as const)(
+  "in a workspace that is %s",
+  (state) => {
+    it("a connection can still be turned off and on, and nothing else about it changes", async () => {
+      const wb = await workerDb();
+      const created = await create(oidc({ enforce: true }));
+      await callAction(await owner(), "workspace.setState", { state });
+
+      const off = await callAction(await owner(), "sso.setConnectionEnabled", {
+        id: created.id,
+        enabled: false,
+      });
+      expect(off.enabled).toBe(false);
+      expect(await listSSOProviders(wb.appPool)).toEqual([]);
+
+      await expect(
+        callAction(await owner(), "sso.updateConnection", {
+          id: created.id,
+          displayName: "Renamed during a freeze",
+        }),
+      ).rejects.toThrow();
+      await expect(
+        callAction(await owner(), "sso.removeConnection", { id: created.id }),
+      ).rejects.toThrow();
+
+      await callAction(await owner(), "sso.setConnectionEnabled", {
+        id: created.id,
+        enabled: true,
+      });
+      expect(
+        (await listSSOProviders(wb.appPool)).map((p) => p.displayName),
+      ).toEqual(["Sign in with Okta"]);
+    });
+  },
+);
+
 describe("removing a connection", () => {
   it("soft-deletes it, so it is gone from every reader and the row remains", async () => {
     const wb = await workerDb();
