@@ -394,6 +394,9 @@ The review missed these three. Each turned up while fixing another finding, and 
 | M-31 | Search is empty after an archive import, because nothing reindexes | `portability/import.ts` | Audit |
 | M-32 | The review badge is not live, although TECHNICAL-PLAN makes the review inbox live | `lib/review-badge.ts` | Audit |
 | M-33 | The instance name cannot be changed. `OPENOKR_INSTANCE_NAME` and the wizard's name are stored and never read, so every screen, email and message says "OpenOKR". Found after the review: section 5.4a | [instance-registry.ts:41](../packages/core/src/secrets/instance-registry.ts#L41) | Run |
+| M-34 | Trusted-domain auto-join never happens. The trusted domains are saved on `/admin/general` and `invitations.joinByTrustedDomain` exists, but nothing calls it. Found while fixing M-30: section 5.4a | [invitations.ts](../packages/core/src/actions/invitations.ts) | Code |
+| M-35 | A goal dependency is added in the alignment studio and can never be removed in the browser. Found while fixing M-30: section 5.4a | [studio/actions.ts](../apps/web/app/goals/studio/actions.ts) | Code |
+| M-36 | A member cannot set their own AI key, which P2-T14's acceptance needs. The three actions exist and no screen calls them. Found while fixing M-30: section 5.4a | [actions/ai.ts](../packages/core/src/actions/ai.ts) | Code |
 
 ### 5.4a Medium: found after the review
 
@@ -461,6 +464,18 @@ The review missed these three. Each turned up while fixing another finding, and 
   - For each email and message builder: given a name, the subject and body use it; given none, they say "OpenOKR".
   - End to end, with `OPENOKR_INSTANCE_NAME` set on the server: the tab title and the sign-in heading show it.
   - The wizard stores no name when the field is left as pre-filled.
+
+**M-34, M-35 and M-36. Three gaps the action-coverage exemptions hid.** `Code`
+
+- **Found** on 30 September 2026, while fixing M-30 by checking every exemption in [action-coverage.test.ts](../apps/web/test/action-coverage.test.ts) against the code. Each was excused by a reason that named a caller which does not exist, which is the pattern section 4.1 describes.
+
+| Finding | What the exemption said | What is true | Plan that asks for it |
+|---|---|---|---|
+| M-34 | `invitations.joinByTrustedDomain`: "the pipeline calls it, from the join route once the domain matches" | Nothing calls it. An administrator can save trusted domains and they change nothing | REQUIREMENTS §4 People and org (P0) "trusted-domain auto-join"; IMPLEMENTATION-PLAN P2 invitations, "trusted-domain joining works" |
+| M-35 | `goals.removeDependency`: "the alignment studio removes them through its own canvas write" | The studio adds a dependency and has no way to remove one | UIUX-PLAN S-16 |
+| M-36 | `ai.setPersonalCredential`, `ai.removePersonalCredential`, `ai.readOwnCredentialStatus`: "no screen yet, and it is P7's own row" | No P7 row builds it | P2-T14 acceptance, "their own key is used"; S-37's deliverables name the personal credential flow |
+
+- **Fix.** Give each its caller, and remove its exemption. M-30 makes the exemption list check its own claims so the next false reason fails the build.
 
 ### 5.5 Low
 
