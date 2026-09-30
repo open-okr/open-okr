@@ -1,0 +1,253 @@
+<!doctype html>
+<!-- window-height:900 -->
+<meta charset="utf-8">
+<title>S-13 OKRs (proposed)</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .pagehead { display: flex; align-items: center; gap: 10px; padding: 0 0 12px; }
+  .cyclesel {
+    height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface); font-size: 12.5px; font-weight: 640; color: var(--ink-2);
+    display: inline-flex; align-items: center; gap: 7px; box-shadow: var(--shadow);
+  }
+  .tabrow { display: flex; align-items: center; gap: 4px; padding: 0 0 12px; }
+  .tab { height: 28px; padding: 0 12px; border-radius: 8px; font-size: 12.5px; font-weight: 620;
+    color: var(--ink-3); display: inline-flex; align-items: center; white-space: nowrap; }
+  .tab.on { background: var(--ink); color: #fff; }
+  .tab .n { font-size: 11px; opacity: .65; margin-left: 5px; }
+
+  .obj { margin-bottom: 12px; }
+  .obj-h { padding: 11px 14px; display: flex; align-items: center; gap: 10px; }
+  .obj-t { font-size: 14px; font-weight: 700; letter-spacing: -.2px; }
+  .obj-m { font-size: 11.5px; color: var(--ink-3); }
+  .lvl { font-size: 9.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+    color: var(--brand-text); background: var(--brand-weak); border: 1px solid var(--brand-line);
+    border-radius: 4px; padding: 1px 5px; flex: none; }
+  .objbar { display: flex; align-items: center; gap: 10px; padding: 0 14px 11px; }
+  .objbar .bar { flex: 1; height: 7px; }
+  .pct { font-size: 12.5px; font-weight: 700; width: 42px; text-align: right; }
+
+  .krhead { padding: 7px 14px; background: var(--bg); border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line); font-size: 10.5px; font-weight: 700;
+    letter-spacing: .4px; text-transform: uppercase; color: var(--ink-4); }
+  .kr { display: grid; grid-template-columns: 1fr 88px 150px 58px 74px;
+    gap: 12px; align-items: center; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+  .kr:hover { background: var(--bg); }
+  .kr-t { font-size: 12.5px; font-weight: 560; }
+  .kr-m { font-size: 11px; color: var(--ink-4); }
+  .addrow { display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+    font-size: 12.5px; font-weight: 620; color: var(--brand-text); }
+  .addrow .plus { width: 17px; height: 17px; border-radius: 5px; display: grid; place-items: center;
+    border: 1px dashed var(--brand-line); background: var(--brand-weak); font-size: 12px; line-height: 1; }
+
+  .coach { display: flex; align-items: flex-start; gap: 9px; margin: 0 14px 11px;
+    padding: 9px 11px; border-radius: 9px;
+    background: var(--warn-bg); border: 1px solid color-mix(in srgb, var(--warn) 22%, transparent); }
+  .coach .k { font-size: 9.5px; font-weight: 800; letter-spacing: .5px; color: var(--warn);
+    border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent); border-radius: 4px;
+    padding: 1px 5px; flex: none; background: var(--surface); }
+  .coach .tx { font-size: 11.5px; color: var(--ink-2); }
+
+  .list { height: 100%; overflow: hidden; }
+  .foot { font-size: 11.5px; color: var(--ink-4); padding: 2px 2px 0; }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brandmark">
+      <div class="logo">O</div>
+      <div><div class="wsname">Northwind Group</div><div class="wssub">FY2026 · Q3</div></div>
+    </div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10h-5l-2 3h-2l-2-3H4z"/></svg>Review<span class="badge">7</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20h4"/></svg>Inbox<span class="badge mute">12</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.3-4.3"/></svg>Search</div>
+    <div class="navsec">OKR</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>Cycle<span class="chip brand" style="margin-left:auto;height:17px;font-size:10px">P5</span></div>
+    <div class="navitem on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg>OKRs</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/></svg>KPIs<span class="badge">2</span></div>
+    <div class="navsec">Work</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h13"/></svg>Initiatives</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Board</div>
+    <div class="navsec">Spaces</div>
+    <div class="navsub">Revenue</div>
+    <div class="navsub">Product</div>
+    <div class="navsub">Customer Success</div>
+    <div class="agentcard">
+      <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:0 0 5px">Your agents</div>
+      <div class="agentrow"><div class="av bot sm">C</div><div class="nm">OKR Coach</div><div class="st">3 findings</div></div>
+      <div class="agentrow"><div class="av bot2 sm">Ch</div><div class="nm">OKR Champion</div><div class="st">nudged 4</div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">Northwind Group · <b>OKRs</b></div>
+      <div class="searchbox">Search goals, key results, people<span class="kbd">⌘K</span></div>
+      <div class="tools">
+        <div class="btn p">+ New</div>
+        <div class="btn ai">✨ Ask AI<span class="kbd" style="margin-left:6px">⌘J</span></div>
+        <div class="av a3">PR</div>
+      </div>
+    </div>
+
+    <div class="strip">
+      <span class="phase">Phase 5 · Align and commit</span>
+      <span class="sep">·</span>
+      <span class="block">2 gates still unmet</span>
+      <span class="due">Publication in 6 days</span>
+    </div>
+
+    <div class="body">
+      <div class="pagehead">
+        <div>
+          <div class="h1">OKRs</div>
+          <div class="sub">Twelve objectives in this cycle. Yours first.</div>
+        </div>
+        <div class="row" style="margin-left:auto">
+          <div class="cyclesel">Q3 2026 <span class="mut4">▾</span></div>
+          <div class="btn">Filter</div>
+          <div class="btn">Tree</div>
+          <div class="btn p">+ New objective</div>
+        </div>
+      </div>
+
+      <div class="tabrow">
+        <div class="tab on">Mine <span class="n">3</span></div>
+        <div class="tab">My team <span class="n">7</span></div>
+        <div class="tab">Company <span class="n">4</span></div>
+      </div>
+
+      <div class="list stagger">
+
+        <div class="card obj">
+          <div class="obj-h">
+            <span class="lvl">Company</span>
+            <div class="grow col">
+              <div class="obj-t">A new account proves the product to itself in its first thirty days</div>
+              <div class="obj-m">Priya Raman champions it · Ada Lovelace reviews it · Q3 2026</div>
+            </div>
+            <span class="chip ok"><span class="dot"></span>on track</span>
+            <span class="chip">strength 88</span>
+            <span class="chip info">confidence 0.8</span>
+          </div>
+          <div class="objbar">
+            <div class="bar"><i style="width:68%"></i></div>
+            <div class="pct num">68%</div>
+          </div>
+
+          <div class="krhead">Key results</div>
+          <div class="kr">
+            <div class="col">
+              <div class="kr-t">New accounts reaching value within 7 days, from 40 to 70 per cent</div>
+              <div class="kr-m">increase · leading · weight 2 · due 30 Sep</div>
+            </div>
+            <div class="row"><div class="av sm a5">JW</div><span class="tiny mut">Jonas</span></div>
+            <div class="bar"><i style="width:62%"></i></div>
+            <div class="pct num">62%</div>
+            <span class="chip ok"><span class="dot"></span>0.8</span>
+          </div>
+          <div class="kr">
+            <div class="col">
+              <div class="kr-t">Median time to first value, from 14 days to 5</div>
+              <div class="kr-m">reduce · leading · weight 2 · due 30 Sep</div>
+            </div>
+            <div class="row"><div class="av sm a4">DO</div><span class="tiny mut">Daniel</span></div>
+            <div class="bar"><i style="width:80%"></i></div>
+            <div class="pct num">80%</div>
+            <span class="chip ok"><span class="dot"></span>0.9</span>
+          </div>
+          <div class="kr">
+            <div class="col">
+              <div class="kr-t">Support tickets per account per month, from 2.9 to 2.0</div>
+              <div class="kr-m">reduce · lagging · weight 1 · due 30 Sep</div>
+            </div>
+            <div class="row"><div class="av sm a7">MS</div><span class="tiny mut">Maya</span></div>
+            <div class="bar"><i style="width:47%"></i></div>
+            <div class="pct num">47%</div>
+            <span class="chip warn"><span class="dot"></span>0.5</span>
+          </div>
+          <div class="addrow"><span class="plus">+</span>Add a key result</div>
+        </div>
+
+        <div class="card obj">
+          <div class="obj-h">
+            <span class="lvl">Department</span>
+            <div class="grow col">
+              <div class="obj-t">Sell to accounts that can onboard themselves</div>
+              <div class="obj-m">Daniel Osei champions it · Priya Raman reviews it · Q3 2026</div>
+            </div>
+            <span class="chip warn"><span class="dot"></span>at risk</span>
+            <span class="chip">strength 74</span>
+            <span class="chip warn">confidence 0.4</span>
+          </div>
+          <div class="objbar">
+            <div class="bar"><i style="width:41%"></i></div>
+            <div class="pct num">41%</div>
+          </div>
+
+          <div class="coach">
+            <span class="k">KR-2</span>
+            <div class="tx"><b>Measurable.</b> A target but no baseline on "Raise the share of new deals inside the target profile". Without the from, you cannot prove movement.
+              <span class="mut4">Checked as you type, from METHOD.md §4.</span></div>
+            <div class="btn ai sm" style="margin-left:auto">✨ Rewrite</div>
+          </div>
+
+          <div class="krhead">Key results</div>
+          <div class="kr">
+            <div class="col">
+              <div class="kr-t">Raise the share of new deals inside the target profile to 80 per cent</div>
+              <div class="kr-m"><span class="vd warn" style="display:inline-block;vertical-align:-1px;margin-right:5px"></span>increase · leading · weight 2 · <span style="color:var(--warn);font-weight:640">no baseline</span></div>
+            </div>
+            <div class="row"><div class="av sm a4">DO</div><span class="tiny mut">Daniel</span></div>
+            <div class="bar"><i style="width:55%"></i></div>
+            <div class="pct num">55%</div>
+            <span class="chip warn"><span class="dot"></span>0.5</span>
+          </div>
+          <div class="kr">
+            <div class="col">
+              <div class="kr-t">Cut days from signature to kickoff, from 12 to 4</div>
+              <div class="kr-m">reduce · lagging · weight 1 · due 30 Sep</div>
+            </div>
+            <div class="row"><div class="av sm a1">LN</div><span class="tiny mut">Lena</span></div>
+            <div class="bar"><i style="width:33%"></i></div>
+            <div class="pct num">33%</div>
+            <span class="chip bad"><span class="dot"></span>0.3</span>
+          </div>
+          <div class="addrow"><span class="plus">+</span>Add a key result</div>
+        </div>
+
+        <div class="card obj" style="opacity:.99">
+          <div class="obj-h">
+            <span class="lvl">Team</span>
+            <div class="grow col">
+              <div class="obj-t">Bring operating margin back above 15 per cent</div>
+              <div class="obj-m">Maya Sharma champions it · Daniel Osei reviews it · Q3 2026 · recovery OKR for <span style="color:var(--brand-text);font-weight:620">Operating margin</span></div>
+            </div>
+            <span class="chip ok"><span class="dot"></span>on track</span>
+            <span class="chip">strength 91</span>
+            <span class="chip info">confidence 0.7</span>
+          </div>
+          <div class="objbar">
+            <div class="bar"><i style="width:58%"></i></div>
+            <div class="pct num">58%</div>
+          </div>
+          <div class="krhead">Key results</div>
+          <div class="kr">
+            <div class="col">
+              <div class="kr-t">Self-serve deflection rate, from 17 to 35 per cent</div>
+              <div class="kr-m">increase · leading · weight 1 · due 30 Sep</div>
+            </div>
+            <div class="row"><div class="av sm a7">MS</div><span class="tiny mut">Maya</span></div>
+            <div class="bar"><i style="width:58%"></i></div>
+            <div class="pct num">58%</div>
+            <span class="chip ok"><span class="dot"></span>0.7</span>
+          </div>
+          <div class="addrow"><span class="plus">+</span>Add a key result</div>
+        </div>
+
+        <div class="foot">Progress is computed from key result values. Health is reported at check-in and turns outdated on its own. The two are never the same number.</div>
+      </div>
+    </div>
+  </div>
+</div>

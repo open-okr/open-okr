@@ -71,6 +71,12 @@ Moves, not deletions:
 the sidebar and the avatar menu agree with the registry. Every moved row needs
 its new door asserted there, or a screen goes dark and no test notices.
 
+**Drawn.** [12-okr-home](../stakeholder/mockups/png/12-okr-home.png) is the
+list, [12b-okr-create](../stakeholder/mockups/png/12b-okr-create.png) is the
+create action in both its states. Sources in
+`docs/stakeholder/mockups/src/`. They illustrate this proposal and nothing
+else: no specification cites them, and they are deleted if this is rejected.
+
 ### 3.2 OKRs becomes the screen the complaint asked for
 
 ```
