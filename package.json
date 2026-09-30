@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:ci": "vitest run --config vitest.ci.config.ts --retry=2",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "turbo run typecheck --concurrency=4",
     "lint": "biome check --max-diagnostics=400 .",
     "lint:fix": "biome check --write --max-diagnostics=400 .",
     "dead-code": "knip",
