@@ -18,9 +18,19 @@
  */
 import { ssoProviders } from "@openokr/db";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import type { SSOProviderConfig } from "./sso.ts";
+
+/**
+ * What writes the derived row: a pool's own connection, or the transaction
+ * of the Operation that changed the authority.
+ *
+ * The second is what an edit, a switch and a removal use, so the derived row
+ * commits with the change it follows or not at all. A derived row written on a
+ * separate connection could land for a change that then rolled back.
+ */
+type DerivedTableWriter = Pick<NodePgDatabase, "insert" | "delete">;
 
 /**
  * What the plugin stores in its `samlConfig` column.
@@ -97,20 +107,44 @@ export async function syncSamlProvider(
   connection: SSOProviderConfig,
   baseUrl: string,
 ): Promise<void> {
-  const db = drizzle(pool);
+  await writeSamlProvider(drizzle(pool), connection, baseUrl);
+}
 
+/**
+ * Removes the derived row for one provider, if it has one.
+ *
+ * What turning a connection off and removing it both need: the plugin must
+ * stop answering for a provider the product no longer offers, and the
+ * reload that would remove it anyway is up to a few seconds away.
+ */
+export async function removeSamlProvider(
+  db: DerivedTableWriter,
+  providerId: string,
+): Promise<void> {
+  // openokr:allow-mutation: `sso_providers` is a Better Auth table, outside
+  // the Operation pipeline the way `users` and `sessions` are. The audited
+  // change is the one on `sso_connections`; this is its consequence.
+  await db.delete(ssoProviders).where(eq(ssoProviders.providerId, providerId));
+}
+
+/**
+ * `syncSamlProvider` on a writer the caller already holds.
+ *
+ * An Operation passes its own transaction, so the derived row and the change
+ * to the authority commit together.
+ */
+export async function writeSamlProvider(
+  db: DerivedTableWriter,
+  connection: SSOProviderConfig,
+  baseUrl: string,
+): Promise<void> {
   if (
     connection.kind !== "saml" ||
     !connection.samlEntryPoint ||
     !connection.samlIssuer ||
     !connection.samlCertificate
   ) {
-    // openokr:allow-mutation: `sso_providers` is a Better Auth table, outside
-    // the Operation pipeline the way `users` and `sessions` are. The audited
-    // change is the one on `sso_connections`; this is its consequence.
-    await db
-      .delete(ssoProviders)
-      .where(eq(ssoProviders.providerId, connection.providerId));
+    await removeSamlProvider(db, connection.providerId);
     return;
   }
 

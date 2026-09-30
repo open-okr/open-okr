@@ -1,12 +1,10 @@
 import { loadEnv } from "@openokr/config";
-import {
-  listWorkspaceSSOProviders,
-  samlServiceProviderUrls,
-} from "@openokr/core";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { callAction, samlServiceProviderUrls } from "@openokr/core";
+import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
+import { ConnectionControls } from "./connection-controls";
 import { SSOForm } from "./sso-form";
 
 /**
@@ -22,15 +20,25 @@ import { SSOForm } from "./sso-form";
  * provider needs this instance's entity id and assertion consumer address.
  * Until they were printed here the second half was only obtainable by reading
  * the plugin's source, which is not a thing to ask of an administrator.
+ *
+ * **Every connection can be changed, turned off and removed here.** Until
+ * then the screen only added them, and anything else meant SQL on
+ * `sso_connections`. The list reads `sso.listConnections`, which holds this
+ * workspace's own connections under its own tenant floor (completeness review
+ * L-21), turned-off ones included so they can be turned on again, and never
+ * the client secret.
  */
 export default async function SSOPage() {
   const { t } = await getTranslations();
-  const pool = getPool();
-  const { workspace } = await requireWorkspace();
-  // This workspace's own, never the instance's (completeness review L-21).
-  const connections = await listWorkspaceSSOProviders(
-    pool,
-    workspace.workspaceId,
+  const { session, workspace } = await requireWorkspace();
+  const connections = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sso.listConnections",
+    {},
   );
   const baseUrl = loadEnv().BETTER_AUTH_URL;
 
@@ -44,6 +52,9 @@ export default async function SSOPage() {
           <p className="text-sm text-ink-3">
             {t("admin.sso.connectAnIdentityProvider")}
           </p>
+          <p className="text-sm text-ink-3">
+            {t("admin.sso.aChangeTakesEffect")}
+          </p>
         </CardHeader>
         <CardBody>
           {connections.length === 0 ? (
@@ -53,11 +64,12 @@ export default async function SSOPage() {
           ) : (
             <ul className="flex flex-col gap-2">
               {connections.map((c) => {
-                const urls = samlServiceProviderUrls(baseUrl, c.id);
+                const urls = samlServiceProviderUrls(baseUrl, c.signInId);
                 return (
                   <li
                     key={c.id}
-                    className="flex flex-col gap-2 rounded-control border border-ink/10 px-3 py-2"
+                    className="flex flex-col gap-2 rounded-control border border-line px-3 py-2"
+                    data-testid={`sso-connection-${c.providerId}`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
@@ -80,14 +92,22 @@ export default async function SSOPage() {
                               : t("admin.sso.allEmailDomains")}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                        {t("admin.sso.active")}
-                      </span>
+                      {/* A label beside the tone, so the state never rests
+                       * on colour alone. */}
+                      {c.enabled ? (
+                        <Chip tone="ok" dot className="shrink-0">
+                          {t("admin.sso.active")}
+                        </Chip>
+                      ) : (
+                        <Chip tone="neutral" dot className="shrink-0">
+                          {t("admin.sso.off")}
+                        </Chip>
+                      )}
                     </div>
                     {c.kind === "saml" && (
                       <dl
-                        className="flex flex-col gap-1 border-t border-ink/10 pt-2 text-xs"
-                        data-testid={`saml-details-${c.id}`}
+                        className="flex flex-col gap-1 border-t border-line pt-2 text-xs"
+                        data-testid={`saml-details-${c.signInId}`}
                       >
                         <div className="flex flex-col gap-0.5">
                           <dt className="text-ink-3">
@@ -120,6 +140,7 @@ export default async function SSOPage() {
                         </div>
                       </dl>
                     )}
+                    <ConnectionControls connection={c} />
                   </li>
                 );
               })}

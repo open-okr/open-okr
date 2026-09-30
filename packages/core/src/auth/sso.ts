@@ -230,12 +230,20 @@ interface ProviderInfoRow extends Record<string, unknown> {
   enforce: boolean;
 }
 
-const providerInfo = (workspaceId?: string) => sql`
+/**
+ * Every enabled connection on the instance, for the sign-in page.
+ *
+ * **Never for an administration screen.** It reads past the tenant floor,
+ * because the sign-in page has no workspace to read under, and the admin
+ * screen once used it: every workspace's administrator was shown every other
+ * workspace's connections (completeness review L-21). That screen reads
+ * `sso.listConnections` now, under its own workspace's floor.
+ */
+const providerInfo = sql`
   select kind, provider_id, display_name, workspace_id, email_domains, enforce
     from sso_connections
    where enabled = true
      and deleted_at is null
-     ${workspaceId === undefined ? sql`` : sql`and workspace_id = ${workspaceId}`}
    order by display_name`;
 
 const toProviderInfo = (row: ProviderInfoRow): SSOProviderInfo => ({
@@ -246,29 +254,6 @@ const toProviderInfo = (row: ProviderInfoRow): SSOProviderInfo => ({
   emailDomains: row.email_domains,
   enforce: row.enforce,
 });
-
-/**
- * One workspace's own connections, for its administration screen.
- *
- * **Under the tenant floor, not `app.sso_lookup`.** The admin screen used
- * `listSSOProviders`, which reads past the floor because the sign-in page has
- * no workspace to read under. So every workspace's administrator was shown
- * every other workspace's connections: their names, the email domains they
- * cover and whether they are enforced. On the managed cloud that is a list
- * of which customers use which identity provider. Found while fixing
- * completeness review L-15 and recorded as L-21.
- */
-export async function listWorkspaceSSOProviders(
-  pool: Pool,
-  workspaceId: string,
-): Promise<readonly SSOProviderInfo[]> {
-  // The floor and the predicate both, so neither is the only thing standing
-  // between one customer and another's configuration.
-  const { rows } = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
-    tx.execute<ProviderInfoRow>(providerInfo(workspaceId)),
-  );
-  return rows.map(toProviderInfo);
-}
 
 /**
  * Returns the public SSO provider info (no secrets) for the sign-in page.
@@ -285,7 +270,7 @@ export async function listSSOProviders(
 ): Promise<readonly SSOProviderInfo[]> {
   try {
     const { rows } = await withSSOLookup(drizzle(pool), (tx) =>
-      tx.execute<ProviderInfoRow>(providerInfo()),
+      tx.execute<ProviderInfoRow>(providerInfo),
     );
     return rows.map(toProviderInfo);
   } catch (error) {
@@ -524,6 +509,15 @@ function isAbsoluteUrl(value: string | null | undefined): boolean {
  */
 export function validateSSOConnectionInput(
   input: CreateSSOConnectionInput,
+  options: {
+    /**
+     * The connection already holds a sealed client secret and this change
+     * keeps it. An edit leaves the secret blank to mean "keep the one you
+     * have", because the screen never sends a stored secret back to be
+     * re-entered.
+     */
+    readonly keepsSecret?: boolean;
+  } = {},
 ): SSOConnectionProblem | null {
   if (!input.providerId || !/^[a-z0-9-]+$/.test(input.providerId)) {
     return {
@@ -592,7 +586,10 @@ export function validateSSOConnectionInput(
         "The client ID is what identifies this instance to the provider.",
     };
   }
-  if (!input.clientSecret || input.clientSecret.trim() === "") {
+  if (
+    !options.keepsSecret &&
+    (!input.clientSecret || input.clientSecret.trim() === "")
+  ) {
     return {
       field: "clientSecret",
       message:

@@ -14648,6 +14648,692 @@
         }
       }
     },
+    "/sso/listConnections": {
+      "get": {
+        "operationId": "sso.listConnections",
+        "summary": "This workspace's single sign-on connections, turned-off ones included, with every setting except the client secret.",
+        "tags": [
+          "sso"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "oidc",
+                              "saml"
+                            ]
+                          },
+                          "providerId": {
+                            "type": "string"
+                          },
+                          "signInId": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "emailDomains": {
+                            "type": "string"
+                          },
+                          "enforce": {
+                            "type": "boolean"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "clientId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "discoveryUrl": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorizationUrl": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "tokenUrl": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "userInfoUrl": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "scopes": {
+                            "type": "string"
+                          },
+                          "samlEntryPoint": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "samlIssuer": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "samlCertificate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "samlAudience": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "providerId",
+                          "signInId",
+                          "displayName",
+                          "emailDomains",
+                          "enforce",
+                          "enabled",
+                          "clientId",
+                          "discoveryUrl",
+                          "authorizationUrl",
+                          "tokenUrl",
+                          "userInfoUrl",
+                          "scopes",
+                          "samlEntryPoint",
+                          "samlIssuer",
+                          "samlCertificate",
+                          "samlAudience"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
+      }
+    },
+    "/sso/updateConnection": {
+      "post": {
+        "operationId": "sso.updateConnection",
+        "summary": "Changes a single sign-on connection's name, email domains, enforcement and protocol settings. A blank client secret keeps the stored one.",
+        "tags": [
+          "sso"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "oidc",
+                            "saml"
+                          ]
+                        },
+                        "providerId": {
+                          "type": "string"
+                        },
+                        "signInId": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "emailDomains": {
+                          "type": "string"
+                        },
+                        "enforce": {
+                          "type": "boolean"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "clientId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "discoveryUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "authorizationUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "tokenUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "userInfoUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "scopes": {
+                          "type": "string"
+                        },
+                        "samlEntryPoint": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "samlIssuer": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "samlCertificate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "samlAudience": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "providerId",
+                        "signInId",
+                        "displayName",
+                        "emailDomains",
+                        "enforce",
+                        "enabled",
+                        "clientId",
+                        "discoveryUrl",
+                        "authorizationUrl",
+                        "tokenUrl",
+                        "userInfoUrl",
+                        "scopes",
+                        "samlEntryPoint",
+                        "samlIssuer",
+                        "samlCertificate",
+                        "samlAudience"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "emailDomains": {
+                    "type": "string"
+                  },
+                  "enforce": {
+                    "type": "boolean"
+                  },
+                  "clientId": {
+                    "type": "string"
+                  },
+                  "clientSecret": {
+                    "type": "string"
+                  },
+                  "discoveryUrl": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "authorizationUrl": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "tokenUrl": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "userInfoUrl": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "scopes": {
+                    "type": "string"
+                  },
+                  "samlEntryPoint": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "samlIssuer": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "samlCertificate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "samlAudience": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sso/setConnectionEnabled": {
+      "post": {
+        "operationId": "sso.setConnectionEnabled",
+        "summary": "Turns a single sign-on connection off, so nobody signs in through it and it leaves the sign-in page, or on again.",
+        "tags": [
+          "sso"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "oidc",
+                            "saml"
+                          ]
+                        },
+                        "providerId": {
+                          "type": "string"
+                        },
+                        "signInId": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "emailDomains": {
+                          "type": "string"
+                        },
+                        "enforce": {
+                          "type": "boolean"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "clientId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "discoveryUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "authorizationUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "tokenUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "userInfoUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "scopes": {
+                          "type": "string"
+                        },
+                        "samlEntryPoint": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "samlIssuer": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "samlCertificate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "samlAudience": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "providerId",
+                        "signInId",
+                        "displayName",
+                        "emailDomains",
+                        "enforce",
+                        "enabled",
+                        "clientId",
+                        "discoveryUrl",
+                        "authorizationUrl",
+                        "tokenUrl",
+                        "userInfoUrl",
+                        "scopes",
+                        "samlEntryPoint",
+                        "samlIssuer",
+                        "samlCertificate",
+                        "samlAudience"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "enabled"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sso/removeConnection": {
+      "post": {
+        "operationId": "sso.removeConnection",
+        "summary": "Removes a single sign-on connection. Nobody signs in through it again, and an enforced connection's domains go back to passwords.",
+        "tags": [
+          "sso"
+        ],
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/agents/list": {
       "get": {
         "operationId": "agents.list",

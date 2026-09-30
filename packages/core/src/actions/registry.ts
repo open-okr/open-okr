@@ -426,6 +426,12 @@ import {
   updateSpaceSettings,
 } from "./spaces.ts";
 import {
+  listSSOConnections,
+  removeSSOConnection,
+  setSSOConnectionEnabled,
+  updateSSOConnection,
+} from "./sso.ts";
+import {
   addChecklistItem,
   assignTask,
   createTask,
@@ -588,6 +594,12 @@ export const ACTION_MAP = {
   "ai.readUsageSummary": readUsageSummary,
   "ai.readPrivacySettings": readPrivacySettings,
   "ai.updatePrivacySettings": updatePrivacySettings,
+  // Single sign-on connections. Adding one is still `POST /api/v1/admin/sso`,
+  // which predates these; changing, switching and removing one are here.
+  "sso.listConnections": listSSOConnections,
+  "sso.updateConnection": updateSSOConnection,
+  "sso.setConnectionEnabled": setSSOConnectionEnabled,
+  "sso.removeConnection": removeSSOConnection,
   "agents.list": readAgents,
   "agents.create": createAgent,
   "agents.setAutonomy": setAgentAutonomy,

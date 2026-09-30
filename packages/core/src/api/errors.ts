@@ -19,6 +19,7 @@
  * constraint name in a response body is a map of the schema.
  */
 import { ZodError } from "zod";
+import { SSOConnectionRejected } from "../auth/sso.ts";
 import { OperationError } from "../operations/errors.ts";
 import { AdmissionError } from "../tenancy/admission.ts";
 
@@ -117,6 +118,14 @@ export function errorFor(thrown: unknown): ApiError {
   }
   if (thrown instanceof OperationError) {
     return apiError(thrown.code, thrown.message);
+  }
+  if (thrown instanceof SSOConnectionRejected) {
+    // A fourth refusal, and it is about the input like a Zod one is: a single
+    // sign-on connection that would not work if stored. It names its field, so
+    // an API caller learns what to correct rather than that something failed.
+    return apiError("invalid_input", thrown.message, {
+      [thrown.field]: thrown.message,
+    });
   }
   return apiError("internal", "Something went wrong handling that request.");
 }

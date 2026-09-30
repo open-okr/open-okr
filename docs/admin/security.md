@@ -50,10 +50,31 @@ connection every few seconds and rebuilds its sign-in client when it finds
 one, so on a deployment with several processes the others follow within
 seconds. Nobody who is already signed in is signed out by it.
 
-The same holds for a connection somebody changes or removes in the database
-directly: the next sign-in uses the new client id, endpoints or certificate,
-and a removed or disabled provider refuses the next sign-in through it. The
-screen itself only adds connections.
+### Changing, turning off and removing a connection
+
+Every connection on the screen has three controls.
+
+| Control | What it does |
+|---|---|
+| Edit | Opens the same form, filled in. Change the display name, the email domains, enforcement and the protocol's own fields. The client secret field is blank: leave it blank to keep the stored secret, or type a new one to replace it. The provider ID and the protocol cannot be changed, because the provider ID is part of the callback address your identity provider already holds. To use a different one, add a new connection |
+| Turn off, Turn on | Off means nobody signs in through it and it leaves the sign-in page. Nothing else about it changes, so turning it on again restores it as it was |
+| Remove | Asks first, then removes it. It cannot be brought back from the screen, and its provider ID is free to be used by a new connection |
+
+A change, turning a connection off and removing one all work from the next
+sign-in, within a few seconds, with no restart, like adding one.
+
+**Turning off or removing an enforced connection hands its domains back to
+passwords.** Enforcement is read only from connections that are on, so the
+moment one is off or removed, people on its domains sign in with a password
+again. The screen asks before doing either and names the domains.
+
+Each change is recorded in the audit log with the administrator who made it,
+and a new client secret is sealed under the root key like the first one. The
+secret itself never appears in the log.
+
+A connection changed or removed in the database directly is followed the same
+way: the next sign-in uses the new client id, endpoints or certificate, and a
+removed or disabled provider refuses the next sign-in through it.
 
 ## What is encrypted at rest
 

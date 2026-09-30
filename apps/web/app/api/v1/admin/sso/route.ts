@@ -23,6 +23,11 @@ import { expireSSOProviders } from "../../../../../lib/sso";
  * provider posted to it was refused for having no client secret, which it
  * cannot have. One validator now answers for both and names the field, and
  * the screen shows what it said.
+ *
+ * **Only adding is here.** Changing, turning off and removing a connection are
+ * registered actions, `sso.updateConnection`, `sso.setConnectionEnabled` and
+ * `sso.removeConnection`, which run through the Operation pipeline and are
+ * audited. This route predates them and still writes outside it.
  */
 export const dynamic = "force-dynamic";
 

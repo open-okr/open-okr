@@ -71,6 +71,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     (payload as { via: string }).via === "sso"
       ? "Someone joined by signing in through the identity provider"
       : "The directory added someone",
+  "sso.connection_updated": (p) =>
+    `Single sign-on through "${asString(p.name, "a provider")}" was changed`,
+  "sso.connection_switched": (p) =>
+    p.enabled === true
+      ? `Single sign-on through "${asString(p.name, "a provider")}" was turned on`
+      : `Single sign-on through "${asString(p.name, "a provider")}" was turned off`,
+  "sso.connection_removed": (p) =>
+    `Single sign-on through "${asString(p.name, "a provider")}" was removed`,
   "blob.prepared": () => "A file upload was started",
   "blob.claimed": () => "A file was uploaded",
   "blob.scanned": (payload) =>
