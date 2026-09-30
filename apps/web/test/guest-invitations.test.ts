@@ -72,15 +72,35 @@ describe("the action behind it", () => {
 });
 
 describe("where a guest lands", () => {
-  test("the front door sends somebody who holds nothing on the workspace to their spaces", () => {
-    const home = source("../app/(home)/page.tsx");
-    expect(home).toMatch(
+  test("the reader level sends somebody who holds nothing on the workspace to their spaces", () => {
+    expect(source("../lib/access.ts")).toMatch(
       /if \(level < ACCESS_LEVELS\.view\) \{\s*redirect\("\/spaces"\);\s*\}/,
     );
-    // Before any workspace-wide read that would refuse them.
-    expect(home.indexOf('redirect("/spaces")')).toBeLessThan(
-      home.indexOf('"settings.readForMember"'),
+  });
+
+  // Completeness review L-23. The Work Map made this check alone, and eight
+  // other screens asked a workspace-wide read first and showed a guest "We
+  // could not load". Each now takes its level from the one helper, and before
+  // anything it reads.
+  test.each([
+    "../app/(home)/page.tsx",
+    "../app/check-in/page.tsx",
+    "../app/cycle/page.tsx",
+    "../app/goals/page.tsx",
+    "../app/goals/studio/page.tsx",
+    "../app/kpis/page.tsx",
+    "../app/kpis/recovery/page.tsx",
+    "../app/scorecard/page.tsx",
+    "../app/activity/page.tsx",
+  ])("%s moves a guest before its first read", (path) => {
+    const text = source(path);
+    const guard = text.indexOf("workspaceReaderLevel(");
+    const firstRead = text.search(
+      /callAction\(|progressCeiling\(\)|readRhythmForRequest\(\)/,
     );
+    expect(guard).toBeGreaterThan(-1);
+    expect(firstRead).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(firstRead);
   });
 });
 

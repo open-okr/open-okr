@@ -8,7 +8,7 @@ import {
   type ResolvedThresholds,
 } from "@openokr/method";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
-import { resolveAccessLevelFor } from "../../lib/access";
+import { workspaceReaderLevel } from "../../lib/access";
 import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
@@ -82,7 +82,7 @@ export default async function CyclePage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  const level = await resolveAccessLevelFor(
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );

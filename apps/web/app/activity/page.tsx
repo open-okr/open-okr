@@ -1,6 +1,7 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { workspaceReaderLevel } from "../../lib/access";
 import { FeedLive } from "../../lib/feed-live.tsx";
 import { getInstanceName } from "../../lib/instance-name";
 import { getPool } from "../../lib/pool";
@@ -68,6 +69,8 @@ export default async function ActivityPage({
   const { t } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
+  // A guest holds nothing here, and is moved to their spaces (L-23).
+  await workspaceReaderLevel(workspace.workspaceId, workspace.memberId);
   const context = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,

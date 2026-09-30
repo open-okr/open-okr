@@ -8,7 +8,7 @@ import {
   type MessageValues,
 } from "@openokr/ui";
 import Link from "next/link";
-import { resolveAccessLevelFor } from "../../../lib/access";
+import { workspaceReaderLevel } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX, progressCeiling } from "../../../lib/ceilings.ts";
 import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
@@ -83,7 +83,6 @@ function recoverySummary(
 
 export default async function RecoveryBoardPage() {
   const { t } = await getTranslations();
-  const ceiling = await progressCeiling();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -92,11 +91,14 @@ export default async function RecoveryBoardPage() {
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  const level = await resolveAccessLevelFor(
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+  // After the level, because it reads a workspace setting a guest cannot
+  // (L-23).
+  const ceiling = await progressCeiling();
   const board = await callAction(context, "kpis.recoveryBoard", {});
 
   // What launching would create, read before anybody presses it

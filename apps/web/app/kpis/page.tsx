@@ -1,6 +1,6 @@
 import { ACCESS_LEVELS, callAction, RHYTHM_ASSIST_KEYS } from "@openokr/core";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import { resolveAccessLevelFor } from "../../lib/access";
+import { workspaceReaderLevel } from "../../lib/access";
 import { assistOffered } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
 import { KPI_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
@@ -48,7 +48,7 @@ export default async function KpisPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  const level = await resolveAccessLevelFor(
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );

@@ -8,6 +8,7 @@ import {
   type MessageValues,
 } from "@openokr/ui";
 import type { ReactNode } from "react";
+import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
@@ -61,6 +62,8 @@ export default async function GoalsPage({
   const { t } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
+  // A guest holds nothing here, and is moved to their spaces (L-23).
+  await workspaceReaderLevel(workspace.workspaceId, workspace.memberId);
   const context = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,

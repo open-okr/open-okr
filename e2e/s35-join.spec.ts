@@ -283,6 +283,25 @@ test("the guest is told what they are joining, and lands with one space", async 
     visitor.locator(`a[href='/spaces/${guestSpaceId}']`),
   ).toBeVisible();
 
+  // Every other screen that reads the whole workspace does the same, rather
+  // than showing a guest "We could not load" (completeness review L-23). Eight
+  // of them did, which only the server log said until L-04 made it readable.
+  for (const screen of [
+    "/check-in",
+    "/cycle",
+    "/goals",
+    "/goals/studio",
+    "/kpis",
+    "/kpis/recovery",
+    "/scorecard",
+    "/activity",
+  ]) {
+    await visitor.goto(screen);
+    await expect(visitor, `${screen} moves a guest`).toHaveURL(/\/spaces$/, {
+      timeout: 15_000,
+    });
+  }
+
   // A guest, with no binding on the workspace's own context: the state
   // converting a member leaves, reached without passing through a member.
   const member = await pool.query<{ id: string; kind: string }>(
