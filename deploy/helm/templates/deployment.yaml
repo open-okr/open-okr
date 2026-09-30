@@ -130,12 +130,18 @@ spec:
                   name: {{ .Values.storage.s3.existingSecret }}
                   key: {{ .Values.storage.s3.secretAccessKeyKey }}
             {{- end }}
-            {{- /* The optional virus scan. Absent unless a host is named. */}}
-            {{- with .Values.scan.clamd.host }}
+            {{- /* The optional virus scan. Absent unless a host is named.
+                   Read through `default dict` rather than as a path: a
+                   release installed before this block existed and upgraded
+                   with --reuse-values has no `scan` at all, and a path through
+                   a missing map fails the upgrade before anything rolls out. */}}
+            {{- $scan := .Values.scan | default dict }}
+            {{- $clamd := $scan.clamd | default dict }}
+            {{- with $clamd.host }}
             - name: OPENOKR_CLAMD_HOST
               value: {{ . | quote }}
             - name: OPENOKR_CLAMD_PORT
-              value: {{ $.Values.scan.clamd.port | quote }}
+              value: {{ $clamd.port | default 3310 | quote }}
             {{- end }}
           # Ready means the database answers, not merely that the port is open.
           # A pod that is listening but cannot reach Postgres must not receive
