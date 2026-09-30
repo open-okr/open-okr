@@ -4,7 +4,7 @@
 **Commit reviewed:** `main` at `7bbf31e` (the tree is identical to `agung` at `be1bf49`)
 **Question asked:** Development is believed complete. Is it?
 
-> **Fix progress.** ✅ marks a finding fixed and tested. High: 26 of 27 fixed on branch `fix/review-high`, including H-25 to H-27, which turned up during the fixes (section 5.3a). H-23 is a release, which a human cuts. Medium: all 36 fixed on branch `fix/review-medium`, including M-33, found after the review, and M-34 to M-36, which reviewing the coverage exemptions turned up (section 5.4a). Low follows in its own pull request.
+> **Fix progress.** ✅ marks a finding fixed and tested. High: 26 of 27 fixed on branch `fix/review-high`, including H-25 to H-27, which turned up during the fixes (section 5.3a). H-23 is a release, which a human cuts. Medium: all 36 fixed on branch `fix/review-medium`, including M-33, found after the review, and M-34 to M-36, which reviewing the coverage exemptions turned up (section 5.4a). Low: all 23 fixed on branch `fix/review-low`, including L-21 to L-23, which turned up during the fixes.
 
 > **Since the review.** `main` moved to `c529177` with PR #85, which changed documentation and a deck script only. No application, package, deployment or test code changed, so every code finding below still applies. PR #85 fixed the stale README (L-05). It also made H-22 more serious, because the install guides now tell self-hosters to build the image themselves.
 
@@ -524,28 +524,57 @@ The questions these fixes raised for a person are listed in the pull request.
 
 | ID | Finding | Mark |
 |---|---|---|
-| L-01 | The smoke test checks the app straight after `rotate-key`, which returns before the recreated container is serving. Locally, the check failed; the app answered one second later | Run |
-| L-02 | `smoke-test.sh` leaves `deploy/docker/backups/` behind | Run |
-| L-03 | One full test run fills 95% of Docker Desktop's default Postgres tmpfs (162 databases, 2.7 GB) before the next run sweeps them. A slightly larger suite would fail with "no space left" | Run |
-| L-04 | The end-to-end server log holds 1,076 "The destination stream closed early" errors. The noise hides real errors such as H-02 | Run |
-| L-05 | The README said Phase 1 was "in progress", counted 104 tasks, and showed an "in development" badge. **Fixed on `main` by PR #85.** Its new badge says "feature complete", which this review does not support | Code |
-| L-06 | GAP-AUDIT.md's checkboxes were never updated as tasks closed them. Stale comments remain in [notifications/create.ts:10](../packages/core/src/notifications/create.ts#L10), [e2e/reviews.spec.ts:325](../e2e/reviews.spec.ts#L325) and the session page header | Code |
-| L-07 | `biome.json` names schema 2.5.7 against CLI 2.5.14, and there are six lint warnings in two test files | Run |
-| L-08 | Onboarding says "Four questions" over a "1 / 5" counter. It has no tour and cannot be resumed from admin | Run |
-| L-09 | `/favicon.ico` returns 404 on every page | Run |
-| L-10 | Channel webhooks answer 200 for an unknown tenant and 401 for a bad signature, which tells a caller which tenants are installed | Audit |
-| L-11 | Identity-provider OAuth tokens are stored in plain text in `accounts` | Audit |
-| L-12 | The default console mail driver logs full message bodies, including invitation links | Audit |
-| L-13 | `./openokr restore` does not re-run migrations, and the restore runbook names a CronJob that does not exist | Audit |
-| L-14 | 41 tables are not named in the TECHNICAL-PLAN §7.2 importer mapping, and no gate checks it | Audit |
-| L-15 | A new OIDC connection takes effect only after a restart | Audit |
-| L-16 | Rule-key safety is a runtime throw. Nothing checks statically that the keys the code emits exist | Audit |
-| L-17 | No end-to-end path publishes a cycle, overrides a gate, publishes or acknowledges a check-in, or casts a vote. No cloud screen has one | Audit |
-| L-18 | The Caddyfile is unformatted and sets two headers Caddy already forwards | Run |
-| L-19 | The admin audit log can be verified and exported but not browsed | Audit |
-| L-20 | A Helm `values.yaml` comment says local disk is the only storage driver. S3 exists | Audit |
-| L-21 | `/admin/sso` lists every workspace's SSO connections, with their names, email domains and enforcement, because it read the instance-wide list the sign-in page uses. Found while fixing L-15. On the managed cloud this shows one customer which identity provider another uses, so it is arguably Medium; it ships with the Low fixes because the Medium pull request had already passed | Audit |
-| L-22 | The rich-text editor's base styles were blocked in production. TipTap injects them as an inline `<style>`, which the Content-Security-Policy refuses, so the browser logged a violation on every document page and the editor ran without `pre-wrap`. Found while checking a console error during the Medium work | Run |
+| L-01 ✅ | The smoke test checks the app straight after `rotate-key`, which returns before the recreated container is serving. Locally, the check failed; the app answered one second later | Run |
+| L-02 ✅ | `smoke-test.sh` leaves `deploy/docker/backups/` behind | Run |
+| L-03 ✅ | One full test run fills 95% of Docker Desktop's default Postgres tmpfs (162 databases, 2.7 GB) before the next run sweeps them. A slightly larger suite would fail with "no space left" | Run |
+| L-04 ✅ | The end-to-end server log holds 1,076 "The destination stream closed early" errors. The noise hides real errors such as H-02 | Run |
+| L-05 ✅ | The README said Phase 1 was "in progress", counted 104 tasks, and showed an "in development" badge. **Fixed on `main` by PR #85.** Its new badge says "feature complete", which this review does not support | Code |
+| L-06 ✅ | GAP-AUDIT.md's checkboxes were never updated as tasks closed them. Stale comments remain in [notifications/create.ts:10](../packages/core/src/notifications/create.ts#L10), [e2e/reviews.spec.ts:325](../e2e/reviews.spec.ts#L325) and the session page header | Code |
+| L-07 ✅ | `biome.json` names schema 2.5.7 against CLI 2.5.14, and there are six lint warnings in two test files | Run |
+| L-08 ✅ | Onboarding says "Four questions" over a "1 / 5" counter. It has no tour and cannot be resumed from admin | Run |
+| L-09 ✅ | `/favicon.ico` returns 404 on every page | Run |
+| L-10 ✅ | Channel webhooks answer 200 for an unknown tenant and 401 for a bad signature, which tells a caller which tenants are installed | Audit |
+| L-11 ✅ | Identity-provider OAuth tokens are stored in plain text in `accounts` | Audit |
+| L-12 ✅ | The default console mail driver logs full message bodies, including invitation links | Audit |
+| L-13 ✅ | `./openokr restore` does not re-run migrations, and the restore runbook names a CronJob that does not exist | Audit |
+| L-14 ✅ | 41 tables are not named in the TECHNICAL-PLAN §7.2 importer mapping, and no gate checks it | Audit |
+| L-15 ✅ | A new OIDC connection takes effect only after a restart | Audit |
+| L-16 ✅ | Rule-key safety is a runtime throw. Nothing checks statically that the keys the code emits exist | Audit |
+| L-17 ✅ | No end-to-end path publishes a cycle, overrides a gate, publishes or acknowledges a check-in, or casts a vote. No cloud screen has one | Audit |
+| L-18 ✅ | The Caddyfile is unformatted and sets two headers Caddy already forwards | Run |
+| L-19 ✅ | The admin audit log can be verified and exported but not browsed | Audit |
+| L-20 ✅ | A Helm `values.yaml` comment says local disk is the only storage driver. S3 exists | Audit |
+| L-21 ✅ | `/admin/sso` lists every workspace's SSO connections, with their names, email domains and enforcement, because it read the instance-wide list the sign-in page uses. Found while fixing L-15. On the managed cloud this shows one customer which identity provider another uses, so it is arguably Medium; it ships with the Low fixes because the Medium pull request had already passed | Audit |
+| L-22 ✅ | The rich-text editor's base styles were blocked in production. TipTap injects them as an inline `<style>`, which the Content-Security-Policy refuses, so the browser logged a violation on every document page and the editor ran without `pre-wrap`. Found while checking a console error during the Medium work | Run |
+| L-23 ✅ | A guest who opens Check in, Cycle, Goals, the alignment studio, KPIs, the recovery board, the scorecard or the feed is shown "We could not load", and the goals on the guest's own space page fail to draw. Only the Work Map sent a guest to their spaces (M-22). Found by the full end-to-end run once L-04 made the server log readable | Run |
+
+**How each Low finding was fixed**, on branch `fix/review-low`, in the order of the table above.
+
+| Finding | What is true now |
+|---|---|
+| L-01 | The smoke test waits for the app to serve again after `upgrade`, `rotate-key` and `restore` before it checks anything |
+| L-02 | The smoke test keeps its backups in a temporary directory it removes when it ends |
+| L-03 | Each test file drops its own database when it ends, so one full run no longer fills the Postgres tmpfs |
+| L-04 | "The destination stream closed early" is left out of the server log unless `LOG_LEVEL=debug`. It came from the browser cancelling prefetches, and nothing had failed |
+| L-05 | The README says pre-release and points at this review |
+| L-06 | GAP-AUDIT is ticked, and the three stale comments are gone |
+| L-07 | `biome.json` names the schema of the Biome it runs, and lint has no warnings |
+| L-08 | Setup counts its own steps, reopens from General in administration, and a member's first visit gets S-34's five-stop tour |
+| L-09 | `/favicon.ico` and `/icon.svg` are served, and the tab has an icon |
+| L-10 | Every chat webhook gives an unknown tenant and a bad signature the same answer, after the same delay |
+| L-11 | Identity-provider tokens are sealed under the instance root key, and `keys:rotate` re-wraps them |
+| L-12 | The console mail driver keeps message bodies and full addresses out of a production log |
+| L-13 | The restore runbook runs the migrations through the chart's own hook Job. `./openokr restore` already ran them (H-01, H-19) |
+| L-14 | Every table has a row in TECHNICAL-PLAN §7.2, and a test in the importer suite fails when one does not |
+| L-15 | An SSO connection works from the next sign-in, on every process, with no restart |
+| L-16 | A rule key nothing defines is a type error in `pnpm typecheck` |
+| L-17 | End-to-end specs publish a set past its gates, publish, acknowledge and vote on a check-in, and open the cloud screens |
+| L-18 | The Caddyfile is formatted and sets only the forwarded header the smoke test guards |
+| L-19 | The admin audit trail can be browsed, newest first, with the export's filters |
+| L-20 | The Helm values name S3 as the other storage driver |
+| L-21 | The SSO administration screen lists only its own workspace's connections |
+| L-22 | The editor's base styles ship in the application's stylesheet, which the Content-Security-Policy allows |
+| L-23 | Every screen that reads the whole workspace sends a guest to their spaces, the way the Work Map does, and a guest's own space draws its goals with the canon's terms and ceiling |
 
 ---
 
