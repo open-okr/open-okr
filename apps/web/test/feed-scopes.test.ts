@@ -22,8 +22,11 @@ const at = (path: string) =>
 const panel = at("../lib/feed-panel.tsx");
 
 const SURFACES: ReadonlyArray<readonly [string, string, string]> = [
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
   ["../app/goals/[id]/page.tsx", "activities.goalFeed", "/goals/${id}"],
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
   ["../app/spaces/[id]/page.tsx", "activities.spaceFeed", "/spaces/${id}"],
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
   ["../app/people/[id]/page.tsx", "activities.profileFeed", "/people/${id}"],
 ];
 
@@ -81,6 +84,7 @@ describe("the feed at every scope", () => {
   test("the older link carries the last row's own key", () => {
     // Which is what keeps a page stable while new rows arrive above it.
     expect(panel).toContain("const last = items.at(-1)");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
     expect(panel).toContain("at=${encodeURIComponent(last.at)}&id=${last.id}");
   });
 });
