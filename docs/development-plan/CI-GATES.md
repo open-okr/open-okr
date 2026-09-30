@@ -207,6 +207,13 @@ The unit and integration suites are the only gate that catches a write that
 **refuses at run time**. Typecheck and lint cannot see an action that throws the
 moment somebody calls it.
 
+**A migration that adds a table needs a row in TECHNICAL-PLAN §7.2**, and the
+importer suite refuses one without it (completeness review L-14).
+`packages/importer/test/mapping-coverage.test.ts` fails naming each table with
+no row, and each row naming a table that does not exist. The row either names
+the FlowyTeam source or says `No legacy source` with a reason. 41 tables had
+drifted out of the mapping before this test existed.
+
 `pnpm test` is the shorter route and runs Turbo's per-package tasks, so it
 caches and only re-runs what changed. The command below is the whole repository
 as one suite, which is what CI shards and what you want before a pull request.
