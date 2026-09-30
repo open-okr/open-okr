@@ -87,6 +87,8 @@ export const ASSIST_NAME_KEYS: Readonly<Record<string, string>> = {
   "assists.suggestParent": "assists.suggestParent",
   "assists.parseFilter": "assists.parseFilter",
   "assists.proposeImportMapping": "assists.proposeImportMapping",
+  "assists.summariseThread": "assists.summariseThread",
+  "assists.decomposeKeyResult": "assists.decomposeKeyResult",
   "assists.clusterRetro": "assists.clusterRetro",
   "assists.narrateDiagnostic": "assists.narrateDiagnostic",
   "assists.draftMinutes": "assists.draftMinutes",

@@ -757,3 +757,73 @@ export async function clusterRetroAction(sessionId: string) {
     { sessionId },
   );
 }
+
+/**
+ * Next-cycle objectives proposed from the learnings the room carried, each
+ * citing its learning, or null (completeness review M-09).
+ *
+ * Writes nothing. A proposal the facilitator keeps goes into the draft form,
+ * where they edit it and save it with `sessions.draftNextCycle` like any
+ * other draft.
+ */
+export async function proposeFromLearningsAction(sessionId: string) {
+  const { assistContext } = await import("../../../lib/assists");
+  return callAction(await assistContext(), "sessions.proposeFromLearnings", {
+    sessionId,
+  });
+}
+
+/** The review written up as prose from its own record, or null (M-09). */
+export async function draftMinutesAction(sessionId: string) {
+  const { assistContext } = await import("../../../lib/assists");
+  return callAction(await assistContext(), "sessions.draftMinutes", {
+    sessionId,
+  });
+}
+
+/**
+ * Keeps an edited write-up as a draft document on the session (M-09).
+ *
+ * The minutes themselves are generated from the record and are not the
+ * reader's to edit, so the write-up does not replace them: it becomes a
+ * document on the session, a draft private to its author until they publish
+ * it (P5-T12), with the ordinary history and comments a document has. That
+ * is AI-NATIVE-PLAN §2.3's "draft the review minutes" as a write a person
+ * makes, rather than prose that vanishes when the page is closed.
+ */
+export async function saveMinutesWriteUpAction(
+  sessionId: string,
+  title: string,
+  text: string,
+): Promise<{ readonly documentId: string } | { readonly error: string }> {
+  const { t } = await getTranslations();
+  if (text.trim() === "") {
+    return { error: t("session.detail.minutes.writeUp.nothingToSave") };
+  }
+  const { session, workspace } = await requireWorkspace();
+  try {
+    const created = await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human", userId: session.user.id },
+      },
+      "documents.create",
+      {
+        subjectType: "session",
+        subjectId: sessionId,
+        title:
+          title.trim().slice(0, 300) ||
+          t("session.detail.minutes.writeUp.title"),
+        body: richTextFromPlainText(text),
+      },
+    );
+    revalidatePath(`/session/${sessionId}/minutes`);
+    return { documentId: created.id };
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    return { error: t("session.detail.thatDidNotSave") };
+  }
+}

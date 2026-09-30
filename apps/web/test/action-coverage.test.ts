@@ -25,17 +25,19 @@ const LIB = fileURLToPath(new URL("../lib", import.meta.url));
 /**
  * Why each action has no screen, in the words that make it a decision.
  *
- * Four reasons recur, and none of them is "not built yet":
+ * Three reasons recur, and none of them is "not built yet":
  *
  * - **another surface owns it**: the command line, an importer, a channel
  *   webhook or the agent endpoint is the caller, and a button would be a
  *   second way to do one thing.
  * - **the pipeline calls it**: it is reached from another action or from a
  *   worker, never from a person.
- * - **it is an AI draft**: the copilot and the assists call these through the
- *   agent surface, and every one of them is hidden with the provider off.
  * - **it is a read a page does not need**: something else already answers the
  *   question the screen asks.
+ *
+ * **"It is an AI draft" was a fourth, and it was never true.** Every assist it
+ * excused had no caller at all (completeness review M-09). An assist is a
+ * control a person presses, so it has a screen, and the reason is retired.
  */
 const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
   "workspace.overview":
@@ -83,20 +85,10 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "no screen yet, and it is P7's own row for personal keys",
   "ai.updateCustomModel":
     "no screen yet, and it is P7's own row for the model catalogue",
-  "kpis.recoveryDraft":
-    "it is an AI draft, offered on the recovery board beside the corridor it is recovering from",
-  "kpis.narrateTrend":
-    "it is an AI draft, offered on the KPI detail beside the chart it narrates",
-  "kpis.suggest":
-    "it is an AI draft, offered while a KPI tree is being built rather than as a control of its own",
-  "blockers.summarise":
-    "it is an AI draft, offered on the blocker board and in the session's diagnose stage",
-  "sessions.draftMinutes":
-    "it is an AI draft, offered on the minutes screen once a session has closed",
-  "sessions.proposeFromLearnings":
-    "it is an AI draft, offered in the session's closing stage from what the retrospective said",
-  "goals.draftRetrospective":
-    "it is an AI draft, offered in the close form beside the account it is drafting",
+  // Completeness review M-09 found seven reasons here that were not true: six
+  // assists "offered" on screens that never called them, and one
+  // (`kpis.recoveryDraft`) that is not an AI draft at all. Each now has the
+  // caller its line claimed, and the lines are gone.
   "goals.publishDraftedCheckIn":
     "the pipeline calls it, after a drafted check-in is accepted",
   "comments.previewNotify":

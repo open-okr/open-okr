@@ -20,7 +20,7 @@
  * session record and the live sync; the subsequent tasks fill the panels.
  */
 
-import { callAction, excerptRichText } from "@openokr/core";
+import { callAction, excerptRichText, REVIEW_ASSIST_KEYS } from "@openokr/core";
 import {
   canonThresholds,
   REVIEW_STAGE_KEYS,
@@ -34,6 +34,7 @@ import {
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { assistOffered } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
@@ -538,6 +539,15 @@ export default async function SessionPage({ params }: SessionPageProps) {
       sessionId: id,
     })) as Forward;
   }
+  // Next-cycle drafts proposed from what the room carried (M-09). Asked only
+  // on the stage that shows the drafts, and only when a provider may write
+  // them; the panel then also needs a carried learning before it offers.
+  const forwardAssistAvailable =
+    forward !== null &&
+    (await assistOffered(
+      workspace.workspaceId,
+      REVIEW_ASSIST_KEYS.proposeObjectives,
+    ));
 
   // Stage eight: the process-health survey (METHOD.md §8.5, P4-T11b).
   let processHealth: ProcessHealth | null = null;
@@ -926,7 +936,12 @@ export default async function SessionPage({ params }: SessionPageProps) {
 
       {/* Stages ten and eleven (METHOD.md §8.9, §8.1 stage 11, P4-T11c-b) */}
       {forward ? (
-        <ForwardPanel sessionId={id} forward={forward} canEdit={isRunning} />
+        <ForwardPanel
+          sessionId={id}
+          forward={forward}
+          canEdit={isRunning}
+          assistAvailable={forwardAssistAvailable}
+        />
       ) : null}
 
       {/* Stage eight: process health (METHOD.md §8.5, P4-T11b) */}

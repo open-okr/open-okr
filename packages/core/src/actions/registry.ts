@@ -441,6 +441,7 @@ import {
   unassignTask,
   updateTask,
 } from "./tasks.ts";
+import { decomposeKeyResult, summariseThread } from "./work-assists.ts";
 import {
   changeWorkspacePlan,
   finishOnboarding,
@@ -703,6 +704,8 @@ export const ACTION_MAP = {
   "goals.suggestMeasure": suggestMeasure,
   "goals.suggestParent": suggestParent,
   "goals.parseFilter": parseListFilter,
+  // §2.4's decomposition, which no task had built (completeness review M-09).
+  "goals.decomposeKeyResult": decomposeKeyResult,
   "goals.startCheckIn": startCheckIn,
   "goals.publishCheckIn": publishCheckIn,
   "goals.importCheckIn": importCheckIn,
@@ -741,6 +744,8 @@ export const ACTION_MAP = {
   "review.inbox": reviewInbox,
   // Comments and reactions (P3-T16)
   "comments.list": listCommentsAction,
+  // §2.4's thread summary (completeness review M-09).
+  "comments.summarise": summariseThread,
   "comments.create": createCommentAction,
   // P6-T04b. A comment an import found, kept as its author wrote it.
   "comments.importComment": importCommentAction,

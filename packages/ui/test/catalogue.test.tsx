@@ -86,6 +86,7 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "workMap.kr",
   "workMap.obj",
   // Words Bahasa Melayu uses as they are.
+  "kpis.suggestion.unit",
   "admin.agents.levelEdit",
   "admin.agents.proposalQueue.itemsOne",
   "admin.ai.model",
@@ -101,6 +102,11 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "session.detail.quarterlyReview.actRetro",
   "sessions.schedule.kind",
   // Only holes and punctuation.
+  "copilot.copilotPanel.preview.cycle",
+  "copilot.copilotPanel.preview.keyResult",
+  "copilot.copilotPanel.preview.objective",
+  "copilot.copilotPanel.preview.space",
+  "goals.detail.decompose.refused",
   "admin.plan.planWithSeats",
   "checkIn.timeline.bylineDate",
   "checkIn.walkerLine",

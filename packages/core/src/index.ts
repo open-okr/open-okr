@@ -99,8 +99,10 @@ export type {
   AmbitionContext,
   CheckInDraftContext,
   ClusterableNote,
+  DecompositionContext,
   DiagnosticContext,
   DraftedCheckIn,
+  DraftedInitiative,
   DraftedKeyResult,
   DraftedObjective,
   FilterContext,
@@ -128,6 +130,8 @@ export type {
   SuggestedKpi,
   SuggestedParent,
   SummarisableBlocker,
+  ThreadComment,
+  ThreadSummary,
   TrendContext,
   TrendPoint,
 } from "./agents/drafter.ts";
@@ -141,6 +145,7 @@ export {
   ASSIST_FEATURE_KEYS,
   REVIEW_ASSIST_KEYS,
   RHYTHM_ASSIST_KEYS,
+  THREAD_SUMMARY_MINIMUM,
 } from "./ai/assist-keys.ts";
 export {
   type BudgetCheckResult,

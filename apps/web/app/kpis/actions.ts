@@ -8,6 +8,7 @@
  */
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { assistContext } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -91,6 +92,84 @@ export async function addKpi(
         : {}),
     }),
   );
+}
+
+/**
+ * §2.2's KPI suggestion from a sentence, or null (completeness review M-09).
+ *
+ * A read that writes nothing. Every field has already been checked against
+ * its own grammar by the action, and a formula §6's parser refuses comes back
+ * as null with the reason beside it.
+ */
+export async function suggestKpiAction(description: string) {
+  return callAction(await assistContext(), "kpis.suggest", { description });
+}
+
+/** A suggestion as the person left it after editing. */
+export interface KeptKpi {
+  readonly title: string;
+  readonly unit: string;
+  readonly frequency: "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
+  readonly direction: "higher_better" | "lower_better";
+  readonly tier: "input" | "output" | "outcome" | "impact";
+  readonly targetDefault: number | null;
+  readonly healthyPct: number | null;
+  readonly watchPct: number | null;
+  /** The formula the action validated, when the person kept it. */
+  readonly formula: unknown;
+}
+
+/**
+ * Creates the KPI a person kept from a suggestion.
+ *
+ * The ordinary `kpis.create`, then `kpis.setFormula` when they kept the
+ * formula, both as the person pressing the button. The formula is the tree
+ * the action already validated with §6's parser, and `kpis.setFormula`
+ * validates it again, because a value that crossed the browser is input.
+ */
+export async function addSuggestedKpiAction(
+  kept: KeptKpi,
+): Promise<WriteState> {
+  const { t } = await getTranslations();
+  const title = kept.title.trim();
+  if (title === "") {
+    return { error: t("kpis.actions.kpiNeedsATitle") };
+  }
+  const number = (value: number | null) =>
+    value !== null && Number.isFinite(value) ? value : undefined;
+  const targetDefault = number(kept.targetDefault);
+  const healthyPct = number(kept.healthyPct);
+  const watchPct = number(kept.watchPct);
+  const unit = kept.unit.trim();
+
+  return run(async (context) => {
+    const created = await callAction(context, "kpis.create", {
+      title,
+      frequency: kept.frequency,
+      direction: kept.direction,
+      // The tier the trees name for something a team can act on this week is
+      // input, and input is what a leading indicator measures.
+      indicatorType: kept.tier === "input" ? "leading" : "lagging",
+      tier: kept.tier,
+      aggregate: "sum",
+      ownerKind: "workspace",
+      ...(unit === "" ? {} : { unit }),
+      ...(targetDefault === undefined ? {} : { targetDefault }),
+      ...(healthyPct === undefined ? {} : { healthyPct }),
+      ...(watchPct === undefined ? {} : { watchPct }),
+    });
+    if (kept.formula !== null && kept.formula !== undefined) {
+      const settings = await callAction(context, "settings.readForMember", {});
+      const today = new Intl.DateTimeFormat("en-CA", {
+        timeZone: String(settings.settings.timezone ?? "UTC"),
+      }).format(new Date());
+      await callAction(context, "kpis.setFormula", {
+        kpiId: created.id,
+        formula: kept.formula,
+        on: today,
+      });
+    }
+  });
 }
 
 export async function addCategory(

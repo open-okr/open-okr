@@ -11,14 +11,17 @@
  * facilitator's private notes are absent for everybody.
  */
 
-import { callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction, REVIEW_ASSIST_KEYS } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { resolveAccessLevelFor } from "../../../../lib/access";
+import { assistOffered } from "../../../../lib/assists";
 import { getPool } from "../../../../lib/auth";
 import { getTranslations } from "../../../../lib/translations";
 import { requireWorkspace } from "../../../../lib/workspace";
 import type { Minutes } from "./minutes-document";
+import { MinutesWriteUp } from "./minutes-write-up.tsx";
 
 /** Catalogue keys, so the words are the reader's language. */
 const VERDICTS: Record<string, string> = {
@@ -78,6 +81,17 @@ export default async function MinutesPage({
     notFound();
   }
 
+  // §2.3's prose write-up (M-09), offered to somebody who may keep it as a
+  // document on the session, and only where a provider may write it. The
+  // minutes below are the record either way.
+  const writeUpOffered =
+    (await resolveAccessLevelFor(workspace.workspaceId, workspace.memberId)) >=
+      ACCESS_LEVELS.edit &&
+    (await assistOffered(
+      workspace.workspaceId,
+      REVIEW_ASSIST_KEYS.draftMinutes,
+    ));
+
   const summary = minutes.summary;
   const verdictKey =
     summary.verdict === null ? undefined : VERDICTS[summary.verdict];
@@ -126,6 +140,10 @@ export default async function MinutesPage({
           </p>
         )}
       </header>
+
+      {writeUpOffered ? (
+        <MinutesWriteUp sessionId={id} title={minutes.title} />
+      ) : null}
 
       <Card role="region" aria-labelledby="minutes-summary-heading">
         <CardHeader>

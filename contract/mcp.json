@@ -9001,6 +9001,39 @@
       }
     },
     {
+      "name": "goals.decomposeKeyResult",
+      "description": "Drafts initiatives and their first tasks for one key result, as plain drafts a person edits before creating any of them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "goalId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "keyResultId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "goalId",
+          "keyResultId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "goalId": "00000000-0000-4000-8000-000000000000",
+        "keyResultId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "goals.startCheckIn",
       "description": "Opens or reopens the author's draft check-in on a goal. Completely silent.",
       "inputSchema": {
@@ -10469,6 +10502,45 @@
     {
       "name": "comments.list",
       "description": "List comments on a subject",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subjectType": {
+            "type": "string",
+            "enum": [
+              "goal",
+              "key_result",
+              "check_in",
+              "cycle",
+              "document",
+              "task"
+            ]
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "subjectType",
+          "subjectId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "subjectType": "goal",
+        "subjectId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "comments.summarise",
+      "description": "Summarises the discussion on a subject and lists what it left open, refusing a summary that quotes words nobody wrote.",
       "inputSchema": {
         "type": "object",
         "properties": {

@@ -218,7 +218,7 @@ Format: purpose, layout, primary actions, states.
 
 **S-38 Agent detail.** For the Coach, the Champion or a custom agent: persona, staged instructions with versions, provider and tier, schedule, access scope, autonomy policy, sandbox toggle, cost to date against the cap, and a run history where each run expands into its readable log and the proposals it produced.
 
-**S-39 Copilot.** A side panel opened with ⌘J, workspace-scoped or entity-scoped. A thread of turns with streaming and a stop control, inline action proposals rendered as a preview or difference with apply and dismiss, and citations only to what the viewer may see. States: empty, AI off with a link for admins, rate-limited or capped.
+**S-39 Copilot.** A side panel opened with ⌘J, workspace-scoped or entity-scoped. A thread of turns with streaming and a stop control, inline action proposals rendered as a preview or difference with apply and dismiss, and citations only to what the viewer may see. States: empty, AI off with a link for admins, rate-limited or capped. A proposal names what it is ("New objective", "New task") rather than the registry action, and its preview labels are in the reader's language (completeness review M-09). Where each §2 assist sits on the screens above is tabled in AI-NATIVE-PLAN.md §2.
 
 **S-40 Consent.** The screen an external agent's user sees when connecting: the client's identity, the workspace picker, the scopes requested in plain language, and approve or deny. Granted connections are listed in the admin console with their last use and a revoke control.
 

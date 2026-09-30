@@ -99,6 +99,30 @@ export default async function RecoveryBoardPage() {
   const canEdit = level >= ACCESS_LEVELS.edit;
   const board = await callAction(context, "kpis.recoveryBoard", {});
 
+  // What launching would create, read before anybody presses it
+  // (completeness review M-09). METHOD.md §6.5's recovery objective is a
+  // template over the driver tree and needs no provider, and `kpis.recoveryDraft`
+  // exists so it can be read before it is committed to, which nothing did: the
+  // button launched a write the reader had never seen. One read per card
+  // without a recovery, for somebody who may launch one.
+  const recoveryDrafts = new Map<
+    string,
+    NonNullable<Awaited<ReturnType<typeof callAction<"kpis.recoveryDraft">>>>
+  >();
+  if (canEdit) {
+    for (const card of board.cards) {
+      if (card.recovery) {
+        continue;
+      }
+      const draft = await callAction(context, "kpis.recoveryDraft", {
+        kpiId: card.kpiId,
+      });
+      if (draft) {
+        recoveryDrafts.set(card.kpiId, draft);
+      }
+    }
+  }
+
   return (
     <div className="flex w-full flex-col gap-3.5">
       <SectionTabs items={KPI_TABS} active="/kpis/recovery" />
@@ -211,6 +235,31 @@ export default async function RecoveryBoardPage() {
                     {t("kpis.recovery.youCanReadThis")}
                   </span>
                 )}
+                {recoveryDrafts.has(card.kpiId) ? (
+                  <section
+                    aria-label={t("kpis.recovery.launchingCreates")}
+                    className="flex w-full flex-col gap-1 rounded-md border border-line p-2.5"
+                  >
+                    <p className="text-xs font-semibold text-ink-3">
+                      {t("kpis.recovery.launchingCreates")}
+                    </p>
+                    <p className="text-sm text-ink">
+                      {recoveryDrafts.get(card.kpiId)?.objective}
+                    </p>
+                    <ul className="flex list-disc flex-col gap-0.5 pl-4">
+                      {recoveryDrafts
+                        .get(card.kpiId)
+                        ?.keyResults.map((keyResult) => (
+                          <li
+                            key={keyResult.title}
+                            className="text-xs text-ink-2"
+                          >
+                            {keyResult.title}
+                          </li>
+                        ))}
+                    </ul>
+                  </section>
+                ) : null}
               </div>
             )}
           </CardBody>

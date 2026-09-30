@@ -1,10 +1,16 @@
-import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  OperationError,
+  RHYTHM_ASSIST_KEYS,
+} from "@openokr/core";
 import { canonThresholds, type ResolvedThresholds } from "@openokr/method";
 import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { assistOffered } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { SectionBoundary } from "../../../lib/section-boundary.tsx";
@@ -14,6 +20,7 @@ import { WatchControl } from "../../../lib/watch-control.tsx";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ScheduleSessions } from "../../sessions/schedule.tsx";
+import { BlockerSummary } from "./blocker-summary.tsx";
 import { SpaceManagement } from "./manage.tsx";
 import { SpaceMembership } from "./space-membership";
 import { SpaceSettingsCard } from "./space-settings.tsx";
@@ -123,6 +130,14 @@ export default async function SpacePage({
   // The board, ranked by §11's ladder. Deterministic and needs no provider
   // (P4-T15b-b).
   const board = await callAction(actor, "blockers.board", { spaceId: id });
+  // Its summary, offered only over a board with something on it and only
+  // where a provider may write it (M-09). The board is the same either way.
+  const summaryOffered =
+    board.blockers.length > 0 &&
+    (await assistOffered(
+      workspace.workspaceId,
+      RHYTHM_ASSIST_KEYS.summariseBlockers,
+    ));
 
   // **The team's own week (P6-G19c, GAP-AUDIT B-10).** The trend, the streak
   // and the last closed week's figures. The blocker board below already
@@ -360,7 +375,8 @@ export default async function SpacePage({
       {/* P4-T15b-b: the open-blocker board REQUIREMENTS §7 asks for. */}
       <Card>
         <CardHeader>{t("common.openBlockers")}</CardHeader>
-        <CardBody>
+        <CardBody className="flex flex-col gap-3">
+          {summaryOffered ? <BlockerSummary spaceId={space.id} /> : null}
           {board.blockers.length === 0 ? (
             <p className="text-sm text-ink-3">
               {t("spaces.detail.nothingIsStuckIn")}

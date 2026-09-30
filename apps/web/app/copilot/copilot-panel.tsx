@@ -195,6 +195,44 @@ interface Proposal {
 }
 
 /**
+ * What each proposable action is called on screen (completeness review M-09).
+ *
+ * The card printed the registry name, `goals.create`, which P8-G11d's rule
+ * keeps out of the interface. With one action it was one string; with four it
+ * is a reader wondering what `initiatives.create` means. An action without a
+ * name here, which the catalogue in `packages/core` would have to gain first,
+ * reads as a proposed change rather than as its identifier.
+ */
+const ACTION_NAME_KEYS: Readonly<Record<string, string>> = {
+  "goals.create": "copilot.copilotPanel.actions.newObjective",
+  "goals.addKeyResult": "copilot.copilotPanel.actions.newKeyResult",
+  "initiatives.create": "copilot.copilotPanel.actions.newInitiative",
+  "tasks.create": "copilot.copilotPanel.actions.newTask",
+};
+
+/**
+ * The preview's labels, as the reader's language.
+ *
+ * Core builds the preview in English words because it is stored with the
+ * proposal and read back on any surface; the panel is where it meets a
+ * reader. A label not listed here is shown as it was stored.
+ */
+const PREVIEW_LABEL_KEYS: Readonly<Record<string, string>> = {
+  Objective: "copilot.copilotPanel.preview.objective",
+  Description: "copilot.copilotPanel.preview.description",
+  Level: "copilot.copilotPanel.preview.level",
+  Space: "copilot.copilotPanel.preview.space",
+  Cycle: "copilot.copilotPanel.preview.cycle",
+  "Key result": "copilot.copilotPanel.preview.keyResult",
+  Baseline: "copilot.copilotPanel.preview.baseline",
+  Target: "copilot.copilotPanel.preview.target",
+  Direction: "copilot.copilotPanel.preview.direction",
+  Indicator: "copilot.copilotPanel.preview.indicator",
+  Initiative: "copilot.copilotPanel.preview.initiative",
+  Task: "copilot.copilotPanel.preview.task",
+};
+
+/**
  * One proposal, with what it would do and what may be done about it.
  *
  * **The buttons are offered whether or not the reader may use them.** A member
@@ -226,7 +264,10 @@ function ProposalCard({
       <header className="flex items-center gap-2">
         <Chip tone="agent">{t("common.ai")}</Chip>
         <span className="text-xs font-semibold text-ink-2">
-          {proposal.action}
+          {t(
+            ACTION_NAME_KEYS[proposal.action] ??
+              "copilot.copilotPanel.proposedChange",
+          )}
         </span>
         {proposal.status === "applied" ? (
           <Chip tone={proposal.undone ? "neutral" : "ok"}>
@@ -243,7 +284,11 @@ function ProposalCard({
       <dl className="mt-2 flex flex-col gap-1">
         {proposal.preview.map((row) => (
           <div key={row.label} className="flex gap-2 text-xs">
-            <dt className="w-20 flex-none text-ink-4">{row.label}</dt>
+            <dt className="w-20 flex-none text-ink-4">
+              {PREVIEW_LABEL_KEYS[row.label]
+                ? t(PREVIEW_LABEL_KEYS[row.label] as string)
+                : row.label}
+            </dt>
             <dd className="min-w-0 text-ink-2">{row.value}</dd>
           </div>
         ))}

@@ -1,8 +1,11 @@
 import {
   ACCESS_LEVELS,
+  ASSIST_FEATURE_KEYS,
   callAction,
   excerptRichText,
   OperationError,
+  REVIEW_ASSIST_KEYS,
+  THREAD_SUMMARY_MINIMUM,
 } from "@openokr/core";
 import type { ResolvedThresholds } from "@openokr/method";
 import {
@@ -16,6 +19,7 @@ import {
 } from "@openokr/ui";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { assistOffered } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
@@ -33,10 +37,13 @@ import {
   reopenGoal,
 } from "./actions.ts";
 import { CoachStrip } from "./coach-strip";
+import { DecomposeKeyResult } from "./decompose.tsx";
 import { GoalComments } from "./goal-comments.tsx";
 import { GoalWrites } from "./goal-writes.tsx";
 import { Rail } from "./rail.tsx";
+import { RetrospectiveField } from "./retrospective-field.tsx";
 import { Sparkline } from "./sparkline.tsx";
+import { ThreadSummary } from "./thread-summary.tsx";
 
 /**
  * A goal (UIUX-PLAN.md §4 S-14, P3-T04).
@@ -239,6 +246,41 @@ export default async function GoalPage({
   const kpiOptions =
     unlinkedKeyResults.length > 0 ? await readKpiOptions(context) : [];
 
+  // The assists this page can offer (completeness review M-09), each asked
+  // whether a provider may run it here and each only where it has something
+  // to work on. With AI off all three are false and the page is what it was.
+  // The draft retrospective and the decomposition are for somebody who may
+  // change this goal; the thread summary is for anybody who may read it.
+  const open = canEdit && !closed;
+  const [retrospectiveOffered, threadSummaryOffered, decomposeOffered] =
+    await Promise.all([
+      open
+        ? assistOffered(
+            workspace.workspaceId,
+            REVIEW_ASSIST_KEYS.draftRetrospective,
+          )
+        : false,
+      comments.length >= THREAD_SUMMARY_MINIMUM
+        ? assistOffered(
+            workspace.workspaceId,
+            ASSIST_FEATURE_KEYS.summariseThread,
+          )
+        : false,
+      open && goal.keyResults.length > 0
+        ? assistOffered(
+            workspace.workspaceId,
+            ASSIST_FEATURE_KEYS.decomposeKeyResult,
+            "deep",
+          )
+        : false,
+    ]);
+  const workSpaces = decomposeOffered
+    ? (await callAction(context, "spaces.list", {})).map((space) => ({
+        id: space.id,
+        name: space.name,
+      }))
+    : [];
+
   const cycles = await callAction(context, "cycles.list", {});
   const cycleEndsOn =
     cycles.find((cycle) => cycle.id === goal.cycleId)?.endsOn ?? null;
@@ -381,6 +423,15 @@ export default async function GoalPage({
                         target={keyResult.targetValue}
                         horizonAt={horizonFor(keyResult.dueOn)}
                       />
+                      {decomposeOffered ? (
+                        <DecomposeKeyResult
+                          goalId={goal.id}
+                          keyResultId={keyResult.id}
+                          keyResultTitle={keyResult.title}
+                          spaces={workSpaces}
+                          defaultSpaceId={goal.spaceId}
+                        />
+                      ) : null}
                     </span>
                     <span className="flex flex-none flex-col items-end gap-1">
                       <span className="text-sm font-bold text-ink">
@@ -692,16 +743,9 @@ export default async function GoalPage({
                       className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
                     />
                   </div>
-                  <label className="sr-only" htmlFor="close-retrospective">
-                    {t("goals.detail.theRetrospective")}
-                  </label>
-                  <textarea
-                    id="close-retrospective"
-                    name="retrospective"
-                    rows={4}
-                    required
-                    placeholder={t("goals.detail.whatHappenedAndWhat")}
-                    className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  <RetrospectiveField
+                    goalId={goal.id}
+                    offered={retrospectiveOffered}
                   />
                   <Button
                     type="submit"
@@ -724,7 +768,8 @@ export default async function GoalPage({
         />
 
         <Card>
-          <CardBody>
+          <CardBody className="flex flex-col gap-3">
+            {threadSummaryOffered ? <ThreadSummary goalId={id} /> : null}
             <GoalComments
               goalId={id}
               comments={comments.map((comment) => ({

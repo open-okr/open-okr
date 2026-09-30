@@ -67,6 +67,21 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Summarise a thread or a document | read | Read it |
 | Map spreadsheet columns to import fields | write | Manual mapping |
 
+**Where each assist sits, since completeness review M-09.** Six assists were built with no browser caller, and two in this table were not built at all. Each is now offered beside the value it helps, only where a provider may run it (a drafter exists, so the egress level allows an assist, and the assist's own switch is on), and each draft lands in fields a person edits before anything is saved.
+
+| Assist | Where | What saving it does |
+|---|---|---|
+| Narrate a KPI trend | KPI detail, under the chart | Nothing: it is a reading |
+| Suggest a KPI from a sentence | KPI grid, under the add form | `kpis.create`, then `kpis.setFormula` if the person kept the formula |
+| Summarise blockers | Space home, above the blocker board | Nothing: it is a reading |
+| Draft the retrospective | Goal detail, the close form | Fills the retrospective field; closing is the person's |
+| Draft the review minutes | Minutes screen | A draft document on the session, private to its author |
+| Propose next-cycle objectives | Quarterly review, learnings stage | Fills the draft form; `sessions.draftNextCycle` is the person's |
+| Summarise a thread (`comments.summarise`) | Goal detail, above the discussion | Nothing: it is a reading, refused if it quotes words nobody wrote |
+| Decompose a key result (`goals.decomposeKeyResult`, `deep` tier) | Goal detail, on each key result | `initiatives.create` and `tasks.create` for the rows left ticked, as the person, in the space they chose |
+
+"Summarise a document" is not built: a document is already one reader's page, and the thread summary is the half REQUIREMENTS names. The copilot may propose four actions (`goals.create`, `goals.addKeyResult`, `initiatives.create`, `tasks.create`), each offered only over spaces, objectives and key results the person may edit.
+
 ## 3. Architecture
 
 ### 3.1 The AIProvider port

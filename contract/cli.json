@@ -6588,6 +6588,29 @@
       "pages": false
     },
     {
+      "name": "goals decomposeKeyResult",
+      "action": "goals.decomposeKeyResult",
+      "method": "GET",
+      "path": "/goals/decomposeKeyResult",
+      "scope": "read",
+      "summary": "Drafts initiatives and their first tasks for one key result, as plain drafts a person edits before creating any of them.",
+      "flags": [
+        {
+          "name": "goal-id",
+          "field": "goalId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals startCheckIn",
       "action": "goals.startCheckIn",
       "method": "POST",
@@ -7660,6 +7683,37 @@
       "path": "/comments/list",
       "scope": "read",
       "summary": "List comments on a subject",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "goal",
+            "key_result",
+            "check_in",
+            "cycle",
+            "document",
+            "task"
+          ]
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "comments summarise",
+      "action": "comments.summarise",
+      "method": "GET",
+      "path": "/comments/summarise",
+      "scope": "read",
+      "summary": "Summarises the discussion on a subject and lists what it left open, refusing a summary that quotes words nobody wrote.",
       "flags": [
         {
           "name": "subject-type",

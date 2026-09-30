@@ -1,14 +1,21 @@
-import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  OperationError,
+  RHYTHM_ASSIST_KEYS,
+} from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { assistOffered } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { FormulaBuilder } from "./formula-builder.tsx";
+import { TrendNarration } from "./trend-narration.tsx";
 
 /**
  * The KPI detail (UIUX-PLAN.md §4 S-21, METHOD.md §6, P3-T14).
@@ -129,6 +136,16 @@ export default async function KpiDetailPage({
     )
     .filter((point): point is string => point !== null)
     .join(" ");
+
+  // §2.2's narration beside the chart (M-09). Offered only for a series with
+  // two measured points, because one point is not a trend, and only where a
+  // provider may write it; with AI off the chart is the whole card.
+  const narrationOffered =
+    values.length >= 2 &&
+    (await assistOffered(
+      workspace.workspaceId,
+      RHYTHM_ASSIST_KEYS.narrateTrend,
+    ));
 
   return (
     <div className="flex w-full flex-col gap-3.5">
@@ -280,6 +297,11 @@ export default async function KpiDetailPage({
               )}
             </svg>
           )}
+          {narrationOffered ? (
+            <div className="mt-3">
+              <TrendNarration kpiId={kpi.id} />
+            </div>
+          ) : null}
         </CardBody>
       </Card>
 

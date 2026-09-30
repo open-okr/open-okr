@@ -1,6 +1,7 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction, RHYTHM_ASSIST_KEYS } from "@openokr/core";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
+import { assistOffered } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
 import { KPI_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
@@ -9,6 +10,7 @@ import { ActionForm } from "../cycle/action-form.tsx";
 import { addCategory, addKpi } from "./actions.ts";
 import { KpiGrid } from "./grid.tsx";
 import { CategorySubtotal, FilterRow, RowSparkline } from "./grid-extras.tsx";
+import { KpiSuggestion } from "./kpi-suggestion.tsx";
 
 /**
  * The KPI grid (UIUX-PLAN.md §4 S-20, P3-T12).
@@ -51,6 +53,12 @@ export default async function KpisPage({
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+  // §2.2's suggestion beside the add form (M-09), for somebody who may add a
+  // KPI and only where a provider may write one. The form is the same either
+  // way.
+  const suggestionOffered =
+    canEdit &&
+    (await assistOffered(workspace.workspaceId, RHYTHM_ASSIST_KEYS.suggestKpi));
 
   const grid = await callAction(context, "kpis.grid", { periods: 12 });
 
@@ -289,6 +297,7 @@ export default async function KpisPage({
                   {t("kpis.theCorridorDefaultsTo")}
                 </p>
               </ActionForm>
+              {suggestionOffered ? <KpiSuggestion /> : null}
             </CardBody>
           </Card>
 

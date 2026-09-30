@@ -154,6 +154,11 @@ test("the ones past §7.3's clock say so, and the newest does not", async () => 
 test("no summary is offered, and the board reads on its own", async () => {
   // The half a provider-off instance gets: the list, with owners and ages, which
   // is what REQUIREMENTS §7 asks for and needs no model.
+  // Named as the affordance names itself since completeness review M-09 put
+  // it on this card, so this fails the day it renders with no provider.
+  await expect(
+    page.getByRole("button", { name: "Summarise the blockers" }),
+  ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Summarise" })).toHaveCount(0);
   await expect(
     page.getByRole("list", { name: "Open blockers" }),

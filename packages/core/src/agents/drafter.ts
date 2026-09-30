@@ -454,6 +454,62 @@ export interface ProposedObjective {
 }
 
 /**
+ * One comment in a discussion, as the thread summary is shown it
+ * (AI-NATIVE-PLAN.md §2.4, completeness review M-09).
+ *
+ * The author's name and the words, nothing else. No identifier reaches the
+ * model, and the text is already plain: the editor document is excerpted by
+ * the caller, so a link or a mention cannot smuggle an id in.
+ */
+export interface ThreadComment {
+  readonly author: string;
+  readonly text: string;
+}
+
+/**
+ * A discussion, summarised, with what it left open.
+ *
+ * `openQuestions` is a list rather than a sentence because a reader acts on
+ * them one at a time. Empty is a real answer: a thread that settled what it
+ * raised has nothing left open.
+ */
+export interface ThreadSummary {
+  readonly summary: string;
+  readonly openQuestions: readonly string[];
+}
+
+/**
+ * One key result, as the decomposition assist is shown it (§2.4, M-09).
+ *
+ * The numbers are the product's and are given so the work drafted is sized to
+ * the gap between them. The initiatives already behind it are named so a draft
+ * does not repeat one the team is already running.
+ */
+export interface DecompositionContext {
+  readonly goalTitle: string;
+  readonly keyResultTitle: string;
+  readonly unit: string | null;
+  readonly direction: string;
+  readonly baseline: number;
+  readonly target: number;
+  readonly current: number;
+  readonly existingInitiatives: readonly string[];
+}
+
+/**
+ * An initiative drafted for a key result, with the tasks that would start it.
+ *
+ * Titles and a sentence only. Who owns it, when it runs and which space it
+ * belongs to are a person's decisions, made on the preview before anything is
+ * created.
+ */
+export interface DraftedInitiative {
+  readonly title: string;
+  readonly description: string;
+  readonly tasks: readonly string[];
+}
+
+/**
  * What a host must provide for the agents to write language.
  *
  * **Every capability is optional and every one may answer null.** A host may
@@ -645,6 +701,29 @@ export interface AgentDrafter {
   proposeObjectives?(context: {
     readonly learnings: readonly string[];
   }): Promise<readonly ProposedObjective[] | null>;
+  /**
+   * §2.4's thread summary (completeness review M-09).
+   *
+   * **A quotation is a claim the caller checks.** Anything the summary puts in
+   * quotation marks has to appear in one of the comments it was given, so a
+   * summary that attributes words to the thread nobody wrote is dropped rather
+   * than shown.
+   */
+  summariseThread?(context: {
+    /** What the discussion hangs on, for the model's own framing. */
+    readonly subject: string;
+    readonly comments: readonly ThreadComment[];
+  }): Promise<ThreadSummary | null>;
+  /**
+   * §2.4's decomposition of a key result into initiatives and tasks (M-09).
+   *
+   * A draft and never a write. The caller bounds how many come back, drops a
+   * title the key result already has an initiative for, and hands the rest to
+   * a person who edits them and chooses what to create.
+   */
+  decomposeKeyResult?(
+    context: DecompositionContext,
+  ): Promise<readonly DraftedInitiative[] | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }
