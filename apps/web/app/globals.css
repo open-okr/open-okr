@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "../../../packages/ui/src/styles/tokens.css";
+/* The editor's base rules, which TipTap would otherwise inject inline and the
+ * Content-Security-Policy refuses. In `base`, for the reason the block below
+ * gives: a utility on an editor must still be able to win. */
+@import "../../../packages/ui/src/styles/prosemirror.css" layer(base);
 
 /* packages/ui/src lives outside apps/web's own tree, so Tailwind v4's
  * automatic content detection (which scans relative to this file) never

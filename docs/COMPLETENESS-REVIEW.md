@@ -545,6 +545,7 @@ The questions these fixes raised for a person are listed in the pull request.
 | L-19 | The admin audit log can be verified and exported but not browsed | Audit |
 | L-20 | A Helm `values.yaml` comment says local disk is the only storage driver. S3 exists | Audit |
 | L-21 | `/admin/sso` lists every workspace's SSO connections, with their names, email domains and enforcement, because it read the instance-wide list the sign-in page uses. Found while fixing L-15. On the managed cloud this shows one customer which identity provider another uses, so it is arguably Medium; it ships with the Low fixes because the Medium pull request had already passed | Audit |
+| L-22 | The rich-text editor's base styles were blocked in production. TipTap injects them as an inline `<style>`, which the Content-Security-Policy refuses, so the browser logged a violation on every document page and the editor ran without `pre-wrap`. Found while checking a console error during the Medium work | Run |
 
 ---
 
