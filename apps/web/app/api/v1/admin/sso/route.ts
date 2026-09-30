@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { requireAccessLevel } from "../../../../../lib/access";
 import { getPool } from "../../../../../lib/auth";
 import { getKeyRing } from "../../../../../lib/secrets";
+import { expireSSOProviders } from "../../../../../lib/sso";
 
 /**
  * SSO connection management endpoint (P8-T07, extended at P8-T07c-b).
@@ -67,6 +68,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       input,
       loadEnv().BETTER_AUTH_URL,
     );
+
+    // **Usable from the administrator's next click** (completeness review
+    // L-15). Every process notices the change within a few seconds by itself;
+    // this one saved it, so it looks again at the next sign-in rather than
+    // waiting out the few seconds.
+    expireSSOProviders();
 
     return NextResponse.json(
       { ok: true, providerId: created.providerId },

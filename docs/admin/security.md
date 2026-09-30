@@ -44,8 +44,16 @@ prints them once it is saved: the entity ID, the assertion consumer service
 metadata document that states both. Hand your identity provider the metadata
 document, or the two addresses if it prefers them typed in.
 
-**A new provider takes effect on the next restart**, and so does its metadata
-document. The client is built once when the process starts.
+**A provider works from the next sign-in, with no restart**, and so does a
+SAML provider's metadata document. Every server process checks for a changed
+connection every few seconds and rebuilds its sign-in client when it finds
+one, so on a deployment with several processes the others follow within
+seconds. Nobody who is already signed in is signed out by it.
+
+The same holds for a connection somebody changes or removes in the database
+directly: the next sign-in uses the new client id, endpoints or certificate,
+and a removed or disabled provider refuses the next sign-in through it. The
+screen itself only adds connections.
 
 ## What is encrypted at rest
 

@@ -171,9 +171,14 @@ export interface AuthOptions {
     url: string;
   }) => Promise<void>;
   /**
-   * SSO provider configurations loaded from `sso_connections` at boot
-   * (P8-T07). Each entry becomes a genericOAuth provider that appears on
-   * the sign-in page and flows through Better Auth's social-provider path.
+   * SSO provider configurations loaded from `sso_connections` (P8-T07). Each
+   * OIDC entry becomes a genericOAuth provider that appears on the sign-in
+   * page and flows through Better Auth's social-provider path.
+   *
+   * **Fixed for the life of this instance, and the instance is not for the
+   * life of the process** (completeness review L-15). Better Auth reads its
+   * plugins once, when it is built, so the web process builds a new instance
+   * when these change, through `followSSOProviders` in `sso-refresh.ts`.
    *
    * An empty array means no SSO providers are configured. The plugin is
    * only included when at least one provider is present, so an instance
@@ -235,7 +240,7 @@ export function createAuth(options: AuthOptions) {
    *
    * Built once, because the after-create hook has to answer it while a
    * browser waits mid-redirect and the providers are fixed for the life of
-   * the process anyway.
+   * this instance anyway. A change builds another instance (L-15).
    */
   const workspaceByProvider = new Map<string, string>(
     (options.ssoProviders ?? []).flatMap((provider) =>
@@ -248,7 +253,7 @@ export function createAuth(options: AuthOptions) {
    *
    * Built once beside `workspaceByProvider` above and for the same reason: the
    * plugin's `provisionUser` has to answer "which workspace" while a browser
-   * waits mid-redirect, and the answer is fixed for the life of the process.
+   * waits mid-redirect, and the answer is fixed for the life of this instance.
    */
   /**
    * Every configured provider id, whichever protocol it speaks.
@@ -670,11 +675,12 @@ export function createAuth(options: AuthOptions) {
         rpName: instanceNameOr(options.instanceName),
         origin: options.baseUrl,
       }),
-      // SSO providers (P8-T07). Each entry loaded from `sso_connections` at
-      // boot and passed through `genericOAuth`, which registers them as
-      // social providers on the standard `signIn.social` flow. Only included
-      // when at least one provider is configured: an instance with no SSO
-      // carries no plugin, no route and no schema contribution.
+      // SSO providers (P8-T07). Each entry read from `sso_connections` and
+      // passed through `genericOAuth`, which resolves them once, in its
+      // `init`, and registers them as social providers on the standard
+      // `signIn.social` flow. Only included when at least one provider is
+      // configured: an instance with no SSO carries no plugin, no route and
+      // no schema contribution.
       ...(options.ssoProviders && options.ssoProviders.length > 0
         ? [
             genericOAuth({
@@ -701,9 +707,12 @@ export function createAuth(options: AuthOptions) {
        * plugin, no route and no schema contribution.
        *
        * The plugin reads its providers from `sso_providers`, which
-       * `saml-sync.ts` derives from `sso_connections`. Nothing is passed in
-       * here, because a provider added while the process runs must work
-       * without a restart, which is the one thing the OIDC path cannot do.
+       * `saml-sync.ts` derives from `sso_connections`, on every request.
+       * That made SAML look as if it needed no restart, but the plugin is
+       * only here when a SAML provider existed when this instance was built,
+       * and the workspace map above is fixed then too. So the first SAML
+       * provider on an instance waited for a restart like every OIDC one,
+       * until the instance began to be rebuilt on a change (L-15).
        */
       ...(samlProviders.length > 0
         ? [

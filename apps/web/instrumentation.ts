@@ -35,8 +35,9 @@ export async function register(): Promise<void> {
   await checkTenantFloor();
   startOutboxRelay();
   startRecurringWork();
-  // Before resolveAuthPolicy, because getAuth() is built once and SSO
-  // providers must be cached before it runs (P8-T07).
+  // Before the first request, so the first sign-in finds the SSO providers
+  // already read (P8-T07). A connection saved later reaches the next sign-in
+  // without a restart (L-15).
   await resolveSSO();
   // Last, and awaited: the first request must not reach Better Auth with
   // the answer still unresolved, or a mail-capable instance would serve one

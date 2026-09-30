@@ -22,13 +22,14 @@
  * what the identity provider asks for. They were obtainable only by reading
  * the plugin's source.
  *
- * **The metadata document is fetched after a restart, not here.** The SSO
- * plugin is mounted at boot and only when a SAML provider already exists, so
- * on this instance, which had none when the server started, the document's
- * route does not exist yet. That is the same restart the screen names for
- * every connection. It is proved over the plugin's own handler in
- * `packages/core/test/saml-surfaces.test.ts`, which parses it and reads its
- * entity id back.
+ * **The metadata document is fetched here, from the server that was already
+ * running** (completeness review L-15). The SSO plugin is mounted only when a
+ * SAML provider exists when the auth instance is built, and this instance had
+ * none when the server started, so the document used to wait for a restart.
+ * The server now rebuilds its instance when a connection changes, and the
+ * last test below is what an identity provider fetching the document would
+ * see. The document itself is parsed and its entity id read back in
+ * `packages/core/test/saml-surfaces.test.ts`.
  */
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -153,4 +154,27 @@ test("the screen prints what the identity provider asks for", async () => {
   await expect(
     entry.getByRole("link", { name: /sso\/saml2\/sp\/metadata/ }),
   ).toBeVisible();
+});
+
+test("the metadata document is served without a restart", async ({
+  playwright,
+}) => {
+  await goTo(page, "/admin/sso");
+  const entry = page.getByRole("listitem").filter({ hasText: "Sign in with Acme" });
+  const href = await entry
+    .getByRole("link", { name: /sso\/saml2\/sp\/metadata/ })
+    .getAttribute("href");
+  expect(href).toBeTruthy();
+
+  // A context of its own, with no cookie: an identity provider fetching the
+  // document has no session here.
+  const api = await playwright.request.newContext();
+  try {
+    const response = await api.get(href as string);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("xml");
+    expect(await response.text()).toContain("/api/auth/sso/saml2/sp/acs/");
+  } finally {
+    await api.dispose();
+  }
 });

@@ -4,10 +4,11 @@
  * Reads `sso_connections` from the database, decrypts client secrets, and
  * returns a configuration array for Better Auth's `genericOAuth` plugin.
  *
- * Connections are loaded at boot and cached. A change takes effect on the
- * next restart. This is a documented limitation: rebuilding the auth
- * instance on every sign-in would put a database read and a decryption on
- * the hot path of every request.
+ * Connections are loaded at boot and cached, and loaded again when a stamp
+ * of the table moves (completeness review L-15). Rebuilding the auth instance
+ * on every sign-in would put a database read and a decryption on the hot path
+ * of every request; `sso-refresh.ts` reads one small digest every few seconds
+ * instead, and decrypts only when it changed.
  */
 import { X509Certificate } from "node:crypto";
 import { withSSOLookup, withWorkspace } from "@openokr/db";
@@ -141,8 +142,9 @@ type SSORow = {
  * Loads all enabled SSO connections from the database and decrypts their
  * client secrets.
  *
- * Called once at boot. The result configures Better Auth's genericOAuth
- * plugin for the lifetime of the process.
+ * Called at boot, and again whenever `ssoConfigurationStamp` moves. The
+ * result configures Better Auth's genericOAuth plugin for the life of one
+ * auth instance, which is rebuilt around the next result.
  */
 export async function loadSSOConnections(
   pool: Pool,
@@ -599,8 +601,8 @@ export function validateSSOConnectionInput(
  * `syncAllSamlProviders` was built at P8-T07c-a and no running process ever
  * called it, so `sso_providers` stayed empty on every instance and the plugin
  * had nothing to answer a sign-in with. Writing it beside the authority is
- * what makes a provider configured today work at the next restart rather than
- * after somebody notices.
+ * what makes a provider configured today work at the next sign-in rather than
+ * after somebody notices (L-15).
  */
 export async function createSSOConnection(
   pool: Pool,

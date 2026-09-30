@@ -19,6 +19,12 @@ const getKeyRingMock = vi.fn();
 vi.mock("@openokr/core", () => ({
   createAuth: createAuthMock,
   resolveRequireEmailVerification: vi.fn(),
+  // Builds on every call, which is all these two tests need of it. What it
+  // does between calls is `test/sso-without-restart.test.ts`'s subject.
+  followSSOProviders: (
+    tracker: { providers: () => unknown },
+    build: (providers: unknown) => unknown,
+  ) => ({ latest: () => build(tracker.providers()) }),
 }));
 vi.mock("@openokr/config", () => ({
   loadEnv: () => ({
@@ -30,10 +36,12 @@ vi.mock("better-auth/next-js", () => ({ nextCookies: () => ({}) }));
 vi.mock("../lib/instance-name", () => ({ getInstanceName: vi.fn() }));
 vi.mock("../lib/pool", () => ({ getPool: () => "fake-pool" }));
 vi.mock("../lib/secrets", () => ({ getKeyRing: getKeyRingMock }));
-vi.mock("../lib/sso", () => ({ getSSOProviders: () => [] }));
+vi.mock("../lib/sso", () => ({
+  ssoProviderTracker: () => ({ providers: () => [] }),
+}));
 
 afterEach(() => {
-  delete (globalThis as { openokrAuth?: unknown }).openokrAuth;
+  delete (globalThis as { openokrAuthFollower?: unknown }).openokrAuthFollower;
   vi.resetModules();
 });
 

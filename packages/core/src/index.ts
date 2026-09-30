@@ -499,6 +499,12 @@ export {
   listEnforcingConnections,
 } from "./auth/sso-enforcement.ts";
 export {
+  followSSOProviders,
+  type SSOFollowingAuth,
+  type SSOProviderTracker,
+  trackSSOProviders,
+} from "./auth/sso-refresh.ts";
+export {
   type ClaimBlobInput,
   type ClaimedBlob,
   claimBlob,
