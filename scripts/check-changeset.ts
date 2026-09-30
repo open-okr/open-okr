@@ -174,6 +174,44 @@ if (visible.length === 0) {
 }
 
 const changesets = changesetFiles();
+
+/**
+ * The changesets this branch used up, which is what a release does.
+ *
+ * `changeset version` deletes every pending changeset and writes what they
+ * said into the changelog, so the branch that cuts a release changes the
+ * version in every package and leaves no changeset behind. Counted as
+ * described, because it is: by exactly the files it consumed.
+ */
+const consumed = (): number => {
+  try {
+    return execFileSync(
+      "git",
+      [
+        "diff",
+        "--name-only",
+        "--diff-filter=D",
+        `${base}...${head}`,
+        "--",
+        ".changeset/",
+      ],
+      { cwd: root, encoding: "utf8" },
+    )
+      .split("\n")
+      .filter((line) => line.endsWith(".md") && !line.endsWith("README.md"))
+      .length;
+  } catch {
+    return 0;
+  }
+};
+
+if (changesets.length === 0 && consumed() > 0) {
+  console.log(
+    `Changeset gate passed. A release: ${consumed()} changeset(s) were ` +
+      `consumed into the changelog by \`changeset version\`.`,
+  );
+  process.exit(0);
+}
 if (changesets.length === 0) {
   console.error(
     `Changeset gate failed. ${visible.length} file(s) change what a running ` +
