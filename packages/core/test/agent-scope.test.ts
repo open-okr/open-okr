@@ -170,6 +170,54 @@ describe("what the agents are bound to", () => {
     }
   });
 
+  /**
+   * The goal is stored by its owner, not by the space it was sent with: only a
+   * space-owned goal keeps `spaceId`. The binding used to be decided by the
+   * space it was sent with, so a caller passing both, which the API, the
+   * command line and the agent tools all allow, got a goal that belonged to no
+   * space and that neither agent could see.
+   */
+  it("binds both agents to a goal sent with a space it does not belong to", async () => {
+    const wb = await workerDb();
+    const cycle = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.current",
+      { mode: "quarterly" },
+    )) as { id: string };
+    for (const ownerKind of ["workspace", "member"] as const) {
+      const goal = (await callAction(
+        { pool: wb.appPool, ...context() },
+        "goals.create",
+        {
+          title: `Win the ${ownerKind} segment before the next planning round`,
+          cycleId: cycle.id,
+          spaceId,
+          level: ownerKind === "member" ? "individual" : "company",
+          ownerKind,
+          ...(ownerKind === "member" ? { memberId: ownerMemberId } : {}),
+          championId: ownerMemberId,
+          reviewerId: secondMemberId,
+          weight: 1,
+        },
+      )) as { id: string };
+
+      const { rows } = await wb.admin.query<{ space_id: string | null }>(
+        "select space_id from goals where id = $1",
+        [goal.id],
+      );
+      expect(rows[0]?.space_id, `${ownerKind} goal keeps no space`).toBeNull();
+      for (const kind of ["champion", "coach"] as const) {
+        expect(
+          await boundTo(kind),
+          `${kind} sees the ${ownerKind} goal`,
+        ).toContainEqual({
+          resource_type: "goal",
+          resource_id: goal.id,
+        });
+      }
+    }
+  });
+
   it("gives a KPI that belongs to no space its own context, with both agents bound", async () => {
     const wb = await workerDb();
     const workspaceKpi = (await callAction(
