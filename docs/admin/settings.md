@@ -15,13 +15,35 @@ no administrator overrides it.
 | `timezone` | The registering browser's, falling back to UTC | Almost always, on the first day. Every rhythm date is read in it, so a wrong one sends Monday's nudges on Sunday night |
 | `language` | Inherited from the instance default, which is English | Your workspace works in Bahasa Melayu |
 | `branding` | The product's own palette | You want the workspace to carry your colour. It becomes the buttons, links, progress bars and focus rings on every screen of the workspace, in light and dark. A colour too light for white text is darkened for buttons, and the card says which shade is used. Red, amber and green are refused, because they mean off track, at risk and on track. The sign-in page and email do not carry it |
-| `trustedEmailDomains` | None | Anybody with a company address should be able to join without being invited. Joining is by invitation until you set this |
+| `trustedEmailDomains` | None | Anybody with a company address should be able to join without being invited. Joining is by invitation until you set this. See [Trusted email domains](#trusted-email-domains) for what it takes |
 | `requireSecondFactor` | Off | Your organisation mandates a second factor. It holds you too. See [Security](security.md) |
 | `storageQuotaBytes` | 5 GiB | A team whose files outgrow it |
 | `exportInlineRowLimit` | Set by the registry | A list export is large enough to be built in the background instead of handed over directly |
 | `importRowLimit` | Set by the registry | An import is bigger than the default ceiling |
 | `messageLogRetentionDays` | Set by the registry | Your policy says chat message records live for a different span |
 | `agentRunCostCapUsd` | Set by the registry | You want a harder or softer ceiling on what an agent run may spend |
+
+### Trusted email domains
+
+Somebody whose **confirmed** address is at one of these domains is offered the
+workspace when they sign in, and joins it with one press. Nobody is added
+without pressing it.
+
+| Who | What they see |
+|---|---|
+| Somebody with no workspace yet | A page listing the workspaces their domain admits, and a button to start one of their own instead. Nothing is made for them until they choose |
+| A member of another workspace | The same offer at the top of their Work Map |
+| Somebody whose address is not confirmed | Nothing. Anybody can type an address at your company into a sign-up form |
+| A member you suspended, or one who was removed | Nothing. Only an invitation brings them back |
+
+**Confirming an address needs mail.** An instance with no mail server confirms
+nobody, so a trusted domain admits nobody there.
+
+**It does not open registration.** On an invitation-only instance a trusted
+domain lets people who already have an account join. Creating an account there
+still takes an invitation or single sign-on.
+
+The seat limit still applies: a full workspace refuses the join and says so.
 
 ## Space
 

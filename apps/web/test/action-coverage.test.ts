@@ -190,10 +190,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     why: "a person feeds the next cycle by closing this one with `cycles.close`; this is an idempotent re-run for the command line",
   },
 
-  "invitations.joinByTrustedDomain": {
-    notBuilt: "M-34",
-    why: "nothing lets a person whose email domain a workspace trusts join it, although the domains are saved",
-  },
   "ai.setPersonalCredential": {
     notBuilt: "M-36",
     why: "no screen lets a member set their own AI key",

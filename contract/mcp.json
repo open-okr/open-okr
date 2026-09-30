@@ -818,7 +818,7 @@
     },
     {
       "name": "invitations.joinByTrustedDomain",
-      "description": "Join a workspace automatically because your email domain is trusted.",
+      "description": "Join a workspace because it trusts the domain of your confirmed email address.",
       "inputSchema": {
         "type": "object",
         "properties": {}

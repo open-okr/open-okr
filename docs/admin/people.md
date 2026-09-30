@@ -5,13 +5,15 @@
 | Way in | Where | Good for |
 |---|---|---|
 | An invitation link | Admin, Invitations | Almost everybody. A link can be for one person or reusable |
-| A trusted email domain | Admin, General | An organisation where anybody with a company address should be able to join without being asked |
+| A trusted email domain | Admin, General | An organisation where anybody with a confirmed company address should be able to join without being asked. They are offered the workspace when they sign in and join with one press. See [Trusted email domains](settings.md#trusted-email-domains) |
 | Single sign-on | Admin, Single sign-on | An organisation that already has an identity provider. First sign-in creates the account and puts them in this workspace |
 | Directory sync | Admin, Directory sync | An organisation whose identity provider should own the member list outright |
 
 Registration is closed on a self-hosted instance the moment the owner account
-exists. That is the rule these four routes are exceptions to, and the reason
-there is no fifth.
+exists. An invitation, single sign-on and directory sync are the exceptions
+that create an account there. A trusted domain is not one of them: it admits
+people who already have an account, or who can create one because
+registration is open, as it is on a managed cloud.
 
 ## Access levels
 

@@ -5,6 +5,7 @@ import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { goalTreeNodes } from "../goal-nodes.ts";
+import { TrustedDomainOffers } from "../trusted-domain-offers.tsx";
 import { WorkMap } from "../work-map.tsx";
 import {
   type ScopeTab,
@@ -212,6 +213,13 @@ export default async function HomePage({
 
   return (
     <div className="flex w-full flex-col gap-3.5">
+      {/* Completeness review M-34: the workspaces this member's domain
+          admits, drawn only when there are some. */}
+      <TrustedDomainOffers
+        userId={session.user.id}
+        email={session.user.email}
+      />
+
       <WorkMapContextStrip
         context={workMapContext}
         cycleHref={cycleId ? `/cycle?cycle=${cycleId}` : "/cycle"}

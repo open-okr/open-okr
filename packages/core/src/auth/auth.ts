@@ -29,6 +29,7 @@ import {
   inviteTokenFromCookies,
 } from "../invitations/pending.ts";
 import { previewInvite } from "../invitations/preview.ts";
+import { domainIsTrusted } from "../invitations/trusted-domain.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
@@ -599,6 +600,22 @@ export function createAuth(options: AuthOptions) {
                   ? { externalId: authority.externalId }
                   : {}),
               });
+            }
+
+            // **A workspace that trusts their domain is offered first**
+            // (completeness review M-34). Their address is not confirmed yet,
+            // so nothing can be offered now; what this decides is only to
+            // hold off making them a workspace of their own. The first page
+            // they open after confirming asks again, offers what their
+            // domain admits, and makes their own workspace only if they
+            // choose it or nothing is on offer. Making it here would leave
+            // everybody who joins their company's workspace holding a stray
+            // empty one. Somebody already joined above loses nothing: the
+            // line below would only have returned that membership.
+            if (
+              await domainIsTrusted(options.pool, user.email).catch(() => false)
+            ) {
+              return;
             }
 
             await provisionWorkspaceForUser(options.pool, {

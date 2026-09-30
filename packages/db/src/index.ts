@@ -607,6 +607,7 @@ export {
   withProviderTeam,
   withSSOLookup,
   withSystemScan,
+  withTrustedEmailDomain,
   withUser,
   withWorkspace,
 } from "./tenant.ts";

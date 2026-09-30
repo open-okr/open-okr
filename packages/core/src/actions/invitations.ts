@@ -15,10 +15,12 @@
 import {
   activeOnly,
   INVITE_MEMBER_KINDS,
+  includeDeleted,
   inviteLinks,
   spaceMembers,
   spaces,
   withWorkspace,
+  workspaceMembers,
 } from "@openokr/db";
 import { desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -590,10 +592,29 @@ export const acceptLink = defineWriteAction({
   }),
 });
 
+/**
+ * Joins the workspace this runs in, because it trusts the domain of the
+ * caller's address (P2-T04, completeness review M-34).
+ *
+ * Nothing called this until M-34: which workspaces trust a domain was a
+ * question nobody without a membership could ask. `trustedDomainOffers` asks it
+ * now, and the join page and the front door offer what it finds. This is the
+ * write behind the button, and it checks everything again rather than trusting
+ * the page, because a request can name any workspace it likes.
+ *
+ * **A confirmed address, or nothing.** Anybody can type somebody else's
+ * company address into a sign-up form, so an unconfirmed one would let a
+ * stranger claim a whole domain.
+ *
+ * **A member somebody suspended or removed stays out.** The funnel hands back
+ * a live membership unchanged and inserts a new one when the old row is
+ * deleted, so without the check below a removed member could walk straight
+ * back in. Only an administrator's invitation brings them back.
+ */
 export const joinByTrustedDomain = defineWriteAction({
   name: "invitations.joinByTrustedDomain",
   summary:
-    "Join a workspace automatically because your email domain is trusted.",
+    "Join a workspace because it trusts the domain of your confirmed email address.",
   input: z.object({}),
   output: z.object({ memberId: z.uuid() }),
   // Declarative only: see acceptLink above, same bootstrap reasoning.
@@ -610,10 +631,19 @@ export const joinByTrustedDomain = defineWriteAction({
         id: string;
         name: string;
         email: string;
-      }>(sql`select id, name, email from users where id = ${userId}`);
+        email_verified: boolean;
+      }>(
+        sql`select id, name, email, email_verified from users where id = ${userId}`,
+      );
       const userRow = userResult.rows[0];
       if (!userRow) {
         throw new OperationError("forbidden", "No such account.");
+      }
+      if (!userRow.email_verified) {
+        throw new OperationError(
+          "forbidden",
+          "Confirm your email address before joining a workspace by its domain.",
+        );
       }
 
       // openokr:allow-raw-read: no member row exists yet for this user in
@@ -633,6 +663,33 @@ export const joinByTrustedDomain = defineWriteAction({
         );
       }
 
+      const [previous] = await tx
+        .select({
+          status: workspaceMembers.status,
+          deletedAt: workspaceMembers.deletedAt,
+        })
+        .from(workspaceMembers)
+        .where(
+          // Deleted rows included on purpose: a removed member is exactly the
+          // row this has to see.
+          includeDeleted(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, userRow.id),
+          ),
+        )
+        .orderBy(sql`${workspaceMembers.deletedAt} is null desc`)
+        .limit(1);
+      if (
+        previous &&
+        (previous.deletedAt !== null || previous.status === "suspended")
+      ) {
+        throw new OperationError(
+          "forbidden",
+          "Your membership of this workspace was suspended or removed, so your domain cannot bring it back. Ask an administrator.",
+        );
+      }
+
       const provisioned = await provisionMemberForInvite(tx, {
         workspaceId,
         user: { id: userRow.id, name: userRow.name },
@@ -649,7 +706,7 @@ export const joinByTrustedDomain = defineWriteAction({
           action: "invitations.joinByTrustedDomain",
           targetType: "workspace_member",
           targetId: provisioned.memberId,
-          payload: { domain },
+          payload: { domain, alreadyMember: !provisioned.created },
         },
       };
     },

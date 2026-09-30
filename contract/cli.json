@@ -551,7 +551,7 @@
       "method": "POST",
       "path": "/invitations/joinByTrustedDomain",
       "scope": "write",
-      "summary": "Join a workspace automatically because your email domain is trusted.",
+      "summary": "Join a workspace because it trusts the domain of your confirmed email address.",
       "flags": [],
       "pages": false
     },

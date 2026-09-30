@@ -43,6 +43,8 @@ const APP = fileURLToPath(new URL("../apps/web/app", import.meta.url));
 const NOT_CHECKED_HERE: Readonly<Record<string, string>> = {
   "/join/[token]":
     "needs an unused invite token, and s35-join opens the screen with a real one",
+  "/join":
+    "shows only to a confirmed address a workspace trusts and sends everybody else home, so this account would scan the Work Map again; s35b-trusted-domain opens it as such a person",
   "/reset-password":
     "needs a token from a delivered email, which this suite has no mailbox for",
   "/backup-code":

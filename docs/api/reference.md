@@ -350,7 +350,7 @@ the machine-readable document.
 | `invitations.acceptLink`<br/>Accept an invite link and join the workspace. | `POST /api/v1/invitations/acceptLink` | writes |
 | `invitations.createPersonalLink`<br/>Invite one email address, usable once, as a member or as a guest of one space. | `POST /api/v1/invitations/createPersonalLink` | writes |
 | `invitations.createWorkspaceLink`<br/>Create a reusable link anyone holding it may join through. | `POST /api/v1/invitations/createWorkspaceLink` | writes |
-| `invitations.joinByTrustedDomain`<br/>Join a workspace automatically because your email domain is trusted. | `POST /api/v1/invitations/joinByTrustedDomain` | writes |
+| `invitations.joinByTrustedDomain`<br/>Join a workspace because it trusts the domain of your confirmed email address. | `POST /api/v1/invitations/joinByTrustedDomain` | writes |
 | `invitations.list`<br/>Every invitation link this workspace has issued, without their tokens. | `GET /api/v1/invitations/list` | reads |
 | `invitations.revokeLink`<br/>Revoke a link. Already-used memberships are unaffected. | `POST /api/v1/invitations/revokeLink` | writes |
 

@@ -840,6 +840,10 @@ export {
   hashInviteToken,
 } from "./invitations/tokens.ts";
 export {
+  type TrustedDomainOffer,
+  trustedDomainOffers,
+} from "./invitations/trusted-domain.ts";
+export {
   findNavigationItem,
   isRouteAllowed,
   MODULE_REGISTRY,

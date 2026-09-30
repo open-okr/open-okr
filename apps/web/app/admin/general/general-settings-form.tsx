@@ -134,9 +134,20 @@ export async function GeneralSettingsForm({
               id="trustedEmailDomains"
               name="trustedEmailDomains"
               defaultValue={trustedEmailDomains}
+              aria-describedby="trustedEmailDomainsHint"
               className={INPUT_CLASS}
             />
           </label>
+          {/* What the setting does, and the one condition it needs
+              (completeness review M-34): it saved and did nothing for as long
+              as nothing offered it, and an instance with no mail confirms no
+              address, so it still admits nobody there. */}
+          <p
+            id="trustedEmailDomainsHint"
+            className="-mt-1.5 max-w-sm text-xs text-ink-3"
+          >
+            {t("admin.general.generalSettingsForm.trustedEmailDomainsHint")}
+          </p>
           <div className="flex flex-col gap-1 border-t border-line pt-3">
             <label
               htmlFor="requireSecondFactor"
