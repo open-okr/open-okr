@@ -11,7 +11,6 @@
 #
 # Both come from the same file, so moving from a laptop to a server is one
 # environment variable and not a different configuration.
-
 {
 	# No `email` directive. Let's Encrypt does not require one, and Caddy
 	# refuses to start on an empty value, so a default of "" would break every
@@ -44,19 +43,20 @@
 	}
 
 	reverse_proxy app:3000 {
-		# The application builds absolute URLs for passkeys and mail links, so
-		# it has to know how it was reached rather than that it was reached
-		# over plain HTTP inside the network.
-		header_up X-Forwarded-Proto {scheme}
-		# **`{hostport}`, not `{host}`** (P8-G06). `{host}` is the hostname
-		# with the port stripped off, so an instance published on any port but
-		# 80 sent `X-Forwarded-Host: localhost` while the browser sent
-		# `Origin: localhost:8088`. Next.js compares those two on every
-		# forwarded Server Action and aborts the request when they disagree, so
-		# **every form and every write from the interface failed**: signing out
-		# is simply the first one somebody presses. `{hostport}` carries the
-		# Host header as the browser sent it, which on port 80 has no port in
-		# it and is therefore unchanged for a standard deployment.
+		# Caddy already sends X-Forwarded-For, and X-Forwarded-Proto with the
+		# scheme the browser used, so neither is set here (completeness review
+		# L-18). The application needs both: it builds absolute URLs for
+		# passkeys and mail links from them.
+		#
+		# **X-Forwarded-Host is the one kept, and on purpose.** `{hostport}` is
+		# what Caddy sends by default too, the Host header as the browser sent
+		# it, port included. It stays written out because it is the line that
+		# broke (P8-G06, P8-G07): it once read `{host}`, the hostname with the
+		# port stripped, so an instance on any port but 80 sent `localhost`
+		# while the browser sent `localhost:8088`, Next.js refused every
+		# forwarded Server Action, and every form and write failed. The smoke
+		# test asserts this line, since a script cannot reproduce the browser's
+		# headers, and an explicit line is what an edit has to get past.
 		header_up X-Forwarded-Host {hostport}
 
 		# Long enough for a slow first paint on a cold instance, short enough
