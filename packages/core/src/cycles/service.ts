@@ -11,6 +11,7 @@
 import {
   activeOnly,
   type CycleCadence,
+  type CycleMode,
   cycles,
   newId,
   type RhythmSettingsRow,
@@ -18,7 +19,7 @@ import {
   type WorkspaceTx,
   workspaces,
 } from "@openokr/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { LegacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import {
@@ -34,8 +35,9 @@ type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
 /**
  * The cadence a new cycle inherits.
  *
- * The most recent cycle's own, falling back to quarterly. Deliberately not a
- * setting: §11 holds no cadence parameter and §4.14 holds no cycle settings, so
+ * The most recent quarterly-mode cycle's own, then the most recent annual
+ * one's, falling back to quarterly (`resolveWorkspaceCadence`). Deliberately
+ * not a setting: §11 holds no cadence parameter and §4.14 holds no cycle settings, so
  * adding one would put the same fact in two places. The cadence a workspace
  * practises is the cadence its cycles have.
  */
@@ -65,14 +67,45 @@ export async function workspaceTimeZone<
   return typeof timezone === "string" && timezone !== "" ? timezone : "UTC";
 }
 
+/**
+ * The cadence a new cycle takes when its caller names none (completeness
+ * review M-06).
+ *
+ * **An annual cycle is a second horizon, not a change of rhythm.** METHOD.md
+ * §2.1 runs the year and the quarter side by side, so a workspace that opens
+ * next year's annual cycle still plans in quarters. Reading only the newest
+ * cycle turned that one act into a new cadence for every later bare call: the
+ * next "create" or "ensure current" built a year instead of a quarter. So the
+ * quarterly-mode cycles decide, and an annual cadence only answers for a
+ * workspace that has nothing else.
+ *
+ * `mode` narrows the question to one horizon. Annual has one cadence; the
+ * quarterly horizon keeps whichever of its cadences the workspace practises,
+ * and the fallback when it has practised none.
+ */
 export async function resolveWorkspaceCadence<
   TSchema extends Record<string, unknown> = Record<string, never>,
->(tx: AnyTx<TSchema>, workspaceId: string): Promise<CycleCadence> {
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  mode?: CycleMode,
+): Promise<CycleCadence> {
+  if (mode === "annual") {
+    return "annual";
+  }
   const [latest] = await tx
     .select({ cadence: cycles.cadence })
     .from(cycles)
-    .where(activeOnly(cycles, eq(cycles.workspaceId, workspaceId)))
-    .orderBy(desc(cycles.startsOn))
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        ...(mode === "quarterly" ? [eq(cycles.mode, "quarterly")] : []),
+      ),
+    )
+    // False sorts before true, so any quarterly-mode cycle outranks every
+    // annual one, and the newest wins within each.
+    .orderBy(asc(sql`${cycles.mode} = 'annual'`), desc(cycles.startsOn))
     .limit(1);
   return latest?.cadence ?? FALLBACK_CADENCE;
 }
@@ -83,7 +116,7 @@ export interface EnsureCycleInput {
   readonly timeZone: string;
   /** The clock, passed in so this stays testable and the engine stays pure. */
   readonly now: Date;
-  /** Defaults to the most recent cycle's cadence, then to quarterly. */
+  /** Defaults to the workspace's own, which `resolveWorkspaceCadence` reads. */
   readonly cadence?: CycleCadence;
 }
 

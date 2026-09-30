@@ -220,6 +220,25 @@ const DIRECTORY_TOKEN_HASH_SETTING = "app.directory_token_hash";
  */
 export const SYSTEM_SCAN_SETTING = "app.system_scan";
 
+/**
+ * Names one email domain, for trusted-domain joining only (completeness review
+ * M-34, migration 0104).
+ *
+ * A signed-in person with a confirmed address belongs to none of the
+ * workspaces that trust its domain, so which ones do is the question rather
+ * than the context. `workspaces` admits a row through this setting when its
+ * own `trustedEmailDomains` holds exactly this domain, for SELECT, and only
+ * while no workspace is scoped. No other table names it.
+ *
+ * Unlike the digest keys above, this names no secret: it names a domain the
+ * workspace itself published to the people at it. That is why the one caller
+ * reads a workspace's id and name and nothing else.
+ */
+const TRUSTED_EMAIL_DOMAIN_SETTING = "app.trusted_email_domain";
+
+/** A lower-case domain, the shape `trustedEmailDomains` stores. */
+const EMAIL_DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+
 /** What a transaction is scoped to. At least one of the three is required. */
 export interface TenantContext {
   readonly workspaceId?: string;
@@ -293,6 +312,14 @@ export interface TenantContext {
    * maintenance commands that iterate every tenant (migration 0099).
    */
   readonly systemScan?: boolean;
+  /**
+   * Names one email domain, for trusted-domain joining only (completeness
+   * review M-34).
+   *
+   * Reveals the `workspaces` rows whose `trustedEmailDomains` holds exactly
+   * this domain, for reading, and nothing else in the database.
+   */
+  readonly trustedEmailDomain?: string;
 }
 
 /**
@@ -453,6 +480,25 @@ export async function withSystemScan<
 }
 
 /**
+ * Opens a transaction that can find the workspaces trusting one email domain
+ * (completeness review M-34).
+ *
+ * Use it for that lookup and nothing else. It reads `workspaces` and reaches no
+ * other table, and it cannot write. Joining then runs under the workspace the
+ * person chose, like any other write.
+ */
+export async function withTrustedEmailDomain<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  domain: string,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { trustedEmailDomain: domain }, fn);
+}
+
+/**
  * Opens a transaction and applies the tenant context transaction-locally.
  *
  * Provisioning needs both settings at once: it inserts into the new workspace
@@ -502,6 +548,7 @@ export async function withContext<
     ssoLookup,
     directoryTokenHash,
     systemScan,
+    trustedEmailDomain,
   } = context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
@@ -558,6 +605,15 @@ export async function withContext<
       "Invalid directory token hash: expected a SHA-256 hex digest.",
     );
   }
+  // The domain comes from an account row rather than a request, but the policy
+  // compares it with `?`, so anything that is not a plain lower-case domain is
+  // refused here rather than trusted to match nothing.
+  if (
+    trustedEmailDomain !== undefined &&
+    (trustedEmailDomain.length > 253 || !EMAIL_DOMAIN.test(trustedEmailDomain))
+  ) {
+    throw new Error("Invalid email domain: expected a lower-case domain.");
+  }
   if (
     workspaceId === undefined &&
     userId === undefined &&
@@ -568,12 +624,13 @@ export async function withContext<
     inviteTokenHash === undefined &&
     operatorUserId === undefined &&
     directoryTokenHash === undefined &&
+    trustedEmailDomain === undefined &&
     !ssoLookup &&
     !instanceAdmin &&
     !systemScan
   ) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, an invitation token hash, an operator id, a directory token hash, the SSO provider list, instance admin, or a system scan.",
+      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, an invitation token hash, an operator id, a directory token hash, an email domain, the SSO provider list, instance admin, or a system scan.",
     );
   }
 
@@ -638,6 +695,11 @@ export async function withContext<
     if (systemScan) {
       await tx.execute(
         sql`select set_config(${SYSTEM_SCAN_SETTING}, 'on', true)`,
+      );
+    }
+    if (trustedEmailDomain !== undefined) {
+      await tx.execute(
+        sql`select set_config(${TRUSTED_EMAIL_DOMAIN_SETTING}, ${trustedEmailDomain}, true)`,
       );
     }
     return fn(tx);

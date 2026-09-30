@@ -16,6 +16,7 @@ import {
 } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
@@ -96,10 +97,8 @@ export async function publishCheckIn(
   if (isBlankText(narrative)) {
     // The same refusal the action makes, said before the round trip so it lands
     // beside the empty field.
-    return {
-      error:
-        "A check-in needs a narrative. What moved, what is in the way, and what happens next?",
-    };
+    const { t } = await getTranslations();
+    return { error: t("checkIn.actions.needsANarrative") };
   }
 
   return run((context) =>
@@ -164,7 +163,8 @@ export async function castVote(
   const keyResultId = String(formData.get("keyResultId") ?? "");
   const confidence = Number(formData.get("confidence"));
   if (!Number.isFinite(confidence)) {
-    return { error: "A vote has to be a number between 0 and 1." };
+    const { t } = await getTranslations();
+    return { error: t("checkIn.actions.voteBetweenZeroAndOne") };
   }
   return run((context) =>
     callAction(context, "goals.vote", { keyResultId, confidence }),

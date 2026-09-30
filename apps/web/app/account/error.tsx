@@ -7,5 +7,5 @@ export default function AccountError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="your account settings" />;
+  return <SegmentError {...props} headingKey="segmentError.account" />;
 }

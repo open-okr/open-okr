@@ -23,5 +23,5 @@ export default function OperatorError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the operator console" />;
+  return <SegmentError {...props} headingKey="segmentError.operator" />;
 }

@@ -31,7 +31,7 @@ export default async function ImportsPage() {
 
   const [runs, drafter] = await Promise.all([
     callAction(context, "imports.listRuns", { limit: 10 }),
-    drafterFor(workspace.workspaceId),
+    drafterFor(workspace.workspaceId, "balanced", session.user.id),
   ]);
 
   const entities = TEMPLATES.map((template) => ({
@@ -59,8 +59,8 @@ export default async function ImportsPage() {
             </h2>
             <span className="text-xs text-ink-3">
               {runs.runs.length === 0
-                ? "None yet"
-                : `${runs.runs.length} shown`}
+                ? t("board.noneYet")
+                : t("admin.imports.shown", { count: runs.runs.length })}
             </span>
           </CardHeader>
           <CardBody>
@@ -79,7 +79,9 @@ export default async function ImportsPage() {
                     className="flex items-center gap-3 py-2 text-sm"
                   >
                     <Chip tone={run.mode === "real" ? "info" : "neutral"}>
-                      {run.mode === "real" ? "Imported" : "Preview"}
+                      {run.mode === "real"
+                        ? t("admin.imports.archiveImportCard.imported")
+                        : t("admin.imports.preview")}
                     </Chip>
                     <span className="min-w-0 flex-1 truncate text-ink-2">
                       {run.filename ?? run.source}

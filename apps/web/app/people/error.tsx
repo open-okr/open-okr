@@ -7,5 +7,5 @@ export default function PeopleError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the people directory" />;
+  return <SegmentError {...props} headingKey="segmentError.people" />;
 }

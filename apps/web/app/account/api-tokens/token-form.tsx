@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { agentConfiguration } from "./agent-config.ts";
 import { NOTHING_YET, type TokenResult } from "./token-state.ts";
 
 /**
@@ -15,9 +16,15 @@ import { NOTHING_YET, type TokenResult } from "./token-state.ts";
  * tree above a form unmounts it and takes its state. The exception is the token
  * itself, which has nowhere else to live, so it is rendered in the same pass as
  * the answer that produced it.
+ *
+ * **An agent token comes already in place** (completeness review M-12). The
+ * configuration an agent reads is rendered with the token inside it, in the
+ * same pass, so the one moment the token exists is also the moment it can be
+ * pasted whole rather than spliced into an example by hand.
  */
 export function TokenForm({
   action,
+  agentEndpoint,
   className,
   children,
 }: {
@@ -25,6 +32,8 @@ export function TokenForm({
     previous: TokenResult | null,
     formData: FormData,
   ) => Promise<TokenResult>;
+  /** The agent endpoint, for the configuration an agent token is shown in. */
+  readonly agentEndpoint?: string;
   readonly className?: string;
   readonly children: React.ReactNode;
 }) {
@@ -41,6 +50,14 @@ export function TokenForm({
             {state.token}
           </code>
           <span>{state.message}</span>
+          {state.audience === "mcp" && agentEndpoint ? (
+            <pre
+              data-testid="minted-agent-configuration"
+              className="whitespace-pre-wrap break-all rounded-md bg-surface px-2.5 py-2 font-mono text-xs text-ink"
+            >
+              {agentConfiguration(agentEndpoint, state.token)}
+            </pre>
+          ) : null}
         </div>
       ) : state.message ? (
         <p

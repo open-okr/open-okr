@@ -105,6 +105,43 @@ export interface OutboxRelayOptions {
    * nothing at all.
    */
   readonly metrics?: MetricRecorder;
+  /**
+   * Payload fields to strip from a row the moment it is delivered, by topic
+   * (completeness review M-19).
+   *
+   * An invitation's email has to carry the raw token and the address through
+   * the outbox, because the row is the only place they exist once the write
+   * commits. After the email has gone they are a secret and a personal
+   * address sitting in a table forever. The host names the fields; this
+   * package knows nothing about invitations.
+   */
+  readonly redactOnDelivery?: Readonly<Record<string, readonly string[]>>;
+}
+
+/**
+ * Deletes the rows the relay has finished with: delivered, or dead-lettered,
+ * more than `olderThanDays` ago (completeness review M-19). Zero or less keeps
+ * everything. A pending row is never touched, whatever its age.
+ */
+export async function purgeSettledOutbox(
+  pool: RelayPool,
+  olderThanDays: number,
+): Promise<number> {
+  if (!(olderThanDays > 0)) {
+    return 0;
+  }
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `delete from outbox
+        where (delivered_at is not null and delivered_at < now() - make_interval(days => $1))
+           or (dead_lettered_at is not null and dead_lettered_at < now() - make_interval(days => $1))`,
+      [Math.floor(olderThanDays)],
+    );
+    return result.rowCount ?? 0;
+  } finally {
+    client.release();
+  }
 }
 
 /**
@@ -164,9 +201,15 @@ export interface DeadLetteredOutboxRecord extends OutboxRecord {
 export class OutboxRelay {
   readonly #pool: RelayPool;
   readonly #options: Required<
-    Omit<OutboxRelayOptions, "onError" | "onDeadLetter" | "metrics">
+    Omit<
+      OutboxRelayOptions,
+      "onError" | "onDeadLetter" | "metrics" | "redactOnDelivery"
+    >
   > &
-    Pick<OutboxRelayOptions, "onError" | "onDeadLetter" | "metrics">;
+    Pick<
+      OutboxRelayOptions,
+      "onError" | "onDeadLetter" | "metrics" | "redactOnDelivery"
+    >;
   #timer: NodeJS.Timeout | undefined;
   #running = false;
   #draining: Promise<number> | undefined;
@@ -183,6 +226,7 @@ export class OutboxRelay {
       onError: options.onError,
       onDeadLetter: options.onDeadLetter,
       metrics: options.metrics,
+      redactOnDelivery: options.redactOnDelivery,
     };
 
     // **Registered here, not in the drain loop, and read at scrape time.**
@@ -306,7 +350,7 @@ export class OutboxRelay {
     for (const record of claimed) {
       try {
         await this.#options.dispatch(record);
-        await this.#markDelivered(record.id);
+        await this.#markDelivered(record);
         delivered++;
         this.#count(OUTBOX_DISPATCHED, { topic: record.topic, outcome: "ok" });
       } catch (error) {
@@ -530,14 +574,18 @@ export class OutboxRelay {
     }
   }
 
-  async #markDelivered(id: string): Promise<void> {
+  async #markDelivered(record: OutboxRecord): Promise<void> {
+    // In the same statement as the stamp, so there is no moment at which a
+    // row reads as delivered and still holds what it carried.
+    const redact = this.#options.redactOnDelivery?.[record.topic] ?? [];
     const client = await this.#pool.connect();
     try {
       await client.query(
         `update outbox
-            set delivered_at = now(), last_error = null
+            set delivered_at = now(), last_error = null,
+                payload = payload - $2::text[]
           where id = $1 and delivered_at is null`,
-        [id],
+        [record.id, [...redact]],
       );
     } finally {
       client.release();

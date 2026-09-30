@@ -27,21 +27,24 @@ import { requireWorkspace } from "../../../lib/workspace";
  * lift it. A control that locked itself out would be worse than no control.
  */
 
+// Each state names its whole sentence in the catalogue: what it is and what it
+// means, then the button that moves to it. One message per sentence, so a
+// translator never has to reassemble a label and a lowercased copy of it.
 const STATES = [
   {
     value: "active",
-    label: "Active",
-    says: "Everything works. This is where a workspace lives.",
+    says: "admin.state.saysActive",
+    moveTo: "admin.state.returnToActive",
   },
   {
     value: "read_only",
-    label: "Read only",
-    says: "Everything stays readable and nothing new can be written. For a workspace that has finished rather than one in trouble.",
+    says: "admin.state.saysReadOnly",
+    moveTo: "admin.state.setToReadOnly",
   },
   {
     value: "frozen",
-    label: "Frozen",
-    says: "The same refusal, and it reads as a stop rather than a wind-down. For an instance operator holding an investigation still.",
+    says: "admin.state.saysFrozen",
+    moveTo: "admin.state.setToFrozen",
   },
 ] as const;
 
@@ -97,7 +100,7 @@ export async function WorkspaceStateCard({
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
         <p className="text-sm text-ink-2" data-testid="workspace-state-current">
-          {current?.label ?? state}. {current?.says ?? ""}
+          {current ? t(current.says) : state}
         </p>
         <div className="flex flex-wrap gap-2.5">
           {STATES.filter((one) => one.value !== state).map((one) => (
@@ -109,9 +112,7 @@ export async function WorkspaceStateCard({
                 variant={one.value === "active" ? "primary" : "default"}
                 data-testid={`set-state-${one.value}`}
               >
-                {one.value === "active"
-                  ? "Return to active"
-                  : `Set to ${one.label.toLowerCase()}`}
+                {t(one.moveTo)}
               </Button>
             </form>
           ))}

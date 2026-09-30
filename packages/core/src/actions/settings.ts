@@ -117,7 +117,13 @@ export const readWorkspaceSettings = defineReadAction({
  * notices, and the stored map holds administrative values. A list is the other
  * way round: a new setting is invisible here until somebody adds it on purpose.
  */
-const MEMBER_VISIBLE_SETTINGS = ["timezone", "onboardingDone"] as const;
+const MEMBER_VISIBLE_SETTINGS = [
+  "timezone",
+  "onboardingDone",
+  // Every screen is drawn in it, so every member already sees it (M-14). Only
+  // the colour leaves, never the rest of the branding object.
+  "branding",
+] as const;
 
 /**
  * The few settings an ordinary member's own screens need (P8-G05).
@@ -148,6 +154,7 @@ export const readSettingsForMember = defineReadAction({
     settings: z.object({
       timezone: z.string().optional(),
       onboardingDone: z.boolean().optional(),
+      branding: z.object({ primaryColor: z.string().optional() }).optional(),
     }),
   }),
   access: ACCESS_LEVELS.view,
@@ -206,7 +213,11 @@ export const readSettingsForMember = defineReadAction({
         }
 
         const stored = workspace.settings as Record<string, unknown>;
-        const settings: { timezone?: string; onboardingDone?: boolean } = {};
+        const settings: {
+          timezone?: string;
+          onboardingDone?: boolean;
+          branding?: { primaryColor?: string };
+        } = {};
         for (const key of MEMBER_VISIBLE_SETTINGS) {
           const value = stored[key];
           // Typed on the way out rather than cast. A stored value of the wrong
@@ -217,6 +228,15 @@ export const readSettingsForMember = defineReadAction({
           }
           if (key === "onboardingDone" && typeof value === "boolean") {
             settings.onboardingDone = value;
+          }
+          if (
+            key === "branding" &&
+            value !== null &&
+            typeof value === "object"
+          ) {
+            const colour = (value as Record<string, unknown>).primaryColor;
+            settings.branding =
+              typeof colour === "string" ? { primaryColor: colour } : {};
           }
         }
 

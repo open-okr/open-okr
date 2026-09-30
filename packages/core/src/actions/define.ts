@@ -100,6 +100,13 @@ export interface ActionCallContext {
    */
   readonly baseUrl?: string;
   /**
+   * What the instance calls itself, for the text an action writes that names
+   * it (completeness review M-33): a nudge's subject and button, a channel
+   * test message. Resolved by the host with `resolveInstanceName`, which is
+   * the one reader. Absent, the text says "OpenOKR", as it always did.
+   */
+  readonly instanceName?: string;
+  /**
    * How to turn text into a vector, when the host has a provider that can
    * (P4-T14a-a).
    *
@@ -113,9 +120,12 @@ export interface ActionCallContext {
    * Where this call came from, when it did not come from the browser
    * (P5-T06a).
    *
-   * Set by the chat router and by nothing else. It reaches the audit row
+   * Set by every surface that is not the browser: the chat router, the REST
+   * surface (`api`) and the agent endpoint (`mcp`). It reaches the audit row
    * through the Operation pipeline, in one place, so that every inbound action
    * is answerable a quarter later without each action having to remember.
+   * Minting a token reads it too, to refuse any caller that arrived holding a
+   * credential already (completeness review M-12).
    */
   readonly channel?: string;
   /**

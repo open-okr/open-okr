@@ -7,5 +7,5 @@ export default function CheckInError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the check-in composer" />;
+  return <SegmentError {...props} headingKey="segmentError.checkIn" />;
 }

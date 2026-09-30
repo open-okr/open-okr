@@ -1,6 +1,6 @@
 {
   "name": "@openokr/test-support",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -14,7 +14,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit --singleThreaded"
   },
   "dependencies": {
     "@openokr/core": "workspace:*",

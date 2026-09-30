@@ -68,13 +68,15 @@ export default async function DevicePage({
           <CardBody className="flex flex-col gap-2">
             <p className="text-sm text-ink">
               {code
-                ? "There is nothing to authorise for that code."
-                : "Open the link your terminal printed to authorise it."}
+                ? t("account.device.nothingToAuthoriseForThatCode")
+                : t("account.device.openTheLinkYourTerminalPrinted")}
             </p>
             <p className="text-xs text-ink-3">
               {code
-                ? "It may have expired, been answered already, or never existed. Run the login again in your terminal to get a new one."
-                : "Run okr login in a terminal and it will print a link and a code."}
+                ? t("account.device.itMayHaveExpired")
+                : t("account.device.runLoginInATerminal", {
+                    command: "okr login",
+                  })}
             </p>
           </CardBody>
         </Card>

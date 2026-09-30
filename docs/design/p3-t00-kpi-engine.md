@@ -358,7 +358,11 @@ METHOD.md §6.1's first connection: a key result measured by a live KPI.
 | Progress source | The KPI's **real** `achievement_pct`, clamped to 0 to 100 (decision D-4) |
 | Never the effective value | A recovery key result reading its own KPI's effective health would feed its own progress back into itself |
 | Manual entry | Refused while linked |
-| Cascade | A KPI record write recomputes the KPI, then every linked key result, then their goals upward, all through the outbox |
+| Current value | The KPI's latest reading, the newest period with an actual value. Written as a `kpi` history row when it moves, so the sparkline records it |
+| Cascade | A KPI record write recomputes the KPI and every calculated KPI downstream, then every linked key result, then their goals upward |
+| Where the cascade runs | **In the writing Operation, not through the outbox** (completeness review M-07). No relay drains the outbox yet, which is the call P3-T05 made for the scoring cascade. `kpis.record`, `kpis.setFormula` and `kpis.update` all run it, because each can move an achievement |
+| Closed goals | Left as they were closed. Their key results take no new values, and `goals.linkKpi` refuses one until it is reopened |
+| Linking | On create (`goals.addKeyResult` with `kpiId`) or later (`goals.linkKpi`). Either way the key result starts at the KPI's latest reading. A key result that already reads a KPI is refused; unlinking first puts the change of source on the record |
 
 ## 11. Acceptance criteria
 

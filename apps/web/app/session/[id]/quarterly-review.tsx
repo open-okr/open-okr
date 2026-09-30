@@ -31,11 +31,12 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { addMinuteAction, setStageNoteAction } from "./actions";
 
+/** Catalogue keys, so the words are the reader's language. */
 const ACT_LABELS: Record<ReviewAct, string> = {
-  open: "Open",
-  review: "Review",
-  retro: "Retro",
-  reset: "Reset",
+  open: "session.detail.quarterlyReview.actOpen",
+  review: "session.detail.quarterlyReview.actReview",
+  retro: "session.detail.quarterlyReview.actRetro",
+  reset: "goals.studio.canvas.reset",
 };
 
 /** `4:12`, and `12:03` past ten minutes. Never negative. */
@@ -118,12 +119,14 @@ export function QuarterlyReview({
           router.refresh();
         } catch (error) {
           setProblem(
-            error instanceof Error ? error.message : "That did not save.",
+            error instanceof Error
+              ? error.message
+              : t("session.detail.thatDidNotSave"),
           );
         }
       });
     },
-    [router],
+    [router, t],
   );
 
   const currentIndex = currentStageKey
@@ -198,8 +201,11 @@ export function QuarterlyReview({
         role="img"
         aria-label={
           current
-            ? `Stage ${current.stage} of ${stages.length}`
-            : "The review has not started"
+            ? t("session.detail.quarterlyReview.stageOfLength", {
+                stage: current.stage,
+                length: stages.length,
+              })
+            : t("session.detail.quarterlyReview.theReviewHasNotStarted")
         }
       >
         {stages.map((stage, index) => {
@@ -249,7 +255,7 @@ export function QuarterlyReview({
               return (
                 <div key={act} className="flex flex-col gap-1">
                   <span className="text-2xs font-semibold uppercase tracking-wide text-ink-4">
-                    {ACT_LABELS[act]}
+                    {t(ACT_LABELS[act])}
                   </span>
                   <ul className="flex flex-col gap-0.5">
                     {inAct.map(({ stage, index }) => {
@@ -318,7 +324,10 @@ export function QuarterlyReview({
                 <textarea
                   className="min-h-20 w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
                   value={noteDraft}
-                  aria-label={`Private note for ${current.title}`}
+                  aria-label={t(
+                    "session.detail.quarterlyReview.privateNoteFor",
+                    { title: current.title },
+                  )}
                   placeholder={t(
                     "session.detail.quarterlyReview.onlyYouCanRead",
                   )}
@@ -351,9 +360,9 @@ export function QuarterlyReview({
               <h2 className="text-sm font-bold text-ink">
                 {current
                   ? stageHasPanel
-                    ? "This stage"
+                    ? t("session.detail.quarterlyReview.thisStage")
                     : current.title
-                  : "The review"}
+                  : t("session.detail.quarterlyReview.theReview")}
               </h2>
             </CardHeader>
             <CardBody className="flex flex-col gap-2">

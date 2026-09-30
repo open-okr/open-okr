@@ -31,7 +31,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { withoutTrailingSlashes } from "../../urls.ts";
-import { resolveClient } from "./clients.ts";
+import { clientDisplayName, resolveClient } from "./clients.ts";
 import { resourceIdentifier, SUPPORTED_SCOPES } from "./discovery.ts";
 import { issueAuthorisationCode } from "./flow.ts";
 import { createGrant } from "./grants.ts";
@@ -100,6 +100,11 @@ export async function checkAuthoriseRequest(
   input: {
     readonly request: AuthoriseRequest;
     readonly issuer: string;
+    /**
+     * What the instance calls itself (M-33). The command line's consent
+     * screen names the instance it signs in to. Absent says "OpenOKR".
+     */
+    readonly instanceName?: string;
   },
 ): Promise<AuthoriseCheck> {
   const { request } = input;
@@ -190,7 +195,7 @@ export async function checkAuthoriseRequest(
   return {
     kind: "ok",
     clientRowId: client.client.id,
-    clientName: client.client.name,
+    clientName: clientDisplayName(client.client, input.instanceName),
     scopes: scopesFrom(request.scope),
   };
 }
@@ -375,12 +380,15 @@ export async function checkAuthoriseRequestFor(
     readonly workspaceId: string;
     readonly request: AuthoriseRequest;
     readonly issuer: string;
+    /** What the instance calls itself, for the client's name (M-33). */
+    readonly instanceName?: string;
   },
 ): Promise<AuthoriseCheck> {
   return withWorkspace(drizzle(pool), input.workspaceId, (tx) =>
     checkAuthoriseRequest(tx, {
       request: input.request,
       issuer: input.issuer,
+      ...(input.instanceName ? { instanceName: input.instanceName } : {}),
     }),
   );
 }

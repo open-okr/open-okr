@@ -33,6 +33,7 @@ import {
 import {
   isTriggerKey,
   type ResolvedThresholds,
+  type TriggerKey,
   trigger,
 } from "@openokr/method";
 import { and, eq, isNull } from "drizzle-orm";
@@ -54,7 +55,7 @@ import type { DueNudge } from "./service.ts";
  * Coach's inline message as somebody types. Inventing a trigger for either would
  * be adding a proactive message, which CLAUDE.md puts on the ask-a-human list.
  */
-const TRIGGER_FOR_FINDING: Record<string, string> = {
+const TRIGGER_FOR_FINDING: Record<string, TriggerKey> = {
   "AL-1": "quality.orphan_goal",
   "AL-3": "quality.level_skip",
   "AL-6": "quality.silo",
@@ -73,7 +74,7 @@ const TRIGGER_FOR_FINDING: Record<string, string> = {
 const TRIGGER_FOR_VERDICT: readonly {
   readonly id: string;
   readonly condition: string;
-  readonly ruleKey: string;
+  readonly ruleKey: TriggerKey;
 }[] = [
   {
     id: "KR-4",
@@ -89,7 +90,7 @@ const TRIGGER_FOR_VERDICT: readonly {
 
 /** One nudge, with the rule key refused before the row exists. */
 function qualityNudge(input: {
-  readonly ruleKey: string;
+  readonly ruleKey: TriggerKey;
   readonly goalId: string;
   readonly recipientMemberId: string;
 }): DueNudge {

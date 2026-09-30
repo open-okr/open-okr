@@ -16,6 +16,7 @@
  */
 import { createProviderDrafter } from "@openokr/agents";
 import { type AgentDrafter, resolveAgentRunCostCap } from "@openokr/core";
+import type { ModelTier } from "@openokr/db";
 import { providerForTier } from "./ai-provider";
 import { getPool } from "./auth";
 
@@ -39,19 +40,42 @@ async function runCostCapFor(
   return resolveAgentRunCostCap(pool, workspaceId);
 }
 
-/** The drafter for this workspace, or nothing when the provider is off. */
+/**
+ * The drafter for this workspace, or nothing when the provider is off.
+ *
+ * `tier` is `balanced` unless a caller names another. AI-NATIVE-PLAN §3.4
+ * gives decomposition the `deep` tier (completeness review M-09), and a
+ * feature names a tier rather than a model, so the one assist that asks for
+ * more says so here and every other caller is unchanged.
+ *
+ * `forUser` is the signed-in person an assist or a copilot answer is for, so
+ * their own key answers them where they stored one (completeness review M-36).
+ * Every surface a person presses passes it. The agents, the scheduler and the
+ * administrator's "run it now" buttons do not, because those are the Coach's
+ * and the Champion's requests and run on the workspace's key.
+ */
 export async function drafterFor(
   workspaceId: string,
+  tier: ModelTier = "balanced",
+  forUser?: string,
 ): Promise<AgentDrafter | null> {
   const pool = getPool();
   const costCapUsd = await runCostCapFor(pool, workspaceId);
 
-  // `balanced` rather than `fast`: a check-in somebody publishes under their
-  // own name is worth a better model than the cheapest one, and the run cap
-  // bounds what that can cost. Whichever provider the workspace routes that
-  // tier to, not OpenRouter always (completeness review H-27).
-  const routed = await providerForTier(workspaceId, "balanced");
+  // `balanced` by default rather than `fast`: a check-in somebody publishes
+  // under their own name is worth a better model than the cheapest one, and
+  // the run cap bounds what that can cost. Whichever provider the workspace
+  // routes that tier to, not OpenRouter always (completeness review H-27).
+  const routed = await providerForTier(workspaceId, tier, forUser);
   if (!routed) {
+    return null;
+  }
+  // A workspace whose egress controls let nothing reach this provider has no
+  // drafter, exactly as one with no provider has none (M-10): its assists are
+  // hidden and its agents run in their deterministic form, rather than
+  // offering buttons the guard would refuse every time. `assist` is the
+  // narrowest purpose, so nothing is permitted when it is not.
+  if (!routed.provider.permits("assist")) {
     return null;
   }
 

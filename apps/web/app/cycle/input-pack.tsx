@@ -78,8 +78,12 @@ export async function InputPack({
                       aria-pressed={item.gathered}
                       aria-label={
                         item.gathered
-                          ? `Mark "${item.label}" as not gathered`
-                          : `Mark "${item.label}" as gathered`
+                          ? t("cycle.inputPack.markNotGathered", {
+                              label: item.label,
+                            })
+                          : t("cycle.inputPack.markGathered", {
+                              label: item.label,
+                            })
                       }
                       className={
                         item.gathered
@@ -126,7 +130,9 @@ export async function InputPack({
                         name="note"
                         defaultValue={item.note ?? ""}
                         placeholder={t("cycle.inputPack.whereItIsOr")}
-                        aria-label={`Note for "${item.label}"`}
+                        aria-label={t("cycle.inputPack.noteFor", {
+                          label: item.label,
+                        })}
                         className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2 placeholder:text-ink-4"
                       />
                       <Button
@@ -142,7 +148,9 @@ export async function InputPack({
                   ) : null}
                 </div>
                 <Chip tone={item.gathered ? "ok" : "bad"}>
-                  {item.gathered ? "Gathered" : "Missing"}
+                  {item.gathered
+                    ? t("cycle.inputPack.gathered")
+                    : t("cycle.inputPack.missing")}
                 </Chip>
               </div>
             </div>
@@ -177,7 +185,9 @@ export async function InputPack({
                 type="submit"
                 variant={distributedAt ? "ghost" : "primary"}
               >
-                {distributedAt ? "Record a new send" : "Confirm distribution"}
+                {distributedAt
+                  ? t("cycle.inputPack.recordANewSend")
+                  : t("cycle.inputPack.confirmDistribution")}
               </Button>
             </ActionForm>
           ) : null}
@@ -192,7 +202,7 @@ export async function InputPack({
           <CardBody className="flex flex-col gap-2.5 text-sm">
             <div className="flex flex-col">
               <span className="font-semibold text-ink">
-                {sponsor?.name ?? "No sponsor named"}
+                {sponsor?.name ?? t("cycle.inputPack.noSponsorNamed")}
               </span>
               <span className="text-xs text-ink-3">
                 {t("cycle.inputPack.sponsorDecidesAndUnblocks")}
@@ -200,7 +210,7 @@ export async function InputPack({
             </div>
             <div className="flex flex-col">
               <span className="font-semibold text-ink">
-                {facilitator?.name ?? "No facilitator named"}
+                {facilitator?.name ?? t("cycle.inputPack.noFacilitatorNamed")}
               </span>
               <span className="text-xs text-ink-3">
                 {t("cycle.inputPack.facilitatorGuardsTheMethod")}

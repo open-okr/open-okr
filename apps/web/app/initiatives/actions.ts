@@ -15,6 +15,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
@@ -67,12 +68,13 @@ export async function createInitiativeAction(
   const startsOn = String(formData.get("startsOn") ?? "").trim();
   const endsOn = String(formData.get("endsOn") ?? "").trim();
   const keyResultId = String(formData.get("keyResultId") ?? "").trim();
+  const { t } = await getTranslations();
 
   if (title === "") {
-    return { error: "An initiative needs a title. What work is this?" };
+    return { error: t("initiatives.actions.initiativeNeedsATitle") };
   }
   if (spaceId === "" || ownerId === "") {
-    return { error: "An initiative needs a space and somebody who owns it." };
+    return { error: t("initiatives.actions.initiativeNeedsASpaceAndOwner") };
   }
 
   return run((context) =>
@@ -100,7 +102,8 @@ export async function setStatusAction(
 ): Promise<WriteState> {
   const value = asStatus(status);
   if (!value) {
-    return { error: "That is not a status an initiative has." };
+    const { t } = await getTranslations();
+    return { error: t("initiatives.actions.notAStatus") };
   }
   return run(
     (context) =>
@@ -117,7 +120,8 @@ export async function setCapacityAction(
   // `fits` and the one gate five reads differently.
   const value = capacity === "" ? null : asCapacity(capacity);
   if (capacity !== "" && !value) {
-    return { error: "That is not one of the three capacity verdicts." };
+    const { t } = await getTranslations();
+    return { error: t("initiatives.actions.notACapacityVerdict") };
   }
   return run(
     (context) =>
@@ -133,7 +137,8 @@ export async function linkKeyResultAction(
   const id = String(formData.get("id") ?? "");
   const keyResultId = String(formData.get("keyResultId") ?? "");
   if (id === "" || keyResultId === "") {
-    return { error: "Pick the key result this work will move." };
+    const { t } = await getTranslations();
+    return { error: t("initiatives.actions.pickTheKeyResult") };
   }
   return run(
     (context) =>

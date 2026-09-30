@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { setWatching } from "./watch-action.ts";
 
@@ -22,14 +22,18 @@ import { setWatching } from "./watch-action.ts";
  * In `lib` rather than under a route, because six route segments render it.
  */
 
-/** §6.4's reasons, in the words a member would use about themselves. */
+/**
+ * §6.4's reasons, in the words a member would use about themselves. Each is
+ * the whole sentence the control shows, and the three obligations below carry
+ * the warning that turning the watch off does not remove the obligation.
+ */
 const REASON_WORDS: Record<string, string> = {
-  invited: "you were invited to it",
-  joined: "you joined it",
-  mentioned: "you were mentioned",
-  role: "of your role on it",
-  review: "you are the reviewer",
-  check_in: "you check in on it",
+  invited: "watchControl.becauseInvited",
+  joined: "watchControl.becauseJoined",
+  mentioned: "watchControl.becauseMentioned",
+  role: "watchControl.becauseRole",
+  review: "watchControl.becauseReview",
+  check_in: "watchControl.becauseCheckIn",
 };
 
 /** A reason a member should think twice about switching off. */
@@ -51,6 +55,7 @@ export function WatchControl({
   readonly subjectId: string;
   readonly initial: WatchState;
 }) {
+  const { t } = useTranslations();
   const [pending, start] = useTransition();
   const [state, setState] = useState<WatchState>(initial);
   const [problem, setProblem] = useState<string | null>(null);
@@ -83,17 +88,22 @@ export function WatchControl({
             });
           }}
         >
-          {pending ? "Saving…" : state.watching ? "Watching" : "Watch this"}
+          {pending
+            ? t("watchControl.saving")
+            : state.watching
+              ? t("watchControl.watching")
+              : t("watchControl.watchThis")}
         </Button>
         {state.watchers > 0 ? (
-          <span className="text-xs text-ink-3">{state.watchers} watching</span>
+          <span className="text-xs text-ink-3">
+            {t("watchControl.watchers", { count: state.watchers })}
+          </span>
         ) : null}
       </div>
 
       {state.everyone ? (
         <span className="text-xs text-ink-4">
-          Everybody in the space is notified about this, whether or not they
-          watch it.
+          {t("watchControl.everybodyInTheSpace")}
         </span>
       ) : null}
 
@@ -101,9 +111,7 @@ export function WatchControl({
         <span
           className={obligation ? "text-xs text-warn" : "text-xs text-ink-4"}
         >
-          {obligation
-            ? `Because ${reason}. Turning this off does not remove the obligation.`
-            : `Because ${reason}.`}
+          {t(reason)}
         </span>
       ) : null}
 

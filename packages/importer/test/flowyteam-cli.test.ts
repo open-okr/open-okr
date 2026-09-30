@@ -133,7 +133,7 @@ const INTROSPECTION = {
     appliedOn: "2026_07_14",
     migrationCount: 812,
   },
-  domains: { okrs: ["objective_discussions"], work: [] },
+  domains: { okrs: ["checkin_reviews"], work: [] },
   completeDomains: ["work"],
 };
 
@@ -164,7 +164,7 @@ describe("the report a dry run produces", () => {
     expect(report.notes.join(" ")).toContain(
       "The okrs domain will import nothing",
     );
-    expect(report.notes.join(" ")).toContain("objective_discussions");
+    expect(report.notes.join(" ")).toContain("checkin_reviews");
   });
 
   it("offers the company timezone rather than applying it", () => {
@@ -182,6 +182,74 @@ describe("the report a dry run produces", () => {
       "Would write: 0. Would skip: 0. Nothing was written.",
     );
     expect(printed).toContain("Run run-1");
+  });
+
+  it("says nothing about unread tables when none holds a row", () => {
+    // The fixture above passes none, which is what a company with nothing in
+    // them produces. A heading over an empty list reads as a problem.
+    expect(report.unreadTables).toEqual([]);
+    const printed = render(report, "run-1");
+    expect(printed).not.toContain("Not read");
+  });
+});
+
+/**
+ * Completeness review M-16: the source tables no domain reads, named with what
+ * each holds for this company rather than checked for and then forgotten.
+ */
+describe("the report's unread tables", () => {
+  const report = buildReport({
+    connectedTo: "root@db.example/flowyteam",
+    introspection: INTROSPECTION,
+    company: COMPANY,
+    counts: { objectives: 2 },
+    mode: "dry_run",
+    unread: [
+      {
+        table: "objective_discussions",
+        rows: 3,
+        scope: "company",
+        holds: "Comment threads on objectives, not read yet.",
+      },
+      {
+        table: "scores",
+        rows: 12,
+        scope: "source",
+        holds: "Points awarded, not read yet.",
+      },
+    ],
+  });
+  const printed = render(report, "run-1");
+
+  it("keeps them on the report object, so the stored run says it too", () => {
+    expect(report.unreadTables.map((one) => one.table)).toEqual([
+      "objective_discussions",
+      "scores",
+    ]);
+  });
+
+  it("puts the count in the summary, before anything else", () => {
+    const summary = printed.indexOf("Summary:");
+    const line = printed.indexOf(
+      "Not read: 2 source table(s) hold rows that this import does not bring across. Each is named below.",
+    );
+    expect(line).toBeGreaterThan(summary);
+    expect(line).toBeLessThan(printed.indexOf("In this company:"));
+  });
+
+  it("names each one with its count and what it holds", () => {
+    expect(printed).toContain(
+      "Not read by this import, so not brought across:",
+    );
+    expect(printed).toContain(
+      "  objective_discussions: 3 in this company\n    Comment threads on objectives, not read yet.",
+    );
+  });
+
+  it("says when a count is the whole source rather than this company", () => {
+    expect(printed).toContain(
+      "  scores: 12 in the whole source, because this table has no company column here\n    Points awarded, not read yet.",
+    );
   });
 });
 

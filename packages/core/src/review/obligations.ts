@@ -14,6 +14,7 @@
  * stale the moment somebody publishes. This is the same choice §2.3 makes for
  * phase completion.
  */
+import type { ProposalPreviewLine } from "./proposals.ts";
 
 /**
  * Where an obligation comes from. Two are real today; four are declared and
@@ -60,6 +61,19 @@ export interface Obligation {
   readonly subjectId: string;
   /** Set on an acknowledgement, so the row can act without a second lookup. */
   readonly checkInId: string | null;
+  /**
+   * Set on an agent proposal, so the row can be decided where it is listed
+   * (completeness review M-08): which proposal, what it would change, and
+   * whether a model chose the words.
+   */
+  readonly proposal: {
+    readonly id: string;
+    readonly action: string;
+    readonly aiGenerated: boolean;
+    // A plain array rather than a readonly one: the action's declared output
+    // is a plain array, and the handler hands this straight to it.
+    readonly preview: ProposalPreviewLine[];
+  } | null;
 }
 
 /**

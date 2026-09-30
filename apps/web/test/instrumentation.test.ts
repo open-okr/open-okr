@@ -40,6 +40,11 @@ vi.mock("../lib/sso", () => ({ resolveSSOProviders: vi.fn() }));
 vi.mock("../lib/tenant-floor", () => ({
   tenantFloor: vi.fn(async () => "enforced"),
 }));
+// Not for the import cost: the real one replaces `console.error` for the
+// whole process, and the tests below spy on it (completeness review L-04).
+vi.mock("../lib/abandoned-responses", () => ({
+  quietAbandonedResponses: vi.fn(),
+}));
 
 const original = { ...process.env };
 

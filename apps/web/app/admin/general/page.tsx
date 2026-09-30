@@ -1,4 +1,9 @@
-import { callAction } from "@openokr/core";
+import {
+  callAction,
+  deploymentInstanceName,
+  isCloudEnabled,
+  readInstanceName,
+} from "@openokr/core";
 import { getPool } from "../../../lib/auth";
 import { getMailSettings } from "../../../lib/mail";
 import { schedulerState } from "../../../lib/scheduler";
@@ -8,6 +13,8 @@ import { requireWorkspace } from "../../../lib/workspace";
 import { ConsoleMailNotice } from "./console-mail-notice";
 import { GeneralSettingsForm } from "./general-settings-form";
 import { InstanceHealthNotice } from "./instance-health-notice";
+import { InstanceNameCard } from "./instance-name-card";
+import { SetupCard } from "./setup-card";
 import { WorkspaceStateCard } from "./workspace-state-card";
 
 export default async function GeneralSettingsPage() {
@@ -34,6 +41,12 @@ export default async function GeneralSettingsPage() {
   }));
   // Neither is fatal to the page either, for the same reason.
   const floor = await tenantFloor().catch(() => "enforced" as const);
+  // The instance's own name (M-33). Not offered on a managed cloud, where it
+  // is the operator's rather than any customer's, and not fatal when the
+  // settings cannot be read: the card is left out rather than the page.
+  const instanceName = (await isCloudEnabled(getPool()).catch(() => true))
+    ? null
+    : await readInstanceName(getPool()).catch(() => null);
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -55,6 +68,18 @@ export default async function GeneralSettingsPage() {
       />
       {mail.transport === "console" ? <ConsoleMailNotice /> : null}
       <GeneralSettingsForm settings={read.settings} />
+      {instanceName ? (
+        <InstanceNameCard
+          name={instanceName.value}
+          source={instanceName.source}
+          deploymentName={deploymentInstanceName()}
+        />
+      ) : null}
+      {/*
+       * S-34 offered again (completeness review L-08). The registry's default
+       * for `onboardingDone` is true, so only a stored `false` is pending.
+       */}
+      <SetupCard done={read.settings.onboardingDone !== false} />
       {/*
        * The freeze switch (P6-G25). `workspace.setState` shipped at P2-T09
        * and no screen ever called it, so P6-T07's rehearsal runbook asked an

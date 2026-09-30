@@ -12,6 +12,7 @@
  */
 import type {
   AIProvider,
+  AIPurpose,
   ChatMessage,
   ExtractRequest,
   TokenUsage,
@@ -21,6 +22,16 @@ import type { z } from "zod";
 export interface ExtractStructuredInput<T> {
   readonly provider: AIProvider;
   readonly model: string;
+  /**
+   * What the messages carry, for the workspace's egress level (M-10).
+   *
+   * Required rather than optional, so every extraction says whether it sends
+   * the item an assist works on or content retrieval found. The provider
+   * treats a request that says neither as retrieval and withholds it under a
+   * narrower level; making the caller choose here means that is never an
+   * accident.
+   */
+  readonly purpose: AIPurpose;
   readonly messages: readonly ChatMessage[];
   readonly schema: z.ZodType<T>;
   /** JSON Schema for the provider's own `extract()` call — the same shape
@@ -106,6 +117,7 @@ export async function extractStructured<T>(
 ): Promise<T> {
   const baseRequest: ExtractRequest = {
     model: input.model,
+    purpose: input.purpose,
     messages: input.messages,
     schema: input.jsonSchema,
     temperature: input.temperature,

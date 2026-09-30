@@ -712,9 +712,15 @@ Acceptance: Given a review that recorded every stage, when a member opens the mi
 ### P4-T12-b: Review feed-forward into the next cycle [M]
 Depends on: P4-T12-a, P3-T15
 Goal: the handover (METHOD.md §8.9).
-Deliverables: the two §8.9 rows `cycles.feedForward` reports as waiting, filled: learnings and the retrospective into the next cycle's input pack, and the lowest process-health statement as an issue; carried learnings joining carried key results as issues at impact 4.
-Test plan: a carried learning becomes an issue at impact 4; the lowest process-health statement becomes an issue with source `process_health`; the feed-forward is idempotent, so running it twice does not double the issues.
-Acceptance: Given a closed review with a carried learning, when the next cycle is fed forward, then that learning is a strategic issue at impact 4, the lowest process-health statement is an issue with source `process_health`, the learnings are in §2.6's item two, and the `waiting` list is empty.
+Deliverables: the two §8.9 rows `cycles.feedForward` reports as waiting, filled: learnings and the retrospective into the next cycle's input pack, and the lowest process-health statement as a Phase 3 process priority; carried learnings joining carried key results as issues at impact 4.
+Test plan: a carried learning becomes an issue at impact 4; the lowest process-health statement becomes a Phase 3 priority and not an issue; the feed-forward is idempotent, so running it twice does not double the issues or the priority.
+Acceptance: Given a closed review with a carried learning, when the next cycle is fed forward, then that learning is a strategic issue at impact 4, the lowest process-health statement is a priority in the next cycle's Phase 3, the learnings are in §2.6's item two, and the `waiting` list is empty.
+
+**Corrected 29 September 2026 (completeness review M-05).** This row said the
+lowest process-health statement became an issue with source `process_health`,
+and the code did that. METHOD.md §8.9's table sends it to "Phase 3, a process
+priority", and METHOD.md outranks this plan, so the row and the code both
+follow the table now. Issues written the old way are left in place.
 
 **Why P4-T12 was split.** The minutes are a read across twelve tables, a screen
 and two export routes; the feed-forward is a change to `cycles.feedForward`,
@@ -730,6 +736,11 @@ and a `toCycleId` and runs when the next cycle is created, which is the only
 shape that works. The original acceptance criterion said "when the facilitator
 closes it... the next cycle's Phase 2 already holds the scores", and that is
 corrected above.
+
+**Nothing pulled it until M-05.** The pull was a button, and nothing ever set a
+cycle to `closed`. `cycles.close` now records the archive, closes the cycle and
+feeds the next one when it exists; when it does not, `cycles.create` and
+`cycles.ensureCurrent` feed it at creation. Both orders end in the same rows.
 
 ### P4-T13a: The embedding table and the outbox worker [M]
 Depends on: P2-T15
@@ -1737,6 +1748,13 @@ Deliverables: scoring every key result with the band table highlighted at the po
 Test plan: the highlighted band matches the computed portfolio average; carry-forward arrives unticked, per METHOD.md §8.9; the feed-forward action is idempotent; the arithmetic matches `packages/method` exactly.
 Acceptance: Given a cycle at its close, when a facilitator scores every key result and runs feed-forward, then the next cycle opens carrying the scores and the flagged items, and running it twice changes nothing.
 
+**Corrected 29 September 2026 (completeness review M-05).** The feed-forward
+action is now the close itself: phase 7's **Close the cycle** records the
+result, closes the cycle and feeds the next one, as METHOD.md §8.9's "at close,
+the product feeds the next cycle automatically" asks. It is disabled with the
+reasons until phase 7 is complete, and a second close is refused rather than
+repeated.
+
 ### P6-G17: The dependency register on phase 5, S-10 [M]
 Depends on: P3-T09, P4-T03
 Goal: publish gate 4 can be satisfied from the browser (GAP-AUDIT B-04).
@@ -2006,6 +2024,8 @@ Depends on: P3-T17
 Goal: a first sign-in as owner leads somewhere (GAP-AUDIT G-02).
 Deliverables: the four-step onboarding after the first sign-in, every step skippable over the TECHNICAL-PLAN §4.14 defaults; the demo-data choice the wizard never offered; the citation in this document corrected so S-34 has one owner rather than two.
 
+**Five steps since P8-T12, not four** (corrected at completeness review L-08). P8-T12 put the starting templates between the invitation and the demo, and the screen went on saying "Four questions" above a "1 / 5" counter; the sentence now takes its number from the step list. L-08 also built the two things S-34 asks for that this row did not name: reopening the setup from General in admin, and the five-stop first-visit tour.
+
 **Corrected at P6-G26: P3-T17 built no action.** This row said "the demo-data choice P3-T17 built the action for". P3-T17 built `buildDemoWorkspace` and a seed command; there is no registry action for the demo and P6-G26 did not add one, because the wizard calls the function and the pipeline is still what writes.
 Test plan: skipping every step leaves a working workspace practising the full method; choosing demo data seeds it idempotently; onboarding does not reappear once finished; a second owner does not see it.
 Acceptance: Given a first sign-in as owner, when they skip every step, then they land on a working workspace with every setting at its documented default.
@@ -2042,6 +2062,13 @@ point, because a server action takes whatever the browser sends it.
 are sure.** Nothing is destroyed, the history stays readable, and the row drops
 out of every default-scoped read. That sentence does not fit in a dialog title
 and does fit on a second press.
+
+**Corrected at completeness review M-13: the second press is gone.** UIUX-PLAN
+§1 and §4 give reversible destruction a six second undo toast and keep a
+confirmation for what cannot be undone, and a soft delete can be. The delete is
+now one press, the sentence travels in the toast beside Undo, and Undo calls
+the restore action (`goals.restore`, `initiatives.restore`, `tasks.restore`,
+`documents.restore`). Later restores are on Admin, Deleted items.
 
 Deliverables: delete on goals, initiatives, tasks and documents, with the soft-delete semantics stated on the confirmation rather than implied; checklist item removal, which is not the same gesture as ticking a line; `goals.moveToCycle`, `goals.reviewDecision` and `goals.unlinkKpi` on goal detail; `reactions.remove`, so a reaction given by mistake can be taken back; `workspace.rename` on the general card.
 Test plan: a soft-deleted goal leaves its history readable and drops out of every default-scoped read; a removed reaction is gone for everybody; a delete request naming an entity outside the allow-list is refused; a removed checklist line is distinguishable from a ticked one.

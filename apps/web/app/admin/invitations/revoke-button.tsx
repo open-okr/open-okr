@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@openokr/ui";
 import { useTransition } from "react";
 import { revokeLinkAction } from "./actions";
 
@@ -15,17 +16,14 @@ import { revokeLinkAction } from "./actions";
  * about when they click.
  */
 export function RevokeButton({ linkId }: { readonly linkId: string }) {
+  const { t } = useTranslations();
   const [pending, start] = useTransition();
   return (
     <button
       type="button"
       disabled={pending}
       onClick={() => {
-        if (
-          !window.confirm(
-            "Revoke this invitation? Nobody else can use it. People who already joined through it stay members.",
-          )
-        ) {
+        if (!window.confirm(t("admin.invitations.revokeButton.confirm"))) {
           return;
         }
         start(() => {
@@ -34,7 +32,9 @@ export function RevokeButton({ linkId }: { readonly linkId: string }) {
       }}
       className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60"
     >
-      {pending ? "Revoking…" : "Revoke"}
+      {pending
+        ? t("admin.invitations.revokeButton.revoking")
+        : t("common.revoke")}
     </button>
   );
 }

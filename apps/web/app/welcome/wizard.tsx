@@ -1,5 +1,6 @@
 "use client";
 
+import type { CheckInFrequency } from "@openokr/method";
 import {
   Button,
   Card,
@@ -19,16 +20,27 @@ import {
 } from "./actions.ts";
 
 /**
- * The four steps a first sign-in walks through (screen S-34, P6-G26).
+ * The five steps a first sign-in walks through (screen S-34, P6-G26, P8-T12).
  *
  * **Every step is skippable, and skipping is not a lesser path.** §4.14 says
  * every setting has a working default and nothing must be configured before
  * the product works, and provisioning has already resolved all of them. So the
- * wizard asks four questions whose answers a workspace already has, and
- * "Skip" is the answer that keeps them. The acceptance line is exactly this:
- * skip every step and land on a working workspace at every documented default.
+ * wizard asks questions whose answers a workspace already has, and "Skip" is
+ * the answer that keeps them. The acceptance line is exactly this: skip every
+ * step and land on a working workspace at every documented default.
  *
- * **A client component holding one step at a time**, rather than four routes.
+ * **The count on screen is `STEPS.length`, never a word in the catalogue**
+ * (completeness review L-08). The introduction said "Four questions" above a
+ * "1 / 5" counter from the day P8-T12 added the template step, because the
+ * sentence and the list were two places to change and only one was changed.
+ *
+ * **It opens on what the workspace holds now**, which is also what makes it
+ * safe to offer again from General in admin (L-08). The name, the timezone and
+ * the rhythm arrive from the page rather than from constants, so pressing
+ * Continue on a reopened wizard writes back the answer already given instead
+ * of the default.
+ *
+ * **A client component holding one step at a time**, rather than five routes.
  * The state is which question is on screen and nothing else; a route per step
  * would put a half-finished setup in the browser's history and let somebody
  * arrive at step three by typing.
@@ -76,10 +88,18 @@ const FREQUENCIES = [
 export function Wizard({
   workspaceName,
   timezone,
+  frequency: currentFrequency,
 }: {
   readonly workspaceName: string;
-  /** The timezone provisioning resolved from the registering browser. */
+  /** The workspace's timezone: the registering browser's, or a later answer. */
   readonly timezone: string;
+  /**
+   * The rhythm the workspace runs now. Weekly on a first run, which is the
+   * method's own default; whatever was chosen since on a reopened one. It may
+   * be one the three buttons do not offer, and then none is pressed and
+   * Continue keeps it.
+   */
+  readonly frequency: CheckInFrequency;
 }) {
   const { t } = useTranslations();
   const router = useRouter();
@@ -90,7 +110,7 @@ export function Wizard({
   const [name, setName] = useState(workspaceName);
   const [zone, setZone] = useState(timezone);
   const [frequency, setFrequency] =
-    useState<(typeof FREQUENCIES)[number]["value"]>("weekly");
+    useState<CheckInFrequency>(currentFrequency);
   const [email, setEmail] = useState("");
   const [template, setTemplate] = useState<
     (typeof STARTING_TEMPLATES)[number]["value"] | "none"
@@ -130,7 +150,9 @@ export function Wizard({
       <CardHeader>
         <div className="flex min-w-0 flex-col">
           <h1 className="text-lg font-bold text-ink">{t("common.title")}</h1>
-          <p className="text-xs text-ink-3">{t("welcome.explains")}</p>
+          <p className="text-xs text-ink-3">
+            {t("welcome.explains", { count: STEPS.length })}
+          </p>
           {/* The counter is digits and a slash, which is the same in every
               language; the catalogue names it for a screen reader instead. */}
           <p className="mt-1 text-xs text-ink-3" data-testid="welcome-progress">

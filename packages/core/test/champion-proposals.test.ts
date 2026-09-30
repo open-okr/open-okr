@@ -531,3 +531,93 @@ describe("goals.publishDraftedCheckIn", () => {
     expect(drafted).toBe(composer);
   });
 });
+
+describe("the KPI sweep's three misfires (completeness review M-29)", () => {
+  const unhealthyKpi = async (options: {
+    readonly ownerKind: "member" | "workspace";
+    readonly standingTargetOnly?: boolean;
+  }) => {
+    const wb = await workerDb();
+    const kpi = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.create",
+      {
+        title: "Net retention",
+        ownerKind: options.ownerKind,
+        ...(options.ownerKind === "member" ? { memberId: ownerMemberId } : {}),
+        frequency: "monthly",
+        direction: "higher_better",
+        indicatorType: "lagging",
+        tier: "output",
+        aggregate: "sum",
+        ...(options.standingTargetOnly ? { targetDefault: 100 } : {}),
+      },
+    )) as { id: string };
+    for (let month = 0; month < 2; month++) {
+      await callAction({ pool: wb.appPool, ...context() }, "kpis.record", {
+        kpiId: kpi.id,
+        on: `2026-0${month + 1}-15`,
+        ...(options.standingTargetOnly ? {} : { targetValue: 100 }),
+        actualValue: 60,
+      });
+    }
+    return kpi.id;
+  };
+
+  it("proposes for a KPI measured only against its standing target", async () => {
+    // Every period read as "no data" before: the reader looked at the
+    // period's own target and never the KPI's.
+    const kpiId = await unhealthyKpi({
+      ownerKind: "member",
+      standingTargetOnly: true,
+    });
+    await runDaily();
+    const pending = await proposals();
+    expect(pending.map((row) => row.subject_id)).toEqual([kpiId]);
+  });
+
+  it("tells a workspace-owned KPI's administrators", async () => {
+    const kpiId = await unhealthyKpi({ ownerKind: "workspace" });
+    await runDaily();
+    const sent = await sentNudges();
+    // The founder is the administrator; the second member is not one.
+    expect(
+      sent.filter(
+        (row) => row.rule_key === "kpi.unhealthy" && row.subject_id === kpiId,
+      ),
+    ).toEqual([
+      expect.objectContaining({ recipient_member_id: ownerMemberId }),
+    ]);
+  });
+
+  it("sends kpi.recovered once, after the recompute decided", async () => {
+    const wb = await workerDb();
+    const kpiId = await unhealthyKpi({ ownerKind: "member" });
+    const goal = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.create",
+      {
+        title: "Bring net retention back to target",
+        level: "team",
+        ownerKind: "space",
+        spaceId,
+        cycleId,
+        championId: ownerMemberId,
+        reviewerId: secondMemberId,
+        weight: 1,
+      },
+    )) as { id: string };
+    // An open recovery the recompute has already proposed closing: its stamp
+    // is what the sweep used to read as "already proposed" and stop at.
+    await wb.admin.query(
+      "update kpis set recovery_goal_id = $1, recovery_close_proposed_at = now() where id = $2",
+      [goal.id, kpiId],
+    );
+    await runDaily();
+    await runDaily();
+    const recovered = (await sentNudges()).filter(
+      (row) => row.rule_key === "kpi.recovered" && row.subject_id === kpiId,
+    );
+    expect(recovered).toHaveLength(1);
+  });
+});

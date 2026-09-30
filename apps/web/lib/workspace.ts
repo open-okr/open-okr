@@ -7,6 +7,7 @@ import {
   provisionWorkspaceForUser,
   requiresSecondFactor,
   resolveActiveWorkspace,
+  trustedDomainOffers,
 } from "@openokr/core";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -23,6 +24,13 @@ import { requireSession } from "./session";
  * so there is nothing for a signature to protect.
  */
 export const ACTIVE_WORKSPACE_COOKIE = "openokr_workspace";
+
+/**
+ * Where the workspaces a person's domain admits are offered (completeness
+ * review M-34). That page never calls `requireWorkspace`, which is what lets a
+ * person with no workspace yet be sent there without a loop.
+ */
+const TRUSTED_DOMAIN_JOIN_PATH = "/join";
 
 export interface ActiveWorkspace {
   readonly session: Awaited<ReturnType<typeof requireSession>>;
@@ -47,6 +55,16 @@ export async function requireWorkspace(): Promise<ActiveWorkspace> {
   let memberships = await listMembershipsForUser(pool, session.user.id);
 
   if (memberships.length === 0) {
+    // **Somebody a workspace trusts chooses before anything is made for
+    // them** (completeness review M-34). Sign-up holds off a workspace of
+    // their own when their domain is trusted, so this is where the offer
+    // lands: the join page lists what their confirmed address admits, and
+    // making their own workspace is one of the choices rather than the
+    // default. Nobody is held here: with nothing on offer, including an
+    // address not yet confirmed, provisioning goes ahead as it always has.
+    if ((await trustedDomainOffers(pool, session.user.id)).length > 0) {
+      redirect(TRUSTED_DOMAIN_JOIN_PATH);
+    }
     await provisionWorkspaceForUser(pool, {
       id: session.user.id,
       name: session.user.name,

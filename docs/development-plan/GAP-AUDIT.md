@@ -2,6 +2,8 @@
 
 A per page and per module audit of what is missing from work already built, written 7 September 2026 against commit `795cfd9` on branch `agung`.
 
+> **Closed, 30 September 2026** (completeness review L-06). Every item below was closed by the task named beside it, which STATUS.md marks done, or by the screen or wiring it asked for, which now exists; each box is ticked. The checklist in section 7 is the one exception: it records no run, so it is left open, and the [completeness review](../COMPLETENESS-REVIEW.md), which read the product against the requirements rather than against this audit, is what superseded it.
+
 ## What this is, and what it is not
 
 **The question asked.** Is there any gap that stops a page or a module doing the job it was built for?
@@ -42,7 +44,7 @@ Six screens specified in UIUX-PLAN.md §6 have no route at all (S-03, S-31, S-33
 
 - [x] Wire a job queue host and call `registerAgentSchedules` at boot. **Closed at P6-G01a.** `apps/web/lib/scheduler.ts` builds the pg-boss driver, subscribes a worker to every declared job and registers the schedules at boot, behind `OPENOKR_SCHEDULER` which defaults to on. The Coach gained the nightly cadence §6.1 gives it and had never had, fired at each workspace's own local hour. Proved by construction, not by observation: no run against a live pg-boss yet.
 - [x] **P6-G01b** the notification batch drain. Closed on 7 September 2026. `notifications.drainBatches` claims every batch whose window has closed and enqueues one digest per batch through the outbox; the `notification.digest` handler renders it and sends. The claim is a conditional update from `pending`, which is the whole of the idempotence under several hosts. The daily summary was a second finding inside this one: `digest.daily` had fired at each member's local hour since P4-T05b carrying the generic "you have a reminder waiting" line, so it was scheduled and summarised nothing; it now carries the member's own unread rows through the same builder as the batch digest.
-- [ ] **P6-G01c** the orphan-blob reap, which needs `delete` on the action context's storage seam.
+- [x] **P6-G01c** the orphan-blob reap, which needs `delete` on the action context's storage seam.
 
 `registerAgentSchedules` declares four cron cadences for the Champion ([schedule.ts:69](../../packages/agents/src/schedule.ts#L69)). Nothing calls it. No file outside `packages/adapters` and `packages/agents` references `JobQueue` at all, and `apps/web` constructs no queue: [instrumentation.node.ts](../../apps/web/instrumentation.node.ts) starts the outbox relay and nothing else.
 
@@ -79,7 +81,7 @@ All four tasks have landed. S-02 is "what I owe right now" and it does not tell 
 
 ## B-03: Three of the eight cycle phases have no surface
 
-- [ ] Build the phase 0, phase 6 and phase 7 panels on `/cycle`
+- [x] Build the phase 0, phase 6 and phase 7 panels on `/cycle`
 
 [cycle/page.tsx:291-299](../../apps/web/app/cycle/page.tsx#L291-L299) renders a text card for phases 0, 6 and 7 naming tasks that are all done:
 
@@ -111,7 +113,7 @@ A cycle carrying any dependency therefore cannot pass its own publish gates with
 
 ## B-05: The AI console does not exist
 
-- [ ] Build screen S-37
+- [x] Build screen S-37
 
 P2-T16 is `done` and its deliverables name "the AI console (screen S-37) assembling the provider, models, features, budgets, prompts, privacy and usage cards from P2-T13 to P2-T16" (IMPLEMENTATION-PLAN.md:232).
 
@@ -124,8 +126,8 @@ Practical effect: an administrator cannot supply a provider key, route a tier, s
 ## B-06: The notification inbox does not exist
 
 - [x] **P6-G07a** built screen S-03 on 7 September 2026. The route, the Inbox entry in the primary block with its own icon, the sidebar badge beside Review's, subject grouping, reason chips, unread dots, deep links, mark-read, three snooze choices and mute. Mute is `subscriptions.toggle` with `subscribe: false`, which cancels rather than deletes, so muting a noisy subject keeps the history.
-- [ ] **P6-G07b** the watch control on the six subject pages, and live insert. Watching something is still only reachable through a mention or a check-in fan-out.
-- [ ] **P6-G08** the member half of §4.14: per-reason routing, the batch window and the daily summary time.
+- [x] **P6-G07b** the watch control on the six subject pages, and live insert. Watching something is still only reachable through a mention or a check-in fan-out.
+- [x] **P6-G08** the member half of §4.14: per-reason routing, the batch window and the daily summary time.
 
 **Two defects the screen could not be built on top of, both older than this row.** `notifyRecipients` takes the subject, resolves who is watching from it, and stored neither, so the only route back to what a row was about was `activity_id` — nullable, and null on two of the three producers, because the Operation pipeline writes the activity after `execute` returns. Migration **0074** stores `subject_type` and `subject_id` and all three producers set them. And `notifications.list` described four of the table's six reasons: `review` and `check_in` reached `NOTIFICATION_REASONS` at P3-T07 and P4-T04 and never reached the output schema, so the contract described an inbox that could not hold a reviewer's obligation or a nudge.
 
@@ -152,7 +154,7 @@ A workspace admin cannot add a second person to the workspace from the browser. 
 
 ## B-08: The people directory and org chart do not exist
 
-- [ ] Build screen S-33
+- [x] Build screen S-33
 
 P2-T03 is `done` and its deliverables name "the directory and org chart" plus suspend, restore, guest conversion and erasure (IMPLEMENTATION-PLAN.md:142). There is no `/people` route. Seven actions have no caller: `people.updateMember`, `people.suspend`, `people.restore`, `people.convertToGuest`, `people.erase`, `people.orgChart`, `people.possibleManagers`.
 
@@ -163,7 +165,7 @@ Effect: an administrator cannot suspend a leaver, convert somebody to a guest, o
 ## B-09: Spaces cannot be created or managed
 
 - [x] **P6-G18a** creation, rename, archive and membership. All six writes P3-T01 shipped have surfaces now; only `join` and `leave` had ever been wired.
-- [ ] **P6-G18b** the space settings surface. TECHNICAL-PLAN §4.14 names three settings for a space and the settings registry has no space scope at all, so they have to be declared with defaults before a screen can show them.
+- [x] **P6-G18b** the space settings surface. TECHNICAL-PLAN §4.14 names three settings for a space and the settings registry has no space scope at all, so they have to be declared with defaults before a screen can show them.
 
 Four space actions are called from the browser: `list`, `read`, `join`, `leave`. Six are not: `spaces.create`, `spaces.update`, `spaces.archive`, `spaces.addMember`, `spaces.setMemberRole`, `spaces.removeMember`.
 
@@ -171,7 +173,7 @@ Provisioning creates one space named after the workspace (TECHNICAL-PLAN §4.14)
 
 ## B-10: The weekly session screen still says its data does not exist
 
-- [ ] Render the confidence trend, blocker ages, streak and commitments on the session screen
+- [x] Render the confidence trend, blocker ages, streak and commitments on the session screen
 
 [session/[id]/page.tsx:702-708](../../apps/web/app/session/[id]/page.tsx#L702-L708) renders, to end users:
 
@@ -297,19 +299,19 @@ P1-T09's STATUS row records the human decision as "local disk stays the only sto
 ## G-01: No activity feed anywhere
 
 - [x] **P6-G11a** the workspace feed. `/activity` renders it with its own cursor paging, the actor joined from the directory, and the audit-log distinction stated on the screen. Reached from the work map rather than the sidebar, because §6 gives S-31 a screen and §3's nine sidebar items do not include one.
-- [ ] **P6-G11b** the space, goal and profile scopes. `queryFeed` can answer all three and none of them is a registered action yet, so a panel on those surfaces has nothing to call.
+- [x] **P6-G11b** the space, goal and profile scopes. `queryFeed` can answer all three and none of them is a registered action yet, so a panel on those surfaces has nothing to call.
 
 P2-T07 is `done` and its deliverables name "per-kind renderers behind a registry" and "live inserts" (IMPLEMENTATION-PLAN.md:176). The engine is real: 19 catalogued kinds, `queryFeed`, `aggregateFeed`. No screen renders any of it, and `activities.workspaceFeed` has no caller. Nineteen kinds of typed, access-scoped, human-readable history are written on every operation and never shown to anyone.
 
 ## G-02: No onboarding
 
-- [ ] Build screen S-34, or move it explicitly to P8-T02
+- [x] Build screen S-34, or move it explicitly to P8-T02
 
 S-34 is cited by P3-T17 (`in_review`) and P8-T02 (`todo`). The four-step onboarding after a first sign-in as owner does not exist and no route resembles it. Because a `todo` task also claims the screen, this is the one screen gap that may be correctly deferred. Confirm which task owns it and record the answer in IMPLEMENTATION-PLAN.md.
 
 ## G-03: Three of about sixty-five method thresholds are editable
 
-- [ ] Extend the rhythm and thresholds cards to the METHOD §11 registry
+- [x] Extend the rhythm and thresholds cards to the METHOD §11 registry
 
 TECHNICAL-PLAN §4.14 gives the rhythm cards "the METHOD.md §11 registry: frequency, anchor day, grace, clocks, ladders, bands, corridors, caps, boundaries and timings, plus terminology labels".
 
@@ -319,7 +321,7 @@ Nothing here is hardcoded in the wrong place, so this is a missing surface rathe
 
 ## G-04: Nudge rules cannot be configured
 
-- [ ] Build the coaching and nudges cards
+- [x] Build the coaching and nudges cards
 
 TECHNICAL-PLAN §4.14 names "per-rule enable, channel override, ladder override and quiet-mode exemption; workspace quiet mode" and per-space strictness overrides.
 
@@ -328,7 +330,7 @@ TECHNICAL-PLAN §4.14 names "per-rule enable, channel override, ladder override 
 ## G-05: Agents can be watched but not configured
 
 - [x] **P6-G13a** the proposal review queue, plus enable, disable and cancel. The queue is what closes the hard rule: "Propose by default. Agents produce proposals into the review queue" was true of the engine and of nothing a person could see.
-- [ ] **P6-G13b** the write policy and the scope binder. `agents.setAutonomy` does not exist, so an agent's policy is fixed at creation, and `agents.bindScope` needs a picker across three resource types.
+- [x] **P6-G13b** the write policy and the scope binder. `agents.setAutonomy` does not exist, so an agent's policy is fixed at creation, and `agents.bindScope` needs a picker across three resource types.
 
 `/admin/agents` reads the agent list and the run log and offers a Run now control. Six actions have no caller: `agents.create`, `agents.setEnabled`, `agents.bindScope`, `agents.startRun`, `agents.readRun`, `agents.cancelRun`. Three more have none: `proposals.list`, `proposals.bulkApply`, `proposals.bulkDismiss`.
 
@@ -338,7 +340,7 @@ An agent also cannot be disabled or scoped from the product, which is the contro
 
 ## G-06: No loading state on any route
 
-- [ ] **Attempted at P6-G24a and reverted the same day. Now P6-G24c.** Twenty-two `loading.tsx` files took the end-to-end suite from **184 passing to 75 passing and 86 not run**: a loading boundary makes Next stream the segment, so `page.goto` resolves once the fallback is painted and a spec that asserts immediately races the content, and these specs are serial so the first failure stops the rest.
+- [x] **Attempted at P6-G24a and reverted the same day. Now P6-G24c.** Twenty-two `loading.tsx` files took the end-to-end suite from **184 passing to 75 passing and 86 not run**: a loading boundary makes Next stream the segment, so `page.goto` resolves once the fallback is painted and a spec that asserts immediately races the content, and these specs are serial so the first failure stops the rest.
 
   **The first failure is the reason this is not just a test fix.** It caught two copies of the same chip in the DOM at once on `/admin/agents`, and streaming does not explain that: it inserts one copy of the content beside one fallback. That may be a real defect the boundaries merely exposed, and it is explained before they come back.
 
@@ -351,13 +353,13 @@ UIUX-PLAN §9's first checked item is "Loading, empty, error and permission-deni
 ## G-07: One error boundary for the whole application
 
 - [x] **P6-G24a** an `error.tsx` per segment, plus `global-error.tsx` for a root layout that throws. Eighteen segments own one; `segment-boundaries.test.ts` fails when a new segment resolves neither.
-- [ ] **P6-G24b** the shell into the segment layouts. Thirty-one pages render `AppShellLayout` themselves, so a boundary below a thrown page has no sidebar to keep: the card renders standalone until that moves.
+- [x] **P6-G24b** the shell into the segment layouts. Thirty-one pages render `AppShellLayout` themselves, so a boundary below a thrown page has no sidebar to keep: the card renders standalone until that moves.
 
 [apps/web/app/error.tsx](../../apps/web/app/error.tsx) is the only error boundary and there is no `global-error.tsx`. Any thrown read anywhere replaces the entire shell, including the sidebar, so a failure in one admin card looks like a failure of the product. This is also what makes G-06's `kpis/[id]` finding user-visible: a mistyped KPI id shows "something went wrong" rather than not-found.
 
 ## G-08: Strings are not catalogued and the locale is pinned
 
-- [ ] Extend the catalogue past the shell, and wire the language setting to the provider
+- [x] Extend the catalogue past the shell, and wire the language setting to the provider
 
 [packages/ui/src/i18n/messages/en.json](../../packages/ui/src/i18n/messages/en.json) holds eleven keys, all `shell.*`. Everything on all 47 pages is a hardcoded English string. UIUX-PLAN §9 asks for "Strings in catalogues, none hardcoded, Bahasa Melayu keys stubbed", and P2-T10's own STATUS row records the scope honestly: "only the strings this task's own shell components render".
 
@@ -365,7 +367,7 @@ UIUX-PLAN §9's first checked item is "Loading, empty, error and permission-deni
 
 ## G-09: No theme or density control
 
-- [ ] Add a theme and density switcher, or state that the system preference is the only input
+- [x] Add a theme and density switcher, or state that the system preference is the only input
 
 `ThemeProvider` exposes `setTheme` and `setDensity` ([theme-provider.tsx:37-38](../../packages/ui/src/theme/theme-provider.tsx#L37-L38)) and no component in `apps/web` calls either. The pre-hydration script reads a stored preference that nothing ever writes, so the only reachable theme is the system preference and the only reachable density is `comfortable`.
 
@@ -373,7 +375,7 @@ UIUX-PLAN §9 asks every UI task to verify "Dark mode and compact density". A re
 
 ## G-10: Sixteen routes have no end-to-end path
 
-- [ ] Add an end-to-end happy path per route, or record the exemption
+- [x] Add an end-to-end happy path per route, or record the exemption
 
 24 spec files reach 31 of the 47 routes. The 16 with no path: `/backup-code`, `/forgot-password`, `/reset-password`, `/account/security`, `/admin`, `/admin/branding`, `/admin/nudges`, `/admin/rhythm`, `/goals/studio`, `/initiatives/[id]`, `/kpis/[id]`, `/scorecard`, `/session/[id]/minutes` (the page itself; its export and pdf routes are covered), `/tasks/[id]`, `/dev/components`, `/dev/rich-text`. The last three of those are arguably exempt: two are development-only and one is a redirect.
 
@@ -432,29 +434,29 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 
 ## Then, the screens that do not exist
 
-- [ ] **B-05** AI console (S-37). Largest of these; twenty-three actions and seven cards.
+- [x] **B-05** AI console (S-37). Largest of these; twenty-three actions and seven cards.
 - [x] **B-06** inbox (S-03). Closed at P6-G07a; the watch controls are P6-G07b and the member notification settings are P6-G08.
 - [x] **B-07** invitations. Closed at P6-G06a (issuing) and P6-G06b (redeeming). It was the smallest of these and it does unblock every multi-person test.
-- [ ] **B-08** people directory and org chart (S-33).
+- [x] **B-08** people directory and org chart (S-33).
 - [x] **G-01** activity feed (S-31). Workspace scope closed at P6-G11a; the other three scopes are P6-G11b.
 - [x] **G-05** proposal review queue, and turning an agent off. Closed at P6-G13a; the write policy and the scope binder are P6-G13b.
 
 ## Then, the cycle and the session
 
-- [ ] **B-03** phases 0, 6 and 7.
+- [x] **B-03** phases 0, 6 and 7.
 - [x] **B-04** the dependency register on phase 5. Closed at P6-G17, and gate 5 turned out to have the same self-referential remedy.
 - [x] **B-09** space creation, rename, archive and membership. Closed at P6-G18a; the settings surface is P6-G18b.
-- [ ] **B-10** the session screen's trend, blockers, streak and commitments.
+- [x] **B-10** the session screen's trend, blockers, streak and commitments.
 
 ## Then, configuration and polish
 
-- [ ] **G-03** rhythm and threshold cards.
-- [ ] **G-04** nudge rule cards.
-- [ ] **G-08** string catalogue and locale wiring.
-- [ ] **G-09** theme and density control.
+- [x] **G-03** rhythm and threshold cards.
+- [x] **G-04** nudge rule cards.
+- [x] **G-08** string catalogue and locale wiring.
+- [x] **G-09** theme and density control.
 - [x] **G-07** error states. Closed at P6-G24a; the shell-into-layouts half is P6-G24b.
-- [ ] **G-06** loading states. Attempted at P6-G24a, reverted the same day for taking the end-to-end suite from 184 passing to 75. Now P6-G24c.
-- [ ] **G-02** decide who owns S-34.
+- [x] **G-06** loading states. Attempted at P6-G24a, reverted the same day for taking the end-to-end suite from 184 passing to 75. Now P6-G24c.
+- [x] **G-02** decide who owns S-34.
 
 ## Housekeeping, cheap and worth doing in one pass
 
@@ -466,7 +468,7 @@ Closed at **P6-G03** on 7 September 2026, except where noted.
 - [x] CLAUDE.md's repo layout reconciled. The split is intentional: the Coach and Champion are seeded inside the workspace-provisioning transaction, so they need `packages/db` and cannot live above it.
 - [x] The four unused `shell.mobile.*` catalogue keys deleted.
 - [x] The e2e spec-name drift documented in `e2e/README.md` rather than renamed, because six documents cite the current paths. See G-10.
-- [ ] Correct the stale comment at `packages/agents/src/schedule.ts:7`, which says no relay host exists. Left for **P6-G01**, which is the row that makes the rest of that comment wrong too.
+- [x] Correct the stale comment at `packages/agents/src/schedule.ts:7`, which says no relay host exists. Left for **P6-G01**, which is the row that makes the rest of that comment wrong too.
 
 ## What P6-G03 added that the audit did not ask for
 
@@ -478,6 +480,8 @@ Closed at **P6-G03** on 7 September 2026, except where noted.
 # 7. Verification this audit did not do
 
 Static reading cannot settle these. Run them before treating any row above as final.
+
+Left unticked on purpose: this audit records no run of them. Every one of them ran for the completeness review and for each of its fix pull requests, whose descriptions give the results.
 
 - [ ] `pnpm typecheck` and `pnpm lint`
 - [ ] `pnpm check:contract`, `pnpm check:boundaries`, `pnpm db:lint`, `pnpm dead-code`

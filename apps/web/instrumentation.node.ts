@@ -1,4 +1,5 @@
 import { EnvironmentError, loadEnv } from "@openokr/config";
+import { quietAbandonedResponses } from "./lib/abandoned-responses";
 import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
 import { startRelay } from "./lib/relay";
@@ -6,6 +7,15 @@ import { startScheduler } from "./lib/scheduler";
 import { resolveSSOProviders } from "./lib/sso";
 import { installTelemetry } from "./lib/telemetry";
 import { tenantFloor } from "./lib/tenant-floor";
+
+/**
+ * Keeps responses the browser cancelled out of the error log (completeness
+ * review L-04). `lib/abandoned-responses.ts` says why this is the log's
+ * problem and not the renderer's.
+ */
+export function quietCancelledResponses(): void {
+  quietAbandonedResponses();
+}
 
 /**
  * Node-only boot checks. Kept out of `instrumentation.ts` so the edge bundle
@@ -149,16 +159,6 @@ export async function resolveAdmission(): Promise<void> {
 }
 
 /**
- * Loads SSO connections from the database and caches them for `getAuth()`
- * (P8-T07).
- *
- * Non-fatal on failure: an instance that cannot read its SSO connections
- * still serves password and passkey sign-in. The SSO buttons do not appear.
- *
- * A build worker has the placeholder `DATABASE_URL` and no key ring, so
- * this is skipped during `next build`.
- */
-/**
  * Says so, loudly, when the database would not enforce the tenant floor
  * (completeness review H-01).
  *
@@ -187,19 +187,24 @@ export async function checkTenantFloor(): Promise<void> {
   }
 }
 
+/**
+ * Loads SSO connections from the database and caches them for `getAuth()`
+ * (P8-T07). A connection saved later is read by the next sign-in without a
+ * restart (completeness review L-15); this only means the first one does not
+ * have to wait for it.
+ *
+ * Non-fatal on failure: an instance that cannot read its SSO connections
+ * still serves password and passkey sign-in, and the next sign-in tries again.
+ *
+ * A build worker has the placeholder `DATABASE_URL` and no key ring, so
+ * this is skipped during `next build`.
+ */
 export async function resolveSSO(): Promise<void> {
   if (process.env.NEXT_PHASE === "phase-production-build") {
     return;
   }
   try {
-    const { getPool } = await import("./lib/pool");
-    const { getKeyRing } = await import("./lib/secrets");
-    const { loadEnv } = await import("@openokr/config");
-    await resolveSSOProviders(
-      getPool(),
-      getKeyRing(),
-      loadEnv().BETTER_AUTH_URL,
-    );
+    await resolveSSOProviders();
   } catch (error) {
     process.stderr.write(
       `sso: could not load SSO connections: ${error instanceof Error ? error.message : String(error)}\n`,

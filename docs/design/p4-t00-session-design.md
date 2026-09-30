@@ -742,21 +742,52 @@ Assembles after the weekly session closes.
 
 ## 8. Feed-forward (SS8.9)
 
-> **BLOCKED: awaits P3-T15 (scorecard, cycle archive and feed-forward).**
->
-> P3-T15 implements the archive job, performance snapshots, and the
-> feed-forward operation. This section will document the exact mapping from
-> the quarterly review's close action to the next cycle's opening state.
->
-> The mapping from METHOD.md SS8.9:
->
-> | From this cycle | Into the next cycle |
-> |---|---|
-> | Every KR and its score | Phase 2, the prior-cycle scoring list |
-> | Every carry-forward item | Phase 2, the strategic issue list at impact 4 |
-> | Learnings and the retrospective | Phase 1, the input pack |
-> | The lowest process-health statement | Phase 3, a process priority |
-> | The annual frame and annual OKRs | Phase 0 reference, focus flags cleared |
+Built at P3-T15 and P4-T12-b. Made automatic at the close by completeness
+review M-05: until then the archive and the feed-forward were two buttons,
+nothing set a cycle to `closed`, and the lowest process-health statement
+landed as a phase 2 issue.
+
+**The close is `cycles.close`, one Operation** (`closeCycleInTx` in
+`packages/core/src/cycles/archive.ts`):
+
+1. Refused until phase 7 is complete (METHOD.md SS2.3: every key result scored
+   and the retrospective written). The refusal lists what is missing. No
+   override: METHOD and REQUIREMENTS give one to the publish gates only.
+2. Writes the performance snapshots (the scorecard row).
+3. Sets the cycle `closed`, phase 7.
+4. Feeds the next cycle: the earliest cycle of the same mode starting after
+   this one ends, when it exists and is open.
+
+**When the next cycle does not exist yet**, which SS8.10 makes the usual case,
+`cycles.create` and `cycles.ensureCurrent` feed it at creation
+(`feedFromClosedPredecessorInTx`): from the cycle of the same mode immediately
+before it, only if that cycle is closed and has fed no other cycle yet.
+`cycles.previous_cycle_id` records which cycle fed which.
+
+| From this cycle | Into the next cycle | Written as |
+|---|---|---|
+| Every KR and its score | Phase 2, the prior-cycle scoring list | `cycle_prior_scores` |
+| Every carry-forward KR and learning | Phase 2, the strategic issue list at impact 4 | `cycle_issues`, source `carry_forward`, impact `quality.carryForwardIssueImpact` |
+| Learnings and the retrospective | Phase 1, the input pack | `cycle_pack_items` item 2, note rewritten |
+| The lowest process-health statement | Phase 3, a process priority | `cycle_priorities`, last position |
+| The annual frame | Reference | `cycles.frame_id`; focus flags are per cycle, so nothing to clear |
+
+Every row is idempotent: a second run, a retry or a manual
+`cycles.feedForward` adds nothing that is already there. A closed cycle
+refuses a second close, a second snapshot, being fed into, new goals and new
+sessions.
+
+**Concurrency.** The close locks the closing cycle's row before reading its
+status, and a creation locks its predecessor's row before reading its status.
+Two closes at once: the second waits, reads `closed` and is refused. A close
+and the next cycle's creation at once: whichever waits sees what the other
+committed, so the inheritance lands exactly once.
+
+**Acceptance.** Given a cycle whose phase 7 is complete and whose review
+scored process-health statement 3 lowest, when it is closed and the next
+quarter is created afterwards, then the next quarter's phase 2 holds every
+prior score and each carried item at impact 4, its phase 3 holds statement 3
+as a priority and not as an issue, and closing again is refused.
 
 ## 9. Minutes (SS8.10)
 

@@ -195,6 +195,44 @@ interface Proposal {
 }
 
 /**
+ * What each proposable action is called on screen (completeness review M-09).
+ *
+ * The card printed the registry name, `goals.create`, which P8-G11d's rule
+ * keeps out of the interface. With one action it was one string; with four it
+ * is a reader wondering what `initiatives.create` means. An action without a
+ * name here, which the catalogue in `packages/core` would have to gain first,
+ * reads as a proposed change rather than as its identifier.
+ */
+const ACTION_NAME_KEYS: Readonly<Record<string, string>> = {
+  "goals.create": "copilot.copilotPanel.actions.newObjective",
+  "goals.addKeyResult": "copilot.copilotPanel.actions.newKeyResult",
+  "initiatives.create": "copilot.copilotPanel.actions.newInitiative",
+  "tasks.create": "copilot.copilotPanel.actions.newTask",
+};
+
+/**
+ * The preview's labels, as the reader's language.
+ *
+ * Core builds the preview in English words because it is stored with the
+ * proposal and read back on any surface; the panel is where it meets a
+ * reader. A label not listed here is shown as it was stored.
+ */
+const PREVIEW_LABEL_KEYS: Readonly<Record<string, string>> = {
+  Objective: "copilot.copilotPanel.preview.objective",
+  Description: "copilot.copilotPanel.preview.description",
+  Level: "copilot.copilotPanel.preview.level",
+  Space: "copilot.copilotPanel.preview.space",
+  Cycle: "copilot.copilotPanel.preview.cycle",
+  "Key result": "copilot.copilotPanel.preview.keyResult",
+  Baseline: "copilot.copilotPanel.preview.baseline",
+  Target: "copilot.copilotPanel.preview.target",
+  Direction: "copilot.copilotPanel.preview.direction",
+  Indicator: "copilot.copilotPanel.preview.indicator",
+  Initiative: "copilot.copilotPanel.preview.initiative",
+  Task: "copilot.copilotPanel.preview.task",
+};
+
+/**
  * One proposal, with what it would do and what may be done about it.
  *
  * **The buttons are offered whether or not the reader may use them.** A member
@@ -226,11 +264,16 @@ function ProposalCard({
       <header className="flex items-center gap-2">
         <Chip tone="agent">{t("common.ai")}</Chip>
         <span className="text-xs font-semibold text-ink-2">
-          {proposal.action}
+          {t(
+            ACTION_NAME_KEYS[proposal.action] ??
+              "copilot.copilotPanel.proposedChange",
+          )}
         </span>
         {proposal.status === "applied" ? (
           <Chip tone={proposal.undone ? "neutral" : "ok"}>
-            {proposal.undone ? "Undone" : "Applied"}
+            {proposal.undone
+              ? t("copilot.copilotPanel.undone")
+              : t("copilot.copilotPanel.applied")}
           </Chip>
         ) : null}
         {proposal.status === "dismissed" ? (
@@ -241,7 +284,11 @@ function ProposalCard({
       <dl className="mt-2 flex flex-col gap-1">
         {proposal.preview.map((row) => (
           <div key={row.label} className="flex gap-2 text-xs">
-            <dt className="w-20 flex-none text-ink-4">{row.label}</dt>
+            <dt className="w-20 flex-none text-ink-4">
+              {PREVIEW_LABEL_KEYS[row.label]
+                ? t(PREVIEW_LABEL_KEYS[row.label] as string)
+                : row.label}
+            </dt>
             <dd className="min-w-0 text-ink-2">{row.value}</dd>
           </div>
         ))}
@@ -303,7 +350,7 @@ export function CopilotPanel({
     {
       id: "copilot",
       keys: "⌘J",
-      description: "Ask the copilot",
+      description: t("copilot.copilotPanel.askTheCopilot"),
       group: "Global",
     },
     () => setOpen((was) => !was),
@@ -407,7 +454,9 @@ export function CopilotPanel({
         await decision(id);
       } catch (error) {
         setNotice(
-          error instanceof Error ? error.message : "That could not be done.",
+          error instanceof Error
+            ? error.message
+            : t("copilot.copilotPanel.couldNotBeDone"),
         );
       } finally {
         setBusy(false);
@@ -416,7 +465,7 @@ export function CopilotPanel({
         }
       }
     },
-    [loadThread, threadId],
+    [loadThread, t, threadId],
   );
 
   const stop = useCallback(() => {
@@ -460,9 +509,7 @@ export function CopilotPanel({
         signal: controller.signal,
       });
       if (!response.ok || !response.body) {
-        setNotice(
-          "The copilot could not be reached. Your question was not saved.",
-        );
+        setNotice(t("copilot.copilotPanel.couldNotBeReached"));
         return;
       }
 
@@ -511,7 +558,7 @@ export function CopilotPanel({
       // An abort is the stop control working, not a failure. What arrived was
       // recorded by the server, and the re-read below shows it.
       if (!(error instanceof DOMException && error.name === "AbortError")) {
-        setNotice("The answer stopped early. What arrived was saved.");
+        setNotice(t("copilot.copilotPanel.answerStoppedEarly"));
       }
     } finally {
       abort.current = null;
@@ -526,7 +573,7 @@ export function CopilotPanel({
         await loadThread(landedThreadId).catch(() => undefined);
       }
     }
-  }, [busy, loadThread, question, threadId]);
+  }, [busy, loadThread, question, t, threadId]);
 
   if (!open) {
     return (
@@ -609,7 +656,7 @@ export function CopilotPanel({
                             className="text-left text-xs text-ink-2 underline"
                             onClick={() => void loadThread(thread.id)}
                           >
-                            {thread.title ?? "Untitled"}
+                            {thread.title ?? t("copilot.copilotPanel.untitled")}
                           </button>
                         </li>
                       ))}
@@ -673,7 +720,7 @@ export function CopilotPanel({
             {canAsk ? null : (
               <p className="mb-2 text-xs text-ink-3">
                 {availability.reason ??
-                  "The copilot cannot answer in this workspace right now."}
+                  t("copilot.copilotPanel.cannotAnswerRightNow")}
               </p>
             )}
             <div className="flex items-end gap-2">
@@ -695,8 +742,8 @@ export function CopilotPanel({
                   }}
                   placeholder={
                     canAsk
-                      ? "Ask a question"
-                      : "Search your workspace for matching passages"
+                      ? t("copilot.copilotPanel.askAQuestion")
+                      : t("copilot.copilotPanel.searchForMatchingPassages")
                   }
                   className="w-full resize-none rounded-md border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none placeholder:text-ink-4"
                 />

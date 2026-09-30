@@ -62,20 +62,33 @@ async function Objective({
         >
           {objective.title}
           <span className="ml-1.5 text-xs text-ink-3">
-            {objective.championName ?? "No champion named"}
+            {objective.championName ??
+              t("cycle.annualObjectives.noChampionNamed")}
           </span>
         </Link>
         <span className="flex flex-none items-center gap-2">
           <Chip tone={objective.keyResultCount > 0 ? "neutral" : "warn"}>
             {objective.keyResultCount === 0
-              ? "no key results"
-              : `${objective.keyResultCount} key results`}
+              ? t("cycle.annualObjectives.noKeyResults")
+              : objective.keyResultCount === 1
+                ? t("common.count.keyResultOne", {
+                    count: objective.keyResultCount,
+                  })
+                : t("common.count.keyResultOther", {
+                    count: objective.keyResultCount,
+                  })}
           </Chip>
           {objective.sentForward > 0 ? (
             <Chip tone="ok">
-              {t("cycle.annualObjectives.inQuarter", {
-                sentForward: objective.sentForward,
-                sentForward2: objective.sentForward === 1 ? "" : "s",
+              {t("cycle.annualObjectives.inQuarters", {
+                quarters:
+                  objective.sentForward === 1
+                    ? t("common.count.quarterOne", {
+                        count: objective.sentForward,
+                      })
+                    : t("common.count.quarterOther", {
+                        count: objective.sentForward,
+                      }),
               })}
             </Chip>
           ) : null}
@@ -91,7 +104,9 @@ async function Objective({
           <select
             name="strategyId"
             defaultValue={objective.strategyId ?? ""}
-            aria-label={`The strategy ${objective.title} serves`}
+            aria-label={t("cycle.annualObjectives.theStrategyItServes", {
+              title: objective.title,
+            })}
             className="w-96 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
           >
             <option value="">
@@ -120,7 +135,9 @@ async function Objective({
           <input
             name="title"
             defaultValue={objective.title}
-            aria-label={`This quarter's objective under ${objective.title}`}
+            aria-label={t("cycle.annualObjectives.thisQuarterObjectiveUnder", {
+              title: objective.title,
+            })}
             className="w-96 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
           />
           <Button type="submit" variant="default" size="sm">

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import { withMessages } from "./screen-text.ts";
 
 /**
  * The workspace state gets a control and an explanation (§4.1, P6-G25).
@@ -67,8 +68,8 @@ describe("the explanation", () => {
     // `operations/freeze.ts` treats them identically and says so. A member
     // does not care about that: one is a decision about how the workspace is
     // used, the other is an operator holding it still.
-    expect(banner).toContain("This workspace is frozen");
-    expect(banner).toContain("This workspace is read only");
+    expect(withMessages(banner)).toContain("This workspace is frozen");
+    expect(withMessages(banner)).toContain("This workspace is read only");
   });
 
   test("the state travels on the membership every page already resolves", () => {

@@ -5,7 +5,8 @@
  *
  * `goals.moveToCycle` and `goals.unlinkKpi` shipped with the goal and neither
  * had a caller anywhere in `apps/web`. Both are small, both are audited by the
- * pipeline, and both were reachable only from the command line.
+ * pipeline, and both were reachable only from the command line. `goals.linkKpi`
+ * joined them with completeness review M-07.
  */
 
 import { callAction, OperationError } from "@openokr/core";
@@ -44,6 +45,26 @@ export async function moveGoalToCycle(input: {
   }
   // Both cycles read differently now, and neither is only this page: the
   // scorecard, the cycle screen and the Work Map all count by cycle.
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
+/**
+ * Links a KPI to a key result drafted without one (completeness review M-07).
+ * The action checks the KPI belongs to this workspace, so an id typed into
+ * the request is refused there rather than trusted here.
+ */
+export async function linkKeyResultKpi(input: {
+  id: string;
+  kpiId: string;
+}): Promise<WriteResult> {
+  try {
+    await callAction(await context(), "goals.linkKpi", input);
+  } catch (error) {
+    return refused(error);
+  }
+  // The goal's progress moves, and so does every goal above it and the KPI's
+  // own page, which lists the key results it measures.
   revalidatePath("/", "layout");
   return { error: null };
 }

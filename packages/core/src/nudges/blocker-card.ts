@@ -28,6 +28,7 @@ import {
 import { trigger } from "@openokr/method";
 import { eq } from "drizzle-orm";
 import type { MessageDraft } from "../channels/builder.ts";
+import { instanceNameOr } from "../secrets/instance-registry.ts";
 
 /** Rules whose subject is a blocker, from §6.4's own catalogue. */
 const BLOCKER_RULES = new Set([
@@ -72,6 +73,8 @@ export async function blockerDraft(
     readonly now: Date;
     /** The instance's own address, for the link to the board. */
     readonly baseUrl?: string;
+    /** What the instance calls itself (M-33). Absent says "OpenOKR". */
+    readonly instanceName?: string;
   },
 ): Promise<MessageDraft | null> {
   const [row] = await tx
@@ -146,7 +149,7 @@ export async function blockerDraft(
   ];
 
   return {
-    subject: "OpenOKR: a blocker needs you",
+    subject: `${instanceNameOr(input.instanceName)}: a blocker needs you`,
     text,
     blocks,
     buttons,

@@ -1,9 +1,15 @@
 /**
  * Comment and reaction actions (TECHNICAL-PLAN.md §4.10, P3-T16).
  *
- * Comments require the `comment` access level (40) to write. Reactions
- * require `view` (10) to add and can only be removed by their owner.
- * Reading both requires `view`.
+ * Writing either requires the `comment` access level (40) on the workspace.
+ * A reaction can only be removed by its owner. Reading both requires `view`.
+ *
+ * **What it hangs on decides who may see it** (completeness review M-01).
+ * Every read and every write also asks whether the caller reads the subject
+ * the comment or reaction is on, through `getParentAccessScoped`. Before that
+ * only `comments.list` asked, and `comments.create`, `reactions.add` and
+ * `reactions.list` would take any subject id at all, so a member could write
+ * under a goal they could not open and read the reactions on it.
  */
 import {
   activeOnly,
@@ -18,7 +24,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
+import { getParentAccessScoped } from "../access/reads.ts";
 import {
   addReaction,
   createComment,
@@ -94,6 +100,32 @@ async function readingMember<TSchema extends Record<string, unknown>>(
 
 const subjectTypeSchema = z.enum(COMMENT_SUBJECT_TYPES);
 
+/**
+ * Refuses, with not-found, a caller who does not reach what a comment or a
+ * reaction hangs on (completeness review M-01).
+ *
+ * `view` for everything a member does to their own words, because a
+ * discussion is open to everybody who can read the thing it is about: that is
+ * what the workspace-wide `comment` level on these actions already said. A
+ * subject may itself be a comment, which is how a reaction on a reply is
+ * decided by the goal above it.
+ */
+async function requireParent<TSchema extends Record<string, unknown>>(
+  tx: WorkspaceTx<TSchema>,
+  workspaceId: string,
+  memberId: string,
+  subjectType: string,
+  subjectId: string,
+): Promise<void> {
+  await getParentAccessScoped(tx, {
+    workspaceId,
+    memberId,
+    resourceType: subjectType,
+    resourceId: subjectId,
+    requires: ACCESS_LEVELS.view,
+  });
+}
+
 // ── Reads ─────────────────────────────────────────────────────────────
 
 export const listCommentsAction = defineReadAction({
@@ -134,12 +166,13 @@ export const listCommentsAction = defineReadAction({
   async handler(ctx, input) {
     const db = drizzle(ctx.pool);
     return withWorkspace(db, ctx.workspaceId, async (tx) => {
-      await getAccessScoped(tx, {
-        workspaceId: ctx.workspaceId,
-        memberId: await readingMember(tx, ctx.workspaceId, ctx.actor),
-        resourceType: input.subjectType,
-        resourceId: input.subjectId,
-      });
+      await requireParent(
+        tx,
+        ctx.workspaceId,
+        await readingMember(tx, ctx.workspaceId, ctx.actor),
+        input.subjectType,
+        input.subjectId,
+      );
       const rows = await listComments(
         tx,
         ctx.workspaceId,
@@ -182,12 +215,21 @@ export const listReactionsAction = defineReadAction({
   async handler(ctx, input) {
     const db = drizzle(ctx.pool);
     return withWorkspace(db, ctx.workspaceId, async (tx) => {
+      const memberId = await readingMember(tx, ctx.workspaceId, ctx.actor);
+      // Who reacted to something is as much about it as what was said.
+      await requireParent(
+        tx,
+        ctx.workspaceId,
+        memberId,
+        input.subjectType,
+        input.subjectId,
+      );
       return listReactions(
         tx,
         ctx.workspaceId,
         input.subjectType,
         input.subjectId,
-        await readingMember(tx, ctx.workspaceId, ctx.actor),
+        memberId,
       );
     });
   },
@@ -223,7 +265,8 @@ export const previewNotifyAction = defineReadAction({
 
 export const createCommentAction = defineWriteAction({
   name: "comments.create",
-  summary: "Post a comment on a goal, key result, check-in, cycle or document",
+  summary:
+    "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
   input: z.object({
     subjectType: subjectTypeSchema,
     subjectId: z.string().uuid(),
@@ -232,6 +275,16 @@ export const createCommentAction = defineWriteAction({
   output: z.object({ id: z.string().uuid() }),
   access: ACCESS_LEVELS.comment,
   operation: (_context, input) => ({
+    async load({ tx, workspaceId, actor }) {
+      await requireParent(
+        tx,
+        workspaceId,
+        requireMemberId(actor.memberId),
+        input.subjectType,
+        input.subjectId,
+      );
+      return undefined;
+    },
     async execute({ tx, workspaceId, actor }) {
       const authorMemberId = requireMemberId(actor.memberId);
       const result = await createComment(tx, {
@@ -535,6 +588,15 @@ export const updateCommentAction = defineWriteAction({
           "Only the author can edit a comment.",
         );
       }
+      // An author who can no longer read the subject has left the
+      // conversation, and editing is taking part in it.
+      await requireParent(
+        tx,
+        workspaceId,
+        comment.authorMemberId,
+        comment.subjectType,
+        comment.subjectId,
+      );
       await updateComment(tx, {
         workspaceId,
         commentId: input.commentId,
@@ -590,11 +652,12 @@ export const deleteCommentAction = defineWriteAction({
   access: ACCESS_LEVELS.comment,
   safety: "destructive",
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId }) {
+    async execute({ tx, workspaceId, actor }) {
       const [comment] = await tx
         .select({
           authorMemberId: comments.authorMemberId,
           subjectType: comments.subjectType,
+          subjectId: comments.subjectId,
         })
         .from(comments)
         .where(
@@ -607,6 +670,29 @@ export const deleteCommentAction = defineWriteAction({
         .limit(1);
       if (!comment) {
         throw new OperationError("not_found", "Comment not found.");
+      }
+      // **What the summary always said, and the code did not** (completeness
+      // review M-01). The author takes back their own words; anybody else
+      // needs edit on the subject, which is the moderator the summary names.
+      // Before this any member could delete any comment, which mattered less
+      // while the goal page was the only thread in the product.
+      const memberId = requireMemberId(actor.memberId);
+      const reached = await getParentAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: comment.subjectType,
+        resourceId: comment.subjectId,
+      });
+      if (
+        comment.authorMemberId !== memberId &&
+        reached.level < ACCESS_LEVELS.edit
+      ) {
+        // Forbidden rather than not-found: the caller can read the thread, so
+        // the comment's existence is not news to them.
+        throw new OperationError(
+          "forbidden",
+          "Only its author, or somebody who can edit what it is on, can delete a comment.",
+        );
       }
       await deleteComment(tx, workspaceId, input.commentId);
       return {
@@ -642,6 +728,16 @@ export const addReactionAction = defineWriteAction({
   // anyone who could merely read a goal could attach something to it.
   access: ACCESS_LEVELS.comment,
   operation: (_context, input) => ({
+    async load({ tx, workspaceId, actor }) {
+      await requireParent(
+        tx,
+        workspaceId,
+        requireMemberId(actor.memberId),
+        input.subjectType,
+        input.subjectId,
+      );
+      return undefined;
+    },
     async execute({ tx, workspaceId, actor }) {
       const result = await addReaction(tx, {
         workspaceId,

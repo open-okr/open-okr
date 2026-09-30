@@ -19,6 +19,7 @@ export default defineConfig({
   },
   test: {
     globalSetup: [join(testSupport, "src/db-harness.ts")],
+    setupFiles: [join(testSupport, "src/db-file-teardown.ts")],
     env: {
       // Keeps this project's per-worker database names distinct from other
       // projects running in the same Vitest process pool.

@@ -60,6 +60,11 @@ export const accounts = pgTable(
     providerId: text("provider_id").notNull(),
     /** Hashed by Better Auth. Null for social and passkey accounts. */
     password: text("password"),
+    /**
+     * The identity provider's three tokens, sealed under the instance's root
+     * key by the account-token adapter in packages/core (L-11). Rows from
+     * before that are sealed by data change 0011.
+     */
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),

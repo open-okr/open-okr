@@ -4,11 +4,10 @@
  * **Written at P8-T03b-fix, because `route-coverage.test.ts` was red and no
  * honest reason could be written instead.** That test asks every route to be
  * opened by a spec or to carry a written sentence saying why not. The plan
- * screen beside this one has such a sentence and it is true: that screen
- * calls `notFound()` with the cloud flag off, so the suite's instance
- * genuinely cannot reach it. Support access carries no such guard, so it is
- * reachable on exactly the instance this suite builds, and the only truthful
- * answer was to open it.
+ * screen beside this one calls `notFound()` with the cloud flag off, which is
+ * why `s45-operator-console.spec.ts` turns the flag on to open it. Support
+ * access carries no such guard, so it is reachable on exactly the instance
+ * this suite builds, and the only truthful answer was to open it.
  *
  * **No route is written here in backticks, and that is not a style choice.**
  * `route-coverage.test.ts` reads a backtick or a quote followed by a url as a

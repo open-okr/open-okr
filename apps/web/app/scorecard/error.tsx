@@ -7,5 +7,5 @@ export default function ScorecardError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the scorecard" />;
+  return <SegmentError {...props} headingKey="segmentError.scorecard" />;
 }

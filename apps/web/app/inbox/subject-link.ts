@@ -16,36 +16,41 @@ export {
   subjectPath as subjectLink,
 } from "@openokr/core";
 
-/** The word for a subject type, for the group heading above its rows. */
-const NAMES: Readonly<Record<string, string>> = {
-  goal: "Goal",
-  initiative: "Initiative",
-  task: "Task",
-  kpi: "KPI",
-  space: "Space",
-  session: "Session",
-  cycle: "Cycle",
-  blocker: "Blocker",
-  document: "Document",
-  comment: "Comment",
-  check_in: "Check-in",
-  member: "You",
-  workspace: "Workspace",
+/**
+ * The catalogue key for a subject type's word, for the group heading above its
+ * rows. Keys rather than words since completeness review M-15, so a Malay
+ * reader's headings are Malay.
+ */
+const NAME_KEYS: Readonly<Record<string, string>> = {
+  goal: "inbox.subject.goal",
+  initiative: "inbox.subject.initiative",
+  task: "inbox.subject.task",
+  kpi: "inbox.subject.kpi",
+  space: "inbox.subject.space",
+  session: "inbox.subject.session",
+  cycle: "inbox.subject.cycle",
+  blocker: "inbox.subject.blocker",
+  document: "inbox.subject.document",
+  comment: "inbox.subject.comment",
+  check_in: "inbox.subject.checkIn",
+  member: "inbox.subject.member",
+  workspace: "inbox.subject.workspace",
 };
 
-export function subjectName(subjectType: string | null): string {
+/** The key for a subject type's heading, or null for a type with no word. */
+export function subjectNameKey(subjectType: string | null): string | null {
   if (!subjectType) {
-    return "Other";
+    return "inbox.subject.other";
   }
-  return NAMES[subjectType] ?? subjectType;
+  return NAME_KEYS[subjectType] ?? null;
 }
 
-/** What each reason means, in the words the chip shows. */
-export const REASON_LABELS: Readonly<Record<string, string>> = {
-  invited: "Invited",
-  joined: "Joined",
-  mentioned: "Mentioned",
-  role: "Role change",
-  review: "To review",
-  check_in: "Reminder",
+/** The catalogue key for what each reason means, as the chip shows it. */
+export const REASON_LABEL_KEYS: Readonly<Record<string, string>> = {
+  invited: "inbox.reason.invited",
+  joined: "inbox.reason.joined",
+  mentioned: "inbox.reason.mentioned",
+  role: "inbox.reason.role",
+  review: "inbox.reason.review",
+  check_in: "inbox.reason.checkIn",
 };

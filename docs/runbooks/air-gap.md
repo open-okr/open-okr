@@ -18,6 +18,7 @@ product is whole without them because continuous integration proves it is.
 | Both agents: the Coach and the Champion | Every nudge, escalation, gate and diagnostic is deterministic. AI adds drafting and rewriting, never the decision |
 | Import from a spreadsheet | The file is uploaded to the instance |
 | Export, the workspace archive, the audit export | Built by the instance and handed to the browser |
+| Image re-encoding and previews | sharp and its libvips ship inside the image as packages; nothing is downloaded when it first runs |
 | Upgrades | `docker compose pull` from a registry mirror, or a loaded image tarball |
 
 ## What needs a connection, and stays off until it has one
@@ -33,6 +34,7 @@ configures one never calls out.
 | Single sign-on | Password and passkey sign-in, which is the default anyway |
 | Directory sync | Members are invited rather than provisioned |
 | Link enrichment and the agent's research tools | Absent. `outboundFetch` is the only way out and it is never called with nothing configured |
+| Virus scanning | No scan, and a file is available as soon as it is uploaded. A clamd on the same isolated network works like any other; its signature updates need a mirror. See [Security](../admin/security.md#uploaded-files) |
 
 **A local AI provider counts as no route out.** An OpenAI-compatible server on
 the same isolated network is configured as a base URL like any other provider,

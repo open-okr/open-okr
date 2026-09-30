@@ -3,6 +3,7 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { RevokeResult } from "./revoke-state.ts";
 
@@ -17,9 +18,13 @@ export async function revoke(
   _previous: RevokeResult | null,
   form: FormData,
 ): Promise<RevokeResult> {
+  const { t } = await getTranslations();
   const id = String(form.get("id") ?? "").trim();
   if (id === "") {
-    return { ok: false, message: "Nothing to revoke." };
+    return {
+      ok: false,
+      message: t("account.connections.actions.nothingToRevoke"),
+    };
   }
 
   const { session, workspace } = await requireWorkspace();
@@ -39,7 +44,7 @@ export async function revoke(
       message:
         error instanceof Error
           ? error.message
-          : "That connection could not be revoked.",
+          : t("account.connections.actions.couldNotBeRevoked"),
     };
   }
 

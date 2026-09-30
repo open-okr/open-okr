@@ -118,6 +118,10 @@ export const RichTextEditor = forwardRef<
     extensions,
     content: content as never,
     editable,
+    // TipTap would append its base rules as an inline <style>, which the
+    // Content-Security-Policy refuses in production. The same rules ship in
+    // `styles/prosemirror.css` instead (completeness review L-22).
+    injectCSS: false,
     editorProps: {
       attributes: placeholder ? { "data-placeholder": placeholder } : {},
       handlePaste(view, event) {

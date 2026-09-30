@@ -7,6 +7,12 @@ What the wizard does, and what is worth doing next.
 An account. Name, email address, and a password of at least twelve characters.
 That account owns the instance.
 
+The screen also asks what the instance should be called. It is filled in with
+`OPENOKR_INSTANCE_NAME` when your deployment sets it, or `OpenOKR` when it does
+not. Leave it as it is and the variable keeps deciding; type another name and
+that one is kept instead. Either way it can be changed later on General in
+admin.
+
 Nothing else on that screen needs configuring, and the screen says so: every
 setting has a working default, so you can create the account and start. Mail,
 AI, chat channels, single sign-on and directory sync are all optional, all off,
@@ -15,6 +21,21 @@ and all changeable later without downtime.
 **Registration closes the moment your account exists.** Everybody after you
 joins by invitation. On the managed cloud registration stays open, because a
 cloud belongs to nobody.
+
+## Then the workspace asks a few questions
+
+Your first visit to the workspace opens its own setup: its name and timezone,
+the check-in rhythm, a first invitation, a starting template, and a worked
+example. Every question already has an answer, so skipping all of them is a
+working start rather than an unfinished one.
+
+Skipped something you now want? **General in admin opens the setup again.**
+Every step shows what the workspace holds now, and skipping a step keeps it,
+so reopening it changes nothing you do not change.
+
+After the setup, the Work Map offers everybody a short tour on their first
+visit: the map itself, Review, check-ins, the cycle strip and ⌘K. Ending it
+early ends it for good, on every machine.
 
 ## What you already have
 

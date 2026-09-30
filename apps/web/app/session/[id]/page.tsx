@@ -14,13 +14,19 @@
  * event. This satisfies the acceptance criterion: both participants see the
  * stage advance without a manual reload.
  *
- * What is deliberately absent: the twelve-week confidence trend (P4-T07b data),
- * the streak ribbon (P4-T08), and the blocker ages (P4-T07c table). Those are
- * listed as "no data yet" placeholders rather than faked. P4-T07a owns the
- * session record and the live sync; the subsequent tasks fill the panels.
+ * The twelve-week confidence trend, the streak ribbon, the blocker panel with
+ * its ages and the commitments are all drawn here: P4-T07a built the session
+ * record and the live sync with "no data yet" placeholders, and later tasks
+ * filled every panel (the gap audit's B-10, closed by P6-G19a to P6-G19c).
  */
 
-import { callAction, excerptRichText } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  excerptRichText,
+  OperationError,
+  REVIEW_ASSIST_KEYS,
+} from "@openokr/core";
 import {
   canonThresholds,
   REVIEW_STAGE_KEYS,
@@ -34,10 +40,17 @@ import {
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { resolveAccessLevelFor } from "../../../lib/access";
+import { assistOffered } from "../../../lib/assists";
+import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
+import {
+  readSubjectDocuments,
+  SubjectDocuments,
+} from "../../documents/subject-documents.tsx";
 import {
   closeSessionAction,
   openSessionAction,
@@ -73,6 +86,17 @@ import { type TeamRetro, TeamRetroPanel } from "./team-retro";
 
 interface SessionPageProps {
   params: Promise<{ id: string }>;
+}
+
+/**
+ * A read the reader is not allowed, as null, so its card is left off rather
+ * than the page. The same shape the space home uses for a guest.
+ */
+function refusedAsNull(error: unknown): null {
+  if (error instanceof OperationError && error.code === "not_found") {
+    return null;
+  }
+  throw error;
 }
 
 export default async function SessionPage({ params }: SessionPageProps) {
@@ -127,6 +151,12 @@ export default async function SessionPage({ params }: SessionPageProps) {
     confirmed: boolean;
     confirmedConfidence: number | null;
     whatChanged: string | null;
+    teamVoting: boolean;
+    votesCast: number;
+    revealed: boolean;
+    votes: { memberId: string; confidence: number }[];
+    average: number | null;
+    myVote: number | null;
   }> = [];
   // The workspace's own §3.2 boundaries, which the dial colours and names
   // bands from (completeness review H-17). Canon until the stage is read.
@@ -341,6 +371,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
     lines: string[];
     /** What the coordinator added for leadership (P6-G19b). */
     note: string | null;
+    /** Where it has been posted, and where it could be now (M-23). */
+    postedTo: string[];
+    postableTo: string[];
   }
   let weeklyDigest: WeeklyDigestRead | null = null;
   let digestAssistAvailable = false;
@@ -349,7 +382,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
       sessionId: id,
     })) as WeeklyDigestRead | null;
     const { drafterFor } = await import("../../../lib/drafter");
-    digestAssistAvailable = (await drafterFor(workspace.workspaceId)) !== null;
+    digestAssistAvailable =
+      (await drafterFor(workspace.workspaceId, "balanced", session.user.id)) !==
+      null;
   }
 
   // Whether a provider can add §8.6's specifics, or find retro themes
@@ -357,7 +392,11 @@ export default async function SessionPage({ params }: SessionPageProps) {
   // it: the verdict, the prescription and the board are the method's.
   const { drafterFor: resolveDrafter } = await import("../../../lib/drafter");
   const reviewAssistAvailable =
-    (await resolveDrafter(workspace.workspaceId)) !== null;
+    (await resolveDrafter(
+      workspace.workspaceId,
+      "balanced",
+      session.user.id,
+    )) !== null;
 
   const isFacilitator = workspace.memberId === sessionRow.facilitatorId;
   const isScheduled = sessionRow.state === "scheduled";
@@ -529,6 +568,17 @@ export default async function SessionPage({ params }: SessionPageProps) {
       sessionId: id,
     })) as Forward;
   }
+  // Next-cycle drafts proposed from what the room carried (M-09). Asked only
+  // on the stage that shows the drafts, and only when a provider may write
+  // them; the panel then also needs a carried learning before it offers.
+  const forwardAssistAvailable =
+    forward !== null &&
+    (await assistOffered(
+      workspace.workspaceId,
+      REVIEW_ASSIST_KEYS.proposeObjectives,
+      "balanced",
+      session.user.id,
+    ));
 
   // Stage eight: the process-health survey (METHOD.md §8.5, P4-T11b).
   let processHealth: ProcessHealth | null = null;
@@ -591,6 +641,22 @@ export default async function SessionPage({ params }: SessionPageProps) {
     : -1;
   const isOnLastStage =
     stageKeys.length > 0 && currentStageIndex === stageKeys.length - 1;
+
+  // The session's own documents and files (REQUIREMENTS §4 Pillar C,
+  // completeness review M-01): the notes a room writes and the deck it looks
+  // at. Both are read through the workspace, which is how a session is
+  // reached as far as access goes, so a reader who cannot reach the workspace
+  // itself, a guest, gets the session without the two cards rather than no
+  // session at all.
+  const [sessionDocuments, sessionFiles, level] = await Promise.all([
+    readSubjectDocuments(context, "session", id).catch(refusedAsNull),
+    callAction(context, "attachments.list", {
+      subjectType: "session",
+      subjectId: id,
+    }).catch(refusedAsNull),
+    resolveAccessLevelFor(workspace.workspaceId, workspace.memberId),
+  ]);
+  const canWrite = level >= ACCESS_LEVELS.edit;
 
   return (
     <div className="space-y-6 p-6">
@@ -696,6 +762,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           sessionId={id}
           digest={weeklyDigest}
           assistAvailable={digestAssistAvailable}
+          // After the close, like the note: the digest row is the close's,
+          // and the figures move until then (M-23).
+          canPost={sessionRow.state === "closed" && isFacilitator}
         />
       )}
 
@@ -706,6 +775,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           krStatuses={krStatuses}
           isFacilitator={isFacilitator}
           thresholds={confidenceThresholds}
+          names={Object.fromEntries(
+            participants.map((one) => [one.memberId, one.name]),
+          )}
         />
       )}
 
@@ -911,7 +983,12 @@ export default async function SessionPage({ params }: SessionPageProps) {
 
       {/* Stages ten and eleven (METHOD.md §8.9, §8.1 stage 11, P4-T11c-b) */}
       {forward ? (
-        <ForwardPanel sessionId={id} forward={forward} canEdit={isRunning} />
+        <ForwardPanel
+          sessionId={id}
+          forward={forward}
+          canEdit={isRunning}
+          assistAvailable={forwardAssistAvailable}
+        />
       ) : null}
 
       {/* Stage eight: process health (METHOD.md §8.5, P4-T11b) */}
@@ -952,6 +1029,24 @@ export default async function SessionPage({ params }: SessionPageProps) {
           </CardBody>
         </Card>
       )}
+
+      {/* The session's documents and files (completeness review M-01). */}
+      {sessionDocuments ? (
+        <SubjectDocuments
+          subjectType="session"
+          subjectId={id}
+          documents={sessionDocuments}
+          canEdit={canWrite}
+        />
+      ) : null}
+      {sessionFiles ? (
+        <Attachments
+          subjectType="session"
+          subjectId={id}
+          attachments={sessionFiles}
+          canEdit={canWrite}
+        />
+      ) : null}
     </div>
   );
 }

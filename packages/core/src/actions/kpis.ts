@@ -35,6 +35,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ensureContext } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { getAccessScoped } from "../access/reads.ts";
 import { bindAgentsToContextInTx } from "../agents/bindings.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -48,6 +49,7 @@ import {
   evaluateKpiForPeriod,
   setKpiFormula,
 } from "../kpis/formula.ts";
+import { followKpisInTx } from "../kpis/linked.ts";
 import { draftRecoveryForKpi, launchRecoveryInTx } from "../kpis/recovery.ts";
 import {
   loadKpiRecords,
@@ -337,6 +339,16 @@ export const recordKpiValue = defineWriteAction({
 
       const recomputed = await recomputeKpi(tx, workspaceId, input.kpiId);
 
+      // Then every key result that reads this KPI or one the cascade just
+      // recomputed, and the goals above them (completeness review M-07).
+      // Last, because the progress it sets off reads the achievement stored
+      // by the two steps above.
+      await followKpisInTx(tx, {
+        workspaceId,
+        kpiIds: [input.kpiId, ...touched],
+        authorMemberId: memberId,
+      });
+
       return {
         result: {
           id: record.id,
@@ -535,6 +547,77 @@ export const readKpiGrid = defineReadAction({
   },
 });
 
+/**
+ * Every KPI, one row each, for a picker (completeness review M-07).
+ *
+ * The grid read answers a different question and costs one query per KPI for
+ * its periods, which is a lot to pay for a drop-down on the drafting step and
+ * on every goal page. This is one query, and it reads the same rows the grid
+ * does: KPIs sit at the workspace floor, so a member who can open the grid
+ * can pick any of them, and a member who cannot open this workspace reaches
+ * nothing here either.
+ */
+export const listKpis = defineReadAction({
+  name: "kpis.list",
+  summary:
+    "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+  input: z.object({}),
+  output: z.object({
+    kpis: z.array(
+      z.object({
+        id: z.uuid(),
+        shortId: z.string(),
+        title: z.string(),
+        unit: z.string().nullable(),
+        frequency: z.string(),
+        direction: z.string(),
+        state: z.string(),
+        achievementPct: z.number().nullable(),
+        targetDefault: z.number().nullable(),
+        isCalculated: z.boolean(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const rows = await tx
+          .select({
+            id: kpis.id,
+            shortId: kpis.shortId,
+            title: kpis.title,
+            unit: kpis.unit,
+            frequency: kpis.frequency,
+            direction: kpis.direction,
+            state: kpis.state,
+            achievementPct: kpis.achievementPct,
+            targetDefault: kpis.targetDefault,
+            isCalculated: kpis.isCalculated,
+          })
+          .from(kpis)
+          .where(activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)))
+          .orderBy(asc(kpis.title), asc(kpis.id));
+        return {
+          kpis: rows.map((row) => ({
+            ...row,
+            achievementPct:
+              row.achievementPct === null ? null : Number(row.achievementPct),
+            targetDefault:
+              row.targetDefault === null ? null : Number(row.targetDefault),
+          })),
+        };
+      },
+    );
+  },
+});
+
 export const setKpiFormulaAction = defineWriteAction({
   name: "kpis.setFormula",
   summary:
@@ -594,6 +677,13 @@ export const setKpiFormulaAction = defineWriteAction({
         memberId,
       );
       await recomputeKpi(tx, workspaceId, input.kpiId);
+      // A KPI that has just become calculated has a new value, and whatever
+      // reads it has to see that value rather than the typed one it replaced.
+      await followKpisInTx(tx, {
+        workspaceId,
+        kpiIds: [input.kpiId],
+        authorMemberId: memberId,
+      });
 
       return {
         result: {
@@ -646,7 +736,11 @@ export const updateKpi = defineWriteAction({
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
-      await actingMember(tx, workspaceId, context.actor.userId);
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
 
       const [existing] = await tx
         .select({
@@ -763,6 +857,13 @@ export const updateKpi = defineWriteAction({
       // mean, so the derived columns are recomputed rather than left describing
       // the KPI as it was before the edit.
       const recomputed = await recomputeKpi(tx, workspaceId, input.kpiId);
+      // A new target or direction moves the achievement a linked key result
+      // reads, with no new reading to say so (completeness review M-07).
+      await followKpisInTx(tx, {
+        workspaceId,
+        kpiIds: [input.kpiId],
+        authorMemberId: memberId,
+      });
 
       return {
         result: {
@@ -1052,6 +1153,91 @@ export const readRecoveryBoard = defineReadAction({
   },
 });
 
+/** One node of a driver tree, as S-18 and the space home draw it. */
+const kpiTreeNode = z.object({
+  id: z.uuid(),
+  parentKpiId: z.uuid().nullable(),
+  title: z.string(),
+  unit: z.string().nullable(),
+  indicatorType: z.string(),
+  tier: z.string(),
+  direction: z.string(),
+  state: z.string(),
+  achievementPct: z.number().nullable(),
+  effectivePct: z.number().nullable(),
+  healthyPct: z.number(),
+  watchPct: z.number(),
+  targetDefault: z.number().nullable(),
+  recoveryGoalId: z.uuid().nullable(),
+  recoveryProgressPct: z.number().nullable(),
+});
+type TreeNode = z.infer<typeof kpiTreeNode>;
+
+/**
+ * The columns a tree node is read from, with `goals` joined for a recovery's
+ * progress. Shared by `kpis.tree` and `kpis.spaceTrees`, so S-18 and the space
+ * home cannot draw one KPI two ways (completeness review M-22).
+ */
+const KPI_TREE_NODE_COLUMNS = {
+  id: kpis.id,
+  treeId: kpis.treeId,
+  parentKpiId: kpis.parentKpiId,
+  title: kpis.title,
+  unit: kpis.unit,
+  indicatorType: kpis.indicatorType,
+  tier: kpis.tier,
+  direction: kpis.direction,
+  state: kpis.state,
+  achievementPct: kpis.achievementPct,
+  effectivePct: kpis.effectivePct,
+  healthyPct: kpis.healthyPct,
+  watchPct: kpis.watchPct,
+  targetDefault: kpis.targetDefault,
+  recoveryGoalId: kpis.recoveryGoalId,
+  recoveryProgress: goals.progressPct,
+  position: kpis.position,
+};
+
+/** A numeric column as a number, or null when it holds none. */
+const numberOrNull = (value: string | null): number | null =>
+  value === null ? null : Number(value);
+
+function toTreeNode(row: {
+  readonly id: string;
+  readonly parentKpiId: string | null;
+  readonly title: string;
+  readonly unit: string | null;
+  readonly indicatorType: string;
+  readonly tier: string;
+  readonly direction: string;
+  readonly state: string;
+  readonly achievementPct: string | null;
+  readonly effectivePct: string | null;
+  readonly healthyPct: string;
+  readonly watchPct: string;
+  readonly targetDefault: string | null;
+  readonly recoveryGoalId: string | null;
+  readonly recoveryProgress: string | null;
+}): TreeNode {
+  return {
+    id: row.id,
+    parentKpiId: row.parentKpiId,
+    title: row.title,
+    unit: row.unit,
+    indicatorType: row.indicatorType,
+    tier: row.tier,
+    direction: row.direction,
+    state: row.state,
+    achievementPct: numberOrNull(row.achievementPct),
+    effectivePct: numberOrNull(row.effectivePct),
+    healthyPct: Number(row.healthyPct),
+    watchPct: Number(row.watchPct),
+    targetDefault: numberOrNull(row.targetDefault),
+    recoveryGoalId: row.recoveryGoalId,
+    recoveryProgressPct: numberOrNull(row.recoveryProgress),
+  };
+}
+
 export const readKpiTree = defineReadAction({
   name: "kpis.tree",
   summary:
@@ -1066,25 +1252,7 @@ export const readKpiTree = defineReadAction({
   output: z.object({
     trees: z.array(z.object({ id: z.uuid(), name: z.string() })),
     treeId: z.uuid().nullable(),
-    nodes: z.array(
-      z.object({
-        id: z.uuid(),
-        parentKpiId: z.uuid().nullable(),
-        title: z.string(),
-        unit: z.string().nullable(),
-        indicatorType: z.string(),
-        tier: z.string(),
-        direction: z.string(),
-        state: z.string(),
-        achievementPct: z.number().nullable(),
-        effectivePct: z.number().nullable(),
-        healthyPct: z.number(),
-        watchPct: z.number(),
-        targetDefault: z.number().nullable(),
-        recoveryGoalId: z.uuid().nullable(),
-        recoveryProgressPct: z.number().nullable(),
-      }),
-    ),
+    nodes: z.array(kpiTreeNode),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -1110,24 +1278,7 @@ export const readKpiTree = defineReadAction({
         const treeId =
           input.treeId === null ? null : (input.treeId ?? trees[0]?.id ?? null);
         const rows = await tx
-          .select({
-            id: kpis.id,
-            parentKpiId: kpis.parentKpiId,
-            title: kpis.title,
-            unit: kpis.unit,
-            indicatorType: kpis.indicatorType,
-            tier: kpis.tier,
-            direction: kpis.direction,
-            state: kpis.state,
-            achievementPct: kpis.achievementPct,
-            effectivePct: kpis.effectivePct,
-            healthyPct: kpis.healthyPct,
-            watchPct: kpis.watchPct,
-            targetDefault: kpis.targetDefault,
-            recoveryGoalId: kpis.recoveryGoalId,
-            recoveryProgress: goals.progressPct,
-            position: kpis.position,
-          })
+          .select(KPI_TREE_NODE_COLUMNS)
           .from(kpis)
           .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
           .where(
@@ -1139,32 +1290,120 @@ export const readKpiTree = defineReadAction({
           )
           .orderBy(asc(kpis.position), asc(kpis.title));
 
+        return { trees, treeId, nodes: rows.map(toTreeNode) };
+      },
+    );
+  },
+});
+
+/**
+ * One space's KPIs, grouped by the driver tree each is filed in (completeness
+ * review M-22).
+ *
+ * **The space home had no KPIs on it.** REQUIREMENTS §4 makes a space a team
+ * home with its own goals, and a KPI a space owns (`owner_kind` `space`) is
+ * the team's own measure; the only way to find one was the workspace-wide
+ * grid, filtered by eye.
+ *
+ * **Read through the space.** The space goes through the access getter first,
+ * so a space the reader cannot open is not-found here exactly as it is on
+ * `spaces.read`, and every KPI the space owns is then in their sight through
+ * it. That is the rule the agents' scope already writes for a KPI in a space
+ * (`agentSeesKpi`), and it is what lets a guest bound to one space see that
+ * space's measures and nobody else's.
+ *
+ * **Grouped rather than one tree at a time**, because a space home shows all
+ * of a team's measures at once. The named trees come in their own order and
+ * the KPIs filed in none come last, which is where S-18 keeps them too. A
+ * node whose parent belongs to another space or to the workspace is still
+ * returned, with its parent id, and the screen draws it at the root.
+ */
+export const readSpaceKpiTrees = defineReadAction({
+  name: "kpis.spaceTrees",
+  summary:
+    "One space's KPIs, grouped by the driver tree each is filed in. Drives the space home.",
+  input: z.object({ spaceId: z.uuid() }),
+  output: z.object({
+    trees: z.array(
+      z.object({
+        /** Null for the KPIs filed in no tree. */
+        id: z.uuid().nullable(),
+        name: z.string().nullable(),
+        nodes: z.array(kpiTreeNode),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such space.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await getAccessScoped(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "space",
+          resourceId: input.spaceId,
+          requires: ACCESS_LEVELS.view,
+        });
+
+        const rows = await tx
+          .select({
+            ...KPI_TREE_NODE_COLUMNS,
+            treeName: kpiTrees.name,
+            treePosition: kpiTrees.position,
+          })
+          .from(kpis)
+          .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
+          .leftJoin(
+            kpiTrees,
+            activeOnly(
+              kpiTrees,
+              eq(kpiTrees.id, kpis.treeId),
+              eq(kpiTrees.workspaceId, context.workspaceId),
+            ),
+          )
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, context.workspaceId),
+              eq(kpis.spaceId, input.spaceId),
+            ),
+          )
+          .orderBy(
+            asc(kpiTrees.position),
+            asc(kpiTrees.name),
+            asc(kpis.position),
+            asc(kpis.title),
+          );
+
+        // A tree that was deleted leaves its KPIs pointing at nothing live, so
+        // they are grouped with the unfiled ones rather than under a name
+        // nobody can open.
+        const groups = new Map<
+          string | null,
+          { id: string | null; name: string | null; nodes: TreeNode[] }
+        >();
+        for (const row of rows) {
+          const key = row.treeName === null ? null : row.treeId;
+          const group = groups.get(key) ?? {
+            id: key,
+            name: key === null ? null : row.treeName,
+            nodes: [],
+          };
+          group.nodes.push(toTreeNode(row));
+          groups.set(key, group);
+        }
+        const unfiled = groups.get(null);
+        groups.delete(null);
         return {
-          trees,
-          treeId,
-          nodes: rows.map((row) => ({
-            id: row.id,
-            parentKpiId: row.parentKpiId,
-            title: row.title,
-            unit: row.unit,
-            indicatorType: row.indicatorType,
-            tier: row.tier,
-            direction: row.direction,
-            state: row.state,
-            achievementPct:
-              row.achievementPct === null ? null : Number(row.achievementPct),
-            effectivePct:
-              row.effectivePct === null ? null : Number(row.effectivePct),
-            healthyPct: Number(row.healthyPct),
-            watchPct: Number(row.watchPct),
-            targetDefault:
-              row.targetDefault === null ? null : Number(row.targetDefault),
-            recoveryGoalId: row.recoveryGoalId,
-            recoveryProgressPct:
-              row.recoveryProgress === null
-                ? null
-                : Number(row.recoveryProgress),
-          })),
+          trees: [...groups.values(), ...(unfiled ? [unfiled] : [])],
         };
       },
     );

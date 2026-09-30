@@ -7,5 +7,5 @@ export default function ActivityError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the activity feed" />;
+  return <SegmentError {...props} headingKey="segmentError.activity" />;
 }

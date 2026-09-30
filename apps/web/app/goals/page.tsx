@@ -1,7 +1,14 @@
 import { callAction } from "@openokr/core";
 import { ALIGNMENT_LEVEL_ORDER } from "@openokr/method";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  type MessageValues,
+} from "@openokr/ui";
 import type { ReactNode } from "react";
+import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
@@ -55,6 +62,8 @@ export default async function GoalsPage({
   const { t } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
+  // A guest holds nothing here, and is moved to their spaces (L-23).
+  await workspaceReaderLevel(workspace.workspaceId, workspace.memberId);
   const context = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
@@ -147,11 +156,9 @@ export default async function GoalsPage({
                * two answers, and the wrong one was the louder. */}
               {goals.length === 0
                 ? filtered
-                  ? "No match for these filters"
-                  : "No goals in this cycle yet"
-                : `${goals.length} goal${goals.length === 1 ? "" : "s"}${
-                    filtered ? ", filtered" : ""
-                  }${tree ? ", as a tree" : ""}`}
+                  ? t("goals.noMatchForTheseFilters")
+                  : t("goals.noGoalsInThisCycleYet")
+                : countChip(t, goals.length, filtered, tree)}
             </Chip>
           </div>
           {alignment?.score !== null && alignment !== null ? (
@@ -230,9 +237,10 @@ export default async function GoalsPage({
             }))
         ).flatMap(({ goal, depth, detached }) =>
           mapNodesFor(
+            t,
             goal,
             depth,
-            detached ? "parent is outside this filter" : undefined,
+            detached ? t("goals.parentIsOutsideThisFilter") : undefined,
           ),
         )}
         selected={null}
@@ -252,6 +260,33 @@ export default async function GoalsPage({
       />
     </div>
   );
+}
+
+/**
+ * What the header chip says about the set on screen: how many goals, and
+ * whether a filter or the tree is shaping them. One whole message per case, so
+ * a translator never assembles the phrase from pieces.
+ */
+function countChip(
+  t: (key: string, values?: MessageValues) => string,
+  count: number,
+  filtered: boolean,
+  tree: boolean,
+): string {
+  const goals =
+    count === 1
+      ? t("common.count.goalOne", { count })
+      : t("common.count.goalOther", { count });
+  if (filtered && tree) {
+    return t("goals.countFilteredAsATree", { goals });
+  }
+  if (filtered) {
+    return t("goals.countFiltered", { goals });
+  }
+  if (tree) {
+    return t("goals.countAsATree", { goals });
+  }
+  return goals;
 }
 
 /** §3.2's bands, in the order the explorer offers them. */
@@ -316,7 +351,7 @@ async function Filters({
          * the repository's own rule for wide content, and it is the one that
          * holds without depending on flex shrink behaviour. */}
         <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
-          <Group label="Cycle">
+          <Group label={t("scorecard.cycle")}>
             {cycles.map((cycle) => (
               <Tab
                 key={cycle.id}
@@ -328,7 +363,7 @@ async function Filters({
             ))}
           </Group>
 
-          <Group label="Level">
+          <Group label={t("common.level")}>
             <Tab href={href({ level: null })} active={level === null}>
               {t("goals.all")}
             </Tab>
@@ -343,7 +378,7 @@ async function Filters({
             ))}
           </Group>
 
-          <Group label="View">
+          <Group label={t("goals.view")}>
             <Tab href={href({ view: null })} active={tree}>
               {t("goals.tree")}
             </Tab>
@@ -354,7 +389,7 @@ async function Filters({
         </div>
 
         <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
-          <Group label="Health">
+          <Group label={t("workMap.health")}>
             <Tab href={href({ health: null })} active={health === null}>
               {t("common.any")}
             </Tab>
@@ -369,7 +404,7 @@ async function Filters({
             ))}
           </Group>
 
-          <Group label="Whose">
+          <Group label={t("goals.whose")}>
             <Tab href={href({ mine: null })} active={!mine}>
               {t("goals.everyoneS")}
             </Tab>
@@ -378,7 +413,7 @@ async function Filters({
             </Tab>
           </Group>
 
-          <Group label="Closed">
+          <Group label={t("operator.workspace.factClosed")}>
             <Tab href={href({ closed: null })} active={!includeClosed}>
               {t("goals.hidden")}
             </Tab>

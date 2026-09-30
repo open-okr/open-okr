@@ -22,13 +22,22 @@
  * what the identity provider asks for. They were obtainable only by reading
  * the plugin's source.
  *
- * **The metadata document is fetched after a restart, not here.** The SSO
- * plugin is mounted at boot and only when a SAML provider already exists, so
- * on this instance, which had none when the server started, the document's
- * route does not exist yet. That is the same restart the screen names for
- * every connection. It is proved over the plugin's own handler in
- * `packages/core/test/saml-surfaces.test.ts`, which parses it and reads its
- * entity id back.
+ * **The metadata document is fetched here, from the server that was already
+ * running** (completeness review L-15). The SSO plugin is mounted only when a
+ * SAML provider exists when the auth instance is built, and this instance had
+ * none when the server started, so the document used to wait for a restart.
+ * The server now rebuilds its instance when a connection changes, and the
+ * last test below is what an identity provider fetching the document would
+ * see. The document itself is parsed and its entity id read back in
+ * `packages/core/test/saml-surfaces.test.ts`.
+ *
+ * **A connection is changed, turned off and removed from the same screen.**
+ * Until it could be, anything but adding one meant SQL on `sso_connections`.
+ * The last three tests do each from a browser, on an OIDC connection of their
+ * own so the SAML one above stays as the metadata test left it. What the
+ * writes do to the stored secret, another workspace's rows, the plugin's
+ * derived table and the stamp every process watches is proved against a
+ * database in `packages/core/test/sso-connection-writes.test.ts`.
  */
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -152,5 +161,184 @@ test("the screen prints what the identity provider asks for", async () => {
   await expect(entry).toContainText("Assertion consumer service");
   await expect(
     entry.getByRole("link", { name: /sso\/saml2\/sp\/metadata/ }),
+  ).toBeVisible();
+});
+
+test("the metadata document is served without a restart", async ({
+  playwright,
+}) => {
+  await goTo(page, "/admin/sso");
+  const entry = page.getByRole("listitem").filter({ hasText: "Sign in with Acme" });
+  const href = await entry
+    .getByRole("link", { name: /sso\/saml2\/sp\/metadata/ })
+    .getAttribute("href");
+  expect(href).toBeTruthy();
+
+  // A context of its own, with no cookie: an identity provider fetching the
+  // document has no session here.
+  const api = await playwright.request.newContext();
+  try {
+    const response = await api.get(href as string);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("xml");
+    expect(await response.text()).toContain("/api/auth/sso/saml2/sp/acs/");
+  } finally {
+    await api.dispose();
+  }
+});
+
+/**
+ * The connection the last three tests work on.
+ *
+ * Explicit endpoints rather than a discovery URL, on purpose: `genericOAuth`
+ * fetches a discovery document when it builds the sign-in client, and every
+ * save here rebuilds it, so an address that does not resolve would be asked
+ * for on each of them. Its domain is one nobody in this run signs in from,
+ * because enforcing `example.com` would refuse every later spec's password.
+ */
+const GLOBEX = {
+  providerId: "globex-idp",
+  displayName: "Sign in with Globex",
+  renamed: "Globex single sign-on",
+  domain: "globex.test",
+};
+
+/** The connection's row on the screen, found by the ID that never changes. */
+const globexRow = () =>
+  page.getByTestId(`sso-connection-${GLOBEX.providerId}`);
+
+/** The names the sign-in page is offered, read as a visitor would read them. */
+async function signInPageOffers(): Promise<string[]> {
+  const response = await page.request.get("/api/sso-providers");
+  expect(response.status()).toBe(200);
+  const body = (await response.json()) as {
+    providers: { displayName: string }[];
+  };
+  return body.providers.map((provider) => provider.displayName);
+}
+
+test("a connection is changed from the screen, with its secret kept and its provider ID held", async () => {
+  await goTo(page, "/admin/sso");
+
+  await page.getByLabel("Protocol").selectOption("oidc");
+  await page.getByLabel("Provider ID").fill(GLOBEX.providerId);
+  await page.getByLabel("Display name").fill(GLOBEX.displayName);
+  await page
+    .getByLabel("Authorization URL")
+    .fill("https://idp.test/oauth2/authorize");
+  await page.getByLabel("Token URL").fill("https://idp.test/oauth2/token");
+  await page.getByLabel("Client ID").fill("globex-client");
+  await page.getByLabel("Client secret").fill("globex-secret");
+  await page
+    .getByLabel("Email domains (comma-separated)")
+    .fill(GLOBEX.domain);
+  await page.getByRole("button", { name: "Add provider" }).click();
+  await expect(page.getByRole("status")).toContainText("Provider saved");
+
+  await goTo(page, "/admin/sso");
+  const row = globexRow();
+  await expect(row).toContainText(GLOBEX.displayName);
+  await row.getByRole("button", { name: "Edit", exact: true }).click();
+
+  const form = row.getByRole("form", { name: `Edit ${GLOBEX.displayName}` });
+  await expect(form).toBeVisible();
+  // Filled in with what is stored, except the secret, which never comes back.
+  await expect(form.getByLabel("Client ID")).toHaveValue("globex-client");
+  await expect(form.getByLabel("Client secret")).toHaveValue("");
+  // The provider ID is in the callback address the identity provider holds.
+  const providerId = form.getByLabel("Provider ID");
+  await expect(providerId).toHaveValue(GLOBEX.providerId);
+  await expect(providerId).not.toBeEditable();
+  await expect(form).toContainText("The provider ID cannot be changed");
+
+  await form.getByLabel("Display name").fill(GLOBEX.renamed);
+  await form.getByLabel("Client ID").fill("globex-client-2");
+  // Enforced, so the questions in the next two tests have domains to name.
+  await form
+    .getByLabel("Enforce SSO for the email domains listed above")
+    .check();
+  await form.getByRole("button", { name: "Save changes" }).click();
+
+  await expect(row.getByRole("status")).toContainText("Provider saved");
+  await expect(form).toHaveCount(0);
+
+  await goTo(page, "/admin/sso");
+  await expect(globexRow()).toContainText(GLOBEX.renamed);
+  await expect(globexRow()).toContainText(`${GLOBEX.domain} (enforced)`);
+  expect(await signInPageOffers()).toContain(GLOBEX.renamed);
+
+  // Opened again, it holds what was saved, and still no secret.
+  await globexRow().getByRole("button", { name: "Edit", exact: true }).click();
+  const again = globexRow().getByRole("form", {
+    name: `Edit ${GLOBEX.renamed}`,
+  });
+  await expect(again.getByLabel("Client ID")).toHaveValue("globex-client-2");
+  await expect(again.getByLabel("Client secret")).toHaveValue("");
+  await again.getByRole("button", { name: "Cancel" }).click();
+  await expect(again).toHaveCount(0);
+});
+
+test("turning an enforced connection off asks first, and it leaves the sign-in page", async () => {
+  await goTo(page, "/admin/sso");
+  const row = globexRow();
+
+  await row.getByRole("button", { name: "Turn off", exact: true }).click();
+  const question = row.getByRole("group", {
+    name: `Turn ${GLOBEX.renamed} off?`,
+  });
+  await expect(question).toContainText(
+    `It is enforced for ${GLOBEX.domain}, so people on those domains will sign in with a password again.`,
+  );
+  const confirm = question.getByRole("button", {
+    name: "Turn off connection",
+  });
+  await expect(confirm).toBeFocused();
+  await confirm.click();
+
+  await expect(row.getByRole("status")).toContainText("Turned off");
+  await expect(
+    row.getByRole("button", { name: "Turn on", exact: true }),
+  ).toBeVisible();
+  expect(await signInPageOffers()).not.toContain(GLOBEX.renamed);
+
+  // On again, with no question: turning on hands nothing back.
+  await row.getByRole("button", { name: "Turn on", exact: true }).click();
+  await expect(row.getByRole("status")).toContainText("Turned on");
+  expect(await signInPageOffers()).toContain(GLOBEX.renamed);
+});
+
+test("removing a connection asks first, names the domains, and takes it away", async () => {
+  await goTo(page, "/admin/sso");
+  const row = globexRow();
+
+  // Asked, and cancelled: nothing happens.
+  await row.getByRole("button", { name: "Remove", exact: true }).click();
+  const question = row.getByRole("group", {
+    name: `Remove ${GLOBEX.renamed}?`,
+  });
+  // Said outright, because the screen offers no way back (Akmal's decision,
+  // 30 September 2026: confirm, and say it cannot be undone).
+  await expect(question).toContainText("This cannot be undone.");
+  await expect(question).toContainText(
+    `It is enforced for ${GLOBEX.domain}, so people on those domains will sign in with a password again.`,
+  );
+  await expect(
+    question.getByRole("button", { name: "Remove connection" }),
+  ).toBeFocused();
+  await question.getByRole("button", { name: "Cancel" }).click();
+  await expect(question).toHaveCount(0);
+  await expect(row).toBeVisible();
+
+  // Asked, and answered.
+  await row.getByRole("button", { name: "Remove", exact: true }).click();
+  await row.getByRole("button", { name: "Remove connection" }).click();
+  await expect(globexRow()).toHaveCount(0);
+
+  await goTo(page, "/admin/sso");
+  await expect(globexRow()).toHaveCount(0);
+  expect(await signInPageOffers()).not.toContain(GLOBEX.renamed);
+  // The SAML connection the earlier tests configured is untouched.
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Sign in with Acme" }),
   ).toBeVisible();
 });

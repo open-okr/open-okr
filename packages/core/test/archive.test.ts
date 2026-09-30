@@ -221,7 +221,7 @@ describe("the feed-forward", () => {
     expect(result.waiting).toEqual([]);
     // This cycle has no review behind it, so §8.9's last two rows hand over
     // nothing and say so rather than inventing a hand-over.
-    expect(result.processHealthIssue).toBe(false);
+    expect(result.processPriority).toBeNull();
     expect(result.packNote).toBe(false);
 
     const scores = await wb.admin.query<{ text: string; score: string }>(

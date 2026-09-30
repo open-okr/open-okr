@@ -60,7 +60,8 @@ interface Query {
 // biome-ignore lint/suspicious/noExplicitAny: see the note above.
 type AdapterMethod = (query: any) => Promise<any>;
 
-interface AdapterLike {
+/** Shared with the account-token wrapper, which wraps the same adapter. */
+export interface AdapterLike {
   create: AdapterMethod;
   findOne: AdapterMethod;
   findMany: AdapterMethod;
@@ -75,7 +76,7 @@ interface AdapterLike {
   [key: string]: unknown;
 }
 
-type TransactionFn = (
+export type TransactionFn = (
   callback: (trx: AdapterLike) => Promise<unknown>,
 ) => Promise<unknown>;
 

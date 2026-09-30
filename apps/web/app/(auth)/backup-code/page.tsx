@@ -30,7 +30,7 @@ export default function BackupCodePage() {
     setPending(false);
 
     if (failure) {
-      setError("That backup code was not recognised, or it has been used.");
+      setError(t("auth.backupCode.notRecognised"));
       return;
     }
     router.push("/");
@@ -39,7 +39,7 @@ export default function BackupCodePage() {
   return (
     <AuthCard
       title={t("auth.backupCode.useABackupCode")}
-      description="Each code works once. Generate a fresh set afterwards."
+      description={t("auth.backupCode.eachCodeWorksOnce")}
       footer={
         <Link
           href="/sign-in"
@@ -51,13 +51,15 @@ export default function BackupCodePage() {
     >
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field
-          label="Backup code"
+          label={t("auth.backupCode.backupCode")}
           name="code"
           autoComplete="one-time-code"
           required
         />
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? "Checking…" : "Verify"}
+          {pending
+            ? t("auth.backupCode.checking")
+            : t("auth.backupCode.verify")}
         </Button>
       </form>
       <FormError>{error}</FormError>

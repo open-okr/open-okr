@@ -36,8 +36,15 @@ export async function VotePanel({
         <span className="text-sm text-ink">{vote.title}</span>
         <Chip tone={vote.revealed ? "ok" : "neutral"}>
           {vote.revealed
-            ? `revealed · average ${vote.average ?? 0}`
-            : `${vote.count} vote${vote.count === 1 ? "" : "s"} in`}
+            ? t("checkIn.votePanel.revealedAverage", {
+                average: vote.average ?? 0,
+              })
+            : t("checkIn.votePanel.votesIn", {
+                votes:
+                  vote.count === 1
+                    ? t("common.count.voteOne", { count: vote.count })
+                    : t("common.count.voteOther", { count: vote.count }),
+              })}
         </Chip>
       </div>
 
@@ -48,8 +55,8 @@ export async function VotePanel({
       ) : (
         <p className="text-xs text-ink-3">
           {vote.own === null
-            ? "You have not voted yet."
-            : `Your vote: ${vote.own}`}
+            ? t("checkIn.votePanel.youHaveNotVotedYet")
+            : t("checkIn.votePanel.yourVote", { vote: vote.own })}
         </p>
       )}
 
@@ -70,7 +77,9 @@ export async function VotePanel({
             className="w-32"
           />
           <Button type="submit" variant="ghost" className="h-7 px-2 text-xs">
-            {vote.own === null ? "Vote" : "Change"}
+            {vote.own === null
+              ? t("checkIn.votePanel.vote")
+              : t("checkIn.votePanel.change")}
           </Button>
         </ActionForm>
       )}

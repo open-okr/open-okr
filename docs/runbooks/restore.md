@@ -107,11 +107,23 @@ rm /tmp/db.dump
 
 ### 4. Run migrations
 
-The backup may be from an older schema version. Upgrade the release (which
-triggers the migration hook) or run migrations manually:
+The backup may be from an older schema version, and a restore with
+`--no-privileges` leaves out the application role's grants, which the migrator
+writes again. The chart runs its migrations as a Helm hook Job on every
+install and upgrade, so an upgrade to the same chart and the same values runs
+them again:
 
 ```sh
-kubectl create job --from=cronjob/openokr-migrate openokr-post-restore
+helm upgrade <release> deploy/helm --reuse-values
+```
+
+The Job is named `<fullname>-migrate-<revision>`, where `<fullname>` is the
+chart's full name (the release name when it already contains `openokr`), one
+per revision, because a hook Job cannot be patched. There is no CronJob to copy it from.
+Wait for it to finish before scaling up:
+
+```sh
+kubectl wait --for=condition=complete job -l app.kubernetes.io/component=migration --timeout=10m
 ```
 
 ### 5. Scale back up

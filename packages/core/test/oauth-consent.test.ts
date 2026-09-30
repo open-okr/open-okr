@@ -137,6 +137,37 @@ describe("what a person is shown, and what they are not", () => {
     expect(outcome.scopes).toEqual(["read", "write"]);
   });
 
+  it("names the command line for the instance it signs in to (M-33)", async () => {
+    const wb = await workerDb();
+    const outcome = await checkAuthoriseRequestFor(wb.appPool, {
+      workspaceId,
+      request: request(),
+      issuer: ISSUER,
+      instanceName: "OKR Goal",
+    });
+    expect(outcome.kind === "ok" && outcome.clientName).toBe(
+      "The OKR Goal command line",
+    );
+  });
+
+  it("keeps a name an operator gave the command line, whatever the instance is called", async () => {
+    // The row an operator edited, which the lookup reads before it would
+    // write the allow-listed one.
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into oauth_clients (id, client_id, name, redirect_uris, source)
+       values (gen_random_uuid(), 'openokr-cli', 'Our terminal', $1, 'allow_list')`,
+      [[REDIRECT]],
+    );
+    const outcome = await checkAuthoriseRequestFor(wb.appPool, {
+      workspaceId,
+      request: request(),
+      issuer: ISSUER,
+      instanceName: "OKR Goal",
+    });
+    expect(outcome.kind === "ok" && outcome.clientName).toBe("Our terminal");
+  });
+
   it("shows an unknown client to the person rather than redirecting", async () => {
     // Bouncing this to the address would hand the error, and the request's
     // state, to whoever supplied that address.
@@ -311,6 +342,17 @@ describe("the connections list", () => {
     // A screen that could show somebody else's would be a screen somebody
     // could aim at a colleague.
     expect(await connections(OTHER)).toHaveLength(0);
+  });
+
+  it("names the command line for this instance when the host says which (M-33)", async () => {
+    await approve();
+    const wb = await workerDb();
+    const { connections: mine } = await callAction(
+      { pool: wb.appPool, ...context(), instanceName: "OKR Goal" },
+      "connections.mine",
+      {},
+    );
+    expect(mine[0]?.clientName).toBe("The OKR Goal command line");
   });
 
   it("revoking stops the next call, and the row stays with its reason", async () => {

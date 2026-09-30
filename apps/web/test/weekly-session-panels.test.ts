@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { BLOCKER_TYPE_DEFINITIONS, resolveThresholds } from "@openokr/method";
 import { describe, expect, test } from "vitest";
+import { withMessages } from "./screen-text.ts";
 
 /**
  * The weekly session shows what its own tables hold (S-22, P6-G19b).
@@ -89,7 +90,9 @@ describe("the weekly session panels", () => {
     // Padding twelve weeks with zeroes would draw a collapse that never
     // happened, and a team four weeks old would be reading a lie about their
     // own first month.
-    expect(figures).toContain("A week with no session is not a point");
+    expect(withMessages(figures)).toContain(
+      "A week with no session is not a point",
+    );
     expect(figures).not.toContain("Array.from({ length: weeks }");
   });
 

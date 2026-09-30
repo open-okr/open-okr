@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:ci": "vitest run --config vitest.ci.config.ts --retry=2",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "turbo run typecheck --concurrency=4",
     "lint": "biome check --max-diagnostics=400 .",
     "lint:fix": "biome check --write --max-diagnostics=400 .",
     "dead-code": "knip",
@@ -19,7 +19,7 @@
     "db:down": "docker compose -f packages/test-support/docker/compose.yaml down",
     "db:ports": "node --experimental-strip-types --no-warnings packages/test-support/bin/db-ports.ts",
     "db:migrate": "pnpm --filter @openokr/db migrate",
-    "db:change": "pnpm --filter @openokr/db change",
+    "db:change": "pnpm --filter @openokr/db run change",
     "import:csv": "pnpm --filter @openokr/importer import:csv",
     "import:flowyteam": "pnpm --filter @openokr/importer import:flowyteam",
     "db:seed": "pnpm --filter @openokr/core seed",
@@ -65,6 +65,7 @@
     "knip": "6.38.0",
     "pg": "catalog:",
     "turbo": "2.11.4",
+    "typescript5": "catalog:",
     "vitest": "catalog:"
   }
 }

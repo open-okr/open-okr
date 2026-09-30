@@ -60,9 +60,10 @@ The [restore runbook](../runbooks/restore.md) is the full procedure.
 ./openokr rotate-key
 ```
 
-Re-wraps every stored secret under a new root key. The old key is kept in the
-previous-keys list until the rotation finishes, so nothing becomes unreadable
-mid-way.
+Re-wraps every stored secret under a new root key, including the tokens an
+identity provider issued at sign-in. The old key is kept in the previous-keys
+list until the rotation finishes, so nothing becomes unreadable mid-way.
+[Security](security.md#what-is-encrypted-at-rest) lists what is sealed.
 
 ## Taking the whole workspace out
 
@@ -79,10 +80,21 @@ becomes theirs.
 
 ## Scheduled work
 
-An instance runs two things on a clock: the agents' cadence, and the pass that
-gives each audit row its position in the hash chain. Both are on by default.
-`OPENOKR_SCHEDULER=off` turns them off for a host that should not run them, and
-then `pnpm cadence:sweep` and `pnpm audit:chain` are the manual equivalents.
+An instance runs these on a clock, all on by default:
+
+| Run | When | What it does |
+|---|---|---|
+| The agents' cadence | Hourly, daily, weekly, per cycle, and the Coach at 02:00 local | Nudges, proposals and the staleness sweep |
+| Notification batches | Every 5 minutes | Sends the batched notifications whose window has closed |
+| Audit chain | Every minute | Gives each audit row its position in the hash chain |
+| Orphaned uploads | 03:20 UTC | Removes uploads that were prepared and never attached |
+| Message log retention | 03:40 UTC | Deletes channel message records older than the workspace's setting, when it has one |
+| Outbox purge | 04:00 UTC | Deletes delivered and given-up outbox rows older than `outbox.retentionDays`, 30 by default, 0 to keep them. A delivered invitation loses its token and address the moment it is sent |
+
+`OPENOKR_SCHEDULER=off` turns them all off for a host that should not run them,
+and then `pnpm cadence:sweep` and `pnpm audit:chain` are the manual equivalents
+of the two that matter most. `OPENOKR_OUTBOX_RETENTION_DAYS` sets the outbox
+window from the environment.
 
 ## If something is wrong now
 

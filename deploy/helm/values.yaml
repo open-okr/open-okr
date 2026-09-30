@@ -105,8 +105,9 @@ migrationResources:
   limits:
     memory: 512Mi
 
-# File storage for the local-disk driver, which is the only storage driver
-# this build has.
+# File storage for the local-disk driver, the default. The other driver is
+# S3-compatible object storage, configured under `storage.s3` below; with a
+# bucket set, uploads go there and this volume holds nothing.
 #
 # On by default since 7 September 2026. Off was the previous default and it
 # meant every upload went to an emptyDir: lost on restart, invisible to a
@@ -153,6 +154,16 @@ storage:
     existingSecret: ""
     accessKeyIdKey: "access-key-id"
     secretAccessKeyKey: "secret-access-key"
+
+# The optional virus scan. Name a ClamAV daemon (clamd) the pods can reach and
+# every uploaded file waits as "being checked" until clamd has scanned it; a
+# file it flags is held back and never served. Empty is the default and means
+# no scan. clamd is not part of this chart: run it as its own Deployment, or
+# point at one you already have. Its signature updates are its own business.
+scan:
+  clamd:
+    host: ""
+    port: 3310
 
 serviceAccount:
   create: true

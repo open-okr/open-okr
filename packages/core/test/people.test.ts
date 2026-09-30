@@ -961,3 +961,120 @@ describe("the export is produced before anything is erased (P7-T08b)", () => {
     expect(after.rows[0].n).toBe(0);
   });
 });
+
+describe("what erasure leaves behind (completeness review M-18)", () => {
+  const PERSON = "people-erased-person";
+
+  /** A member with a real sign-in account, a session and a password. */
+  const memberWithAccount = async (name: string) => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      [PERSON, name, "erased-person@example.com"],
+    );
+    await wb.admin.query(
+      "insert into sessions (id, token, user_id, expires_at) values ('s1', 'tok-1', $1, now() + interval '1 day')",
+      [PERSON],
+    );
+    await wb.admin.query(
+      "insert into accounts (id, user_id, account_id, provider_id, password) values ('a1', $1, $1, 'credential', 'hash')",
+      [PERSON],
+    );
+    const { rows } = await wb.admin.query<{ id: string }>(
+      `insert into workspace_members (id, workspace_id, user_id, name, kind, status)
+       values (gen_random_uuid(), $1, $2, $3, 'human', 'active') returning id`,
+      [workspaceId, PERSON, name],
+    );
+    return rows[0]?.id as string;
+  };
+
+  it("writes no name into the feed, and takes it out of earlier entries", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Named Person");
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateMember",
+      { memberId: member, title: "Analyst" },
+    );
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "people.erase", {
+      memberId: member,
+    });
+    const { rows } = await wb.admin.query<{ kind: string; payload: object }>(
+      "select kind, payload from activities where subject_id = $1",
+      [member],
+    );
+    expect(JSON.stringify(rows)).not.toContain("Named Person");
+    expect(rows.find((row) => row.kind === "member.erased")?.payload).toEqual(
+      {},
+    );
+  });
+
+  it("anonymises the account and ends its sign-in when this was the person's only workspace", async () => {
+    const wb = await workerDb();
+    const member = await memberWithAccount("Only Here");
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "people.erase", {
+      memberId: member,
+    });
+    const user = await wb.admin.query<{ name: string; email: string }>(
+      "select name, email from users where id = $1",
+      [PERSON],
+    );
+    expect(user.rows[0]?.name).toBe("Erased user");
+    expect(user.rows[0]?.email).toMatch(/@erased\.invalid$/);
+    const left = await wb.admin.query<{ sessions: number; accounts: number }>(
+      `select (select count(*) from sessions where user_id = $1)::int as sessions,
+              (select count(*) from accounts where user_id = $1)::int as accounts`,
+      [PERSON],
+    );
+    expect(left.rows[0]).toEqual({ sessions: 0, accounts: 0 });
+  });
+
+  it("leaves the account for a person still in another workspace, and says so", async () => {
+    const wb = await workerDb();
+    const member = await memberWithAccount("Here And Elsewhere");
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('people-other-owner', 'Other', 'other-owner@example.com')",
+    );
+    const other = await provisionWorkspaceForUser(wb.appPool, {
+      id: "people-other-owner",
+      name: "Other",
+    });
+    await wb.admin.query(
+      `insert into workspace_members (id, workspace_id, user_id, name, kind, status)
+       values (gen_random_uuid(), $1, $2, 'Here And Elsewhere', 'human', 'active')`,
+      [other.workspaceId, PERSON],
+    );
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "people.erase", {
+      memberId: member,
+    });
+    const user = await wb.admin.query<{ email: string }>(
+      "select email from users where id = $1",
+      [PERSON],
+    );
+    expect(user.rows[0]?.email).toBe("erased-person@example.com");
+    const audit = await wb.admin.query<{ payload: { account?: object } }>(
+      "select payload from audit_events where action = 'people.erase' and workspace_id = $1",
+      [workspaceId],
+    );
+    expect(audit.rows[0]?.payload.account).toMatchObject({
+      anonymised: false,
+      otherWorkspaces: 1,
+    });
+  });
+
+  it("hands a member their own data whenever they ask, and only theirs", async () => {
+    const wb = await workerDb();
+    const member = await memberWithAccount("Curious Person");
+    const mine = await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", userId: PERSON },
+      },
+      "people.exportMine",
+      {},
+    );
+    expect(mine.memberId).toBe(member);
+    expect(mine.tables.length).toBeGreaterThan(0);
+  });
+});

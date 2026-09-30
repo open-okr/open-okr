@@ -17,6 +17,7 @@ import type { Company, CompanyCounts } from "./companies.ts";
 import type { Introspection } from "./introspect.ts";
 import type { DomainReconciliation } from "./mappers/reconcile.ts";
 import { describeDomain } from "./mappers/reconcile.ts";
+import type { UnreadCount } from "./unread.ts";
 
 /** What §7.2 records as out of scope, so the report says it rather than a plan. */
 export const NOT_IMPORTED = [
@@ -51,6 +52,12 @@ export interface FlowyteamReport {
   readonly selected: readonly string[];
   /** Of those, the ones `--only` did not name and a dependency required. */
   readonly addedForDependencies: readonly string[];
+  /**
+   * Source tables no domain reads that hold rows for this company, with the
+   * count and what each holds (completeness review M-16). Every run fills it,
+   * whatever `--only` named, because no domain reads these at all.
+   */
+  readonly unreadTables: readonly UnreadCount[];
   readonly notImported: readonly string[];
   /** Anything a person has to know, in the words they should read. */
   readonly notes: readonly string[];
@@ -68,6 +75,8 @@ export function buildReport(input: {
   readonly selected?: readonly string[];
   /** Of those, the ones nobody asked for and a dependency required. */
   readonly addedForDependencies?: readonly string[];
+  /** The unread tables that hold rows, from `countUnread`. */
+  readonly unread?: readonly UnreadCount[];
 }): FlowyteamReport {
   const missing = Object.entries(input.introspection.domains).filter(
     ([, tables]) => tables.length > 0,
@@ -104,6 +113,7 @@ export function buildReport(input: {
     reconciliation,
     selected: input.selected ?? [],
     addedForDependencies: input.addedForDependencies ?? [],
+    unreadTables: input.unread ?? [],
     notImported: NOT_IMPORTED,
     notes: [
       ...missing.map(
@@ -148,6 +158,21 @@ export function render(report: FlowyteamReport, runId: string): string {
   );
   for (const [table, count] of Object.entries(report.counts)) {
     lines.push(`  ${table.padEnd(width)}  ${count}`);
+  }
+
+  // Beside the counts, because these are counts too: what the company holds
+  // that nothing reads. Two lines each, since the sentence is too long to sit
+  // in a column and the count is the part somebody scans for.
+  if (report.unreadTables.length > 0) {
+    lines.push("", "Not read by this import, so not brought across:");
+    for (const table of report.unreadTables) {
+      lines.push(
+        table.scope === "company"
+          ? `  ${table.table}: ${table.rows} in this company`
+          : `  ${table.table}: ${table.rows} in the whole source, because this table has no company column here`,
+        `    ${table.holds}`,
+      );
+    }
   }
 
   if (report.reconciliation.length > 0) {
@@ -239,5 +264,12 @@ function summarise(report: FlowyteamReport): readonly string[] {
       ? "Every domain reconciles: every row read is accounted for."
       : `Not reconciled: ${unclean.map((domain) => domain.domain).join(", ")}. Every skipped row is named below.`,
   );
+  // "Every row read is accounted for" is true and says nothing about rows that
+  // were never read, which is exactly where a silent drop hides (M-16).
+  if (report.unreadTables.length > 0) {
+    lines.push(
+      `Not read: ${report.unreadTables.length} source table(s) hold rows that this import does not bring across. Each is named below.`,
+    );
+  }
   return lines;
 }

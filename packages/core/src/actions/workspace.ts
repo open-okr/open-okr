@@ -137,6 +137,64 @@ export const finishOnboarding = defineWriteAction({
   }),
 });
 
+/**
+ * Offers S-34 again, from General in admin (UIUX-PLAN S-34, completeness
+ * review L-08).
+ *
+ * **"A dismissed onboarding is resumable from admin", and it was not.** Once
+ * `onboardingDone` was true the wizard sent everybody home, and nothing could
+ * set it back, so an owner who skipped every step on the first day could never
+ * see the offer again.
+ *
+ * **It flips the one flag and nothing else.** Every answer the wizard asks for
+ * lives in its own setting, and the wizard opens on what the workspace holds
+ * now, so reopening it forgets nothing: skipping a step keeps the answer, and
+ * the template and the demo each refuse a workspace that already holds goals.
+ */
+export const reopenOnboarding = defineWriteAction({
+  name: "workspace.reopenOnboarding",
+  summary:
+    "Offer the workspace's own setup again, keeping every answer it already holds.",
+  input: z.object({}),
+  output: z.object({ workspaceId: z.uuid(), onboardingDone: z.boolean() }),
+  // `full`, like the finish it undoes: it decides what every administrator
+  // meets on their next visit to the Work Map.
+  access: ACCESS_LEVELS.full,
+  operation: () => ({
+    async execute({ tx, workspaceId }) {
+      // Merged into the stored map, for the reason `finishOnboarding` gives:
+      // every other key in it belongs to somebody else.
+      const [updated] = await tx
+        .update(workspaces)
+        .set({
+          settings: sql`coalesce(${workspaces.settings}, '{}'::jsonb) || '{"onboardingDone": false}'::jsonb`,
+          updatedAt: new Date(),
+        })
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .returning({ id: workspaces.id });
+      if (!updated) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      return {
+        result: { workspaceId, onboardingDone: false },
+        activity: {
+          kind: "workspace.onboarding_reopened",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: {},
+        },
+        audit: {
+          action: "workspace.reopen_onboarding",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: {},
+        },
+      };
+    },
+  }),
+});
+
 export const setWorkspaceState = defineWriteAction({
   name: "workspace.setState",
   summary:
@@ -334,7 +392,12 @@ export const changeWorkspacePlan = defineWriteAction({
     // Read from the instance setting before the change, outside the
     // workspace's transaction, because the catalogue belongs to the instance
     // rather than to any tenant.
-    async load() {
+    // The return type is written out: TypeScript 7 does not infer the loaded
+    // shape from a load that takes no arguments, and `execute` then reads
+    // `plan` off `undefined`.
+    async load(): Promise<{
+      plan: Awaited<ReturnType<typeof planByKey>>;
+    }> {
       return { plan: await planByKey(context.pool, input.planKey) };
     },
     async execute({ tx, workspaceId, loaded: { plan } }) {

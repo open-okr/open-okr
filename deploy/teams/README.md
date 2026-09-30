@@ -35,6 +35,11 @@ fill in the Teams card. Nothing is verified at this point: the card says
 `REPLACE_WITH_YOUR_` value, add a `color.png` (192x192) and an `outline.png`
 (32x32, transparent), and zip the three files together with no enclosing folder.
 
+If you named your instance, with `OPENOKR_INSTANCE_NAME` or on General in
+admin, put the same name in the manifest's `name` and `description` fields.
+Teams shows the app by what the manifest says, and the instance cannot change
+a file you upload.
+
 Upload it in Teams under **Apps, Manage your apps, Upload an app**, or hand the
 zip to a Teams administrator to publish for the organisation.
 
@@ -68,3 +73,20 @@ its age, what it blocks and the next action its owner wrote, with **Resolve** an
 
 Pressing one runs the same command somebody could have typed, checked the same
 way, and audited with Teams named on the row.
+
+## Checking in from Teams
+
+`checkin` with a goal, typed or pressed as **Check in** on a reminder, answers
+with a card holding the three questions: how it is going, how confident the
+member is from 0 to 10, and one line on why. **Publish** sends the answers back,
+and they are written exactly as a check-in from the browser is. Typing
+`checkin` with no goal still asks the questions one message at a time.
+
+## Posting a space's digest to a channel
+
+Add the bot to the team the channel belongs to, then copy the channel's link
+from Teams (**Get link to channel**). The part after `/channel/` and before the
+next `/`, decoded, is the channel's ID and looks like `19:…@thread.tacv2`. A
+space manager pastes it into **Teams channel ID** in the space's settings. Once
+a weekly session closes, its coordinator can post the digest there from the
+session page, once per week.

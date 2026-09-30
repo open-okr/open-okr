@@ -1,6 +1,6 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import { resolveAccessLevelFor } from "../../lib/access";
+import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
 import { getTranslations } from "../../lib/translations";
@@ -30,9 +30,6 @@ export default async function CheckInPage({
   searchParams: Promise<{ goal?: string }>;
 }) {
   const { t } = await getTranslations();
-  // P8-G04. Resolved once here rather than inside the loop below, because
-  // a bar on a 0-to-100 track under a raised ceiling fills early.
-  const ceiling = await progressCeiling();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -41,11 +38,16 @@ export default async function CheckInPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  const level = await resolveAccessLevelFor(
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+
+  // P8-G04. Resolved once here rather than inside the loop below, because
+  // a bar on a 0-to-100 track under a raised ceiling fills early. After the
+  // level, because it reads a workspace setting a guest cannot (L-23).
+  const ceiling = await progressCeiling();
 
   const { goals: due } = await callAction(context, "goals.due", {
     withinDays: 2,
@@ -71,8 +73,10 @@ export default async function CheckInPage({
             </h1>
             <p className="text-xs text-ink-3">
               {due.length === 0
-                ? "Nothing of yours is due."
-                : `${due.length} of your goals ${due.length === 1 ? "is" : "are"} due or nearly due, soonest first.`}
+                ? t("checkIn.nothingOfYoursIsDue")
+                : due.length === 1
+                  ? t("checkIn.goalsDueOne", { count: due.length })
+                  : t("checkIn.goalsDueOther", { count: due.length })}
             </p>
           </div>
           <Chip tone={due.length === 0 ? "ok" : "brand"}>
@@ -105,17 +109,38 @@ export default async function CheckInPage({
                       {goal.title}
                     </span>
                     <span className="text-xs text-ink-3">
-                      {t("common.keyResult3", {
-                        level: goal.level,
-                        keyResultCount: goal.keyResultCount,
-                        keyResultCount2: goal.keyResultCount === 1 ? "" : "s",
-                        nextCheckInOn:
-                          goal.daysPastDue !== null && goal.daysPastDue > 0
-                            ? `${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
-                            : `due ${goal.nextCheckInOn}`,
-                        open: goal.hasOpenDraft ? " · draft open" : "",
-                        replace: goal.health.replace("_", " "),
-                      })}
+                      {t(
+                        goal.hasOpenDraft
+                          ? "checkIn.walkerLineDraftOpen"
+                          : "checkIn.walkerLine",
+                        {
+                          level: goal.level,
+                          keyResults:
+                            goal.keyResultCount === 1
+                              ? t("common.count.keyResultOne", {
+                                  count: goal.keyResultCount,
+                                })
+                              : t("common.count.keyResultOther", {
+                                  count: goal.keyResultCount,
+                                }),
+                          when:
+                            goal.daysPastDue !== null && goal.daysPastDue > 0
+                              ? t("checkIn.overdueBy", {
+                                  days:
+                                    goal.daysPastDue === 1
+                                      ? t("common.count.dayOne", {
+                                          count: goal.daysPastDue,
+                                        })
+                                      : t("common.count.dayOther", {
+                                          count: goal.daysPastDue,
+                                        }),
+                                })
+                              : t("checkIn.dueOn", {
+                                  date: String(goal.nextCheckInOn),
+                                }),
+                          health: goal.health.replace("_", " "),
+                        },
+                      )}
                     </span>
                     <span className="flex items-center gap-2">
                       {/* No tone on the fill. Rule 2 of the colour system: progress is
@@ -225,14 +250,16 @@ async function CheckInForGoal({
           <CardHeader className="justify-between">
             <h2 className="text-sm font-bold text-ink">{goal.title}</h2>
             <Chip tone={stillDue ? "neutral" : "ok"}>
-              {stillDue ? "not yours to report" : "reported"}
+              {stillDue ? t("checkIn.notYoursToReport") : t("checkIn.reported")}
             </Chip>
           </CardHeader>
           <CardBody className="flex flex-col gap-1.5">
             <p className="text-sm text-ink-3">
               {stillDue
-                ? "You can read this goal's check-ins but not post one. The champion posts them."
-                : `This goal is not due. Its next check-in is ${goal.nextCheckInOn ?? "not scheduled"}, and the card below is what was reported.`}
+                ? t("checkIn.youCanReadNotPost")
+                : goal.nextCheckInOn
+                  ? t("checkIn.notDueNextOn", { date: goal.nextCheckInOn })
+                  : t("checkIn.notDueNotScheduled")}
             </p>
             {nextGoalId ? (
               <p className="text-xs text-ink-3">

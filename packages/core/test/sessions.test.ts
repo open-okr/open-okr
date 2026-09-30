@@ -1032,6 +1032,95 @@ describe("sessions.close digest and streak (P4-T08)", () => {
   });
 });
 
+describe("the streak counts weeks of check-ins (completeness review M-04)", () => {
+  async function holdWeeklyCheckIn(): Promise<void> {
+    const wb = await workerDb();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToCommitments(sessionId, 0.7);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId,
+        items: [
+          { text: "A", ownerId: facilitatorMemberId },
+          { text: "B", ownerId: memberMemberId },
+        ],
+      },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.close", {
+      id: sessionId,
+    });
+  }
+
+  const readStreak = async () => {
+    const wb = await workerDb();
+    return (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.readStreak",
+      { spaceId },
+    )) as { currentWeeks: number; longestWeeks: number };
+  };
+
+  const trend = async () => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confidenceTrend",
+      { spaceId, weeks: 12 },
+    );
+  };
+
+  it("counts two check-ins in one week as one week and one trend point", async () => {
+    await createGoalWithKr();
+    await holdWeeklyCheckIn();
+    await holdWeeklyCheckIn();
+    expect((await readStreak()).currentWeeks).toBe(1);
+    expect(await trend()).toHaveLength(1);
+  });
+
+  it("adds neither a week nor a trend point for a monthly review", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await holdWeeklyCheckIn();
+    const monthly = (await createSession({
+      kind: "monthly",
+      title: "Monthly review",
+    })) as { id: string };
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.open", {
+      id: monthly.id,
+    });
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.close", {
+      id: monthly.id,
+    });
+    expect((await readStreak()).currentWeeks).toBe(1);
+    // The monthly close used to add a point at 0.0, a collapse nobody saw.
+    const points = await trend();
+    expect(points).toHaveLength(1);
+    expect(points[0]?.average).toBe(0.7);
+  });
+
+  it("reads as broken once a whole week passes with nothing held", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await holdWeeklyCheckIn();
+    expect((await readStreak()).currentWeeks).toBe(1);
+    // As if the last check-in were three weeks ago and nobody pressed skip.
+    await wb.admin.query(
+      "update streaks set last_session_week = (current_date - 21) where space_id = $1",
+      [spaceId],
+    );
+    const streak = await readStreak();
+    expect(streak.currentWeeks).toBe(0);
+    expect(streak.longestWeeks).toBe(1);
+  });
+});
+
 describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {
   it("names this workspace's own lower bound when it is refused", async () => {
     const wb = await workerDb();
@@ -1478,5 +1567,94 @@ describe("a blocker raised in a session reaches its owner (H-10)", () => {
         nextAction: "Agree the definition",
       }),
     ).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
+describe("the confidence round the panel draws (completeness review M-03)", () => {
+  const status = async (userId: string, sessionId: string) => {
+    const wb = await workerDb();
+    const rows = (await callAction(
+      { pool: wb.appPool, ...context(userId) },
+      "sessions.confidenceStatus",
+      { sessionId },
+    )) as Array<{
+      keyResultId: string;
+      teamVoting: boolean;
+      votesCast: number;
+      revealed: boolean;
+      votes: { memberId: string; confidence: number }[];
+      average: number | null;
+      myVote: number | null;
+    }>;
+    return rows.find((row) => row.keyResultId === keyResultId);
+  };
+
+  it("shows a count and your own vote before reveal, and every vote and the average after", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+      sessionId,
+      keyResultId,
+      confidence: 0.6,
+    });
+    await callAction(
+      { pool: wb.appPool, ...context(MEMBER) },
+      "sessions.castVote",
+      { sessionId, keyResultId, confidence: 0.4 },
+    );
+
+    const before = await status(MEMBER, sessionId);
+    expect(before).toMatchObject({
+      teamVoting: true,
+      votesCast: 2,
+      revealed: false,
+      votes: [],
+      average: null,
+      myVote: 0.4,
+    });
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.revealVotes",
+      { sessionId, keyResultId },
+    );
+    const after = await status(MEMBER, sessionId);
+    expect(after?.revealed).toBe(true);
+    expect(after?.votes).toHaveLength(2);
+    expect(after?.average).toBe(0.5);
+  });
+
+  it("says when voting is off, and the facilitator confirms without a vote", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.updateSettings",
+      { id: spaceId, teamVoting: false },
+    );
+    const sessionId = await openSessionAtConfidence();
+    expect((await status(FACILITATOR, sessionId))?.teamVoting).toBe(false);
+
+    // Step 1 used to be impossible here: the panel waited for a vote the
+    // server refuses.
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confirmConfidence",
+      {
+        sessionId,
+        keyResultId,
+        confidence: 0.7,
+        whatChanged: "Two deals closed",
+      },
+    );
+    const rows = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confidenceStatus",
+      { sessionId },
+    )) as Array<{ keyResultId: string; confirmed: boolean }>;
+    expect(rows.find((row) => row.keyResultId === keyResultId)?.confirmed).toBe(
+      true,
+    );
   });
 });

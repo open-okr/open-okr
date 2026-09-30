@@ -10,6 +10,7 @@ import {
 import { buttonVariants, cn } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
+import { getInstanceName } from "../../lib/instance-name";
 import { getMailSettings, mailerFrom } from "../../lib/mail";
 import { getKeyRing } from "../../lib/secrets";
 import { getStorage, storageDescription } from "../../lib/storage";
@@ -89,7 +90,9 @@ export default async function SetupPage() {
 
   return (
     <>
-      <h1 className="text-lg font-bold text-ink">{t("setup.setUpOpenokr")}</h1>
+      <h1 className="text-lg font-bold text-ink">
+        {t("setup.heading", { instanceName: await getInstanceName() })}
+      </h1>
       <p className="text-sm text-ink-3">
         {t("setup.nothingHereNeedsConfiguring")}
       </p>

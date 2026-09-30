@@ -7,8 +7,8 @@ import { workspaces } from "./workspaces.ts";
  *
  * Each row is one identity provider. The client secret is envelope-encrypted
  * with the instance root key. Better Auth's `genericOAuth` plugin is
- * configured at boot from the OIDC rows, and `@better-auth/sso` from the SAML
- * ones.
+ * configured from the OIDC rows, and `@better-auth/sso` from the SAML ones, at
+ * boot and again whenever a row changes (completeness review L-15).
  *
  * **This table is the authority and the plugin's own `ssoProvider` table is
  * derived from it** (P8-T07c). Which identity provider a workspace trusts is

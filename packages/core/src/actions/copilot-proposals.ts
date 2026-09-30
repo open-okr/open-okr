@@ -59,6 +59,7 @@ async function ownProposal(
         eq(proposedChanges.id, proposalId),
         // Not just any proposal: one from a copilot thread, and that thread has
         // to be this member's. An agent run's proposal goes through
+        // `proposals.apply` for the member it is for (M-08), or
         // `proposals.bulkApply`, which requires `full`.
         isNotNull(proposedChanges.threadId),
         eq(aiThreads.memberId, memberId),

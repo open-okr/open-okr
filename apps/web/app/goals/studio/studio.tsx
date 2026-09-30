@@ -11,7 +11,12 @@ import {
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { ActionForm } from "../../cycle/action-form.tsx";
-import { applyFinding, dismissFinding, linkGoals } from "./actions.ts";
+import {
+  applyFinding,
+  dismissFinding,
+  linkGoals,
+  unlinkGoals,
+} from "./actions.ts";
 import { Canvas, type StudioEdge, type StudioNode } from "./canvas.tsx";
 
 /**
@@ -113,12 +118,14 @@ export function Studio({
                 setLinkMode((value) => !value);
               }}
             >
-              {linkMode ? "Cancel link" : "Link two goals"}
+              {linkMode
+                ? t("goals.studio.studio.cancelLink")
+                : t("goals.studio.studio.linkTwoGoals")}
             </Button>
             <span className="text-xs text-ink-3">
               {pending
-                ? "Saving the link…"
-                : "A dependency is two-way by meaning, so either end may add it."}
+                ? t("goals.studio.studio.savingTheLink")
+                : t("goals.studio.studio.aDependencyIsTwoWay")}
             </span>
           </div>
         ) : null}
@@ -162,23 +169,27 @@ export function Studio({
                     {selected.title}
                   </a>
                   <dl className="flex flex-col gap-1 text-xs">
-                    <Row label="Level" value={selected.level} />
-                    <Row label="Owner" value={selected.owner} />
+                    <Row label={t("common.level")} value={selected.level} />
+                    <Row label={t("common.owner")} value={selected.owner} />
                     <Row
-                      label="Health"
+                      label={t("workMap.health")}
                       value={selected.health.replace("_", " ")}
                     />
                     <Row
-                      label="Key results"
+                      label={t("cycle.reviewAndLearn.keyResults")}
                       value={String(selected.keyResultCount)}
                     />
                     <Row
-                      label="Dependencies"
+                      label={t("goals.studio.studio.dependencies")}
                       value={String(selected.dependencyCount)}
                     />
                     <Row
-                      label="Aligned"
-                      value={selected.unaligned ? "no parent" : "yes"}
+                      label={t("goals.studio.studio.aligned")}
+                      value={
+                        selected.unaligned
+                          ? t("goals.studio.studio.noParent")
+                          : t("goals.studio.studio.yes")
+                      }
                     />
                   </dl>
                   <span className="flex items-center gap-2">
@@ -191,6 +202,22 @@ export function Studio({
                       {Math.round(selected.progressPct)}%
                     </span>
                   </span>
+                  <DependencyList
+                    goalId={selected.id}
+                    nodes={nodes}
+                    edges={edges}
+                    canEdit={canEdit}
+                    pending={pending}
+                    onRemove={(dependencyId) => {
+                      setError(null);
+                      startTransition(async () => {
+                        const state = await unlinkGoals(dependencyId);
+                        if (state.error) {
+                          setError(state.error);
+                        }
+                      });
+                    }}
+                  />
                   <p className="text-xs text-ink-4">
                     {t("goals.studio.studio.reParentingAndEditing")}
                   </p>
@@ -227,8 +254,12 @@ export function Studio({
                     <Bar value={score} className="h-1.5" />
                     <p className="text-xs text-ink-3">
                       {healthy
-                        ? `At or above ${threshold}, which METHOD.md §5.2 calls healthy.`
-                        : `Below ${threshold}. Each gap below opens the goal that caused it.`}
+                        ? t("goals.studio.studio.atOrAboveHealthy", {
+                            threshold,
+                          })
+                        : t("goals.studio.studio.belowThreshold", {
+                            threshold,
+                          })}
                     </p>
                   </>
                 )}
@@ -270,7 +301,8 @@ export function Studio({
                             href={`/goals/${finding.subjectGoalId}`}
                             className="text-xs text-brand-text underline"
                           >
-                            {finding.subjectGoalTitle ?? "Open the goal"}
+                            {finding.subjectGoalTitle ??
+                              t("workMap.openTheGoal")}
                           </a>
                         ) : (
                           <span className="text-xs text-ink-4">
@@ -347,6 +379,80 @@ export function Studio({
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * The selected goal's dependencies, each with the way to take it apart
+ * (completeness review M-35).
+ *
+ * The canvas draws them as lines, which a pointer can see and a keyboard or a
+ * screen reader cannot pick out, so they are listed here by the other goal's
+ * title. The list is what makes removal reachable at all.
+ */
+function DependencyList({
+  goalId,
+  nodes,
+  edges,
+  canEdit,
+  pending,
+  onRemove,
+}: {
+  readonly goalId: string;
+  readonly nodes: readonly StudioNode[];
+  readonly edges: readonly StudioEdge[];
+  readonly canEdit: boolean;
+  readonly pending: boolean;
+  readonly onRemove: (dependencyId: string) => void;
+}) {
+  const { t } = useTranslations();
+  const titles = new Map(nodes.map((node) => [node.id, node.title]));
+  const mine = edges.filter(
+    (edge) => edge.from === goalId || edge.to === goalId,
+  );
+  if (mine.length === 0) {
+    return (
+      <p className="text-xs text-ink-4">
+        {t("goals.studio.studio.noDependencies")}
+      </p>
+    );
+  }
+  return (
+    <ul
+      className="flex flex-col gap-1"
+      aria-label={t("goals.studio.studio.dependencies")}
+    >
+      {mine.map((edge) => {
+        const other = edge.from === goalId ? edge.to : edge.from;
+        const title = titles.get(other) ?? t("goals.studio.studio.anotherGoal");
+        return (
+          <li
+            key={edge.id}
+            className="flex items-center justify-between gap-2 text-xs"
+          >
+            <a
+              href={`/goals/${other}`}
+              className="min-w-0 truncate text-ink-2 hover:underline"
+            >
+              {title}
+            </a>
+            {canEdit ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending}
+                onClick={() => onRemove(edge.id)}
+                aria-label={t("goals.studio.studio.removeDependencyOn", {
+                  title,
+                })}
+              >
+                {t("goals.studio.studio.removeDependency")}
+              </Button>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

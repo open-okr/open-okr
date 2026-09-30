@@ -41,7 +41,9 @@ selected, and what a real run would create in the workspace.
 
 It imports people, spaces, space membership, cycles, objectives, key results,
 key result history, check-ins, KPI categories, KPIs and their records,
-initiatives, tasks, checklists, task comments and watchers.
+initiatives, tasks, checklists, task comments and watchers. The tables it does
+not read, such as discussions, KPI sharing and points, are counted and named in
+every report instead.
 
 --only <domains> is a comma-separated list, and the default is all of them:
 ${DOMAIN_KEYS.join(", ")}.

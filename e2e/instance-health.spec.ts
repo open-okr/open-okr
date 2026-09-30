@@ -44,3 +44,14 @@ test("the status page counts the scheduler as operational", async () => {
   };
   expect(body.components.scheduler.status).toBe("operational");
 });
+
+test("the tab has an icon, so no page asks for one that is missing", async () => {
+  // Completeness review L-09: /favicon.ico answered 404 on every page, which
+  // is a line in every access log and a blank square in every tab.
+  const ico = await api.get("/favicon.ico");
+  expect(ico.status()).toBe(200);
+  expect(ico.headers()["content-type"]).toMatch(/icon/);
+  const svg = await api.get("/icon.svg");
+  expect(svg.status()).toBe(200);
+  expect(svg.headers()["content-type"]).toMatch(/svg/);
+});

@@ -5,6 +5,7 @@ import { workspaceMembers, workspaces } from "../src/schema/workspaces.ts";
 import {
   withContext,
   withSystemScan,
+  withTrustedEmailDomain,
   withUser,
   withWorkspace,
 } from "../src/tenant.ts";
@@ -409,5 +410,143 @@ describe("app.system_scan: the scheduler listing every workspace", () => {
       "select count(*)::int as n from workspaces",
     );
     expect(after.rows[0].n).toBe(0);
+  });
+});
+
+/**
+ * `app.trusted_email_domain`: a person finding the workspaces that trust their
+ * address (completeness review M-34, migration 0104).
+ *
+ * Nothing could answer "which workspaces trust acme.example" for somebody who
+ * belongs to none of them, so trusted-domain joining never happened. The key
+ * answers that one question and no other: the rows trusting exactly that
+ * domain, read-only, nothing else in the database, and never inside a tenant
+ * transaction.
+ */
+describe("app.trusted_email_domain: the workspaces trusting one domain", () => {
+  const trust = async (workspaceId: string, domains: unknown) => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update workspaces
+          set settings = settings || jsonb_build_object('trustedEmailDomains', $2::jsonb)
+        where id = $1`,
+      [workspaceId, JSON.stringify(domains)],
+    );
+  };
+
+  it("admits exactly the workspaces whose list holds the domain", async () => {
+    const wb = await workerDb();
+    await trust(WORKSPACE_A, ["acme.example", "acme.test"]);
+    await trust(WORKSPACE_B, ["other.example"]);
+
+    const rows = await withTrustedEmailDomain(wb.db, "acme.example", (tx) =>
+      tx.select({ id: workspaces.id }).from(workspaces),
+    );
+    expect(rows.map((row) => row.id)).toEqual([WORKSPACE_A]);
+  });
+
+  it("admits nothing for a domain no workspace trusts, or for a near miss", async () => {
+    const wb = await workerDb();
+    await trust(WORKSPACE_A, ["acme.example"]);
+
+    for (const domain of [
+      "nobody.example",
+      "mail.acme.example",
+      "cme.example",
+    ]) {
+      const rows = await withTrustedEmailDomain(wb.db, domain, (tx) =>
+        tx.select({ id: workspaces.id }).from(workspaces),
+      );
+      expect(rows, domain).toEqual([]);
+    }
+  });
+
+  it("admits nothing when the setting is not a list", async () => {
+    const wb = await workerDb();
+    // `?` also matches a bare string and an object's keys, and neither is a
+    // list of domains.
+    await trust(WORKSPACE_A, "acme.example");
+    await trust(WORKSPACE_B, { "acme.example": true });
+
+    const rows = await withTrustedEmailDomain(wb.db, "acme.example", (tx) =>
+      tx.select({ id: workspaces.id }).from(workspaces),
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("admits no deleted workspace", async () => {
+    const wb = await workerDb();
+    await trust(WORKSPACE_A, ["acme.example"]);
+    await wb.admin.query(
+      "update workspaces set deleted_at = now() where id = $1",
+      [WORKSPACE_A],
+    );
+
+    const rows = await withTrustedEmailDomain(wb.db, "acme.example", (tx) =>
+      tx.select({ id: workspaces.id }).from(workspaces),
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("opens no other table across tenants", async () => {
+    const wb = await workerDb();
+    await trust(WORKSPACE_A, ["acme.example"]);
+
+    const members = await withTrustedEmailDomain(wb.db, "acme.example", (tx) =>
+      tx.select().from(workspaceMembers),
+    );
+    expect(members).toEqual([]);
+  });
+
+  it("can read the workspaces it admits and change none of them", async () => {
+    const wb = await workerDb();
+    await trust(WORKSPACE_A, ["acme.example"]);
+
+    const renamed = await withTrustedEmailDomain(wb.db, "acme.example", (tx) =>
+      tx
+        .update(workspaces)
+        .set({ name: "Renamed" })
+        .where(eq(workspaces.id, WORKSPACE_A))
+        .returning({ id: workspaces.id }),
+    );
+    expect(renamed).toEqual([]);
+  });
+
+  it("widens nothing inside a tenant transaction", async () => {
+    const wb = await workerDb();
+    await trust(WORKSPACE_A, ["acme.example"]);
+
+    // Workspace B scoped, with the key set beside it: B's own row and nothing
+    // of A's, the rule migration 0008 set for the membership policies.
+    const rows = await withContext(
+      wb.db,
+      { workspaceId: WORKSPACE_B, trustedEmailDomain: "acme.example" },
+      (tx) => tx.select({ id: workspaces.id }).from(workspaces),
+    );
+    expect(rows.map((row) => row.id)).toEqual([WORKSPACE_B]);
+  });
+
+  it("does not outlive its transaction", async () => {
+    const wb = await workerDb();
+    await trust(WORKSPACE_A, ["acme.example"]);
+    await withTrustedEmailDomain(wb.db, "acme.example", (tx) =>
+      tx.select().from(workspaces),
+    );
+    const after = await wb.appPool.query(
+      "select count(*)::int as n from workspaces",
+    );
+    expect(after.rows[0].n).toBe(0);
+  });
+
+  it("refuses a value that is not a lower-case domain before any query", async () => {
+    const wb = await workerDb();
+    for (const domain of ["", "Acme.Example", "a@acme.example", "acme"]) {
+      await expect(
+        withTrustedEmailDomain(wb.db, domain, (tx) =>
+          tx.select().from(workspaces),
+        ),
+        domain,
+      ).rejects.toThrow(/Invalid email domain/);
+    }
   });
 });

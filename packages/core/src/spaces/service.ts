@@ -16,6 +16,7 @@
  * | `space_standard` | edit | Being in the space is what lets you work in it |
  * | A manager's own `member` group | full | Administering the space: its name, its mission, who is in it |
  * | A coordinator's own `member` group | edit, tagged `coordinator` | The tag is the point, not the level. The nudge engine finds the person who runs the weekly session by tag rather than by re-querying a column |
+ * | A guest's own `member` group, in the member role | view | Neither standard tier reaches a guest, so this is the only way a guest in a space can see it (completeness review M-22) |
  *
  * A coordinator therefore holds no more access than an ordinary member, which
  * is correct: running the session is a duty, not a permission.
@@ -28,6 +29,7 @@ import {
   spaceMembers,
   spaces,
   type WorkspaceTx,
+  workspaceMembers,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
 import {
@@ -349,6 +351,35 @@ async function applyRoleBindings<
       contextId: input.contextId,
       level: ACCESS_LEVELS.edit,
       tag: "coordinator",
+    });
+    return;
+  }
+
+  // **A guest in the member role sees the space, through their own group**
+  // (completeness review M-22). The space's standard group never reaches a
+  // guest: the human decided on 10 August 2026 that a guest reaches nothing
+  // through a blanket tier, only through a binding that names them. So without
+  // this, putting a guest in a space put a name in a list and granted nothing.
+  // `view`, the least a place can be given, because a guest is somebody from
+  // outside the organisation; anything wider is a binding somebody adds on
+  // purpose. Removing them from the space unbinds it with everything else.
+  const [member] = await tx
+    .select({ kind: workspaceMembers.kind })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, input.workspaceId),
+        eq(workspaceMembers.id, input.memberId),
+      ),
+    )
+    .limit(1);
+  if (member?.kind === "guest") {
+    await bindGroup(tx, {
+      workspaceId: input.workspaceId,
+      groupId: memberGroupId,
+      contextId: input.contextId,
+      level: ACCESS_LEVELS.view,
     });
   }
 }

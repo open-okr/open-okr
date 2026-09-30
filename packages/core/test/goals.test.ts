@@ -315,6 +315,57 @@ describe("the single-parent invariant", () => {
     expect(read.parentGoalId).toBeNull();
   });
 
+  it("refuses a loop closed through a parent key result (completeness review M-28)", async () => {
+    const wb = await workerDb();
+    const addKeyResult = (goalId: string) =>
+      callAction({ pool: wb.appPool, ...context() }, "goals.addKeyResult", {
+        goalId,
+        title: "Raise activation",
+        direction: "increase",
+        indicatorType: "leading",
+        baselineValue: 0,
+        targetValue: 1,
+        weight: 1,
+      });
+    const a = await createGoal({ title: "Goal A" });
+    const ownKeyResult = await addKeyResult(a.id);
+    const b = await createGoal({ title: "Goal B", parentGoalId: a.id });
+    const childKeyResult = await addKeyResult(b.id);
+
+    // Under one of its own key results.
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+        id: a.id,
+        parentKeyResultId: ownKeyResult.id,
+      }),
+    ).rejects.toThrow(/circular/i);
+    // Under a key result of its own child.
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+        id: a.id,
+        parentKeyResultId: childKeyResult.id,
+      }),
+    ).rejects.toThrow(/circular/i);
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.read",
+      { id: a.id },
+    );
+    expect(read.parentKeyResultId).toBeNull();
+  });
+
+  it("refuses a parent key result that does not exist", async () => {
+    const wb = await workerDb();
+    const a = await createGoal();
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+        id: a.id,
+        parentKeyResultId: "00000000-0000-4000-8000-000000000000",
+      }),
+    ).rejects.toThrow(/No such key result/);
+  });
+
   it("refuses a goal as its own parent", async () => {
     const wb = await workerDb();
     const a = await createGoal();

@@ -1,5 +1,5 @@
-import { resolveOwnWorkspaceAccessLevel } from "@openokr/core";
-import { notFound } from "next/navigation";
+import { ACCESS_LEVELS, resolveOwnWorkspaceAccessLevel } from "@openokr/core";
+import { notFound, redirect } from "next/navigation";
 import { getPool } from "./auth";
 import { requireWorkspace } from "./workspace";
 
@@ -30,6 +30,29 @@ export async function resolveAccessLevelFor(
   memberId: string,
 ): Promise<number> {
   return resolveOwnWorkspaceAccessLevel(getPool(), workspaceId, memberId);
+}
+
+/**
+ * The level of somebody opening a screen that reads the whole workspace, or a
+ * move to their spaces when they hold nothing on it (completeness review
+ * L-23).
+ *
+ * A guest is a member with no binding on the workspace's own context: they
+ * were asked into one space (M-22). The Work Map already sent them to
+ * `/spaces`, but eight other screens asked a workspace-wide read first and
+ * showed the guest "We could not load" instead. Every screen that reads the
+ * whole workspace now resolves its level through this, before its first read,
+ * so a guest is moved rather than shown an error, the same way on every one.
+ */
+export async function workspaceReaderLevel(
+  workspaceId: string,
+  memberId: string,
+): Promise<number> {
+  const level = await resolveAccessLevelFor(workspaceId, memberId);
+  if (level < ACCESS_LEVELS.view) {
+    redirect("/spaces");
+  }
+  return level;
 }
 
 async function currentAccessLevel(): Promise<CurrentAccess> {

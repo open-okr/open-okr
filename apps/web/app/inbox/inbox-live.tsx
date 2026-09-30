@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -21,6 +22,7 @@ import { useEffect, useState } from "react";
  * reader can tell the list moved and why.
  */
 export function InboxLive() {
+  const { t } = useTranslations();
   const router = useRouter();
   const [arrived, setArrived] = useState(0);
 
@@ -44,8 +46,8 @@ export function InboxLive() {
   return (
     <p className="text-xs text-ink-3" role="status" data-testid="inbox-live">
       {arrived === 1
-        ? "1 row arrived while you were here."
-        : `${arrived} rows arrived while you were here.`}
+        ? t("inbox.inboxLive.rowsArrivedOne", { count: arrived })
+        : t("inbox.inboxLive.rowsArrivedOther", { count: arrived })}
     </p>
   );
 }

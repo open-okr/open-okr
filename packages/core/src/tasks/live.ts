@@ -24,6 +24,6 @@ export interface BoardChangedEvent {
     readonly spaceId: string;
     readonly taskId: string;
     /** What happened, so a client can decide whether to animate anything. */
-    readonly change: "created" | "moved" | "updated" | "deleted";
+    readonly change: "created" | "moved" | "updated" | "deleted" | "restored";
   };
 }

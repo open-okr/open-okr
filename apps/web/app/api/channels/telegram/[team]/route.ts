@@ -15,10 +15,9 @@
  * on Slack reaches when their trigger has expired.
  */
 import { TelegramChannel, telegramDeliveryId } from "@openokr/adapters";
-import { parseTelegramSecret, workspaceForProviderTeam } from "@openokr/core";
+import { parseTelegramSecret } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { runInbound } from "../../../../../lib/channel-inbound";
-import { getPool } from "../../../../../lib/pool";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +31,7 @@ export async function POST(
     provider: "telegram",
     // The path segment, not anything on the body: an update says nothing about
     // which bot received it.
-    resolveWorkspace: () =>
-      workspaceForProviderTeam(getPool(), {
-        provider: "telegram",
-        teamId: team,
-      }),
+    tenantOf: () => team,
     buildDriver(secret) {
       const parsed = parseTelegramSecret(secret);
       return parsed

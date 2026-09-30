@@ -29,6 +29,13 @@ export interface OpenAiCompatibleOptions {
   /** Injected for contract tests; a real client reaches `baseURL` over the network otherwise. */
   readonly fetch?: typeof fetch;
   readonly defaultContextWindow?: number;
+  /**
+   * Fields added to every completion request's body, for a vendor's own
+   * extension of the OpenAI shape. OpenRouter's `provider` routing object is
+   * the one in use: it is how a no-training request reaches it (M-10).
+   * Embeddings do not carry it; no target of this driver defines one there.
+   */
+  readonly extraBody?: Readonly<Record<string, unknown>>;
 }
 
 /** `max_tokens` is deprecated in this SDK version in favour of
@@ -93,6 +100,7 @@ function fromCompletion(completion: OpenAI.Chat.ChatCompletion): ChatResponse {
 export class OpenAiCompatibleProvider implements AIProvider {
   readonly #client: OpenAI;
   readonly #defaultContextWindow: number;
+  readonly #extraBody: Readonly<Record<string, unknown>>;
 
   constructor(options: OpenAiCompatibleOptions) {
     this.#client = new OpenAI({
@@ -102,10 +110,12 @@ export class OpenAiCompatibleProvider implements AIProvider {
       fetch: options.fetch,
     });
     this.#defaultContextWindow = options.defaultContextWindow ?? 128_000;
+    this.#extraBody = options.extraBody ?? {};
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
     const completion = await this.#client.chat.completions.create({
+      ...this.#extraBody,
       model: request.model,
       messages: toMessages(request.messages),
       temperature: request.temperature,
@@ -116,6 +126,7 @@ export class OpenAiCompatibleProvider implements AIProvider {
 
   async *stream(request: ChatRequest): AsyncIterable<string> {
     const stream = await this.#client.chat.completions.create({
+      ...this.#extraBody,
       model: request.model,
       messages: toMessages(request.messages),
       temperature: request.temperature,
@@ -134,6 +145,7 @@ export class OpenAiCompatibleProvider implements AIProvider {
     request: ChatRequest & { readonly tools: readonly ToolDefinition[] },
   ): Promise<ChatResponse> {
     const completion = await this.#client.chat.completions.create({
+      ...this.#extraBody,
       model: request.model,
       messages: toMessages(request.messages),
       temperature: request.temperature,
@@ -167,6 +179,7 @@ export class OpenAiCompatibleProvider implements AIProvider {
 
   async extract(request: ExtractRequest): Promise<ChatResponse> {
     const completion = await this.#client.chat.completions.create({
+      ...this.#extraBody,
       model: request.model,
       messages: toMessages(request.messages),
       temperature: request.temperature,

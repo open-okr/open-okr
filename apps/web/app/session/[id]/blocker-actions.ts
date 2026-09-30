@@ -15,6 +15,7 @@ import { callAction, OperationError } from "@openokr/core";
 import { BLOCKER_TYPE_DEFINITIONS } from "@openokr/method";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { type CommitmentState, NO_ERROR } from "./commitment-state.ts";
 
@@ -48,27 +49,25 @@ export async function raiseBlockerAction(
   const type = String(form.get("type") ?? "");
   const ownerId = String(form.get("ownerId") ?? "");
   const nextAction = String(form.get("nextAction") ?? "").trim();
+  const { t } = await getTranslations();
 
   // Named one at a time rather than "fill in every field", because a form
   // with four controls should say which one is empty.
   if (keyResultId === "") {
-    return { error: "Name the key result this is blocking." };
+    return { error: t("session.detail.actions.nameTheKeyResultBlocked") };
   }
   // Checked against §6.2's taxonomy rather than cast. A select is not a
   // guarantee: the value arrives in a form body like any other string, and
   // `sessions.createBlocker` takes the enum.
   const known = BLOCKER_TYPE_DEFINITIONS.find((one) => one.type === type);
   if (!known) {
-    return { error: "Choose what kind of blocker it is." };
+    return { error: t("session.detail.actions.chooseTheBlockerKind") };
   }
   if (ownerId === "") {
-    return { error: "Somebody owns clearing it. §6.2 has no unowned blocker." };
+    return { error: t("session.detail.actions.somebodyOwnsClearingIt") };
   }
   if (nextAction === "") {
-    return {
-      error:
-        "Write the next action. §7.2 gives it twenty-four hours, which needs it to be a thing somebody can do.",
-    };
+    return { error: t("session.detail.actions.writeTheNextAction") };
   }
 
   try {
@@ -113,7 +112,8 @@ export async function reassignBlockerAction(
 ): Promise<CommitmentState> {
   const ownerId = String(form.get("ownerId") ?? "");
   if (ownerId === "") {
-    return { error: "Choose who it moves to." };
+    const { t } = await getTranslations();
+    return { error: t("session.detail.actions.chooseWhoItMovesTo") };
   }
   try {
     await callAction(await context(), "sessions.reassignBlocker", {
@@ -150,10 +150,8 @@ export async function setCoordinatorNoteAction(
   // clearing a note that is already written; saying so is better than a
   // control that looks as though it does.
   if (note === "") {
-    return {
-      error:
-        "Write the note before saving it. An empty note cannot clear one already published.",
-    };
+    const { t } = await getTranslations();
+    return { error: t("session.detail.actions.writeTheNoteFirst") };
   }
   try {
     await callAction(await context(), "sessions.setCoordinatorNote", {

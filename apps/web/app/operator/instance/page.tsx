@@ -110,13 +110,21 @@ export default async function OperatorInstancePage() {
                      * reads differently, and a date range alone makes
                      * somebody work them out. */}
                     <span className="text-ink-3 text-xs">
-                      {live ? "showing now" : past ? "finished" : "scheduled"}
+                      {live
+                        ? t("operator.instance.showingNow")
+                        : past
+                          ? t("operator.instance.finished")
+                          : t("operator.instance.scheduled")}
                     </span>
                     {message.targetWorkspaceIds ? (
                       <span className="text-ink-3 text-xs">
                         {message.targetWorkspaceIds.length === 1
-                          ? "1 workspace"
-                          : `${message.targetWorkspaceIds.length} workspaces`}
+                          ? t("operator.instance.workspacesOne", {
+                              count: message.targetWorkspaceIds.length,
+                            })
+                          : t("operator.instance.workspacesOther", {
+                              count: message.targetWorkspaceIds.length,
+                            })}
                       </span>
                     ) : (
                       <span className="text-ink-3 text-xs">
@@ -128,13 +136,15 @@ export default async function OperatorInstancePage() {
                     {message.body}
                   </p>
                   <p className="text-ink-3 text-xs">
-                    {t("operator.instance.to", {
-                      startsAt: when(message.startsAt),
-                      endsAt: when(message.endsAt),
-                      dismissible: message.dismissible
-                        ? ""
-                        : ", not dismissible",
-                    })}
+                    {t(
+                      message.dismissible
+                        ? "operator.instance.window"
+                        : "operator.instance.windowNotDismissible",
+                      {
+                        startsAt: when(message.startsAt),
+                        endsAt: when(message.endsAt),
+                      },
+                    )}
                   </p>
                 </li>
               );
@@ -167,7 +177,7 @@ export default async function OperatorInstancePage() {
                   </td>
                   <td className="px-4 py-2.5 text-right align-top">
                     <Chip tone={flag.value ? "ok" : "neutral"}>
-                      {flag.value ? "on" : "off"}
+                      {flag.value ? t("admin.ai.on") : t("admin.ai.off")}
                     </Chip>
                     <span className="block text-ink-3 text-xs">
                       {t("operator.instance.fromThe", { source: flag.source })}

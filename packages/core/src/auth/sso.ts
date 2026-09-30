@@ -4,10 +4,11 @@
  * Reads `sso_connections` from the database, decrypts client secrets, and
  * returns a configuration array for Better Auth's `genericOAuth` plugin.
  *
- * Connections are loaded at boot and cached. A change takes effect on the
- * next restart. This is a documented limitation: rebuilding the auth
- * instance on every sign-in would put a database read and a decryption on
- * the hot path of every request.
+ * Connections are loaded at boot and cached, and loaded again when a stamp
+ * of the table moves (completeness review L-15). Rebuilding the auth instance
+ * on every sign-in would put a database read and a decryption on the hot path
+ * of every request; `sso-refresh.ts` reads one small digest every few seconds
+ * instead, and decrypts only when it changed.
  */
 import { X509Certificate } from "node:crypto";
 import { withSSOLookup, withWorkspace } from "@openokr/db";
@@ -141,8 +142,9 @@ type SSORow = {
  * Loads all enabled SSO connections from the database and decrypts their
  * client secrets.
  *
- * Called once at boot. The result configures Better Auth's genericOAuth
- * plugin for the lifetime of the process.
+ * Called at boot, and again whenever `ssoConfigurationStamp` moves. The
+ * result configures Better Auth's genericOAuth plugin for the life of one
+ * auth instance, which is rebuilt around the next result.
  */
 export async function loadSSOConnections(
   pool: Pool,
@@ -219,6 +221,40 @@ export async function loadSSOConnections(
   });
 }
 
+interface ProviderInfoRow extends Record<string, unknown> {
+  kind: string;
+  provider_id: string;
+  display_name: string;
+  workspace_id: string;
+  email_domains: string;
+  enforce: boolean;
+}
+
+/**
+ * Every enabled connection on the instance, for the sign-in page.
+ *
+ * **Never for an administration screen.** It reads past the tenant floor,
+ * because the sign-in page has no workspace to read under, and the admin
+ * screen once used it: every workspace's administrator was shown every other
+ * workspace's connections (completeness review L-21). That screen reads
+ * `sso.listConnections` now, under its own workspace's floor.
+ */
+const providerInfo = sql`
+  select kind, provider_id, display_name, workspace_id, email_domains, enforce
+    from sso_connections
+   where enabled = true
+     and deleted_at is null
+   order by display_name`;
+
+const toProviderInfo = (row: ProviderInfoRow): SSOProviderInfo => ({
+  kind: row.kind === "saml" ? "saml" : "oidc",
+  id: derivedProviderId(row.provider_id, row.workspace_id),
+  displayName: row.display_name,
+  workspaceId: row.workspace_id,
+  emailDomains: row.email_domains,
+  enforce: row.enforce,
+});
+
 /**
  * Returns the public SSO provider info (no secrets) for the sign-in page.
  *
@@ -234,29 +270,9 @@ export async function listSSOProviders(
 ): Promise<readonly SSOProviderInfo[]> {
   try {
     const { rows } = await withSSOLookup(drizzle(pool), (tx) =>
-      tx.execute<{
-        kind: string;
-        provider_id: string;
-        display_name: string;
-        workspace_id: string;
-        email_domains: string;
-        enforce: boolean;
-      }>(sql`
-        select kind, provider_id, display_name, workspace_id, email_domains,
-               enforce
-          from sso_connections
-         where enabled = true
-           and deleted_at is null
-         order by display_name`),
+      tx.execute<ProviderInfoRow>(providerInfo),
     );
-    return rows.map((row) => ({
-      kind: row.kind === "saml" ? ("saml" as const) : ("oidc" as const),
-      id: derivedProviderId(row.provider_id, row.workspace_id),
-      displayName: row.display_name,
-      workspaceId: row.workspace_id,
-      emailDomains: row.email_domains,
-      enforce: row.enforce,
-    }));
+    return rows.map(toProviderInfo);
   } catch (error) {
     // Graceful degradation: if the table does not exist yet (migration
     // 0091 not applied), return no providers. The sign-in page renders
@@ -493,6 +509,15 @@ function isAbsoluteUrl(value: string | null | undefined): boolean {
  */
 export function validateSSOConnectionInput(
   input: CreateSSOConnectionInput,
+  options: {
+    /**
+     * The connection already holds a sealed client secret and this change
+     * keeps it. An edit leaves the secret blank to mean "keep the one you
+     * have", because the screen never sends a stored secret back to be
+     * re-entered.
+     */
+    readonly keepsSecret?: boolean;
+  } = {},
 ): SSOConnectionProblem | null {
   if (!input.providerId || !/^[a-z0-9-]+$/.test(input.providerId)) {
     return {
@@ -561,7 +586,10 @@ export function validateSSOConnectionInput(
         "The client ID is what identifies this instance to the provider.",
     };
   }
-  if (!input.clientSecret || input.clientSecret.trim() === "") {
+  if (
+    !options.keepsSecret &&
+    (!input.clientSecret || input.clientSecret.trim() === "")
+  ) {
     return {
       field: "clientSecret",
       message:
@@ -599,8 +627,8 @@ export function validateSSOConnectionInput(
  * `syncAllSamlProviders` was built at P8-T07c-a and no running process ever
  * called it, so `sso_providers` stayed empty on every instance and the plugin
  * had nothing to answer a sign-in with. Writing it beside the authority is
- * what makes a provider configured today work at the next restart rather than
- * after somebody notices.
+ * what makes a provider configured today work at the next sign-in rather than
+ * after somebody notices (L-15).
  */
 export async function createSSOConnection(
   pool: Pool,

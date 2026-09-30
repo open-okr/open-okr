@@ -92,7 +92,10 @@ describe("the run table", () => {
    * four surfaces for something only a scheduler and an operator ever call
    * (P7-T02a). Anything added here has to argue the same case.
    */
-  const NOT_REGISTRY_ACTIONS = new Set(["audit.chain"]);
+  // `outbox.purge` since completeness review M-19: it deletes delivery
+  // bookkeeping for the whole instance, has no workspace or member to act
+  // as, and is nothing an API caller should be able to trigger.
+  const NOT_REGISTRY_ACTIONS = new Set(["audit.chain", "outbox.purge"]);
 
   test("names a real action for every run", () => {
     // Checked against the registry rather than against a list written here.
@@ -113,12 +116,12 @@ describe("the run table", () => {
     // Guards the exemption. A run added to it silently would be a scheduled
     // job with no contract, no permission check and no place in the one-
     // contract surface, which is the opposite of what the registry is for.
-    expect([...NOT_REGISTRY_ACTIONS]).toEqual(["audit.chain"]);
+    expect([...NOT_REGISTRY_ACTIONS]).toEqual(["audit.chain", "outbox.purge"]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
     );
     // And it is scheduled, rather than declared and never run.
-    expect(off.map((run) => run.job)).toEqual(["audit.chain"]);
+    expect(off.map((run) => run.job)).toEqual(["audit.chain", "outbox.purge"]);
     for (const run of off) {
       expect(run.cron, run.job).toBeTruthy();
     }
@@ -239,5 +242,30 @@ describe("running a job across every workspace", () => {
       now: () => new Date(),
     });
     expect(outcome).toEqual({ ran: 0, skipped: 0, failed: 0 });
+  });
+});
+
+describe("an instance run (completeness review M-19)", () => {
+  test("runs once for the instance and never lists workspaces", async () => {
+    const purge = SCHEDULED_RUNS.find((run) => run.action === "outbox.purge");
+    expect(purge?.instance).toBe(true);
+    let listed = 0;
+    let ranInstance = 0;
+    const outcome = await runScheduledJob(purge as ScheduledRun, {
+      listWorkspaces: async () => {
+        listed++;
+        return [];
+      },
+      runOne: async () => {
+        throw new Error("an instance run has no workspace to be given");
+      },
+      runInstance: async () => {
+        ranInstance++;
+      },
+      now: () => new Date(),
+    });
+    expect(ranInstance).toBe(1);
+    expect(listed).toBe(0);
+    expect(outcome).toEqual({ ran: 1, skipped: 0, failed: 0 });
   });
 });

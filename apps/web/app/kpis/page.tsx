@@ -1,6 +1,7 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction, RHYTHM_ASSIST_KEYS } from "@openokr/core";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import { resolveAccessLevelFor } from "../../lib/access";
+import { workspaceReaderLevel } from "../../lib/access";
+import { assistOffered } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
 import { KPI_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
@@ -9,6 +10,7 @@ import { ActionForm } from "../cycle/action-form.tsx";
 import { addCategory, addKpi } from "./actions.ts";
 import { KpiGrid } from "./grid.tsx";
 import { CategorySubtotal, FilterRow, RowSparkline } from "./grid-extras.tsx";
+import { KpiSuggestion } from "./kpi-suggestion.tsx";
 
 /**
  * The KPI grid (UIUX-PLAN.md §4 S-20, P3-T12).
@@ -46,11 +48,22 @@ export default async function KpisPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  const level = await resolveAccessLevelFor(
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+  // §2.2's suggestion beside the add form (M-09), for somebody who may add a
+  // KPI and only where a provider may write one. The form is the same either
+  // way.
+  const suggestionOffered =
+    canEdit &&
+    (await assistOffered(
+      workspace.workspaceId,
+      RHYTHM_ASSIST_KEYS.suggestKpi,
+      "balanced",
+      session.user.id,
+    ));
 
   const grid = await callAction(context, "kpis.grid", { periods: 12 });
 
@@ -97,24 +110,24 @@ export default async function KpisPage({
             <h1 className="text-lg font-bold text-ink">{t("common.count")}</h1>
             <p className="text-xs text-ink-3">
               {grid.kpis.length === 0
-                ? "Nothing measured yet."
-                : `${grid.kpis.length} measure${
-                    grid.kpis.length === 1 ? "" : "s"
-                  }, each in its own periods.`}
+                ? t("kpis.nothingMeasuredYet")
+                : grid.kpis.length === 1
+                  ? t("kpis.measuresOne", { count: grid.kpis.length })
+                  : t("kpis.measuresOther", { count: grid.kpis.length })}
             </p>
           </div>
         </CardHeader>
         <CardBody className="flex flex-col gap-2.5">
           {/* S-20's filter row, at last (P6-G30). */}
           <FilterRow
-            label="Frequency"
+            label={t("common.frequency")}
             param="frequency"
             active={filters.frequency ?? ""}
             query={query}
             choices={frequencies.map((one) => ({ value: one, label: one }))}
           />
           <FilterRow
-            label="State"
+            label={t("operator.workspaces.columnState")}
             param="state"
             active={filters.state ?? ""}
             query={query}
@@ -125,7 +138,7 @@ export default async function KpisPage({
           />
           {owners.length > 0 ? (
             <FilterRow
-              label="Owner"
+              label={t("common.owner")}
               param="owner"
               active={filters.owner ?? ""}
               query={query}
@@ -134,7 +147,7 @@ export default async function KpisPage({
           ) : null}
           {grid.categories.length > 0 ? (
             <FilterRow
-              label="Category"
+              label={t("kpis.category")}
               param="category"
               active={filters.category ?? ""}
               query={query}
@@ -205,7 +218,9 @@ export default async function KpisPage({
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="text-xs text-ink-2">{kpi.title}</span>
                         {kpi.isCalculated ? (
-                          <Chip tone="info">{kpi.formula ?? "calculated"}</Chip>
+                          <Chip tone="info">
+                            {kpi.formula ?? t("kpis.grid.calculated")}
+                          </Chip>
                         ) : null}
                       </span>
                       <RowSparkline records={kpi.records} />
@@ -287,6 +302,7 @@ export default async function KpisPage({
                   {t("kpis.theCorridorDefaultsTo")}
                 </p>
               </ActionForm>
+              {suggestionOffered ? <KpiSuggestion /> : null}
             </CardBody>
           </Card>
 

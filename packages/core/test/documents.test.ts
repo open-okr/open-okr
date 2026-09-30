@@ -310,6 +310,40 @@ describe("attachments, which go on any subject", () => {
     expect(list[0]?.filename).toBe("plan.pdf");
   });
 
+  it("lets whoever can read the goal download what hangs on it", async () => {
+    // Found while fixing M-22. The file's own context binds only its uploader,
+    // and attaching it granted nothing, so the list showed a colleague a file
+    // the download then refused.
+    const blobId = await upload();
+    await expect(
+      call("blobs.getForDownload", { blobId }, OTHER),
+    ).rejects.toThrow(/No such/);
+
+    const attached = (await call("attachments.attach", {
+      subjectType: "goal",
+      subjectId: goalId,
+      blobId,
+    })) as { id: string };
+    const listed = (await call(
+      "attachments.list",
+      { subjectType: "goal", subjectId: goalId },
+      OTHER,
+    )) as { blobId: string }[];
+    expect(listed.map((one) => one.blobId)).toContain(blobId);
+    const download = (await call(
+      "blobs.getForDownload",
+      { blobId },
+      OTHER,
+    )) as { filename: string };
+    expect(download.filename).toBe("plan.pdf");
+
+    // Taken off again, it is the uploader's alone once more.
+    await call("attachments.detach", { id: attached.id });
+    await expect(
+      call("blobs.getForDownload", { blobId }, OTHER),
+    ).rejects.toThrow(/No such/);
+  });
+
   it("attaches the same file twice as one attachment", async () => {
     const blobId = await upload();
     await call("attachments.attach", {

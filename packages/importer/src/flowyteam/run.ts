@@ -25,6 +25,7 @@ import type { DomainReconciliation } from "./mappers/reconcile.ts";
 import { resolverFor } from "./mappers/resolve.ts";
 import { buildReport, type FlowyteamReport } from "./report.ts";
 import { openSource, type Source, SourceError } from "./source.ts";
+import { countUnread } from "./unread.ts";
 
 export interface FlowyteamRunOptions {
   readonly pool: Pool;
@@ -93,6 +94,10 @@ export async function runFlowyteamImport(
       (table) => !missingTables(introspection).has(table),
     );
     const counts = await countFor(source, company.id, present);
+    // Every run, whatever `--only` names: no domain reads these tables, so a
+    // run that left them out of its report would be dropping them silently
+    // (completeness review M-16).
+    const unread = await countUnread(source, company.id);
 
     const write = options.write ?? false;
     // Recorded before the first row, so a run that dies halfway leaves a row
@@ -144,6 +149,7 @@ export async function runFlowyteamImport(
       reconciliation,
       selected: selection.domains.map((domain) => domain.key),
       addedForDependencies: selection.added,
+      unread,
       extraNotes: notes,
     });
 

@@ -6,6 +6,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
 
@@ -21,7 +22,8 @@ export async function addDriver(
   const targetRaw = String(formData.get("targetDefault") ?? "").trim();
   const treeId = String(formData.get("treeId") ?? "").trim();
   if (title === "" || parentKpiId === "") {
-    return { error: "A driver needs a title and a parent to drive." };
+    const { t } = await getTranslations();
+    return { error: t("kpis.trees.actions.driverNeedsATitleAndParent") };
   }
   const target = Number(targetRaw);
 
@@ -78,7 +80,8 @@ export async function fileIntoTree(
   const kpiId = String(formData.get("kpiId") ?? "").trim();
   const treeId = String(formData.get("treeId") ?? "").trim();
   if (kpiId === "") {
-    return { error: "Pick a KPI to file." };
+    const { t } = await getTranslations();
+    return { error: t("kpis.trees.actions.pickAKpiToFile") };
   }
   const { session, workspace } = await requireWorkspace();
   try {
@@ -107,7 +110,8 @@ export async function addTree(
 ): Promise<WriteState> {
   const name = String(formData.get("name") ?? "").trim();
   if (name === "") {
-    return { error: "A tree needs a name. What does its root measure?" };
+    const { t } = await getTranslations();
+    return { error: t("kpis.trees.actions.treeNeedsAName") };
   }
   const { session, workspace } = await requireWorkspace();
   try {

@@ -25,11 +25,12 @@ export interface GridRecord {
  * Inline SVG rather than a chart library: twelve points and one path need no
  * dependency, and the grid draws one of these per row.
  */
-export function RowSparkline({
+export async function RowSparkline({
   records,
 }: {
   readonly records: readonly GridRecord[];
 }) {
+  const { t } = await getTranslations();
   const values = records
     .filter((record) => record.actualValue !== null)
     .map((record) => record.actualValue as number);
@@ -37,7 +38,9 @@ export function RowSparkline({
   if (values.length < 2) {
     return (
       <span className="text-xs text-ink-4" data-testid="sparkline-too-short">
-        {values.length === 0 ? "No values yet" : "One value so far"}
+        {values.length === 0
+          ? t("kpis.gridExtras.noValuesYet")
+          : t("kpis.gridExtras.oneValueSoFar")}
       </span>
     );
   }
@@ -55,16 +58,22 @@ export function RowSparkline({
     })
     .join(" ");
 
+  const described = t("kpis.gridExtras.periodsFromTo", {
+    count: values.length,
+    lowest,
+    highest,
+  });
+
   return (
     <svg
       viewBox="0 0 100 20"
       preserveAspectRatio="none"
       className="h-5 w-24 text-brand"
       role="img"
-      aria-label={`${values.length} periods, from ${lowest} to ${highest}`}
+      aria-label={described}
       data-testid="row-sparkline"
     >
-      <title>{`${values.length} periods, from ${lowest} to ${highest}`}</title>
+      <title>{described}</title>
       <polyline
         points={points}
         fill="none"
@@ -163,7 +172,7 @@ export interface FilterChoice {
  * state would lose both. Every chip is the current query with one key changed,
  * so combinations compose without a control that knows about the others.
  */
-export function FilterRow({
+export async function FilterRow({
   label,
   param,
   choices,
@@ -177,6 +186,7 @@ export function FilterRow({
   /** The whole current query, so one chip can change one key. */
   readonly query: Readonly<Record<string, string>>;
 }) {
+  const { t } = await getTranslations();
   const href = (value: string): string => {
     const next = new URLSearchParams(query);
     if (value === "") {
@@ -191,7 +201,7 @@ export function FilterRow({
   return (
     <div className="flex flex-wrap items-baseline gap-1.5">
       <span className="text-xs font-semibold text-ink-4">{label}</span>
-      {[{ value: "", label: "All" }, ...choices].map((choice) => (
+      {[{ value: "", label: t("goals.all") }, ...choices].map((choice) => (
         <Link
           key={choice.value || "all"}
           href={href(choice.value)}

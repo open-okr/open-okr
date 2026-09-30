@@ -10,28 +10,24 @@
  * the filtering. A member who loses a space stops seeing its rows on the next
  * query with no reindex.
  */
-import { activeOnly, kpis, withContext, workspaceMembers } from "@openokr/db";
-import { eq } from "drizzle-orm";
+import {
+  accessContexts,
+  activeOnly,
+  kpis,
+  withContext,
+  workspaceMembers,
+} from "@openokr/db";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { accessFilterMember, accessScopeFilter } from "../access/reads.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
+import { findByName, NAMED_KINDS } from "../search/entities.ts";
+import { resolveHrefs } from "../search/hrefs.ts";
 import { searchWithSemantic } from "../search/service.ts";
 import { defineReadAction } from "./define.ts";
-
-/** Where a result of each type opens. */
-const HREF_FOR: Readonly<Record<string, (id: string) => string>> = {
-  goal: (id) => `/goals/${id}`,
-  key_result: (id) => `/goals/${id}`,
-  kpi: (id) => `/kpis/${id}`,
-  initiative: (id) => `/initiatives/${id}`,
-  task: (id) => `/tasks/${id}`,
-  document: (id) => `/documents/${id}`,
-  session: (id) => `/session/${id}`,
-  comment: (id) => `/goals/${id}`,
-  check_in: (id) => `/goals/${id}`,
-};
 
 async function actingMember(
   tx: OperationTx,
@@ -111,15 +107,79 @@ export const runSearch = defineReadAction({
       context.embed ?? null,
     );
 
-    return hits.map((hit) => ({
-      entityType: hit.entityType,
-      entityId: hit.entityId,
-      title: hit.title,
-      snippet: hit.snippet,
-      href: HREF_FOR[hit.entityType]?.(hit.entityId) ?? "/",
-      rank: hit.rank,
-      semantic: hit.semantic,
-    }));
+    // Where each one opens, read from its parent where it has no page of its
+    // own (completeness review M-21). A result with nowhere to open, or in a
+    // session the reader is not in, is left out rather than pointed at the
+    // home page or at a refusal.
+    const hrefs = await resolveHrefs(
+      context.pool,
+      context.workspaceId,
+      memberId,
+      hits,
+    );
+    return hits.flatMap((hit) => {
+      const href = hrefs.get(`${hit.entityType}:${hit.entityId}`);
+      return href
+        ? [
+            {
+              entityType: hit.entityType,
+              entityId: hit.entityId,
+              title: hit.title,
+              snippet: hit.snippet,
+              href,
+              rank: hit.rank,
+              semantic: hit.semantic,
+            },
+          ]
+        : [];
+    });
+  },
+});
+
+const entitiesInput = z.object({
+  text: z.string().trim().min(1).max(200),
+  limit: z.number().int().min(1).max(20).optional(),
+});
+
+export const findEntities = defineReadAction({
+  name: "search.entities",
+  summary:
+    "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+  input: entitiesInput,
+  output: z.array(
+    z.object({
+      entityType: z.enum(NAMED_KINDS),
+      entityId: z.uuid(),
+      title: z.string(),
+      href: z.string(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  /**
+   * The jump by name that §3 asks of the palette (completeness review M-21).
+   *
+   * `search.jump` answers a short identifier, and only a KPI has one. This
+   * answers the start of a name, for goals, key results, KPIs, spaces, people,
+   * initiatives, tasks, documents, sessions and cycles, each filtered by the
+   * rule its own read applies. `search/entities.ts` says which rule is which.
+   */
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      return [];
+    }
+    const memberId = await withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      (rawTx) =>
+        actingMember(rawTx as OperationTx, context.workspaceId, userId),
+    );
+    return findByName(context.pool, {
+      workspaceId: context.workspaceId,
+      memberId,
+      text: input.text,
+      ...(input.limit ? { limit: input.limit } : {}),
+    });
   },
 });
 
@@ -141,13 +201,13 @@ export const readPaletteJump = defineReadAction({
    * **One table carries a short identifier today, and it is `kpis`.** S-32 asks
    * for an entity jump by short code, and only `kpis.short_id` exists: goals,
    * initiatives and tasks have none. So this answers for a KPI and answers null
-   * for everything else, rather than pretending to a lookup it cannot do. The
-   * palette falls back to the phrase search, which is what somebody typing a
-   * goal's name wanted anyway.
+   * for everything else, rather than pretending to a lookup it cannot do.
    *
-   * Giving the other three a short code is a schema change with an
-   * allocation scheme behind it, and it belongs to whichever task decides what
-   * those codes look like. Recorded on the P5-T13 row rather than guessed at.
+   * The jump by name is `search.entities`, beside this, and reaches every kind
+   * (completeness review M-21). The palette asks both. Giving the other kinds a
+   * short code is a schema change with an allocation scheme behind it, and it
+   * belongs to whichever task decides what those codes look like. Recorded on
+   * the P5-T13 row rather than guessed at.
    */
   async handler(context, input) {
     const userId = context.actor.userId;
@@ -165,16 +225,42 @@ export const readPaletteJump = defineReadAction({
       async (rawTx) => {
         const tx = rawTx as OperationTx;
         // Resolved so a suspended member gets nothing, the same as every read.
-        await actingMember(tx, context.workspaceId, userId);
+        const memberId = await actingMember(tx, context.workspaceId, userId);
 
+        // **Through the workspace's own context, which is the rule the index
+        // applies to a KPI** (completeness review M-21). This read used to
+        // answer any active member, so a guest who typed a KPI's code got its
+        // title from the jump while the jump by name, beside it, rightly
+        // offered them nothing. The two answer in one list, so they have to
+        // agree about who may see what.
         const [kpi] = await tx
           .select({ id: kpis.id, title: kpis.title })
           .from(kpis)
-          .where(
+          .innerJoin(
+            accessContexts,
             activeOnly(
-              kpis,
-              eq(kpis.workspaceId, context.workspaceId),
-              eq(kpis.shortId, code),
+              accessContexts,
+              eq(accessContexts.workspaceId, context.workspaceId),
+              eq(accessContexts.resourceType, "workspace"),
+              eq(accessContexts.resourceId, kpis.workspaceId),
+            ),
+          )
+          .where(
+            and(
+              activeOnly(
+                kpis,
+                eq(kpis.workspaceId, context.workspaceId),
+                eq(kpis.shortId, code),
+              ),
+              accessScopeFilter(accessContexts.id, {
+                workspaceId: context.workspaceId,
+                memberId,
+                minLevel: ACCESS_LEVELS.view,
+                member: await accessFilterMember(tx, {
+                  workspaceId: context.workspaceId,
+                  memberId,
+                }),
+              }),
             ),
           )
           .limit(1);

@@ -155,10 +155,26 @@ The rail shows, per key result:
 | Shown | Source |
 |---|---|
 | Progress | The measured value. The one that counts |
-| Linked work | Completed linked tasks over total linked tasks |
+| Linked work | Completed linked tasks over total linked tasks. A linked task names the key result, or belongs to an initiative serving it (M-26) |
 | Divergence | Present when the second is complete and the first has not moved |
 
 Two numbers, labelled differently, never added together.
+
+**Initiatives feed the second number, corrected at completeness review M-26.**
+This table counted only the tasks that named the key result, so an initiative
+fed nothing, and REQUIREMENTS §4 Pillar C says an initiative's progress feeds
+the key result's linked-work view. An initiative's progress is the share of its
+own tasks that are done, so its tasks now count as linked work for every key
+result it serves. Each task counts once however many routes reach it, and a
+dropped initiative contributes nothing. TECHNICAL-PLAN §4.9 holds the full rule.
+The rail lists the key results a card's initiative serves as well as the one the
+card names, filtered by what the reader can see of each key result's goal.
+
+**Given** an initiative serving a key result, with every one of its tasks done,
+and a measured value that has not moved,
+**when** the rail is drawn or the Coach's divergence check runs,
+**then** the linked work reads complete and the divergence names both figures,
+and the key result's progress is still the measured one.
 
 **Where the divergence lives, decided at P5-T11.** The rule is
 `packages/method/src/linked-work.ts`, pure, and it names both figures in one
@@ -177,6 +193,41 @@ folded into a task about tasks.
 facts the product already holds, so there is no band to tune and no wording to
 choose. The message cites `quality.divergence`, the rule §6.4 already defines,
 exactly as `divergence.ts` does.
+
+### 3.5 Three boards, presence and the keyboard (completeness review M-02)
+
+P5-T11 shipped the read for all three boards and a screen for one, with no
+presence and no way to reorder a column without a mouse. What was added:
+
+| Part | Decision | Why |
+|---|---|---|
+| Scopes | `/board?space=`, `?initiative=` and `?keyResult=` on one screen. Linked from the initiative page and from each key result on its goal's page | The read already answered all three. A second screen would be a second way to ask one question |
+| Scope access | `tasks.board` reads its scope through the getter before any card: a space or an initiative by its own context, a key result by its goal's. Every scope the input names is checked. A scope the reader cannot see is not-found | It answered an empty board instead, and the live stream took a successful read as its access check, so the stream opened for anybody |
+| A key result's cards | The tasks that name it and the tasks of every initiative serving it that is not dropped | M-26's linked work. The board and the rail's chip then count the same set |
+| Presence | Each open board says `here` on `workspace:{id}:presence:board:{kind}:{id}` every 20 seconds, answers a newcomer at once, and says `left` on close. A board silent for 50 seconds is dropped. Nothing is stored | Presence is true for seconds, so a table would be a write per heartbeat per tab for a fact nobody reads a minute later |
+| Who is named | Identifiers on the channel; the stream route turns them into names for its viewer through `boardReaders`, which re-checks each member's access to the scope and drops the suspended | The realtime port's rule, and a member who loses access leaves everybody's board at once rather than when their tab closes |
+| Realtime down | The stream answers 503, the browser stops retrying, and the board shows no presence | The board is drawn by the server, so it never depended on the stream |
+| Keyboard | A move handle per card. Space or Enter picks it up, arrows carry it within and across columns, Space or Enter drops, Escape puts it back. Each step is announced in a live region. The drop is one `tasks.move` | The WAI-ARIA pattern for a sortable list. Nothing is written until the drop, so a carry through five places is one write, under the same lock a drag takes |
+
+**Given** two members with the same space's board open,
+**when** either looks at the board,
+**then** each sees the other's name and neither sees their own, and when one
+leaves the other's board forgets them.
+
+**Given** a guest of one space,
+**when** they ask for another space's board, an initiative's or a key result's,
+**then** the answer is not-found, and their name is never drawn on a board they
+cannot read.
+
+**Given** a card focused by its move handle,
+**when** Space, then an arrow key, then Space are pressed,
+**then** one `tasks.move` is written with the card it now sits after, and the
+live region has said where it went.
+
+**A known limit, not new with M-02.** Positions are ordered within a space's
+column. A key result's board can hold cards from several spaces, and a card
+dropped after a card from another space lands at the end of its own space's
+column, which is where a drag has always put it.
 
 ## 4. Documents and attachments (P5-T12)
 
@@ -247,13 +298,70 @@ now and can have one from the first migration.
 
 ### 5.3 The palette
 
-Screen S-32. Entity jump by short identifier, actions from the registry, and
-recents. The actions it offers are the same registry entries the chat commands
-and the tools project, filtered by the reader's own access.
+Screen S-32. Entity jump by short identifier or name, actions, and search
+results, every one filtered by what the reader may open.
+
+**As built at completeness review M-21.** P5-T13 shipped a jump that reached a
+KPI by its short code and nothing else, no actions, and a search that never
+asked the semantic index. The palette now draws four groups:
+
+| Group | What it holds | Read | Shown |
+|---|---|---|---|
+| Go to | A KPI its short code names, then things of every kind whose name holds every typed word | `search.jump`, `search.entities` | When something matches |
+| Search results | Full-text matches not already under Go to | `search.query` with no embedding | When something matches |
+| Related | Semantic matches full text missed | `search.query` with the workspace's embedding function | Only when an AI provider is on and found something |
+| Actions | New objective, the theme switch, "search everything for", and every page the sidebar and the admin area offer this reader | None: each navigates, or calls an action that already exists | Always, and alone before anything is typed |
+
+| Kind the jump offers | Opens | Offered to |
+|---|---|---|
+| Goal, key result, KPI, initiative, task, document | Its page. A key result opens its goal at its own row | Whoever the index row's access context lets through |
+| Space | `/spaces/<id>` | View on the space's context, as `spaces.list` |
+| Session | `/session/<id>` | In the space, or a session with no space, as `sessions.read` |
+| Cycle | `/cycle?cycle=<id>` | View on the workspace's context, as `cycles.list` |
+| Person | `/people/<id>` | Every active member, as `people.directory` |
+
+**The actions are not the registry's entries, and that is a deviation from the
+line this section used to hold.** Nearly every registry action needs input a
+palette row cannot collect, so an action row either opens the page whose form
+collects it (New objective opens the drafting phase at its title field) or runs
+an action that needs none (the theme switch calls `people.updateOwnProfile`,
+the same write the avatar menu makes). No palette row is a new write path.
+
+**A session is stricter than the row that finds it.** The search index and the
+retrieval behind Related let a session through to anybody who can view its
+space, which is every member. A session, and a retro note, kudos, a learning or
+a next-cycle draft that opens one, is offered only to a reader in its space.
+The same rule now holds in `search.query`, so the search page follows it too.
+
+**The fast answer never waits on a model.** The jump and full text are one
+server action and the Related group is another, asked beside it, so a slow or
+failing provider delays or empties Related and nothing else. With no provider
+nothing is embedded and no Related group is drawn.
+
+**Not built, and still owed to UIUX-PLAN §3 and S-32:** recent items, and
+recents boosting the ranking, because nothing records what a member opened;
+and scoped tabs inside the palette, which the search page has as type filters.
+
+**A known limit at §13.1's scale.** The jump matches names with `ILIKE`, which
+no index serves. Measured on 29 September 2026 over 1.2 million titles in one
+workspace on the development machine: about 170 ms for a specific word and
+about 210 ms for a word 150,000 titles share, before the access
+filter runs on each match. A broad word can pass the 300 ms suggestion budget.
+A trigram index would serve it, and needs the `pg_trgm` extension, which is a
+deployment decision rather than this row's.
 
 **Given** any screen,
 **when** the palette is opened and a short identifier typed,
 **then** the entity opens inside the budget.
+
+**Given** a guest let into one task,
+**when** it types a word every goal, space, KPI and session in the workspace
+shares,
+**then** the palette offers that task and none of the rest.
+
+**Given** the AI provider is off,
+**when** a phrase is typed,
+**then** no embedding is asked for and no Related group is drawn.
 
 ### 5.4 Exports
 

@@ -392,33 +392,12 @@ const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
     if (!row) {
       return undefined;
     }
-    // A key result has no resolver of its own; its goal is what decides.
-    if (row.subjectType === "key_result") {
-      const goal = await tx.execute<{ goal_id: string }>(
-        sql`select goal_id from key_results
-             where id = ${row.subjectId}
-               and workspace_id = ${workspaceId}
-               and deleted_at is null
-             limit 1`,
-      );
-      const goalId = goal.rows[0]?.goal_id;
-      return goalId
-        ? SUBJECT_RESOLVERS.goal?.(tx, goalId, workspaceId)
-        : undefined;
-    }
-    // A cycle and a session belong to the workspace as far as access goes.
-    const parent =
-      row.subjectType === "cycle" || row.subjectType === "session"
-        ? "workspace"
-        : row.subjectType;
-    const resolver = SUBJECT_RESOLVERS[parent];
-    return resolver
-      ? resolver(
-          tx,
-          parent === "workspace" ? workspaceId : row.subjectId,
-          workspaceId,
-        )
-      : undefined;
+    return resolveParentContext(
+      tx,
+      row.subjectType,
+      row.subjectId,
+      workspaceId,
+    );
   },
   // P3-T16. Comments and reactions inherit their parent subject's context.
   comment: async (tx, subjectId, workspaceId) => {
@@ -439,10 +418,12 @@ const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
     if (!row) {
       return undefined;
     }
-    const parentResolver = SUBJECT_RESOLVERS[row.subjectType];
-    return parentResolver
-      ? parentResolver(tx, row.subjectId, workspaceId)
-      : undefined;
+    return resolveParentContext(
+      tx,
+      row.subjectType,
+      row.subjectId,
+      workspaceId,
+    );
   },
   reaction: async (tx, subjectId, workspaceId) => {
     const [row] = await tx
@@ -462,12 +443,199 @@ const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
     if (!row) {
       return undefined;
     }
-    const parentResolver = SUBJECT_RESOLVERS[row.subjectType];
-    return parentResolver
-      ? parentResolver(tx, row.subjectId, workspaceId)
-      : undefined;
+    return resolveParentContext(
+      tx,
+      row.subjectType,
+      row.subjectId,
+      workspaceId,
+    );
   },
 };
+
+/**
+ * The context a comment, a reaction or a document inherits from what it hangs
+ * on (completeness review M-01).
+ *
+ * **Wider than `SUBJECT_RESOLVERS`, and deliberately not part of it.** A key
+ * result, a check-in, a cycle and a session own no context, so they are absent
+ * from that map: a direct read of one is decided by its caller, and adding them
+ * there would change what the floor, the notification filter and the proposal
+ * rule do with every subject of those types. What this adds is narrower: when
+ * the walk up from a comment reaches one of them, where it lives.
+ *
+ * | Parent | Decided by |
+ * |---|---|
+ * | A key result | Its goal |
+ * | A check-in | The goal it reports on |
+ * | A cycle, a session | The workspace, which every active member reaches. The same rule a document on one has always had |
+ * | Anything in `SUBJECT_RESOLVERS` | Its own resolver |
+ *
+ * Anything else resolves to nothing, which every caller answers with
+ * not-found. Fail-closed, like the map.
+ */
+async function resolveParentContext<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  subjectType: string,
+  subjectId: string,
+  workspaceId: string,
+): Promise<SubjectContext | undefined> {
+  if (subjectType === "key_result" || subjectType === "check_in") {
+    const rows = await tx.execute<{ goal_id: string }>(
+      subjectType === "key_result"
+        ? sql`select goal_id from key_results
+               where id = ${subjectId}
+                 and workspace_id = ${workspaceId}
+                 and deleted_at is null
+               limit 1`
+        : sql`select subject_id as goal_id from check_ins
+               where id = ${subjectId}
+                 and workspace_id = ${workspaceId}
+                 and subject_type = 'goal'
+                 and deleted_at is null
+               limit 1`,
+    );
+    const goalId = rows.rows[0]?.goal_id;
+    return goalId
+      ? SUBJECT_RESOLVERS.goal?.(tx, goalId, workspaceId)
+      : undefined;
+  }
+  if (subjectType === "cycle" || subjectType === "session") {
+    return SUBJECT_RESOLVERS.workspace?.(tx, workspaceId, workspaceId);
+  }
+  const resolver = SUBJECT_RESOLVERS[subjectType];
+  return resolver ? resolver(tx, subjectId, workspaceId) : undefined;
+}
+
+/**
+ * The access-aware getter for the thing a comment or a reaction hangs on
+ * (completeness review M-01).
+ *
+ * `getAccessScoped` with one difference: the subject may be a key result, a
+ * check-in, a cycle or a session, which own no context and are resolved
+ * through their parent instead. A comment is readable, and writable, by
+ * whoever reads what it is on, so "no such key result" and "not yours to see"
+ * answer alike here exactly as they do there.
+ */
+export async function getParentAccessScoped<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: GetAccessScopedInput,
+): Promise<AccessScopedResource> {
+  const context = await resolveParentContext(
+    tx,
+    input.resourceType,
+    input.resourceId,
+    input.workspaceId,
+  );
+  const reached = await requireLevelOn(tx, input, context);
+
+  // **A draft has no discussion.** A draft document is its author's alone
+  // (P5-T12), and a comment on one would be a line in the goal's feed and a
+  // notification to its watchers, both about something they cannot open. So
+  // the walk refuses a draft for everybody: not-found for anybody else, which
+  // is what the document itself answers them, and a sentence for its author.
+  const draft = await draftUnder(
+    tx,
+    input.workspaceId,
+    input.resourceType,
+    input.resourceId,
+  );
+  if (draft) {
+    if (draft.authorMemberId === input.memberId) {
+      throw new OperationError(
+        "forbidden",
+        "A draft has no discussion yet. Publish it, and then it can be commented on and reacted to.",
+      );
+    }
+    throw new OperationError(
+      "not_found",
+      `No such ${input.resourceType}, or you do not have access to it.`,
+    );
+  }
+  return reached;
+}
+
+/**
+ * The draft document a comment or a reaction would hang on, if it would.
+ *
+ * Walks down from a reaction to its comment and from a comment to its subject,
+ * which are the only two ways to reach a document. Null when the walk ends
+ * anywhere else, or at a published document.
+ */
+async function draftUnder<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  subjectType: string,
+  subjectId: string,
+): Promise<{ readonly authorMemberId: string } | null> {
+  let type = subjectType;
+  let id = subjectId;
+  if (type === "reaction") {
+    const [row] = await tx
+      .select({
+        subjectType: reactions.subjectType,
+        subjectId: reactions.subjectId,
+      })
+      .from(reactions)
+      .where(
+        activeOnly(
+          reactions,
+          eq(reactions.workspaceId, workspaceId),
+          eq(reactions.id, id),
+        ),
+      )
+      .limit(1);
+    if (!row) {
+      return null;
+    }
+    type = row.subjectType;
+    id = row.subjectId;
+  }
+  if (type === "comment") {
+    const [row] = await tx
+      .select({
+        subjectType: comments.subjectType,
+        subjectId: comments.subjectId,
+      })
+      .from(comments)
+      .where(
+        activeOnly(
+          comments,
+          eq(comments.workspaceId, workspaceId),
+          eq(comments.id, id),
+        ),
+      )
+      .limit(1);
+    if (!row) {
+      return null;
+    }
+    type = row.subjectType;
+    id = row.subjectId;
+  }
+  if (type !== "document") {
+    return null;
+  }
+  const [row] = await tx
+    .select({
+      state: documents.state,
+      authorMemberId: documents.authorMemberId,
+    })
+    .from(documents)
+    .where(
+      activeOnly(
+        documents,
+        eq(documents.workspaceId, workspaceId),
+        eq(documents.id, id),
+      ),
+    )
+    .limit(1);
+  return row?.state === "draft" ? { authorMemberId: row.authorMemberId } : null;
+}
 
 export async function resolveSubjectContext<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -531,13 +699,24 @@ export async function getAccessScoped<
   tx: AnyTx<TSchema>,
   input: GetAccessScopedInput,
 ): Promise<AccessScopedResource> {
-  const requires = input.requires ?? ACCESS_LEVELS.view;
   const context = await resolveSubjectContext(
     tx,
     input.resourceType,
     input.resourceId,
     input.workspaceId,
   );
+  return requireLevelOn(tx, input, context);
+}
+
+/** The half both getters share: the level on a context, or not-found. */
+async function requireLevelOn<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: GetAccessScopedInput,
+  context: SubjectContext | undefined,
+): Promise<AccessScopedResource> {
+  const requires = input.requires ?? ACCESS_LEVELS.view;
   const notFound = () =>
     new OperationError(
       "not_found",

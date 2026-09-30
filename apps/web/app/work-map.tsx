@@ -3,8 +3,16 @@ import {
   confidenceBand,
   type ResolvedTerminology,
   type ResolvedThresholds,
+  TERMINOLOGY,
 } from "@openokr/method";
-import { Avatar, Bar, Card, CardBody, Chip } from "@openokr/ui";
+import {
+  Avatar,
+  Bar,
+  Card,
+  CardBody,
+  Chip,
+  type MessageValues,
+} from "@openokr/ui";
 import type { ReactNode } from "react";
 import { progressCeiling } from "../lib/ceilings.ts";
 import { workspaceTerminology } from "../lib/terminology.ts";
@@ -38,18 +46,40 @@ export function rowKindAbbreviation(
     .toUpperCase();
 }
 
+/**
+ * The chip's text for each kind of row, worked out once per table rather than
+ * once per row.
+ *
+ * A term the workspace kept reads the catalogue's own abbreviation, so a
+ * translator still owns it (M-15). A renamed one is abbreviated from the
+ * workspace's word, which is one pair of words in every language (M-14), so
+ * there is nothing to translate. Only the singular is compared, because it is
+ * the only word the abbreviation is built from.
+ */
+function rowKindLabels(
+  terms: ResolvedTerminology,
+  t: (key: string, values?: MessageValues) => string,
+): Readonly<Record<"goal" | "key_result", string>> {
+  return {
+    goal:
+      terms.objective.singular === TERMINOLOGY.objective.singular
+        ? t("workMap.obj")
+        : rowKindAbbreviation("goal", terms),
+    key_result:
+      terms.keyResult.singular === TERMINOLOGY.keyResult.singular
+        ? t("workMap.kr")
+        : rowKindAbbreviation("key_result", terms),
+  };
+}
+
 function RowKindChip({
   kind,
-  terms,
+  label,
 }: {
   readonly kind: "goal" | "key_result";
-  readonly terms: ResolvedTerminology;
+  readonly label: string;
 }) {
-  return (
-    <Chip tone={kind === "goal" ? "brand" : "neutral"}>
-      {rowKindAbbreviation(kind, terms)}
-    </Chip>
-  );
+  return <Chip tone={kind === "goal" ? "brand" : "neutral"}>{label}</Chip>;
 }
 
 /**
@@ -62,9 +92,12 @@ function RowKindChip({
 function ConfidenceChip({
   confidence,
   thresholds,
+  t,
 }: {
   readonly confidence: number | null;
   readonly thresholds: ResolvedThresholds;
+  /** The caller's `t`, so a row does not resolve the locale once per row. */
+  readonly t: (key: string, values?: MessageValues) => string;
 }) {
   if (confidence === null) {
     return <span className="text-xs text-ink-4">—</span>;
@@ -72,17 +105,14 @@ function ConfidenceChip({
   const verdict = confidenceBand(confidence, thresholds);
   const tone =
     verdict.band === "high" ? "ok" : verdict.band === "medium" ? "warn" : "bad";
+  const value = { confidence: confidence.toFixed(1) };
   const label =
     verdict.band === "high"
-      ? "High"
+      ? t("workMap.confidenceHigh", value)
       : verdict.band === "medium"
-        ? "Med"
-        : "Low";
-  return (
-    <Chip tone={tone}>
-      {label} {confidence.toFixed(1)}
-    </Chip>
-  );
+        ? t("workMap.confidenceMed", value)
+        : t("workMap.confidenceLow", value);
+  return <Chip tone={tone}>{label}</Chip>;
 }
 
 /**
@@ -157,7 +187,7 @@ export async function GoalTable({
   // P8-G04. A bar drawn on a 0-to-100 track under a raised ceiling fills
   // early and tells a screen reader 100 is the most there is.
   const ceiling = await progressCeiling();
-  const terms = await workspaceTerminology();
+  const rowKind = rowKindLabels(await workspaceTerminology(), t);
 
   const thresholds = canonThresholds();
 
@@ -225,7 +255,10 @@ export async function GoalTable({
                       className="flex items-center gap-2"
                       style={{ paddingLeft: `${node.depth * 18}px` }}
                     >
-                      <RowKindChip kind={node.kind} terms={terms} />
+                      <RowKindChip
+                        kind={node.kind}
+                        label={rowKind[node.kind]}
+                      />
                       <span
                         className={
                           node.kind === "goal"
@@ -249,6 +282,7 @@ export async function GoalTable({
                     <ConfidenceChip
                       confidence={node.confidence}
                       thresholds={thresholds}
+                      t={t}
                     />
                   </td>
                   <td className="hidden px-2 py-2 sm:table-cell">
@@ -298,11 +332,11 @@ export async function WorkMap({
 }) {
   const { t } = await getTranslations();
   const ceiling = await progressCeiling();
-  const terms = await workspaceTerminology();
 
   return (
     <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
-      <div className="min-w-0 flex-1">
+      {/* The first stop of the first-visit tour (L-08) outlines this. */}
+      <div className="min-w-0 flex-1" data-tour-target="work-map">
         <GoalTable
           nodes={nodes}
           selected={selected}
@@ -341,8 +375,8 @@ export async function WorkMap({
               <div className="flex flex-wrap items-center gap-1.5">
                 <Chip tone="neutral">
                   {selected.kind === "goal"
-                    ? terms.objective.singular.toLowerCase()
-                    : terms.keyResult.singular.toLowerCase()}
+                    ? t("workMap.objective")
+                    : t("workMap.keyResult")}
                 </Chip>
                 <HealthChip health={selected.health} />
               </div>

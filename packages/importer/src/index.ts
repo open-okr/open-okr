@@ -80,3 +80,9 @@ export {
   type Source,
   SourceError,
 } from "./flowyteam/source.ts";
+export {
+  countUnread,
+  UNREAD_TABLES,
+  type UnreadCount,
+  type UnreadTable,
+} from "./flowyteam/unread.ts";

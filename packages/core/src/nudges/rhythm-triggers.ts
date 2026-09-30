@@ -34,6 +34,7 @@ import {
   phasesClosingToday,
   type ResolvedThresholds,
   streakAtRisk,
+  type TriggerKey,
   trigger,
 } from "@openokr/method";
 import { and, eq, gte, inArray, isNotNull, isNull, ne } from "drizzle-orm";
@@ -55,7 +56,7 @@ const DAY_MS = 86_400_000;
 
 /** One nudge, with the rule key refused before the row exists. */
 function nudge(input: {
-  readonly ruleKey: string;
+  readonly ruleKey: TriggerKey;
   readonly subjectType: DueNudge["subjectType"];
   readonly subjectId: string;
   readonly recipientMemberId: string;

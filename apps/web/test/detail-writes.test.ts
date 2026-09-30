@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import { withMessages } from "./screen-text.ts";
 
 /**
  * The detail-page writes that had no browser caller (P6-G27, GAP-AUDIT §5).
@@ -36,13 +37,35 @@ describe("delete", () => {
     expect(deleteAction).toContain("const ACTION = {");
   });
 
-  test("states the soft-delete semantics on the confirmation", () => {
-    // The thing worth telling somebody is not "are you sure" but what a delete
-    // is in this product, and that does not fit in a dialog title.
-    expect(deleteControl).toContain("Nothing is destroyed");
-    expect(deleteControl).toContain("the history stays readable");
-    // Two presses, so the sentence is read before the second one.
-    expect(deleteControl).toContain("armed ? (");
+  test("restores through the same kind of allow-list (M-13)", () => {
+    for (const action of [
+      '"goals.restore"',
+      '"initiatives.restore"',
+      '"tasks.restore"',
+      '"documents.restore"',
+    ]) {
+      expect(deleteAction, action).toContain(action);
+    }
+    expect(deleteAction).toContain("const RESTORE = {");
+  });
+
+  test("offers an undo instead of asking twice, and says what a delete is", () => {
+    // UIUX-PLAN §1 and §4: reversible destruction gets a six second undo
+    // toast, not a confirmation. The sentence about what a delete is in this
+    // product travels in that toast, beside the Undo that makes it true.
+    expect(withMessages(deleteControl)).toContain("Nothing is destroyed");
+    expect(withMessages(deleteControl)).toContain("the history stays readable");
+    expect(withMessages(deleteControl)).toContain("Deleted items");
+    expect(deleteControl).toContain("restoreSubject(");
+    expect(deleteControl).toContain('t("deleteControl.undo")');
+    expect(deleteControl).not.toContain("armed");
+  });
+
+  test("the toast lives above every page, so the undo survives the move", () => {
+    // A delete sends the reader to another section, and every section renders
+    // its own shell. A provider inside the shell was replaced on that move.
+    expect(at("../app/layout.tsx")).toContain("<ToastProvider");
+    expect(at("../lib/app-shell.tsx")).not.toContain("<ToastProvider");
   });
 
   test("is on all four detail pages, and only above `full`", () => {
@@ -62,6 +85,26 @@ describe("delete", () => {
   });
 });
 
+describe("deleted items (M-13)", () => {
+  const page = at("../app/admin/deleted/page.tsx");
+  const button = at("../app/admin/deleted/restore-button.tsx");
+
+  test("lists through the one read, and restores through the one path", () => {
+    expect(page).toContain('"workspace.deletedItems"');
+    expect(button).toContain("restoreSubject(");
+  });
+
+  test("has its empty and permission-denied states", () => {
+    expect(page).toContain('t("admin.deleted.nothingDeleted")');
+    expect(page).toContain("level < ACCESS_LEVELS.full");
+    expect(page).toContain('t("admin.deleted.onlyAnAdministrator")');
+  });
+
+  test("keeps a refusal beside the row, because it names what to restore first", () => {
+    expect(button).toContain('role="alert"');
+  });
+});
+
 describe("the goal writes", () => {
   const writes = at("../app/goals/[id]/write-actions.ts");
 
@@ -72,8 +115,9 @@ describe("the goal writes", () => {
 
   test("revalidate the whole tree, because a move changes two cycles", () => {
     // The scorecard, the cycle screen and the Work Map all count by cycle, and
-    // none of them is this page.
-    expect(writes.split('revalidatePath("/", "layout")').length - 1).toBe(2);
+    // none of them is this page. Linking and unlinking a KPI move the goals
+    // above this one and the KPI's own page, so all three writes do it.
+    expect(writes.split('revalidatePath("/", "layout")').length - 1).toBe(3);
   });
 
   test("offer an unlink only where a key result has a KPI", () => {
@@ -97,7 +141,9 @@ describe("reactions", () => {
   test("the toggle is finally a toggle", () => {
     // It was named one and only ever added, so pressing an emoji a second time
     // did nothing and a reaction given by mistake stayed for good.
-    const actions = at("../app/goals/[id]/actions.ts");
+    // In the shared thread's writes since completeness review M-01, when the
+    // goal page stopped being the only page with a thread.
+    const actions = at("../lib/comment-actions.ts");
     expect(actions).toContain('"reactions.remove"');
     expect(actions).toContain("if (ownReactionId) {");
   });

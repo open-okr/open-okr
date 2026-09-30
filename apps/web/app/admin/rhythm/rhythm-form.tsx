@@ -64,23 +64,24 @@ import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
 type Rhythm = Awaited<ReturnType<typeof callAction<"rhythm.read">>>;
 type RegistryEntry = Rhythm["registry"][number];
 
+/** Catalogue keys for each group's card title. */
 const GROUP_TITLES: Record<string, string> = {
-  cadence: "Cadence and escalation",
-  scoring: "Confidence and scoring",
-  quality: "Quality and planning",
-  alignment: "Alignment",
-  kpi: "KPIs and recovery",
-  sessions: "Sessions",
+  cadence: "admin.rhythm.rhythmForm.groupCadence",
+  scoring: "admin.rhythm.rhythmForm.groupScoring",
+  quality: "admin.rhythm.rhythmForm.groupQuality",
+  alignment: "goals.alignment",
+  kpi: "admin.rhythm.rhythmForm.groupKpi",
+  sessions: "common.sessions",
 };
 
 const WEEKDAYS = [
-  [1, "Monday"],
-  [2, "Tuesday"],
-  [3, "Wednesday"],
-  [4, "Thursday"],
-  [5, "Friday"],
-  [6, "Saturday"],
-  [7, "Sunday"],
+  [1, "sessions.schedule.weekday.monday"],
+  [2, "sessions.schedule.weekday.tuesday"],
+  [3, "sessions.schedule.weekday.wednesday"],
+  [4, "sessions.schedule.weekday.thursday"],
+  [5, "sessions.schedule.weekday.friday"],
+  [6, "admin.rhythm.rhythmForm.saturday"],
+  [7, "admin.rhythm.rhythmForm.sunday"],
 ] as const;
 
 /**
@@ -479,6 +480,7 @@ function ResetCard({
   readonly disabled: boolean;
   readonly onOutcome: (outcome: RhythmState, cleared: boolean) => void;
 }) {
+  const { t } = useTranslations();
   const [pending, start] = useTransition();
 
   return (
@@ -486,11 +488,7 @@ function ResetCard({
       type="button"
       disabled={disabled || pending}
       onClick={() => {
-        if (
-          !window.confirm(
-            "Return every threshold in this card to its default? Anything this workspace changed here goes back to the method's own number. Nothing else moves.",
-          )
-        ) {
+        if (!window.confirm(t("admin.rhythm.rhythmForm.resetCardConfirm"))) {
           return;
         }
         start(async () => {
@@ -500,7 +498,9 @@ function ResetCard({
       }}
       className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60"
     >
-      {pending ? "Resetting…" : "Reset to defaults"}
+      {pending
+        ? t("admin.rhythm.rhythmForm.resetting")
+        : t("common.resetToDefaults")}
     </button>
   );
 }
@@ -700,7 +700,9 @@ function SettingsCard({
                 size="sm"
                 disabled={pending}
               >
-                {pending ? "Saving…" : t("common.save")}
+                {pending
+                  ? t("admin.rhythm.rhythmForm.saving")
+                  : t("common.save")}
               </Button>
             ) : null}
           </div>
@@ -748,11 +750,11 @@ export function RhythmForm({
     register({
       id: "form.save",
       keys: "⌘⏎",
-      description: "Save the card the caret is in",
+      description: t("admin.rhythm.rhythmForm.saveTheCardShortcut"),
       group: "Detail",
     });
     return () => unregister("form.save");
-  }, [register, unregister]);
+  }, [register, unregister, t]);
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -802,9 +804,9 @@ export function RhythmForm({
               defaultValue={String(rhythm.checkInAnchorDay)}
               className="rounded-md border border-line bg-bg px-2 py-1"
             >
-              {WEEKDAYS.map(([value, label]) => (
+              {WEEKDAYS.map(([value, labelKey]) => (
                 <option key={value} value={value}>
-                  {label}
+                  {t(labelKey)}
                 </option>
               ))}
             </select>
@@ -840,7 +842,7 @@ export function RhythmForm({
           <SettingsCard
             key={group}
             id={group}
-            title={GROUP_TITLES[group] ?? group}
+            title={GROUP_TITLES[group] ? t(GROUP_TITLES[group]) : group}
             canManage={canManage}
             resetKeys={rows.map((entry) => entry.key)}
           >

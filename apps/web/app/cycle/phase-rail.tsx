@@ -2,6 +2,7 @@ import { PHASE_GUIDANCE } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
+import { phaseHref } from "./cycle-href.ts";
 
 /**
  * The eight phases down the left of the cycle workspace (UIUX-PLAN.md §4 S-04:
@@ -21,7 +22,7 @@ export interface PhaseSummary {
   readonly conditions: { readonly met: number; readonly total: number };
 }
 
-function Mark({
+async function Mark({
   phase,
   state,
   current,
@@ -30,6 +31,7 @@ function Mark({
   readonly state: PhaseSummary["state"];
   readonly current: boolean;
 }) {
+  const { t } = await getTranslations();
   const base =
     "flex size-6 flex-none items-center justify-center rounded-full text-xs font-bold";
   if (state === "pass") {
@@ -37,7 +39,7 @@ function Mark({
       <span
         role="img"
         className={`${base} bg-ok text-white`}
-        aria-label={`Phase ${phase} is complete`}
+        aria-label={t("cycle.phaseRail.phaseIsComplete", { phase })}
       >
         ✓
       </span>
@@ -48,7 +50,7 @@ function Mark({
       <span
         role="img"
         className={`${base} bg-raised text-ink-4`}
-        aria-label={`Phase ${phase} does not apply to this cycle`}
+        aria-label={t("cycle.phaseRail.phaseDoesNotApply", { phase })}
       >
         –
       </span>
@@ -62,7 +64,7 @@ function Mark({
           ? `${base} bg-brand text-white`
           : `${base} border border-line bg-surface text-ink-3`
       }
-      aria-label={`Phase ${phase} is not complete`}
+      aria-label={t("cycle.phaseRail.phaseIsNotComplete", { phase })}
     >
       {phase}
     </span>
@@ -72,9 +74,12 @@ function Mark({
 export async function PhaseRail({
   phases,
   currentPhase,
+  pinnedCycleId,
 }: {
   readonly phases: readonly PhaseSummary[];
   readonly currentPhase: number;
+  /** The cycle the reader opened by name, which every phase link keeps. */
+  readonly pinnedCycleId: string | null;
 }) {
   const { t } = await getTranslations();
 
@@ -101,7 +106,7 @@ export async function PhaseRail({
           return (
             <Link
               key={entry.phase}
-              href={`/cycle?phase=${entry.phase}`}
+              href={phaseHref(entry.phase, pinnedCycleId)}
               aria-current={current ? "step" : undefined}
               className={
                 current
@@ -122,7 +127,7 @@ export async function PhaseRail({
                 </span>
                 <span className="text-xs text-ink-3">
                   {entry.state === "not_applicable"
-                    ? "Annual cycles only"
+                    ? t("cycle.phaseRail.annualCyclesOnly")
                     : (guidance?.output ?? "")}
                 </span>
                 {current && total > 0 ? (

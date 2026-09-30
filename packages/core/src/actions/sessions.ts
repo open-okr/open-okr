@@ -55,8 +55,10 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
+  afterWeeklyCheckIn,
   CLOSE_DECISION_MEANINGS,
   cadenceCoverage,
+  currentStreakOn,
   cycleScore,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
@@ -73,6 +75,7 @@ import {
   rhythmScore,
   roomPulseRead,
   WEEKLY_STAGE_KEYS,
+  weekStartOf,
 } from "@openokr/method";
 import {
   and,
@@ -163,7 +166,13 @@ function stageKeysFor(kind: string): readonly string[] | null {
   }
 }
 
-async function requireSessionAccess(
+/**
+ * One session, authorised through its space, or not-found.
+ *
+ * Exported for `sessions.postDigest` (completeness review M-23), which lives in
+ * its own file and must refuse exactly as the note beside it does.
+ */
+export async function requireSessionAccess(
   tx: OperationTx,
   workspaceId: string,
   memberId: string,
@@ -1195,8 +1204,10 @@ export const skipSession = defineWriteAction({
         .set({ state: "skipped", updatedAt: now })
         .where(activeOnly(sessions, eq(sessions.id, input.id)));
 
-      // Reset streak on skip (§7.4: a skipped week breaks it).
-      if (session.spaceId) {
+      // Reset streak on skip (§7.4: a skipped week breaks it). Only the weekly
+      // check-in's own skip: a skipped monthly review is not a skipped week
+      // (completeness review M-04).
+      if (session.spaceId && session.kind === "weekly") {
         const [existing] = await tx
           .select()
           .from(streaks)
@@ -1264,9 +1275,23 @@ export const closeSession = defineWriteAction({
 
       const now = new Date();
 
-      // Generate digest from session data.
+      // **The weekly check-in only** (completeness review M-04). A monthly or
+      // quarterly close wrote a weekly digest too, with an average of zero
+      // because those rituals have no confidence round, which drew a collapse
+      // on the trend that never happened; and each one added a week to the
+      // streak. §7.4's streak is "weeks in which a space held its check-in".
       let digestId: string | null = null;
-      if (session.spaceId) {
+      if (session.spaceId && session.kind === "weekly") {
+        // The week in the workspace's own timezone, and its Monday, so every
+        // close in one week lands on one digest period and one streak week.
+        // It was the UTC date of the close, so a Monday-morning session in
+        // Kuala Lumpur was filed under Sunday.
+        const heldOn = localDateOf(
+          now,
+          await workspaceTimeZone(tx, workspaceId),
+        );
+        const weekStart = weekStartOf(heldOn);
+
         const confirmations = await tx
           .select({
             keyResultId: sessionConfidences.keyResultId,
@@ -1282,10 +1307,12 @@ export const closeSession = defineWriteAction({
           );
 
         const confidences = confirmations.map((c) => Number(c.confidence));
+        // Absent rather than zero when nothing was confirmed: the trend skips
+        // a week with no figure instead of plotting one nobody gave.
         const avgConfidence =
           confidences.length > 0
             ? confidences.reduce((s, v) => s + v, 0) / confidences.length
-            : 0;
+            : null;
 
         // §3.2's boundaries, resolved for this workspace (P6-G19b).
         //
@@ -1328,7 +1355,6 @@ export const closeSession = defineWriteAction({
           );
         const commitmentCount = commitmentRow?.count ?? 0;
 
-        const weekStart = now.toISOString().slice(0, 10);
         digestId = crypto.randomUUID();
         await tx.insert(digests).values({
           id: digestId,
@@ -1338,7 +1364,9 @@ export const closeSession = defineWriteAction({
           period: "weekly",
           periodStart: weekStart,
           body: {
-            averageConfidence: Math.round(avgConfidence * 100) / 100,
+            ...(avgConfidence === null
+              ? {}
+              : { averageConfidence: Math.round(avgConfidence * 100) / 100 }),
             onTrackCount: onTrack,
             atRiskCount: atRisk,
             blockerCount,
@@ -1346,11 +1374,8 @@ export const closeSession = defineWriteAction({
           },
           generatedAt: now,
         });
-      }
 
-      // Update streak.
-      if (session.spaceId) {
-        const weekStart = now.toISOString().slice(0, 10);
+        // The streak, counted in weeks by §7.4's own rule.
         const [existing] = await tx
           .select()
           .from(streaks)
@@ -1361,17 +1386,26 @@ export const closeSession = defineWriteAction({
             ),
           )
           .limit(1);
-
+        const next = afterWeeklyCheckIn(
+          existing
+            ? {
+                currentWeeks: existing.currentWeeks,
+                longestWeeks: existing.longestWeeks,
+                lastWeek: existing.lastSessionWeek
+                  ? weekStartOf(existing.lastSessionWeek)
+                  : null,
+              }
+            : null,
+          heldOn,
+        );
         if (existing) {
-          const newCurrent = existing.currentWeeks + 1;
-          const newLongest = Math.max(existing.longestWeeks, newCurrent);
           // openokr:allow-mutation: streak is derived, not a domain change.
           await tx
             .update(streaks)
             .set({
-              currentWeeks: newCurrent,
-              longestWeeks: newLongest,
-              lastSessionWeek: weekStart,
+              currentWeeks: next.currentWeeks,
+              longestWeeks: next.longestWeeks,
+              lastSessionWeek: next.lastWeek,
               updatedAt: now,
             })
             .where(eq(streaks.id, existing.id));
@@ -1381,9 +1415,9 @@ export const closeSession = defineWriteAction({
             id: crypto.randomUUID(),
             workspaceId,
             spaceId: session.spaceId,
-            currentWeeks: 1,
-            longestWeeks: 1,
-            lastSessionWeek: weekStart,
+            currentWeeks: next.currentWeeks,
+            longestWeeks: next.longestWeeks,
+            lastSessionWeek: next.lastWeek,
           });
         }
       }
@@ -2247,6 +2281,21 @@ export const sessionConfidenceStatus = defineReadAction({
       confirmed: z.boolean(),
       confirmedConfidence: z.number().nullable(),
       whatChanged: z.string().nullable(),
+      /**
+       * Whether the space votes before the facilitator confirms (completeness
+       * review M-03). The same on every row; carried per row so the one read
+       * the panel makes answers every question it asks.
+       */
+      teamVoting: z.boolean(),
+      /** How many have voted. A count only, so nobody anchors before reveal. */
+      votesCast: z.number().int(),
+      revealed: z.boolean(),
+      /** Every vote, after reveal only. Empty before. */
+      votes: z.array(z.object({ memberId: z.uuid(), confidence: z.number() })),
+      /** The room's mean, after reveal only. */
+      average: z.number().nullable(),
+      /** The caller's own vote, which they may always see. */
+      myVote: z.number().nullable(),
     }),
   ),
   access: ACCESS_LEVELS.view,
@@ -2260,6 +2309,12 @@ export const sessionConfidenceStatus = defineReadAction({
       confirmed: boolean;
       confirmedConfidence: number | null;
       whatChanged: string | null;
+      teamVoting: boolean;
+      votesCast: number;
+      revealed: boolean;
+      votes: { memberId: string; confidence: number }[];
+      average: number | null;
+      myVote: number | null;
     }>
   > {
     const db = drizzle(context.pool);
@@ -2324,14 +2379,83 @@ export const sessionConfidenceStatus = defineReadAction({
 
         const confirmedMap = new Map(confirmed.map((c) => [c.keyResultId, c]));
 
+        const [space] = await tx
+          .select({ settings: spaces.settings })
+          // openokr:allow-raw-read: the session was read under the caller's
+          // own membership above; this reads one setting of its space to say
+          // which confidence round the panel should draw.
+          .from(spaces)
+          .where(
+            activeOnly(
+              spaces,
+              eq(spaces.id, session.spaceId),
+              eq(spaces.workspaceId, context.workspaceId),
+            ),
+          )
+          .limit(1);
+        const teamVoting = resolveSpaceSettingsFrom(space?.settings).teamVoting;
+
+        const [me] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+            ),
+          )
+          .limit(1);
+
+        const cast = await tx
+          .select({
+            keyResultId: checkInVotes.keyResultId,
+            memberId: checkInVotes.memberId,
+            confidence: checkInVotes.confidence,
+            revealedAt: checkInVotes.revealedAt,
+          })
+          .from(checkInVotes)
+          .where(
+            activeOnly(
+              checkInVotes,
+              eq(checkInVotes.workspaceId, context.workspaceId),
+              eq(checkInVotes.sessionId, input.sessionId),
+            ),
+          );
+
         return krs.map((kr) => {
           const c = confirmedMap.get(kr.id);
+          const mine = cast.filter((vote) => vote.keyResultId === kr.id);
+          // Revealed together or not at all: `sessions.revealVotes` stamps
+          // every vote for the key result in one statement.
+          const revealed =
+            mine.length > 0 && mine.every((vote) => vote.revealedAt !== null);
+          const shown = revealed
+            ? mine.map((vote) => ({
+                memberId: vote.memberId,
+                confidence: Number(vote.confidence),
+              }))
+            : [];
+          const own = mine.find((vote) => vote.memberId === me?.id);
           return {
             keyResultId: kr.id,
             title: kr.title,
             confirmed: !!c,
             confirmedConfidence: c ? Number(c.confirmedConfidence) : null,
             whatChanged: c?.whatChanged ?? null,
+            teamVoting,
+            votesCast: mine.length,
+            revealed,
+            votes: shown,
+            average:
+              shown.length === 0
+                ? null
+                : Math.round(
+                    (shown.reduce((sum, vote) => sum + vote.confidence, 0) /
+                      shown.length) *
+                      100,
+                  ) / 100,
+            myVote: own ? Number(own.confidence) : null,
           };
         });
       },
@@ -3148,8 +3272,26 @@ export const readStreak = defineReadAction({
           )
           .limit(1);
 
+        // Broken once a whole week has passed with no check-in, whether or
+        // not anybody pressed skip (completeness review M-04). The stored
+        // number is the run as of the last close; this is the run today.
+        const today = localDateOf(
+          new Date(),
+          await workspaceTimeZone(tx, context.workspaceId),
+        );
         return {
-          currentWeeks: row?.currentWeeks ?? 0,
+          currentWeeks: currentStreakOn(
+            row
+              ? {
+                  currentWeeks: row.currentWeeks,
+                  longestWeeks: row.longestWeeks,
+                  lastWeek: row.lastSessionWeek
+                    ? weekStartOf(row.lastSessionWeek)
+                    : null,
+                }
+              : null,
+            today,
+          ),
           longestWeeks: row?.longestWeeks ?? 0,
           lastSessionWeek: row?.lastSessionWeek ?? null,
         };

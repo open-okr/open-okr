@@ -550,8 +550,8 @@ export async function runOperation<TResult, TLoaded = undefined>(
           throw new OperationError(
             "forbidden",
             current.state === "frozen"
-              ? "This workspace is frozen. Only member and settings management is allowed until it is reactivated."
-              : "This workspace is read-only. Only member and settings management is allowed until it is reactivated.",
+              ? "This workspace is frozen. Only member and settings management, and turning single sign-on on or off, are allowed until it is reactivated."
+              : "This workspace is read-only. Only member and settings management, and turning single sign-on on or off, are allowed until it is reactivated.",
           );
         }
       }

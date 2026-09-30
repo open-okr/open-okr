@@ -32,6 +32,18 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import {
+  AGENT_RUN_STEP_TOPIC,
+  type AgentRunStepJob,
+  type AgentRunStepOutcome,
+  parseAgentRunStepJob,
+} from "../agents/run-steps.ts";
+import {
+  BLOB_SCAN_TOPIC,
+  parseScanJob,
+  runScanJob,
+  type ScanFile,
+} from "../blobs/scan.ts";
 import { parseCopilotRunJob, runCopilotAnswer } from "../copilot/background.ts";
 
 import type { EmbedFunction } from "../embeddings/service.ts";
@@ -47,6 +59,7 @@ import { digestItemsFor } from "../notifications/digest.ts";
 import { DIGEST_TOPIC } from "../notifications/drain.ts";
 import { renderDigest } from "../notifications/templates.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
+import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
@@ -110,6 +123,12 @@ export interface OutboxHandlerDeps {
     /** The approved template, for a provider that will carry nothing else. */
     readonly templateKey?: string;
     readonly templateParameters?: readonly string[];
+    /**
+     * The provider's own channel id, for a post to a space's channel rather
+     * than to a member (completeness review M-23). Present exactly when
+     * `memberId` is null, and the host sends it with `sendToChannel`.
+     */
+    readonly target?: string;
     readonly idempotencyKey: string;
   }) => Promise<{
     readonly delivered: boolean;
@@ -126,18 +145,57 @@ export interface OutboxHandlerDeps {
    */
   readonly putFile?: PutFile;
   /**
+   * Reads one stored file back, or null when the object is gone (completeness
+   * review M-24). What a virus scan reads. A function rather than the port,
+   * for the reason `putFile` is one.
+   */
+  readonly getFile?: (key: string) => Promise<Buffer | null>;
+  /**
+   * The virus scanner this instance is configured with, or null for none
+   * (completeness review M-24).
+   *
+   * A function resolved when a scan is delivered rather than a scanner built
+   * once, because `scan.clamd.host` is a stored setting an administrator can
+   * change while the relay runs, and because every other topic should not pay
+   * for reading it.
+   */
+  readonly scanner?: () => Promise<ScanFile | null>;
+  /**
    * The workspace's AI drafter (P4-T14b-b).
    *
    * A function rather than the provider itself, for the reason every other
    * dependency here is one: the provider lives in `packages/adapters`. Absent,
    * or answering null, means this workspace has no provider configured and a
    * copilot run halts saying so rather than failing.
+   *
+   * `forUser` is the account that asked (completeness review M-36), so the
+   * host can answer with that person's own key where they stored one. A run
+   * nobody asked for passes nothing and gets the workspace's.
    */
   readonly drafterFor?: (
     workspaceId: string,
+    forUser?: string,
   ) => Promise<AgentDrafter | null | undefined>;
+  /**
+   * Takes one step of an agent run (completeness review M-11).
+   *
+   * A function rather than the run executor itself, because the executor
+   * lives in `packages/agents`, which depends on this package. The host joins
+   * the two, and resolves the run's AI provider through its one choke point
+   * while it does. Absent means this process runs no agents.
+   */
+  readonly continueAgentRun?: (
+    job: AgentRunStepJob,
+  ) => Promise<AgentRunStepOutcome>;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
+  /**
+   * What the instance calls itself, for the words around those links
+   * (completeness review M-33). Resolved by the host per delivery, like mail
+   * settings, because a rename should reach the next email. Absent says
+   * "OpenOKR".
+   */
+  readonly instanceName?: string;
   /** Where a skipped delivery is reported. */
   readonly onSkipped?: (delivery: OutboxDelivery, reason: string) => void;
 }
@@ -250,13 +308,14 @@ const sendInvitation: OutboxHandler = async (delivery, deps) => {
   }
 
   const link = `${withoutTrailingSlashes(deps.baseUrl)}/join/${token}`;
+  const name = instanceNameOr(deps.instanceName);
   await deps.sendMail({
     to,
-    subject: "You have been invited to OpenOKR",
+    subject: `You have been invited to ${name}`,
     // Plain text, and short. The link is the message; anything else is
     // decoration around a URL somebody is about to click.
     text: [
-      "You have been invited to a workspace on OpenOKR.",
+      `You have been invited to a workspace on ${name}.`,
       "",
       link,
       "",
@@ -437,9 +496,14 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     buttons?: unknown;
     templateKey?: unknown;
     templateParameters?: unknown;
+    target?: unknown;
   };
   const text = asString(payload.text);
   const templateKey = asString(payload.templateKey);
+  // A post to a space's own channel names where it goes and nobody it is for
+  // (M-23). Only ever read on a row with no member: a member's message goes to
+  // their own identity, whatever its payload says.
+  const target = row.memberId === null ? asString(payload.target) : null;
   // **A template message has no text, and that is not an empty message**
   // (P5-T04b-b). WhatsApp outside its conversation window carries the approved
   // template and nothing else, so the row is a template name and its filled-in
@@ -472,6 +536,7 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
             templateParameters: payload.templateParameters as readonly string[],
           }
         : {}),
+      ...(target ? { target } : {}),
       idempotencyKey: row.idempotencyKey,
     })
     // A driver that throws is a failed send, not a crashed relay. The row
@@ -524,7 +589,12 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     // anybody on this provider goes to email and its owner is told once that
     // it needs reconnecting. Without this the same send would fail again every
     // hour and nobody would ever be told why.
-    if (row.provider !== "email") {
+    //
+    // **Not for a post to a space's channel** (M-23). The bot not being in
+    // one team's channel is that space's link being wrong, not the
+    // connection: marking it broken would move every member of the workspace
+    // off Slack because one space pasted the wrong id. The row says why.
+    if (row.provider !== "email" && !target) {
       // openokr:allow-mutation: the delivery side of the outbox, recording
       // what a driver just reported. Not a domain write.
       await withWorkspace(db, workspaceId, (tx) =>
@@ -621,7 +691,9 @@ const runCopilot: OutboxHandler = async (delivery, deps) => {
       `${delivery.topic} does not carry a copilot run, so nothing can answer it.`,
     );
   }
-  const drafter = await deps.drafterFor?.(job.workspaceId);
+  // The asker's own key where they stored one, as the same question answered
+  // in the request would have used (M-36).
+  const drafter = await deps.drafterFor?.(job.workspaceId, job.userId);
   const outcome = await runCopilotAnswer(
     {
       pool: deps.pool,
@@ -634,6 +706,76 @@ const runCopilot: OutboxHandler = async (delivery, deps) => {
   );
   if (outcome.haltedReason) {
     deps.onSkipped?.(delivery, outcome.haltedReason);
+  }
+};
+
+/**
+ * Scans one held file and records the verdict (completeness review M-24).
+ *
+ * **Safe to run twice**: `runScanJob` leaves a file alone once it is no longer
+ * `scanning`, so a redelivery costs one read.
+ *
+ * **Nothing here decides a file is clean.** A scanner that cannot be reached
+ * throws, and so does a relay with no scanner or no storage to read from: the
+ * relay backs off and tries again, and at its ceiling the row is a dead letter
+ * in the log. The file stays held throughout. Releasing it unscanned because
+ * this one process was missing a setting would make the scan a formality
+ * whenever a replica was configured differently from the rest.
+ */
+const scanBlob: OutboxHandler = async (delivery, deps) => {
+  const job = parseScanJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} has no workspace and file on its payload, so nothing can be scanned.`,
+    );
+  }
+  if (!deps.getFile) {
+    throw new Error(
+      "A file is waiting for a virus scan and this relay has no file storage to read it from.",
+    );
+  }
+  const scanFile = await deps.scanner?.();
+  if (!scanFile) {
+    throw new Error(
+      "A file is waiting for a virus scan and no scanner is configured where this relay runs. It stays held until scan.clamd.host names one.",
+    );
+  }
+  const outcome = await runScanJob(job, {
+    pool: deps.pool,
+    getFile: deps.getFile,
+    scanFile,
+  });
+  if (outcome.kind === "skipped") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
+};
+
+/**
+ * Takes the next step of an agent run (completeness review M-11).
+ *
+ * **The run advances one task per delivery.** Each step that leaves tasks
+ * behind enqueues the next one in its own transaction, so a run survives a
+ * restart between any two steps: what is left to do is on the run row, not in
+ * this process.
+ *
+ * **Safe to run twice** by the task index on the row: a step delivered again
+ * after the run moved past it finds a different index and is skipped, and so
+ * is one for a run somebody cancelled in the meantime.
+ */
+const continueAgentRun: OutboxHandler = async (delivery, deps) => {
+  const job = parseAgentRunStepJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not carry a run and a task index, so no step can be taken.`,
+    );
+  }
+  if (!deps.continueAgentRun) {
+    deps.onSkipped?.(delivery, "this process runs no agents");
+    return;
+  }
+  const outcome = await deps.continueAgentRun(job);
+  if (outcome.kind === "skipped") {
+    deps.onSkipped?.(delivery, outcome.reason);
   }
 };
 
@@ -677,7 +819,31 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // (P4-T14b-b). Before this, an answer existed only inside one HTTP response
   // and closing the tab took the run with it.
   "copilot.run": runCopilot,
+  // One step of an agent run (completeness review M-11). The executor has
+  // written this topic since P2-T17 and nothing read it, so a run started
+  // through `agents.startRun` sat at its first task forever.
+  [AGENT_RUN_STEP_TOPIC]: continueAgentRun,
+  // The virus scan (completeness review M-24). Written by a claim only when a
+  // scanner is configured, so an instance without one never sees this topic.
+  [BLOB_SCAN_TOPIC]: scanBlob,
   "workspace.renamed": acknowledge,
+};
+
+/**
+ * What each topic's payload must lose once it is delivered (completeness
+ * review M-19). The relay strips these fields in the statement that marks the
+ * row delivered.
+ *
+ * An invitation's email carries the raw token and the address, because the row
+ * is the only place either exists once the write commits: the invitation
+ * table holds the token's digest. After the email has gone, both are a secret
+ * and a personal address kept for nothing. Every other topic carries
+ * identifiers only.
+ */
+export const OUTBOX_REDACT_ON_DELIVERY: Readonly<
+  Record<string, readonly string[]>
+> = {
+  "invitation.email": ["to", "token"],
 };
 
 /** Runs one delivery, or refuses it permanently when nothing handles it. */

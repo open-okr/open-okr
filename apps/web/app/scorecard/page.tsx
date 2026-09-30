@@ -1,12 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import { resolveAccessLevelFor } from "../../lib/access";
+import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
-import { handOver, recordPerformance } from "./actions.ts";
+import { closeCycle } from "../cycle/frame-actions.ts";
 
 /**
  * The scorecard (METHOD.md §8.9, TECHNICAL-PLAN §4.6, P3-T15).
@@ -29,13 +29,22 @@ export default async function ScorecardPage() {
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
-  const scorecard = await callAction(context, "cycles.scorecard", {});
-  const cycles = await callAction(context, "cycles.list", {});
-  const level = await resolveAccessLevelFor(
+  // Before the first read, so a guest is moved rather than refused (L-23).
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );
-  const canEdit = level >= ACCESS_LEVELS.edit;
+  const scorecard = await callAction(context, "cycles.scorecard", {});
+  const cycles = await callAction(context, "cycles.list", {});
+  // `full`, which is what `cycles.close` requires. A control that will be
+  // refused for everybody below it is a control nobody below it should see.
+  const canClose = level >= ACCESS_LEVELS.full;
+  // The cycles still open, oldest first: the one most likely to be waiting on
+  // its close is the oldest one nobody has closed. `cycles.list` is newest
+  // first.
+  const closable = cycles
+    .filter((cycle) => cycle.status !== "closed")
+    .reverse();
 
   // The trend, as a sparkline over the results that exist. Cycles with no
   // result are skipped rather than drawn at zero: a cycle nobody scored is not
@@ -85,10 +94,14 @@ export default async function ScorecardPage() {
             </h1>
             <p className="text-xs text-ink-3">
               {scorecard.rows.length === 0
-                ? "No cycle has been archived yet."
-                : `${scorecard.rows.length} archived cycle${
-                    scorecard.rows.length === 1 ? "" : "s"
-                  }, oldest first.`}
+                ? t("scorecard.noCycleHasBeen")
+                : scorecard.rows.length === 1
+                  ? t("scorecard.archivedCyclesOne", {
+                      count: scorecard.rows.length,
+                    })
+                  : t("scorecard.archivedCyclesOther", {
+                      count: scorecard.rows.length,
+                    })}
             </p>
           </div>
           {scorecard.rows.length > 0 ? (
@@ -107,7 +120,11 @@ export default async function ScorecardPage() {
               viewBox={`0 0 ${trendWidth} ${trendHeight}`}
               className="h-10 w-full max-w-sm"
               role="img"
-              aria-label={`The result across ${points.length} scored cycles, from ${points[0]?.value.toFixed(2)} to ${points[points.length - 1]?.value.toFixed(2)}`}
+              aria-label={t("scorecard.resultAcrossScoredCycles", {
+                count: points.length,
+                from: points[0]?.value.toFixed(2) ?? "",
+                to: points[points.length - 1]?.value.toFixed(2) ?? "",
+              })}
             >
               <title>{t("scorecard.resultAcrossCycles")}</title>
               <polyline
@@ -202,7 +219,15 @@ export default async function ScorecardPage() {
         </CardBody>
       </Card>
 
-      {canEdit ? (
+      {/*
+       * **One control, where two buttons were** (M-05). Recording the result
+       * and handing over to the next cycle were separate forms here, and
+       * nothing set a cycle to closed. Closing now does both, as METHOD.md
+       * §8.9 says the close does. It stays on this screen as well as on phase
+       * 7 because the cycle screen shows the current cycle, and the one
+       * waiting to close has usually just stopped being current.
+       */}
+      {canClose && closable.length > 0 ? (
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
@@ -211,11 +236,11 @@ export default async function ScorecardPage() {
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             <ActionForm
-              action={recordPerformance}
+              action={closeCycle}
               className="flex flex-wrap items-center gap-2"
             >
               <label className="text-xs text-ink-3" htmlFor="cycleId">
-                {t("scorecard.recordTheResultOf")}
+                {t("scorecard.cycleToClose")}
               </label>
               <select
                 id="cycleId"
@@ -223,7 +248,7 @@ export default async function ScorecardPage() {
                 required
                 className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
               >
-                {cycles.map((cycle) => (
+                {closable.map((cycle) => (
                   <option key={cycle.id} value={cycle.id}>
                     {cycle.name}
                   </option>
@@ -233,54 +258,12 @@ export default async function ScorecardPage() {
                 type="submit"
                 className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
               >
-                {t("common.record")}
-              </button>
-            </ActionForm>
-
-            <ActionForm
-              action={handOver}
-              className="flex flex-wrap items-center gap-2"
-            >
-              <label className="text-xs text-ink-3" htmlFor="fromCycleId">
-                {t("scorecard.handOverFrom")}
-              </label>
-              <select
-                id="fromCycleId"
-                name="fromCycleId"
-                required
-                className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
-              >
-                {cycles.map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {cycle.name}
-                  </option>
-                ))}
-              </select>
-              <label className="text-xs text-ink-3" htmlFor="toCycleId">
-                {t("scorecard.into")}
-              </label>
-              <select
-                id="toCycleId"
-                name="toCycleId"
-                required
-                className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
-              >
-                {cycles.map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {cycle.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
-              >
-                {t("scorecard.handOver")}
+                {t("scorecard.close")}
               </button>
             </ActionForm>
 
             <p className="text-xs text-ink-4">
-              {t("scorecard.bothBelongToThe")}
+              {t("scorecard.closingRecordsAndFeeds")}
             </p>
           </CardBody>
         </Card>
@@ -295,8 +278,8 @@ export default async function ScorecardPage() {
         <CardBody>
           <p className="text-sm text-ink-3">
             {scorecard.pointsEnabled
-              ? "The points layer is on for this workspace."
-              : "The points layer is off, and no points exist. It stays off until somebody turns it on."}
+              ? t("scorecard.thePointsLayerIsOn")
+              : t("scorecard.thePointsLayerIsOff")}
           </p>
         </CardBody>
       </Card>

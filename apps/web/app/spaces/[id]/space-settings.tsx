@@ -36,14 +36,117 @@ export interface SpaceSettings {
   readonly teamVoting: boolean;
   readonly coachStrictness: string | null;
   readonly defaultCheckInFrequency: string | null;
+  /** The channel this space posts its digest to, per provider (M-23). */
+  readonly slackChannel: string | null;
+  readonly teamsChannel: string | null;
+}
+
+/** The two providers a space can post to, as AI-NATIVE-PLAN §5.2 names them. */
+type PostProvider = "slack" | "teams";
+
+const CHANNEL_FIELDS: readonly {
+  readonly provider: PostProvider;
+  readonly name: "slackChannel" | "teamsChannel";
+  readonly label: string;
+  readonly placeholder: string;
+}[] = [
+  {
+    provider: "slack",
+    name: "slackChannel",
+    label: "spaces.detail.spaceSettings.slackChannel",
+    placeholder: "C0123ABCD",
+  },
+  {
+    provider: "teams",
+    name: "teamsChannel",
+    label: "spaces.detail.spaceSettings.teamsChannel",
+    placeholder: "19:…@thread.tacv2",
+  },
+];
+
+/**
+ * Where this space's digest is posted (AI-NATIVE-PLAN §5.2, completeness
+ * review M-23).
+ *
+ * **A field only for a provider the workspace has connected.** A channel id on
+ * a provider nobody connected is a link that never posts, and the field would
+ * invite it. With neither connected the card says who can change that, rather
+ * than drawing two inputs that do nothing.
+ */
+function ChannelFields({
+  settings,
+  connected,
+}: {
+  readonly settings: SpaceSettings;
+  readonly connected: readonly string[];
+}) {
+  const { t } = useTranslations();
+  const offered = CHANNEL_FIELDS.filter((field) =>
+    connected.includes(field.provider),
+  );
+
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="text-ink">
+        {t("spaces.detail.spaceSettings.whereTheDigestIsPosted")}
+      </legend>
+      {offered.length === 0 ? (
+        <span className="text-xs text-ink-3">
+          {t("spaces.detail.spaceSettings.noChannelConnected")}
+        </span>
+      ) : (
+        <>
+          {offered.map((field) => (
+            <label key={field.name} className="flex flex-col gap-1">
+              <span className="text-sm text-ink-2">{t(field.label)}</span>
+              <input
+                name={field.name}
+                defaultValue={settings[field.name] ?? ""}
+                placeholder={field.placeholder}
+                spellCheck={false}
+                autoComplete="off"
+                className="w-72 rounded-md border border-line bg-bg px-2 py-1 font-mono text-xs"
+              />
+            </label>
+          ))}
+          <span className="text-xs text-ink-3">
+            {t("spaces.detail.spaceSettings.channelHint")}
+          </span>
+        </>
+      )}
+    </fieldset>
+  );
+}
+
+/** What a reader who cannot change it sees: where it posts, or that it does not. */
+function channelSummary(
+  settings: SpaceSettings,
+  t: (key: string, values?: Record<string, string>) => string,
+): string {
+  const linked = [
+    settings.slackChannel ? `Slack (${settings.slackChannel})` : null,
+    settings.teamsChannel ? `Teams (${settings.teamsChannel})` : null,
+  ].filter((one): one is string => one !== null);
+  return linked.length > 0
+    ? t("spaces.detail.spaceSettings.postsItsDigestTo", {
+        channels: linked.join(", "),
+      })
+    : t("spaces.detail.spaceSettings.postsItsDigestNowhere");
 }
 
 /** What each strictness does, rather than three words to guess between. */
-const STRICTNESS_MEANING: Record<string, string> = {
-  advisory: "the Coach comments and refuses nothing",
-  warn: "the Coach warns, and the six publish gates still refuse",
-  strict: "the Coach refuses what it warns about",
-};
+function strictnessMeaning(option: string, t: (key: string) => string): string {
+  switch (option) {
+    case "advisory":
+      return t("spaces.detail.spaceSettings.strictnessAdvisory");
+    case "warn":
+      return t("spaces.detail.spaceSettings.strictnessWarn");
+    case "strict":
+      return t("spaces.detail.spaceSettings.strictnessStrict");
+    default:
+      return "";
+  }
+}
 
 export function SpaceSettingsCard({
   spaceId,
@@ -51,6 +154,7 @@ export function SpaceSettingsCard({
   workspaceStrictness,
   workspaceFrequency,
   canManage,
+  connectedProviders = [],
 }: {
   readonly spaceId: string;
   readonly settings: SpaceSettings;
@@ -58,6 +162,8 @@ export function SpaceSettingsCard({
   readonly workspaceStrictness: string;
   readonly workspaceFrequency: string;
   readonly canManage: boolean;
+  /** Providers the workspace has connected, so only those are offered. */
+  readonly connectedProviders?: readonly string[];
 }) {
   const { t } = useTranslations();
 
@@ -74,24 +180,32 @@ export function SpaceSettingsCard({
             {t("spaces.detail.spaceSettings.spaceSettings")}
           </h2>
           <Chip tone={settings.teamVoting ? "ok" : "neutral"}>
-            {settings.teamVoting ? "team voting on" : "team voting off"}
+            {settings.teamVoting
+              ? t("spaces.detail.spaceSettings.teamVotingOn")
+              : t("spaces.detail.spaceSettings.teamVotingOff")}
           </Chip>
         </CardHeader>
         <CardBody className="flex flex-col gap-1 text-sm text-ink-2">
           <p>
-            {t("spaces.detail.spaceSettings.coachingStrictness3", {
-              workspaceStrictness:
-                settings.coachStrictness ??
-                `the workspace's (${workspaceStrictness})`,
-            })}
+            {settings.coachStrictness !== null
+              ? t("spaces.detail.spaceSettings.coachingStrictness3", {
+                  workspaceStrictness: settings.coachStrictness,
+                })
+              : t("spaces.detail.spaceSettings.coachingStrictnessInherited", {
+                  workspaceStrictness,
+                })}
           </p>
           <p>
-            {t("spaces.detail.spaceSettings.defaultCheckInFrequency3", {
-              workspaceFrequency:
-                settings.defaultCheckInFrequency ??
-                `the workspace's (${workspaceFrequency})`,
-            })}
+            {settings.defaultCheckInFrequency !== null
+              ? t("spaces.detail.spaceSettings.defaultCheckInFrequency3", {
+                  workspaceFrequency: settings.defaultCheckInFrequency,
+                })
+              : t(
+                  "spaces.detail.spaceSettings.defaultCheckInFrequencyInherited",
+                  { workspaceFrequency },
+                )}
           </p>
+          <p>{channelSummary(settings, t)}</p>
           <p className="text-xs text-ink-3">
             {t("spaces.detail.spaceSettings.changingTheseIsThe")}
           </p>
@@ -151,7 +265,7 @@ export function SpaceSettingsCard({
               </option>
               {COACH_STRICTNESS.map((option) => (
                 <option key={option} value={option}>
-                  {option}: {STRICTNESS_MEANING[option] ?? ""}
+                  {option}: {strictnessMeaning(option, t)}
                 </option>
               ))}
             </select>
@@ -185,9 +299,13 @@ export function SpaceSettingsCard({
             </span>
           </label>
 
+          <ChannelFields settings={settings} connected={connectedProviders} />
+
           <div className="flex flex-col gap-1">
             <Button type="submit" disabled={pending} className="self-start">
-              {pending ? "Saving…" : "Save space settings"}
+              {pending
+                ? t("spaces.detail.spaceSettings.saving")
+                : t("spaces.detail.spaceSettings.saveSpaceSettings")}
             </Button>
             {state.error ? (
               <p

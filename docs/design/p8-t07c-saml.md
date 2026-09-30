@@ -194,10 +194,13 @@ the base URL and the provider id, never stored, because a stored copy is the
 one that drifts and the symptom would be an identity provider posting a valid
 assertion to an address that answers 404.
 
-**The document is served after the next restart**, because the plugin is
-mounted at boot and only when a SAML provider already exists. That is the same
-restart every connection on this screen already waits for, and the screen says
-so.
+**The document is served from the next request, with no restart**
+(completeness review L-15). The plugin is only mounted when a SAML provider
+exists when the auth instance is built, so this used to wait for a restart,
+the same one every connection on this screen waited for. Each process now
+reads a stamp of `sso_connections` every few seconds and rebuilds its
+instance when it moves (`packages/core/src/auth/sso-refresh.ts`), which mounts
+the plugin for the first SAML provider as it does any other change.
 
 ### Enforcement
 
@@ -220,9 +223,12 @@ Every provider went to `signIn.social`, which for a SAML one reached a provider
 
 ### What this still does not do
 
-- **No editing or removal from the screen.** A connection is created and then
-  changed in the database. That was true of OIDC before this row and is not
-  made worse by it, but it is the obvious next row.
+- ~~**No editing or removal from the screen.**~~ Built since: every
+  connection has Edit, Turn off or Turn on, and Remove, through
+  `sso.updateConnection`, `sso.setConnectionEnabled` and
+  `sso.removeConnection`. Each writes the derived row inside its own
+  transaction, so an edited SAML provider's plugin row changes with it, and a
+  connection that is off or removed has none.
 - **No signed authentication requests.** As above: `authnRequestsSigned` stays
   false and no private key of ours is stored.
 - **No IdP-initiated sign-in.** Service-provider initiated only, which is what

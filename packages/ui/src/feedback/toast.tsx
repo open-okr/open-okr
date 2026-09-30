@@ -78,6 +78,19 @@ export interface ToastRequest {
    * card, one toast.
    */
   readonly source?: string;
+  /**
+   * One thing the reader can do about it, which in practice is an undo
+   * (completeness review M-13).
+   *
+   * §1's seventh principle gives reversible destruction an undo toast rather
+   * than an "are you sure", and a toast that only says a thing happened cannot
+   * take it back. Pressing it closes the toast first, so a second press cannot
+   * run the action twice while the first is still on its way.
+   */
+  readonly action?: {
+    readonly label: string;
+    readonly run: () => void;
+  };
 }
 
 interface Toast extends ToastRequest {
@@ -265,11 +278,29 @@ function ToastRegion({
               {toast.message}
             </p>
           </div>
+          {toast.action ? (
+            <button
+              type="button"
+              data-testid="toast-action"
+              onClick={() => {
+                onDismiss(toast.id);
+                toast.action?.run();
+              }}
+              className="ml-auto shrink-0 rounded-md px-2 py-0.5 text-sm font-semibold text-brand-text hover:bg-ink/[0.045] focus:outline-2 focus:outline-brand"
+            >
+              {toast.action.label}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => onDismiss(toast.id)}
             aria-label={dismissLabel}
-            className="ml-auto rounded-md px-1.5 py-0.5 text-sm text-ink-3 hover:text-ink focus:outline-2 focus:outline-brand"
+            className={cn(
+              "rounded-md px-1.5 py-0.5 text-sm text-ink-3 hover:text-ink focus:outline-2 focus:outline-brand",
+              // The action takes the push to the right edge when there is one,
+              // so the two buttons sit together rather than apart.
+              !toast.action && "ml-auto",
+            )}
           >
             ✕
           </button>

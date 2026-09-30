@@ -13,6 +13,7 @@ import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledge } from "./actions.ts";
 import { NudgeProvenance } from "./nudge-provenance.tsx";
+import { ProposalDecision } from "./proposal-decision.tsx";
 
 /**
  * Review, "what I owe" (UIUX-PLAN.md §4 S-02, P3-T08).
@@ -224,11 +225,19 @@ function Count({
  * composer itself lives at `/check-in`, already built at P3-T07, so this opens
  * that rather than growing a second one nobody would keep in step with the
  * first.
+ *
+ * **An agent proposal is decided on the row** (M-08): its preview and its two
+ * answers sit under the title, and the card carries the anchor the inbox's own
+ * `href` points at, so a link to the proposal from anywhere lands on it.
  */
 function Row({ obligation }: { readonly obligation: Obligation }) {
   const overdue = obligation.group === "overdue";
   return (
-    <Card>
+    <Card
+      id={
+        obligation.proposal ? `proposal-${obligation.proposal.id}` : undefined
+      }
+    >
       <CardBody className="flex items-start justify-between gap-3.5 py-2.5">
         <span
           aria-hidden="true"
@@ -238,12 +247,15 @@ function Row({ obligation }: { readonly obligation: Obligation }) {
               : "mt-0.5 h-9 w-1 flex-none rounded-full bg-line"
           }
         />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-sm font-semibold text-ink">
             {obligation.title}
           </span>
           <span className="text-xs text-ink-3">{obligation.meta}</span>
-        </span>
+          {obligation.proposal ? (
+            <ProposalDecision proposal={obligation.proposal} />
+          ) : null}
+        </div>
         <span className="flex flex-none items-center gap-2.5">
           <span
             className={
@@ -265,7 +277,7 @@ function Row({ obligation }: { readonly obligation: Obligation }) {
                 {obligation.actionLabel}
               </Button>
             </ActionForm>
-          ) : (
+          ) : obligation.proposal ? null : (
             // An anchor rather than a Button, because this navigates. `Button`
             // renders a `<button>` and only a `<button>`, and wrapping a link in
             // one would take the middle-click, the open-in-new-tab and the

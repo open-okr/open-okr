@@ -1,11 +1,13 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { redirect } from "next/navigation";
-import { resolveAccessLevelFor } from "../../lib/access";
+import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
-import { mapNodesFor } from "../goal-nodes.ts";
-import { type MapNode, WorkMap } from "../work-map.tsx";
+import { FirstVisitTour } from "../first-visit-tour.tsx";
+import { goalTreeNodes } from "../goal-nodes.ts";
+import { TrustedDomainOffers } from "../trusted-domain-offers.tsx";
+import { WorkMap } from "../work-map.tsx";
 import {
   type ScopeTab,
   type WorkMapContext,
@@ -56,11 +58,15 @@ export default async function HomePage({
    * The default is `true`, so a workspace nobody marked never comes here: only
    * one provisioning wrote `false` for is pending.
    */
-  const level = await resolveAccessLevelFor(
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+
+  // **Somebody who holds nothing on the workspace itself is a guest**
+  // (completeness review M-22), and `workspaceReaderLevel` has already sent
+  // them to the spaces they can open, which is the one they were asked into.
 
   const welcome = await callAction(context, "settings.readForMember", {});
   // **Only somebody who can finish the setup is sent to it** (P8-G05a). S-34
@@ -78,6 +84,10 @@ export default async function HomePage({
   ) {
     redirect("/welcome");
   }
+  // The first-visit tour (UIUX-PLAN S-34, L-08). Here, because this is the
+  // screen every first visit lands on, and after the redirect above, so an
+  // owner meets the setup first and the tour when they arrive.
+  const tour = await callAction(context, "people.readOwnTour", {});
   const query = await searchParams;
 
   const cycles = await callAction(context, "cycles.list", {});
@@ -120,7 +130,7 @@ export default async function HomePage({
       })
     : null;
 
-  const nodes = flatten(goals);
+  const nodes = goalTreeNodes(t, goals);
   const selected = nodes.find((node) => node.id === query.node) ?? null;
 
   // Health lives on the goal, never on a key result (METHOD.md §3.5), so "on
@@ -203,6 +213,13 @@ export default async function HomePage({
 
   return (
     <div className="flex w-full flex-col gap-3.5">
+      {/* Completeness review M-34: the workspaces this member's domain
+          admits, drawn only when there are some. */}
+      <TrustedDomainOffers
+        userId={session.user.id}
+        email={session.user.email}
+      />
+
       <WorkMapContextStrip
         context={workMapContext}
         cycleHref={cycleId ? `/cycle?cycle=${cycleId}` : "/cycle"}
@@ -213,6 +230,12 @@ export default async function HomePage({
         scopeLabel={scopeLabel}
         stats={stats}
       />
+
+      {/* Under the page's own heading, so the outline reads Work map and then
+          the tour, and above the tree its first stop outlines, so a keyboard
+          meets the card before the rows it introduces. Gone for good once
+          finished or ended. */}
+      {tour.finished ? null : <FirstVisitTour />}
 
       <WorkMapScopeTabs
         tabs={scopeTabs}
@@ -260,52 +283,4 @@ export default async function HomePage({
       </p>
     </div>
   );
-}
-
-type Goal = Awaited<
-  ReturnType<typeof callAction<"goals.list">>
->["goals"][number];
-
-/**
- * Parents before children, key results under the goal that owns them.
- *
- * A goal whose parent is not in the set is drawn at the root rather than
- * dropped, the same way the explorer treats one: a tree that silently omits work
- * is worse than one that shows it at the wrong indent.
- */
-function flatten(goals: readonly Goal[]): MapNode[] {
-  const present = new Set(goals.map((goal) => goal.id));
-  const childrenOf = new Map<string, Goal[]>();
-  const roots: Goal[] = [];
-  for (const goal of goals) {
-    const parent = goal.parentGoalId;
-    if (parent && present.has(parent)) {
-      const siblings = childrenOf.get(parent);
-      if (siblings) {
-        siblings.push(goal);
-      } else {
-        childrenOf.set(parent, [goal]);
-      }
-    } else {
-      roots.push(goal);
-    }
-  }
-
-  const out: MapNode[] = [];
-  const seen = new Set<string>();
-  const walk = (goal: Goal, depth: number): void => {
-    if (seen.has(goal.id)) {
-      // Unreachable through the interface, reachable through a bad import.
-      return;
-    }
-    seen.add(goal.id);
-    out.push(...mapNodesFor(goal, depth));
-    for (const child of childrenOf.get(goal.id) ?? []) {
-      walk(child, depth + 1);
-    }
-  };
-  for (const root of roots) {
-    walk(root, 0);
-  }
-  return out;
 }

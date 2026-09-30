@@ -52,6 +52,7 @@ describe("the rhythm and thresholds card", () => {
     // There are eighteen of these and they were all read-only.
     expect(composite.length).toBeGreaterThan(10);
     expect(form).toContain("numericParts(resolved)");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
     expect(form).toContain("`${prefix}:${entry.key}:${part}`");
   });
 
@@ -105,6 +106,7 @@ describe("the rhythm and thresholds card", () => {
     // Every other long screen in this product already saves per card, so this
     // was the one outlier rather than a pattern.
     expect(form).toContain("function SettingsCard");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
     expect(form).toContain("data-testid={`rhythm-card-${id}`}");
     // And the page itself no longer wraps everything in one form.
     expect(form).not.toContain("<form action={submit} aria-busy={pending}");

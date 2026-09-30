@@ -1,7 +1,9 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { workspaceReaderLevel } from "../../lib/access";
 import { FeedLive } from "../../lib/feed-live.tsx";
+import { getInstanceName } from "../../lib/instance-name";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -67,6 +69,8 @@ export default async function ActivityPage({
   const { t } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
+  // A guest holds nothing here, and is moved to their spaces (L-23).
+  await workspaceReaderLevel(workspace.workspaceId, workspace.memberId);
   const context = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
@@ -76,12 +80,14 @@ export default async function ActivityPage({
   const params = await searchParams;
   const cursor = parseCursor(params.at, params.id);
 
-  const [items, directory, settings] = await Promise.all([
+  const [items, directory, settings, instanceName] = await Promise.all([
     callAction(context, "activities.workspaceFeed", {
       ...(cursor ? { cursor } : {}),
     }),
     callAction(context, "people.directory", {}),
     callAction(context, "settings.readForMember", {}),
+    // A system principal's rows read as the instance acting (M-33).
+    getInstanceName(),
   ]);
 
   const names = new Map(directory.map((member) => [member.id, member.name]));
@@ -110,8 +116,8 @@ export default async function ActivityPage({
           {items.length === 0 ? (
             <p className="text-sm text-ink-3">
               {cursor
-                ? "Nothing further back than this."
-                : "Nothing yet. Every check-in, goal, session and setting change lands here as it happens."}
+                ? t("activity.nothingFurtherBack")
+                : t("activity.nothingYet")}
             </p>
           ) : (
             <ul className="flex flex-col gap-2.5">
@@ -124,8 +130,9 @@ export default async function ActivityPage({
                     <span className="text-sm text-ink">{item.rendered}</span>
                     <span className="text-xs text-ink-4">
                       {item.actorMemberId
-                        ? (names.get(item.actorMemberId) ?? "A member")
-                        : "OpenOKR"}
+                        ? (names.get(item.actorMemberId) ??
+                          t("activity.aMember"))
+                        : instanceName}
                       {" · "}
                       {when(item.at, timeZone)}
                     </span>

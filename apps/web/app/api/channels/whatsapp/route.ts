@@ -29,14 +29,11 @@ import {
   workspaceForProviderTeam,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
-import { runInbound } from "../../../../lib/channel-inbound";
+import { refuse, runInbound } from "../../../../lib/channel-inbound";
 import { getPool } from "../../../../lib/pool";
 import { getKeyRing } from "../../../../lib/secrets";
 
 export const dynamic = "force-dynamic";
-
-/** Refused, and never says why: a body would confirm the endpoint exists. */
-const refused = (): Response => new Response(null, { status: 403 });
 
 /**
  * Meta's subscription handshake.
@@ -45,13 +42,20 @@ const refused = (): Response => new Response(null, { status: 403 });
  * webhook, because the handshake carries no body to read it from. A caller who
  * guesses a number they do not have a token for gets the same 403 as a caller
  * who guesses nothing, so nothing here confirms which numbers this instance
- * knows.
+ * knows. The same 403 in the same time, too (completeness review L-10): a
+ * known number is refused only after a second read and a decryption, and the
+ * shared refusal floor is what keeps that from showing.
+ *
+ * 403 rather than the POST's 401 because that is what Meta's own examples
+ * answer a token that does not match with. Every refusal here is 403, so the
+ * difference between the two methods says nothing about any number.
  */
 export async function GET(request: NextRequest): Promise<Response> {
+  const startedAt = Date.now();
   const parameters = request.nextUrl.searchParams;
   const phoneNumberId = parameters.get("phone_number_id") ?? "";
   if (phoneNumberId === "") {
-    return refused();
+    return refuse("whatsapp", "no_tenant", startedAt, 403);
   }
 
   const workspaceId = await workspaceForProviderTeam(getPool(), {
@@ -59,7 +63,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     teamId: phoneNumberId,
   });
   if (!workspaceId) {
-    return refused();
+    return refuse("whatsapp", "unknown_tenant", startedAt, 403);
   }
 
   const connection = await openConnection(getPool(), getKeyRing(), {
@@ -68,12 +72,12 @@ export async function GET(request: NextRequest): Promise<Response> {
   });
   const secret = connection ? parseWhatsAppSecret(connection.secret) : null;
   if (!secret) {
-    return refused();
+    return refuse("whatsapp", "no_connection", startedAt, 403);
   }
 
   const challenge = verifySubscription(parameters, secret.verifyToken);
   return challenge === null
-    ? refused()
+    ? refuse("whatsapp", "failed_verification", startedAt, 403)
     : new Response(challenge, {
         status: 200,
         headers: { "content-type": "text/plain; charset=utf-8" },
@@ -83,15 +87,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 export async function POST(request: NextRequest): Promise<Response> {
   return runInbound(request, {
     provider: "whatsapp",
-    resolveWorkspace({ rawBody }) {
-      const number = whatsAppPhoneNumberId(rawBody);
-      return number
-        ? workspaceForProviderTeam(getPool(), {
-            provider: "whatsapp",
-            teamId: number,
-          })
-        : Promise.resolve(null);
-    },
+    tenantOf: ({ rawBody }) => whatsAppPhoneNumberId(rawBody),
     buildDriver(secret, config) {
       const parsed = parseWhatsAppSecret(secret);
       const phoneNumberId = config.teamId;

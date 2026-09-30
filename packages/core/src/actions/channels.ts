@@ -55,6 +55,7 @@ import {
   type StoredTemplate,
 } from "../channels/templates.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { encryptSecret, type KeyRing } from "../secrets/key-ring.ts";
 import { DEFAULT_MESSAGE_LOG_RETENTION_DAYS } from "../settings/registry.ts";
 import {
@@ -996,10 +997,13 @@ export const testSend = defineWriteAction({
   }),
   output: z.object({ queued: z.boolean(), provider: messageProviderSchema }),
   access: ACCESS_LEVELS.full,
-  operation: (_context, input) => ({
+  operation: (context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = requireMember(actor);
       const provider = "email" as const;
+      // Written now, delivered by the relay later: the name is the one the
+      // host resolved when the button was pressed (M-33).
+      const name = instanceNameOr(context.instanceName);
 
       // openokr:allow-mutation: inside this operation's own transaction.
       const [row] = await tx
@@ -1010,8 +1014,8 @@ export const testSend = defineWriteAction({
           direction: "out" as const,
           memberId,
           payload: {
-            text: "This is a test from OpenOKR. Your channel works.",
-            subject: "OpenOKR test message",
+            text: `This is a test from ${name}. Your channel works.`,
+            subject: `${name} test message`,
           },
           idempotencyKey: `channel.test:${memberId}:${input.attempt}`,
           status: "queued" as const,

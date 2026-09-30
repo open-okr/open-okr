@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { CATALOGUES } from "@openokr/ui";
+import { CATALOGUES, fillTermHole } from "@openokr/ui";
 
 /**
  * What a screen says, read from its source (P6-G22c).
@@ -22,8 +22,45 @@ import { CATALOGUES } from "@openokr/ui";
 export function readScreen(path: string): string {
   const source = readFileSync(path, "utf8");
   const en = CATALOGUES.en;
-  return source.replace(
-    /\bt\(\s*"([^"]+)"\s*\)/g,
-    (whole, key: string) => en[key] ?? whole,
+  return source.replace(/\bt\(\s*"([^"]+)"\s*\)/g, (whole, key: string) => {
+    const english = en[key];
+    return english === undefined ? whole : withDefaultTerms(english);
+  });
+}
+
+/**
+ * A catalogue string with its term holes filled by the canon words
+ * (completeness review M-14).
+ *
+ * "No annual {termCycleLower} yet" is what the catalogue holds once a term can
+ * be renamed; "No annual cycle yet" is what a workspace nobody renamed reads,
+ * and so what a test asking "does this screen say X" should see.
+ */
+function withDefaultTerms(text: string): string {
+  return text.replace(
+    /\{(term[A-Za-z]+)\}/g,
+    (whole, name: string) => fillTermHole(CATALOGUES.en, name) ?? whole,
+  );
+}
+
+/**
+ * A source file followed by the English of every catalogue key it names,
+ * with or without values (completeness review M-15).
+ *
+ * `readScreen` only fills a `t("key")` that takes no values. The sweep that
+ * moved the last 461 hardcoded strings into the catalogue turned sentences
+ * several tests asserted on into keys with holes, and some into one/other
+ * pairs. A test that asks "does this screen say X" asks it of this; a test
+ * about the code itself keeps reading the source.
+ */
+export function withMessages(source: string): string {
+  const en = CATALOGUES.en;
+  const named = [
+    ...source.matchAll(/"([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+)"/g),
+  ]
+    .map((match) => match[1] ?? "")
+    .filter((key) => key in en);
+  return [source, ...named.map((key) => withDefaultTerms(en[key] ?? ""))].join(
+    "\n",
   );
 }
