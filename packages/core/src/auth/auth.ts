@@ -446,7 +446,7 @@ export function createAuth(options: AuthOptions) {
            * future social or single-sign-on provider cannot quietly reopen
            * registration by not knowing about the rule.
            */
-          before: async (_user, hookContext) => {
+          before: async (user, hookContext) => {
             // **An invitation is the exception, and the only one** (P6-G06b).
             // A closed instance was closed to everybody, including the person
             // an administrator had just invited, so every invitation issued
@@ -501,9 +501,18 @@ export function createAuth(options: AuthOptions) {
             }
 
             // consumed by an attempt that may still fail on a taken address.
+            //
+            // **The address is what makes this the real decision, not the
+            // sign-up page's preview of it.** A token admits the one address
+            // it was issued to, or the domains a shared link named; passing
+            // `user.email` is what stops a personal invitation for one
+            // address from opening registration for any address (manual UAT,
+            // 29 September 2026, M04-03 — see `registrationOpenOrInvited`'s
+            // own comment for the failure this closes).
             const allowed = await registrationOpenOrInvited(
               options.pool,
               cookieHeaderFrom(hookContext),
+              user.email,
             );
             if (allowed) {
               return;

@@ -16,6 +16,12 @@ import { GUIDE, PHASES } from "./uat-guide.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 // UAT_OUT writes elsewhere, for when the workbook is open in Excel and locked.
 const OUT = process.env.UAT_OUT ?? join(here, "OpenOKR-UAT.xlsx");
+// UAT_RESULTS points at a JSON file of { [caseId]: { status, notes, tester, date, bugId } }
+// to pre-fill the Status column from a real test run instead of leaving every
+// row at "Not Run". Absent, this changes nothing: same rows, same file.
+const RESULTS = process.env.UAT_RESULTS
+  ? JSON.parse(readFileSync(process.env.UAT_RESULTS, "utf8"))
+  : {};
 
 const STATUSES = ["Not Run", "Pass", "Fail", "Error", "Blocked", "N/A"];
 const PRIORITIES = ["High", "Medium", "Low"];
@@ -294,6 +300,7 @@ for (const tc of CASES) {
   seq[tc.module] = (seq[tc.module] ?? 0) + 1;
   const id = `${tc.module}-${String(seq[tc.module]).padStart(2, "0")}`;
   const steps = tc.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
+  const r = RESULTS[id] ?? {};
   tcRows.push({
     cells: [
       [id, S.body],
@@ -305,11 +312,11 @@ for (const tc of CASES) {
       [tc.expected, S.body],
       [tc.priority, S.body],
       [tc.hint, S.body],
-      ["Not Run", S.input],
-      [null, S.input],
-      [null, S.input],
-      [null, S.input],
-      [null, S.input],
+      [r.status ?? "Not Run", S.input],
+      [r.notes ?? null, S.input],
+      [r.tester ?? null, S.input],
+      [r.date ?? null, S.input],
+      [r.bugId ?? null, S.input],
     ],
   });
 }

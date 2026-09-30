@@ -1,6 +1,8 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { callAction } from "../src/actions/registry.ts";
 import { createAuth } from "../src/auth/auth.ts";
+import { INVITE_COOKIE } from "../src/invitations/pending.ts";
 import { SETTINGS_REGISTRY } from "../src/settings/registry.ts";
 import { listMembershipsForUser } from "../src/workspaces/memberships.ts";
 import {
@@ -155,6 +157,102 @@ describe("the registration policy", () => {
     const second = await register("grace@example.com", "Grace Hopper");
     const body = await second.text();
     expect(body.toLowerCase()).toMatch(/invit|closed/);
+  });
+
+  /**
+   * A personal invitation names one address. Found by a manual UAT pass, 29
+   * September 2026 (M04-03): the token-only check let anybody carrying *any*
+   * usable invitation register *any* address, because nothing compared the
+   * two. `registrationOpenOrInvited` now takes the address that is actually
+   * registering and refuses one the token does not admit, the same rule
+   * `invitations.acceptLink` already enforces for a signed-in visitor.
+   */
+  describe("a personal invitation admits the address it was issued to, and no other", () => {
+    const registerWithInvite = (email: string, name: string, token: string) =>
+      auth.handler(
+        new Request(`${BASE_URL}/api/auth/sign-up/email`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: `${INVITE_COOKIE}=${token}`,
+          },
+          body: JSON.stringify({ email, password: PASSWORD, name }),
+        }),
+      );
+
+    async function issuePersonalInvite(email: string) {
+      await register("ada@example.com", "Ada Lovelace");
+      const wb = await workerDb();
+      const owner = await wb.admin.query(
+        "select id from users where email = 'ada@example.com'",
+      );
+      const membership = await wb.admin.query(
+        "select workspace_id from workspace_members where user_id = $1",
+        [owner.rows[0].id],
+      );
+      const workspaceId = membership.rows[0].workspace_id as string;
+      const link = await callAction(
+        {
+          pool: wb.appPool,
+          workspaceId,
+          actor: { kind: "human", userId: owner.rows[0].id },
+        },
+        "invitations.createPersonalLink",
+        { email },
+      );
+      return { token: link.token as string, workspaceId };
+    }
+
+    it("refuses a different address, and creates neither a user nor a workspace", async () => {
+      const { token } = await issuePersonalInvite("invited@example.com");
+
+      const response = await registerWithInvite(
+        "not-who-this-was-for@example.com",
+        "Somebody Else",
+        token,
+      );
+      expect(response.status).toBeGreaterThanOrEqual(400);
+
+      const wb = await workerDb();
+      const users = await wb.admin.query(
+        "select email from users where email = 'not-who-this-was-for@example.com'",
+      );
+      expect(users.rows).toHaveLength(0);
+      // Two, not three: Ada's own workspace from issuePersonalInvite, and
+      // nothing else. Before this fix, the refused attempt still fell through
+      // to a fresh workspace of its own.
+      const workspaces = await wb.admin.query(
+        "select count(*)::int as n from workspaces",
+      );
+      expect(workspaces.rows[0].n).toBe(1);
+    });
+
+    it("admits the invited address, into the inviting workspace, not a fresh one", async () => {
+      const { token, workspaceId } = await issuePersonalInvite(
+        "invited@example.com",
+      );
+
+      const response = await registerWithInvite(
+        "invited@example.com",
+        "Invited Person",
+        token,
+      );
+      expect(response.status).toBe(200);
+
+      const wb = await workerDb();
+      const workspaces = await wb.admin.query(
+        "select count(*)::int as n from workspaces",
+      );
+      // Still one: the invitee joined Ada's, rather than the failed
+      // acceptance silently handing them a private one of their own.
+      expect(workspaces.rows[0].n).toBe(1);
+      const membership = await wb.admin.query(
+        `select workspace_id from workspace_members wm
+         join users u on u.id = wm.user_id
+         where u.email = 'invited@example.com'`,
+      );
+      expect(membership.rows[0].workspace_id).toBe(workspaceId);
+    });
   });
 });
 
