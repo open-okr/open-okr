@@ -158,6 +158,8 @@ Unique on `token_hash` alone for live rows since migration 0075 (P6-G06b), and t
 
 `seq` is the position in this workspace's chain, from 1. Ordering by `at` would be ambiguous under concurrency, and a chain needs exactly one order to be verifiable. `action` is the registry action name, so a row resolves back to one contract.
 
+**Migration 0105 adds `audit_events_recent_idx` on `(workspace_id, at desc, id desc)`** (completeness review L-19). The admin screen's list, `audit.list`, reads the trail newest first with the last row's `(at, id)` as the cursor for the next page, and a date range narrows the same index. The chain index answers `seq`, which is null for a row still waiting for its position, so it could not serve a list that has to show those rows too.
+
 `at` is written by the application rather than defaulted to `now()`, because it is part of the hash and has to be the value the hash was computed over.
 
 Neither foreign key carries an ON DELETE action. A cascade would delete audit rows and a SET NULL would update them, so the append-only trigger would refuse an ordinary member removal.
@@ -880,6 +882,7 @@ Indexes ship with the feature that needs them. The composite indexes carrying th
 | Recovery board | `kpis (workspace_id, state)` |
 | Board | `tasks (workspace_id, space_id, status, position)` and `tasks (workspace_id, key_result_id)` |
 | Feed | `activities (workspace_id, context_id, at desc)` |
+| Audit trail list | `audit_events (workspace_id, at desc, id desc)` |
 | Nudges | `nudges (workspace_id, recipient_member_id, scheduled_for)` and `nudges (workspace_id, subject_id, rule_key, sent_at)` |
 | Search | A generated text-search vector with a suitable index on the search document table, plus a vector index on embeddings |
 | Idempotent import | `(workspace_id, legacy_type, legacy_id)` unique on every importable table |

@@ -99,7 +99,7 @@ import {
   readPendingDevice,
   revokeApiToken,
 } from "./api-tokens.ts";
-import { exportAudit, verifyAudit } from "./audit.ts";
+import { exportAudit, listAudit, verifyAudit } from "./audit.ts";
 import {
   claimUpload,
   getBlobForDownload,
@@ -546,6 +546,8 @@ export const ACTION_MAP = {
   // P8-T10. The audit trail, filtered out as a file, and the chain checked.
   "audit.export": exportAudit,
   "audit.verify": verifyAudit,
+  // Completeness review L-19. The trail read a page at a time, for the screen.
+  "audit.list": listAudit,
   "settings.readWorkspaceSettings": readWorkspaceSettings,
   // P8-G05. The member-visible half, so an ordinary member is not refused on
   // their own Overview by an admin read.

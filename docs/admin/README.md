@@ -15,7 +15,7 @@ account has and what an administrator can grant to somebody else.
 | **Support access** | Whether the vendor may look, for how long, and with what reason. Cloud only |
 | **Single sign-on** | An OIDC provider, which email domains it claims, and whether it is enforced |
 | **Directory sync** | The SCIM endpoint and its bearer token, so an identity provider provisions people |
-| **Audit trail** | Verify the hash chain, and export the trail with a filter |
+| **Audit trail** | Verify the hash chain, browse the trail newest first, and export it, with one filter for both |
 | **Branding** | The workspace's own colour, which every screen of the workspace is drawn in. See [Settings](settings.md) |
 | **Rhythm and thresholds** | The cadence, the staleness grace, the numbers the coaching rules fire on, and the workspace's own words for the method's terms. See [Terminology](settings.md#terminology) |
 | **Channels** | Slack, Microsoft Teams, WhatsApp and Telegram, and the templates each one uses |

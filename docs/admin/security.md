@@ -117,9 +117,17 @@ checked. The chain is built just behind the write path, so a busy workspace
 always has a short tail waiting for its position. Pending is never counted as
 verified and never reported as a break.
 
-**Export the trail** hands over a CSV narrowed by date, action or target,
-carrying each row's position and hash so the file and a later verification can
-be lined up against each other. The export is itself recorded, with the filter
+**Browse the trail** with one filter: a date range, an action, a person or
+agent, and a target type. **Show matching rows** lists them on the screen,
+newest first, fifty at a time with older rows a click away. Each row says
+when, who acted and through which channel when it was not the browser (Slack,
+the API, an external agent), the action, the target, and its position in the
+chain or that it is still waiting for one. The row's details stay out of the
+list.
+
+**Export as CSV** hands over the rows the same filter matches, with each
+row's details, position and hash, so the file and a later verification can be
+lined up against each other. The export is itself recorded, with the filter
 that was used.
 
 ## Uploaded files
