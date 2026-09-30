@@ -65,6 +65,7 @@
     "knip": "6.38.0",
     "pg": "catalog:",
     "turbo": "2.11.4",
+    "typescript5": "catalog:",
     "vitest": "catalog:"
   }
 }

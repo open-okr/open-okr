@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --singleThreaded",
     "audit:verify": "node --experimental-strip-types --no-warnings src/bin/verify-audit.ts",
     "audit:chain": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/chain-audit.ts",
     "keys:rotate": "node --experimental-strip-types --no-warnings src/bin/rotate-keys.ts",

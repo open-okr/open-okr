@@ -18,6 +18,10 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    // TypeScript 7 no longer loads every @types package it can find, so the
+    // Node globals (process, performance, node:fs) are named here. Every
+    // package lists @types/node.
+    "types": ["node"]
   }
 }

@@ -14,7 +14,7 @@ integration green, and a push happens only when Agung asks for one, so there is
 always time to run the list.
 
 ```
-pnpm typecheck        # strict types across all ten packages
+pnpm typecheck        # strict types across all eleven packages, TypeScript 7, four at a time
 pnpm lint             # Biome. Read the whole tail, not the last few lines
 pnpm dead-code        # knip
 pnpm db:lint          # migration rules, then soft-delete usage

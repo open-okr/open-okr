@@ -334,7 +334,12 @@ export const changeWorkspacePlan = defineWriteAction({
     // Read from the instance setting before the change, outside the
     // workspace's transaction, because the catalogue belongs to the instance
     // rather than to any tenant.
-    async load() {
+    // The return type is written out: TypeScript 7 does not infer the loaded
+    // shape from a load that takes no arguments, and `execute` then reads
+    // `plan` off `undefined`.
+    async load(): Promise<{
+      plan: Awaited<ReturnType<typeof planByKey>>;
+    }> {
       return { plan: await planByKey(context.pool, input.planKey) };
     },
     async execute({ tx, workspaceId, loaded: { plan } }) {
