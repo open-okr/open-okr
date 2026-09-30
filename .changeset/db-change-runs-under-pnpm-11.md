@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 `pnpm db:change` runs the data changes again.

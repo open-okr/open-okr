@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The server log no longer fills up with "The destination stream closed early".

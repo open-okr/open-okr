@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Per-tenant usage figures for the cloud operator, taken without loosening a

@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A single sign-on connection can be changed, turned off and removed from Admin,

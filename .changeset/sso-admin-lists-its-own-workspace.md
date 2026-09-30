@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The single sign-on screen in administration lists only this workspace's

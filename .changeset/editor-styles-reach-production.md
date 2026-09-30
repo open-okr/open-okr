@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The document editor has its base styles in production again.

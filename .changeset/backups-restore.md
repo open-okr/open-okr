@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 Backups on Kubernetes now run, include your files, and are proved to restore.

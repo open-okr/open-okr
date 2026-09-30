@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A suspended member sees why, instead of a crash page that blames the app.

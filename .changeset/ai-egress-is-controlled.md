@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 An administrator now decides what may leave for an AI provider, and the product

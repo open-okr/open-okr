@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 A member can keep their own AI key, and their own requests use it.

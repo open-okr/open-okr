@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Bahasa Melayu is a real translation rather than a copy of the English.

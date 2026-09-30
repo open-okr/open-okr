@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 An initiative's work now counts as linked work for every key result it serves.

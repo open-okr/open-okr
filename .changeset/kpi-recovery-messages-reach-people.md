@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The coach's KPI recovery messages now reach people in three cases where they

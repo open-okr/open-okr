@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 An agent's proposal is now decided on the Review screen, by the person it is

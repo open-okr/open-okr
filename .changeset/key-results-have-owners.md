@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A key result drafted on the cycle screen can now name its owner and due date.

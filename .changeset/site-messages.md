@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 The vendor can say something to everybody, and an operator can see what the

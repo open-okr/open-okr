@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 Search and the copilot's semantic search find a workspace's content after it

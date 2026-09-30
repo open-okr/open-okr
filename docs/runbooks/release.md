@@ -17,9 +17,18 @@ pnpm changeset version
 ```
 
 That consumes every file in `.changeset/`, writes the new version into every
-package, and writes the release's section into `CHANGELOG.md`. Read what it
-wrote. It is the release notes, assembled from sentences written by the people
-who made the changes while they still knew whether anything broke.
+package, and writes the release's section into `apps/web/CHANGELOG.md`. Read
+what it wrote. It is the release notes, assembled from sentences written by the
+people who made the changes while they still knew whether anything broke.
+
+Run it with `GITHUB_TOKEN=$(gh auth token)` in front: the changelog links each
+entry to its pull request, and asks GitHub which one that was.
+
+**Every changeset names `@openokr/web`**, the application. Changesets never
+versions a monorepo's root package, so a changeset naming the root stops
+`changeset version` outright, and `pnpm check:changeset` refuses one. The fixed
+group in `.changeset/config.json` moves every `@openokr/*` package to the same
+number, because OpenOKR ships as one instance with one version.
 
 Commit it, with a sign-off, and merge it to `main`.
 

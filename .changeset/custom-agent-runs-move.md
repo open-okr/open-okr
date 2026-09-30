@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A run started for a custom agent now actually runs, one task at a time, and

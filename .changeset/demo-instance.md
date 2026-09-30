@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 A public demonstration instance, and a reset that rebuilds it from nothing.

@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The last phase of a cycle, "Review and learn", can now complete. It reads

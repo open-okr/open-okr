@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Teams checks in with a card, a space can post its digest to its own channel,

@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Cloud signup, the workspace lifecycle, and a verification rule that helps

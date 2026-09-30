@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 An OIDC provider can be configured, and the AI spend cap is read.

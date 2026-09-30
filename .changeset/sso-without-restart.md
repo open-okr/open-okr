@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A single sign-on connection works from the next sign-in, with no restart.

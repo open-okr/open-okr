@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 `pnpm uat:personas --inbox <address>` gives a fresh workspace the seven

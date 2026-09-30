@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 An instance can now watch itself, forget what it no longer needs, and hand a

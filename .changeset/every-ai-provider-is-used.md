@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Anthropic, OpenAI, Google, a local Ollama and any OpenAI-compatible endpoint

@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 A space's home shows its goals and KPI trees, a member can set their own

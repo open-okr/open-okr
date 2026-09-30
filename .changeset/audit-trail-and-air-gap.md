@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 The audit trail has a screen, and an isolated network has a guide.

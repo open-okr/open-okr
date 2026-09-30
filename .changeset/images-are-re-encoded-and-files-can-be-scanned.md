@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Uploaded images are re-encoded and shown as previews, and files can be scanned

@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A file attached to a goal, task, check-in or document now opens for everyone

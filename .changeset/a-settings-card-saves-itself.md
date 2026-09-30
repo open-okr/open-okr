@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The rhythm and thresholds screen saves a card at a time, beside the card.

@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 Two form controls on detail pages now have names a screen reader can say: the

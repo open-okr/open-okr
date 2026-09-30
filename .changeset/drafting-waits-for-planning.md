@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Drafting on the cycle screen now waits until the planning phases are done.

@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A blocker left open past its clock now lands in the review inbox of the person

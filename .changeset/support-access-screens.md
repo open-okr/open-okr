@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 You can see who from OpenOKR is in your workspace, and end it from anywhere.

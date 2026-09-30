@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 A key result can be measured by a KPI from the browser, and recording the KPI

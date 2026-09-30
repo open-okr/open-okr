@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A guest who opens a screen that reads the whole workspace is taken to their

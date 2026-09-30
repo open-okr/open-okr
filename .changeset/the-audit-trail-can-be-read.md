@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 The audit trail can be read on the admin screen, not only verified and

@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The Work Map now shows a workspace's own renamed terms, not just the canon.

@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 Seven places that ignored a workspace's own thresholds now read them.

@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 The groundwork for a managed cloud, with nothing visible on a self-hosted

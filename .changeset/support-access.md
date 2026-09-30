@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Support access, and the promise that comes with it: nobody from outside gets

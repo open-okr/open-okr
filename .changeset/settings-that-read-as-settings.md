@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The rhythm and thresholds screen reads as settings rather than as the method

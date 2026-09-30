@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The Helm chart upgrades a release installed before the virus-scan settings

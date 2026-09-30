@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Closing a cycle is one act now, and it feeds the next cycle by itself.

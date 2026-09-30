@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 A deleted goal, initiative, task or document can be brought back, by an undo

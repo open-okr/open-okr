@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Reminders sent by email, Slack, Teams and Telegram now say what they are about

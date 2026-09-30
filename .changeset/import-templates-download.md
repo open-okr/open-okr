@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 The spreadsheet importer offers a template for each kind of row, as a CSV file

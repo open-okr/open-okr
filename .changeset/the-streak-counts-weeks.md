@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The rhythm streak counts weeks in which a space held its check-in, as the

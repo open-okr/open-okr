@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The Review count in the sidebar updates while a page is open. When somebody

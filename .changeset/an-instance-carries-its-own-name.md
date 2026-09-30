@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 An instance now carries the name its operator gave it, everywhere a person

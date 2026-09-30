@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 `/api/status` answers an uptime monitor, as it was designed to.

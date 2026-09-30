@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 Aligning a goal under a key result is now checked the way aligning it under a

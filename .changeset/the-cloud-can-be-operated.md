@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 A managed cloud can now change a workspace's plan, and grant its first

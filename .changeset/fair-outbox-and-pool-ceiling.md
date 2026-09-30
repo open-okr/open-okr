@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 One workspace's import no longer holds up everybody else's notifications.

@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 The annual cycle can be created and opened from the cycle screen, and the

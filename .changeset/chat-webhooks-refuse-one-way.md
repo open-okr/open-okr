@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The Slack, Microsoft Teams, WhatsApp and Telegram webhooks no longer tell a

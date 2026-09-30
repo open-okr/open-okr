@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 The Coach and the Champion read only what they are bound to, and an agent in

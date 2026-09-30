@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A calculated KPI no longer loses its value when a source is recorded mid-period.

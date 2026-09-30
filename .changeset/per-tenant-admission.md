@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 One workspace can no longer slow down everybody else on the same server.

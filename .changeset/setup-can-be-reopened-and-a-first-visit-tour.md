@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 The workspace's first-day setup can be opened again from admin, it counts its

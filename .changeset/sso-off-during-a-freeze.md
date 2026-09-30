@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 Single sign-on can be turned off in a frozen workspace, a new client secret

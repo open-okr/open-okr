@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A check-in submitted through Slack's form is no longer lost on an instance

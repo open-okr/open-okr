@@ -1,11 +1,24 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "open-okr/open-okr" }],
+  "changelog": [
+    "@changesets/changelog-github",
+    {
+      "repo": "open-okr/open-okr"
+    }
+  ],
   "commit": false,
-  "fixed": [["@openokr/*", "openokr"]],
+  "fixed": [
+    [
+      "@openokr/*"
+    ]
+  ],
   "linked": [],
   "access": "restricted",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": []
+  "ignore": [],
+  "privatePackages": {
+    "version": true,
+    "tag": false
+  }
 }

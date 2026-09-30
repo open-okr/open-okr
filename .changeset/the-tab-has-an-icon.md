@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The browser tab shows an icon, a target in the brand indigo, and

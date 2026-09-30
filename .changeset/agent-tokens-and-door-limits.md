@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 A local AI agent can connect with a token, every public door is rate limited,

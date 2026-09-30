@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Comments, mentions, check-ins and closed goals now tell the people following

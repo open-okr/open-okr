@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 Rules, assists, schedules and channels are named on screen instead of being

@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The "outcome, not output" check on an objective now reads its rows in the

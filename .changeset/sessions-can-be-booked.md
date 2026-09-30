@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Sessions can be scheduled from the browser, and a whole cycle can be booked

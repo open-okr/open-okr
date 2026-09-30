@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 The command palette (⌘K) jumps to anything by its name, offers actions, and

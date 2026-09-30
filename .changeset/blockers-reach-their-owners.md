@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A blocker raised in a weekly session now reaches its owner's review inbox,

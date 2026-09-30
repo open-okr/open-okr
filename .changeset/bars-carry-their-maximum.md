@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 A progress bar drawn beside a number above 100 now agrees with that number.

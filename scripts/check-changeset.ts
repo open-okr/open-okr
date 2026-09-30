@@ -22,7 +22,7 @@
  * Defaults to `origin/main..HEAD`, which is what a pull request compares.
  */
 import { execFileSync } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -82,6 +82,69 @@ const changesetFiles = (): string[] => {
     return [];
   }
 };
+
+/**
+ * The packages a changeset may name: the workspace's own, by the globs in
+ * `pnpm-workspace.yaml`.
+ *
+ * **Checked because the first release could not be cut.** Every changeset
+ * named `openokr`, the repository's root package, and Changesets never
+ * versions a monorepo's root, so `pnpm changeset version` stopped on the
+ * first file with "not in the workspace", after 129 of them had passed this
+ * gate. The product's version is carried by `@openokr/web` and the fixed
+ * group in `.changeset/config.json` moves every package with it.
+ */
+const workspacePackages = (): Set<string> => {
+  const names = new Set<string>();
+  for (const dir of ["apps", "packages"]) {
+    for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      try {
+        const manifest = JSON.parse(
+          readFileSync(join(root, dir, entry.name, "package.json"), "utf8"),
+        ) as { name?: string };
+        if (manifest.name) {
+          names.add(manifest.name);
+        }
+      } catch {
+        // A folder with no package.json is not a package.
+      }
+    }
+  }
+  return names;
+};
+
+const misnamed = (): { file: string; name: string }[] => {
+  const known = workspacePackages();
+  const wrong: { file: string; name: string }[] = [];
+  for (const file of changesetFiles()) {
+    const text = readFileSync(join(root, ".changeset", file), "utf8");
+    const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? "";
+    for (const line of front.split(/\r?\n/)) {
+      const name = /^["']([^"']+)["']\s*:/.exec(line.trim())?.[1];
+      if (name && !known.has(name)) {
+        wrong.push({ file, name });
+      }
+    }
+  }
+  return wrong;
+};
+
+const wrong = misnamed();
+if (wrong.length > 0) {
+  console.error(
+    `Changeset gate failed. ${wrong.length} changeset(s) name a package that is not in the workspace:\n`,
+  );
+  for (const { file, name } of wrong.slice(0, 10)) {
+    console.error(`  .changeset/${file}: "${name}"`);
+  }
+  console.error(
+    `\nName "@openokr/web". Every package moves with it, and \`pnpm changeset version\` refuses any other name.`,
+  );
+  process.exit(1);
+}
 
 let changed: string[];
 try {

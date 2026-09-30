@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 An instance that has not set up mail no longer writes password-reset links,

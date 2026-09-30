@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Seats, on the managed cloud only, and nothing else changes with a plan.

@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 A cloud operator can suspend a workspace, and the workspace can see who did

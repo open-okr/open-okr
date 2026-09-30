@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 Erasing a member now removes their name from everywhere a workspace can read

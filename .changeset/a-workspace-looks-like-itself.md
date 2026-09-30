@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 A workspace's brand colour and its own words for the method's terms now reach

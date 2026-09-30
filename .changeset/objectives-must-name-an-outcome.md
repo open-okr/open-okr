@@ -1,5 +1,5 @@
 ---
-"openokr": minor
+"@openokr/web": minor
 ---
 
 An objective that names an output now blocks publishing, and the drafting

@@ -1,5 +1,5 @@
 ---
-"openokr": patch
+"@openokr/web": patch
 ---
 
 The Docker image builds on a machine with 8 GB of memory or less.
