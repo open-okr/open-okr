@@ -309,7 +309,7 @@ export default async function InitiativePage({
        * down yet, and the two deserve different sentences.
        */}
       <Card>
-        <CardHeader>
+        <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
             <h2 className="text-sm font-bold text-ink">
               {t("initiatives.detail.tasksOfDone", {
@@ -321,6 +321,14 @@ export default async function InitiativePage({
               {t("initiatives.detail.theWorkThisInitiative")}
             </p>
           </div>
+          {/* This initiative's own board (M-02): the same cards, in columns,
+              where they can be moved. */}
+          <Link
+            href={`/board?initiative=${initiative.id}`}
+            className="flex-none text-xs font-semibold text-brand-text hover:underline"
+          >
+            {t("initiatives.detail.openTheBoard")}
+          </Link>
         </CardHeader>
         <CardBody className="flex flex-col gap-2.5">
           {initiativeTasks.length === 0 ? (

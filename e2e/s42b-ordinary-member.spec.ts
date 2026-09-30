@@ -405,3 +405,38 @@ test("dismissing the other one changes nothing but the proposal", async () => {
   expect(rows[0]?.status).toBe("dismissed");
   expect(rows[0]?.recovery_goal_id).toBeNull();
 });
+
+/**
+ * Who else has the board open (UIUX-PLAN §3 "Presence", completeness review
+ * M-02).
+ *
+ * The one file with two people signed in at once, which is what presence
+ * needs: a face on somebody's board is only ever somebody else's. Both open
+ * `/board`, which is the first space's board for each of them, so they are on
+ * the same board. Each sees the other by name, and the founder's avatar goes
+ * when the member leaves.
+ */
+test("the board shows who else has it open, and forgets them when they go", async () => {
+  await ownerPage.goto("/board");
+  await expect(
+    ownerPage.getByRole("heading", { level: 1, name: "Board" }),
+  ).toBeVisible({ timeout: 20_000 });
+  await memberPage.goto("/board");
+  await expect(
+    memberPage.getByRole("heading", { level: 1, name: "Board" }),
+  ).toBeVisible({ timeout: 20_000 });
+
+  await expect(memberPage.getByTestId("board-presence")).toContainText(
+    `Also looking at this board: ${INSTANCE_ACCOUNT.name}`,
+    { timeout: 20_000 },
+  );
+  await expect(ownerPage.getByTestId("board-presence")).toContainText(
+    MEMBER_NAME,
+    { timeout: 20_000 },
+  );
+
+  await memberPage.goto("/");
+  await expect(ownerPage.getByTestId("board-presence")).toHaveCount(0, {
+    timeout: 20_000,
+  });
+});

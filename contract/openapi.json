@@ -24789,7 +24789,7 @@
     "/tasks/board": {
       "get": {
         "operationId": "tasks.board",
-        "summary": "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
+        "summary": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
         "tags": [
           "tasks"
         ],
@@ -24806,6 +24806,66 @@
                     "data": {
                       "type": "object",
                       "properties": {
+                        "scope": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "space",
+                                "initiative",
+                                "key_result"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "parentTitle": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "spaceId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "goalId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "title",
+                            "parentTitle",
+                            "spaceId",
+                            "goalId"
+                          ],
+                          "additionalProperties": false
+                        },
                         "columns": {
                           "type": "array",
                           "items": {
@@ -25011,6 +25071,7 @@
                         }
                       },
                       "required": [
+                        "scope",
                         "columns",
                         "rail"
                       ],

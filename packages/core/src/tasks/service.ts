@@ -818,6 +818,46 @@ export async function linkedWorkForKeyResults<
 }
 
 /**
+ * The initiatives serving one key result, leaving out dropped ones
+ * (completeness review M-02).
+ *
+ * A key result's board holds its linked work, and linked work is the tasks
+ * that name the key result and the tasks of every initiative serving it
+ * (M-26). This is the second half of that set, under the rule `countLinkedWork`
+ * applies: a dropped initiative serves nothing, so its open cards would sit on
+ * the board as work nobody is going to finish while the rail left them out of
+ * the count beside it.
+ */
+export async function initiativesServingKeyResult<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  keyResultId: string,
+): Promise<string[]> {
+  const rows = await tx
+    .selectDistinct({ initiativeId: initiativeKeyResults.initiativeId })
+    .from(initiativeKeyResults)
+    .innerJoin(
+      initiatives,
+      and(
+        eq(initiatives.id, initiativeKeyResults.initiativeId),
+        eq(initiatives.workspaceId, workspaceId),
+        isNull(initiatives.deletedAt),
+        ne(initiatives.status, "dropped"),
+      ),
+    )
+    .where(
+      activeOnly(
+        initiativeKeyResults,
+        eq(initiativeKeyResults.workspaceId, workspaceId),
+        eq(initiativeKeyResults.keyResultId, keyResultId),
+      ),
+    );
+  return rows.map((row) => row.initiativeId);
+}
+
+/**
  * The key results these initiatives serve, leaving out dropped initiatives.
  *
  * The board's rail lists every key result its cards' work serves, and since

@@ -36,7 +36,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import { linkedWorkDivergence } from "@openokr/method";
-import { and, asc, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -51,9 +51,16 @@ import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { boardChannel } from "../tasks/live.ts";
 import {
+  BOARD_SCOPE_KINDS,
+  boardScopesOf,
+  describeBoardScope,
+  requireBoardScope,
+} from "../tasks/scope.ts";
+import {
   addChecklistItemInTx,
   assignTaskInTx,
   createTaskInTx,
+  initiativesServingKeyResult,
   keyResultsServedByInitiatives,
   linkedWorkForKeyResults,
   moveTaskInTx,
@@ -348,9 +355,22 @@ const boardInput = z
 export const readBoard = defineReadAction({
   name: "tasks.board",
   summary:
-    "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
+    "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
   input: boardInput,
   output: z.object({
+    /**
+     * What the board is of (completeness review M-02): the most specific
+     * scope the input named, as its heading draws it, and the space a task
+     * added on it lands in.
+     */
+    scope: z.object({
+      kind: z.enum(BOARD_SCOPE_KINDS),
+      id: z.uuid(),
+      title: z.string(),
+      parentTitle: z.string().nullable(),
+      spaceId: z.uuid().nullable(),
+      goalId: z.uuid().nullable(),
+    }),
     columns: z.array(
       z.object({
         status: z.enum(TASK_STATUSES),
@@ -386,8 +406,15 @@ export const readBoard = defineReadAction({
     const input = boardInput.parse(rawInput);
     const db = drizzle(context.pool);
     const userId = context.actor.userId;
-    if (!userId) {
-      return { columns: [], rail: [] };
+    const scopes = boardScopesOf(input);
+    const [scope] = scopes;
+    if (!userId || !scope) {
+      // No member to decide access for, which the getter answers with
+      // not-found. The input's refine already refused a board of nothing.
+      throw new OperationError(
+        "not_found",
+        "No such board, or you do not have access to it.",
+      );
     }
     return withContext(
       db,
@@ -395,6 +422,44 @@ export const readBoard = defineReadAction({
       async (rawTx) => {
         const tx = rawTx as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
+
+        // **The scope through the getter before any card** (M-02). A board
+        // of something the reader cannot see is not-found, not empty.
+        for (const named of scopes) {
+          await requireBoardScope(tx, {
+            workspaceId: context.workspaceId,
+            memberId,
+            scope: named,
+          });
+        }
+        const described = await describeBoardScope(
+          tx,
+          context.workspaceId,
+          scope,
+        );
+
+        // **A key result's board is its linked work** (M-02, M-26): the
+        // cards that name it and the cards of every initiative serving it,
+        // which is exactly the set the rail counts. A board that showed only
+        // the first half would draw fewer cards than the "linked work" chip
+        // beside it says there are.
+        const serving = input.keyResultId
+          ? await initiativesServingKeyResult(
+              tx,
+              context.workspaceId,
+              input.keyResultId,
+            )
+          : [];
+        const keyResultFilter = input.keyResultId
+          ? [
+              serving.length === 0
+                ? eq(tasks.keyResultId, input.keyResultId)
+                : (or(
+                    eq(tasks.keyResultId, input.keyResultId),
+                    inArray(tasks.initiativeId, serving),
+                  ) as SQL),
+            ]
+          : [];
 
         // **A column at a time, each bounded** (P7-T02).
         //
@@ -427,9 +492,7 @@ export const readBoard = defineReadAction({
                     ...(input.initiativeId
                       ? [eq(tasks.initiativeId, input.initiativeId)]
                       : []),
-                    ...(input.keyResultId
-                      ? [eq(tasks.keyResultId, input.keyResultId)]
-                      : []),
+                    ...keyResultFilter,
                   ),
                 )
                 .orderBy(asc(tasks.position), asc(tasks.id))
@@ -477,6 +540,7 @@ export const readBoard = defineReadAction({
         );
 
         return {
+          scope: described,
           columns: TASK_STATUSES.map((status) => ({
             status,
             cards: cards

@@ -52,6 +52,8 @@ export async function createTaskAction(
   const spaceId = String(formData.get("spaceId") ?? "");
   const status = String(formData.get("status") ?? "backlog");
   const keyResultId = String(formData.get("keyResultId") ?? "").trim();
+  // Set by an initiative's board, so work added there is part of it (M-02).
+  const initiativeId = String(formData.get("initiativeId") ?? "").trim();
   const dueOn = String(formData.get("dueOn") ?? "").trim();
 
   if (title === "") {
@@ -62,14 +64,20 @@ export async function createTaskAction(
   }
   const column = STATUSES.find((one) => one === status) ?? "backlog";
 
-  return run((context) =>
-    callAction(context, "tasks.create", {
-      spaceId,
-      title,
-      status: column,
-      ...(keyResultId === "" ? {} : { keyResultId }),
-      ...(dueOn === "" ? {} : { dueOn }),
-    }),
+  return run(
+    (context) =>
+      callAction(context, "tasks.create", {
+        spaceId,
+        title,
+        status: column,
+        ...(keyResultId === "" ? {} : { keyResultId }),
+        ...(initiativeId === "" ? {} : { initiativeId }),
+        ...(dueOn === "" ? {} : { dueOn }),
+      }),
+    // The initiative's own page lists its tasks, so it is stale too.
+    initiativeId === ""
+      ? ["/board"]
+      : ["/board", `/initiatives/${initiativeId}`],
   );
 }
 

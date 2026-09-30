@@ -1135,6 +1135,15 @@ export {
   boardChannel,
 } from "./tasks/live.ts";
 export {
+  boardPresenceChannel,
+  PRESENCE_HEARTBEAT_MS,
+  PresenceRoster,
+  type PresenceSignal,
+  presenceEvent,
+  readPresenceSignal,
+} from "./tasks/presence.ts";
+export { type BoardScope, boardReaders } from "./tasks/scope.ts";
+export {
   assignTaskInTx,
   createTaskInTx,
   linkedWorkForKeyResults,

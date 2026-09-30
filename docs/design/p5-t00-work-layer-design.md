@@ -194,6 +194,41 @@ facts the product already holds, so there is no band to tune and no wording to
 choose. The message cites `quality.divergence`, the rule §6.4 already defines,
 exactly as `divergence.ts` does.
 
+### 3.5 Three boards, presence and the keyboard (completeness review M-02)
+
+P5-T11 shipped the read for all three boards and a screen for one, with no
+presence and no way to reorder a column without a mouse. What was added:
+
+| Part | Decision | Why |
+|---|---|---|
+| Scopes | `/board?space=`, `?initiative=` and `?keyResult=` on one screen. Linked from the initiative page and from each key result on its goal's page | The read already answered all three. A second screen would be a second way to ask one question |
+| Scope access | `tasks.board` reads its scope through the getter before any card: a space or an initiative by its own context, a key result by its goal's. Every scope the input names is checked. A scope the reader cannot see is not-found | It answered an empty board instead, and the live stream took a successful read as its access check, so the stream opened for anybody |
+| A key result's cards | The tasks that name it and the tasks of every initiative serving it that is not dropped | M-26's linked work. The board and the rail's chip then count the same set |
+| Presence | Each open board says `here` on `workspace:{id}:presence:board:{kind}:{id}` every 20 seconds, answers a newcomer at once, and says `left` on close. A board silent for 50 seconds is dropped. Nothing is stored | Presence is true for seconds, so a table would be a write per heartbeat per tab for a fact nobody reads a minute later |
+| Who is named | Identifiers on the channel; the stream route turns them into names for its viewer through `boardReaders`, which re-checks each member's access to the scope and drops the suspended | The realtime port's rule, and a member who loses access leaves everybody's board at once rather than when their tab closes |
+| Realtime down | The stream answers 503, the browser stops retrying, and the board shows no presence | The board is drawn by the server, so it never depended on the stream |
+| Keyboard | A move handle per card. Space or Enter picks it up, arrows carry it within and across columns, Space or Enter drops, Escape puts it back. Each step is announced in a live region. The drop is one `tasks.move` | The WAI-ARIA pattern for a sortable list. Nothing is written until the drop, so a carry through five places is one write, under the same lock a drag takes |
+
+**Given** two members with the same space's board open,
+**when** either looks at the board,
+**then** each sees the other's name and neither sees their own, and when one
+leaves the other's board forgets them.
+
+**Given** a guest of one space,
+**when** they ask for another space's board, an initiative's or a key result's,
+**then** the answer is not-found, and their name is never drawn on a board they
+cannot read.
+
+**Given** a card focused by its move handle,
+**when** Space, then an arrow key, then Space are pressed,
+**then** one `tasks.move` is written with the card it now sits after, and the
+live region has said where it went.
+
+**A known limit, not new with M-02.** Positions are ordered within a space's
+column. A key result's board can hold cards from several spaces, and a card
+dropped after a card from another space lands at the end of its own space's
+column, which is where a drag has always put it.
+
 ## 4. Documents and attachments (P5-T12)
 
 ### 4.1 Tables

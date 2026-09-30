@@ -4898,7 +4898,7 @@
       "method": "GET",
       "path": "/tasks/board",
       "scope": "read",
-      "summary": "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
+      "summary": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
       "flags": [
         {
           "name": "space-id",

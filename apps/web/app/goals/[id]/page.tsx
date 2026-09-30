@@ -17,6 +17,7 @@ import {
   Chip,
   formatMeasure,
 } from "@openokr/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { assistOffered } from "../../../lib/assists";
@@ -407,6 +408,17 @@ export default async function GoalPage({
                       <span className="text-sm font-bold text-ink">
                         {formatMeasure(keyResult.currentValue, keyResult.unit)}
                       </span>
+                      {/* The work behind this measure, as a board (M-02): the
+                          tasks that name it and its initiatives' tasks. */}
+                      <Link
+                        href={`/board?keyResult=${keyResult.id}`}
+                        aria-label={t("goals.detail.workBoardFor", {
+                          title: keyResult.title,
+                        })}
+                        className="text-xs font-semibold text-brand-text hover:underline"
+                      >
+                        {t("goals.detail.workBoard")}
+                      </Link>
                       {canEdit && !closed && keyResult.kpiId === null ? (
                         <ActionForm
                           action={recordValue}

@@ -569,7 +569,7 @@ the machine-readable document.
 |---|---|---|
 | `tasks.addChecklistItem`<br/>Adds one line to a task's checklist. | `POST /api/v1/tasks/addChecklistItem` | writes |
 | `tasks.assign`<br/>Assigns a member, which grants them edit on this task and notifies them. | `POST /api/v1/tasks/assign` | writes |
-| `tasks.board`<br/>One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27. | `GET /api/v1/tasks/board` | reads |
+| `tasks.board`<br/>One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27. | `GET /api/v1/tasks/board` | reads |
 | `tasks.create`<br/>Creates a task in a space, optionally behind a key result. | `POST /api/v1/tasks/create` | writes |
 | `tasks.delete`<br/>Soft-deletes a task, its assignments and its checklist. | `POST /api/v1/tasks/delete` | destroys |
 | `tasks.linkedWork`<br/>Linked work per key result for one cycle: two counts, and the sentence when they disagree with the measure. | `GET /api/v1/tasks/linkedWork` | reads |
