@@ -244,6 +244,11 @@ export async function createGoalInTx<
   // No loop check on create: a goal that does not exist yet cannot be its own
   // ancestor. `update` is where the walk matters, and it is where it runs.
   const goalId = newId();
+  // The space the goal is stored in, which is the one every binding below
+  // follows. Only a space-owned goal keeps the space it was sent with; the
+  // bindings used to read `input.spaceId` instead, so a goal sent with a space
+  // it does not belong to was stored in none and bound to no agent.
+  const spaceId = input.ownerKind === "space" ? (input.spaceId ?? null) : null;
 
   // openokr:allow-mutation: runs on the transaction the calling Operation
   // opened, so the goal, its access wiring and that Operation's audit row
@@ -263,7 +268,7 @@ export async function createGoalInTx<
       timeframe: input.timeframe ?? null,
       level: input.level,
       ownerKind: input.ownerKind,
-      spaceId: input.ownerKind === "space" ? (input.spaceId ?? null) : null,
+      spaceId,
       memberId: input.ownerKind === "member" ? (input.memberId ?? null) : null,
       championId: input.championId,
       reviewerId: input.reviewerId,
@@ -301,10 +306,10 @@ export async function createGoalInTx<
     level: ACCESS_LEVELS.view,
   });
 
-  if (input.ownerKind === "space" && input.spaceId) {
+  if (spaceId) {
     const spaceStandardGroupId = await ensureSpaceStandardGroup(tx, {
       workspaceId: input.workspaceId,
-      spaceId: input.spaceId,
+      spaceId,
     });
     await bindGroup(tx, {
       workspaceId: input.workspaceId,
@@ -331,7 +336,7 @@ export async function createGoalInTx<
   // space binding the built-in agents can see it through, so they are bound
   // to it by name (completeness review H-04). A space goal is already in
   // their sight through the space.
-  if (!input.spaceId) {
+  if (!spaceId) {
     await bindAgentsToContextInTx(tx, {
       workspaceId: input.workspaceId,
       contextId,
