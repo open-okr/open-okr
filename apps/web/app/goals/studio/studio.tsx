@@ -11,7 +11,12 @@ import {
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { ActionForm } from "../../cycle/action-form.tsx";
-import { applyFinding, dismissFinding, linkGoals } from "./actions.ts";
+import {
+  applyFinding,
+  dismissFinding,
+  linkGoals,
+  unlinkGoals,
+} from "./actions.ts";
 import { Canvas, type StudioEdge, type StudioNode } from "./canvas.tsx";
 
 /**
@@ -197,6 +202,22 @@ export function Studio({
                       {Math.round(selected.progressPct)}%
                     </span>
                   </span>
+                  <DependencyList
+                    goalId={selected.id}
+                    nodes={nodes}
+                    edges={edges}
+                    canEdit={canEdit}
+                    pending={pending}
+                    onRemove={(dependencyId) => {
+                      setError(null);
+                      startTransition(async () => {
+                        const state = await unlinkGoals(dependencyId);
+                        if (state.error) {
+                          setError(state.error);
+                        }
+                      });
+                    }}
+                  />
                   <p className="text-xs text-ink-4">
                     {t("goals.studio.studio.reParentingAndEditing")}
                   </p>
@@ -358,6 +379,80 @@ export function Studio({
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * The selected goal's dependencies, each with the way to take it apart
+ * (completeness review M-35).
+ *
+ * The canvas draws them as lines, which a pointer can see and a keyboard or a
+ * screen reader cannot pick out, so they are listed here by the other goal's
+ * title. The list is what makes removal reachable at all.
+ */
+function DependencyList({
+  goalId,
+  nodes,
+  edges,
+  canEdit,
+  pending,
+  onRemove,
+}: {
+  readonly goalId: string;
+  readonly nodes: readonly StudioNode[];
+  readonly edges: readonly StudioEdge[];
+  readonly canEdit: boolean;
+  readonly pending: boolean;
+  readonly onRemove: (dependencyId: string) => void;
+}) {
+  const { t } = useTranslations();
+  const titles = new Map(nodes.map((node) => [node.id, node.title]));
+  const mine = edges.filter(
+    (edge) => edge.from === goalId || edge.to === goalId,
+  );
+  if (mine.length === 0) {
+    return (
+      <p className="text-xs text-ink-4">
+        {t("goals.studio.studio.noDependencies")}
+      </p>
+    );
+  }
+  return (
+    <ul
+      className="flex flex-col gap-1"
+      aria-label={t("goals.studio.studio.dependencies")}
+    >
+      {mine.map((edge) => {
+        const other = edge.from === goalId ? edge.to : edge.from;
+        const title = titles.get(other) ?? t("goals.studio.studio.anotherGoal");
+        return (
+          <li
+            key={edge.id}
+            className="flex items-center justify-between gap-2 text-xs"
+          >
+            <a
+              href={`/goals/${other}`}
+              className="min-w-0 truncate text-ink-2 hover:underline"
+            >
+              {title}
+            </a>
+            {canEdit ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending}
+                onClick={() => onRemove(edge.id)}
+                aria-label={t("goals.studio.studio.removeDependencyOn", {
+                  title,
+                })}
+              >
+                {t("goals.studio.studio.removeDependency")}
+              </Button>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

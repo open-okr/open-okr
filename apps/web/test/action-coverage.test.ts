@@ -97,8 +97,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "a read no page needs: the goal page reads its initiatives directly",
   "goals.reviewDecision":
     "a read the goal page does not need: it shows the decision log from `decisions.forGoal`, which carries the same answer with its author and its session",
-  "goals.removeDependency":
-    "the alignment studio owns dependencies and removes them through its own canvas write",
   "sessions.votes":
     "a read the session screen does not need: the stage panels carry their own tallies",
   // M-05. Both were buttons, on phase 7 and on the scorecard, until closing a
