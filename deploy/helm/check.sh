@@ -374,6 +374,30 @@ else
   pass "the backup leaves object storage to the bucket"
 fi
 
+# --- a release installed before a block existed ----------------------------
+# `helm upgrade --reuse-values`, which the restore runbook uses, keeps the old
+# release's values and does not merge in the defaults added since. A template
+# that walks a path through a block the old values lack fails to render, and
+# the upgrade fails before anything rolls out: the nightly Upgrade workflow
+# caught exactly that with `scan` on 30 September 2026. Setting the block to
+# null removes it the way an older release lacks it.
+if render_one deployment.yaml --set scan=null | grep -q "^kind: Deployment"; then
+  pass "a release from before the scan block still renders"
+else
+  fail "a release from before the scan block fails to render on upgrade"
+fi
+if render_one deployment.yaml --set scan.clamd.host=clamd \
+  | grep -A1 "OPENOKR_CLAMD_PORT" | grep -q '"3310"'; then
+  pass "a named clamd host is passed on with its port"
+else
+  fail "a named clamd host is not passed on with its port"
+fi
+if render_one deployment.yaml | grep -q "OPENOKR_CLAMD_HOST"; then
+  fail "the scan is switched on although no clamd host is named"
+else
+  pass "no clamd host means no scan"
+fi
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "openokr: $FAILURES chart check(s) failed." >&2
