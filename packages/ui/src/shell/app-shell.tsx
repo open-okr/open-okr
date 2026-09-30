@@ -63,11 +63,25 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         {topbar}
         {cycleStrip}
+        {/*
+         * `relative`, and it is load-bearing (reported 30 September 2026).
+         *
+         * Tailwind's `sr-only` is `position: absolute`, and an absolutely
+         * positioned box with no positioned ancestor resolves against the
+         * initial containing block, so its scrollable overflow lands on the
+         * document rather than on the pane it sits in. The cycle drafting
+         * phase carries one `sr-only` label per form field, a few hundred
+         * rows down: `html.scrollHeight` measured 6151px against a `body`
+         * of 900px, and the browser drew a document scrollbar beside the
+         * one `main` already had. Two scrollbars, and the outer one moved
+         * nothing. Making `main` the containing block keeps that overflow
+         * inside the pane that owns it.
+         */}
         <main
           id="main-content"
           tabIndex={-1}
           className={cn(
-            "flex-1 overflow-y-auto p-4.5 pb-20 md:pb-4.5 focus:outline-none",
+            "relative flex-1 overflow-y-auto p-4.5 pb-20 md:pb-4.5 focus:outline-none",
             contentClassName,
           )}
         >
