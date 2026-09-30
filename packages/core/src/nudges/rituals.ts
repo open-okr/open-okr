@@ -35,6 +35,7 @@ import {
   type ResolvedThresholds,
   reviewPreparationDue,
   sessionLifecycleStage,
+  type TriggerKey,
 } from "@openokr/method";
 import { asc, eq } from "drizzle-orm";
 import { type AgentScope, agentSeesSession } from "../agents/scope.ts";
@@ -53,7 +54,7 @@ const MS_PER_DAY = 86_400_000;
 
 /** One nudge, with the rule key refused before the row exists. */
 function nudge(input: {
-  readonly ruleKey: string;
+  readonly ruleKey: TriggerKey;
   readonly subjectType: DueNudge["subjectType"];
   readonly subjectId: string;
   readonly recipientMemberId: string;

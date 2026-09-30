@@ -41,6 +41,7 @@ import {
   type ResolvedThresholds,
   type SuppressionReason,
   suppressionFor,
+  type TriggerKey,
   trigger,
 } from "@openokr/method";
 import {
@@ -82,7 +83,7 @@ export interface NudgeProposal {
 }
 
 export interface DueNudge {
-  readonly ruleKey: string;
+  readonly ruleKey: TriggerKey;
   readonly kind: NudgeKind;
   readonly subjectType: NudgeSubjectType;
   readonly subjectId: string;

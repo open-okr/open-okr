@@ -27,6 +27,7 @@ import {
   isTriggerKey,
   objectivesOverCap,
   type ResolvedThresholds,
+  type TriggerKey,
 } from "@openokr/method";
 import { and, eq, gte, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import {
@@ -41,7 +42,7 @@ import type { DueNudge } from "./service.ts";
 
 /** One quality nudge, with the rule key refused before the row exists. */
 function qualityNudge(input: {
-  readonly ruleKey: string;
+  readonly ruleKey: TriggerKey;
   readonly subjectType: DueNudge["subjectType"];
   readonly subjectId: string;
   readonly recipientMemberId: string;
@@ -206,7 +207,7 @@ export async function dueCycleQualityNudges(
 
   const due: DueNudge[] = [];
   const say = (
-    ruleKey: string,
+    ruleKey: TriggerKey,
     cycleId: string,
     recipients: readonly (string | null)[],
   ) => {
