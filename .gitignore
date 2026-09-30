@@ -44,3 +44,17 @@ next-env.d.ts
 # Scratch output from driving a browser by hand during verification. Session
 # debris, never a build artefact worth keeping.
 /.playwright-mcp/
+
+# A named run of the UAT workbook (build-uat.mjs with UAT_OUT/UAT_RESULTS set),
+# such as a copy filled in from one person's test pass. Agung's call, 29
+# September 2026: these stay local, never in the repo. The blank workbook,
+# docs/testing/OpenOKR-UAT.xlsx, is still tracked and this pattern excludes it.
+docs/testing/OpenOKR-UAT-*.xlsx
+
+# One-off driver scripts and evidence from a manual UAT pass through a real
+# browser (the M01-M08 Group D sweep, 29 September 2026): screenshots, a
+# scratch Postgres database's worth of nothing tracked, and Playwright
+# scripts written to reproduce one case at a time rather than to keep. Real
+# findings from the pass are written up in commits and reports, not left
+# sitting here.
+/.manual-uat-scratch/

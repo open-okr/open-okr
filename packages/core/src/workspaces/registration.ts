@@ -19,7 +19,7 @@
  */
 import type { Pool } from "pg";
 import { inviteTokenFromCookies } from "../invitations/pending.ts";
-import { previewInvite } from "../invitations/preview.ts";
+import { addressMayAccept, previewInvite } from "../invitations/preview.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
 import { isCloudEnabled } from "../tenancy/index.ts";
 
@@ -82,10 +82,30 @@ export const REGISTRATION_CLOSED_MESSAGE =
  *
  * One function, both callers. The cookie is the same one `/join` sets, and a
  * token that is not usable is the same as no token at all.
+ *
+ * **`email` is optional because one caller has one and the other never can.**
+ * The sign-up page asks before anybody has typed an address, to decide
+ * whether to render the form at all, so it asks the token-only question: is
+ * there something here worth a form. Better Auth's own `user.create.before`
+ * asks after the address exists, and that is the call that actually admits
+ * somebody, so it is the one required to pass it.
+ *
+ * **Without it, a token for one address opened registration for any address**
+ * (manual UAT, 29 September 2026, M04-03). `registrationOpenOrInvited`
+ * checked only whether *some* usable token sat in the cookie, never which
+ * email the token was for, so a personal invitation for `a@x` let a visitor
+ * register `b@x` instead: the `before` hook let it through, and `after`'s
+ * `acceptPendingInvitation` then refused to join a workspace it was never
+ * addressed to, silently, and the account fell through to its own fresh
+ * workspace. A single-use invitation for one address had become a skeleton
+ * key for a closed instance. `addressMayAccept`, the function
+ * `invitations.acceptLink` already uses for the identical decision, closes
+ * that gap here too rather than a third copy of the same rule.
  */
 export async function registrationOpenOrInvited(
   pool: Pool,
   cookieHeader: string | null,
+  email?: string,
 ): Promise<boolean> {
   if (await isRegistrationOpen(pool)) {
     return true;
@@ -95,5 +115,8 @@ export async function registrationOpenOrInvited(
     return false;
   }
   const invitation = await previewInvite(pool, { token, now: new Date() });
-  return invitation.kind === "usable";
+  if (invitation.kind !== "usable") {
+    return false;
+  }
+  return email === undefined || addressMayAccept(invitation, email);
 }

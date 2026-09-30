@@ -1,7 +1,9 @@
 import {
   canonThresholds,
   confidenceBand,
+  type ResolvedTerminology,
   type ResolvedThresholds,
+  TERMINOLOGY,
 } from "@openokr/method";
 import {
   Avatar,
@@ -13,29 +15,71 @@ import {
 } from "@openokr/ui";
 import type { ReactNode } from "react";
 import { progressCeiling } from "../lib/ceilings.ts";
+import { workspaceTerminology } from "../lib/terminology.ts";
 import { getTranslations } from "../lib/translations";
 import { HealthChip } from "./goals/health-chip.tsx";
 import { QuickCheckIn } from "./quick-check-in.tsx";
 
 /**
- * What a row is, in two letters (S-01's uniform node contract).
+ * What a row is, abbreviated to fit the column (S-01's uniform node contract).
  *
- * The mockup writes OBJ and KR. Initiatives and KPI rows join the same column
- * when their tasks land, and the chip is the only place that has to know.
+ * The mockup writes OBJ and KR for the canon terms. A workspace that renames
+ * Objective still gets an abbreviation, built from its own word rather than
+ * the canon's, so the renamed screens are not the one place still abbreviating
+ * the word nobody kept.
+ *
+ * A single word is its own first three letters (Objective -> OBJ, Goal ->
+ * GOA). A multi-word term takes one letter per word instead, which is what
+ * makes the canon's own "Key result" read as KR rather than KEY.
  */
+export function rowKindAbbreviation(
+  kind: "goal" | "key_result",
+  terms: ResolvedTerminology,
+): string {
+  const word =
+    kind === "goal" ? terms.objective.singular : terms.keyResult.singular;
+  const parts = word.trim().split(/\s+/);
+  return (
+    parts.length > 1 ? parts.map((part) => part[0]).join("") : word.slice(0, 3)
+  )
+    .slice(0, 3)
+    .toUpperCase();
+}
+
+/**
+ * The chip's text for each kind of row, worked out once per table rather than
+ * once per row.
+ *
+ * A term the workspace kept reads the catalogue's own abbreviation, so a
+ * translator still owns it (M-15). A renamed one is abbreviated from the
+ * workspace's word, which is one pair of words in every language (M-14), so
+ * there is nothing to translate. Only the singular is compared, because it is
+ * the only word the abbreviation is built from.
+ */
+function rowKindLabels(
+  terms: ResolvedTerminology,
+  t: (key: string, values?: MessageValues) => string,
+): Readonly<Record<"goal" | "key_result", string>> {
+  return {
+    goal:
+      terms.objective.singular === TERMINOLOGY.objective.singular
+        ? t("workMap.obj")
+        : rowKindAbbreviation("goal", terms),
+    key_result:
+      terms.keyResult.singular === TERMINOLOGY.keyResult.singular
+        ? t("workMap.kr")
+        : rowKindAbbreviation("key_result", terms),
+  };
+}
+
 function RowKindChip({
   kind,
-  t,
+  label,
 }: {
   readonly kind: "goal" | "key_result";
-  /** The caller's `t`, so a row does not resolve the locale once per row. */
-  readonly t: (key: string, values?: MessageValues) => string;
+  readonly label: string;
 }) {
-  return (
-    <Chip tone={kind === "goal" ? "brand" : "neutral"}>
-      {kind === "goal" ? t("workMap.obj") : t("workMap.kr")}
-    </Chip>
-  );
+  return <Chip tone={kind === "goal" ? "brand" : "neutral"}>{label}</Chip>;
 }
 
 /**
@@ -143,6 +187,7 @@ export async function GoalTable({
   // P8-G04. A bar drawn on a 0-to-100 track under a raised ceiling fills
   // early and tells a screen reader 100 is the most there is.
   const ceiling = await progressCeiling();
+  const rowKind = rowKindLabels(await workspaceTerminology(), t);
 
   const thresholds = canonThresholds();
 
@@ -210,7 +255,10 @@ export async function GoalTable({
                       className="flex items-center gap-2"
                       style={{ paddingLeft: `${node.depth * 18}px` }}
                     >
-                      <RowKindChip kind={node.kind} t={t} />
+                      <RowKindChip
+                        kind={node.kind}
+                        label={rowKind[node.kind]}
+                      />
                       <span
                         className={
                           node.kind === "goal"
