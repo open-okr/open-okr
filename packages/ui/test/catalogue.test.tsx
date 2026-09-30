@@ -78,6 +78,8 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "admin.sso.ssoForm.signOnUrlPlaceholder",
   "admin.sso.ssoForm.urlPlaceholder",
   "common.esc",
+  // The shortcut itself, as the tour's last stop is named for it (L-08).
+  "tour.search.title",
   // Abbreviations the method keeps in English in every language.
   "common.ai",
   "dev.components.ai",
@@ -152,6 +154,7 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "sessions.schedule.facilitator",
   "sessions.schedule.space",
   "spaces.spaces",
+  "tour.checkIn.title",
   "workMap.keyResult",
   "workMap.objective",
 ]);

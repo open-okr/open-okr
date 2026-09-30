@@ -441,12 +441,14 @@ import {
   unassignTask,
   updateTask,
 } from "./tasks.ts";
+import { finishOwnTour, readOwnTour } from "./tour.ts";
 import { decomposeKeyResult, summariseThread } from "./work-assists.ts";
 import {
   changeWorkspacePlan,
   finishOnboarding,
   provisionWorkspace,
   renameWorkspace,
+  reopenOnboarding,
   setWorkspaceLifecycle,
   setWorkspaceState,
 } from "./workspace.ts";
@@ -460,11 +462,14 @@ export const ACTION_MAP = {
   "workspace.deletedItems": listDeletedItems,
   "workspace.rename": renameWorkspace,
   "workspace.finishOnboarding": finishOnboarding,
+  "workspace.reopenOnboarding": reopenOnboarding,
   "workspace.changePlan": changeWorkspacePlan,
   "workspace.setLifecycle": setWorkspaceLifecycle,
   "workspace.setState": setWorkspaceState,
   "workspace.provision": provisionWorkspace,
   "people.updateOwnProfile": updateOwnProfile,
+  "people.readOwnTour": readOwnTour,
+  "people.finishOwnTour": finishOwnTour,
   "people.exportMine": exportMine,
   "people.importMember": importMember,
   "people.updateMember": updateMember,

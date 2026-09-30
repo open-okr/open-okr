@@ -10,7 +10,7 @@ account has and what an administrator can grant to somebody else.
 
 | Screen | What you decide there |
 |---|---|
-| **General** | Timezone, language, trusted email domains, the second-factor policy, and the workspace state |
+| **General** | Timezone, language, trusted email domains, the second-factor policy, the workspace state, and whether to open the first-day setup again. Reopening it keeps every answer, and every administrator is sent to it from the Work Map until somebody finishes it |
 | **Plan and seats** | The plan and how many seats it carries. Cloud only; a self-hosted instance is never seat-limited |
 | **Support access** | Whether the vendor may look, for how long, and with what reason. Cloud only |
 | **Single sign-on** | An OIDC provider, which email domains it claims, and whether it is enforced |

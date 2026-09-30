@@ -19,6 +19,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "workspace.renamed": (p) =>
     `Workspace renamed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "workspace.onboarded": () => "Workspace setup finished",
+  "workspace.onboarding_reopened": () => "Workspace setup opened again",
   "workspace.state_changed": (p) =>
     `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "support.granted": (p) =>
@@ -32,6 +33,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : `Workspace moved to the ${asString(p.plan)} plan, with unlimited seats`,
   "member.profile_updated": (p) =>
     `${asString(p.name, "A member")} updated their profile`,
+  "member.tour_finished": () => "Finished the first-visit tour",
   "channel.templatesSynced": (p) =>
     `Synced ${asString(p.recorded, "0")} WhatsApp templates, withdrawing ${asString(p.withdrawn, "0")}`,
   "channel.templateMapped": (p) =>

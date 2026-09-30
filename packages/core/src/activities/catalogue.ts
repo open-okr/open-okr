@@ -34,6 +34,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // P6-G26. No payload: the fact is the event, and who did it is on the
   // audit row beside it.
   "workspace.onboarded": z.object({}),
+  // Completeness review L-08. The same fact in the other direction: S-34 is
+  // offered again, and the feed says so for the same reason it says it
+  // finished.
+  "workspace.onboarding_reopened": z.object({}),
   "workspace.state_changed": z.object({
     from: z.enum(["active", "read_only", "frozen"]),
     to: z.enum(["active", "read_only", "frozen"]),
@@ -59,6 +63,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     seats: z.number().nullable(),
   }),
   "member.profile_updated": z.object({ name: z.string() }),
+  // Completeness review L-08. Private, in the list below: nobody else in the
+  // workspace needs to read that one person closed a tour.
+  "member.tour_finished": z.object({}),
   "channel.templatesSynced": z.object({
     recorded: z.number(),
     withdrawn: z.number(),
@@ -624,6 +631,9 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   // (M-10). Which member asked is theirs; the audit row is where an
   // administrator reads that the control acted.
   "ai.egress_withheld",
+  // Somebody closing their own first-visit tour (L-08). The pipeline needs the
+  // row; the workspace's feed has no reader for it.
+  "member.tour_finished",
 ]);
 
 /**

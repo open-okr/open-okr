@@ -24,6 +24,10 @@ import { Wizard } from "./wizard.tsx";
  * the owner's, and a workspace already marked done sends everybody home. Both
  * are redirects rather than empty states: there is no version of this screen
  * that is useful to somebody it is not for.
+ *
+ * **Done is not for ever** (completeness review L-08). "A dismissed onboarding
+ * is resumable from admin": General in admin calls `workspace.reopenOnboarding`,
+ * which marks it pending again and sends the administrator here.
  */
 export default async function WelcomePage() {
   const { session, workspace } = await requireWorkspace();
@@ -45,12 +49,16 @@ export default async function WelcomePage() {
   if (read.settings.onboardingDone !== false) {
     redirect("/");
   }
+  // What the workspace runs now, so a wizard reopened from General in admin
+  // (L-08) opens on the answer already given rather than on the default.
+  const rhythm = await callAction(context, "rhythm.read", {});
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center p-6">
       <Wizard
         workspaceName={workspace.name}
         timezone={String(read.settings.timezone ?? "UTC")}
+        frequency={rhythm.defaultCheckInFrequency}
       />
     </main>
   );

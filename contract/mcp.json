@@ -73,6 +73,21 @@
       "example": {}
     },
     {
+      "name": "workspace.reopenOnboarding",
+      "description": "Offer the workspace's own setup again, keeping every answer it already holds.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "workspace.changePlan",
       "description": "Move this cloud workspace onto another plan from the catalogue.",
       "inputSchema": {
@@ -317,6 +332,36 @@
             ]
           }
         }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
+      "name": "people.readOwnTour",
+      "description": "Whether the signed-in member has finished the first-visit tour.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "people.finishOwnTour",
+      "description": "Mark the first-visit tour as finished for the signed-in member, on every machine.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       },
       "scope": "write",
       "annotations": {

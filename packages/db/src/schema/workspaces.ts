@@ -105,6 +105,14 @@ export const workspaceMembers = pgTable("workspace_members", {
    * a new locale is a new catalogue plus a value here, in that order.
    */
   language: text("language", { enum: ["en", "ms"] }),
+  /**
+   * When the member finished the first-visit tour (UIUX-PLAN S-34, L-08).
+   *
+   * Null means it is still offered, which is what every member who joined
+   * before this column existed has too: they have not seen it either. Here
+   * rather than in the browser, so ending it once ends it on every machine.
+   */
+  tourFinishedAt: timestamp("tour_finished_at", { withTimezone: true }),
   placeholderEmail: text("placeholder_email"),
   legacyId: text("legacy_id"),
   legacyType: text("legacy_type", { enum: ["flowyteam", "csv"] }),

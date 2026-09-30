@@ -63,7 +63,12 @@ export async function WorkMapContextStrip({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-line border-b pb-2.5 text-xs">
+    <div
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-line border-b pb-2.5 text-xs"
+      // The Work Map's own cycle strip, which stays after publishing when the
+      // shell's goes. The tour's cycle stop outlines both (L-08).
+      data-tour-target="cycle-strip"
+    >
       <Link
         href={cycleHref}
         className="rounded-full border border-line px-2.5 py-1 font-semibold text-ink-2 hover:border-brand"

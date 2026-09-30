@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { INSTANCE_ACCOUNT, skipOnboarding } from "./instance-account.ts";
@@ -49,7 +50,7 @@ test("registering provisions a workspace and lands on the dashboard", async () =
    * redirects a workspace provisioning marked pending to S-34 instead.
    *
    * Every step is skipped here, which is the acceptance criterion this spec is
-   * closest to: skip all four and land on a working workspace at every
+   * closest to: skip all five and land on a working workspace at every
    * documented default. `s34-onboarding.spec.ts` cannot prove it, because by
    * the time it runs the instance has been onboarded once and the wizard
    * refuses to appear again, which is itself the behaviour it does prove.
@@ -86,6 +87,62 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   await expect(
     page.getByRole("link", { name: "Company", exact: true }),
   ).toBeVisible();
+});
+
+/**
+ * The first-visit tour (UIUX-PLAN S-34, completeness review L-08).
+ *
+ * "Per user on first visit: a five-stop tour covering the Work Map, the review
+ * inbox, a check-in, the cycle strip and ⌘K." The account registered above is
+ * on its first visit, so this is the one place the tour can be walked from its
+ * start. **Finishing it here is also what keeps it out of every later spec**:
+ * they all sign in as this account, and the tour is remembered on the member,
+ * so none of them meets it.
+ */
+test("a first visit is offered a five-stop tour, and finishing it ends it for good", async () => {
+  await page.goto("/");
+  const tour = page.getByRole("region", { name: "Finding your way around" });
+  await expect(tour).toBeVisible({ timeout: 15_000 });
+
+  // `s43-accessibility` scans every screen as this account, which never sees
+  // the tour again after this test, so the card is scanned here, while it is
+  // on screen, against the same rules and the same failing impacts.
+  const scan = await new AxeBuilder({ page })
+    .include('[data-testid="first-visit-tour"]')
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(
+    scan.violations
+      .filter((one) => one.impact === "serious" || one.impact === "critical")
+      .map((one) => `${one.id}: ${one.help}`),
+  ).toEqual([]);
+
+  const stops = ["work-map", "review", "check-in", "cycle-strip", "search"];
+  for (const [index, stop] of stops.entries()) {
+    await expect(tour.getByTestId("tour-progress")).toContainText(
+      `${index + 1} / ${stops.length}`,
+    );
+    await expect(tour.getByTestId("tour-stop")).toHaveAttribute(
+      "data-stop",
+      stop,
+    );
+    // The stop sits on the page root, which is what outlines the thing it
+    // names: the tree, the Review link, the strip, the search box.
+    await expect(page.locator("html")).toHaveAttribute("data-tour-stop", stop);
+    await tour.getByTestId("tour-next").click();
+  }
+
+  // The last press was Done: the card goes, and so does the outline.
+  await expect(tour).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator("html")).not.toHaveAttribute("data-tour-stop");
+
+  // Remembered on the member rather than the page: a fresh load of the front
+  // door does not offer it again.
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Work map" }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("first-visit-tour")).toHaveCount(0);
 });
 
 test("the front door shows what provisioning resolved, with nothing configured", async () => {

@@ -4,6 +4,7 @@ import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
+import { FirstVisitTour } from "../first-visit-tour.tsx";
 import { goalTreeNodes } from "../goal-nodes.ts";
 import { TrustedDomainOffers } from "../trusted-domain-offers.tsx";
 import { WorkMap } from "../work-map.tsx";
@@ -88,6 +89,10 @@ export default async function HomePage({
   ) {
     redirect("/welcome");
   }
+  // The first-visit tour (UIUX-PLAN S-34, L-08). Here, because this is the
+  // screen every first visit lands on, and after the redirect above, so an
+  // owner meets the setup first and the tour when they arrive.
+  const tour = await callAction(context, "people.readOwnTour", {});
   const query = await searchParams;
 
   const cycles = await callAction(context, "cycles.list", {});
@@ -230,6 +235,12 @@ export default async function HomePage({
         scopeLabel={scopeLabel}
         stats={stats}
       />
+
+      {/* Under the page's own heading, so the outline reads Work map and then
+          the tour, and above the tree its first stop outlines, so a keyboard
+          meets the card before the rows it introduces. Gone for good once
+          finished or ended. */}
+      {tour.finished ? null : <FirstVisitTour />}
 
       <WorkMapScopeTabs
         tabs={scopeTabs}
