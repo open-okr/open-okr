@@ -14,10 +14,10 @@
  * event. This satisfies the acceptance criterion: both participants see the
  * stage advance without a manual reload.
  *
- * What is deliberately absent: the twelve-week confidence trend (P4-T07b data),
- * the streak ribbon (P4-T08), and the blocker ages (P4-T07c table). Those are
- * listed as "no data yet" placeholders rather than faked. P4-T07a owns the
- * session record and the live sync; the subsequent tasks fill the panels.
+ * The twelve-week confidence trend, the streak ribbon, the blocker panel with
+ * its ages and the commitments are all drawn here: P4-T07a built the session
+ * record and the live sync with "no data yet" placeholders, and later tasks
+ * filled every panel (the gap audit's B-10, closed by P6-G19a to P6-G19c).
  */
 
 import {

@@ -318,12 +318,11 @@ test("a monthly review records a trend and a decision, and the goal shows it", a
  * participant" is the whole claim, and a single page proves nothing about the
  * second one.
  *
- * **Half of that criterion is blocked and this test says so rather than
- * pretending.** "Without a reload" needs an event to reach the browser, and
- * nothing drains the outbox. The second client reloads here, which proves the
- * stage change reached the server and that both clients read the same rail from
- * it. The live half is `test.fixme` on P4-T07a's criterion above, and the
- * blocker is recorded in PHASE-4-SPLIT.md.
+ * **This test asserts the server, not the push.** "Without a reload" is an
+ * event reaching the open page: the relay drains the outbox since P6-G01b and
+ * the session screen follows it. The second client still reloads here, which
+ * proves the stage change reached the server and that both clients read the
+ * same rail from it; no spec yet asserts the push itself arriving.
  *
  * **The private half of the notes line is not driven here, and cannot be.**
  * Both contexts sign in as the same account, because this suite has exactly one
@@ -431,9 +430,9 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     timeout: 10_000,
   });
   // **Not asserted live.** Opening is a stage change and the second client
-  // should follow without touching anything, and it will not until a relay
-  // drains the outbox row `sessions.open` now writes. A reload is what proves
-  // the server moved, which is the honest claim this test can make today.
+  // follows it through the relay, which drains the outbox row `sessions.open`
+  // writes. A reload is what proves the server moved, which is the claim this
+  // test makes; the push's timing is not what it is about.
   await secondPage.reload();
   await expect(secondPage.getByText(/Stage 1 of 11/)).toBeVisible({
     timeout: 10_000,
@@ -576,8 +575,8 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(page.getByText("healthy").first()).toBeVisible();
 
   // **The same number for the participant, from the same write.** Reloaded for
-  // the reason every other live assertion in this file is: the push is an outbox
-  // row and no relay drains it yet. What this proves is that both clients read
+  // the reason every other assertion in this file is: it is about the server's
+  // answer, not the push's timing. What this proves is that both clients read
   // one answer off the server rather than each computing their own.
   await secondPage.reload();
   await expect(secondPage.getByText("0.60").first()).toBeVisible({
