@@ -9,7 +9,7 @@
 [![Licence: AGPL-3.0](https://img.shields.io/badge/licence-AGPL--3.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6.svg)](#the-stack)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-the%20only%20required%20service-336791.svg)](#the-stack)
-[![Status](https://img.shields.io/badge/status-feature%20complete%2C%20pre--release-yellow.svg)](docs/development-plan/STATUS.md)
+[![Status](https://img.shields.io/badge/status-pre--release-yellow.svg)](docs/COMPLETENESS-REVIEW.md)
 [![Self-hosted](https://img.shields.io/badge/self--host-never%20feature--gated-success.svg)](#-install-it)
 
 [Install it](#-install-it) ·
@@ -334,7 +334,7 @@ TypeScript in strict mode everywhere. Next.js App Router and React. PostgreSQL t
 
 **All eight phases are built.** The plan set holds requirements, architecture, the method canon, the complete database schema, the AI and agent design, forty screen specifications and the cloud operator screens, cut into **200 scoped tasks**, each with acceptance criteria and a test plan. Every row in [STATUS.md](docs/development-plan/STATUS.md) reads done.
 
-**No version has been tagged yet**, so nothing is published to a container registry and nobody outside this repository has run it. Treat it as feature complete and unproven in the field rather than as a release. Build the image yourself, as the install section shows.
+**No version has been tagged yet**, so nothing is published to a container registry and nobody outside this repository has run it. Every task is done, and a [completeness review](docs/COMPLETENESS-REVIEW.md) then checked the product against the requirements rather than the task list and found gaps; they are being closed, and the first release waits until they are. Treat it as pre-release and unproven in the field. Build the image yourself, as the install section shows.
 
 | Phase | What it delivered |
 |---|---|
