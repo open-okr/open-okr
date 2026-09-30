@@ -100,3 +100,51 @@ test("the export is itself in the trail", async () => {
   // rows: taking a copy of who did what is itself an act worth recording.
   await expect(page.getByTestId("export-note")).not.toHaveText("0 rows.");
 });
+
+/**
+ * Completeness review L-19: the trail could be verified and exported and not
+ * read. The filters, the cursor and the refusal below `full` are proved in
+ * `packages/core/test/audit-admin.test.ts`; this is the table a person sees.
+ */
+test("the trail can be read on the screen, narrowed by the same filter as the file", async () => {
+  await goTo(page, "/admin/audit");
+
+  const table = page.getByTestId("audit-log");
+  await expect(table).toBeVisible({ timeout: 15_000 });
+  for (const header of ["Who", "Action", "Target", "Chain"]) {
+    await expect(
+      table.getByRole("columnheader", { name: header, exact: true }),
+    ).toBeVisible();
+  }
+  // The zone is in the header, so a timestamp is never a guess.
+  await expect(
+    table.getByRole("columnheader", { name: /^When \(.+\)$/ }),
+  ).toBeVisible();
+
+  await page.getByLabel("Action").fill("audit.export");
+  await page.getByRole("button", { name: "Show matching rows" }).click();
+
+  // The exports this spec took are in the trail, and nothing else matches.
+  const rows = page.getByTestId("audit-row");
+  await expect(rows.first()).toContainText("audit.export", {
+    timeout: 15_000,
+  });
+  await expect(rows.filter({ hasNotText: "audit.export" })).toHaveCount(0, {
+    timeout: 15_000,
+  });
+  // The person who took them is named, not an id.
+  await expect(rows.first().getByRole("cell").nth(1)).not.toHaveText(
+    /^[0-9a-f-]{36}$/,
+  );
+});
+
+test("a filter the trail has nothing for says so on the screen", async () => {
+  await goTo(page, "/admin/audit");
+  await page.getByLabel("Action").fill("nothing.everHappened");
+  await page.getByRole("button", { name: "Show matching rows" }).click();
+
+  await expect(page.getByTestId("audit-log-empty")).toHaveText(
+    "No rows match this filter.",
+    { timeout: 15_000 },
+  );
+});

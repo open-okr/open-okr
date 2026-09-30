@@ -10,6 +10,9 @@ export {
   type RunDataChangesOptions,
   runDataChanges,
 } from "./data-change.ts";
+// Exported so the application's own test can open what it sealed, through
+// the reader a sign-in uses (completeness review L-11).
+export { sealAccountTokens } from "./data-changes/0011_seal_account_tokens.ts";
 export {
   APPEND_ONLY_TABLES,
   type GrantOptions,

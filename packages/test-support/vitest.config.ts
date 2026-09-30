@@ -6,6 +6,7 @@ export default defineConfig({
     // suite runs in its own Vitest process. It must not run here.
     exclude: ["**/node_modules/**", "fixtures/**"],
     globalSetup: ["./src/db-harness.ts"],
+    setupFiles: ["./src/db-file-teardown.ts"],
     env: {
       // Keeps this project's per-worker database names distinct from other
       // projects running in the same Vitest process pool.

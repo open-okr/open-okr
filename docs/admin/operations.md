@@ -60,9 +60,10 @@ The [restore runbook](../runbooks/restore.md) is the full procedure.
 ./openokr rotate-key
 ```
 
-Re-wraps every stored secret under a new root key. The old key is kept in the
-previous-keys list until the rotation finishes, so nothing becomes unreadable
-mid-way.
+Re-wraps every stored secret under a new root key, including the tokens an
+identity provider issued at sign-in. The old key is kept in the previous-keys
+list until the rotation finishes, so nothing becomes unreadable mid-way.
+[Security](security.md#what-is-encrypted-at-rest) lists what is sealed.
 
 ## Taking the whole workspace out
 

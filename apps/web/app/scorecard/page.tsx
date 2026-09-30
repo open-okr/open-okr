@@ -1,6 +1,6 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import { resolveAccessLevelFor } from "../../lib/access";
+import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
@@ -29,12 +29,13 @@ export default async function ScorecardPage() {
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
-  const scorecard = await callAction(context, "cycles.scorecard", {});
-  const cycles = await callAction(context, "cycles.list", {});
-  const level = await resolveAccessLevelFor(
+  // Before the first read, so a guest is moved rather than refused (L-23).
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );
+  const scorecard = await callAction(context, "cycles.scorecard", {});
+  const cycles = await callAction(context, "cycles.list", {});
   // `full`, which is what `cycles.close` requires. A control that will be
   // refused for everybody below it is a control nobody below it should see.
   const canClose = level >= ACCESS_LEVELS.full;

@@ -4,7 +4,7 @@
  * Against a real database through the test-support harness.
  */
 import { workerDb } from "@openokr/test-support/db";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
@@ -73,11 +73,6 @@ beforeEach(async () => {
     throw new Error("the second member was not inserted");
   }
   secondMemberId = secondRow.id;
-});
-
-afterAll(async () => {
-  const wb = await workerDb();
-  wb.appPool.end();
 });
 
 async function createGoal(): Promise<string> {

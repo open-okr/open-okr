@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { workerDb } from "@openokr/test-support/db";
 import pg from "pg";
@@ -14,6 +15,7 @@ import { seedChampionAgent } from "../src/data-changes/0006_seed_champion_agent.
 import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_goal.ts";
 import { bindAgentsToSpacelessItems } from "../src/data-changes/0009_bind_agents_to_spaceless_items.ts";
 import { scrubErasedMemberNames } from "../src/data-changes/0010_scrub_erased_member_names.ts";
+import { sealAccountTokens } from "../src/data-changes/0011_seal_account_tokens.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -651,5 +653,153 @@ describe("0010: taking erased members' names out of the feed", () => {
       scripts: [scrubErasedMemberNames],
     });
     expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0011: sealing the identity-provider tokens stored in plain text", () => {
+  const ROOT = randomBytes(32).toString("base64");
+  const SEALED =
+    /^openokr-sealed:v1:[0-9a-f]{16}:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/;
+
+  const seedAccount = async (
+    id: string,
+    tokens: [string | null, string | null, string | null],
+  ) => {
+    await client.query(
+      "insert into users (id, name, email) values ($1, $1, $2)",
+      [id, `${id}@example.com`],
+    );
+    await client.query(
+      `insert into accounts (id, user_id, account_id, provider_id,
+                             access_token, refresh_token, id_token)
+       values ($1, $1, $1, 'sso-okta', $2, $3, $4)`,
+      [id, ...tokens],
+    );
+  };
+
+  const tokensOf = async (id: string) =>
+    (
+      await client.query<{
+        access_token: string | null;
+        refresh_token: string | null;
+        id_token: string | null;
+      }>(
+        "select access_token, refresh_token, id_token from accounts where id = $1",
+        [id],
+      )
+    ).rows[0];
+
+  beforeEach(async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+  });
+
+  it("seals a plain token and leaves sealed, empty and missing ones alone", async () => {
+    const already = `openokr-sealed:v1:${"a".repeat(16)}:AAAA:BBBB`;
+    await seedAccount("plain", ["access-1", "refresh-1", "eyJ.id.token"]);
+    await seedAccount("mixed", [already, "", null]);
+    await seedAccount("password", [null, null, null]);
+
+    const [result] = await runDataChanges(client, {
+      scripts: [sealAccountTokens(ROOT)],
+    });
+    expect(result?.rowsChanged).toBe(1);
+
+    const plain = await tokensOf("plain");
+    for (const value of Object.values(plain ?? {})) {
+      expect(value).toMatch(SEALED);
+    }
+    expect(JSON.stringify(plain)).not.toMatch(/access-1|refresh-1|eyJ/);
+    // A fresh data key per token, so equal tokens never look equal at rest.
+    expect(new Set(Object.values(plain ?? {})).size).toBe(3);
+
+    expect(await tokensOf("mixed")).toEqual({
+      access_token: already,
+      refresh_token: "",
+      id_token: null,
+    });
+    expect(await tokensOf("password")).toEqual({
+      access_token: null,
+      refresh_token: null,
+      id_token: null,
+    });
+  });
+
+  it("changes nothing on a second run, as after a restore", async () => {
+    await seedAccount("twice", ["access-2", null, null]);
+    await runDataChanges(client, { scripts: [sealAccountTokens(ROOT)] });
+    const first = await tokensOf("twice");
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [sealAccountTokens(ROOT)],
+    });
+    expect(again?.rowsChanged).toBe(0);
+    expect(await tokensOf("twice")).toEqual(first);
+  });
+
+  it("works through more rows than one batch holds", async () => {
+    await client.query(
+      `insert into users (id, name, email)
+       select 'u' || n, 'u' || n, 'u' || n || '@example.com'
+         from generate_series(1, 450) n`,
+    );
+    await client.query(
+      `insert into accounts (id, user_id, account_id, provider_id, access_token)
+       select 'u' || n, 'u' || n, 'u' || n, 'sso-okta', 'token-' || n
+         from generate_series(1, 450) n`,
+    );
+
+    const [result] = await runDataChanges(client, {
+      scripts: [sealAccountTokens(ROOT)],
+    });
+    expect(result?.rowsChanged).toBe(450);
+    expect(result?.batches).toBeGreaterThan(1);
+
+    const { rows } = await client.query<{ n: number }>(
+      `select count(*)::int as n from accounts
+        where access_token not like 'openokr-sealed:v1:%'`,
+    );
+    expect(rows[0]?.n).toBe(0);
+  });
+
+  it("needs no key on an instance with nothing to seal", async () => {
+    await seedAccount("nothing", [null, null, null]);
+    const [result] = await runDataChanges(client, {
+      scripts: [sealAccountTokens(undefined)],
+    });
+    expect(result?.rowsChanged).toBe(0);
+  });
+
+  it("refuses to finish without a key when a token is in plain text", async () => {
+    // A completed ledger row would claim the tokens are sealed when they are
+    // not, so this fails loudly and leaves the script to run again.
+    await seedAccount("stranded", ["access-3", null, null]);
+    const error = await runDataChanges(client, {
+      scripts: [sealAccountTokens(undefined)],
+    }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(DataChangeError);
+    // The runner names the batch; the script's own reason is the cause.
+    expect(String((error as Error).cause)).toContain("OPENOKR_ENCRYPTION_KEY");
+
+    expect((await tokensOf("stranded"))?.access_token).toBe("access-3");
+    const { rows } = await client.query<{ completed_at: string | null }>(
+      "select completed_at from _data_changes where name = '0011_seal_account_tokens'",
+    );
+    expect(rows[0]?.completed_at).toBeNull();
+  });
+
+  it("refuses a key that is not 32 bytes of base64, without repeating it", async () => {
+    await seedAccount("bad-key", ["access-4", null, null]);
+    const error = await runDataChanges(client, {
+      scripts: [sealAccountTokens("not-a-key")],
+    }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(DataChangeError);
+    const cause = (error as Error).cause as Error;
+    expect(cause.message).toContain("32-byte key");
+    expect(`${(error as Error).message} ${cause.message}`).not.toContain(
+      "not-a-key",
+    );
   });
 });

@@ -33,7 +33,7 @@ Additional conventions:
 |---|---|---|
 | `users` | `email` unique, `name`, `email_verified`, `two_factor_enabled` | The global person. The per-workspace person is `workspace_members`, which references this |
 | `sessions` | `token` unique, `user_id`, `expires_at`, `ip_address`, `user_agent` | `token` holds the SHA-256 of the browser's token, never the token itself. The hashing adapter in `packages/core` hashes on write and hashes the predicate on lookup, so a database copy cannot be replayed as a signed-in browser |
-| `accounts` | `user_id`, `provider_id`, `account_id`, `password?`, tokens | One per credential. `password` is hashed by Better Auth; null for passkey and social accounts. Unique on `(provider_id, account_id)` |
+| `accounts` | `user_id`, `provider_id`, `account_id`, `password?`, tokens | One per credential. `password` is hashed by Better Auth; null for passkey and social accounts. `access_token`, `refresh_token` and `id_token` are sealed under the instance root key as `openokr-sealed:v1:<key id>:<data key>:<ciphertext>` (L-11); data change 0011 seals rows written before that. Unique on `(provider_id, account_id)` |
 | `verifications` | `identifier`, `value`, `expires_at` | Email verification and password reset challenges. Consumed rows are removed |
 | `passkeys` | `user_id`, `public_key`, `credential_id` unique, `counter`, `device_type`, `backed_up` | The public half only; the private key never leaves the authenticator |
 | `two_factors` | `user_id`, `secret`, `backup_codes`, `verified`, `failed_verification_count`, `locked_until?` | The TOTP secret and backup codes, both encrypted by Better Auth with the instance secret before they reach the table |
@@ -124,7 +124,9 @@ The workspace `language` default now resolves through the instance's own `instan
 `email` unique, authentication linkage. Credentials, sessions, passkeys and second factors are owned by the authentication library.
 
 ### workspace_members
-`user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`, `placeholder_email?`, `legacy_id?`, `legacy_type?`.
+`user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`, `tour_finished_at?`, `placeholder_email?`, `legacy_id?`, `legacy_type?`.
+
+`tour_finished_at` is when the member finished or ended the first-visit tour (UIUX-PLAN S-34, completeness review L-08, migration 0106). Null means the tour is still offered, which is also what every member who joined before the column existed has: they have not seen it either. Per member rather than in the browser, so ending it once ends it on every machine. No legacy source.
 
 `placeholder_email` is the address an imported member is waiting to be claimed by (P6-T03a). Set only on a `placeholder` row, which has no `user_id` and so cannot be signed in as; unique per workspace among live rows, so two imported employees sharing an address cannot become two members waiting for one person. Every member with a real account has this null and their address on the user row. An imported placeholder is `active`, not `invited`: the kind says nobody has signed in as it, the status says the membership is live, and it is, because the row champions objectives (P6-T03b). **The spreadsheet importer's member reference resolves against this column as well as `users.email` and the membership name** (P6-T04d): a workspace that has just imported a company is full of placeholders, a spreadsheet exported from that same source names people by the address they had there, and reading only `users.email` skipped every row of a goals file naming an imported champion. One workspace holding both importers is unusable without it.
 
@@ -157,6 +159,8 @@ Unique on `token_hash` alone for live rows since migration 0075 (P6-G06b), and t
 `seq`, `actor_member_id?`, `actor_kind` (`human` / `agent` / `system` / `operator`), `action`, `target_type`, `target_id?`, `payload jsonb`, `at`, `prev_hash`, `row_hash`. Unique on `(workspace_id, seq)`.
 
 `seq` is the position in this workspace's chain, from 1. Ordering by `at` would be ambiguous under concurrency, and a chain needs exactly one order to be verifiable. `action` is the registry action name, so a row resolves back to one contract.
+
+**Migration 0105 adds `audit_events_recent_idx` on `(workspace_id, at desc, id desc)`** (completeness review L-19). The admin screen's list, `audit.list`, reads the trail newest first with the last row's `(at, id)` as the cursor for the next page, and a date range narrows the same index. The chain index answers `seq`, which is null for a row still waiting for its position, so it could not serve a list that has to show those rows too.
 
 `at` is written by the application rather than defaulted to `now()`, because it is part of the hash and has to be the value the hash was computed over.
 
@@ -880,6 +884,7 @@ Indexes ship with the feature that needs them. The composite indexes carrying th
 | Recovery board | `kpis (workspace_id, state)` |
 | Board | `tasks (workspace_id, space_id, status, position)` and `tasks (workspace_id, key_result_id)` |
 | Feed | `activities (workspace_id, context_id, at desc)` |
+| Audit trail list | `audit_events (workspace_id, at desc, id desc)` |
 | Nudges | `nudges (workspace_id, recipient_member_id, scheduled_for)` and `nudges (workspace_id, subject_id, rule_key, sent_at)` |
 | Search | A generated text-search vector with a suitable index on the search document table, plus a vector index on embeddings |
 | Idempotent import | `(workspace_id, legacy_type, legacy_id)` unique on every importable table |

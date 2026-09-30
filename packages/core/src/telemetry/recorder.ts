@@ -166,6 +166,14 @@ export const METRIC = {
   operationDuration: "openokr_operation_duration_seconds",
   /** Authorisation decisions, by action, required level and outcome. */
   authorisationTotal: "openokr_authorisation_total",
+  /**
+   * Chat webhooks the inbound door would not act on, by provider and reason
+   * (completeness review L-10). The caller is answered the same way for every
+   * reason, so that the answer does not say which tenants are installed; this
+   * is where an operator can still tell a signing secret that does not match
+   * from a provider pointed at the wrong instance.
+   */
+  channelInboundRefusalsTotal: "openokr_channel_inbound_refusals_total",
 
   // The asynchronous surfaces (P7-T06b). Everything below happens after a
   // request has returned, or because a clock said so, which is exactly why

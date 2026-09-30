@@ -49,6 +49,16 @@
       "pages": false
     },
     {
+      "name": "workspace reopenOnboarding",
+      "action": "workspace.reopenOnboarding",
+      "method": "POST",
+      "path": "/workspace/reopenOnboarding",
+      "scope": "write",
+      "summary": "Offer the workspace's own setup again, keeping every answer it already holds.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "workspace changePlan",
       "action": "workspace.changePlan",
       "method": "POST",
@@ -203,6 +213,26 @@
           "required": false
         }
       ],
+      "pages": false
+    },
+    {
+      "name": "people readOwnTour",
+      "action": "people.readOwnTour",
+      "method": "GET",
+      "path": "/people/readOwnTour",
+      "scope": "read",
+      "summary": "Whether the signed-in member has finished the first-visit tour.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "people finishOwnTour",
+      "action": "people.finishOwnTour",
+      "method": "POST",
+      "path": "/people/finishOwnTour",
+      "scope": "write",
+      "summary": "Mark the first-visit tour as finished for the signed-in member, on every machine.",
+      "flags": [],
       "pages": false
     },
     {
@@ -1985,6 +2015,65 @@
       "summary": "Checks the workspace's audit chain and says where it breaks, if it does.",
       "flags": [],
       "pages": false
+    },
+    {
+      "name": "audit list",
+      "action": "audit.list",
+      "method": "GET",
+      "path": "/audit/list",
+      "scope": "read",
+      "summary": "The audit trail a page at a time, newest first, narrowed by date, action, actor or target. Payloads stay out; the export carries them.",
+      "flags": [
+        {
+          "name": "from",
+          "field": "from",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "to",
+          "field": "to",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "action",
+          "field": "action",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "actor-member-id",
+          "field": "actorMemberId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "target-type",
+          "field": "targetType",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "target-id",
+          "field": "targetId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": true
     },
     {
       "name": "settings readWorkspaceSettings",

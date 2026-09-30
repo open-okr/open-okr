@@ -1,6 +1,6 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import { resolveAccessLevelFor } from "../../lib/access";
+import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
 import { getTranslations } from "../../lib/translations";
@@ -30,9 +30,6 @@ export default async function CheckInPage({
   searchParams: Promise<{ goal?: string }>;
 }) {
   const { t } = await getTranslations();
-  // P8-G04. Resolved once here rather than inside the loop below, because
-  // a bar on a 0-to-100 track under a raised ceiling fills early.
-  const ceiling = await progressCeiling();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -41,11 +38,16 @@ export default async function CheckInPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  const level = await resolveAccessLevelFor(
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+
+  // P8-G04. Resolved once here rather than inside the loop below, because
+  // a bar on a 0-to-100 track under a raised ceiling fills early. After the
+  // level, because it reads a workspace setting a guest cannot (L-23).
+  const ceiling = await progressCeiling();
 
   const { goals: due } = await callAction(context, "goals.due", {
     withinDays: 2,

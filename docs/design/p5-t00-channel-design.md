@@ -209,9 +209,32 @@ Every inbound request, in this order, before anything reads the body as data:
 
 | Step | Check | On failure |
 |---|---|---|
-| 0 | *Which workspace is this?* Added at P5-T02a, because the eight steps below all presume a tenant and an inbound request has not named one. `channel_installations` answers it through a second policy key; §2 was silent on where that mapping lives, and the first implementation put it on `channel_connections`, where forced row-level security answered every lookup with nothing | Silence |
+| 0 | *Which workspace is this?* Added at P5-T02a, because the eight steps below all presume a tenant and an inbound request has not named one. `channel_installations` answers it through a second policy key; §2 was silent on where that mapping lives, and the first implementation put it on `channel_connections`, where forced row-level security answered every lookup with nothing | A request that names no tenant: silence. One that names a tenant nobody installed, or one with no usable connection: **the same 401 as step 1** (completeness review L-10). This row said silence for both until then, which let a caller with no secret list the installed tenants by sending a junk signature and comparing 200 with 401 |
 | 1 | Signature over the raw bytes, per provider | 401, nothing parsed. **One provider cannot do this, found at P5-T05:** Telegram does not sign the body at all. It echoes a shared secret, chosen when the webhook is registered, and that is the strongest claim it makes available. The comparison is still timing-safe and the endpoint still refuses before parsing, but a tampered body under a valid secret passes on Telegram and fails on Slack. The difference is structural rather than an oversight, and there is a test that states it |
 | 2 | Timestamp inside the replay window | 401 |
+
+**Step 0 comes before step 1 for three providers, and that is forced.** Slack,
+WhatsApp and Telegram sign with a secret each workspace holds, so the
+signature cannot be checked until the workspace is known. Teams can: Microsoft
+signs with keys it publishes, so its token's signature, issuer, expiry and
+service URL are checked before step 0, and only the audience, which is the
+workspace's own app id, waits until after (L-10).
+
+**Every refusal from step 0 to step 2 is one answer** (L-10): an empty 401,
+never sooner than 250 ms after the request arrived. The floor is what keeps
+the extra read, decryption and MAC an installed tenant costs from showing in
+the timing. Meta's GET handshake is refused the same way with 403, its own
+convention. An operator can still tell the reasons apart on
+`openokr_channel_inbound_refusals_total`, labelled by provider and reason and
+nothing else.
+
+| Provider | Tenant named by | Before L-10: unknown tenant / bad signature | Since |
+|---|---|---|---|
+| Slack | `team_id` on the payload | 200 / 401 | 401 / 401 |
+| Teams | `channelData.tenant.id` | 200 / 401, and a forged token for an installed tenant cost a fetch of Microsoft's keys the unknown one did not | 401 / 401, the token checked before the lookup |
+| WhatsApp POST | `metadata.phone_number_id` | 200 / 401 | 401 / 401 |
+| WhatsApp GET handshake | `phone_number_id` on the query | 403 / 403, at different speeds | 403 / 403, after the floor |
+| Telegram | the bot id in the path | 200 / 401 | 401 / 401 |
 | 3 | The delivery id has not been seen | 200, ignored as a duplicate |
 | 4 | The sender resolves to a verified identity | 200, no reply |
 | 5 | The member is active and not suspended | 200, no reply |

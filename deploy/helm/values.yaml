@@ -105,8 +105,9 @@ migrationResources:
   limits:
     memory: 512Mi
 
-# File storage for the local-disk driver, which is the only storage driver
-# this build has.
+# File storage for the local-disk driver, the default. The other driver is
+# S3-compatible object storage, configured under `storage.s3` below; with a
+# bucket set, uploads go there and this volume holds nothing.
 #
 # On by default since 7 September 2026. Off was the previous default and it
 # meant every upload went to an emptyDir: lost on restart, invisible to a

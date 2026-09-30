@@ -1,0 +1,92 @@
+/*
+ * The editor's base rules, served as a stylesheet rather than injected
+ * (completeness review L-22).
+ *
+ * TipTap appends these to <head> as an inline <style> element when an editor
+ * mounts. The instance's Content-Security-Policy allows styles from this
+ * origin and from a per-request nonce, and the injected element has neither,
+ * so in production the browser refused it and every editor ran without them:
+ * no `pre-wrap`, so runs of spaces collapsed while somebody typed, and no gap
+ * cursor. `injectCSS: false` in `rich-text/editor.tsx` stops the injection and
+ * this file carries the same rules through the normal stylesheet.
+ *
+ * Copied from @tiptap/core (MIT, src/style.ts), which takes them from
+ * prosemirror-view, with three changes, each marked where it is made.
+ */
+
+.ProseMirror {
+  position: relative;
+}
+
+.ProseMirror {
+  word-wrap: break-word;
+  /* The upstream file sets pre-wrap first as a fallback for browsers without
+   * break-spaces. Every browser this product supports has it. */
+  white-space: break-spaces;
+  -webkit-font-variant-ligatures: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0;
+}
+
+.ProseMirror [contenteditable="false"] {
+  white-space: normal;
+}
+
+.ProseMirror [contenteditable="false"] [contenteditable="true"] {
+  white-space: pre-wrap;
+}
+
+.ProseMirror pre {
+  white-space: pre-wrap;
+}
+
+/* Upstream marks each of these !important. Here the only rule that reaches
+ * this element is Preflight's `img`, which sits in the same base layer with a
+ * lower specificity, so the class wins without it. */
+img.ProseMirror-separator {
+  display: inline;
+  border: none;
+  margin: 0;
+  width: 0;
+  height: 0;
+}
+
+.ProseMirror-gapcursor {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+  margin: 0;
+}
+
+.ProseMirror-gapcursor:after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: -2px;
+  width: 20px;
+  /* `black` upstream, which disappears on the dark theme. */
+  border-top: 1px solid currentColor;
+  animation: ProseMirror-cursor-blink 1.1s steps(2, start) infinite;
+}
+
+@keyframes ProseMirror-cursor-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+
+.ProseMirror-hideselection *::-moz-selection {
+  background: transparent;
+}
+
+.ProseMirror-hideselection * {
+  caret-color: transparent;
+}
+
+.ProseMirror-focused .ProseMirror-gapcursor {
+  display: block;
+}

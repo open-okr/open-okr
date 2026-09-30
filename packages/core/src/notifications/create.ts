@@ -5,11 +5,9 @@
  * every other reason batches, coalescing bursts through
  * `ensurePendingBatch`. `sentAt` stays null either way: nothing in this
  * package calls a mailer (CLAUDE.md: vendor SDKs and their ports live only
- * in `packages/adapters`). A row with `sentAt` still null and, for a
- * batch, a `batchId` pointing at a batch whose own `send_at` has arrived is
- * what a future send worker's query watches for — not yet built, the same
- * gap this task leaves on the outbox dispatcher (P2-T04) and the orphan
- * job (P2-T05).
+ * in `packages/adapters`). A batch whose own `send_at` has arrived is
+ * claimed by `drainNotificationBatches` in `drain.ts` (P6-G01b), which the
+ * scheduler runs, and handed to the outbox, whose relay delivers it.
  */
 import {
   activeOnly,

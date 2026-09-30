@@ -21,8 +21,15 @@
  * its own tenant setting, the way a request opens it, so this works under the
  * restricted application role as well as an admin connection. Soft-deleted
  * rows are included: a restore can bring them back, and they must still open.
+ *
+ * **And the identity-provider tokens on `accounts`** (completeness review
+ * L-11), which are sealed under the same root key once somebody signs in
+ * through OIDC. A token still in plain text, written before sealing existed,
+ * is left alone: there is no data key to re-wrap, and sealing it is the data
+ * change's job, not rotation's, which never handles a plaintext credential.
  */
 import {
+  accounts,
   aiCredentials,
   channelConnections,
   includeDeleted,
@@ -33,9 +40,14 @@ import {
   withWorkspace,
   workspaces,
 } from "@openokr/db";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, gt, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import {
+  isSealedAccountToken,
+  rewrapAccountToken,
+  SEALED_ACCOUNT_TOKEN_PREFIX,
+} from "../auth/account-token-sealing.ts";
 import { type KeyRing, rewrapSecret, type SealedSecret } from "./key-ring.ts";
 
 export interface RotationReport {
@@ -45,6 +57,8 @@ export interface RotationReport {
   readonly current: number;
   /** How many of `examined` belong to a workspace rather than the instance. */
   readonly workspaceSecrets: number;
+  /** How many of `examined` are identity-provider tokens on `accounts`. */
+  readonly accountTokens: number;
 }
 
 export async function rotateInstanceSecrets(
@@ -100,16 +114,105 @@ export async function rotateInstanceSecrets(
   }
 
   const inWorkspaces = await rotateWorkspaceSecrets(db, ring);
+  const onAccounts = await rotateAccountTokens(db, ring);
 
   return {
-    examined: sealed.length + inWorkspaces.examined,
-    rewrapped: rewrapped + inWorkspaces.rewrapped,
-    current: current + inWorkspaces.current,
+    examined: sealed.length + inWorkspaces.examined + onAccounts.examined,
+    rewrapped: rewrapped + inWorkspaces.rewrapped + onAccounts.rewrapped,
+    current: current + inWorkspaces.current + onAccounts.current,
     workspaceSecrets: inWorkspaces.examined,
+    accountTokens: onAccounts.examined,
   };
 }
 
 type Tally = { examined: number; rewrapped: number; current: number };
+
+/** Accounts read per page, so a large directory is never held in memory. */
+const ACCOUNT_PAGE = 500;
+
+/**
+ * The sealed identity-provider tokens on `accounts` (completeness review
+ * L-11).
+ *
+ * `accounts` is Better Auth's global table and has no tenant floor, so it is
+ * read directly, a page at a time in id order.
+ */
+async function rotateAccountTokens(
+  db: ReturnType<typeof drizzle>,
+  ring: KeyRing,
+): Promise<Tally> {
+  const tally: Tally = { examined: 0, rewrapped: 0, current: 0 };
+  const sealedPattern = `${SEALED_ACCOUNT_TOKEN_PREFIX}%`;
+  let after: string | null = null;
+
+  for (;;) {
+    const page = await db
+      .select({
+        id: accounts.id,
+        accessToken: accounts.accessToken,
+        refreshToken: accounts.refreshToken,
+        idToken: accounts.idToken,
+      })
+      .from(accounts)
+      .where(
+        and(
+          after === null ? undefined : gt(accounts.id, after),
+          or(
+            like(accounts.accessToken, sealedPattern),
+            like(accounts.refreshToken, sealedPattern),
+            like(accounts.idToken, sealedPattern),
+          ),
+        ),
+      )
+      .orderBy(asc(accounts.id))
+      .limit(ACCOUNT_PAGE);
+
+    for (const row of page) {
+      const changes: Partial<
+        Record<"accessToken" | "refreshToken" | "idToken", string>
+      > = {};
+      for (const field of ["accessToken", "refreshToken", "idToken"] as const) {
+        const value = row[field];
+        if (value === null || !isSealedAccountToken(value)) {
+          continue;
+        }
+        tally.examined += 1;
+        const next = rewrapAccountToken(ring, value);
+        if (next === value) {
+          tally.current += 1;
+          continue;
+        }
+        tally.rewrapped += 1;
+        changes[field] = next;
+      }
+      if (Object.keys(changes).length === 0) {
+        continue;
+      }
+      // Only while each value is still the one read. A sign-in in between
+      // writes fresh tokens under the current key, and those must not be
+      // replaced with the re-wrapped old ones.
+      // openokr:allow-mutation: key rotation re-wraps a data key and changes no value; see rotateInstanceSecrets.
+      await db
+        .update(accounts)
+        .set(changes)
+        .where(
+          and(
+            eq(accounts.id, row.id),
+            ...Object.keys(changes).map((field) => {
+              const name = field as keyof typeof changes;
+              return eq(accounts[name], row[name] as string);
+            }),
+          ),
+        );
+    }
+
+    const last = page.at(-1);
+    if (!last || page.length < ACCOUNT_PAGE) {
+      return tally;
+    }
+    after = last.id;
+  }
+}
 
 /** The three workspace tables that hold a sealed secret. */
 async function rotateWorkspaceSecrets(

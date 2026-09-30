@@ -44,8 +44,44 @@ prints them once it is saved: the entity ID, the assertion consumer service
 metadata document that states both. Hand your identity provider the metadata
 document, or the two addresses if it prefers them typed in.
 
-**A new provider takes effect on the next restart**, and so does its metadata
-document. The client is built once when the process starts.
+**A provider works from the next sign-in, with no restart**, and so does a
+SAML provider's metadata document. Every server process checks for a changed
+connection every few seconds and rebuilds its sign-in client when it finds
+one, so on a deployment with several processes the others follow within
+seconds. Nobody who is already signed in is signed out by it.
+
+The same holds for a connection somebody changes or removes in the database
+directly: the next sign-in uses the new client id, endpoints or certificate,
+and a removed or disabled provider refuses the next sign-in through it. The
+screen itself only adds connections.
+
+## What is encrypted at rest
+
+A credential the instance has to use again is sealed under its root key
+(`OPENOKR_ENCRYPTION_KEY`), each with a data key of its own, and
+`./openokr rotate-key` re-wraps every one. A credential it only has to check
+is hashed, so the original is never stored.
+
+| Stored | How |
+|---|---|
+| AI provider keys, chat channel credentials, SSO client secrets, the mail password | Sealed under the root key |
+| The access, refresh and ID tokens an OIDC provider issues when somebody signs in | Sealed under the root key. Opened only on the server, when a sign-in or a token refresh needs them |
+| Session tokens, API tokens, agent access tokens, directory sync tokens, invitation links | Hashed |
+| Passwords | Hashed by the sign-in library |
+| Authenticator app secrets and backup codes | Encrypted by the sign-in library under `BETTER_AUTH_SECRET` |
+
+**Identity-provider tokens stored before this release are in plain text until
+the data change seals them.** Run it once after upgrading, with the root key in
+the environment:
+
+```sh
+OPENOKR_ENCRYPTION_KEY=... pnpm db:change
+```
+
+It seals every token still in plain text and leaves the rest alone, so running
+it again changes nothing. On an instance nobody has signed into through OIDC
+it has nothing to do and needs no key. Until it runs, those tokens still work,
+and the next sign-in through the provider replaces them with sealed ones.
 
 **Enforcing refuses the local factors for the domains you list**: a password, a
 password reset and a passkey are all refused, and the person is told which
@@ -117,9 +153,17 @@ checked. The chain is built just behind the write path, so a busy workspace
 always has a short tail waiting for its position. Pending is never counted as
 verified and never reported as a break.
 
-**Export the trail** hands over a CSV narrowed by date, action or target,
-carrying each row's position and hash so the file and a later verification can
-be lined up against each other. The export is itself recorded, with the filter
+**Browse the trail** with one filter: a date range, an action, a person or
+agent, and a target type. **Show matching rows** lists them on the screen,
+newest first, fifty at a time with older rows a click away. Each row says
+when, who acted and through which channel when it was not the browser (Slack,
+the API, an external agent), the action, the target, and its position in the
+chain or that it is still waiting for one. The row's details stay out of the
+list.
+
+**Export as CSV** hands over the rows the same filter matches, with each
+row's details, position and hash, so the file and a later verification can be
+lined up against each other. The export is itself recorded, with the filter
 that was used.
 
 ## Uploaded files
@@ -161,6 +205,27 @@ literal host and every resolved address, refuses private and metadata ranges,
 follows no redirect, and caps size and time. An instance with nothing
 configured makes no outbound request at all, which is what makes an air-gapped
 install work. See [the air-gap guide](../runbooks/air-gap.md).
+
+## Chat webhooks
+
+Slack, Microsoft Teams, WhatsApp and Telegram deliver to this instance's
+webhook addresses. Each request is checked against the credential the
+workspace saved before anything in it is read.
+
+**A request the instance will not act on gets one answer**, whatever the
+reason: an empty 401, never sooner than a quarter of a second. The reasons
+are a Slack workspace, Teams tenant, WhatsApp number or Telegram bot nobody
+connected here, a connection that was removed, and a signature that does not
+match. Different answers would let anybody find out which organisations use
+this instance. Meta's subscription check is refused with 403, the same way for
+every reason.
+
+So a provider reporting failed deliveries after you disconnect it is
+expected. If deliveries fail while it is connected, the signing secret or
+token saved here probably does not match the provider's. The
+`openokr_channel_inbound_refusals_total` counter says which, by its `reason`
+label: `unknown_tenant`, `no_connection` or `failed_verification`. See
+[observability](../runbooks/observability.md).
 
 ## Next
 

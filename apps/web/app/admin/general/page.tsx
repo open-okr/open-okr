@@ -14,6 +14,7 @@ import { ConsoleMailNotice } from "./console-mail-notice";
 import { GeneralSettingsForm } from "./general-settings-form";
 import { InstanceHealthNotice } from "./instance-health-notice";
 import { InstanceNameCard } from "./instance-name-card";
+import { SetupCard } from "./setup-card";
 import { WorkspaceStateCard } from "./workspace-state-card";
 
 export default async function GeneralSettingsPage() {
@@ -74,6 +75,11 @@ export default async function GeneralSettingsPage() {
           deploymentName={deploymentInstanceName()}
         />
       ) : null}
+      {/*
+       * S-34 offered again (completeness review L-08). The registry's default
+       * for `onboardingDone` is true, so only a stored `false` is pending.
+       */}
+      <SetupCard done={read.settings.onboardingDone !== false} />
       {/*
        * The freeze switch (P6-G25). `workspace.setState` shipped at P2-T09
        * and no screen ever called it, so P6-T07's rehearsal runbook asked an

@@ -6,6 +6,7 @@ import {
   deterministicTriggers,
   isTriggerKey,
   TRIGGER_CATALOGUE,
+  type TriggerKey,
   trigger,
 } from "../src/triggers.ts";
 
@@ -142,5 +143,33 @@ describe("the design document's own trigger table", () => {
     expect(new Set(documented)).toEqual(
       new Set(TRIGGER_CATALOGUE.map((entry) => entry.key)),
     );
+  });
+});
+
+/**
+ * The keys are a type as well as a list (completeness review L-16).
+ *
+ * The `@ts-expect-error` lines are the assertion, and `pnpm typecheck` is what
+ * runs them: this file is inside the package's `tsconfig`. If the catalogue
+ * loses its literal types, `TriggerKey` widens to `string`, the misspelt key
+ * below stops being an error, and the unused directive fails the build.
+ */
+describe("the trigger keys as a type", () => {
+  const known: TriggerKey = "checkin.overdue";
+  // @ts-expect-error A misspelt key is refused before anything runs.
+  const misspelt: TriggerKey = "checkin.overdu";
+  // @ts-expect-error An activity kind is not a rule a message can cite.
+  const activity: TriggerKey = "cycle.published";
+
+  it("names exactly the catalogue, so the type and the list cannot part", () => {
+    const listed: readonly string[] = TRIGGER_CATALOGUE.map(
+      (entry) => entry.key,
+    );
+    expect(listed).toContain(known);
+    expect(listed).not.toContain(misspelt);
+    expect(listed).not.toContain(activity);
+    for (const key of listed) {
+      expect(isTriggerKey(key)).toBe(true);
+    }
   });
 });

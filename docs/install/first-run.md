@@ -22,6 +22,21 @@ and all changeable later without downtime.
 joins by invitation. On the managed cloud registration stays open, because a
 cloud belongs to nobody.
 
+## Then the workspace asks a few questions
+
+Your first visit to the workspace opens its own setup: its name and timezone,
+the check-in rhythm, a first invitation, a starting template, and a worked
+example. Every question already has an answer, so skipping all of them is a
+working start rather than an unfinished one.
+
+Skipped something you now want? **General in admin opens the setup again.**
+Every step shows what the workspace holds now, and skipping a step keeps it,
+so reopening it changes nothing you do not change.
+
+After the setup, the Work Map offers everybody a short tour on their first
+visit: the map itself, Review, check-ins, the cycle strip and ⌘K. Ending it
+early ends it for good, on every machine.
+
 ## What you already have
 
 | Already there | Detail |

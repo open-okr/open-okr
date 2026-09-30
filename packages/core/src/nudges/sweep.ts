@@ -43,6 +43,7 @@ import {
   kpiState,
   type ResolvedThresholds,
   shouldProposeRecovery,
+  type TriggerKey,
   trigger,
 } from "@openokr/method";
 import { and, asc, eq, gte, isNull } from "drizzle-orm";
@@ -64,7 +65,7 @@ import {
 } from "./service.ts";
 
 /** The rule key each corridor state earns, or nothing where a state is silent. */
-const RULE_FOR_STATE: Partial<Record<KpiState, string>> = {
+const RULE_FOR_STATE: Partial<Record<KpiState, TriggerKey>> = {
   watch: "kpi.watch",
   unhealthy: "kpi.unhealthy",
 };
@@ -134,7 +135,7 @@ export function urgentFor(ruleKey: string, recipientIsOwner: boolean): boolean {
 
 /** One nudge, with the rule key checked against the catalogue before it exists. */
 function nudge(input: {
-  readonly ruleKey: string;
+  readonly ruleKey: TriggerKey;
   readonly subjectType: DueNudge["subjectType"];
   readonly subjectId: string;
   readonly recipientMemberId: string;
@@ -245,21 +246,23 @@ export async function dueKpiCorridorNudges(
     // one already has an objective attached, and one nobody has recorded is
     // unmeasured rather than failing.
     const corridorRule = RULE_FOR_STATE[kpi.state];
-    for (const owner of corridorRule ? owners : []) {
-      due.push(
-        nudge({
-          ruleKey: corridorRule ?? "",
-          subjectType: "kpi",
-          subjectId: kpi.id,
-          recipientMemberId: owner,
-          // §6.4 sends the unhealthy message to "KPI owner + sponsor". A KPI
-          // has no cycle and therefore no sponsor to resolve, so the widening
-          // has no target and the message stays with the owner. It repeats for
-          // as long as the metric is out of its corridor, so the ceiling is
-          // what bounds it: see `urgentFor`.
-          urgent: urgentFor(corridorRule ?? "", true),
-        }),
-      );
+    if (corridorRule) {
+      for (const owner of owners) {
+        due.push(
+          nudge({
+            ruleKey: corridorRule,
+            subjectType: "kpi",
+            subjectId: kpi.id,
+            recipientMemberId: owner,
+            // §6.4 sends the unhealthy message to "KPI owner + sponsor". A
+            // KPI has no cycle and therefore no sponsor to resolve, so the
+            // widening has no target and the message stays with the owner.
+            // It repeats for as long as the metric is out of its corridor, so
+            // the ceiling is what bounds it: see `urgentFor`.
+            urgent: urgentFor(corridorRule, true),
+          }),
+        );
+      }
     }
 
     const achievement =
@@ -628,7 +631,7 @@ function localHourIn(now: Date, timeZone: string): number {
  * because the message does: the owner is being reminded, and then somebody
  * other than the owner is being told.
  */
-const RULE_FOR_BLOCKER_STEP: Record<number, string> = {
+const RULE_FOR_BLOCKER_STEP: Record<number, TriggerKey> = {
   1: "blocker.warning",
   2: "blocker.overdue",
   3: "blocker.escalated",

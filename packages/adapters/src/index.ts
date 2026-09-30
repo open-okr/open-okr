@@ -67,11 +67,13 @@ export {
   TeamsChannel,
   type TeamsChannelOptions,
   TeamsPermanentError,
+  TeamsSigningKeys,
   teamsDeliveryId,
   teamsServiceUrl,
   teamsTenantId,
   toActivity,
   toAdaptiveCard,
+  verifyTeamsToken,
 } from "./drivers/channel/teams.ts";
 export {
   TelegramChannel,

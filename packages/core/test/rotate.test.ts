@@ -8,6 +8,10 @@ import {
 import { workerDb } from "@openokr/test-support/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  openAccountToken,
+  sealAccountToken,
+} from "../src/auth/account-token-sealing.ts";
 import { readSecret, writeSettings } from "../src/secrets/instance-settings.ts";
 import {
   decryptSecret,
@@ -145,6 +149,7 @@ describe("rotating", () => {
       rewrapped: 0,
       current: 0,
       workspaceSecrets: 0,
+      accountTokens: 0,
     });
   });
 });
@@ -269,5 +274,101 @@ describe("rotating the secrets workspaces hold", () => {
     const second = await rotateInstanceSecrets(wb.appPool, rotatingRing);
     expect(second.rewrapped).toBe(0);
     expect(second.current).toBe(3);
+  });
+});
+
+/**
+ * Identity-provider tokens on `accounts` (completeness review L-11).
+ *
+ * They are sealed under the same root key once somebody signs in through
+ * OIDC, so a rotation that skipped them would leave every stored token
+ * unreadable the moment `./openokr rotate-key` drops the previous key.
+ */
+describe("rotating the identity-provider tokens on accounts", () => {
+  const seedAccount = async (
+    id: string,
+    tokens: {
+      access: string | null;
+      refresh: string | null;
+      id: string | null;
+    },
+  ) => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $1, $2)",
+      [id, `${id}@example.com`],
+    );
+    await wb.admin.query(
+      `insert into accounts (id, user_id, account_id, provider_id,
+                             access_token, refresh_token, id_token)
+       values ($1, $1, $1, 'sso-okta', $2, $3, $4)`,
+      [id, tokens.access, tokens.refresh, tokens.id],
+    );
+  };
+
+  const stored = async (id: string) => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      access_token: string | null;
+      refresh_token: string | null;
+      id_token: string | null;
+    }>(
+      "select access_token, refresh_token, id_token from accounts where id = $1",
+      [id],
+    );
+    return rows[0];
+  };
+
+  it("re-wraps every sealed token, so the old key can go", async () => {
+    const wb = await workerDb();
+    await seedAccount("okta-a", {
+      access: sealAccountToken(oldRing, "access-a"),
+      refresh: sealAccountToken(oldRing, "refresh-a"),
+      id: sealAccountToken(oldRing, "id-a"),
+    });
+
+    const report = await rotateInstanceSecrets(wb.appPool, rotatingRing);
+    expect(report.accountTokens).toBe(3);
+    expect(report.rewrapped).toBe(3);
+
+    const row = await stored("okta-a");
+    expect(openAccountToken(newRingOnly, row?.access_token ?? "")).toBe(
+      "access-a",
+    );
+    expect(openAccountToken(newRingOnly, row?.refresh_token ?? "")).toBe(
+      "refresh-a",
+    );
+    expect(openAccountToken(newRingOnly, row?.id_token ?? "")).toBe("id-a");
+  });
+
+  it("leaves a plain token, an empty one and a missing one alone", async () => {
+    // Rotation never handles a plaintext credential. Sealing the tokens
+    // written before L-11 is the data change's job.
+    const wb = await workerDb();
+    await seedAccount("okta-b", { access: "plain", refresh: "", id: null });
+
+    const report = await rotateInstanceSecrets(wb.appPool, rotatingRing);
+    expect(report.accountTokens).toBe(0);
+    expect(await stored("okta-b")).toEqual({
+      access_token: "plain",
+      refresh_token: "",
+      id_token: null,
+    });
+  });
+
+  it("does nothing to them on a second run", async () => {
+    const wb = await workerDb();
+    await seedAccount("okta-c", {
+      access: sealAccountToken(oldRing, "access-c"),
+      refresh: null,
+      id: null,
+    });
+    await rotateInstanceSecrets(wb.appPool, rotatingRing);
+    const before = await stored("okta-c");
+
+    const second = await rotateInstanceSecrets(wb.appPool, rotatingRing);
+    expect(second.rewrapped).toBe(0);
+    expect(second.current).toBe(1);
+    expect(await stored("okta-c")).toEqual(before);
   });
 });

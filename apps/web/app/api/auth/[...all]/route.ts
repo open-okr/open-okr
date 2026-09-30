@@ -1,5 +1,5 @@
 import { recordInstanceAuditEvent } from "@openokr/core";
-import { getAuth, getPool } from "../../../../lib/auth";
+import { getCurrentAuth, getPool } from "../../../../lib/auth";
 
 /**
  * Every authentication endpoint: sign up, sign in, sign out, password reset,
@@ -8,6 +8,11 @@ import { getAuth, getPool } from "../../../../lib/auth";
  *
  * The instance is resolved per request rather than at module load, so
  * importing this route does not open a database connection.
+ *
+ * **It is the current instance, not the first one** (completeness review
+ * L-15). Every sign-in through an identity provider starts and finishes here,
+ * so this is where a connection an administrator saved a moment ago, on this
+ * process or another, has to be in the instance that answers.
  *
  * Better Auth's own rate limiter (P1-T05) enforces the lockout in
  * `createAuth`'s `customRules`, but it rejects a request from inside its own
@@ -29,7 +34,7 @@ import { getAuth, getPool } from "../../../../lib/auth";
  * that might not even be theirs.
  */
 async function withLockoutAudit(request: Request): Promise<Response> {
-  const response = await getAuth().handler(request);
+  const response = await (await getCurrentAuth()).handler(request);
 
   if (response.status === 429) {
     const address =

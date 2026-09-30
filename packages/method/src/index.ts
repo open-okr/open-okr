@@ -288,6 +288,7 @@ export {
   isTriggerKey,
   TRIGGER_CATALOGUE,
   type Trigger,
+  type TriggerKey,
   type TriggerOwner,
   trigger,
 } from "./triggers.ts";

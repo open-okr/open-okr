@@ -1,9 +1,10 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { redirect } from "next/navigation";
-import { resolveAccessLevelFor } from "../../lib/access";
+import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
+import { FirstVisitTour } from "../first-visit-tour.tsx";
 import { goalTreeNodes } from "../goal-nodes.ts";
 import { TrustedDomainOffers } from "../trusted-domain-offers.tsx";
 import { WorkMap } from "../work-map.tsx";
@@ -57,20 +58,15 @@ export default async function HomePage({
    * The default is `true`, so a workspace nobody marked never comes here: only
    * one provisioning wrote `false` for is pending.
    */
-  const level = await resolveAccessLevelFor(
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
 
   // **Somebody who holds nothing on the workspace itself is a guest**
-  // (completeness review M-22). They were invited into one space, and the Work
-  // Map is the whole workspace's, whose reads refuse them. So the front door
-  // sends them to the spaces they can open, which is the one they were asked
-  // into, rather than to a page that cannot render for them.
-  if (level < ACCESS_LEVELS.view) {
-    redirect("/spaces");
-  }
+  // (completeness review M-22), and `workspaceReaderLevel` has already sent
+  // them to the spaces they can open, which is the one they were asked into.
 
   const welcome = await callAction(context, "settings.readForMember", {});
   // **Only somebody who can finish the setup is sent to it** (P8-G05a). S-34
@@ -88,6 +84,10 @@ export default async function HomePage({
   ) {
     redirect("/welcome");
   }
+  // The first-visit tour (UIUX-PLAN S-34, L-08). Here, because this is the
+  // screen every first visit lands on, and after the redirect above, so an
+  // owner meets the setup first and the tour when they arrive.
+  const tour = await callAction(context, "people.readOwnTour", {});
   const query = await searchParams;
 
   const cycles = await callAction(context, "cycles.list", {});
@@ -230,6 +230,12 @@ export default async function HomePage({
         scopeLabel={scopeLabel}
         stats={stats}
       />
+
+      {/* Under the page's own heading, so the outline reads Work map and then
+          the tour, and above the tree its first stop outlines, so a keyboard
+          meets the card before the rows it introduces. Gone for good once
+          finished or ended. */}
+      {tour.finished ? null : <FirstVisitTour />}
 
       <WorkMapScopeTabs
         tabs={scopeTabs}

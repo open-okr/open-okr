@@ -57,7 +57,7 @@ The body is Prometheus text exposition, `version=0.0.4`.
 
 ## What is measured
 
-Nineteen series. Every one is a count, a duration, a queue reading or a
+Twenty series. Every one is a count, a duration, a queue reading or a
 capacity gauge.
 
 **On the request's own thread**
@@ -69,6 +69,7 @@ capacity gauge.
 | `openokr_operations_total` | action, outcome |
 | `openokr_operation_duration_seconds` | action |
 | `openokr_authorisation_total` | action, required, outcome |
+| `openokr_channel_inbound_refusals_total` | provider, reason (no_tenant, unknown_tenant, no_connection, failed_verification) |
 
 **After the request has returned, or because a clock said so**
 
@@ -142,6 +143,16 @@ Six of the TECHNICAL-PLAN §13.1 budgets need a browser or a real channel and
 so cannot come from a server-side series at all. They are named on the
 budgets dashboard with the tool that measures each, rather than left silently
 absent.
+
+## One error the log leaves out
+
+"The destination stream closed early" is not logged unless `LOG_LEVEL` is
+`debug`. It means a browser stopped reading a page before the server finished
+drawing it. Almost always that is the page's own prefetching, which reads a
+screen up to its loading state and cancels the rest, and nothing failed. It
+was left out because a single test run logged more than a thousand of them
+and real errors were lost among them. If you suspect a proxy is cutting
+responses off, set `LOG_LEVEL=debug` and they come back.
 
 ## Looking at it: the observability profile
 

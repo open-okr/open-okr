@@ -42,21 +42,10 @@ const NO_DIRECT_VISIT: Readonly<Record<string, string>> = {
     "development only, and notFound() in production, so there is nothing to open on the instance the suite builds",
   "/dev/rich-text":
     "development only, and notFound() in production, so there is nothing to open on the instance the suite builds",
-  "/admin/plan":
-    "cloud only, and notFound() with the flag off, so the self-hosted instance the suite builds does not have this screen at all",
-  // **The three operator routes, and the reason is the same one three times
-  // because it is one fact.** P8-T01b §7: an operator route answers not-found
-  // to anybody without a live grant, and `instance_operators` holds no rows on
-  // a self-hosted instance by design. The suite builds a self-hosted instance,
-  // so there is no account that can be granted and nothing to sign in as.
-  // Opening these needs a cloud fixture rather than a spec, which is P8's own
-  // row and not a gap to be closed here.
-  "/operator":
-    "an operator route on a self-hosted instance: not-found to everybody, because `instance_operators` holds no rows there by design",
-  "/operator/[workspaceId]":
-    "an operator route on a self-hosted instance: not-found to everybody, because `instance_operators` holds no rows there by design",
-  "/operator/instance":
-    "an operator route on a self-hosted instance: not-found to everybody, because `instance_operators` holds no rows there by design",
+  // `/admin/plan` and the three operator routes had reasons here until
+  // completeness review L-17: each answers not-found with `cloud.enabled`
+  // off. `s45-operator-console.spec.ts` turns the flag on for its own length
+  // and opens all four.
 };
 
 function everyRoute(dir: string): string[] {
