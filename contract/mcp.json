@@ -3016,7 +3016,7 @@
     },
     {
       "name": "ai.readAvailability",
-      "description": "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
+      "description": "Whether any enabled AI provider holds a key the caller's own requests can use, as one boolean.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -3097,7 +3097,9 @@
           },
           "apiKey": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[\\x21-\\x7E]+$"
           }
         },
         "required": [
@@ -3167,7 +3169,9 @@
           },
           "apiKey": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[\\x21-\\x7E]+$"
           }
         },
         "required": [

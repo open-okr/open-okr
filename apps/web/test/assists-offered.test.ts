@@ -106,9 +106,15 @@ describe("whether an assist is offered", () => {
     drafterFor.mockResolvedValue(mockDrafter());
     checkFeatureAvailability.mockResolvedValue({ available: true });
     expect(
-      await assistOffered("workspace-1", "assists.decomposeKeyResult", "deep"),
+      await assistOffered(
+        "workspace-1",
+        "assists.decomposeKeyResult",
+        "deep",
+        "user-1",
+      ),
     ).toBe(true);
-    expect(drafterFor).toHaveBeenCalledWith("workspace-1", "deep");
+    // Asked about the reader, whose own key can be what makes it run (M-36).
+    expect(drafterFor).toHaveBeenCalledWith("workspace-1", "deep", "user-1");
     expect(checkFeatureAvailability).toHaveBeenCalledWith("the pool", {
       workspaceId: "workspace-1",
       featureKey: "assists.decomposeKeyResult",
@@ -183,9 +189,12 @@ describe("every assist's server action", () => {
       drafterFor.mockResolvedValue(drafter);
       await assist.run();
 
+      // For the reader, so their own key answers them where they stored one
+      // (completeness review M-36).
       expect(drafterFor).toHaveBeenCalledWith(
         "workspace-1",
         assist.tier ?? "balanced",
+        "user-1",
       );
       const [context, action, input] = callAction.mock.calls[0] as [
         { drafter?: unknown; actor: { userId: string } },

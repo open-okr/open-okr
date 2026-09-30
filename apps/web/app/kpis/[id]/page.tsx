@@ -145,6 +145,8 @@ export default async function KpiDetailPage({
     (await assistOffered(
       workspace.workspaceId,
       RHYTHM_ASSIST_KEYS.narrateTrend,
+      "balanced",
+      session.user.id,
     ));
 
   return (

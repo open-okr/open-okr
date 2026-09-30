@@ -2084,7 +2084,7 @@
       "method": "GET",
       "path": "/ai/readAvailability",
       "scope": "read",
-      "summary": "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
+      "summary": "Whether any enabled AI provider holds a key the caller's own requests can use, as one boolean.",
       "flags": [],
       "pages": false
     },

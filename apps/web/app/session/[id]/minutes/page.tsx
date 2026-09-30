@@ -90,6 +90,8 @@ export default async function MinutesPage({
     (await assistOffered(
       workspace.workspaceId,
       REVIEW_ASSIST_KEYS.draftMinutes,
+      "balanced",
+      session.user.id,
     ));
 
   const summary = minutes.summary;

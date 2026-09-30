@@ -143,6 +143,8 @@ export default async function SpacePage({
     (await assistOffered(
       workspace.workspaceId,
       RHYTHM_ASSIST_KEYS.summariseBlockers,
+      "balanced",
+      session.user.id,
     ));
 
   // **The team's own week (P6-G19c, GAP-AUDIT B-10).** The trend, the streak

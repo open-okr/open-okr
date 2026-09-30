@@ -42,11 +42,15 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { eq, isNull } from "drizzle-orm";
+import { eq, isNull, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { maskKeyHint, sealCredentialKey } from "../ai/credentials.ts";
+import {
+  aiApiKeySchema,
+  maskKeyHint,
+  sealCredentialKey,
+} from "../ai/credentials.ts";
 import { OperationError } from "../operations/operation.ts";
 import { type KeyRing, rewrapSecret } from "../secrets/key-ring.ts";
 import {
@@ -65,6 +69,39 @@ function requireRing(context: ActionCallContext): KeyRing {
     );
   }
   return context.ring;
+}
+
+/**
+ * The member this call is made by (completeness review M-36).
+ *
+ * A host passes the signed-in account and an agent or a test passes the
+ * member, so both are read. Null means nobody in this workspace, which every
+ * caller below answers with "no key of yours" rather than an error: a question
+ * about your own key has a true answer even when you have none.
+ */
+async function callerMemberId(
+  tx: WorkspaceTx,
+  context: ActionCallContext,
+): Promise<string | null> {
+  if (context.actor.memberId) {
+    return context.actor.memberId;
+  }
+  const userId = context.actor.userId;
+  if (!userId) {
+    return null;
+  }
+  const [member] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, context.workspaceId),
+        eq(workspaceMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+  return member?.id ?? null;
 }
 
 const providerConfigOutput = z.object({
@@ -142,11 +179,16 @@ export const readProviderConfig = defineReadAction({
  * leaves this. A member who may edit a goal may know whether the draft assist
  * will do anything when they press it, and a disabled control that never says
  * why is the alternative.
+ *
+ * **The caller's own key counts, and nobody else's** (completeness review
+ * M-36). A member's key is used for that member's requests, so on a workspace
+ * that holds no key of its own the assist works for them and for nobody else,
+ * and this answers each of them truthfully.
  */
 export const readAiAvailability = defineReadAction({
   name: "ai.readAvailability",
   summary:
-    "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
+    "Whether any enabled AI provider holds a key the caller's own requests can use, as one boolean.",
   input: z.object({}),
   output: z.object({ available: z.boolean() }),
   access: ACCESS_LEVELS.view,
@@ -157,6 +199,7 @@ export const readAiAvailability = defineReadAction({
         .select({
           provider: aiProviders.provider,
           enabled: aiProviders.enabled,
+          allowUserKeys: aiProviders.allowUserKeys,
         })
         .from(aiProviders)
         .where(
@@ -170,21 +213,42 @@ export const readAiAvailability = defineReadAction({
         return { available: false };
       }
 
-      // A workspace credential, counted rather than returned. `isNull` on the
-      // owner is what separates the workspace's own key from a member's
-      // personal one, exactly as `readProviderConfig` does it; the row's key,
-      // hint and status never leave this function.
+      // A credential, counted rather than returned. `isNull` on the owner is
+      // the workspace's own key, exactly as `readProviderConfig` reads it; the
+      // only other row asked for is the caller's own. The row's key, hint and
+      // status never leave this function.
+      const me = await callerMemberId(tx, context);
       const credentials = await tx
-        .select({ provider: aiCredentials.provider })
+        .select({
+          provider: aiCredentials.provider,
+          ownerMemberId: aiCredentials.ownerMemberId,
+        })
         .from(aiCredentials)
         .where(
           activeOnly(
             aiCredentials,
             eq(aiCredentials.workspaceId, context.workspaceId),
-            isNull(aiCredentials.ownerMemberId),
+            me === null
+              ? isNull(aiCredentials.ownerMemberId)
+              : or(
+                  isNull(aiCredentials.ownerMemberId),
+                  eq(aiCredentials.ownerMemberId, me),
+                ),
           ),
         );
-      const withKey = new Set(credentials.map((row) => row.provider));
+      // A personal key counts only where the provider still takes one, which
+      // is the same condition `resolveAICredential` applies before using it.
+      const takesPersonalKeys = new Set(
+        providers.filter((row) => row.allowUserKeys).map((row) => row.provider),
+      );
+      const withKey = new Set(
+        credentials
+          .filter(
+            (row) =>
+              row.ownerMemberId === null || takesPersonalKeys.has(row.provider),
+          )
+          .map((row) => row.provider),
+      );
       return {
         available: providers.some((row) => withKey.has(row.provider)),
       };
@@ -356,7 +420,7 @@ export const setWorkspaceCredential = defineWriteAction({
   summary: "Sets or replaces the workspace's own key for a provider.",
   input: z.object({
     provider: providerSchema,
-    apiKey: z.string().trim().min(1),
+    apiKey: aiApiKeySchema,
   }),
   output: credentialStatusOutput,
   access: ACCESS_LEVELS.full,
@@ -464,7 +528,7 @@ export const setPersonalCredential = defineWriteAction({
   summary: "Sets or replaces the signed-in member's own key for a provider.",
   input: z.object({
     provider: providerSchema,
-    apiKey: z.string().trim().min(1),
+    apiKey: aiApiKeySchema,
   }),
   output: credentialStatusOutput,
   access: ACCESS_LEVELS.edit,
@@ -573,6 +637,17 @@ export const removePersonalCredential = defineWriteAction({
   }),
 });
 
+/**
+ * The signed-in member's own keys, as the account screen shows them
+ * (completeness review M-36).
+ *
+ * One row per provider that takes a personal key, whether or not this member
+ * has stored one, so the screen can offer a slot for each. What a row carries
+ * about a stored key is its masked hint, its status and when it was last set;
+ * the key itself never leaves `resolveAICredential`. There is no input, and so
+ * no member id a caller could pass to read somebody else's: the only rows this
+ * can reach are the caller's own.
+ */
 export const readOwnCredentialStatus = defineReadAction({
   name: "ai.readOwnCredentialStatus",
   summary:
@@ -585,14 +660,16 @@ export const readOwnCredentialStatus = defineReadAction({
       hasPersonalCredential: z.boolean(),
       keyHint: z.string().nullable(),
       status: z.enum(["unverified", "verified", "invalid"]).nullable(),
+      /** When the key was stored or last replaced, so a person can tell. */
+      setAt: z.string().nullable(),
     }),
   ),
   access: ACCESS_LEVELS.view,
   async handler(context) {
     const db = drizzle(context.pool);
     return withWorkspace(db, context.workspaceId, async (tx) => {
-      const userId = context.actor.userId;
-      if (!userId) {
+      const memberId = await callerMemberId(tx, context);
+      if (!memberId) {
         return [];
       }
       const providers = await tx
@@ -608,22 +685,6 @@ export const readOwnCredentialStatus = defineReadAction({
       if (providers.length === 0) {
         return [];
       }
-
-      const [member] = await tx
-        .select({ id: workspaceMembers.id })
-        .from(workspaceMembers)
-        .where(
-          activeOnly(
-            workspaceMembers,
-            eq(workspaceMembers.workspaceId, context.workspaceId),
-            eq(workspaceMembers.userId, userId),
-          ),
-        )
-        .limit(1);
-      if (!member) {
-        return [];
-      }
-      const memberId = member.id;
 
       const credentials = await tx
         .select()
@@ -647,6 +708,7 @@ export const readOwnCredentialStatus = defineReadAction({
           hasPersonalCredential: credential !== undefined,
           keyHint: credential?.keyHint ?? null,
           status: credential?.status ?? null,
+          setAt: credential?.updatedAt.toISOString() ?? null,
         };
       });
     });

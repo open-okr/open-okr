@@ -242,6 +242,11 @@ export default async function AdminAIPage() {
                     />
                     {t("admin.ai.letMembersSupplyTheir")}
                   </label>
+                  {/* Where the other half of this switch lives, since it is
+                      on the member's own account rather than here (M-36). */}
+                  <p className="pl-6 text-xs text-ink-3">
+                    {t("admin.ai.membersStoreTheirs")}
+                  </p>
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
                     {t("admin.ai.baseUrlForA")}
                     <input

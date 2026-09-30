@@ -26,6 +26,7 @@ import {
   Search,
   Shield,
   SlidersHorizontal,
+  Sparkle,
   Sparkles,
   Target,
   Trophy,
@@ -74,6 +75,10 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "account-security": <Shield className="size-full" />,
   "account-api-tokens": <KeyRound className="size-full" />,
   "account-connections": <Plug className="size-full" />,
+  // The single spark of the AI console's pair: the same subject, seen from
+  // one person's side (completeness review M-36). A key would be read as a
+  // second API tokens row one line above it.
+  "account-ai": <Sparkle className="size-full" />,
 
   // The admin sections. They had none until the section navigation started
   // drawing them, which is why nine labels sat in a plain column while every

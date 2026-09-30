@@ -47,10 +47,17 @@ async function runCostCapFor(
  * gives decomposition the `deep` tier (completeness review M-09), and a
  * feature names a tier rather than a model, so the one assist that asks for
  * more says so here and every other caller is unchanged.
+ *
+ * `forUser` is the signed-in person an assist or a copilot answer is for, so
+ * their own key answers them where they stored one (completeness review M-36).
+ * Every surface a person presses passes it. The agents, the scheduler and the
+ * administrator's "run it now" buttons do not, because those are the Coach's
+ * and the Champion's requests and run on the workspace's key.
  */
 export async function drafterFor(
   workspaceId: string,
   tier: ModelTier = "balanced",
+  forUser?: string,
 ): Promise<AgentDrafter | null> {
   const pool = getPool();
   const costCapUsd = await runCostCapFor(pool, workspaceId);
@@ -59,7 +66,7 @@ export async function drafterFor(
   // under their own name is worth a better model than the cheapest one, and
   // the run cap bounds what that can cost. Whichever provider the workspace
   // routes that tier to, not OpenRouter always (completeness review H-27).
-  const routed = await providerForTier(workspaceId, tier);
+  const routed = await providerForTier(workspaceId, tier, forUser);
   if (!routed) {
     return null;
   }

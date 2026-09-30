@@ -167,9 +167,14 @@ export interface OutboxHandlerDeps {
    * dependency here is one: the provider lives in `packages/adapters`. Absent,
    * or answering null, means this workspace has no provider configured and a
    * copilot run halts saying so rather than failing.
+   *
+   * `forUser` is the account that asked (completeness review M-36), so the
+   * host can answer with that person's own key where they stored one. A run
+   * nobody asked for passes nothing and gets the workspace's.
    */
   readonly drafterFor?: (
     workspaceId: string,
+    forUser?: string,
   ) => Promise<AgentDrafter | null | undefined>;
   /**
    * Takes one step of an agent run (completeness review M-11).
@@ -686,7 +691,9 @@ const runCopilot: OutboxHandler = async (delivery, deps) => {
       `${delivery.topic} does not carry a copilot run, so nothing can answer it.`,
     );
   }
-  const drafter = await deps.drafterFor?.(job.workspaceId);
+  // The asker's own key where they stored one, as the same question answered
+  // in the request would have used (M-36).
+  const drafter = await deps.drafterFor?.(job.workspaceId, job.userId);
   const outcome = await runCopilotAnswer(
     {
       pool: deps.pool,

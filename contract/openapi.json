@@ -10950,7 +10950,7 @@
     "/ai/readAvailability": {
       "get": {
         "operationId": "ai.readAvailability",
-        "summary": "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
+        "summary": "Whether any enabled AI provider holds a key the caller's own requests can use, as one boolean.",
         "tags": [
           "ai"
         ],
@@ -11271,7 +11271,9 @@
                   },
                   "apiKey": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "pattern": "^[\\x21-\\x7E]+$"
                   }
                 },
                 "required": [
@@ -11485,7 +11487,9 @@
                   },
                   "apiKey": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "pattern": "^[\\x21-\\x7E]+$"
                   }
                 },
                 "required": [
@@ -11655,6 +11659,12 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "setAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -11662,7 +11672,8 @@
                           "allowUserKeys",
                           "hasPersonalCredential",
                           "keyHint",
-                          "status"
+                          "status",
+                          "setAt"
                         ],
                         "additionalProperties": false
                       }

@@ -160,7 +160,11 @@ export {
   type ContextWindowGuardResult,
   guardContextWindow,
 } from "./ai/context-guard.ts";
-export { maskKeyHint, sealCredentialKey } from "./ai/credentials.ts";
+export {
+  aiApiKeySchema,
+  maskKeyHint,
+  sealCredentialKey,
+} from "./ai/credentials.ts";
 export {
   AI_PRIVACY_KEYS,
   type AIPrivacySettings,

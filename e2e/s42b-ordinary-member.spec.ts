@@ -199,6 +199,9 @@ const SCREENS = [
   ["/goals", null],
   ["/people", null],
   ["/spaces", null],
+  // Their own AI keys (completeness review M-36). The read behind it is at
+  // `view` and names no admin table, which is the thing this file guards.
+  ["/account/ai", null],
 ] as const;
 
 for (const [path] of SCREENS) {

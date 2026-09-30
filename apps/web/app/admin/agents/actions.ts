@@ -34,6 +34,9 @@ export async function runChampionAction(
   cadence: "hourly" | "daily" | "weekly" | "cycle",
 ) {
   const { session, workspace } = await requireWorkspace();
+  // No reader passed: this is the Champion's run, whoever pressed the button,
+  // so it speaks on the workspace's key and never on the administrator's own
+  // (completeness review M-36).
   const drafter = await drafterFor(workspace.workspaceId);
   await callAction(
     {
@@ -52,6 +55,7 @@ export async function runChampionAction(
 
 export async function runCoachAction() {
   const { session, workspace } = await requireWorkspace();
+  // The Coach's run, on the workspace's key, for the same reason (M-36).
   const drafter = await drafterFor(workspace.workspaceId);
   await callAction(
     {

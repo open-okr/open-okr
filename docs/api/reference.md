@@ -94,7 +94,7 @@ the machine-readable document.
 | Action | Method and path | Class |
 |---|---|---|
 | `ai.addCustomModel`<br/>Adds a custom or self-hosted model, with its own context window and cost figures. | `POST /api/v1/ai/addCustomModel` | writes |
-| `ai.readAvailability`<br/>Whether any AI provider is enabled and holds a workspace key, as one boolean. | `GET /api/v1/ai/readAvailability` | reads |
+| `ai.readAvailability`<br/>Whether any enabled AI provider holds a key the caller's own requests can use, as one boolean. | `GET /api/v1/ai/readAvailability` | reads |
 | `ai.readBudgets`<br/>Every configured budget for this workspace, per user, per agent and workspace-wide. | `GET /api/v1/ai/readBudgets` | reads |
 | `ai.readFeatureSettings`<br/>Every feature's admin-configured switch and tier override. | `GET /api/v1/ai/readFeatureSettings` | reads |
 | `ai.readModelCatalog`<br/>The seeded model catalogue plus this workspace's own custom entries. | `GET /api/v1/ai/readModelCatalog` | reads |

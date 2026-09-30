@@ -382,7 +382,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
       sessionId: id,
     })) as WeeklyDigestRead | null;
     const { drafterFor } = await import("../../../lib/drafter");
-    digestAssistAvailable = (await drafterFor(workspace.workspaceId)) !== null;
+    digestAssistAvailable =
+      (await drafterFor(workspace.workspaceId, "balanced", session.user.id)) !==
+      null;
   }
 
   // Whether a provider can add §8.6's specifics, or find retro themes
@@ -390,7 +392,11 @@ export default async function SessionPage({ params }: SessionPageProps) {
   // it: the verdict, the prescription and the board are the method's.
   const { drafterFor: resolveDrafter } = await import("../../../lib/drafter");
   const reviewAssistAvailable =
-    (await resolveDrafter(workspace.workspaceId)) !== null;
+    (await resolveDrafter(
+      workspace.workspaceId,
+      "balanced",
+      session.user.id,
+    )) !== null;
 
   const isFacilitator = workspace.memberId === sessionRow.facilitatorId;
   const isScheduled = sessionRow.state === "scheduled";
@@ -570,6 +576,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
     (await assistOffered(
       workspace.workspaceId,
       REVIEW_ASSIST_KEYS.proposeObjectives,
+      "balanced",
+      session.user.id,
     ));
 
   // Stage eight: the process-health survey (METHOD.md §8.5, P4-T11b).

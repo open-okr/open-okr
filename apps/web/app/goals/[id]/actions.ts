@@ -179,7 +179,11 @@ export async function rewriteKeyResultAction(
   ruleId: string,
 ) {
   const { session, workspace } = await requireWorkspace();
-  const drafter = await drafterFor(workspace.workspaceId);
+  const drafter = await drafterFor(
+    workspace.workspaceId,
+    "balanced",
+    session.user.id,
+  );
   return callAction(
     {
       pool: getPool(),

@@ -228,7 +228,7 @@ A key result and a check-in have no screen of their own, so what hangs on them i
 
 ### AI
 
-**S-37 AI console.** The AI-NATIVE-PLAN.md §4 cards: provider and connection, models and routing, features, agents, budgets and limits, prompts, privacy and governance, connections and grants, usage and logs. Coaching, nudges and channels live in S-36, because they work with AI off.
+**S-37 AI console.** The AI-NATIVE-PLAN.md §4 cards: provider and connection, models and routing, features, agents, budgets and limits, prompts, privacy and governance, connections and grants, usage and logs. Coaching, nudges and channels live in S-36, because they work with AI off. **A member's own key is not on this screen** (completeness review M-36): S-37 is refused below `manage_ai` and a personal key is every member's, so the console keeps only whether a provider takes one, and each member stores, replaces and removes theirs under Your AI keys at `/account/ai`. That card lists each provider that takes a personal key with its state, the masked last four characters, its status and when it was stored; the key is written once into a password field and never read back; a workspace that takes none, and a member whose level cannot store one, are each told so.
 
 **S-38 Agent detail.** For the Coach, the Champion or a custom agent: persona, staged instructions with versions, provider and tier, schedule, access scope, autonomy policy, sandbox toggle, cost to date against the cap, and a run history where each run expands into its readable log and the proposals it produced.
 

@@ -21,13 +21,19 @@ import { getPool } from "./auth";
 import { drafterFor } from "./drafter";
 import { requireWorkspace } from "./workspace";
 
-/** Whether this assist would run for this workspace right now. */
+/**
+ * Whether this assist would run for this reader right now.
+ *
+ * `forUser` is the reader, because their own key can be what makes it run on
+ * a workspace that holds none (completeness review M-36).
+ */
 export async function assistOffered(
   workspaceId: string,
   featureKey: string,
   tier: ModelTier = "balanced",
+  forUser?: string,
 ): Promise<boolean> {
-  if ((await drafterFor(workspaceId, tier)) === null) {
+  if ((await drafterFor(workspaceId, tier, forUser)) === null) {
     return false;
   }
   const availability = await checkFeatureAvailability(getPool(), {
@@ -51,6 +57,11 @@ export async function assistContext(tier: ModelTier = "balanced") {
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
-  const drafter = await drafterFor(workspace.workspaceId, tier);
+  // The reader's own key where they stored one (M-36).
+  const drafter = await drafterFor(
+    workspace.workspaceId,
+    tier,
+    session.user.id,
+  );
   return drafter ? { ...base, drafter } : base;
 }

@@ -116,6 +116,8 @@ Adding a provider is a new driver behind the same port, never a change to featur
 
 Precedence per call: user key, then workspace configuration, then deployment environment, then off. Keys are envelope-encrypted with per-secret data keys wrapped by a master key ring, so rotation re-wraps data keys only and costs nothing. Keys are never sent to the client and never logged. The interface shows a masked hint and a live connection test.
 
+A user key answers that user's own requests only: the assists they run and the copilot's answers to them, including one the relay writes after the request has ended. It never answers an agent run, the scheduler, or another member, and it is used only for a provider the administrator lets take personal keys and only when the workspace's tier routing chooses that provider. It changes whose account pays and nothing else: the same egress controls wrap it. Embeddings, for the search index and for a search, stay on the workspace's key. Built at completeness review M-36; the member's screen is UIUX-PLAN S-37's note.
+
 ### 3.4 Model catalogue and tier routing
 
 Features request a **tier**, never a model.

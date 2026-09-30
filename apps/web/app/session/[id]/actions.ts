@@ -663,7 +663,11 @@ export async function revealObjectiveScoreAction(
 export async function narrateDigestAction(sessionId: string) {
   const { session, workspace } = await requireWorkspace();
   const { drafterFor } = await import("../../../lib/drafter");
-  const drafter = await drafterFor(workspace.workspaceId);
+  const drafter = await drafterFor(
+    workspace.workspaceId,
+    "balanced",
+    session.user.id,
+  );
   const base = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
@@ -728,7 +732,11 @@ export async function postDigestAction(
 export async function narrateDiagnosticAction(sessionId: string) {
   const { session, workspace } = await requireWorkspace();
   const { drafterFor } = await import("../../../lib/drafter");
-  const drafter = await drafterFor(workspace.workspaceId);
+  const drafter = await drafterFor(
+    workspace.workspaceId,
+    "balanced",
+    session.user.id,
+  );
   const base = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
@@ -745,7 +753,11 @@ export async function narrateDiagnosticAction(sessionId: string) {
 export async function clusterRetroAction(sessionId: string) {
   const { session, workspace } = await requireWorkspace();
   const { drafterFor } = await import("../../../lib/drafter");
-  const drafter = await drafterFor(workspace.workspaceId);
+  const drafter = await drafterFor(
+    workspace.workspaceId,
+    "balanced",
+    session.user.id,
+  );
   const base = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,

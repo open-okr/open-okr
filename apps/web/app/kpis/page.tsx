@@ -58,7 +58,12 @@ export default async function KpisPage({
   // way.
   const suggestionOffered =
     canEdit &&
-    (await assistOffered(workspace.workspaceId, RHYTHM_ASSIST_KEYS.suggestKpi));
+    (await assistOffered(
+      workspace.workspaceId,
+      RHYTHM_ASSIST_KEYS.suggestKpi,
+      "balanced",
+      session.user.id,
+    ));
 
   const grid = await callAction(context, "kpis.grid", { periods: 12 });
 

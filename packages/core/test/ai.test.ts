@@ -434,12 +434,14 @@ describe("ai.readAvailability", () => {
     expect(serialised).not.toContain("anthropic");
   });
 
-  it("is false when the only key is a member's personal one", async () => {
-    // `hasWorkspaceCredential` is `isNull(owner_member_id)`, and this answers
-    // the same question the same way. A personal key is not the workspace
-    // having one.
+  it("counts a member's personal key for that member and nobody else", async () => {
+    // A personal key is not the workspace having one, so it answers no for
+    // everybody else. It is the key this member's own requests use, though
+    // (completeness review M-36), so for them the assist does work, and this
+    // said no to them until M-36.
     const wb = await workerDb();
     const member = await addMember("Ordinary4");
+    const other = await addMember("Ordinary5");
     await callAction(
       { pool: wb.appPool, ...context(OWNER) },
       "ai.updateProviderConfig",
@@ -456,17 +458,19 @@ describe("ai.readAvailability", () => {
       { provider: "anthropic", apiKey: "sk-ant-personal-availability" },
     );
 
-    const read = await callAction(
-      {
-        pool: wb.appPool,
-        workspaceId,
-        actor: { kind: "human", memberId: member },
-        ring,
-      },
-      "ai.readAvailability",
-      {},
-    );
-    expect(read).toEqual({ available: false });
+    const readAs = (memberId: string) =>
+      callAction(
+        {
+          pool: wb.appPool,
+          workspaceId,
+          actor: { kind: "human", memberId },
+          ring,
+        },
+        "ai.readAvailability",
+        {},
+      );
+    expect(await readAs(member)).toEqual({ available: true });
+    expect(await readAs(other)).toEqual({ available: false });
   });
 });
 

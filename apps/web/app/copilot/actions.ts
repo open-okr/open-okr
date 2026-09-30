@@ -50,7 +50,11 @@ export async function readCopilotThreadAction(threadId: string) {
  */
 export async function copilotAvailabilityAction() {
   const base = await context();
-  const drafter = await drafterFor(base.workspaceId);
+  const drafter = await drafterFor(
+    base.workspaceId,
+    "balanced",
+    base.actor.userId,
+  );
   return callAction(
     drafter ? { ...base, drafter } : base,
     "copilot.availability",
@@ -70,7 +74,11 @@ export async function proposeFromCopilotAction(
   request: string,
 ) {
   const base = await context();
-  const drafter = await drafterFor(base.workspaceId);
+  const drafter = await drafterFor(
+    base.workspaceId,
+    "balanced",
+    base.actor.userId,
+  );
   if (!drafter) {
     return null;
   }

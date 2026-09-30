@@ -204,7 +204,11 @@ async function propose(
     return null;
   }
   const base = await context();
-  const drafter = await drafterFor(base.workspaceId);
+  const drafter = await drafterFor(
+    base.workspaceId,
+    "balanced",
+    base.actor.userId,
+  );
   if (!drafter) {
     return null;
   }

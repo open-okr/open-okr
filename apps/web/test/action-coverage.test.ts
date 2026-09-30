@@ -189,19 +189,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     apiOnly: true,
     why: "a person feeds the next cycle by closing this one with `cycles.close`; this is an idempotent re-run for the command line",
   },
-
-  "ai.setPersonalCredential": {
-    notBuilt: "M-36",
-    why: "no screen lets a member set their own AI key",
-  },
-  "ai.removePersonalCredential": {
-    notBuilt: "M-36",
-    why: "no screen lets a member remove their own AI key",
-  },
-  "ai.readOwnCredentialStatus": {
-    notBuilt: "M-36",
-    why: "no screen shows a member whether their own AI key is set",
-  },
 };
 
 function sources(dir: string): string[] {

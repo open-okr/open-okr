@@ -229,12 +229,16 @@ export default async function GoalPage({
         ? assistOffered(
             workspace.workspaceId,
             REVIEW_ASSIST_KEYS.draftRetrospective,
+            "balanced",
+            session.user.id,
           )
         : false,
       conversation.comments.length >= THREAD_SUMMARY_MINIMUM
         ? assistOffered(
             workspace.workspaceId,
             ASSIST_FEATURE_KEYS.summariseThread,
+            "balanced",
+            session.user.id,
           )
         : false,
       open && goal.keyResults.length > 0
@@ -242,6 +246,7 @@ export default async function GoalPage({
             workspace.workspaceId,
             ASSIST_FEATURE_KEYS.decomposeKeyResult,
             "deep",
+            session.user.id,
           )
         : false,
     ]);

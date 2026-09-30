@@ -107,10 +107,19 @@ export function providerConfigFor(
  * Null is an ordinary answer: every assist has a manual path, and every agent
  * has its deterministic form. An unpriced model is refused, as it always was,
  * because a model that meters as zero would make the run cap meaningless.
+ *
+ * **`forUser` is the signed-in person a request is for** (completeness review
+ * M-36). Their own key for the routed provider answers it when they stored
+ * one, which is AI-NATIVE-PLAN §3.3's "user key, then workspace". It changes
+ * whose account pays and nothing else: the tier still picks the provider and
+ * the model, and the egress controls below wrap the provider whichever key it
+ * holds. Nothing an agent or the scheduler asks passes it, so the Coach and
+ * the Champion always run on the workspace's key.
  */
 export async function providerForTier(
   workspaceId: string,
   tier: ModelTier,
+  forUser?: string,
 ): Promise<RoutedProvider | null> {
   const pool = getPool();
   const route = await resolveTierRoute(pool, { workspaceId, tier });
@@ -124,6 +133,7 @@ export async function providerForTier(
   const resolved = await resolveAICredential(pool, getKeyRing(), process.env, {
     workspaceId,
     provider: route.provider,
+    ...(forUser ? { userId: forUser } : {}),
   });
   if (resolved.source === "off") {
     return null;

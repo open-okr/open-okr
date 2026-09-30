@@ -26,14 +26,21 @@ async function assistContext() {
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
-  const drafter = await drafterFor(workspace.workspaceId);
+  const drafter = await drafterFor(
+    workspace.workspaceId,
+    "balanced",
+    session.user.id,
+  );
   return drafter ? { ...base, drafter } : base;
 }
 
 /** Whether any assist can run at all, so the surface knows to offer them. */
 export async function assistsAvailableAction(): Promise<boolean> {
-  const { workspace } = await requireWorkspace();
-  return (await drafterFor(workspace.workspaceId)) !== null;
+  const { session, workspace } = await requireWorkspace();
+  return (
+    (await drafterFor(workspace.workspaceId, "balanced", session.user.id)) !==
+    null
+  );
 }
 
 export async function draftObjectiveAction(input: {

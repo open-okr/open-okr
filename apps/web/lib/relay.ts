@@ -106,8 +106,12 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
      * Resolved per delivery rather than per process, for the reason every
      * other dependency here is: provider keys and tier routing live in the
      * database and an administrator can change either while this runs.
+     *
+     * For the member who asked, so their own key answers them where they
+     * stored one (completeness review M-36).
      */
-    drafterFor: (id: string) => drafterFor(id),
+    drafterFor: (id: string, forUser?: string) =>
+      drafterFor(id, "balanced", forUser),
     /**
      * One step of an agent run (completeness review M-11).
      *

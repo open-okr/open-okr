@@ -31,7 +31,7 @@ export default async function ImportsPage() {
 
   const [runs, drafter] = await Promise.all([
     callAction(context, "imports.listRuns", { limit: 10 }),
-    drafterFor(workspace.workspaceId),
+    drafterFor(workspace.workspaceId, "balanced", session.user.id),
   ]);
 
   const entities = TEMPLATES.map((template) => ({
