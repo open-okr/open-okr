@@ -5,11 +5,17 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
+import { readConversation } from "../../../lib/conversation.ts";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
+import {
+  readSubjectDocuments,
+  SubjectDocuments,
+} from "../../documents/subject-documents.tsx";
 import {
   linkKeyResultAction,
   setCapacityAction,
@@ -29,11 +35,12 @@ import { UnlinkButton } from "./unlink-button.tsx";
 /**
  * One initiative (UIUX-PLAN.md §6 S-26, P5-T10b).
  *
- * S-26 asks for "description, linked key results, tasks and documents". Two of
- * those four are not on this page yet, and each says so here rather than being
- * quietly absent. Their tables landed at P5-T11 and P5-T12 and the panels are
- * P6-G28's; until then, drawing an empty panel labelled "Tasks" would read as a
- * team with no work rather than as a page that cannot see the work.
+ * S-26 asks for "description, linked key results, tasks and documents". The
+ * tasks arrived at P6-G28. The documents, the files beside them and the
+ * discussion arrived at completeness review M-01, through the same three
+ * panels the goal page mounts: REQUIREMENTS §4 puts documents on an
+ * initiative, files on anything a document can hang on, and comments
+ * everywhere.
  *
  * **The linked key results are the point of the screen.** METHOD.md §5.5 asks a
  * facilitator to record the main initiatives that will move each measure, and
@@ -93,6 +100,11 @@ export default async function InitiativePage({
     subjectId: id,
   });
   const canEdit = level >= ACCESS_LEVELS.edit;
+
+  // Documents on this initiative. The query has already dropped anybody
+  // else's draft, so the list is safe to render as it comes (P5-T12).
+  const documents = await readSubjectDocuments(context, "initiative", id);
+  const conversation = await readConversation(context, "initiative", id);
 
   // Every key result the reader can see, so the link picker offers real
   // choices. Read through `goals.list`, which is already access-filtered.
@@ -343,12 +355,31 @@ export default async function InitiativePage({
           )}
         </CardBody>
       </Card>
+      <SubjectDocuments
+        subjectType="initiative"
+        subjectId={id}
+        documents={documents}
+        canEdit={canEdit}
+      />
+
       <Attachments
         subjectType="initiative"
         subjectId={id}
         attachments={attachments}
         canEdit={level >= ACCESS_LEVELS.edit}
       />
+
+      <Card>
+        <CardBody>
+          <SubjectComments
+            subjectType="initiative"
+            subjectId={id}
+            comments={conversation.comments}
+            reactions={conversation.reactions}
+            currentMemberId={workspace.memberId}
+          />
+        </CardBody>
+      </Card>
 
       {level >= ACCESS_LEVELS.full ? (
         <DeleteControl subject="initiative" id={id} returnTo="/initiatives" />

@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { assistOffered } from "../../../lib/assists";
+import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { SectionBoundary } from "../../../lib/section-boundary.tsx";
@@ -19,6 +20,10 @@ import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
+import {
+  readSubjectDocuments,
+  SubjectDocuments,
+} from "../../documents/subject-documents.tsx";
 import { ScheduleSessions } from "../../sessions/schedule.tsx";
 import { BlockerSummary } from "./blocker-summary.tsx";
 import { SpaceManagement } from "./manage.tsx";
@@ -52,7 +57,8 @@ function refusedAsNull(error: unknown): null {
  * review M-22), the confidence trend and the streak (P6-G19c), last week's
  * digest as the room read it, the open blocker board (P4-T15b-b), the
  * sessions ahead (P5-T01c) and who is in the space in what role. Sessions are
- * booked here since H-08.
+ * booked here since H-08, and the space's own documents and files hang here
+ * since M-01.
  *
  * **The goals and the KPI trees stream in on their own**, each behind a
  * Suspense boundary with a skeleton and an error boundary of its own, because
@@ -191,6 +197,20 @@ export default async function SpacePage({
       )
     : [];
 
+  // The space's own documents and files (REQUIREMENTS §4: "team homes with
+  // their own goals, sessions, documents", completeness review M-01). Both
+  // read through the space, which `spaces.read` above has already answered
+  // for. A refusal leaves the card off rather than the page, the same as the
+  // two workspace-wide reads above, because this is a guest's one door.
+  const [documents, attachments] = await Promise.all([
+    readSubjectDocuments(actor, "space", id).catch(refusedAsNull),
+    callAction(actor, "attachments.list", {
+      subjectType: "space",
+      subjectId: id,
+    }).catch(refusedAsNull),
+  ]);
+  const canWrite = level >= ACCESS_LEVELS.edit;
+
   return (
     <div className="stagger flex flex-col gap-4.5">
       <Card>
@@ -255,6 +275,23 @@ export default async function SpacePage({
           />
         </Suspense>
       </SectionBoundary>
+
+      {documents ? (
+        <SubjectDocuments
+          subjectType="space"
+          subjectId={space.id}
+          documents={documents}
+          canEdit={canWrite}
+        />
+      ) : null}
+      {attachments ? (
+        <Attachments
+          subjectType="space"
+          subjectId={space.id}
+          attachments={attachments}
+          canEdit={canWrite}
+        />
+      ) : null}
 
       {/* §4.14's space scope (P6-G18b). Placed under the management card
           because it is the same audience and the rarer thing to change. */}

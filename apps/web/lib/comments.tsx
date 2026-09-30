@@ -1,10 +1,15 @@
 "use client";
 
 /**
- * Comment thread on the goal page (TECHNICAL-PLAN.md §4.10, P3-T16).
+ * A comment thread (TECHNICAL-PLAN.md §4.10, P3-T16).
  *
  * Shows comments, a composer with mention support, and reactions per comment.
  * Each comment is deep-linkable via #comment-{id}.
+ *
+ * **One thread for every subject** (completeness review M-01). It lived beside
+ * the goal page, which was the only page that had one, and moved here when the
+ * initiative, the task and the document gained theirs. The subject it is
+ * about is its parent's business: `SubjectComments` binds the writes.
  */
 import { Button, useTranslations } from "@openokr/ui";
 // Rich text editor and mention extensions will be wired in once the
@@ -12,8 +17,8 @@ import { Button, useTranslations } from "@openokr/ui";
 // composer uses a plain textarea that wraps input into editor JSON.
 import { useCallback, useState, useTransition } from "react";
 
-/** Not exported: `CommentData` carries it, and nothing names it on its own. */
-interface ReactionGroupData {
+/** One emoji's reactions on one subject, as `reactions.list` groups them. */
+export interface ReactionGroupData {
   readonly emoji: string;
   readonly count: number;
   readonly own: boolean;
@@ -103,14 +108,14 @@ export function CommentThread({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="comment-thread">
       <h3 className="text-sm font-medium text-ink-2">
-        {t("goals.detail.comments.discussion", { length: comments.length })}
+        {t("comments.thread.discussion", { length: comments.length })}
       </h3>
 
       {comments.length === 0 && (
         <p className="text-sm text-ink-3">
-          {t("goals.detail.comments.noCommentsYetStart")}
+          {t("comments.thread.noCommentsYetStart")}
         </p>
       )}
 
@@ -124,7 +129,7 @@ export function CommentThread({
             <span className="font-medium text-ink">{comment.authorName}</span>
             <span>
               {comment.editedAt
-                ? t("goals.detail.comments.postedEdited", {
+                ? t("comments.thread.postedEdited", {
                     date: postedAt(comment.createdAt),
                   })
                 : postedAt(comment.createdAt)}
@@ -147,45 +152,12 @@ export function CommentThread({
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            {comment.reactions.map((group) => (
-              <button
-                key={group.emoji}
-                type="button"
-                // The reader's own reaction is marked, because a count with no
-                // "did I" in it makes somebody click again to find out.
-                className={
-                  group.own
-                    ? "rounded-full bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
-                    : "rounded-full border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
-                }
-                onClick={() =>
-                  handleReact(
-                    "comment",
-                    comment.id,
-                    group.emoji,
-                    group.ownReactionId,
-                  )
-                }
-              >
-                {group.emoji} {group.count}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="text-xs text-ink-3 hover:text-ink-2"
-              onClick={() =>
-                handleReact(
-                  "comment",
-                  comment.id,
-                  "\u{1F44D}",
-                  // The thumb always adds. A reader who already gave one sees
-                  // it in the row above and presses that to take it back.
-                  null,
-                )
+            <ReactionRow
+              groups={comment.reactions}
+              onReact={(emoji, ownReactionId) =>
+                handleReact("comment", comment.id, emoji, ownReactionId)
               }
-            >
-              +1
-            </button>
+            />
             {comment.authorMemberId === currentMemberId &&
               editingId !== comment.id && (
                 <>
@@ -218,10 +190,56 @@ export function CommentThread({
             });
           }}
           saving={isPending}
-          placeholder={t("goals.detail.comments.writeAComment")}
+          placeholder={t("comments.thread.writeAComment")}
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * The reactions on one subject, and the button that adds one.
+ *
+ * Shared by every comment and by the subject a thread is about, so a reaction
+ * on a document looks and behaves like one on a comment beneath it. A fragment
+ * rather than a box, because a comment sets it in a row beside its own edit
+ * and delete.
+ */
+export function ReactionRow({
+  groups,
+  onReact,
+}: {
+  readonly groups: readonly ReactionGroupData[];
+  readonly onReact: (emoji: string, ownReactionId: string | null) => void;
+}) {
+  return (
+    <>
+      {groups.map((group) => (
+        <button
+          key={group.emoji}
+          type="button"
+          // The reader's own reaction is marked, because a count with no
+          // "did I" in it makes somebody click again to find out.
+          className={
+            group.own
+              ? "rounded-full bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
+              : "rounded-full border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
+          }
+          onClick={() => onReact(group.emoji, group.ownReactionId)}
+        >
+          {group.emoji} {group.count}
+        </button>
+      ))}
+      <button
+        type="button"
+        className="text-xs text-ink-3 hover:text-ink-2"
+        // The thumb always adds. A reader who already gave one sees it in the
+        // row beside it and presses that to take it back.
+        onClick={() => onReact("\u{1F44D}", null)}
+      >
+        +1
+      </button>
+    </>
   );
 }
 
@@ -240,9 +258,7 @@ function CommentBody({ body }: { body: unknown }) {
 
   if (!body || typeof body !== "object") {
     return (
-      <p className="text-ink-3 italic">
-        {t("goals.detail.comments.emptyComment")}
-      </p>
+      <p className="text-ink-3 italic">{t("comments.thread.emptyComment")}</p>
     );
   }
   // Render rich text content as paragraphs for now.
@@ -251,9 +267,7 @@ function CommentBody({ body }: { body: unknown }) {
   const doc = body as { content?: unknown[] };
   if (!doc.content || !Array.isArray(doc.content)) {
     return (
-      <p className="text-ink-3 italic">
-        {t("goals.detail.comments.emptyComment")}
-      </p>
+      <p className="text-ink-3 italic">{t("comments.thread.emptyComment")}</p>
     );
   }
   return (
@@ -269,7 +283,7 @@ function CommentBody({ body }: { body: unknown }) {
                 attrs?: { label?: string };
               };
               if (child.type === "mention") {
-                return `@${child.attrs?.label ?? t("goals.detail.comments.someone")}`;
+                return `@${child.attrs?.label ?? t("comments.thread.someone")}`;
               }
               return child.text ?? "";
             })
@@ -310,7 +324,7 @@ function CommentEditor({
     <div className="space-y-2">
       <textarea
         className="w-full min-h-[80px] rounded border border-line bg-surface p-2 text-sm text-ink placeholder:text-ink-4 resize-y focus:outline-none focus:ring-1 focus:ring-brand"
-        placeholder={placeholder ?? t("goals.detail.comments.writeSomething")}
+        placeholder={placeholder ?? t("comments.thread.writeSomething")}
         defaultValue={initialBody ? extractPlainText(initialBody) : ""}
         onChange={(e) => {
           // Wrap plain text in a minimal rich-text document
@@ -334,10 +348,10 @@ function CommentEditor({
           disabled={saving || !body}
         >
           {saving
-            ? t("goals.detail.comments.posting")
+            ? t("comments.thread.posting")
             : initialBody
               ? t("common.save")
-              : t("goals.detail.comments.post")}
+              : t("comments.thread.post")}
         </Button>
         {onCancel && (
           <Button size="sm" variant="ghost" onClick={onCancel}>

@@ -3,8 +3,11 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
+import { readConversation } from "../../../lib/conversation.ts";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -24,10 +27,11 @@ import { ChecklistLine, DueDateField, RailButton } from "./controls.tsx";
 /**
  * One task (UIUX-PLAN.md §6 S-28, P5-T11).
  *
- * Title, status, description, checklist and a right rail with assignees, the
- * due date, the initiative and the key result it serves. Comments and the
- * activity list are not here: the comment surface is P3-T16's and hanging it on
- * a task is its own change, so this says so rather than drawing an empty panel.
+ * Title, status, description, checklist, files, the discussion, and a right
+ * rail with assignees, the due date, the initiative and the key result it
+ * serves. The files and the discussion are the goal page's own two panels,
+ * mounted here at completeness review M-01. Until then this page told its
+ * reader a task kept neither, which the actions had allowed all along.
  *
  * **The key result on the rail is a link, not a number.** Nothing on this page
  * turns a finished task into progress.
@@ -84,6 +88,15 @@ export default async function TaskPage({
         (one) => one.kind === "human",
       )
     : [];
+  // The files and the discussion S-28 asks for (completeness review M-01).
+  // Both actions took a task since P5-T12 and P6-T04b; this page said they
+  // did not.
+  const attachments = await callAction(context, "attachments.list", {
+    subjectType: "task",
+    subjectId: id,
+  });
+  const conversation = await readConversation(context, "task", id);
+
   const assigned = new Set(task.assignees.map((one) => one.id));
   const statusOptions = STATUS_OPTIONS.map((one) => ({
     value: one.value,
@@ -187,16 +200,22 @@ export default async function TaskPage({
           </CardBody>
         </Card>
 
+        <Attachments
+          subjectType="task"
+          subjectId={id}
+          attachments={attachments}
+          canEdit={canEdit}
+        />
+
         <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {t("tasks.detail.whatIsNotHere")}
-            </h2>
-          </CardHeader>
           <CardBody>
-            <p className="text-sm text-ink-3">
-              {t("tasks.detail.commentsAndTheActivity")}
-            </p>
+            <SubjectComments
+              subjectType="task"
+              subjectId={id}
+              comments={conversation.comments}
+              reactions={conversation.reactions}
+              currentMemberId={workspace.memberId}
+            />
           </CardBody>
         </Card>
       </div>

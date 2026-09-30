@@ -9,10 +9,15 @@ import {
 } from "@openokr/method";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
+import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
+import {
+  readSubjectDocuments,
+  SubjectDocuments,
+} from "../documents/subject-documents.tsx";
 import { AnnualFrame } from "./annual-frame.tsx";
 import { AnnualObjectives } from "./annual-objectives.tsx";
 import { assistsAvailableAction } from "./assist-actions.ts";
@@ -368,6 +373,18 @@ export default async function CyclePage({
         }))
       : null;
 
+  // The cycle's own documents and files, whatever phase is open (UIUX-PLAN
+  // S-29 names a cycle among a document's subjects, completeness review
+  // M-01): the planning notes a cycle collects outside any one goal. A cycle
+  // is read through the workspace, which every member reaches.
+  const [cycleDocuments, cycleFiles] = await Promise.all([
+    readSubjectDocuments(context, "cycle", cycle.id),
+    callAction(context, "attachments.list", {
+      subjectType: "cycle",
+      subjectId: cycle.id,
+    }),
+  ]);
+
   return (
     <div className="flex flex-col gap-4.5 xl:flex-row">
       <div className="w-full flex-none xl:w-72">
@@ -705,6 +722,18 @@ export default async function CyclePage({
           </Card>
         )}
         <GuidanceRail phase={viewing} mode={workflow.mode} />
+        <SubjectDocuments
+          subjectType="cycle"
+          subjectId={cycle.id}
+          documents={cycleDocuments}
+          canEdit={canEdit}
+        />
+        <Attachments
+          subjectType="cycle"
+          subjectId={cycle.id}
+          attachments={cycleFiles}
+          canEdit={canEdit}
+        />
         {/*
          * **Inside the rail, not beside it.** The row above is
          * `xl:flex-row` with exactly two children: the content column and

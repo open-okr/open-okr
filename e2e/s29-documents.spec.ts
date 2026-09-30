@@ -189,6 +189,49 @@ test("a second publish shows what changed between the two", async () => {
 });
 
 /**
+ * S-29's comments and reactions (completeness review M-01).
+ *
+ * The goal page was the only page with a thread, and a document had neither.
+ * A draft still has none, which the earlier cases see by its absence: the
+ * thread appears only once there is somebody besides the author to read it.
+ */
+test("a published document carries a discussion and takes reactions", async () => {
+  const thread = page.getByTestId("comment-thread");
+  await expect(thread).toBeVisible({ timeout: 15_000 });
+  await expect(thread).toContainText("No comments yet");
+
+  await thread.getByPlaceholder("Write a comment...").fill("Ready for review.");
+  await thread.getByRole("button", { name: "Post" }).click();
+  await expect(thread).toContainText("Ready for review.", { timeout: 15_000 });
+
+  // A reaction on the document itself, above its thread.
+  const reactions = page.getByTestId("subject-reactions");
+  await reactions.getByRole("button", { name: "+1" }).click();
+  // The emoji and its count, not the "+1" that was already there.
+  await expect(reactions).toContainText("\u{1F44D} 1", { timeout: 15_000 });
+
+  await expect(async () => {
+    const { rows } = await pool.query<{ subject_type: string }>(
+      `select r.subject_type from reactions r
+         join documents d on d.id = r.subject_id
+        where d.workspace_id = $1 and d.title = $2 and r.deleted_at is null`,
+      [workspaceId, TITLE],
+    );
+    expect(rows.map((row) => row.subject_type)).toEqual(["document"]);
+  }).toPass({ timeout: 15_000 });
+});
+
+test("the goal carries files beside its documents", async () => {
+  await goTo(page, `/goals/${goalId}`);
+  await expect(page.getByTestId("document-count")).toBeVisible({
+    timeout: 15_000,
+  });
+  // The files panel the goal never mounted, although the action took a goal.
+  await expect(page.getByTestId("attachment-input")).toBeVisible();
+  await expect(page.getByTestId("comment-thread")).toBeVisible();
+});
+
+/**
  * Files on a document, and the cycle controls (P6-G27b, GAP-AUDIT §5).
  *
  * Seven attachment actions and three cycle actions shipped and none of them

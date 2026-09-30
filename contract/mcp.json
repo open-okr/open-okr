@@ -10513,7 +10513,8 @@
               "check_in",
               "cycle",
               "document",
-              "task"
+              "task",
+              "initiative"
             ]
           },
           "subjectId": {
@@ -10552,7 +10553,8 @@
               "check_in",
               "cycle",
               "document",
-              "task"
+              "task",
+              "initiative"
             ]
           },
           "subjectId": {
@@ -10579,7 +10581,7 @@
     },
     {
       "name": "comments.create",
-      "description": "Post a comment on a goal, key result, check-in, cycle or document",
+      "description": "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10591,7 +10593,8 @@
               "check_in",
               "cycle",
               "document",
-              "task"
+              "task",
+              "initiative"
             ]
           },
           "subjectId": {
@@ -10633,7 +10636,8 @@
               "check_in",
               "cycle",
               "document",
-              "task"
+              "task",
+              "initiative"
             ]
           },
           "subjectId": {
@@ -10808,7 +10812,8 @@
               "check_in",
               "cycle",
               "document",
-              "task"
+              "task",
+              "initiative"
             ]
           },
           "subjectId": {

@@ -220,6 +220,38 @@ test("an unfinished one with a due date is, and it names the task", async () => 
   });
 });
 
+/**
+ * S-28's comments, and the files beside them (completeness review M-01).
+ *
+ * The page used to say that comments and files were not kept on a task,
+ * although both actions took one. It carries the goal page's own two panels
+ * now.
+ */
+test("a task carries a discussion and files", async () => {
+  await goTo(page, `/tasks/${await taskId()}`);
+  const thread = page.getByTestId("comment-thread");
+  await expect(thread).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("attachment-input")).toBeVisible();
+
+  await thread
+    .getByPlaceholder("Write a comment...")
+    .fill("The copy is with legal.");
+  await thread.getByRole("button", { name: "Post" }).click();
+  await expect(thread).toContainText("The copy is with legal.", {
+    timeout: 15_000,
+  });
+
+  await expect(async () => {
+    const { rows } = await pool.query<{ subject_type: string }>(
+      `select c.subject_type from comments c
+         join tasks t on t.id = c.subject_id
+        where t.workspace_id = $1 and t.title = $2 and c.deleted_at is null`,
+      [workspaceId, TASK],
+    );
+    expect(rows.map((row) => row.subject_type)).toEqual(["task"]);
+  }).toPass({ timeout: 15_000 });
+});
+
 /** The task this file works on, by its title. */
 async function taskId(): Promise<string> {
   const { rows } = await pool.query<{ id: string }>(

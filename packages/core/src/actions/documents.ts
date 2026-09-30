@@ -1260,7 +1260,11 @@ export const attachFile = defineWriteAction({
           result: { id: existing.id, attached: false },
           activity: {
             kind: "attachment.added",
-            subjectType: "document",
+            // What the file hangs on, not always "document" (completeness
+            // review M-01). Written when a document was the only subject with
+            // a files panel, it filed a file on a goal under a document id,
+            // which resolved to no context and so reached no feed.
+            subjectType: input.subjectType,
             subjectId: input.subjectId,
             payload: { duplicate: true },
           },
@@ -1303,7 +1307,7 @@ export const attachFile = defineWriteAction({
         result: { id: row.id, attached: true },
         activity: {
           kind: "attachment.added",
-          subjectType: "document",
+          subjectType: input.subjectType,
           subjectId: input.subjectId,
           payload: { duplicate: false },
         },
@@ -1370,7 +1374,7 @@ export const detachFile = defineWriteAction({
         result: { id: input.id },
         activity: {
           kind: "attachment.removed",
-          subjectType: "document",
+          subjectType: loaded.subjectType,
           subjectId: loaded.subjectId,
           payload: {},
         },

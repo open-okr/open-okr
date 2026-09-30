@@ -7695,7 +7695,8 @@
             "check_in",
             "cycle",
             "document",
-            "task"
+            "task",
+            "initiative"
           ]
         },
         {
@@ -7726,7 +7727,8 @@
             "check_in",
             "cycle",
             "document",
-            "task"
+            "task",
+            "initiative"
           ]
         },
         {
@@ -7744,7 +7746,7 @@
       "method": "POST",
       "path": "/comments/create",
       "scope": "write",
-      "summary": "Post a comment on a goal, key result, check-in, cycle or document",
+      "summary": "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
       "flags": [
         {
           "name": "subject-type",
@@ -7757,7 +7759,8 @@
             "check_in",
             "cycle",
             "document",
-            "task"
+            "task",
+            "initiative"
           ]
         },
         {
@@ -7794,7 +7797,8 @@
             "check_in",
             "cycle",
             "document",
-            "task"
+            "task",
+            "initiative"
           ]
         },
         {
@@ -7930,7 +7934,8 @@
             "check_in",
             "cycle",
             "document",
-            "task"
+            "task",
+            "initiative"
           ]
         },
         {

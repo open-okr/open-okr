@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
+import { readConversation } from "../../../lib/conversation.ts";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -82,6 +84,12 @@ export default async function DocumentPage({
     subjectType: "document",
     subjectId: id,
   });
+  // A draft has no discussion: it is its author's alone, and a comment on it
+  // would reach the feed and the watchers of what it hangs on.
+  const conversation =
+    document.state === "published"
+      ? await readConversation(context, "document", id)
+      : null;
   const canEdit = level >= ACCESS_LEVELS.edit;
   const back = SUBJECT_HREF[document.subjectType]?.(document.subjectId) ?? null;
 
@@ -155,6 +163,25 @@ export default async function DocumentPage({
             />
           </CardBody>
         </Card>
+
+        {/*
+         * S-29's comments and reactions (completeness review M-01), once
+         * there is somebody besides the author to have them with. The draft
+         * notice above already says nobody else can see this yet.
+         */}
+        {conversation ? (
+          <Card>
+            <CardBody>
+              <SubjectComments
+                subjectType="document"
+                subjectId={id}
+                comments={conversation.comments}
+                reactions={conversation.reactions}
+                currentMemberId={workspace.memberId}
+              />
+            </CardBody>
+          </Card>
+        ) : null}
       </div>
 
       <div className="flex w-full flex-none flex-col gap-3.5 xl:w-80">

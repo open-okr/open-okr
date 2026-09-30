@@ -85,13 +85,29 @@ const readableSize = (bytes: number): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+/**
+ * What a file can hang on: `attachments.attach`'s own list (TECHNICAL-PLAN
+ * §4.9). The panel took two of these until completeness review M-01, although
+ * the action had taken all nine since P5-T12.
+ */
+type AttachmentSubjectType =
+  | "space"
+  | "goal"
+  | "key_result"
+  | "initiative"
+  | "cycle"
+  | "session"
+  | "task"
+  | "document"
+  | "check_in";
+
 export function Attachments({
   subjectType,
   subjectId,
   attachments,
   canEdit,
 }: {
-  readonly subjectType: "document" | "initiative";
+  readonly subjectType: AttachmentSubjectType;
   readonly subjectId: string;
   readonly attachments: readonly AttachmentRow[];
   readonly canEdit: boolean;

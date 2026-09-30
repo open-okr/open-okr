@@ -37595,7 +37595,8 @@
                 "check_in",
                 "cycle",
                 "document",
-                "task"
+                "task",
+                "initiative"
               ]
             }
           },
@@ -37707,7 +37708,8 @@
                 "check_in",
                 "cycle",
                 "document",
-                "task"
+                "task",
+                "initiative"
               ]
             }
           },
@@ -37727,7 +37729,7 @@
     "/comments/create": {
       "post": {
         "operationId": "comments.create",
-        "summary": "Post a comment on a goal, key result, check-in, cycle or document",
+        "summary": "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
         "tags": [
           "comments"
         ],
@@ -37803,7 +37805,8 @@
                       "check_in",
                       "cycle",
                       "document",
-                      "task"
+                      "task",
+                      "initiative"
                     ]
                   },
                   "subjectId": {
@@ -37903,7 +37906,8 @@
                       "check_in",
                       "cycle",
                       "document",
-                      "task"
+                      "task",
+                      "initiative"
                     ]
                   },
                   "subjectId": {
@@ -38283,7 +38287,8 @@
                 "check_in",
                 "cycle",
                 "document",
-                "task"
+                "task",
+                "initiative"
               ]
             }
           },

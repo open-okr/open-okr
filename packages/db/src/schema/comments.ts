@@ -12,9 +12,9 @@ import { workspaceMembers, workspaces } from "./workspaces.ts";
 /**
  * Comments and reactions (TECHNICAL-PLAN.md §4.10, P3-T16).
  *
- * Comments are rich text on goals, key results, check-ins, cycles and
- * documents. Edit history is tracked through activities, not stored
- * revisions. Access is inherited from the parent subject through the
+ * Comments are rich text on goals, key results, check-ins, cycles, documents,
+ * tasks and initiatives. Edit history is tracked through activities, not
+ * stored revisions. Access is inherited from the parent subject through the
  * subject-to-context resolver.
  *
  * Reactions are on every major subject, not only comments. One emoji per
@@ -30,6 +30,9 @@ export const COMMENT_SUBJECT_TYPES = [
   // P6-T04b. §7.2 maps FlowyTeam's task comments onto this table, and a
   // comment on a task resolves through the task's own access context.
   "task",
+  // Completeness review M-01, migration 0103. S-26 is where the work that
+  // moves a key result is discussed, and an initiative owns its own context.
+  "initiative",
 ] as const;
 export type CommentSubjectType = (typeof COMMENT_SUBJECT_TYPES)[number];
 

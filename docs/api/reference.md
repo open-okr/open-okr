@@ -188,7 +188,7 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `comments.create`<br/>Post a comment on a goal, key result, check-in, cycle or document | `POST /api/v1/comments/create` | writes |
+| `comments.create`<br/>Post a comment on a goal, key result, check-in, cycle, document, initiative or task | `POST /api/v1/comments/create` | writes |
 | `comments.delete`<br/>Delete a comment (author or moderator with edit access) | `POST /api/v1/comments/delete` | destroys |
 | `comments.importComment`<br/>Records a comment an import found, keeping its author and its date. | `POST /api/v1/comments/importComment` | writes |
 | `comments.list`<br/>List comments on a subject | `GET /api/v1/comments/list` | reads |

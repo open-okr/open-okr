@@ -198,6 +198,20 @@ Format: purpose, layout, primary actions, states.
 
 **S-29 Documents.** A rich document attached to a goal, key result, initiative, cycle, session or space: draft and publish, version history with a visual difference, comments, reactions, subscriptions and attachments.
 
+**Where the three shared panels are mounted, since completeness review M-01.** One component each, the same on every page:
+
+| Surface | Documents | Files | Discussion and reactions |
+|---|---|---|---|
+| S-14 goal | yes | yes | yes |
+| S-26 initiative | yes | yes | yes |
+| S-28 task | no, REQUIREMENTS §4 hangs none on a task | yes | yes |
+| S-29 document | no | yes | yes, once published: a draft has no discussion |
+| Space home | yes | yes | no |
+| S-22 to S-24 session | yes | yes | no |
+| S-04 cycle workspace, in the right rail | yes | yes | no |
+
+A key result and a check-in have no screen of their own, so what hangs on them is reachable through the API and not yet through a panel.
+
 **S-30 Rich text editor.** Its own design document and component: the schema, draft persistence and recovery, mention and attachment enablement, entity autolink, paste to upload, sanitised rendering, and the excerpt utility used by email, the inbox and the feed.
 
 **S-31 Activity feed.** Typed, human-readable events at workspace, space, goal and profile scope, each rendered by its kind, reactable and commentable, with consecutive edits aggregated, permission-filtered and live. Distinct from the audit log.

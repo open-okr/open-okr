@@ -141,7 +141,9 @@ describe("reactions", () => {
   test("the toggle is finally a toggle", () => {
     // It was named one and only ever added, so pressing an emoji a second time
     // did nothing and a reaction given by mistake stayed for good.
-    const actions = at("../app/goals/[id]/actions.ts");
+    // In the shared thread's writes since completeness review M-01, when the
+    // goal page stopped being the only page with a thread.
+    const actions = at("../lib/comment-actions.ts");
     expect(actions).toContain('"reactions.remove"');
     expect(actions).toContain("if (ownReactionId) {");
   });

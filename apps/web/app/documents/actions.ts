@@ -60,6 +60,8 @@ const pathsFor = (subjectType: string, subjectId: string, id?: string) => [
   ...(subjectType === "goal" ? [`/goals/${subjectId}`] : []),
   ...(subjectType === "space" ? [`/spaces/${subjectId}`] : []),
   ...(subjectType === "initiative" ? [`/initiatives/${subjectId}`] : []),
+  ...(subjectType === "session" ? [`/session/${subjectId}`] : []),
+  ...(subjectType === "cycle" ? ["/cycle"] : []),
   ...(id ? [`/documents/${id}`] : []),
 ];
 

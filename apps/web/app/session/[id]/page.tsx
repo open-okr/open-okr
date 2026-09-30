@@ -20,7 +20,13 @@
  * session record and the live sync; the subsequent tasks fill the panels.
  */
 
-import { callAction, excerptRichText, REVIEW_ASSIST_KEYS } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  excerptRichText,
+  OperationError,
+  REVIEW_ASSIST_KEYS,
+} from "@openokr/core";
 import {
   canonThresholds,
   REVIEW_STAGE_KEYS,
@@ -34,11 +40,17 @@ import {
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { resolveAccessLevelFor } from "../../../lib/access";
 import { assistOffered } from "../../../lib/assists";
+import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
+import {
+  readSubjectDocuments,
+  SubjectDocuments,
+} from "../../documents/subject-documents.tsx";
 import {
   closeSessionAction,
   openSessionAction,
@@ -74,6 +86,17 @@ import { type TeamRetro, TeamRetroPanel } from "./team-retro";
 
 interface SessionPageProps {
   params: Promise<{ id: string }>;
+}
+
+/**
+ * A read the reader is not allowed, as null, so its card is left off rather
+ * than the page. The same shape the space home uses for a guest.
+ */
+function refusedAsNull(error: unknown): null {
+  if (error instanceof OperationError && error.code === "not_found") {
+    return null;
+  }
+  throw error;
 }
 
 export default async function SessionPage({ params }: SessionPageProps) {
@@ -611,6 +634,22 @@ export default async function SessionPage({ params }: SessionPageProps) {
   const isOnLastStage =
     stageKeys.length > 0 && currentStageIndex === stageKeys.length - 1;
 
+  // The session's own documents and files (REQUIREMENTS §4 Pillar C,
+  // completeness review M-01): the notes a room writes and the deck it looks
+  // at. Both are read through the workspace, which is how a session is
+  // reached as far as access goes, so a reader who cannot reach the workspace
+  // itself, a guest, gets the session without the two cards rather than no
+  // session at all.
+  const [sessionDocuments, sessionFiles, level] = await Promise.all([
+    readSubjectDocuments(context, "session", id).catch(refusedAsNull),
+    callAction(context, "attachments.list", {
+      subjectType: "session",
+      subjectId: id,
+    }).catch(refusedAsNull),
+    resolveAccessLevelFor(workspace.workspaceId, workspace.memberId),
+  ]);
+  const canWrite = level >= ACCESS_LEVELS.edit;
+
   return (
     <div className="space-y-6 p-6">
       {/* Live sync: subscribes to SSE and calls router.refresh() on stage changes */}
@@ -982,6 +1021,24 @@ export default async function SessionPage({ params }: SessionPageProps) {
           </CardBody>
         </Card>
       )}
+
+      {/* The session's documents and files (completeness review M-01). */}
+      {sessionDocuments ? (
+        <SubjectDocuments
+          subjectType="session"
+          subjectId={id}
+          documents={sessionDocuments}
+          canEdit={canWrite}
+        />
+      ) : null}
+      {sessionFiles ? (
+        <Attachments
+          subjectType="session"
+          subjectId={id}
+          attachments={sessionFiles}
+          canEdit={canWrite}
+        />
+      ) : null}
     </div>
   );
 }

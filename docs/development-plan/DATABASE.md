@@ -497,12 +497,14 @@ Byte accounting sums `filesize` over `ok`, `scanning` and `quarantined` rows (al
 ## 13. Collaboration (domain J)
 
 ### comments
-`subject_type` (`goal` / `key_result` / `check_in` / `cycle` / `document` / `task`), `subject_id`, `author_member_id` to workspace_members, `body` (rich), `body_version`, `edited_at?`, `parent_id?` to comments, `legacy_id?`, `legacy_type?`. Unique on `(workspace_id, legacy_type, legacy_id)` while live.
+`subject_type` (`goal` / `key_result` / `check_in` / `cycle` / `document` / `task` / `initiative`), `subject_id`, `author_member_id` to workspace_members, `body` (rich), `body_version`, `edited_at?`, `parent_id?` to comments, `legacy_id?`, `legacy_type?`. Unique on `(workspace_id, legacy_type, legacy_id)` while live.
 
-`task` and `parent_id` arrived at migration 0073 for the FlowyTeam importer (P6-T04b). Every one of the 7223 comments on the instance it reads is on a task, which the subject list this table was created with did not allow, and 8 of them answer another comment. `parent_id` is `on delete set null` rather than cascade: a deleted parent must not take the answers with it, because the answer is somebody else's words. Nothing renders a thread yet; `comments.list` returns the column so the relationship is addressable rather than only stored.
+`task` and `parent_id` arrived at migration 0073 for the FlowyTeam importer (P6-T04b). Every one of the 7223 comments on the instance it reads is on a task, which the subject list this table was created with did not allow, and 8 of them answer another comment. `parent_id` is `on delete set null` rather than cascade: a deleted parent must not take the answers with it, because the answer is somebody else's words. No screen renders the reply relationship yet; `comments.list` returns the column so it is addressable rather than only stored.
+
+`initiative` arrived at migration 0103 (completeness review M-01), when the initiative page gained the thread the goal, task and document pages carry. A comment and a reaction are readable and writable by whoever reads what they hang on, through `getParentAccessScoped`, which walks a key result and a check-in to their goal and a cycle and a session to the workspace. A draft document has no discussion.
 
 ### reactions
-`subject_type`, `subject_id`, `member_id` to workspace_members, `emoji`.
+`subject_type`, `subject_id`, `member_id` to workspace_members, `emoji`. Any subject the walk above reaches: a comment, a document, a goal, an initiative, a task, a key result.
 
 ### subscription_lists *(built at P2-T06, ahead of comments/reactions above, which are still Phase 3)*
 `subject_type`, `subject_id`, `send_to_everyone bool`. One per notifiable artifact; built before anything creates one, the same way access contexts existed before spaces did.
