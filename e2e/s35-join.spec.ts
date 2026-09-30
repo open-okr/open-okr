@@ -314,6 +314,33 @@ test("the guest is told what they are joining, and lands with one space", async 
   await visitorContext.close();
 });
 
+test("a signed-out visitor asks for a reset link and is told the same whatever the address", async () => {
+  // Completeness review M-30: route coverage said this half was covered here,
+  // and nothing here opened the page. The answer is the same for an address
+  // with an account and one without, so the screen never says which emails
+  // exist; the email itself needs a mailbox this suite does not have.
+  const visitorContext = await context.browser()?.newContext();
+  if (!visitorContext) {
+    throw new Error("No browser to open a signed-out context in.");
+  }
+  const visitor = await visitorContext.newPage();
+  for (const address of [
+    INSTANCE_ACCOUNT.email,
+    "nobody-here@example.com",
+  ]) {
+    await visitor.goto("/forgot-password");
+    await expect(
+      visitor.getByRole("heading", { name: "Reset your password" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await visitor.getByLabel("Email").fill(address);
+    await visitor.getByRole("button", { name: "Send reset link" }).click();
+    await expect(
+      visitor.getByText("If that address has an account, a reset link is on its way."),
+    ).toBeVisible({ timeout: 15_000 });
+  }
+  await visitorContext.close();
+});
+
 test("the instance is left as the other specs expect it", async () => {
   // Registration back to `auto`, which is what every other spec in this suite
   // runs against. A spec that closed the instance and walked away would break
