@@ -71,3 +71,8 @@ it.
 Schema migrations run on start. Data changes run separately through
 `pnpm db:change`, on your schedule, and `status` reports what is pending. An
 upgrade is never held open by a long backfill.
+
+Run it with `OPENOKR_ENCRYPTION_KEY` in the environment. The data change that
+seals identity-provider tokens stored before they were encrypted needs the
+root key, and refuses to finish without it rather than report them sealed.
+[Security](../admin/security.md#what-is-encrypted-at-rest) says more.

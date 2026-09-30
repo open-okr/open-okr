@@ -47,6 +47,34 @@ document, or the two addresses if it prefers them typed in.
 **A new provider takes effect on the next restart**, and so does its metadata
 document. The client is built once when the process starts.
 
+## What is encrypted at rest
+
+A credential the instance has to use again is sealed under its root key
+(`OPENOKR_ENCRYPTION_KEY`), each with a data key of its own, and
+`./openokr rotate-key` re-wraps every one. A credential it only has to check
+is hashed, so the original is never stored.
+
+| Stored | How |
+|---|---|
+| AI provider keys, chat channel credentials, SSO client secrets, the mail password | Sealed under the root key |
+| The access, refresh and ID tokens an OIDC provider issues when somebody signs in | Sealed under the root key. Opened only on the server, when a sign-in or a token refresh needs them |
+| Session tokens, API tokens, agent access tokens, directory sync tokens, invitation links | Hashed |
+| Passwords | Hashed by the sign-in library |
+| Authenticator app secrets and backup codes | Encrypted by the sign-in library under `BETTER_AUTH_SECRET` |
+
+**Identity-provider tokens stored before this release are in plain text until
+the data change seals them.** Run it once after upgrading, with the root key in
+the environment:
+
+```sh
+OPENOKR_ENCRYPTION_KEY=... pnpm db:change
+```
+
+It seals every token still in plain text and leaves the rest alone, so running
+it again changes nothing. On an instance nobody has signed into through OIDC
+it has nothing to do and needs no key. Until it runs, those tokens still work,
+and the next sign-in through the provider replaces them with sealed ones.
+
 **Enforcing refuses the local factors for the domains you list**: a password, a
 password reset and a passkey are all refused, and the person is told which
 provider to use. That is the point of enforcing. Removing somebody at the

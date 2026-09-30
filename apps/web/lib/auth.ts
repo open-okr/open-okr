@@ -3,6 +3,7 @@ import { createAuth, resolveRequireEmailVerification } from "@openokr/core";
 import { nextCookies } from "better-auth/next-js";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
+import { getKeyRing } from "./secrets";
 import { getSSOProviders } from "./sso";
 
 export { getPool };
@@ -71,6 +72,10 @@ export function getAuth(): ReturnType<typeof createAuth> {
       pool: getPool(),
       secret: env.BETTER_AUTH_SECRET,
       baseUrl: env.BETTER_AUTH_URL,
+      // Seals the identity-provider tokens stored on accounts, under the key
+      // `keys:rotate` re-wraps (L-11). Passed as the function, so it is read
+      // at the first provider sign-in rather than when this is built.
+      keyRing: getKeyRing,
       // Read at boot, so a rename reaches these two after a restart (M-33).
       ...(globals.openokrAuthInstanceName
         ? { instanceName: globals.openokrAuthInstanceName }

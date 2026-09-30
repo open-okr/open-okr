@@ -31,12 +31,17 @@ import {
 import { previewInvite } from "../invitations/preview.ts";
 import { domainIsTrusted } from "../invitations/trusted-domain.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
+import type { KeyRing } from "../secrets/key-ring.ts";
 import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
 import {
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
 } from "../workspaces/registration.ts";
+import {
+  processOnlyKeyRing,
+  withSealedAccountTokens,
+} from "./account-token-sealing.ts";
 import { CALLER_ADDRESS_HEADERS } from "./caller-address.ts";
 import { currentProvisioningAuthority } from "./provisioning-authority.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
@@ -104,6 +109,18 @@ export interface AuthOptions {
   readonly pool: Pool;
   /** Signs cookies and encrypts the two-factor secrets at rest. */
   readonly secret: string;
+  /**
+   * The instance's key ring, which seals identity-provider tokens at rest
+   * (completeness review L-11).
+   *
+   * A function, read the first time a token is sealed or opened, so building
+   * the instance needs no key and a password sign-in never reads one. The web
+   * process passes its own ring, which `pnpm keys:rotate` covers. Absent, a
+   * ring made for this process alone is used: a token is still never stored
+   * as issued, and one sealed under it reads as absent after a restart,
+   * which the next sign-in through that provider replaces.
+   */
+  readonly keyRing?: () => KeyRing;
   /** The instance's public origin. Passkeys are bound to it. */
   readonly baseUrl: string;
   /**
@@ -284,16 +301,21 @@ export function createAuth(options: AuthOptions) {
     });
 
   // `drizzleAdapter` returns a factory that Better Auth calls with its
-  // resolved options, so the hashing wrapper goes around the adapter the
-  // factory builds, not around the factory itself.
+  // resolved options, so the wrappers go around the adapter the factory
+  // builds, not around the factory itself. Each touches one model: session
+  // tokens are hashed, and identity-provider tokens on accounts are sealed.
   const adapterFactory = drizzleAdapter(database, {
     provider: "pg",
     schema: authSchema,
   });
+  const keyRing = options.keyRing ?? processOnlyKeyRing();
 
   return betterAuth({
     database: (betterAuthOptions: Parameters<typeof adapterFactory>[0]) =>
-      withHashedSessionTokens(adapterFactory(betterAuthOptions)),
+      withSealedAccountTokens(
+        withHashedSessionTokens(adapterFactory(betterAuthOptions)),
+        keyRing,
+      ),
 
     secret: options.secret,
     baseURL: options.baseUrl,
