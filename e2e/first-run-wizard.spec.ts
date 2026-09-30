@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures.ts";
-import { skipOnboarding } from "./instance-account.ts";
+import { goTo, skipOnboarding } from "./instance-account.ts";
 
 /**
  * The first-run wizard, in a browser (P1-T09).
@@ -224,7 +224,10 @@ test("an administrator renames the instance, and can hand the name back", async 
   await signInAsAdmin(page);
   await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
 
-  await page.goto("/admin/general");
+  // Through `goTo`, which retries a navigation the application superseded:
+  // signing in ends in a client-side push to `/` that can still be in flight
+  // here, and a bare `goto` then fails with ERR_ABORTED (it did on CI).
+  await goTo(page, "/admin/general");
   const field = page.getByLabel("Instance name");
   await expect(field).toHaveValue("OKR Goal");
   // Said on the card, because a restart is the one thing a rename needs.
