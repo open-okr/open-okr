@@ -20,6 +20,8 @@
  * **Every refusal is a typed code.** A client branches on `error.code`, and a
  * fault it does not recognise says nothing about the schema behind it.
  */
+
+import { loadEnv } from "@openokr/config";
 import {
   type ActionName,
   API_RATE_LIMIT,
@@ -44,6 +46,7 @@ import type { NextRequest } from "next/server";
 import { getCache } from "../../../../lib/cache";
 import { getInstanceName } from "../../../../lib/instance-name";
 import { getPool } from "../../../../lib/pool";
+import { getKeyRing } from "../../../../lib/secrets";
 
 export const dynamic = "force-dynamic";
 
@@ -210,6 +213,13 @@ async function handle(
         // Named on the audit row of every write, in one place, so a call that
         // came in over the API is answerable a quarter later.
         channel: "api",
+        // What the screens already hand every action, so a write that seals
+        // a credential works over the API and the command line too. Without
+        // the ring `sso.updateConnection` and `ai.setWorkspaceCredential`
+        // refused a new secret from here, and without the address a SAML
+        // edit waited for the next reload to reach the plugin's table.
+        ring: getKeyRing(),
+        baseUrl: loadEnv().BETTER_AUTH_URL,
       },
       route.action as ActionName,
       // The action parses this with its own schema. Nothing here pre-validates

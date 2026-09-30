@@ -745,7 +745,7 @@
   "admin.sso.connectAnIdentityProvider": "Connect an identity provider so members sign in with their organisation's credentials. OpenOKR speaks OIDC and SAML 2.0 directly; neither needs a bridge.",
   "admin.sso.connectionControls.enforcedDomainsGoBack": "It is enforced for {domains}, so people on those domains will sign in with a password again.",
   "admin.sso.connectionControls.removeConnection": "Remove connection",
-  "admin.sso.connectionControls.removeQuestion": "Remove {name}? Nobody can sign in through it after this, and it cannot be brought back from this screen.",
+  "admin.sso.connectionControls.removeQuestion": "Remove {name}? This cannot be undone. Nobody can sign in through it afterwards, and it cannot be brought back from this screen.",
   "admin.sso.connectionControls.removed": "{name} was removed. It leaves the sign-in page within a few seconds.",
   "admin.sso.connectionControls.turnOff": "Turn off",
   "admin.sso.connectionControls.turnOffConnection": "Turn off connection",

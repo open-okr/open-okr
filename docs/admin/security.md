@@ -58,7 +58,7 @@ Every connection on the screen has three controls.
 |---|---|
 | Edit | Opens the same form, filled in. Change the display name, the email domains, enforcement and the protocol's own fields. The client secret field is blank: leave it blank to keep the stored secret, or type a new one to replace it. The provider ID and the protocol cannot be changed, because the provider ID is part of the callback address your identity provider already holds. To use a different one, add a new connection |
 | Turn off, Turn on | Off means nobody signs in through it and it leaves the sign-in page. Nothing else about it changes, so turning it on again restores it as it was |
-| Remove | Asks first, then removes it. It cannot be brought back from the screen, and its provider ID is free to be used by a new connection |
+| Remove | Asks first, and says the removal cannot be undone, then removes it. It cannot be brought back from the screen, and its provider ID is free to be used by a new connection |
 
 A change, turning a connection off and removing one all work from the next
 sign-in, within a few seconds, with no restart, like adding one.
@@ -67,6 +67,16 @@ sign-in, within a few seconds, with no restart, like adding one.
 passwords.** Enforcement is read only from connections that are on, so the
 moment one is off or removed, people on its domains sign in with a password
 again. The screen asks before doing either and names the domains.
+
+**A connection can be turned off in a frozen or read-only workspace.** A
+compromised identity provider has to be shut out whatever state the
+workspace is in, so turning a connection off, and on again, is allowed
+during a freeze like member and settings management. Editing or removing one
+waits until the workspace is active.
+
+**The same writes work over the API and the command line.** A new client
+secret sent that way is sealed under the root key exactly as the screen
+seals it.
 
 Each change is recorded in the audit log with the administrator who made it,
 and a new client secret is sealed under the root key like the first one. The

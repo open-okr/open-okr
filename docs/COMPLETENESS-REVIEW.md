@@ -694,7 +694,7 @@ Do this only when everything above is done. It closes H-23. Tagging is a human d
 
 **Steps**, by [the release runbook](runbooks/release.md)
 
-1. **Set the version.** On `main`, run `pnpm changeset version`. It uses up the pending changesets, writes the version into every package and writes `CHANGELOG.md`. Every package is at `0.0.0` and minor bumps are pending, so expect `0.1.0`. Read the changelog it writes, commit it with a sign-off, and merge it to `main`.
+1. **Set the version.** On `main`, run `GITHUB_TOKEN=$(gh auth token) pnpm changeset version`. It uses up the pending changesets, writes the version into every package and writes `apps/web/CHANGELOG.md`, which the Release workflow reads its notes from. Every package is at `0.0.0` and minor bumps are pending, so expect `0.1.0`. Read the changelog it writes, commit it with a sign-off, and merge it to `main`.
 2. **Tag it.** `git tag v0.1.0` then `git push origin v0.1.0`. Nothing publishes without a tag.
 3. **Watch the Release workflow to the end.** Every job must be green: verify, build and sign, the signature check, the GitHub release and the chart. `gh run watch` follows it.
 4. **Make the image public.** Go to [the organisation's packages](https://github.com/orgs/open-okr/packages), open `open-okr`, then Package settings, Danger Zone, Change visibility, Public. This cannot be undone. Public packages are already allowed in the organisation's settings (checked on 29 September 2026).

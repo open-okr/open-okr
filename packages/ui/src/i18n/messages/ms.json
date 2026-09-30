@@ -745,7 +745,7 @@
   "admin.sso.connectAnIdentityProvider": "Sambungkan penyedia identiti supaya ahli log masuk dengan kelayakan organisasi mereka. OpenOKR menyokong OIDC dan SAML 2.0 secara terus; kedua-duanya tidak memerlukan perantara.",
   "admin.sso.connectionControls.enforcedDomainsGoBack": "Ia dikuatkuasakan untuk {domains}, jadi orang pada domain tersebut akan log masuk dengan kata laluan semula.",
   "admin.sso.connectionControls.removeConnection": "Buang sambungan",
-  "admin.sso.connectionControls.removeQuestion": "Buang {name}? Tiada sesiapa boleh log masuk melaluinya selepas ini, dan ia tidak boleh dikembalikan dari skrin ini.",
+  "admin.sso.connectionControls.removeQuestion": "Buang {name}? Tindakan ini tidak boleh dibatalkan. Tiada sesiapa boleh log masuk melaluinya selepas ini, dan ia tidak boleh dikembalikan dari skrin ini.",
   "admin.sso.connectionControls.removed": "{name} telah dibuang. Ia hilang dari halaman log masuk dalam beberapa saat.",
   "admin.sso.connectionControls.turnOff": "Matikan",
   "admin.sso.connectionControls.turnOffConnection": "Matikan sambungan",

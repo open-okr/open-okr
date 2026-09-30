@@ -215,16 +215,21 @@ jobs:
           DIGEST: ${{ needs.publish.outputs.digest }}
         run: |
           set -euo pipefail
-          # CHANGELOG.md is written by `changeset version` on the branch that
+          # The changelog is written by `changeset version` on the branch that
           # bumped the version, so by tag time the section for this release
           # already exists. Taking it from the file rather than regenerating
           # it means the notes and the changelog cannot disagree.
-          if [ -f CHANGELOG.md ]; then
+          #
+          # apps/web's, because Changesets never versions a monorepo's root
+          # package: every changeset names @openokr/web, the application, and
+          # the fixed group moves every package to the same number with it.
+          CHANGELOG=apps/web/CHANGELOG.md
+          if [ -f "$CHANGELOG" ]; then
             awk -v tag="${TAG#v}" '
               $0 ~ "^## " tag "$" { grab = 1; next }
               grab && /^## / { exit }
               grab { print }
-            ' CHANGELOG.md > notes.md
+            ' "$CHANGELOG" > notes.md
           else
             : > notes.md
           fi

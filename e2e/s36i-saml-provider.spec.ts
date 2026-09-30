@@ -316,6 +316,9 @@ test("removing a connection asks first, names the domains, and takes it away", a
   const question = row.getByRole("group", {
     name: `Remove ${GLOBEX.renamed}?`,
   });
+  // Said outright, because the screen offers no way back (Akmal's decision,
+  // 30 September 2026: confirm, and say it cannot be undone).
+  await expect(question).toContainText("This cannot be undone.");
   await expect(question).toContainText(
     `It is enforced for ${GLOBEX.domain}, so people on those domains will sign in with a password again.`,
   );
