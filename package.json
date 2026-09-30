@@ -19,7 +19,7 @@
     "db:down": "docker compose -f packages/test-support/docker/compose.yaml down",
     "db:ports": "node --experimental-strip-types --no-warnings packages/test-support/bin/db-ports.ts",
     "db:migrate": "pnpm --filter @openokr/db migrate",
-    "db:change": "pnpm --filter @openokr/db change",
+    "db:change": "pnpm --filter @openokr/db run change",
     "import:csv": "pnpm --filter @openokr/importer import:csv",
     "import:flowyteam": "pnpm --filter @openokr/importer import:flowyteam",
     "db:seed": "pnpm --filter @openokr/core seed",
