@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { listSSOProviders, loadSSOConnections } from "../src/auth/sso.ts";
+import {
+  listSSOProviders,
+  listWorkspaceSSOProviders,
+  loadSSOConnections,
+} from "../src/auth/sso.ts";
 import { createSCIMToken, resolveToken } from "../src/directory-sync/tokens.ts";
 import { encryptSecret, parseKeyRing } from "../src/secrets/key-ring.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
@@ -106,6 +110,25 @@ describe("the SSO provider list", () => {
 
     expect(JSON.stringify(provider)).not.toContain("a-client-secret");
     expect(JSON.stringify(provider)).not.toContain("client-id");
+  });
+});
+
+describe("a workspace's administration screen", () => {
+  /**
+   * Completeness review L-21: the screen read the instance-wide list the
+   * sign-in page uses, so every workspace's administrator was shown every
+   * other workspace's connections.
+   */
+  it("lists its own connections and none of another workspace's", async () => {
+    const wb = await workerDb();
+
+    const own = await listWorkspaceSSOProviders(wb.appPool, workspaceId);
+    expect(own.map((provider) => provider.displayName)).toEqual([
+      "Sign in with Okta",
+    ]);
+
+    const other = await listWorkspaceSSOProviders(wb.appPool, otherWorkspaceId);
+    expect(other).toEqual([]);
   });
 });
 

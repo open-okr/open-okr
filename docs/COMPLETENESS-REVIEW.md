@@ -544,6 +544,7 @@ The questions these fixes raised for a person are listed in the pull request.
 | L-18 | The Caddyfile is unformatted and sets two headers Caddy already forwards | Run |
 | L-19 | The admin audit log can be verified and exported but not browsed | Audit |
 | L-20 | A Helm `values.yaml` comment says local disk is the only storage driver. S3 exists | Audit |
+| L-21 | `/admin/sso` lists every workspace's SSO connections, with their names, email domains and enforcement, because it read the instance-wide list the sign-in page uses. Found while fixing L-15. On the managed cloud this shows one customer which identity provider another uses, so it is arguably Medium; it ships with the Low fixes because the Medium pull request had already passed | Audit |
 
 ---
 

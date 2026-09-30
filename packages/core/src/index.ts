@@ -476,6 +476,7 @@ export {
   createSSOConnection,
   derivedProviderId,
   listSSOProviders,
+  listWorkspaceSSOProviders,
   loadSSOConnections,
   normaliseCertificate,
   type PublicSSOProvider,

@@ -1,8 +1,12 @@
 import { loadEnv } from "@openokr/config";
-import { listSSOProviders, samlServiceProviderUrls } from "@openokr/core";
+import {
+  listWorkspaceSSOProviders,
+  samlServiceProviderUrls,
+} from "@openokr/core";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
+import { requireWorkspace } from "../../../lib/workspace";
 import { SSOForm } from "./sso-form";
 
 /**
@@ -22,7 +26,12 @@ import { SSOForm } from "./sso-form";
 export default async function SSOPage() {
   const { t } = await getTranslations();
   const pool = getPool();
-  const connections = await listSSOProviders(pool);
+  const { workspace } = await requireWorkspace();
+  // This workspace's own, never the instance's (completeness review L-21).
+  const connections = await listWorkspaceSSOProviders(
+    pool,
+    workspace.workspaceId,
+  );
   const baseUrl = loadEnv().BETTER_AUTH_URL;
 
   return (

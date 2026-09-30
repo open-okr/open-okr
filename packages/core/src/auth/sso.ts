@@ -221,6 +221,55 @@ export async function loadSSOConnections(
   });
 }
 
+interface ProviderInfoRow extends Record<string, unknown> {
+  kind: string;
+  provider_id: string;
+  display_name: string;
+  workspace_id: string;
+  email_domains: string;
+  enforce: boolean;
+}
+
+const providerInfo = (workspaceId?: string) => sql`
+  select kind, provider_id, display_name, workspace_id, email_domains, enforce
+    from sso_connections
+   where enabled = true
+     and deleted_at is null
+     ${workspaceId === undefined ? sql`` : sql`and workspace_id = ${workspaceId}`}
+   order by display_name`;
+
+const toProviderInfo = (row: ProviderInfoRow): SSOProviderInfo => ({
+  kind: row.kind === "saml" ? "saml" : "oidc",
+  id: derivedProviderId(row.provider_id, row.workspace_id),
+  displayName: row.display_name,
+  workspaceId: row.workspace_id,
+  emailDomains: row.email_domains,
+  enforce: row.enforce,
+});
+
+/**
+ * One workspace's own connections, for its administration screen.
+ *
+ * **Under the tenant floor, not `app.sso_lookup`.** The admin screen used
+ * `listSSOProviders`, which reads past the floor because the sign-in page has
+ * no workspace to read under. So every workspace's administrator was shown
+ * every other workspace's connections: their names, the email domains they
+ * cover and whether they are enforced. On the managed cloud that is a list
+ * of which customers use which identity provider. Found while fixing
+ * completeness review L-15 and recorded as L-21.
+ */
+export async function listWorkspaceSSOProviders(
+  pool: Pool,
+  workspaceId: string,
+): Promise<readonly SSOProviderInfo[]> {
+  // The floor and the predicate both, so neither is the only thing standing
+  // between one customer and another's configuration.
+  const { rows } = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+    tx.execute<ProviderInfoRow>(providerInfo(workspaceId)),
+  );
+  return rows.map(toProviderInfo);
+}
+
 /**
  * Returns the public SSO provider info (no secrets) for the sign-in page.
  *
@@ -236,29 +285,9 @@ export async function listSSOProviders(
 ): Promise<readonly SSOProviderInfo[]> {
   try {
     const { rows } = await withSSOLookup(drizzle(pool), (tx) =>
-      tx.execute<{
-        kind: string;
-        provider_id: string;
-        display_name: string;
-        workspace_id: string;
-        email_domains: string;
-        enforce: boolean;
-      }>(sql`
-        select kind, provider_id, display_name, workspace_id, email_domains,
-               enforce
-          from sso_connections
-         where enabled = true
-           and deleted_at is null
-         order by display_name`),
+      tx.execute<ProviderInfoRow>(providerInfo()),
     );
-    return rows.map((row) => ({
-      kind: row.kind === "saml" ? ("saml" as const) : ("oidc" as const),
-      id: derivedProviderId(row.provider_id, row.workspace_id),
-      displayName: row.display_name,
-      workspaceId: row.workspace_id,
-      emailDomains: row.email_domains,
-      enforce: row.enforce,
-    }));
+    return rows.map(toProviderInfo);
   } catch (error) {
     // Graceful degradation: if the table does not exist yet (migration
     // 0091 not applied), return no providers. The sign-in page renders
