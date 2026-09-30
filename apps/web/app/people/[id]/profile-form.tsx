@@ -124,6 +124,7 @@ export function ProfileForm({
               <input
                 name="quietStart"
                 type="time"
+                aria-label={t("people.detail.profileForm.quietStart")}
                 className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
               />
               <span className="self-center text-xs text-ink-3">
@@ -132,6 +133,7 @@ export function ProfileForm({
               <input
                 name="quietEnd"
                 type="time"
+                aria-label={t("people.detail.profileForm.quietEnd")}
                 className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
               />
             </div>

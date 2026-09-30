@@ -2,9 +2,11 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
+import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
+import pg from "pg";
 import { expect, test } from "./fixtures.ts";
-import { goTo, signIn } from "./instance-account.ts";
+import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
 
 /**
  * Every screen a signed-in member can open, checked against WCAG (P7-T05).
@@ -39,20 +41,6 @@ const APP = fileURLToPath(new URL("../apps/web/app", import.meta.url));
  * write one.
  */
 const NOT_CHECKED_HERE: Readonly<Record<string, string>> = {
-  "/documents/[id]":
-    "needs a document id, and the accessible surface is the editor which s29-documents drives directly",
-  "/goals/[id]":
-    "needs a goal id; the goal page is opened through a link in the goal specs and checked there",
-  "/initiatives/[id]": "needs an initiative id, same reason as the goal page",
-  "/kpis/[id]": "needs a KPI id, same reason as the goal page",
-  "/session/[id]": "needs a live session, which sessions.spec.ts drives",
-  "/session/[id]/minutes":
-    "exists only once a session has closed, which sessions.spec.ts reaches",
-  "/spaces/[id]": "needs a space id, reached by link from the spaces index",
-  "/people/[id]": "needs a member id, reached by link from the directory",
-  "/tasks/[id]": "needs a task id, reached by opening a card from the board",
-  "/method/[id]":
-    "needs a rule key, reached by following a rule citation from a coaching message",
   "/join/[token]":
     "needs an unused invite token, and s35-join opens the screen with a real one",
   "/reset-password":
@@ -64,9 +52,6 @@ const NOT_CHECKED_HERE: Readonly<Record<string, string>> = {
   "/dev/rich-text": "development only, the same as /dev/components",
   "/sign-up":
     "shut behind the first account, and the instance this suite runs against is already claimed",
-  "/forgot-password":
-    "unauthenticated, and its own half is covered in s35-join",
-  "/sign-in": "unauthenticated, and every spec here signs in through it",
   "/setup":
     "the first-run wizard, which redirects on a claimed instance and has no app shell; first-run-wizard.spec.ts drives it on the unclaimed second instance",
   "/setup/account": "the second wizard step, same instance and same reason",
@@ -89,6 +74,76 @@ const NOT_CHECKED_HERE: Readonly<Record<string, string>> = {
     "an operator route, and not-found to everybody on a self-hosted instance",
 };
 
+/**
+ * The detail screens, each opened on a real row (completeness review M-20).
+ *
+ * Twenty-six routes used to be skipped here as "needs an id", which was true
+ * and was not a reason: the goal, key result, space, session, task, person and
+ * initiative pages are where members spend their time. Each is now opened on
+ * the first row of its kind in the instance account's workspace. The suite
+ * runs in file order and earlier specs make every one of these, so a missing
+ * row is a failure that names which, never a quiet skip.
+ *
+ * `$1` is the workspace. Read as the superuser, for the reason every spec here
+ * records: the forced tenant policy would otherwise answer with nothing.
+ */
+const SESSION_IN_MY_SPACE = `select s.id::text as id
+    from okr_sessions s
+   where s.workspace_id = $1
+     and s.deleted_at is null
+     and (s.space_id is null
+          or exists (select 1
+                       from space_members sm
+                       join workspace_members m on m.id = sm.member_id
+                       join users u on u.id = m.user_id
+                      where sm.space_id = s.space_id
+                        and sm.deleted_at is null
+                        and u.email = $2))`;
+
+const DETAIL: Readonly<Record<string, string>> = {
+  "/goals/[id]":
+    "select id::text from goals where workspace_id = $1 and deleted_at is null order by created_at limit 1",
+  "/initiatives/[id]":
+    "select id::text from initiatives where workspace_id = $1 and deleted_at is null order by created_at limit 1",
+  "/kpis/[id]":
+    "select id::text from kpis where workspace_id = $1 and deleted_at is null order by created_at limit 1",
+  "/spaces/[id]":
+    "select id::text from spaces where workspace_id = $1 and deleted_at is null order by created_at limit 1",
+  "/tasks/[id]":
+    "select id::text from tasks where workspace_id = $1 and deleted_at is null order by created_at limit 1",
+  "/people/[id]":
+    "select id::text from workspace_members where workspace_id = $1 and deleted_at is null and kind = 'human' and status = 'active' order by created_at limit 1",
+  // A session is its space's, and opens only for somebody in it (M-21), so
+  // one in a space the account belongs to. `$2` is the account's email.
+  "/session/[id]": `${SESSION_IN_MY_SPACE} order by s.created_at limit 1`,
+  // The minutes are a quarterly review's record, a closed one first.
+  "/session/[id]/minutes": `${SESSION_IN_MY_SPACE} and s.kind = 'quarterly' order by (s.state = 'closed') desc, s.created_at limit 1`,
+  // A published document, which every reader may open; a draft is its
+  // author's alone.
+  "/documents/[id]":
+    "select id::text from documents where workspace_id = $1 and deleted_at is null and state = 'published' order by created_at limit 1",
+  // A rule is METHOD.md's, not a row: the first objective check.
+  "/method/[id]": "select 'OBJ-1' as id",
+};
+
+/**
+ * The two screens a visitor meets before signing in, scanned signed out.
+ *
+ * Every spec signs in through `/sign-in`, which made it the most visited page
+ * in the suite and one this file never scanned.
+ */
+const SIGNED_OUT: readonly string[] = ["/sign-in", "/forgot-password"];
+
+/** Screens drawn without the application shell, for a room rather than a desk. */
+const FOCUS_SCREENS: readonly string[] = ["/session/"];
+
+const CONNECTION = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : connectionOptions(
+      process.env.E2E_DATABASE ?? "openokr_e2e",
+      testDbEnv.superuser,
+    );
+
 /** The impacts that fail the build. Advisory levels are reported, not fatal. */
 const FATAL_IMPACTS = new Set(["serious", "critical"]);
 
@@ -107,9 +162,9 @@ const FATAL_IMPACTS = new Set(["serious", "critical"]);
  * an entry that stops occurring fails too, so the list can only shrink. It
  * is a debt register with a test attached, not an exemption.
  *
- * Regenerate after fixing some: `A11Y_WRITE_BASELINE=1 pnpm test:e2e --
- * registration-to-dashboard.spec.ts s43-accessibility.spec.ts`, then read the
- * diff before committing it. A baseline that grows in a commit is a
+ * Regenerate after fixing some: `A11Y_WRITE_BASELINE=1 pnpm test:e2e`, then
+ * read the diff before committing it. The whole suite rather than this file
+ * alone, since M-20: the detail screens open on rows the earlier specs make. A baseline that grows in a commit is a
  * regression somebody has to justify in review.
  */
 const BASELINE_PATH = fileURLToPath(
@@ -160,7 +215,8 @@ function everyRoute(dir: string): string[] {
 
 const ALL_ROUTES = everyRoute(APP).sort();
 const CHECKED = ALL_ROUTES.filter(
-  (route) => NOT_CHECKED_HERE[route] === undefined,
+  (route) =>
+    NOT_CHECKED_HERE[route] === undefined && !SIGNED_OUT.includes(route),
 );
 
 // **Not serial, deliberately.** A serial file stops at the first failing
@@ -169,16 +225,54 @@ const CHECKED = ALL_ROUTES.filter(
 // runs single-worker anyway, so these still execute in order on one page.
 let context: BrowserContext;
 let page: Page;
+let pool: pg.Pool;
+let workspaceId: string;
 
 test.beforeAll(async ({ browser }) => {
+  pool = new pg.Pool(CONNECTION);
+  const member = await pool.query<{ workspace_id: string }>(
+    `select m.workspace_id
+       from workspace_members m
+       join users u on u.id = m.user_id
+      where u.email = $1 and m.deleted_at is null
+      -- The workspace the account made, which is the one its browser opens:
+      -- by the time this runs, other specs have made it a member of more.
+      order by m.created_at
+      limit 1`,
+    [INSTANCE_ACCOUNT.email],
+  );
+  workspaceId = member.rows[0]?.workspace_id ?? "";
   context = await browser.newContext();
   page = await context.newPage();
   await signIn(page);
 });
 
 test.afterAll(async () => {
+  await pool?.end();
   await context?.close();
 });
+
+/** The url to open for a route: itself, or its detail page on a real row. */
+async function urlFor(route: string): Promise<string> {
+  const query = DETAIL[route];
+  if (query === undefined) {
+    return route;
+  }
+  const rows = await pool.query<{ id: string }>(
+    query,
+    query.includes("$2")
+      ? [workspaceId, INSTANCE_ACCOUNT.email]
+      : query.includes("$1")
+        ? [workspaceId]
+        : [],
+  );
+  const id = rows.rows[0]?.id;
+  expect(
+    id,
+    `${route}: no row of its kind in the workspace, so an earlier spec that makes one did not run`,
+  ).toBeTruthy();
+  return route.replace(/\[[^\]]+\]/, id ?? "");
+}
 
 test("the screen list is derived from the route tree and is not empty", () => {
   // The assertion that stops this whole file passing on a glob that matched
@@ -192,16 +286,96 @@ test("the screen list is derived from the route tree and is not empty", () => {
     (route) => !ALL_ROUTES.includes(route),
   );
   expect(stale).toEqual([]);
+
+  // Every detail route either has its row or an excuse (M-20): a new
+  // `[id]` screen joins the scan the day it lands, or says why not.
+  const dynamic = CHECKED.filter((route) => route.includes("["));
+  expect(dynamic.filter((route) => DETAIL[route] === undefined)).toEqual([]);
+  expect(
+    [...Object.keys(DETAIL), ...SIGNED_OUT].filter(
+      (route) => !ALL_ROUTES.includes(route),
+    ),
+  ).toEqual([]);
 });
+
+/**
+ * The words no screen may show, and axe's serious findings against the
+ * baseline, for whatever is on the page now.
+ */
+async function assertAccessible(route: string, on: Page): Promise<void> {
+  // **No screen tells a user that part of it arrives at a task**
+  // (completeness review H-24). The first-run wizard said channels and AI
+  // were "not in this build" long after both shipped, and the cycle phases
+  // said "arrives at P4-T03". A plan task's id is a note between the people
+  // building this, and a screen that shows one is showing the build rather
+  // than the product. Checked on every screen this walks.
+  const text = await on.locator("body").innerText();
+  expect(
+    text.match(/\bP[1-8]-[TG]\d+[a-z]?\b/g) ?? [],
+    `${route} shows a plan task id`,
+  ).toEqual([]);
+  expect(text, `${route} says something is not in this build`).not.toMatch(
+    /not in this build/i,
+  );
+
+  const results = await new AxeBuilder({ page: on })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+
+  const fatal = results.violations.filter((violation) =>
+    FATAL_IMPACTS.has(violation.impact ?? ""),
+  );
+  // The message names the rule and the first element, because "3 violations"
+  // sends the next person back to the browser to find out what.
+  const ruleIds = [...new Set(fatal.map((violation) => violation.id))].sort();
+  if (ruleIds.length > 0) {
+    OBSERVED[route] = ruleIds;
+  }
+  if (WRITING_BASELINE) {
+    return;
+  }
+
+  const allowed = new Set(BASELINE[route] ?? []);
+  const introduced = fatal.filter((violation) => !allowed.has(violation.id));
+  const described = introduced.map((violation) => {
+    const node = violation.nodes[0];
+    // axe's own summary carries the numbers a fix needs: the contrast
+    // ratio it measured and the one it wanted, or which attribute is
+    // missing. Without it the reader gets a rule name and a selector and
+    // has to reproduce the whole run to learn anything.
+    const why = (node?.failureSummary ?? "").replace(/\s+/g, " ").trim();
+    return `${violation.impact} ${violation.id}: ${violation.help} (${node?.target.join(" ")}) ${why}`;
+  });
+  expect(
+    described,
+    `${route} has a serious accessibility finding that is not in the baseline`,
+  ).toEqual([]);
+
+  // The other direction: a rule the baseline still excuses on this route
+  // but that no longer happens. Left in, it would excuse the defect again
+  // the day somebody reintroduced it.
+  const fixed = [...allowed].filter((id) => !ruleIds.includes(id));
+  expect(
+    fixed,
+    `${route} no longer has these findings, so remove them from the baseline`,
+  ).toEqual([]);
+}
 
 for (const route of CHECKED) {
   test(`${route} has no serious accessibility findings`, async () => {
-    await goTo(page, route);
+    await goTo(page, await urlFor(route));
     // The shell, so a screen that threw and rendered its error boundary is a
-    // failure here rather than a clean scan of an error page.
-    await expect(
-      page.getByRole("navigation", { name: "Primary" }).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    // failure here rather than a clean scan of an error page. A session is
+    // the one screen drawn without it, full width for the room, so there the
+    // page's own heading is the sign, and it must not be the not-found one.
+    if (FOCUS_SCREENS.some((prefix) => route.startsWith(prefix))) {
+      await expect(page.locator("h1").first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator("h1").first()).not.toHaveText("Not found");
+    } else {
+      await expect(
+        page.getByRole("navigation", { name: "Primary" }).first(),
+      ).toBeVisible({ timeout: 15_000 });
+    }
 
     // **Wait for the content, or the gate is a coin toss** (found while
     // writing it). Two runs of identical code produced baselines of two
@@ -216,68 +390,31 @@ for (const route of CHECKED) {
         // A screen holding a subscription open never goes idle. The main
         // region check below is the real signal; this is the cheap one.
       });
-    await expect(page.locator("main").first()).not.toBeEmpty({
+    // A focus screen has no `main` of its own; its heading was waited for
+    // above, and its content streams inside the same response.
+    if (!FOCUS_SCREENS.some((prefix) => route.startsWith(prefix))) {
+      await expect(page.locator("main").first()).not.toBeEmpty({
+        timeout: 15_000,
+      });
+    }
+
+    await assertAccessible(route, page);
+  });
+}
+
+for (const route of SIGNED_OUT) {
+  test(`${route}, signed out, has no serious accessibility findings`, async ({
+    browser,
+  }) => {
+    const visitorContext = await browser.newContext();
+    const visitor = await visitorContext.newPage();
+    await visitor.goto(route);
+    // These have no shell; the page's own heading is the sign it rendered.
+    await expect(visitor.getByRole("heading").first()).toBeVisible({
       timeout: 15_000,
     });
-
-    // **No screen tells a user that part of it arrives at a task**
-    // (completeness review H-24). The first-run wizard said channels and AI
-    // were "not in this build" long after both shipped, and the cycle phases
-    // said "arrives at P4-T03". A plan task's id is a note between the people
-    // building this, and a screen that shows one is showing the build rather
-    // than the product. Checked on every screen this walks.
-    const text = await page.locator("body").innerText();
-    expect(
-      text.match(/\bP[1-8]-[TG]\d+[a-z]?\b/g) ?? [],
-      `${route} shows a plan task id`,
-    ).toEqual([]);
-    expect(text, `${route} says something is not in this build`).not.toMatch(
-      /not in this build/i,
-    );
-
-    const results = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-      .analyze();
-
-    const fatal = results.violations.filter((violation) =>
-      FATAL_IMPACTS.has(violation.impact ?? ""),
-    );
-    // The message names the rule and the first element, because "3 violations"
-    // sends the next person back to the browser to find out what.
-    const ruleIds = [...new Set(fatal.map((violation) => violation.id))].sort();
-    if (ruleIds.length > 0) {
-      OBSERVED[route] = ruleIds;
-    }
-    if (WRITING_BASELINE) {
-      return;
-    }
-
-    const allowed = new Set(BASELINE[route] ?? []);
-    const introduced = fatal.filter(
-      (violation) => !allowed.has(violation.id),
-    );
-    const described = introduced.map((violation) => {
-      const node = violation.nodes[0];
-      // axe's own summary carries the numbers a fix needs: the contrast
-      // ratio it measured and the one it wanted, or which attribute is
-      // missing. Without it the reader gets a rule name and a selector and
-      // has to reproduce the whole run to learn anything.
-      const why = (node?.failureSummary ?? "").replace(/\s+/g, " ").trim();
-      return `${violation.impact} ${violation.id}: ${violation.help} (${node?.target.join(" ")}) ${why}`;
-    });
-    expect(
-      described,
-      `${route} has a serious accessibility finding that is not in the baseline`,
-    ).toEqual([]);
-
-    // The other direction: a rule the baseline still excuses on this route
-    // but that no longer happens. Left in, it would excuse the defect again
-    // the day somebody reintroduced it.
-    const fixed = [...allowed].filter((id) => !ruleIds.includes(id));
-    expect(
-      fixed,
-      `${route} no longer has these findings, so remove them from the baseline`,
-    ).toEqual([]);
+    await assertAccessible(route, visitor);
+    await visitorContext.close();
   });
 }
 
