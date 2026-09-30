@@ -29,9 +29,11 @@ import {
   checkInCard,
   parseCardSubmission,
   TeamsChannel,
+  TeamsSigningKeys,
   teamsDeliveryId,
   teamsServiceUrl,
   teamsTenantId,
+  verifyTeamsToken,
 } from "@openokr/adapters";
 import {
   CHECK_IN_COMMAND,
@@ -40,7 +42,6 @@ import {
   parseTeamsSecret,
   rememberConnectionConfig,
   submitCheckIn,
-  workspaceForProviderTeam,
 } from "@openokr/core";
 import { CHECK_IN_STATUSES } from "@openokr/db";
 import type { NextRequest } from "next/server";
@@ -51,6 +52,17 @@ import {
 import { getPool } from "../../../../lib/pool";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Microsoft's signing keys, for every request this process serves.
+ *
+ * One source for the check before the lookup and the driver's check after
+ * it, so the keys are fetched once a day rather than on every request, which
+ * is what a driver built per request used to do. They are Microsoft's, the
+ * same for every tenant, so sharing them across workspaces shares nothing a
+ * workspace owns.
+ */
+const signingKeys = new TeamsSigningKeys();
 
 /**
  * A driver that replies to the conversation this activity came from.
@@ -76,15 +88,13 @@ function replyingDriver(secret: string, rawBody: string): TeamsChannel | null {
 export async function POST(request: NextRequest): Promise<Response> {
   return runInbound(request, {
     provider: "teams",
-    resolveWorkspace({ rawBody }) {
-      const tenant = teamsTenantId(rawBody);
-      return tenant
-        ? workspaceForProviderTeam(getPool(), {
-            provider: "teams",
-            teamId: tenant,
-          })
-        : Promise.resolve(null);
-    },
+    // Microsoft's signature, the issuer, the expiry and the service URL, all
+    // before a tenant is looked up (completeness review L-10). The audience
+    // is the driver's, after, because only the connection knows the app id.
+    verifyFirst: async ({ rawBody, headers }) =>
+      (await verifyTeamsToken({ rawBody, headers }, { keys: signingKeys })) !==
+      null,
+    tenantOf: ({ rawBody }) => teamsTenantId(rawBody),
     buildDriver(secret, config) {
       const parsed = parseTeamsSecret(secret);
       if (!parsed) {
@@ -98,6 +108,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         // Resolved from the activity on this path, never from a member: the
         // reply goes back to the conversation the message came from.
         conversationFor: () => null,
+        signingKeys,
       });
     },
     async remember({ rawBody, workspaceId }) {

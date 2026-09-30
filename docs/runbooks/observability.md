@@ -57,7 +57,7 @@ The body is Prometheus text exposition, `version=0.0.4`.
 
 ## What is measured
 
-Nineteen series. Every one is a count, a duration, a queue reading or a
+Twenty series. Every one is a count, a duration, a queue reading or a
 capacity gauge.
 
 **On the request's own thread**
@@ -69,6 +69,7 @@ capacity gauge.
 | `openokr_operations_total` | action, outcome |
 | `openokr_operation_duration_seconds` | action |
 | `openokr_authorisation_total` | action, required, outcome |
+| `openokr_channel_inbound_refusals_total` | provider, reason (no_tenant, unknown_tenant, no_connection, failed_verification) |
 
 **After the request has returned, or because a clock said so**
 

@@ -28,7 +28,6 @@ import {
   parseCommand,
   parseSlackSecret,
   submitCheckIn,
-  workspaceForProviderTeam,
 } from "@openokr/core";
 import { CHECK_IN_STATUSES } from "@openokr/db";
 import type { NextRequest } from "next/server";
@@ -78,12 +77,7 @@ function teamIdFrom(rawBody: string): string | null {
 export async function POST(request: NextRequest): Promise<Response> {
   return runInbound(request, {
     provider: "slack",
-    async resolveWorkspace({ rawBody }) {
-      const teamId = teamIdFrom(rawBody);
-      return teamId
-        ? workspaceForProviderTeam(getPool(), { provider: "slack", teamId })
-        : null;
-    },
+    tenantOf: ({ rawBody }) => teamIdFrom(rawBody),
     buildDriver(secret) {
       const parsed = parseSlackSecret(secret);
       return parsed

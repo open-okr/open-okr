@@ -6,11 +6,13 @@ import {
   stripMentions,
   TeamsChannel,
   TeamsPermanentError,
+  TeamsSigningKeys,
   teamsDeliveryId,
   teamsServiceUrl,
   teamsTenantId,
   toActivity,
   toAdaptiveCard,
+  verifyTeamsToken,
 } from "../src/drivers/channel/teams.ts";
 
 /**
@@ -447,6 +449,124 @@ describe("verifying an inbound activity", () => {
         (call) => new URL(call.url).host === "login.botframework.com",
       ),
     ).toHaveLength(1);
+  });
+});
+
+/**
+ * The checks that need no workspace (completeness review L-10).
+ *
+ * The inbound door runs these before it looks a workspace up, so a forged
+ * token is refused without the lookup whose outcome would tell a caller which
+ * tenants this instance knows.
+ */
+describe("verifying a token before the workspace is known", () => {
+  const keys = () => new TeamsSigningKeys({ fetch: stubFetch, now: () => NOW });
+  const check = (token: string, source = keys(), body = activity()) =>
+    verifyTeamsToken(
+      { headers: { authorization: `Bearer ${token}` }, rawBody: body },
+      { keys: source, now: () => NOW },
+    );
+
+  it("accepts a token for any bot, and says which bot it was for", async () => {
+    // The audience is the one check it cannot make, because the app id is in
+    // the workspace's credential. It hands the audience back instead.
+    expect(await check(sign(goodClaims()))).toBe(APP_ID);
+    expect(await check(sign({ ...goodClaims(), aud: "another-app-id" }))).toBe(
+      "another-app-id",
+    );
+  });
+
+  it("refuses everything else the driver refuses", async () => {
+    const other = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    for (const token of [
+      sign(goodClaims(), { key: other.privateKey }),
+      sign({ ...goodClaims(), iss: "https://login.microsoftonline.com/" }),
+      sign({ ...goodClaims(), exp: Math.floor(NOW.getTime() / 1000) - 1 }),
+      sign({ ...goodClaims(), serviceUrl: "https://attacker.example/" }),
+      sign({ ...goodClaims(), aud: 42 }),
+      "not.a.jwt",
+    ]) {
+      expect(await check(token)).toBeNull();
+    }
+  });
+
+  it("shares its keys with the driver, so a request fetches them once", async () => {
+    const shared = keys();
+    const token = sign(goodClaims());
+    const teams = driver({ signingKeys: shared });
+
+    expect(await check(token, shared)).toBe(APP_ID);
+    expect(
+      await teams.verifyInbound({
+        headers: { authorization: `Bearer ${token}` },
+        rawBody: activity(),
+      }),
+    ).toBe(true);
+    // And the driver still owns the audience check.
+    expect(
+      await driver({
+        appId: "another-app-id",
+        signingKeys: shared,
+      }).verifyInbound({
+        headers: { authorization: `Bearer ${token}` },
+        rawBody: activity(),
+      }),
+    ).toBe(false);
+
+    expect(
+      calls.filter(
+        (call) => new URL(call.url).host === "login.botframework.com",
+      ),
+    ).toHaveLength(1);
+  });
+
+  /**
+   * A shared cache lives for a day, so a key Microsoft rotates in would be
+   * refused until it turned over. An unknown id fetches again instead, but
+   * not more than once an hour, because the id is the caller's to choose.
+   */
+  it("fetches again for a key it has not seen, at most once an hour", async () => {
+    let clock = NOW.getTime();
+    const source = new TeamsSigningKeys({
+      fetch: stubFetch,
+      now: () => new Date(clock),
+    });
+    const rotated = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const newToken = sign(
+      { ...goodClaims(), exp: Math.floor(NOW.getTime() / 1000) + 3 * 3600 },
+      { header: { kid: "rotated-in" }, key: rotated.privateKey },
+    );
+    const at = (token: string) =>
+      verifyTeamsToken(
+        { headers: { authorization: `Bearer ${token}` }, rawBody: activity() },
+        { keys: source, now: () => new Date(clock) },
+      );
+    const keyFetches = () =>
+      calls.filter(
+        (call) => new URL(call.url).host === "login.botframework.com",
+      ).length;
+
+    expect(await at(sign(goodClaims()))).toBe(APP_ID);
+    expect(keyFetches()).toBe(1);
+
+    // Microsoft publishes the new key alongside the old one.
+    const jwk = rotated.publicKey.export({ format: "jwk" });
+    keysAnswer = {
+      keys: [
+        ...(jwks() as { keys: unknown[] }).keys,
+        { ...jwk, kid: "rotated-in", kty: "RSA" },
+      ],
+    };
+
+    // Inside the hour: refused, and Microsoft is not asked again.
+    clock += 30 * 60 * 1000;
+    expect(await at(newToken)).toBeNull();
+    expect(keyFetches()).toBe(1);
+
+    // After it: fetched once more, and accepted.
+    clock += 31 * 60 * 1000;
+    expect(await at(newToken)).toBe(APP_ID);
+    expect(keyFetches()).toBe(2);
   });
 });
 

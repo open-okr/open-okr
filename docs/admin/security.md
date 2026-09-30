@@ -206,6 +206,27 @@ follows no redirect, and caps size and time. An instance with nothing
 configured makes no outbound request at all, which is what makes an air-gapped
 install work. See [the air-gap guide](../runbooks/air-gap.md).
 
+## Chat webhooks
+
+Slack, Microsoft Teams, WhatsApp and Telegram deliver to this instance's
+webhook addresses. Each request is checked against the credential the
+workspace saved before anything in it is read.
+
+**A request the instance will not act on gets one answer**, whatever the
+reason: an empty 401, never sooner than a quarter of a second. The reasons
+are a Slack workspace, Teams tenant, WhatsApp number or Telegram bot nobody
+connected here, a connection that was removed, and a signature that does not
+match. Different answers would let anybody find out which organisations use
+this instance. Meta's subscription check is refused with 403, the same way for
+every reason.
+
+So a provider reporting failed deliveries after you disconnect it is
+expected. If deliveries fail while it is connected, the signing secret or
+token saved here probably does not match the provider's. The
+`openokr_channel_inbound_refusals_total` counter says which, by its `reason`
+label: `unknown_tenant`, `no_connection` or `failed_verification`. See
+[observability](../runbooks/observability.md).
+
 ## Next
 
 - [People and access](people.md)
