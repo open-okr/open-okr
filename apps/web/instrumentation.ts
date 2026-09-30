@@ -12,6 +12,7 @@ export async function register(): Promise<void> {
   }
 
   const {
+    quietCancelledResponses,
     validateEnvironment,
     startTelemetry,
     startOutboxRelay,
@@ -21,6 +22,9 @@ export async function register(): Promise<void> {
     resolveSSO,
     checkTenantFloor,
   } = await import("./instrumentation.node");
+  // First, before anything can log: a filter installed halfway through boot
+  // would leave the log judged by two rules.
+  quietCancelledResponses();
   validateEnvironment();
   // Before the relay and the scheduler, so the work they do from the first
   // second is measured rather than missed (P7-T06a).

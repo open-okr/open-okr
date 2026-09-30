@@ -143,6 +143,16 @@ so cannot come from a server-side series at all. They are named on the
 budgets dashboard with the tool that measures each, rather than left silently
 absent.
 
+## One error the log leaves out
+
+"The destination stream closed early" is not logged unless `LOG_LEVEL` is
+`debug`. It means a browser stopped reading a page before the server finished
+drawing it. Almost always that is the page's own prefetching, which reads a
+screen up to its loading state and cancels the rest, and nothing failed. It
+was left out because a single test run logged more than a thousand of them
+and real errors were lost among them. If you suspect a proxy is cutting
+responses off, set `LOG_LEVEL=debug` and they come back.
+
 ## Looking at it: the observability profile
 
 Off unless asked for. `./openokr up` starts three services and none of this.

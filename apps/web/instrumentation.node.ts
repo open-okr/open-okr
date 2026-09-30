@@ -1,4 +1,5 @@
 import { EnvironmentError, loadEnv } from "@openokr/config";
+import { quietAbandonedResponses } from "./lib/abandoned-responses";
 import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
 import { startRelay } from "./lib/relay";
@@ -6,6 +7,15 @@ import { startScheduler } from "./lib/scheduler";
 import { resolveSSOProviders } from "./lib/sso";
 import { installTelemetry } from "./lib/telemetry";
 import { tenantFloor } from "./lib/tenant-floor";
+
+/**
+ * Keeps responses the browser cancelled out of the error log (completeness
+ * review L-04). `lib/abandoned-responses.ts` says why this is the log's
+ * problem and not the renderer's.
+ */
+export function quietCancelledResponses(): void {
+  quietAbandonedResponses();
+}
 
 /**
  * Node-only boot checks. Kept out of `instrumentation.ts` so the edge bundle
