@@ -54,27 +54,66 @@ async function settle(page: Page): Promise<void> {
     .catch(() => undefined);
 }
 
+const SETTLING = Symbol("settling navigation");
+
+/**
+ * Makes a page's `goto` and `reload` wait for the document to settle.
+ *
+ * Kept alongside the assertion wrapper below rather than replaced by it: a
+ * spec that navigates and then reads `page.url()`, takes a screenshot or
+ * fills a field asserts nothing first, and should still see a finished
+ * document. Idempotent, because a page can reach here twice.
+ */
+function settlingNavigation(page: Page): Page {
+  const marked = page as Page & { [SETTLING]?: true };
+  if (marked[SETTLING]) {
+    return page;
+  }
+  marked[SETTLING] = true;
+  const goto = page.goto.bind(page);
+  const reload = page.reload.bind(page);
+  page.goto = async (url, options) => {
+    const response = await goto(url, options);
+    await settle(page);
+    return response;
+  };
+  page.reload = async (options) => {
+    const response = await reload(options);
+    await settle(page);
+    return response;
+  };
+  return page;
+}
+
 export const test = base.extend({
   page: async ({ page }, use) => {
-    const goto = page.goto.bind(page);
-    const reload = page.reload.bind(page);
-
-    // Kept alongside the assertion wrapper below rather than replaced by it: a
-    // spec that navigates and then reads `page.url()` or takes a screenshot
-    // asserts nothing, and should still see a finished document.
-    page.goto = async (url, options) => {
-      const response = await goto(url, options);
-      await settle(page);
-      return response;
-    };
-    page.reload = async (options) => {
-      const response = await reload(options);
-      await settle(page);
-      return response;
-    };
-
-    await use(page);
+    await use(settlingNavigation(page));
   },
+  // **And every page a spec opens for itself** (completeness review M-20's
+  // run). Most specs share one signed-in page across their tests, from
+  // `browser.newContext()` in `beforeAll`, and that page never passed through
+  // the fixture above, so its `goto` returned with React's staged copy still
+  // in the document. It showed once the cycle screen started streaming its
+  // phase panel: a field filled straight after `goto` matched twice. Patched
+  // on the worker's one browser, so `context.browser()?.newContext()` gets it
+  // too.
+  browser: [
+    async ({ browser }, use) => {
+      const marked = browser as typeof browser & { [SETTLING]?: true };
+      if (!marked[SETTLING]) {
+        marked[SETTLING] = true;
+        const newContext = browser.newContext.bind(browser);
+        browser.newContext = async (options) => {
+          const context = await newContext(options);
+          const newPage = context.newPage.bind(context);
+          context.newPage = async () => settlingNavigation(await newPage());
+          return context;
+        };
+      }
+      await use(browser);
+    },
+    { scope: "worker" },
+  ],
 });
 
 const isLocator = (value: unknown): value is Locator =>
