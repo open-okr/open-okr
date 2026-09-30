@@ -1,11 +1,8 @@
 import { createHash } from "node:crypto";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  listSSOProviders,
-  listWorkspaceSSOProviders,
-  loadSSOConnections,
-} from "../src/auth/sso.ts";
+import { callAction } from "../src/actions/registry.ts";
+import { listSSOProviders, loadSSOConnections } from "../src/auth/sso.ts";
 import { createSCIMToken, resolveToken } from "../src/directory-sync/tokens.ts";
 import { encryptSecret, parseKeyRing } from "../src/secrets/key-ring.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
@@ -117,17 +114,31 @@ describe("a workspace's administration screen", () => {
   /**
    * Completeness review L-21: the screen read the instance-wide list the
    * sign-in page uses, so every workspace's administrator was shown every
-   * other workspace's connections.
+   * other workspace's connections. It reads `sso.listConnections` now, which
+   * also carries what the edit form is filled with.
    */
   it("lists its own connections and none of another workspace's", async () => {
     const wb = await workerDb();
+    const asOwnerOf = (workspace: string, userId: string) => ({
+      pool: wb.appPool,
+      workspaceId: workspace,
+      actor: { kind: "human" as const, userId },
+    });
 
-    const own = await listWorkspaceSSOProviders(wb.appPool, workspaceId);
+    const own = await callAction(
+      asOwnerOf(workspaceId, "sso-floor-owner"),
+      "sso.listConnections",
+      {},
+    );
     expect(own.map((provider) => provider.displayName)).toEqual([
       "Sign in with Okta",
     ]);
 
-    const other = await listWorkspaceSSOProviders(wb.appPool, otherWorkspaceId);
+    const other = await callAction(
+      asOwnerOf(otherWorkspaceId, "sso-floor-other"),
+      "sso.listConnections",
+      {},
+    );
     expect(other).toEqual([]);
   });
 });

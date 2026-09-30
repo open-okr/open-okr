@@ -122,6 +122,16 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "member.joined_by_directory": z.object({
     via: z.enum(["sso", "directory_sync"]),
   }),
+  // A single sign-on connection changed, was switched or was removed. The
+  // name people see on the sign-in button, snapshotted because a removed
+  // connection has no row left to look it up in. Never a client id, a domain
+  // or a secret: the audit row carries what an administrator needs.
+  "sso.connection_updated": z.object({ name: z.string() }),
+  "sso.connection_switched": z.object({
+    name: z.string(),
+    enabled: z.boolean(),
+  }),
+  "sso.connection_removed": z.object({ name: z.string() }),
   // Channels (P5-T01b-a). The provider, never a credential and never a
   // message body: an activity row is read by people.
   "channel.connected": z.object({ provider: z.string() }),

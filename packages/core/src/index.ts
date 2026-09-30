@@ -59,6 +59,7 @@ export {
   updateWorkspaceBranding,
   updateWorkspaceGeneralSettings,
 } from "./actions/settings.ts";
+export type { SSOConnectionDetails } from "./actions/sso.ts";
 export {
   ACTIVITY_PAYLOAD_SCHEMAS,
   type ActivityKind,
@@ -476,7 +477,6 @@ export {
   createSSOConnection,
   derivedProviderId,
   listSSOProviders,
-  listWorkspaceSSOProviders,
   loadSSOConnections,
   normaliseCertificate,
   type PublicSSOProvider,

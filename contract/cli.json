@@ -2901,6 +2901,157 @@
       "pages": false
     },
     {
+      "name": "sso listConnections",
+      "action": "sso.listConnections",
+      "method": "GET",
+      "path": "/sso/listConnections",
+      "scope": "read",
+      "summary": "This workspace's single sign-on connections, turned-off ones included, with every setting except the client secret.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "sso updateConnection",
+      "action": "sso.updateConnection",
+      "method": "POST",
+      "path": "/sso/updateConnection",
+      "scope": "write",
+      "summary": "Changes a single sign-on connection's name, email domains, enforcement and protocol settings. A blank client secret keeps the stored one.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "display-name",
+          "field": "displayName",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "email-domains",
+          "field": "emailDomains",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "enforce",
+          "field": "enforce",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "client-id",
+          "field": "clientId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "client-secret",
+          "field": "clientSecret",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "discovery-url",
+          "field": "discoveryUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "authorization-url",
+          "field": "authorizationUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "token-url",
+          "field": "tokenUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "user-info-url",
+          "field": "userInfoUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "scopes",
+          "field": "scopes",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-entry-point",
+          "field": "samlEntryPoint",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-issuer",
+          "field": "samlIssuer",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-certificate",
+          "field": "samlCertificate",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-audience",
+          "field": "samlAudience",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sso setConnectionEnabled",
+      "action": "sso.setConnectionEnabled",
+      "method": "POST",
+      "path": "/sso/setConnectionEnabled",
+      "scope": "write",
+      "summary": "Turns a single sign-on connection off, so nobody signs in through it and it leaves the sign-in page, or on again.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "enabled",
+          "field": "enabled",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sso removeConnection",
+      "action": "sso.removeConnection",
+      "method": "POST",
+      "path": "/sso/removeConnection",
+      "scope": "destructive",
+      "summary": "Removes a single sign-on connection. Nobody signs in through it again, and an enforced connection's domains go back to passwords.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "agents list",
       "action": "agents.list",
       "method": "GET",

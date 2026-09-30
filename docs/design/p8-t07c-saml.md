@@ -223,9 +223,12 @@ Every provider went to `signIn.social`, which for a SAML one reached a provider
 
 ### What this still does not do
 
-- **No editing or removal from the screen.** A connection is created and then
-  changed in the database. That was true of OIDC before this row and is not
-  made worse by it, but it is the obvious next row.
+- ~~**No editing or removal from the screen.**~~ Built since: every
+  connection has Edit, Turn off or Turn on, and Remove, through
+  `sso.updateConnection`, `sso.setConnectionEnabled` and
+  `sso.removeConnection`. Each writes the derived row inside its own
+  transaction, so an edited SAML provider's plugin row changes with it, and a
+  connection that is off or removed has none.
 - **No signed authentication requests.** As above: `authnRequestsSigned` stays
   false and no private key of ours is stored.
 - **No IdP-initiated sign-in.** Service-provider initiated only, which is what

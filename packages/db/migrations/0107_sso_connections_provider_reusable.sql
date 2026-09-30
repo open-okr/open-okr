@@ -1,0 +1,22 @@
+-- A removed single sign-on connection frees its provider ID.
+--
+-- **0091 meant this and did not do it.** It declared two uniqueness rules on
+-- `(workspace_id, provider_id)`: a table constraint over every row, and a
+-- partial index over rows that are not deleted. Its own comment says the
+-- partial index "is what actually enforces this" and that "a deleted
+-- connection frees its provider_id", and `DATABASE.md` names only the partial
+-- one. The table constraint still applied to deleted rows, so it won.
+--
+-- Nothing soft-deleted a connection until the admin screen could remove one,
+-- so the difference was invisible. Now it is not: the provider ID is in the
+-- callback address registered at the identity provider, and somebody who
+-- removes a connection and adds it back under the same ID would be refused
+-- with "a provider with that ID already exists", about a connection the
+-- screen no longer lists.
+--
+-- Two live connections in one workspace still cannot share an ID: the partial
+-- index `sso_connections_provider_live_idx` from 0091 stays. Dropping a
+-- constraint removes nothing a running release reads, so a rolling upgrade has
+-- nothing to reconcile.
+alter table sso_connections
+  drop constraint sso_connections_provider_unique;

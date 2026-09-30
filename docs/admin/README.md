@@ -13,7 +13,7 @@ account has and what an administrator can grant to somebody else.
 | **General** | Timezone, language, trusted email domains, the second-factor policy, the workspace state, and whether to open the first-day setup again. Reopening it keeps every answer, and every administrator is sent to it from the Work Map until somebody finishes it |
 | **Plan and seats** | The plan and how many seats it carries. Cloud only; a self-hosted instance is never seat-limited |
 | **Support access** | Whether the vendor may look, for how long, and with what reason. Cloud only |
-| **Single sign-on** | An OIDC provider, which email domains it claims, and whether it is enforced |
+| **Single sign-on** | An OIDC or SAML 2.0 provider, which email domains it claims, and whether it is enforced. Each connection can be changed, turned off and removed there too. See [Security](security.md#single-sign-on) |
 | **Directory sync** | The SCIM endpoint and its bearer token, so an identity provider provisions people |
 | **Audit trail** | Verify the hash chain, browse the trail newest first, and export it, with one filter for both |
 | **Branding** | The workspace's own colour, which every screen of the workspace is drawn in. See [Settings](settings.md) |
