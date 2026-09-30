@@ -368,8 +368,26 @@ export const workerDb = async (): Promise<WorkerDb> => {
       await admin.query(`truncate table ${names} restart identity cascade`);
     },
     async close() {
-      await Promise.all([admin.end(), appPool.end(), pooledAppPool.end()]);
+      // A pool a test already ended is skipped: `end` throws on a second
+      // call, and this runs after every file's own teardown.
+      await Promise.all(
+        [admin, appPool, pooledAppPool]
+          .filter((pool) => !pool.ended)
+          .map((pool) => pool.end()),
+      );
       worker = undefined;
+      // **Dropped here, when its file ends, not at the next run** (completeness
+      // review L-03). Every test file runs in a fresh fork, so every file
+      // cloned its own database, and `sweepOrphans` only cleared them when the
+      // next run began. A whole run of 6,029 tests then held some four
+      // hundred clones at once, filled the 3.8 GB tmpfs Docker Desktop gives
+      // Postgres, and crashed the server into recovery mid-run. The name is
+      // this process's own, so nobody else is using it, and a later file in
+      // the same fork clones it again on first use. Best effort: a drop that
+      // fails is left for the sweep, as before.
+      await withSuperuser("postgres", (client) =>
+        client.query(`drop database if exists ${databaseName} with (force)`),
+      ).catch(() => undefined);
     },
   };
   return worker;
