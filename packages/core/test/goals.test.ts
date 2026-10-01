@@ -689,10 +689,17 @@ describe("moving between cycles", () => {
   it("moves into a planning cycle and clears any timeframe", async () => {
     const wb = await workerDb();
     const created = await createGoal();
+    // Two quarters from today, never a date. This named 15 November 2026,
+    // which was a future quarter when it was written and became the current
+    // one on 1 October 2026, which the workspace already holds: every run
+    // that day failed with "Q4 2026 already exists in this workspace".
+    const twoQuartersOn = new Date(Date.now() + 200 * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
     const next = await callAction(
       { pool: wb.appPool, ...context() },
       "cycles.create",
-      { on: "2026-11-15" } as never,
+      { on: twoQuartersOn } as never,
     );
 
     await callAction({ pool: wb.appPool, ...context() }, "goals.moveToCycle", {
