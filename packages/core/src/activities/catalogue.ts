@@ -86,6 +86,17 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "member.updated": z.object({ name: z.string() }),
   "member.suspended": z.object({ name: z.string() }),
   "member.restored": z.object({ name: z.string() }),
+  // Workspace roles (P8-G13a). The role name travels on the first three
+  // because the feed entry has to read as a sentence after a role is renamed
+  // or removed.
+  "role.created": z.object({ name: z.string() }),
+  "role.deleted": z.object({ name: z.string() }),
+  "role.permission_set": z.object({
+    role: z.string(),
+    domain: z.string(),
+    level: z.number(),
+  }),
+  "role.assigned": z.object({}),
   // Full access granted or returned to standard (completeness review H-14).
   "member.administrator_set": z.object({
     name: z.string(),

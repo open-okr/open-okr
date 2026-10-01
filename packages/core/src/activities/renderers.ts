@@ -51,6 +51,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
   "member.restored": (p) => `${asString(p.name, "A member")} was restored`,
+  "role.created": (p) => `Role "${asString(p.name, "a role")}" was added`,
+  "role.deleted": (p) => `Role "${asString(p.name, "a role")}" was removed`,
+  "role.permission_set": (p) =>
+    `What ${asString(p.role, "a role")} may do with ${asString(p.domain, "a domain")} was changed`,
+  "role.assigned": () => "A member was given a different role",
   "member.administrator_set": (p) =>
     p.administrator === true
       ? `${asString(p.name, "A member")} became an administrator`

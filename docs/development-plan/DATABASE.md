@@ -124,7 +124,7 @@ The workspace `language` default now resolves through the instance's own `instan
 `email` unique, authentication linkage. Credentials, sessions, passkeys and second factors are owned by the authentication library.
 
 ### workspace_members
-`user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`, `tour_finished_at?`, `placeholder_email?`, `legacy_id?`, `legacy_type?`.
+`user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`, `tour_finished_at?`, `role_id?` to workspace_roles, `placeholder_email?`, `legacy_id?`, `legacy_type?`.
 
 `tour_finished_at` is when the member finished or ended the first-visit tour (UIUX-PLAN S-34, completeness review L-08, migration 0106). Null means the tour is still offered, which is also what every member who joined before the column existed has: they have not seen it either. Per member rather than in the browser, so ending it once ends it on every machine. No legacy source.
 
@@ -149,6 +149,14 @@ Unique on `(workspace_id, user_id)` for live rows, so one person has at most one
 `group_id` to access_groups, `context_id` to access_contexts, `level` (10 view, 40 comment, 70 edit, 100 full), `tag?` (`champion` / `reviewer` / `sponsor` / `facilitator` / `coordinator`). A group may hold at most one live untagged binding and one live binding per tag on a given context. Written through `bindGroup`, alongside `ensureContext` in the same file. `can()` and the access-aware getter that read these four tables back (`packages/core/src/access/reads.ts`) are P2-T02: `resolveMemberAccessLevel` walks the three reachable tiers and takes the maximum, and `resolveActor` in the Operation pipeline uses it in place of the placeholder `full` it returned before that task.
 
 Workspace provisioning (P1-T06, wired for the access model in P2-T01) gives every new workspace its own context and `workspace_standard` group, and gives the first member a `member` group with a `full` binding on that context.
+
+### workspace_roles
+`name`, `builtin_key?` (`owner` / `admin` / `member` / `viewer`), `is_default`. One live role per name per workspace, one per built-in key, and at most one default (P8-G13a, migration 0108). A workspace is born with all four in the provisioning transaction, and `owner` is the one role the product refuses to change or remove, because a workspace that can lower its own last administrator cannot be repaired.
+
+### role_permissions
+`role_id` to workspace_roles, `domain`, `level` (0, 10, 40, 70 or 100, checked). One live row per role and domain. A domain is an `access_contexts.resource_type` rather than an enum, so the matrix reaches the resolver with no translation and a resource type added by a later phase needs no migration here: `goal`, `kpi`, `initiative`, `task`, `comment`, `space`, `workspace` today.
+
+**A role raises a level and never lowers one.** `resolveMemberAccessLevel` takes the maximum over the bindings reaching the member and the level their role grants for the context being asked about, which is the same composition two overlapping bindings have always had. There is no deny rule, so a Viewer role does not take away an edit somebody holds through a champion binding. `workspace_members.role_id` is nullable, and null means the member holds only their bindings, which is what a guest, an agent and a placeholder keep for good. Data change 0012 seeds the roles and assigns them for every workspace that existed first.
 
 ### invite_links
 `mode` (`workspace` / `personal`), `token_hash` (SHA-256 hex of a raw token that is never itself stored), `email?` (set for `personal`, null for `workspace`: a personal link's one addressee), `allowed_domains text[]?` (meaningful for `workspace` only), `invited_by_member_id?`, `member_id?` (filled in when the link produces a member, so a used personal link cannot be replayed), `use_count`, `max_uses?` (null is unlimited), `expires_at?`, `revoked_at?`, `member_kind` (`human` / `guest`, default `human`), `space_id?` to spaces (set exactly when `member_kind` is `guest`, held by a check constraint: the one space a guest invitation admits to; migration 0101, completeness review M-22).

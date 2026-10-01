@@ -113,6 +113,19 @@ export const workspaceMembers = pgTable("workspace_members", {
    * rather than in the browser, so ending it once ends it on every machine.
    */
   tourFinishedAt: timestamp("tour_finished_at", { withTimezone: true }),
+  /**
+   * The workspace role this member holds (P8-G13a).
+   *
+   * Null means they hold only what their access bindings give them, which is
+   * what every member held before roles existed and what a guest, an agent
+   * and a placeholder keep for good: a role is workspace-wide, and somebody
+   * invited into one space must not be handed the workspace by it.
+   *
+   * No foreign key declared here, to keep this module from importing the role
+   * tables and closing a cycle between the two schema files. Migration 0108
+   * declares the reference, which is where every other constraint lives.
+   */
+  roleId: uuid("role_id"),
   placeholderEmail: text("placeholder_email"),
   legacyId: text("legacy_id"),
   legacyType: text("legacy_type", { enum: ["flowyteam", "csv"] }),

@@ -339,6 +339,13 @@ import {
   proposeFromLearnings,
 } from "./review-assists.ts";
 import { narrateDigest, narrateTrend, readDigest } from "./rhythm-assists.ts";
+import {
+  assignRole,
+  createRole,
+  deleteRole,
+  listRoles,
+  setRolePermission,
+} from "./roles.ts";
 import { findEntities, readPaletteJump, runSearch } from "./search.ts";
 import {
   addRetroNote,
@@ -638,6 +645,11 @@ export const ACTION_MAP = {
   "cycles.feedForward": feedForwardCycle,
   "cycles.close": closeCycle,
   "cycles.scorecard": readScorecard,
+  "roles.list": listRoles,
+  "roles.setPermission": setRolePermission,
+  "roles.create": createRole,
+  "roles.delete": deleteRole,
+  "roles.assign": assignRole,
   "rhythm.read": readRhythmSettings,
   "rhythm.update": updateRhythmSettings,
   "frame.annualObjectives": readAnnualObjectives,

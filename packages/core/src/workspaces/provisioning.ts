@@ -42,6 +42,7 @@ import {
   ensureWorkspaceStandardGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { seedBuiltinRoles } from "../access/roles.ts";
 import { seedChampionInTx } from "../agents/champion.ts";
 import { seedCoachInTx } from "../agents/coach.ts";
 import {
@@ -378,6 +379,21 @@ async function insertWorkspaceAndMember(
           contextId,
           level: ACCESS_LEVELS.full,
         });
+
+        // The four roles, and the founder holding Owner (P8-G13a). Before the
+        // first space and before either agent, because a role is workspace
+        // state rather than a grant on anything: nothing below needs it, and
+        // a workspace that failed part way through and is being repaired gets
+        // its roles on the retry, which `seedBuiltinRoles` is idempotent for.
+        const roleIds = await seedBuiltinRoles(savepoint, { workspaceId });
+        // openokr:allow-mutation: the same transaction, same reason as the
+        // member insert above.
+        await savepoint
+          .update(workspaceMembers)
+          .set({ roleId: roleIds.owner })
+          .where(
+            activeOnly(workspaceMembers, eq(workspaceMembers.id, memberId)),
+          );
 
         // The Champion, before the first space rather than after it: a space
         // binds the agent as it is created, and an agent that did not exist yet

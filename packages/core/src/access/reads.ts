@@ -52,7 +52,7 @@ export async function resolveMemberAccessLevel<
 >(tx: AnyTx<TSchema>, input: MemberContextInput): Promise<number> {
   const result = await tx.execute<{ level: number }>(sql`
     with actor as (
-      select kind from workspace_members
+      select kind, role_id from workspace_members
        where id = ${input.memberId}
          and workspace_id = ${input.workspaceId}
          and status = 'active'
@@ -73,7 +73,33 @@ export async function resolveMemberAccessLevel<
               and s.expires_at is not null
               and s.expires_at <= now()
          )
-    )
+    ),
+    -- The level this member's workspace role grants on the resource type of
+    -- the context being asked about (P8-G13a). One more source for the same
+    -- maximum, not a second model: a champion's binding still outranks a
+    -- role that grants less, exactly as two bindings already compose.
+    --
+    -- A human only. A guest, an agent and a placeholder hold no role and must
+    -- not inherit one, for the same reason written beside the blanket tiers
+    -- below: an agent holds nothing but its own named bindings.
+    role_level as (
+      select coalesce(max(rp.level), 0)::int as level
+        from role_permissions rp
+        join access_contexts c
+          on c.id = ${input.contextId}
+         and c.workspace_id = ${input.workspaceId}
+         and c.deleted_at is null
+         and c.resource_type = rp.domain
+       where rp.workspace_id = ${input.workspaceId}
+         and rp.deleted_at is null
+         and exists (
+           select 1 from actor
+            where actor.kind = 'human'
+              and actor.role_id is not null
+              and actor.role_id = rp.role_id
+         )
+    ),
+    binding_level as (
     select coalesce(max(b.level), 0)::int as level
       from access_bindings b
       join access_groups g
@@ -108,6 +134,12 @@ export async function resolveMemberAccessLevel<
            )
          )
        )
+    )
+    -- The two sources, composed the way §4.1 composes two overlapping grants.
+    select greatest(
+             (select level from binding_level),
+             (select level from role_level)
+           )::int as level
   `);
   return Number(result.rows[0]?.level ?? 0);
 }
