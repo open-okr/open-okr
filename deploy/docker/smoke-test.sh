@@ -17,6 +17,13 @@ cd "$(dirname "$0")"
 : "${OPENOKR_HTTPS_PORT:=8443}"
 export OPENOKR_IMAGE OPENOKR_HTTP_PORT OPENOKR_HTTPS_PORT
 
+# The stack `./openokr up` starts, resolved the way compose resolves it:
+# COMPOSE_PROJECT_NAME when set, otherwise the `name:` in compose.yaml. This
+# used to say `openokr` outright, so under any other name every log read here
+# came back empty, and the v0.1.1 release run failed on "migrations did not
+# run on boot" against a stack that had run them.
+PROJECT="${COMPOSE_PROJECT_NAME:-openokr}"
+
 BASE="http://localhost:$OPENOKR_HTTP_PORT"
 BUDGET_SECONDS=1800
 
@@ -27,9 +34,9 @@ fail() { echo "  FAIL  $1" >&2; exit 1; }
 # log needs a snapshot of it.
 service_log() {
   if docker compose version >/dev/null 2>&1; then
-    docker compose -p openokr logs "$1" 2>&1
+    docker compose -p "$PROJECT" logs "$1" 2>&1
   else
-    docker-compose -p openokr logs "$1" 2>&1
+    docker-compose -p "$PROJECT" logs "$1" 2>&1
   fi
 }
 
@@ -39,9 +46,9 @@ proxy_log() { service_log proxy; }
 # One value from the bundled database, asked as its admin role.
 db_query() {
   if docker compose version >/dev/null 2>&1; then
-    docker compose -p openokr exec -T db psql -U openokr -d openokr -tAc "$1"
+    docker compose -p "$PROJECT" exec -T db psql -U openokr -d openokr -tAc "$1"
   else
-    docker-compose -p openokr exec -T db psql -U openokr -d openokr -tAc "$1"
+    docker-compose -p "$PROJECT" exec -T db psql -U openokr -d openokr -tAc "$1"
   fi
 }
 
@@ -64,9 +71,9 @@ cleanup() {
   # surviving volume plus regenerated secrets is an instance that can never
   # authenticate. `destroy` asks for confirmation, so compose is called here.
   if docker compose version >/dev/null 2>&1; then
-    docker compose -p openokr down -v >/dev/null 2>&1 || true
+    docker compose -p "$PROJECT" down -v >/dev/null 2>&1 || true
   else
-    docker-compose -p openokr down -v >/dev/null 2>&1 || true
+    docker-compose -p "$PROJECT" down -v >/dev/null 2>&1 || true
   fi
   rm -rf ./secrets
 }
@@ -273,9 +280,9 @@ pass "OPENOKR_SKIP_BACKUP=1 upgrades without one"
 # container alone when its image has not changed, which is right for an
 # upgrade and useless for testing what a second boot does.
 if docker compose version >/dev/null 2>&1; then
-  docker compose -p openokr restart app >/dev/null 2>&1
+  docker compose -p "$PROJECT" restart app >/dev/null 2>&1
 else
-  docker-compose -p openokr restart app >/dev/null 2>&1
+  docker-compose -p "$PROJECT" restart app >/dev/null 2>&1
 fi
 
 waited=0

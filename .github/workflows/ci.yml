@@ -243,6 +243,12 @@ jobs:
     needs: scope
     if: needs.scope.outputs.code == 'true'
     runs-on: ubuntu-latest
+    # Not the default name, on purpose. The release job runs this same script
+    # under a name of its own, and when the script still said `openokr` outright
+    # this job passed and the v0.1.1 release run failed. Running here under
+    # another name is what keeps the two from disagreeing again.
+    env:
+      COMPOSE_PROJECT_NAME: openokr-test-compose
     steps:
       - uses: actions/checkout@v7
 
@@ -262,7 +268,7 @@ jobs:
         if: failure()
         run: |
           cd deploy/docker
-          docker compose -p openokr logs --tail=200 || true
+          docker compose -p "$COMPOSE_PROJECT_NAME" logs --tail=200 || true
 
   helm:
     name: Helm chart
