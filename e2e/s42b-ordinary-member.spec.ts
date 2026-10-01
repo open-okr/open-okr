@@ -221,8 +221,15 @@ test("a goal detail opens for them, which had two separate causes", async () => 
   // than skipping when none does**: a test that quietly asserts nothing when
   // the fixture changes is worse than no test, because it keeps reporting
   // green.
+  // **The open control on the editable list, not the Work Map's `OBJ` chip.**
+  // P8-G12 made the editable set the default rendering of `/goals`, and the
+  // chip it used to click is now on the `display=tree` table. Following the
+  // control this screen actually offers is also the stronger test: it proves
+  // an ordinary member can reach a goal from the screen they are given.
   await memberPage.goto("/goals");
-  const link = memberPage.getByRole("link", { name: /^OBJ / }).first();
+  const link = memberPage
+    .getByRole("link", { name: "Open this objective" })
+    .first();
   await expect(link).toBeVisible({ timeout: 20_000 });
 
   await link.click();

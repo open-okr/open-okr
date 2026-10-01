@@ -213,6 +213,54 @@ describe("creating a goal", () => {
     expect(history.values[0]?.source).toBe("manual");
   });
 
+  it("removes a key result, leaves its siblings and rescores the goal", async () => {
+    const wb = await workerDb();
+    const created = await createGoal();
+    const add = (title: string, targetValue: number) =>
+      callAction({ pool: wb.appPool, ...context() }, "goals.addKeyResult", {
+        goalId: created.id,
+        title,
+        direction: "increase" as const,
+        indicatorType: "leading" as const,
+        baselineValue: 0,
+        targetValue,
+        currentValue: targetValue,
+        weight: 1,
+      });
+
+    const first = await add("Raise activation from 0 to 100", 100);
+    await add("Raise retention from 0 to 50", 50);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.removeKeyResult",
+      { id: first.id },
+    );
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.read",
+      { id: created.id },
+    );
+    expect(read.keyResults).toHaveLength(1);
+    expect(read.keyResults[0]?.title).toBe("Raise retention from 0 to 50");
+    // Soft-deleted, so the history behind it is still there to audit. The read
+    // is the scope that hides it, not the delete.
+    const rows = await withTx((tx) =>
+      tx.select().from(keyResults).where(eq(keyResults.id, first.id)),
+    );
+    expect(rows[0]?.deletedAt).not.toBeNull();
+  });
+
+  it("refuses to remove a key result that does not exist", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "goals.removeKeyResult", {
+        id: "00000000-0000-4000-8000-000000000000",
+      }),
+    ).rejects.toThrow(/No such key result/);
+  });
+
   it("clamps a weight above the domain rather than refusing it", async () => {
     const wb = await workerDb();
     const created = await createGoal({ weight: 4000 });
@@ -638,10 +686,17 @@ describe("moving between cycles", () => {
   it("moves into a planning cycle and clears any timeframe", async () => {
     const wb = await workerDb();
     const created = await createGoal();
+    // Six months out rather than a fixed date. `beforeEach` resolves the
+    // current quarter, so a literal lands in the same quarter for three months
+    // of every year and the create is refused as a duplicate. It read
+    // "2026-11-15", which passed until 1 October 2026 and would have failed
+    // every run until the new year.
+    const half = new Date();
+    half.setUTCMonth(half.getUTCMonth() + 6);
     const next = await callAction(
       { pool: wb.appPool, ...context() },
       "cycles.create",
-      { on: "2026-11-15" } as never,
+      { on: half.toISOString().slice(0, 10) } as never,
     );
 
     await callAction({ pool: wb.appPool, ...context() }, "goals.moveToCycle", {

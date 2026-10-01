@@ -296,6 +296,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "key_result.updated": () => "A key result was edited",
   "key_result.value_recorded": (p) =>
     `A key result moved to ${Number(p.value ?? 0)}`,
+  "key_result.removed": (p) =>
+    `Key result "${asString(p.title, "a key result")}" was removed`,
   "key_result.kpi_unlinked": () =>
     "A key result was unlinked from its KPI and keeps the last value it reported",
   "check_in.draft_opened": (p) =>

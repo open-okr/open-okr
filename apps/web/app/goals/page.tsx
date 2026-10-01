@@ -1,8 +1,10 @@
-import { callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { ALIGNMENT_LEVEL_ORDER } from "@openokr/method";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import type { ReactNode } from "react";
+import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { progressCeiling } from "../../lib/ceilings.ts";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -11,8 +13,11 @@ import { exportListAction } from "../search/actions.ts";
 import { ExportButton } from "../search/export-button.tsx";
 import { MyExports } from "../search/my-exports.tsx";
 import { GoalTable } from "../work-map.tsx";
+import { CYCLE_PLACEHOLDER, CyclePicker } from "./cycle-picker.tsx";
 import { filterAssistAvailableAction } from "./filter-actions.ts";
 import { FilterAssist } from "./filter-assist.tsx";
+import { OkrDiagram } from "./okr-diagram.tsx";
+import { OkrTable } from "./okr-table.tsx";
 
 /**
  * The goals explorer (UIUX-PLAN.md §4 S-13, P3-T10).
@@ -50,6 +55,15 @@ export default async function GoalsPage({
      */
     health?: string;
     mine?: string;
+    /**
+     * Which of the three renderings is on screen (P8-G12).
+     *
+     * Separate from `view`, which has meant the tree-or-flat ordering since
+     * P3-T10 and still does. `editor` is the editable set, `diagram` draws the
+     * same cycle as a tree of cards, and `tree` is the Work Map's own table,
+     * which is the only one of the three that indents by the parent pointer.
+     */
+    display?: string;
   }>;
 }) {
   const { t } = await getTranslations();
@@ -78,6 +92,12 @@ export default async function GoalsPage({
   const mine = query.mine === "1";
   const includeClosed = query.closed === "1";
   const tree = query.view !== "list";
+  const display =
+    query.display === "diagram"
+      ? "diagram"
+      : query.display === "tree"
+        ? "tree"
+        : "editor";
   // Whether anything is narrowing the set. Derived rather than counted a second
   // time: the difference between "this cycle has no goals" and "your filters
   // left nothing" is knowable from the query alone, and getting it wrong is
@@ -94,6 +114,14 @@ export default async function GoalsPage({
         ...(mine ? { mine } : {}),
       })
     : { goals: [] };
+
+  const accessLevel = await resolveAccessLevelFor(
+    workspace.workspaceId,
+    workspace.memberId,
+  );
+  const canEdit = accessLevel >= ACCESS_LEVELS.edit;
+  const canAdminister = accessLevel >= ACCESS_LEVELS.full;
+  const progressMax = await progressCeiling();
 
   const alignment = cycleId
     ? await callAction(context, "alignment.read", {
@@ -115,6 +143,7 @@ export default async function GoalsPage({
       mine: mine ? "1" : null,
       view: tree ? null : "list",
       closed: includeClosed ? "1" : null,
+      display: display === "editor" ? null : display,
       ...patch,
     };
     for (const [key, value] of Object.entries(merged)) {
@@ -154,6 +183,16 @@ export default async function GoalsPage({
                   }${tree ? ", as a tree" : ""}`}
             </Chip>
           </div>
+          {/* Which cycle is on screen, and the way another one is made. Beside
+           * the title rather than in the filter bar below: it is the first
+           * question this screen answers and it is not a filter, it is the
+           * set. */}
+          <CyclePicker
+            cycles={cycles}
+            cycleId={cycleId}
+            hrefTemplate={href({ cycle: CYCLE_PLACEHOLDER })}
+            canCreate={canAdminister}
+          />
           {alignment?.score !== null && alignment !== null ? (
             <a
               href={`/cycle?phase=5`}
@@ -201,18 +240,80 @@ export default async function GoalsPage({
         <MyExports />
         <CardBody className="flex flex-col gap-2.5">
           <Filters
-            cycles={cycles}
-            cycleId={cycleId}
             level={level ?? null}
             health={health ?? null}
             mine={mine}
             filterAssist={filterAssistAvailable ? <FilterAssist /> : undefined}
             tree={tree}
+            display={display}
             includeClosed={includeClosed}
             href={href}
           />
         </CardBody>
       </Card>
+
+      {display === "editor" ? (
+        <OkrTable
+          goals={goals.map((goal) => ({
+            id: goal.id,
+            title: goal.title,
+            health: goal.health,
+            progressPct: goal.progressPct,
+            champion: goal.champion.name,
+            reviewer: goal.reviewer.name,
+            keyResults: goal.keyResults.map((keyResult) => ({
+              id: keyResult.id,
+              title: keyResult.title,
+              unit: keyResult.unit,
+              currentValue: keyResult.currentValue,
+              targetValue: keyResult.targetValue,
+              progressPct: keyResult.progressPct,
+            })),
+          }))}
+          cycleId={cycleId}
+          // The level a row added here is written at. The filter when one is
+          // chosen, so a filtered set adds to itself rather than adding a row
+          // the filter immediately hides; team otherwise, which is the level
+          // §4.3 puts most objectives at.
+          level={level ?? "team"}
+          canEdit={canEdit}
+          canAdminister={canAdminister}
+          progressMax={progressMax}
+          empty={
+            <div className="flex flex-col gap-1.5 p-3">
+              <p className="text-sm text-ink-2">
+                {t("goals.noGoalsMatchThis")}
+              </p>
+            </div>
+          }
+        />
+      ) : null}
+
+      {display === "diagram" ? (
+        <OkrDiagram
+          goals={goals.map((goal) => ({
+            id: goal.id,
+            title: goal.title,
+            health: goal.health,
+            progressPct: goal.progressPct,
+            champion: goal.champion.name,
+            reviewer: goal.reviewer.name,
+            keyResults: goal.keyResults.map((keyResult) => ({
+              id: keyResult.id,
+              title: keyResult.title,
+              unit: keyResult.unit,
+              currentValue: keyResult.currentValue,
+              targetValue: keyResult.targetValue,
+              progressPct: keyResult.progressPct,
+            })),
+          }))}
+          cycleName={
+            cycles.find((cycle) => cycle.id === cycleId)?.name ??
+            t("goals.editor.noCycle")
+          }
+          progressMax={progressMax}
+        />
+      ) : null}
 
       {/* The same table the Work Map draws (`01-work-map`), not a card per
        * goal. S-13 has no mockup, and §10 treats a detail only the mockups
@@ -220,36 +321,40 @@ export default async function GoalsPage({
        * repository has is the one both screens use. The explorer's own tree
        * ordering stays here: it walks what survived the filters and has to
        * mark a goal whose parent did not. */}
-      <GoalTable
-        nodes={(tree
-          ? inTreeOrder(goals)
-          : goals.map((goal) => ({
+      {display === "tree" ? (
+        <GoalTable
+          nodes={(tree
+            ? inTreeOrder(goals)
+            : goals.map((goal) => ({
+                goal,
+                depth: 0,
+                detached: false,
+              }))
+          ).flatMap(({ goal, depth, detached }) =>
+            mapNodesFor(
               goal,
-              depth: 0,
-              detached: false,
-            }))
-        ).flatMap(({ goal, depth, detached }) =>
-          mapNodesFor(
-            goal,
-            depth,
-            detached ? "parent is outside this filter" : undefined,
-          ),
-        )}
-        selected={null}
-        rowHref={(node) => `/goals/${node.goalId}`}
-        empty={
-          <div className="flex flex-col gap-1.5 p-3">
-            <p className="text-sm text-ink-2">{t("goals.noGoalsMatchThis")}</p>
-            <p className="text-xs text-ink-3">
-              {t("goals.objectivesAreDraftedIn")}{" "}
-              <a className="underline" href="/cycle?phase=4">
-                {t("goals.openDrafting")}
-              </a>
-              .
-            </p>
-          </div>
-        }
-      />
+              depth,
+              detached ? "parent is outside this filter" : undefined,
+            ),
+          )}
+          selected={null}
+          rowHref={(node) => `/goals/${node.goalId}`}
+          empty={
+            <div className="flex flex-col gap-1.5 p-3">
+              <p className="text-sm text-ink-2">
+                {t("goals.noGoalsMatchThis")}
+              </p>
+              <p className="text-xs text-ink-3">
+                {t("goals.objectivesAreDraftedIn")}{" "}
+                <a className="underline" href="/cycle?phase=4">
+                  {t("goals.openDrafting")}
+                </a>
+                .
+              </p>
+            </div>
+          }
+        />
+      ) : null}
     </div>
   );
 }
@@ -266,22 +371,20 @@ const GOAL_HEALTH_BANDS = [
 ] as const;
 
 async function Filters({
-  cycles,
-  cycleId,
   level,
   health,
   mine,
   tree,
+  display,
   includeClosed,
   href,
   filterAssist,
 }: {
-  readonly cycles: readonly { id: string; name: string }[];
-  readonly cycleId: string | null;
   readonly level: string | null;
   readonly health: string | null;
   readonly mine: boolean;
   readonly tree: boolean;
+  readonly display: "editor" | "diagram" | "tree";
   readonly includeClosed: boolean;
   readonly href: (patch: Record<string, string | null>) => string;
   /** The sentence-to-filter box, when a provider can answer. */
@@ -316,16 +419,22 @@ async function Filters({
          * the repository's own rule for wide content, and it is the one that
          * holds without depending on flex shrink behaviour. */}
         <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
-          <Group label="Cycle">
-            {cycles.map((cycle) => (
-              <Tab
-                key={cycle.id}
-                href={href({ cycle: cycle.id })}
-                active={cycle.id === cycleId}
-              >
-                {cycle.name}
-              </Tab>
-            ))}
+          {/* The cycle itself moved to the picker beside the title, because it
+           * chooses the set rather than narrowing it, and because a chip per
+           * cycle is a row that gains one every quarter and loses none. */}
+          <Group label="Display">
+            <Tab href={href({ display: null })} active={display === "editor"}>
+              {t("goals.editor.displayList")}
+            </Tab>
+            <Tab
+              href={href({ display: "diagram" })}
+              active={display === "diagram"}
+            >
+              {t("goals.editor.displayDiagram")}
+            </Tab>
+            <Tab href={href({ display: "tree" })} active={display === "tree"}>
+              {t("goals.editor.displayTree")}
+            </Tab>
           </Group>
 
           <Group label="Level">

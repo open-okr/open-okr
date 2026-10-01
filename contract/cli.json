@@ -6102,6 +6102,23 @@
       "pages": false
     },
     {
+      "name": "goals removeKeyResult",
+      "action": "goals.removeKeyResult",
+      "method": "POST",
+      "path": "/goals/removeKeyResult",
+      "scope": "destructive",
+      "summary": "Removes one key result from its goal, which is not the same as closing the goal.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals unlinkKpi",
       "action": "goals.unlinkKpi",
       "method": "POST",

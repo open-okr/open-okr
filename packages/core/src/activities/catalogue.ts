@@ -334,6 +334,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "key_result.created": z.object({ title: z.string() }),
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
+  "key_result.removed": z.object({ title: z.string() }),
   "key_result.kpi_unlinked": z.object({}),
   // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing
   // about the goal, because a draft is silent about the goal by design.
