@@ -23,8 +23,9 @@ jobs:
     name: Verify the tagged commit
     runs-on: ubuntu-latest
     # Its own stack name, so a leftover container from another job on the same
-    # host cannot hold this one's port. The defaults are fine here: nothing else
-    # in this workflow starts a database.
+    # host cannot hold this one's port. The default ports are fine: the only
+    # other database here is the compose target's, which the smoke step starts
+    # under a name of its own.
     env:
       COMPOSE_PROJECT_NAME: openokr-test-release
     steps:
@@ -60,6 +61,11 @@ jobs:
       - name: Chart checks
         run: sh deploy/helm/check.sh
       - name: Build the image and boot the compose target
+        # A stack of its own rather than the job's test stack. Under one shared
+        # name the two compose files' containers become each other's orphans
+        # and share one default network, which `down` then cannot remove.
+        env:
+          COMPOSE_PROJECT_NAME: openokr-release-smoke
         run: |
           docker build -f deploy/docker/Dockerfile -t openokr:release-check .
           OPENOKR_IMAGE=openokr:release-check OPENOKR_SKIP_PULL=1 \
@@ -194,7 +200,7 @@ jobs:
       contents: write
       packages: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # The whole history, because the notes are assembled from the
           # changesets between this tag and the last.

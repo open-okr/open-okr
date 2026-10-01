@@ -1,5 +1,7 @@
 # METHOD.md
 
+> **Being revised in Phase 9.** On 1 October 2026 every rule here was reviewed against public OKR practice ([METHOD-REVIEW.md](../METHOD-REVIEW.md)), and Akmal decided that locks become practice settings with best-practice defaults. The revised text is [p9-t00-method-v2.md](../design/p9-t00-method-v2.md). Each Phase 9 task moves its sections into this file together with the code that implements them, so the conformance suite stays green. Until a section has moved, this file still describes what the product does.
+
 The OKR practice canon. Every rule, threshold, band, ritual and diagnostic that OpenOKR encodes lives here.
 
 This document answers one question: **what does good OKR practice look like, precisely enough to build?** It is the authority for the Draft Coach rule engine, the OKR Coach and OKR Champion agents, the scoring and health engines, the session flows, and every nudge the product sends. Product scope lives in REQUIREMENTS.md. Schema and engines live in TECHNICAL-PLAN.md. When one of those needs to know *what the right practice is*, it cites this file.

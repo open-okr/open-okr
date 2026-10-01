@@ -46,6 +46,7 @@ Start where you are.
 | [The quarterly cycle](handbook/quarterly.md) | Eight phases, six gates, scoring and the closing diagnostic |
 | [The numbers](handbook/numbers.md) | Every threshold the practice runs on |
 | [Ways of working](handbook/ways-of-working.md) | Spaces, cycles and initiatives for four common shapes of organisation |
+| [A year of OKRs at Northwind](scenarios/northwind-year/README.md) | One company's full year in OpenOKR, step by step: the reference for tests, the demo and these guides |
 
 ## Building on it
 
