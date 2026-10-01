@@ -1,3 +1,4 @@
+import { INSTANCE_SETTINGS, METRIC } from "@openokr/core";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -106,8 +107,10 @@ describe("exclusions from §6 criterion 6", () => {
 
 describe("new settings in the instance registry", () => {
   it("all four status thresholds are declared", async () => {
-    // Dynamic import so the test does not drag core's full module graph.
-    const { INSTANCE_SETTINGS } = await import("@openokr/core");
+    // Imported at the top of the file, not in here. Loading core's whole
+    // module graph inside a test counted against its five seconds, and under
+    // the release job's load it took seven: the v0.1.0 verify job failed on
+    // exactly that, 1 October 2026, with every other test passing.
     const keys = INSTANCE_SETTINGS.map((s: { key: string }) => s.key);
     expect(keys).toContain("status.relayDegradedSeconds");
     expect(keys).toContain("status.relayUnavailableSeconds");
@@ -116,7 +119,6 @@ describe("new settings in the instance registry", () => {
   });
 
   it("unavailable defaults are greater than degraded defaults", async () => {
-    const { INSTANCE_SETTINGS } = await import("@openokr/core");
     const byKey = new Map(
       INSTANCE_SETTINGS.map((s: { key: string; fallback: unknown }) => [
         s.key,
@@ -134,7 +136,6 @@ describe("new settings in the instance registry", () => {
 
 describe("capacity metrics are in the METRIC catalogue", () => {
   it("all three P8-T06c series are declared", async () => {
-    const { METRIC } = await import("@openokr/core");
     expect(METRIC.poolConnections).toBe("openokr_pool_connections");
     expect(METRIC.concurrentActions).toBe("openokr_concurrent_actions");
     expect(METRIC.admissionRefusalsTotal).toBe(

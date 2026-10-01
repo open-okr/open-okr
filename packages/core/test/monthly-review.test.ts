@@ -22,12 +22,15 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { localDateIn } from "../src/cycles/generation.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "monthly-facilitator";
 const OUTSIDER = "monthly-outsider";
 
 let workspaceId: string;
+/** When the first review is scheduled, which is the month its trend is keyed on. */
+let firstScheduledFor: Date;
 let cycleId: string;
 let spaceId: string;
 let facilitatorMemberId: string;
@@ -121,12 +124,13 @@ beforeEach(async () => {
   );
   outsiderMemberId = outsider.rows[0]?.id as string;
 
+  firstScheduledFor = new Date(Date.now() + 3_600_000);
   const session = (await call("sessions.create", {
     spaceId,
     cycleId,
     kind: "monthly",
     title: "March monthly review",
-    scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+    scheduledFor: firstScheduledFor.toISOString(),
     facilitatorId: facilitatorMemberId,
   })) as { id: string };
   sessionId = session.id;
@@ -339,13 +343,14 @@ describe("the plan's shape, and why it is not the obvious one", () => {
     // March has one March opinion per objective, not two.
     await call("sessions.setTrend", { sessionId, goalId, trend: "flat" });
 
+    const secondScheduledFor = new Date(Date.now() + 14 * 86_400_000);
     const second = (await call("sessions.create", {
       spaceId,
       cycleId,
       kind: "monthly",
       title: "March monthly review, take two",
       // Same month as the first, a fortnight later.
-      scheduledFor: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+      scheduledFor: secondScheduledFor.toISOString(),
       facilitatorId: facilitatorMemberId,
     })) as { id: string };
     await call("sessions.open", { id: second.id });
@@ -353,9 +358,24 @@ describe("the plan's shape, and why it is not the obvious one", () => {
     const before = (await call("sessions.monthlyRecord", {
       sessionId: second.id,
     })) as { trends: { trend: string }[] };
+    // Both reviews' own months, in the workspace's timezone, which is how the
+    // product keys a trend: on when each review is scheduled. This compared
+    // the runner's clock with the second review instead, so it was wrong in
+    // the last hour of every month, when the first review, an hour away,
+    // already falls in the next one. The v0.1.0 Release run failed here at
+    // 22:24 UTC on 30 September.
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ timezone: string | null }>(
+      "select settings->>'timezone' as timezone from workspaces where id = $1",
+      [workspaceId],
+    );
+    const timeZone = rows[0]?.timezone || "UTC";
+    const monthOf = (at: Date) => {
+      const { year, month } = localDateIn(at, timeZone);
+      return `${year}-${month}`;
+    };
     const sameMonth =
-      new Date().getMonth() ===
-      new Date(Date.now() + 14 * 86_400_000).getMonth();
+      monthOf(firstScheduledFor) === monthOf(secondScheduledFor);
     if (sameMonth) {
       // The second review opens already knowing what the first concluded.
       expect(before.trends).toHaveLength(1);
