@@ -53,8 +53,10 @@
  * shrinks, and emptying it is P6-G22d-b. The machinery above is what makes
  * emptying it possible.
  */
+import type { TerminologyOverrides } from "@openokr/method";
 import en from "./messages/en.json";
 import ms from "./messages/ms.json";
+import { fillTermHole, isTermHole } from "./terms.ts";
 
 export type Catalogue = Readonly<Record<string, string>>;
 export type Locale = "en" | "ms";
@@ -91,10 +93,19 @@ export function messageHoles(message: string): readonly string[] {
   ];
 }
 
+/**
+ * The message, with its holes filled.
+ *
+ * `renamed` is the workspace's own words for the method's terms (M-14). A term
+ * hole such as `{termObjective}` is filled from it, or from the catalogue's own
+ * word for the term when the workspace renamed nothing, so a caller never
+ * passes a term as a value. See `terms.ts`.
+ */
 export function translate(
   catalogue: Catalogue,
   key: string,
   values?: MessageValues,
+  renamed?: TerminologyOverrides,
 ): string {
   const value = catalogue[key];
   if (value === undefined) {
@@ -104,11 +115,14 @@ export function translate(
     throw new Error(`No catalogue entry for "${key}".`);
   }
 
-  const holes = messageHoles(value);
-  if (holes.length === 0 && values === undefined) {
+  const every = messageHoles(value);
+  if (every.length === 0 && values === undefined) {
     return value;
   }
 
+  // Term holes are filled by the catalogue and the workspace, never by the
+  // caller, so they are left out of both checks below.
+  const holes = every.filter((hole) => !isTermHole(hole));
   const supplied = values ?? {};
   // **Both directions, and the second one is the useful one.** A missing value
   // would render "{count}" on a screen, which is the defect this replaces. A
@@ -127,7 +141,11 @@ export function translate(
     );
   }
 
-  return value.replace(HOLE, (_, name: string) => String(supplied[name]));
+  return value.replace(
+    HOLE,
+    (_, name: string) =>
+      fillTermHole(catalogue, name, renamed) ?? String(supplied[name]),
+  );
 }
 
 /** Splits a message into its holes and the text between them. */
@@ -191,7 +209,18 @@ export function buildPseudoCatalogue(
  * directly in `catalogue.test.ts` rather than only asserted about.
  */
 export function findUnwrappedText(renderedText: string): readonly string[] {
-  const withoutWrapped = renderedText.replace(/\[[^\]]*\]/g, " ");
+  // Innermost first, until nothing is left to strip, because a term hole puts
+  // one wrapped entry inside another: "[Nëw [späcë~~]~~~]" (M-14). Stripping
+  // outer pairs in one pass would leave the tail of the outer one behind and
+  // report it as text that never came from the catalogue.
+  let withoutWrapped = renderedText;
+  for (;;) {
+    const stripped = withoutWrapped.replace(/\[[^[\]]*\]/g, " ");
+    if (stripped === withoutWrapped) {
+      break;
+    }
+    withoutWrapped = stripped;
+  }
   const matches = withoutWrapped.match(/[A-Za-z]{2,}/g) ?? [];
   return matches;
 }

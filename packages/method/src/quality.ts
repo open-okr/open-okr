@@ -81,6 +81,18 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
           "Your objective starts with a deliverable, not a destination. If we do it and nothing changes, did we succeed? Rewrite around the change you want.",
       },
       {
+        condition: "Matches an end-state shape",
+        status: "pass",
+        prompt:
+          "This names the state you want to be in. Keep the deliverables in your key results.",
+      },
+      {
+        condition: "Contains an output verb anywhere",
+        status: "warn",
+        prompt:
+          "There is output language here. What would be true after this is done? Lead with that.",
+      },
+      {
         condition: "Bare metric movement, no why",
         status: "fail",
         prompt:
@@ -97,18 +109,6 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
         status: "pass",
         prompt:
           "This reads as a change in state, not a to-do. Keep the deliverables in your key results.",
-      },
-      {
-        condition: "Matches an end-state shape",
-        status: "pass",
-        prompt:
-          "This names the state you want to be in. Keep the deliverables in your key results.",
-      },
-      {
-        condition: "Contains an output verb anywhere",
-        status: "warn",
-        prompt:
-          "There is output language here. What would be true after this is done? Lead with that.",
       },
       {
         condition: "Cannot tell",
@@ -502,10 +502,8 @@ const check = (id: string): QualityCheck => {
 /**
  * §4.1's five objective checks, first match wins within each.
  *
- * The order inside OBJ-1 is the order METHOD.md lists, with one exception that
- * matters: "starts with an output verb" is tested before "contains one
- * anywhere", because a title that starts with one also contains one and the
- * stronger verdict has to win. METHOD.md's own table reads the same way.
+ * The order inside OBJ-1 is the order METHOD.md lists, and `pnpm
+ * method:check` compares it row by row since completeness review M-27.
  */
 export function evaluateObjective(
   input: ObjectiveInput,
@@ -529,25 +527,25 @@ export function evaluateObjective(
   const startsMovement = startsWith(title, lists.movementVerbs);
   const hasWhy = contains(title, lists.whyMarkers);
   const hasState = contains(title, lists.stateWords);
+  // METHOD.md §4.1's table, top to bottom, first match wins (completeness
+  // review M-27). The shape row is second: a sentence whose shape names an
+  // end state has named one, whatever list words sit in its tail, and METHOD's
+  // own example carries `finish`. Everything after it is the table's order,
+  // which puts the output-verb sweep above movement, why and state words.
+  // This chain used to ask the sweep second to last, so "Grow revenue so that
+  // we can launch in Europe" passed on its why and never met the warning.
   const obj1Verdict = startsOutput
     ? verdictOf(obj1, "Starts with an output verb")
-    : startsMovement && hasDigits && !hasWhy
-      ? verdictOf(obj1, "Bare metric movement, no why")
-      : startsMovement && hasWhy
-        ? verdictOf(obj1, "Metric movement with a why")
-        : hasState
-          ? verdictOf(obj1, "Names a change in state")
-          : // **Before the output-verb sweep, and that order is the point**
-            // (P7-T07a). "Make X something Y" carries `make`, which is not
-            // an output verb, but "Make the platform something an auditor
-            // can verify unaided" carries `verify` and several shapes will
-            // catch a list word somewhere in their tail. A sentence whose
-            // shape names an end state has named one, whatever words sit
-            // inside it, so the shape is asked first.
-            matchesEndStateShape(title)
-            ? verdictOf(obj1, "Matches an end-state shape")
-            : contains(title, lists.outputVerbs)
-              ? verdictOf(obj1, "Contains an output verb anywhere")
+    : matchesEndStateShape(title)
+      ? verdictOf(obj1, "Matches an end-state shape")
+      : contains(title, lists.outputVerbs)
+        ? verdictOf(obj1, "Contains an output verb anywhere")
+        : startsMovement && hasDigits && !hasWhy
+          ? verdictOf(obj1, "Bare metric movement, no why")
+          : startsMovement && hasWhy
+            ? verdictOf(obj1, "Metric movement with a why")
+            : hasState
+              ? verdictOf(obj1, "Names a change in state")
               : verdictOf(obj1, "Cannot tell");
 
   // OBJ-2. The bounds are the §11 registry's, not this function's: METHOD.md

@@ -138,6 +138,39 @@ The ramp splits by job, and the split is what keeps both themes legible:
   freely.** They have to: indigo-500 against a dark progress track is 2.33:1, a
   focus ring nobody can find and a bar that vanishes.
 
+### A workspace's own brand colour
+
+The branding card on S-36 takes one colour, and the root layout turns it into
+the seven brand tokens for both themes (completeness review M-14). The
+administrator chooses the hue; the product chooses each token's weight, by
+the contrast its job owes. `packages/core/src/settings/brand-colour.ts` does
+the derivation and `packages/core/test/brand-colour.test.ts` asserts every
+pair below for a spread of colours, from a near-black navy to near-white.
+
+| Token | Light | Dark | Owes |
+|---|---|---|---|
+| `--brand` | The chosen colour, or the nearest darker shade that carries white | Same | White at 4.5:1 |
+| `--brand-600` / `--brand-700` | Two steps darker than `--brand` | Same | White at 4.5:1 |
+| `--brand-text` | Darkened until it clears | Lightened until it clears | 4.5:1 on the card, the background, a hover row and `--brand-weak` |
+| `--brand-strong` | `--brand` | `--brand-text` | 3:1 against the track and the surfaces |
+| `--brand-weak` | The hue at 96.5% lightness | The hue at 20%, saturation at most 50% | Nothing: a tint |
+| `--brand-line` | The hue at 89% lightness | `--brand-700` | Nothing: a halo |
+
+- **A colour never fails contrast, so none is refused for it.** One too light
+  to carry white text is darkened, and the card names the shade in force.
+- **A status hue is refused**, by the settings schema rather than the card, so
+  no surface can store one. Rule 1: red (hue 340° to 15°), amber (15° to 65°)
+  and green (65° to 185°, which takes in teal and lime) mean off track, at risk
+  and on track. The arc from cyan-blue through indigo and violet to pink is
+  open, and so is any grey (HSL saturation under 15%). A status hue stored
+  before the refusal is not applied either, and the card says so.
+- **The style sheet is one step more specific than `tokens.css`**
+  (`:root:root`, `:root:root[data-theme=dark]`), so it wins whatever order the
+  two arrive in, and it sets every token for both themes so a light value
+  never outranks a dark default.
+- Not applied before sign-in, because no workspace is known yet, and not in
+  email, which carries no colour at all.
+
 ### Text and surface
 
 | Token | Light | Dark | Use |

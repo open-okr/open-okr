@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { SETTINGS_REGISTRY } from "@openokr/core";
+import { CATALOGUES } from "@openokr/ui";
 import { describe, expect, test } from "vitest";
 
 /**
@@ -90,6 +91,115 @@ describe("the five steps", () => {
     // The first screen fully in it, which is the pattern P6-G22c follows.
     expect(wizard).toContain("useTranslations");
     expect(wizard).toContain('t("common.title")');
+  });
+
+  test("are counted from the list, never written as a word (L-08)", () => {
+    // "Four questions" sat above a "1 / 5" counter from the day P8-T12 added
+    // the template step: the sentence and the list were two places to change.
+    // The count is now the list's own length, in the sentence as in the
+    // counter, so a sixth step changes both or neither.
+    expect(wizard.replace(/\s+/g, " ")).toContain(
+      't("welcome.explains", { count: STEPS.length })',
+    );
+    // The counter beside it, built from the same list.
+    expect(wizard).toContain(`$\{index + 1} / $\{STEPS.length}`);
+    for (const locale of ["en", "ms"] as const) {
+      const explains = CATALOGUES[locale]["welcome.explains"] ?? "";
+      expect(explains, locale).toContain("{count}");
+      // No number written as a word, in either language.
+      expect(explains, locale).not.toMatch(
+        /\b(four|five|six|empat|lima|enam)\b/i,
+      );
+    }
+  });
+
+  test("open on what the workspace holds now, so a reopened one keeps it (L-08)", () => {
+    // Pressing Continue on a reopened wizard writes back whatever the step
+    // shows. A constant there would overwrite the rhythm card's answer with
+    // the default, which is exactly the erasure "resumable" must not cause.
+    expect(page).toContain('callAction(context, "rhythm.read", {})');
+    expect(page).toContain("frequency={rhythm.defaultCheckInFrequency}");
+    expect(wizard).toContain("useState<CheckInFrequency>(currentFrequency)");
+    expect(wizard).not.toContain('>("weekly")');
+    expect(page).toContain("workspaceName={workspace.name}");
+  });
+});
+
+describe("resumable from admin (L-08)", () => {
+  const card = at("../app/admin/general/setup-card.tsx");
+  const cardActions = at("../app/admin/general/setup-actions.ts");
+  const general = at("../app/admin/general/page.tsx");
+
+  test("General in admin carries the card, reading the stored flag", () => {
+    // Inside the admin layout, which refuses anybody below `full`, and the
+    // action itself is declared `full` as well, so neither half relies on
+    // the other.
+    expect(general).toContain(
+      "<SetupCard done={read.settings.onboardingDone !== false} />",
+    );
+  });
+
+  test("reopening is the registered action, and then goes to the wizard", () => {
+    expect(cardActions).toContain('"workspace.reopenOnboarding"');
+    expect(cardActions).toContain('redirect("/welcome")');
+    // A refusal is shown on the card rather than swallowed. A frozen
+    // workspace is the case that meets it.
+    expect(cardActions).toContain("return { error: error.message };");
+    expect(card).toContain("<ActionForm action={reopenSetup}");
+    expect(card).toContain('data-testid="reopen-onboarding"');
+  });
+
+  test("a setup already open links to it rather than writing the flag again", () => {
+    expect(card).toContain('href="/welcome"');
+    expect(card).toContain('data-testid="continue-onboarding"');
+  });
+
+  test("the action is declared full and writes nothing but the flag", () => {
+    const workspaceActions = at(
+      "../../../packages/core/src/actions/workspace.ts",
+    );
+    const start = workspaceActions.indexOf(
+      'name: "workspace.reopenOnboarding"',
+    );
+    expect(start).toBeGreaterThan(-1);
+    const body = workspaceActions.slice(
+      start,
+      workspaceActions.indexOf("export const", start),
+    );
+    expect(body).toContain("access: ACCESS_LEVELS.full");
+    expect(body).toContain(`'{"onboardingDone": false}'::jsonb`);
+  });
+});
+
+describe("the first-visit tour (L-08)", () => {
+  const tour = at("../app/first-visit-tour.tsx");
+  const tourActions = at("../app/tour-actions.ts");
+  const css = at("../app/globals.css");
+
+  test("is drawn on the Work Map, only for a member who has not finished it", () => {
+    expect(home).toContain('callAction(context, "people.readOwnTour", {})');
+    expect(home).toContain("{tour.finished ? null : <FirstVisitTour />}");
+    // After the setup redirect, so an owner meets the setup first.
+    expect(home.indexOf('"people.readOwnTour"')).toBeGreaterThan(
+      home.indexOf('redirect("/welcome")'),
+    );
+  });
+
+  test("is ended by the member's own registered write", () => {
+    expect(tourActions).toContain('"people.finishOwnTour"');
+    expect(tour).toContain("finishTour()");
+  });
+
+  test("outlines every stop that has something on screen to outline", () => {
+    // A check-in is a composer, not a thing on the Work Map, so it is the
+    // one stop that explains without pointing.
+    for (const stop of ["work-map", "review", "cycle-strip", "search"]) {
+      expect(css, stop).toContain(`:root[data-tour-stop="${stop}"]`);
+    }
+    expect(at("../app/work-map.tsx")).toContain('data-tour-target="work-map"');
+    expect(at("../app/work-map-header.tsx")).toContain(
+      'data-tour-target="cycle-strip"',
+    );
   });
 });
 

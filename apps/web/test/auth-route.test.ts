@@ -16,8 +16,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const handlerMock = vi.fn();
 const recordInstanceAuditEventMock = vi.fn();
 
+// The route asks for the current instance, which is the one rebuilt after an
+// SSO change (completeness review L-15).
 vi.mock("../lib/auth", () => ({
-  getAuth: () => ({ handler: handlerMock }),
+  getCurrentAuth: async () => ({ handler: handlerMock }),
   getPool: () => "fake-pool",
 }));
 

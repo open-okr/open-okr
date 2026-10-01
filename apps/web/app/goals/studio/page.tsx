@@ -1,6 +1,6 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
-import { resolveAccessLevelFor } from "../../../lib/access";
+import { workspaceReaderLevel } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { GOAL_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
@@ -30,7 +30,7 @@ export default async function StudioPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  const level = await resolveAccessLevelFor(
+  const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );

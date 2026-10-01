@@ -12,6 +12,16 @@
       "pages": false
     },
     {
+      "name": "workspace deletedItems",
+      "action": "workspace.deletedItems",
+      "method": "GET",
+      "path": "/workspace/deletedItems",
+      "scope": "read",
+      "summary": "The goals, initiatives, tasks and documents that were deleted and that the caller could restore, newest first, with who deleted each.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "workspace rename",
       "action": "workspace.rename",
       "method": "POST",
@@ -35,6 +45,16 @@
       "path": "/workspace/finishOnboarding",
       "scope": "write",
       "summary": "Mark the workspace's own setup as finished, so the wizard stops offering itself.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "workspace reopenOnboarding",
+      "action": "workspace.reopenOnboarding",
+      "method": "POST",
+      "path": "/workspace/reopenOnboarding",
+      "scope": "write",
+      "summary": "Offer the workspace's own setup again, keeping every answer it already holds.",
       "flags": [],
       "pages": false
     },
@@ -193,6 +213,36 @@
           "required": false
         }
       ],
+      "pages": false
+    },
+    {
+      "name": "people readOwnTour",
+      "action": "people.readOwnTour",
+      "method": "GET",
+      "path": "/people/readOwnTour",
+      "scope": "read",
+      "summary": "Whether the signed-in member has finished the first-visit tour.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "people finishOwnTour",
+      "action": "people.finishOwnTour",
+      "method": "POST",
+      "path": "/people/finishOwnTour",
+      "scope": "write",
+      "summary": "Mark the first-visit tour as finished for the signed-in member, on every machine.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "people exportMine",
+      "action": "people.exportMine",
+      "method": "GET",
+      "path": "/people/exportMine",
+      "scope": "read",
+      "summary": "Everything this workspace holds about the signed-in member, as one document.",
+      "flags": [],
       "pages": false
     },
     {
@@ -468,7 +518,7 @@
       "method": "POST",
       "path": "/invitations/createPersonalLink",
       "scope": "write",
-      "summary": "Invite one email address, usable once.",
+      "summary": "Invite one email address, usable once, as a member or as a guest of one space.",
       "flags": [
         {
           "name": "email",
@@ -480,6 +530,12 @@
           "name": "expires-in-days",
           "field": "expiresInDays",
           "type": "integer",
+          "required": false
+        },
+        {
+          "name": "guest-space-id",
+          "field": "guestSpaceId",
+          "type": "string",
           "required": false
         }
       ],
@@ -525,7 +581,7 @@
       "method": "POST",
       "path": "/invitations/joinByTrustedDomain",
       "scope": "write",
-      "summary": "Join a workspace automatically because your email domain is trusted.",
+      "summary": "Join a workspace because it trusts the domain of your confirmed email address.",
       "flags": [],
       "pages": false
     },
@@ -1466,6 +1522,12 @@
           "field": "height",
           "type": "integer",
           "required": false
+        },
+        {
+          "name": "thumbnail",
+          "field": "thumbnail",
+          "type": "boolean",
+          "required": false
         }
       ],
       "pages": false
@@ -1483,6 +1545,16 @@
           "field": "blobId",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "variant",
+          "field": "variant",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "file",
+            "thumbnail"
+          ]
         }
       ],
       "pages": false
@@ -1945,6 +2017,65 @@
       "pages": false
     },
     {
+      "name": "audit list",
+      "action": "audit.list",
+      "method": "GET",
+      "path": "/audit/list",
+      "scope": "read",
+      "summary": "The audit trail a page at a time, newest first, narrowed by date, action, actor or target. Payloads stay out; the export carries them.",
+      "flags": [
+        {
+          "name": "from",
+          "field": "from",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "to",
+          "field": "to",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "action",
+          "field": "action",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "actor-member-id",
+          "field": "actorMemberId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "target-type",
+          "field": "targetType",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "target-id",
+          "field": "targetId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": true
+    },
+    {
       "name": "settings readWorkspaceSettings",
       "action": "settings.readWorkspaceSettings",
       "method": "GET",
@@ -2042,7 +2173,7 @@
       "method": "GET",
       "path": "/ai/readAvailability",
       "scope": "read",
-      "summary": "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
+      "summary": "Whether any enabled AI provider holds a key the caller's own requests can use, as one boolean.",
       "flags": [],
       "pages": false
     },
@@ -2720,6 +2851,207 @@
       "pages": false
     },
     {
+      "name": "ai readPrivacySettings",
+      "action": "ai.readPrivacySettings",
+      "method": "GET",
+      "path": "/ai/readPrivacySettings",
+      "scope": "read",
+      "summary": "The workspace's AI egress controls: context level, personal-data redaction, no-training and the host allow-list.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "ai updatePrivacySettings",
+      "action": "ai.updatePrivacySettings",
+      "method": "POST",
+      "path": "/ai/updatePrivacySettings",
+      "scope": "write",
+      "summary": "Change what may leave for an AI provider off this network: the context level, redaction, no-training and the host allow-list.",
+      "flags": [
+        {
+          "name": "context-egress",
+          "field": "contextEgress",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "all",
+            "assists",
+            "none"
+          ]
+        },
+        {
+          "name": "redact-personal-data",
+          "field": "redactPersonalData",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "no-training",
+          "field": "noTraining",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "allowed-hosts",
+          "field": "allowedHosts",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sso listConnections",
+      "action": "sso.listConnections",
+      "method": "GET",
+      "path": "/sso/listConnections",
+      "scope": "read",
+      "summary": "This workspace's single sign-on connections, turned-off ones included, with every setting except the client secret.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "sso updateConnection",
+      "action": "sso.updateConnection",
+      "method": "POST",
+      "path": "/sso/updateConnection",
+      "scope": "write",
+      "summary": "Changes a single sign-on connection's name, email domains, enforcement and protocol settings. A blank client secret keeps the stored one.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "display-name",
+          "field": "displayName",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "email-domains",
+          "field": "emailDomains",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "enforce",
+          "field": "enforce",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "client-id",
+          "field": "clientId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "client-secret",
+          "field": "clientSecret",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "discovery-url",
+          "field": "discoveryUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "authorization-url",
+          "field": "authorizationUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "token-url",
+          "field": "tokenUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "user-info-url",
+          "field": "userInfoUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "scopes",
+          "field": "scopes",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-entry-point",
+          "field": "samlEntryPoint",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-issuer",
+          "field": "samlIssuer",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-certificate",
+          "field": "samlCertificate",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-audience",
+          "field": "samlAudience",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sso setConnectionEnabled",
+      "action": "sso.setConnectionEnabled",
+      "method": "POST",
+      "path": "/sso/setConnectionEnabled",
+      "scope": "write",
+      "summary": "Turns a single sign-on connection off, so nobody signs in through it and it leaves the sign-in page, or on again.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "enabled",
+          "field": "enabled",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sso removeConnection",
+      "action": "sso.removeConnection",
+      "method": "POST",
+      "path": "/sso/removeConnection",
+      "scope": "destructive",
+      "summary": "Removes a single sign-on connection. Nobody signs in through it again, and an enforced connection's domains go back to passwords.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "agents list",
       "action": "agents.list",
       "method": "GET",
@@ -2904,7 +3236,7 @@
       "method": "POST",
       "path": "/agents/startRun",
       "scope": "write",
-      "summary": "Starts a run for an agent against an already-decomposed task list.",
+      "summary": "Starts a run for an agent against an already-decomposed task list, and queues its first step.",
       "flags": [
         {
           "name": "agent-id",
@@ -3081,6 +3413,40 @@
       "pages": false
     },
     {
+      "name": "proposals apply",
+      "action": "proposals.apply",
+      "method": "POST",
+      "path": "/proposals/apply",
+      "scope": "write",
+      "summary": "Applies one agent proposal the caller may decide, running the proposed action as them.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "proposals dismiss",
+      "action": "proposals.dismiss",
+      "method": "POST",
+      "path": "/proposals/dismiss",
+      "scope": "write",
+      "summary": "Dismisses one agent proposal the caller may decide, without applying it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "spaces list",
       "action": "spaces.list",
       "method": "GET",
@@ -3177,7 +3543,7 @@
       "method": "POST",
       "path": "/spaces/updateSettings",
       "scope": "write",
-      "summary": "Sets one space's team voting, strictness override and default check-in frequency.",
+      "summary": "Sets one space's team voting, strictness override, default check-in frequency and the Slack or Teams channel it posts to.",
       "flags": [
         {
           "name": "id",
@@ -3200,6 +3566,18 @@
         {
           "name": "default-check-in-frequency",
           "field": "defaultCheckInFrequency",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "slack-channel",
+          "field": "slackChannel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "teams-channel",
+          "field": "teamsChannel",
           "type": "string",
           "required": false
         }
@@ -3429,6 +3807,16 @@
           ]
         },
         {
+          "name": "mode",
+          "field": "mode",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "annual",
+            "quarterly"
+          ]
+        },
+        {
           "name": "first-cycle",
           "field": "firstCycle",
           "type": "boolean",
@@ -3572,7 +3960,7 @@
       "method": "POST",
       "path": "/cycles/feedForward",
       "scope": "write",
-      "summary": "Hands METHOD.md §8.9's inheritance to the next cycle: prior scores, carried work as issues at impact four, and the annual frame.",
+      "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
       "flags": [
         {
           "name": "from-cycle-id",
@@ -3583,6 +3971,23 @@
         {
           "name": "to-cycle-id",
           "field": "toCycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "cycles close",
+      "action": "cycles.close",
+      "method": "POST",
+      "path": "/cycles/close",
+      "scope": "write",
+      "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
           "type": "string",
           "required": true
         }
@@ -4273,6 +4678,23 @@
       "pages": false
     },
     {
+      "name": "documents restore",
+      "action": "documents.restore",
+      "method": "POST",
+      "path": "/documents/restore",
+      "scope": "write",
+      "summary": "Brings back a deleted document. Its versions were never removed, so they come back with it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "attachments list",
       "action": "attachments.list",
       "method": "GET",
@@ -4405,6 +4827,29 @@
           "field": "shortId",
           "type": "string",
           "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "search entities",
+      "action": "search.entities",
+      "method": "GET",
+      "path": "/search/entities",
+      "scope": "read",
+      "summary": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+      "flags": [
+        {
+          "name": "text",
+          "field": "text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false
@@ -4693,7 +5138,7 @@
       "method": "GET",
       "path": "/tasks/board",
       "scope": "read",
-      "summary": "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
+      "summary": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
       "flags": [
         {
           "name": "space-id",
@@ -5090,6 +5535,23 @@
       "pages": false
     },
     {
+      "name": "tasks restore",
+      "action": "tasks.restore",
+      "method": "POST",
+      "path": "/tasks/restore",
+      "scope": "write",
+      "summary": "Brings back a deleted task with the assignments and checklist lines deleted with it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tasks linkedWork",
       "action": "tasks.linkedWork",
       "method": "GET",
@@ -5335,6 +5797,23 @@
       "path": "/initiatives/delete",
       "scope": "destructive",
       "summary": "Soft-deletes an initiative and the links it held.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "initiatives restore",
+      "action": "initiatives.restore",
+      "method": "POST",
+      "path": "/initiatives/restore",
+      "scope": "write",
+      "summary": "Brings back a deleted initiative and the key result links that were deleted with it.",
       "flags": [
         {
           "name": "id",
@@ -5774,6 +6253,23 @@
       "pages": false
     },
     {
+      "name": "goals restore",
+      "action": "goals.restore",
+      "method": "POST",
+      "path": "/goals/restore",
+      "scope": "write",
+      "summary": "Brings back a deleted goal and the key results that were deleted with it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals reviewDecision",
       "action": "goals.reviewDecision",
       "method": "GET",
@@ -6119,6 +6615,29 @@
       "pages": false
     },
     {
+      "name": "goals linkKpi",
+      "action": "goals.linkKpi",
+      "method": "POST",
+      "path": "/goals/linkKpi",
+      "scope": "write",
+      "summary": "Links a KPI to a key result, which from then on reads its value and progress from it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "kpi-id",
+          "field": "kpiId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals unlinkKpi",
       "action": "goals.unlinkKpi",
       "method": "POST",
@@ -6319,6 +6838,29 @@
         {
           "name": "sentence",
           "field": "sentence",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals decomposeKeyResult",
+      "action": "goals.decomposeKeyResult",
+      "method": "GET",
+      "path": "/goals/decomposeKeyResult",
+      "scope": "read",
+      "summary": "Drafts initiatives and their first tasks for one key result, as plain drafts a person edits before creating any of them.",
+      "flags": [
+        {
+          "name": "goal-id",
+          "field": "goalId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
           "type": "string",
           "required": true
         }
@@ -7076,6 +7618,16 @@
       "pages": false
     },
     {
+      "name": "kpis list",
+      "action": "kpis.list",
+      "method": "GET",
+      "path": "/kpis/list",
+      "scope": "read",
+      "summary": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "kpis setFormula",
       "action": "kpis.setFormula",
       "method": "POST",
@@ -7196,6 +7748,23 @@
           "field": "treeId",
           "type": "string",
           "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "kpis spaceTrees",
+      "action": "kpis.spaceTrees",
+      "method": "GET",
+      "path": "/kpis/spaceTrees",
+      "scope": "read",
+      "summary": "One space's KPIs, grouped by the driver tree each is filed in. Drives the space home.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false
@@ -7383,7 +7952,40 @@
             "check_in",
             "cycle",
             "document",
-            "task"
+            "task",
+            "initiative"
+          ]
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "comments summarise",
+      "action": "comments.summarise",
+      "method": "GET",
+      "path": "/comments/summarise",
+      "scope": "read",
+      "summary": "Summarises the discussion on a subject and lists what it left open, refusing a summary that quotes words nobody wrote.",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "goal",
+            "key_result",
+            "check_in",
+            "cycle",
+            "document",
+            "task",
+            "initiative"
           ]
         },
         {
@@ -7401,7 +8003,7 @@
       "method": "POST",
       "path": "/comments/create",
       "scope": "write",
-      "summary": "Post a comment on a goal, key result, check-in, cycle or document",
+      "summary": "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
       "flags": [
         {
           "name": "subject-type",
@@ -7414,7 +8016,8 @@
             "check_in",
             "cycle",
             "document",
-            "task"
+            "task",
+            "initiative"
           ]
         },
         {
@@ -7451,7 +8054,8 @@
             "check_in",
             "cycle",
             "document",
-            "task"
+            "task",
+            "initiative"
           ]
         },
         {
@@ -7587,7 +8191,8 @@
             "check_in",
             "cycle",
             "document",
-            "task"
+            "task",
+            "initiative"
           ]
         },
         {
@@ -8421,6 +9026,23 @@
         {
           "name": "note",
           "field": "note",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions postDigest",
+      "action": "sessions.postDigest",
+      "method": "POST",
+      "path": "/sessions/postDigest",
+      "scope": "write",
+      "summary": "Posts a closed weekly session's digest to the Slack or Teams channel its space is linked to, once per channel.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
           "type": "string",
           "required": true
         }

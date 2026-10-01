@@ -1,6 +1,7 @@
 import type { ResolvedThresholds } from "@openokr/method";
 import { confidenceBand } from "@openokr/method";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "./translations";
 
 /**
  * A space's weekly figures: the confidence trend and the streak
@@ -84,7 +85,7 @@ function Sparkline({
   );
 }
 
-export function WeeklyFigures({
+export async function WeeklyFigures({
   trend,
   streakWeeks,
   weeks,
@@ -97,6 +98,7 @@ export function WeeklyFigures({
   /** This workspace's resolved §11 numbers, for §3.2's bands. */
   readonly thresholds: ResolvedThresholds;
 }) {
+  const { t } = await getTranslations();
   const latest = trend.at(-1) ?? null;
   const previous = trend.at(-2) ?? null;
   const move = latest && previous ? latest.average - previous.average : null;
@@ -106,10 +108,11 @@ export function WeeklyFigures({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">Confidence trend</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("weeklyFigures.confidenceTrend")}
+            </h2>
             <p className="text-xs text-ink-3">
-              One point per week this space held a session, oldest first. The
-              figure is the average the digest recorded, not a second sum.
+              {t("weeklyFigures.onePointPerWeek")}
             </p>
           </div>
           <div className="flex flex-none items-center gap-3.5">
@@ -117,15 +120,19 @@ export function WeeklyFigures({
               <span className="text-lg font-bold tabular-nums text-ink">
                 {streakWeeks}
               </span>
-              <span className="text-xs text-ink-3">week streak</span>
+              <span className="text-xs text-ink-3">
+                {t("cycle.runningCadence.weekStreak")}
+              </span>
             </div>
             {move === null ? null : (
               <Chip tone={move > 0 ? "ok" : move < 0 ? "bad" : "neutral"}>
                 {move > 0
-                  ? `up ${move.toFixed(2)}`
+                  ? t("weeklyFigures.up", { move: move.toFixed(2) })
                   : move < 0
-                    ? `down ${Math.abs(move).toFixed(2)}`
-                    : "flat"}
+                    ? t("weeklyFigures.down", {
+                        move: Math.abs(move).toFixed(2),
+                      })
+                    : t("weeklyFigures.flat")}
               </Chip>
             )}
           </div>
@@ -133,16 +140,21 @@ export function WeeklyFigures({
         <CardBody>
           {trend.length === 0 ? (
             <p className="text-xs text-ink-3">
-              No week has been closed yet. The first point lands when this
-              session closes and writes its digest.
+              {t("weeklyFigures.noWeekClosedYet")}
             </p>
           ) : (
             <div className="flex flex-col gap-1.5">
               <Sparkline points={trend} thresholds={thresholds} />
               <p className="text-xs text-ink-4">
                 {trend.length === 1
-                  ? "One week so far."
-                  : `${trend.length} of the last ${weeks} weeks. A week with no session is not a point.`}
+                  ? t("weeklyFigures.oneWeekSoFar")
+                  : t("weeklyFigures.ofTheLast", {
+                      count: trend.length,
+                      weeks:
+                        weeks === 1
+                          ? t("common.count.weekOne", { count: weeks })
+                          : t("common.count.weekOther", { count: weeks }),
+                    })}
               </p>
             </div>
           )}

@@ -13,8 +13,10 @@
  */
 import { loadEnv } from "@openokr/config";
 import {
+  ADDRESS_RATE_LIMIT,
   API_RATE_WINDOW_SECONDS,
   apiError,
+  callerAddress,
   startDeviceAuthorisation,
   statusFor,
 } from "@openokr/core";
@@ -22,31 +24,19 @@ import { TOKEN_SCOPES, type TokenScope } from "@openokr/db";
 import type { NextRequest } from "next/server";
 import { getCache } from "../../../../../lib/cache";
 import { getPool } from "../../../../../lib/pool";
+import { retryAfter } from "../../../../../lib/retry-after";
 
 export const dynamic = "force-dynamic";
 
-/**
- * How many requests one address may start per window.
- *
- * Lower than the read limit on the rest of the surface, because each of these
- * writes a row and nobody legitimately starts thirty logins a minute.
- */
-const START_LIMIT = 10;
-
-const json = (body: unknown, status: number): Response =>
+const json = (
+  body: unknown,
+  status: number,
+  extra?: Readonly<Record<string, string>>,
+): Response =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: { "content-type": "application/json; charset=utf-8", ...extra },
   });
-
-/** The caller's address, through whatever proxy is in front. */
-function callerAddress(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? "unknown";
-  }
-  return request.headers.get("x-real-ip")?.trim() ?? "unknown";
-}
 
 /** The scopes asked for, refusing anything that is not one. */
 function scopesFrom(value: unknown): readonly TokenScope[] | null {
@@ -61,8 +51,8 @@ function scopesFrom(value: unknown): readonly TokenScope[] | null {
 
 export async function POST(request: NextRequest): Promise<Response> {
   const limited = await getCache().rateLimit(
-    `device:start:${callerAddress(request)}`,
-    START_LIMIT,
+    `device:start:${callerAddress(request.headers)}`,
+    ADDRESS_RATE_LIMIT,
     API_RATE_WINDOW_SECONDS,
   );
   if (!limited.allowed) {
@@ -70,7 +60,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       "rate_limited",
       "That is a lot of logins at once. Try again shortly.",
     );
-    return json({ error }, statusFor(error.code));
+    return json({ error }, statusFor(error.code), {
+      "retry-after": retryAfter(limited.resetSeconds),
+    });
   }
 
   let body: Record<string, unknown>;

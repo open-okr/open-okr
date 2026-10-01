@@ -6,7 +6,12 @@
  * That is the wrong place for it: the person who has to answer an auditor is
  * a workspace administrator in a browser, not whoever holds a shell.
  *
- * Two actions, and they are deliberately of different kinds.
+ * Three actions. The third, `audit.list`, is the trail read a page at a time
+ * (completeness review L-19): the first two could check it and take it away,
+ * and nothing could simply show it. It is a read like the verification, for
+ * the same reason, and it hands over less than the export does.
+ *
+ * The first two are deliberately of different kinds.
  *
  * **The export is a write**, because taking a copy of who did what is an act
  * worth recording. It writes its own audit row, which means the trail records
@@ -19,12 +24,13 @@
  * is intact. A verification that could not run on a frozen workspace would be
  * missing at the only moment it matters.
  *
- * Both are `full`. The trail names every actor and every change, and the
+ * All three are `full`. The trail names every actor and every change, and the
  * payloads carry the detail; that is an administrator's to read, and the same
  * argument `workspace.exportArchive` settled for the archive.
  */
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { listAuditRows } from "../audit/browse.ts";
 import {
   auditCsvFile,
   auditExportFilename,
@@ -144,6 +150,115 @@ export const exportAudit = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * How many rows one page of the screen shows, and the most a caller may ask
+ * for.
+ *
+ * Fifty is a screenful an administrator can scan. The ceiling is a page, not
+ * a file: somebody who wants thousands of rows wants the export, which says
+ * when it stopped and records that it was taken.
+ */
+const AUDIT_PAGE_SIZE = 50;
+const AUDIT_PAGE_CEILING = 200;
+
+const auditListRow = z.object({
+  id: z.uuid(),
+  /** The row's position in the chain. Null while it waits for one. */
+  seq: z.number().int().nullable(),
+  at: z.string(),
+  actorKind: z.enum(["human", "agent", "system", "operator"]),
+  actorMemberId: z.uuid().nullable(),
+  actorOperatorUserId: z.string().nullable(),
+  /** Where the write came from, when it was not the browser. */
+  channel: z.string().nullable(),
+  action: z.string(),
+  targetType: z.string(),
+  targetId: z.uuid().nullable(),
+  /** True once the chainer has given the row its position and hash. */
+  chained: z.boolean(),
+});
+
+export const listAudit = defineReadAction({
+  name: "audit.list",
+  summary:
+    "The audit trail a page at a time, newest first, narrowed by date, action, actor or target. Payloads stay out; the export carries them.",
+  input: z.object({
+    ...auditFilter,
+    /**
+     * The last row of the page before. Absent means the newest page.
+     *
+     * Optional rather than defaulted, like `limit` below: a `default` on a
+     * read action's input makes the field required in the inferred handler
+     * type, so the screen would have to pass it on the first page.
+     */
+    cursor: z
+      .object({ at: z.iso.datetime({ offset: true }), id: z.uuid() })
+      .optional(),
+    limit: z.number().int().min(1).max(AUDIT_PAGE_CEILING).optional(),
+  }),
+  output: z.object({
+    rows: z.array(auditListRow),
+    /** True when older rows match the same filter. */
+    more: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  page: { cursorFrom: ["at", "id"], itemsAt: "rows" },
+  async handler({ pool, workspaceId }, input) {
+    // Compared as instants rather than as strings, because an offset is
+    // allowed and "10:00+08:00" is earlier than "09:00Z".
+    if (
+      input.from &&
+      input.to &&
+      new Date(input.from).getTime() > new Date(input.to).getTime()
+    ) {
+      // The export's own refusal, word for word, so the screen says one thing
+      // whichever of the two buttons was pressed.
+      throw new OperationError(
+        "forbidden",
+        "The end of the range is before its start.",
+      );
+    }
+
+    const page = await listAuditRows(
+      pool,
+      workspaceId,
+      {
+        ...(input.from ? { from: new Date(input.from) } : {}),
+        ...(input.to ? { to: new Date(input.to) } : {}),
+        ...(input.action ? { action: input.action } : {}),
+        ...(input.actorMemberId ? { actorMemberId: input.actorMemberId } : {}),
+        ...(input.targetType ? { targetType: input.targetType } : {}),
+        ...(input.targetId ? { targetId: input.targetId } : {}),
+      },
+      {
+        ...(input.cursor
+          ? {
+              cursor: { at: new Date(input.cursor.at), id: input.cursor.id },
+            }
+          : {}),
+        limit: input.limit ?? AUDIT_PAGE_SIZE,
+      },
+    );
+
+    return {
+      rows: page.rows.map((row) => ({
+        id: row.id,
+        seq: row.seq,
+        at: row.at.toISOString(),
+        actorKind: row.actorKind,
+        actorMemberId: row.actorMemberId,
+        actorOperatorUserId: row.actorOperatorUserId,
+        channel: row.channel,
+        action: row.action,
+        targetType: row.targetType,
+        targetId: row.targetId,
+        chained: row.seq !== null,
+      })),
+      more: page.more,
+    };
+  },
 });
 
 export const verifyAudit = defineReadAction({

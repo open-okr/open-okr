@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "./translations";
 
 /**
  * Navigation between the screens of one module (UIUX-PLAN.md §4).
@@ -13,17 +14,22 @@ import Link from "next/link";
  * its siblings. A link rather than client state, so a tab is a URL somebody can
  * send, which is the same rule the explorer's filters follow.
  */
-export function SectionTabs({
+export async function SectionTabs({
   items,
   active,
 }: {
-  readonly items: readonly { readonly href: string; readonly label: string }[];
+  readonly items: readonly {
+    readonly href: string;
+    /** A catalogue key, so the tab is named in the reader's language. */
+    readonly labelKey: string;
+  }[];
   /** The `href` of the screen being rendered. */
   readonly active: string;
 }) {
+  const { t } = await getTranslations();
   return (
     <nav
-      aria-label="Section"
+      aria-label={t("lib.sectionTabs.section")}
       className="flex flex-wrap items-center gap-1.5 border-line border-b pb-2"
     >
       {items.map((item) => (
@@ -37,7 +43,7 @@ export function SectionTabs({
               : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
           }
         >
-          {item.label}
+          {t(item.labelKey)}
         </Link>
       ))}
     </nav>
@@ -46,13 +52,13 @@ export function SectionTabs({
 
 /** The KPI module's screens, in the order somebody works through them. */
 export const KPI_TABS = [
-  { href: "/kpis", label: "Grid" },
-  { href: "/kpis/trees", label: "Trees" },
-  { href: "/kpis/recovery", label: "Recovery board" },
+  { href: "/kpis", labelKey: "lib.sectionTabs.grid" },
+  { href: "/kpis/trees", labelKey: "lib.sectionTabs.trees" },
+  { href: "/kpis/recovery", labelKey: "kpis.recovery.recoveryBoard" },
 ] as const;
 
 /** The goal module's screens. The detail page is a leaf and has no tab. */
 export const GOAL_TABS = [
-  { href: "/goals", label: "Explorer" },
-  { href: "/goals/studio", label: "Alignment studio" },
+  { href: "/goals", labelKey: "lib.sectionTabs.explorer" },
+  { href: "/goals/studio", labelKey: "goals.studio.alignmentStudio" },
 ] as const;

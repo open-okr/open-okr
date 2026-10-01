@@ -110,6 +110,16 @@ function fromMessage(message: Anthropic.Message): ChatResponse {
   };
 }
 
+/**
+ * Where every request goes: the SDK's own default, written down (M-10).
+ *
+ * Passed explicitly rather than left to the SDK, which otherwise reads
+ * `ANTHROPIC_BASE_URL` from the process environment. The egress guard checks
+ * the host this names, and a host chosen by an environment variable nobody
+ * set on purpose would be a request the allow-list never saw.
+ */
+export const ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+
 export interface AnthropicProviderOptions {
   readonly apiKey: string;
   readonly fetch?: typeof fetch;
@@ -123,6 +133,7 @@ export class AnthropicProvider implements AIProvider {
   constructor(options: AnthropicProviderOptions) {
     this.#client = new Anthropic({
       apiKey: options.apiKey,
+      baseURL: ANTHROPIC_BASE_URL,
       fetch: options.fetch,
     });
     this.#defaultContextWindow = options.defaultContextWindow ?? 200_000;

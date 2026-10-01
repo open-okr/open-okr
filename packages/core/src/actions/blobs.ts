@@ -3,9 +3,9 @@
  *
  * `prepareUpload` and `claimUpload` are the two halves of the flow; nothing
  * here calls the storage port (CLAUDE.md: vendor SDKs and their ports live
- * only in `packages/adapters`). Whichever app route drives an actual upload
- * calls `FileStorage.put` with the key `prepareUpload` returns, in between
- * the two calls to this registry.
+ * only in `packages/adapters`). `storeUpload` in `../blobs/upload.ts` drives
+ * an upload between the two calls: it re-encodes an image and writes the
+ * bytes, and its thumbnail, at the key `prepareUpload` returns.
  */
 import {
   activeOnly,
@@ -27,11 +27,22 @@ import {
   QuotaExceededError,
   ValidationFailedError,
 } from "../blobs/provisioning.ts";
+import {
+  readSettingsIn,
+  resolveClamdSettings,
+  scanJobFor,
+} from "../blobs/scan.ts";
+import {
+  IMAGE_CONTENT_TYPES,
+  THUMBNAIL_CONTENT_TYPE,
+  thumbnailKeyFor,
+} from "../blobs/validation.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_ORPHAN_BLOB_MINUTES } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { readableThroughAttachment } from "./documents.ts";
 
 /** The workspace's own byte ceiling, resolved from its settings. */
 async function readQuotaBytes(
@@ -218,6 +229,21 @@ export const prepareImport = defineWriteAction({
     },
   }),
 });
+/**
+ * Finalises an upload (P2-T05), and holds it for a scan when there is a
+ * scanner (completeness review M-24).
+ *
+ * **Whether to scan is the instance's decision, never the caller's.** This is
+ * a public action, so an input flag saying "no scan needed" would be a way
+ * round the scanner for anybody with a token. The claim reads
+ * `scan.clamd.host` itself, and with a host set the file goes to `scanning`
+ * and a `blob.scan` row joins the same transaction, so the scan is enqueued
+ * exactly when the claim commits.
+ *
+ * **`thumbnail` is a flag for the same reason.** The key is derived from the
+ * blob's own storage key, so no caller can aim a preview at an object in
+ * another workspace.
+ */
 export const claimUpload = defineWriteAction({
   name: "blobs.claimUpload",
   summary: "Finalise an upload once the bytes are in storage.",
@@ -227,6 +253,8 @@ export const claimUpload = defineWriteAction({
     digest: z.string().min(1),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
+    /** A thumbnail was written at the key this blob's storage key derives. */
+    thumbnail: z.boolean().optional(),
   }),
   output: z.object({
     status: z.enum(["ok", "scanning"]),
@@ -237,6 +265,7 @@ export const claimUpload = defineWriteAction({
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const quotaBytes = await readQuotaBytes(tx, workspaceId);
+      const scanner = await resolveClamdSettings(readSettingsIn(tx));
 
       let claimed: Awaited<ReturnType<typeof claimBlob>>;
       try {
@@ -247,6 +276,8 @@ export const claimUpload = defineWriteAction({
           digest: input.digest,
           width: input.width,
           height: input.height,
+          thumbnail: input.thumbnail,
+          requiresScan: scanner !== null,
           quotaBytes,
         });
       } catch (error) {
@@ -271,17 +302,39 @@ export const claimUpload = defineWriteAction({
           payload: {
             usedAfterBytes: claimed.usedAfterBytes,
             warningCrossed: claimed.warningCrossed,
+            status: claimed.status,
           },
         },
+        outbox:
+          claimed.status === "scanning"
+            ? [scanJobFor(workspaceId, input.blobId)]
+            : [],
       };
     },
   }),
 });
 
+/**
+ * The storage key behind a file or its thumbnail, after checking access
+ * (P2-T05, P6-G27b, widened at completeness review M-24).
+ *
+ * **Only an `ok` file is served.** A file still `pending` has no bytes it can
+ * vouch for, one `scanning` has not been cleared, and one `quarantined` was
+ * flagged. Before M-24 this handed back the key whatever the status, which did
+ * not matter while nothing ever left `ok` and would have made the scan a
+ * formality the moment something did.
+ *
+ * **The thumbnail goes through the same door**, so a preview is exactly as
+ * readable as the file it shows, no more.
+ */
 export const getBlobForDownload = defineReadAction({
   name: "blobs.getForDownload",
   summary: "Resolve a blob's storage key, after checking access to it.",
-  input: z.object({ blobId: z.uuid() }),
+  input: z.object({
+    blobId: z.uuid(),
+    /** The file itself, or the small preview of an image. */
+    variant: z.enum(["file", "thumbnail"]).optional(),
+  }),
   output: z.object({
     storageKey: z.string(),
     filename: z.string(),
@@ -311,19 +364,37 @@ export const getBlobForDownload = defineReadAction({
         throw new OperationError("not_found", "No such file.");
       }
 
-      await getAccessScoped(tx, {
-        workspaceId: context.workspaceId,
-        memberId: member.id,
-        resourceType: "blob",
-        resourceId: input.blobId,
-        requires: ACCESS_LEVELS.view,
-      });
+      try {
+        await getAccessScoped(tx, {
+          workspaceId: context.workspaceId,
+          memberId: member.id,
+          resourceType: "blob",
+          resourceId: input.blobId,
+          requires: ACCESS_LEVELS.view,
+        });
+      } catch (error) {
+        // Not the uploader's own file, but perhaps one hung on something this
+        // reader reads, which the attachment list already shows them.
+        if (
+          !(error instanceof OperationError) ||
+          !(await readableThroughAttachment(
+            tx as OperationTx,
+            context.workspaceId,
+            member.id,
+            input.blobId,
+          ))
+        ) {
+          throw error;
+        }
+      }
 
       const [row] = await tx
         .select({
           storageKey: blobs.storageKey,
           filename: blobs.filename,
           contentType: blobs.contentType,
+          status: blobs.status,
+          thumbnailKey: blobs.thumbnailKey,
         })
         .from(blobs)
         .where(
@@ -337,7 +408,37 @@ export const getBlobForDownload = defineReadAction({
       if (!row) {
         throw new OperationError("not_found", "No such file.");
       }
-      return row;
+      if (row.status === "scanning") {
+        throw new OperationError(
+          "forbidden",
+          "This file is still being checked for viruses. It opens once the scan finishes.",
+        );
+      }
+      if (row.status === "quarantined") {
+        throw new OperationError(
+          "forbidden",
+          "The virus scan held this file back, so it cannot be opened.",
+        );
+      }
+      if (row.status !== "ok") {
+        throw new OperationError("not_found", "No such file.");
+      }
+
+      if (input.variant === "thumbnail") {
+        if (!row.thumbnailKey) {
+          throw new OperationError("not_found", "This file has no preview.");
+        }
+        return {
+          storageKey: row.thumbnailKey,
+          filename: row.filename,
+          contentType: THUMBNAIL_CONTENT_TYPE,
+        };
+      }
+      return {
+        storageKey: row.storageKey,
+        filename: row.filename,
+        contentType: row.contentType,
+      };
     });
   },
 });
@@ -404,6 +505,15 @@ export const reapOrphanedBlobs = defineWriteAction({
       let bytesLeft = 0;
       for (const orphan of orphans) {
         if (context.storage) {
+          if (IMAGE_CONTENT_TYPES.has(orphan.contentType)) {
+            // An image's thumbnail is written before the claim, so an upload
+            // that stopped in between can leave one. Nothing else names it.
+            // Not counted: most abandoned images never got that far, and a
+            // preview left behind is small and harmless.
+            await context.storage
+              .delete(thumbnailKeyFor(orphan.storageKey))
+              .catch(() => undefined);
+          }
           try {
             await context.storage.delete(orphan.storageKey);
           } catch {

@@ -26,7 +26,7 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
  * | A refresh token is used once, and a second use ends the lineage | A copied refresh token being worth anything |
  * | Resource is compared at issue and on every use | A token minted for one instance working against another |
  * | Membership is read on every use | A suspended member's connections outliving their membership |
- * | The two token kinds live in different tables | An API token being usable as an MCP token |
+ * | The two token kinds live in different tables | An API token being usable as an OAuth access token |
  */
 
 const OWNER = "oauth-owner";

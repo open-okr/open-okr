@@ -1,8 +1,10 @@
 import { expect, test } from "vitest";
-import { APP_NAME, WORKSPACE_PACKAGES } from "../lib/app-info";
+import { WORKSPACE_PACKAGES } from "../lib/app-info";
 
+// `APP_NAME` used to be asserted here and was read by nothing else. The name
+// a person sees is the instance's, resolved at run time (completeness review
+// M-33), and `instance-name.test.ts` holds that.
 test("entry point resolves with the package graph", () => {
-  expect(APP_NAME).toBe("OpenOKR");
   expect(WORKSPACE_PACKAGES).toContain("@openokr/core");
   expect(WORKSPACE_PACKAGES).toContain("@openokr/agents");
 });

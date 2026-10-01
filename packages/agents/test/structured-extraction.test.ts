@@ -74,6 +74,7 @@ describe("extractStructured", () => {
     const result = await extractStructured({
       provider,
       model: "test-model",
+      purpose: "assist",
       messages: [{ role: "user", content: "extract this" }],
       schema,
       jsonSchema,
@@ -92,6 +93,7 @@ describe("extractStructured", () => {
     const result = await extractStructured({
       provider,
       model: "test-model",
+      purpose: "assist",
       messages: [{ role: "user", content: "extract this" }],
       schema,
       jsonSchema,
@@ -116,6 +118,7 @@ describe("extractStructured", () => {
     const result = await extractStructured({
       provider,
       model: "test-model",
+      purpose: "assist",
       messages: [{ role: "user", content: "extract this" }],
       schema,
       jsonSchema,
@@ -135,11 +138,34 @@ describe("extractStructured", () => {
       extractStructured({
         provider,
         model: "test-model",
+        purpose: "assist",
         messages: [{ role: "user", content: "extract this" }],
         schema,
         jsonSchema,
       }),
     ).rejects.toBeInstanceOf(StructuredExtractionError);
     expect(provider.requests).toHaveLength(2);
+  });
+
+  it("tells the provider what it carries, on the repair attempt too (M-10)", async () => {
+    // The egress guard withholds a request that names no purpose under a
+    // narrow level, so an extraction that lost its purpose on the second call
+    // would fail its repair for a reason nobody could see.
+    const provider = new QueuedExtractProvider([
+      { content: "not json", usage },
+      { content: JSON.stringify({ title: "Fixed", score: 2 }), usage },
+    ]);
+    await extractStructured({
+      provider,
+      model: "test-model",
+      purpose: "assist",
+      messages: [{ role: "user", content: "extract this" }],
+      schema,
+      jsonSchema,
+    });
+    expect(provider.requests.map((request) => request.purpose)).toEqual([
+      "assist",
+      "assist",
+    ]);
   });
 });

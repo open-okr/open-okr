@@ -1,6 +1,7 @@
 import type { CheckInFrequency, CoachStrictness } from "@openokr/method";
 import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
 import { z } from "zod";
+import { statusHueOf } from "./brand-colour.ts";
 
 /**
  * The settings registry (TECHNICAL-PLAN §4.14).
@@ -158,6 +159,13 @@ export const brandingSchema = z
     primaryColor: z
       .string()
       .regex(/^#[0-9a-fA-F]{6}$/, "not a hex colour")
+      // Refused here rather than by the card, so the REST surface, the
+      // command line and an agent cannot store one either (M-14). A green
+      // brand puts a green pixel that does not mean on track on every screen.
+      .refine((colour) => statusHueOf(colour) === null, {
+        message:
+          "reads as red, amber or green, which mean off track, at risk and on track here, so a brand colour cannot use it (UIUX-PLAN §2, rule 1). Choose a blue, violet, pink or grey",
+      })
       .optional(),
   })
   .catchall(z.unknown());
@@ -258,6 +266,62 @@ const messageLogRetentionDaysSchema = z
   });
 
 /**
+ * How much may reach an AI provider off the network (AI-NATIVE-PLAN §4,
+ * completeness review M-10).
+ *
+ * | Level | Assists | Retrieval: the copilot's passages and the search index |
+ * |---|---|---|
+ * | `all` | Sent | Sent |
+ * | `assists` | Sent | Kept here |
+ * | `none` | Kept here | Kept here |
+ *
+ * The same three words as `AI_CONTEXT_EGRESS_LEVELS` in `packages/adapters`,
+ * which enforces them. Written out again because core may not import the
+ * adapters package; `apps/web/test/ai-privacy-card.test.ts`, in the one
+ * package that imports both, holds the two lists together.
+ */
+export const AI_CONTEXT_EGRESS_LEVELS = ["all", "assists", "none"] as const;
+
+export type AIContextEgressLevel = (typeof AI_CONTEXT_EGRESS_LEVELS)[number];
+
+export const aiContextEgressSchema = z.enum(AI_CONTEXT_EGRESS_LEVELS);
+
+/** One DNS label: letters, digits and inner hyphens, 63 at most. */
+const isHostLabel = (label: string): boolean =>
+  /^[a-z0-9-]{1,63}$/.test(label) &&
+  !label.startsWith("-") &&
+  !label.endsWith("-");
+
+/**
+ * A host an AI call may reach: a name, or an address written as one.
+ *
+ * Checked label by label rather than with one pattern over the whole name,
+ * which is the shape a backtracking engine takes polynomial time over. An
+ * IPv6 address is accepted as its own characters, without brackets.
+ */
+function isHostName(value: string): boolean {
+  if (value.length === 0 || value.length > 253) {
+    return false;
+  }
+  if (value.includes(":")) {
+    return /^[0-9a-f:.]{2,45}$/.test(value);
+  }
+  return value.split(".").every(isHostLabel);
+}
+
+/** Fifty hosts is past any real list, and a list is read on every AI call. */
+const MAX_ALLOWED_HOSTS = 50;
+
+export const aiEgressAllowListSchema = z
+  .array(
+    z.string().trim().toLowerCase().refine(isHostName, {
+      message:
+        "is not a host name. Write the host alone, like api.openai.com, without https:// or a path",
+    }),
+  )
+  .max(MAX_ALLOWED_HOSTS);
+
+/**
  * The channels a member can be reached on.
  *
  * Exported since P6-G21: a nudge rule's channel override picks from the same
@@ -277,6 +341,23 @@ const quietHoursSchema = z.object({
   start: z.string().regex(/^\d{2}:\d{2}$/),
   end: z.string().regex(/^\d{2}:\d{2}$/),
 });
+
+/**
+ * A space's own channel on one provider, or null for none (completeness
+ * review M-23).
+ *
+ * The provider's own identifier for the channel, which is what its API posts
+ * to: `C0123ABCD` on Slack, `19:…@thread.tacv2` on Teams. One word with no
+ * spaces, because a channel's display name is not something either API
+ * accepts and a pasted name would be a link that never posts.
+ */
+export const spaceChannelSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^\S+$/)
+  .nullable();
 
 /**
  * Per-reason routing: a channel per reason, and the member's primary channel
@@ -462,6 +543,31 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     schema: z.enum(CHECK_IN_FREQUENCIES).nullable(),
   },
   {
+    key: "slackChannel",
+    scope: "space",
+    home: "spaces.settings",
+    why:
+      "Null, meaning this space posts nowhere. AI-NATIVE-PLAN §5.2 gives " +
+      "Slack per-space channel posts and UIUX-PLAN S-22 lets a coordinator " +
+      "post the week's digest to the space's channel; this is which channel " +
+      "that is, as Slack's own channel id. No channel is the only safe " +
+      "default: a guessed one would put a team's figures in front of " +
+      "whoever reads it (completeness review M-23).",
+    resolve: () => null,
+    schema: spaceChannelSchema,
+  },
+  {
+    key: "teamsChannel",
+    scope: "space",
+    home: "spaces.settings",
+    why:
+      "Null, meaning this space posts nowhere. The Teams half of the same " +
+      "link, as the channel's conversation id. Separate from Slack's because " +
+      "a workspace may connect both and a team reads one of them.",
+    resolve: () => null,
+    schema: spaceChannelSchema,
+  },
+  {
     key: "language",
     scope: "member",
     home: "workspace_members",
@@ -582,6 +688,64 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     resolve: () => DEFAULT_AGENT_RUN_COST_CAP_USD,
     schema: agentRunCostCapSchema,
   },
+  // The four AI egress controls (AI-NATIVE-PLAN §4's privacy card,
+  // completeness review M-10). Their card is on S-37 rather than S-36, and
+  // `card` is what lets the reset action restore all four at once. None of
+  // them applies to a provider on this machine or a private address, because
+  // nothing sent there leaves the network.
+  {
+    key: "aiContextEgress",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "All, which is what every workspace has sent since AI arrived: each " +
+      "assist the item it works on, and the copilot and the search index " +
+      "what retrieval finds. A narrower default would quietly switch off " +
+      "the copilot's written answers and semantic search on the day of an " +
+      "upgrade, for workspaces that chose a provider knowing what it is for.",
+    resolve: () => "all",
+    schema: aiContextEgressSchema,
+    card: "aiPrivacy",
+  },
+  {
+    key: "aiRedactPersonalData",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "On. AI-NATIVE-PLAN §10 asks for no personal data in prompts, and an " +
+      "email address or a phone number is never what an assist needs to " +
+      "draft a sentence about a goal. Replacing them costs a draft nothing, " +
+      "so the safe answer is also the one that keeps working.",
+    resolve: () => true,
+    schema: z.boolean(),
+    card: "aiPrivacy",
+  },
+  {
+    key: "aiNoTraining",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "Off. On, OpenRouter is told to route only to endpoints that do not " +
+      "collect what is sent, which can leave a chosen model with nowhere to " +
+      "run; that is a trade an administrator makes knowingly rather than one " +
+      "an upgrade makes for them. No other provider takes the instruction on " +
+      "a request, so for them the provider agreement decides either way.",
+    resolve: () => false,
+    schema: z.boolean(),
+    card: "aiPrivacy",
+  },
+  {
+    key: "aiEgressAllowList",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "Empty, which means any provider an administrator enables. A list is " +
+      "a second decision on top of enabling one, and a default list would " +
+      "refuse the provider somebody just configured.",
+    resolve: () => [],
+    schema: aiEgressAllowListSchema,
+    card: "aiPrivacy",
+  },
   {
     key: "chatConversationMinutes",
     scope: "workspace",
@@ -695,7 +859,7 @@ export function resolveMemberSettings(context: ProvisioningContext): {
  * has no key to read. One function, so the default a new space stores and the
  * default an old one falls back to cannot drift apart.
  *
- * Takes no provisioning context: none of the three depends on the browser or
+ * Takes no provisioning context: none of them depends on the browser or
  * the instance. The parameter is there so the shape matches its two siblings
  * and a setting that later does need one can have it without changing callers.
  */
@@ -703,6 +867,9 @@ export function resolveSpaceSettings(): {
   readonly teamVoting: boolean;
   readonly coachStrictness: CoachStrictness | null;
   readonly defaultCheckInFrequency: CheckInFrequency | null;
+  /** Where this space posts on Slack and on Teams, or null (M-23). */
+  readonly slackChannel: string | null;
+  readonly teamsChannel: string | null;
 } {
   return Object.fromEntries(
     SETTINGS_REGISTRY.filter(

@@ -7,5 +7,5 @@ export default function InitiativesError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the initiatives" />;
+  return <SegmentError {...props} headingKey="segmentError.initiatives" />;
 }

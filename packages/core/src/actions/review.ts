@@ -21,6 +21,7 @@ import {
   checkIns,
   commitments,
   goals,
+  kpis,
   okrSessions,
   proposedChanges,
   spaces,
@@ -50,6 +51,13 @@ import {
   publishedAgo,
   sortObligations,
 } from "../review/obligations.ts";
+import {
+  canReach,
+  mayDecideProposal,
+  proposalHeadline,
+  proposalPreview,
+  proposalRecipients,
+} from "../review/proposals.ts";
 import { defineReadAction } from "./define.ts";
 
 const obligationSchema = z.object({
@@ -73,6 +81,15 @@ const obligationSchema = z.object({
   actionLabel: z.string(),
   subjectId: z.uuid(),
   checkInId: z.uuid().nullable(),
+  /** Set on an agent proposal, so the row can be decided where it is listed. */
+  proposal: z
+    .object({
+      id: z.uuid(),
+      action: z.string(),
+      aiGenerated: z.boolean(),
+      preview: z.array(z.object({ label: z.string(), value: z.string() })),
+    })
+    .nullable(),
 });
 
 async function actingMember(
@@ -99,41 +116,6 @@ async function actingMember(
     throw new OperationError("not_found", "No such workspace.");
   }
   return member.id;
-}
-
-/**
- * Whether this member reaches this resource at this level (P6-G02).
- *
- * The general form of `canSeeGoal` below, which stays as it is because three
- * sources read it and its name says what it asks. Four sources landed at
- * P6-G02 asking about spaces, subjects of a proposal and the workspace itself,
- * and each writing its own try-catch would have been four chances to get the
- * fail-closed direction wrong.
- *
- * A resource type the subject resolver does not know raises, and raising is
- * caught here as "no". Fail-closed is the only safe direction: the alternative
- * lists somebody else's obligation on this member's screen.
- */
-async function canReach(
-  tx: OperationTx,
-  workspaceId: string,
-  memberId: string,
-  resourceType: string,
-  resourceId: string,
-  requires: number = ACCESS_LEVELS.view,
-): Promise<boolean> {
-  try {
-    await getAccessScoped(tx, {
-      workspaceId,
-      memberId,
-      resourceType,
-      resourceId,
-      requires: requires as never,
-    });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /** The Sunday-to-Saturday week a commitment's `week_start` opens. */
@@ -266,6 +248,7 @@ export const reviewInbox = defineReadAction({
             actionLabel: "Check in",
             subjectId: goal.id,
             checkInId: null,
+            proposal: null,
           });
         }
 
@@ -322,6 +305,7 @@ export const reviewInbox = defineReadAction({
             actionLabel: "Acknowledge",
             subjectId: row.goalId,
             checkInId: row.id,
+            proposal: null,
           });
         }
 
@@ -391,6 +375,7 @@ export const reviewInbox = defineReadAction({
             actionLabel: "Open the task",
             subjectId: row.id,
             checkInId: null,
+            proposal: null,
           });
         }
 
@@ -457,6 +442,7 @@ export const reviewInbox = defineReadAction({
             actionLabel: "Open the blocker",
             subjectId: row.goalId,
             checkInId: null,
+            proposal: null,
           });
         }
 
@@ -522,6 +508,7 @@ export const reviewInbox = defineReadAction({
             actionLabel: "Open the session",
             subjectId: row.spaceId,
             checkInId: null,
+            proposal: null,
           });
         }
 
@@ -587,6 +574,7 @@ export const reviewInbox = defineReadAction({
             actionLabel: "Open the session",
             subjectId: row.spaceId,
             checkInId: null,
+            proposal: null,
           });
         }
 
@@ -594,24 +582,49 @@ export const reviewInbox = defineReadAction({
         // "Propose by default" is a hard rule and a proposal nobody is told
         // about is the same as an agent that never spoke.
         //
-        // **Who owes the decision is answered by access, because the table has
-        // no assignee.** A proposal is listed for a member who can reach its
-        // subject at edit level, which is the same access applying it will
-        // need. A proposal with no subject, or one whose subject type the
-        // resolver does not know, falls back to workspace administration:
-        // fail-closed for an ordinary member, and the queue still has an owner.
+        // **Who owes the decision is `mayDecideProposal`'s answer**, the same
+        // function `proposals.apply` and `proposals.dismiss` ask, so a row
+        // listed here is always one this member can decide (completeness
+        // review M-08). A proposal a nudge carried is its recipient's; any
+        // other is decided by edit on its subject. Before that, the row linked
+        // to `/admin/agents` and the only apply path needed `full` on the
+        // workspace: an ordinary champion was told they owed a decision and
+        // could not make it.
         //
         // Copilot proposals are excluded. They belong to the thread that asked
         // for them and the panel that shows them, not to a shared queue.
+        //
+        // The subject's title comes back in the same query, so a row can say
+        // which goal or KPI it is about without one read per row.
         const waiting = await tx
           .select({
             id: proposedChanges.id,
             action: proposedChanges.action,
+            payload: proposedChanges.payload,
+            aiGenerated: proposedChanges.aiGenerated,
             subjectType: proposedChanges.subjectType,
             subjectId: proposedChanges.subjectId,
             createdAt: proposedChanges.createdAt,
+            goalTitle: goals.title,
+            kpiTitle: kpis.title,
           })
           .from(proposedChanges)
+          .leftJoin(
+            goals,
+            and(
+              eq(proposedChanges.subjectType, "goal"),
+              eq(goals.id, proposedChanges.subjectId),
+              isNull(goals.deletedAt),
+            ),
+          )
+          .leftJoin(
+            kpis,
+            and(
+              eq(proposedChanges.subjectType, "kpi"),
+              eq(kpis.id, proposedChanges.subjectId),
+              isNull(kpis.deletedAt),
+            ),
+          )
           .where(
             // No `activeOnly` here: `proposed_changes` carries no
             // `deleted_at`. A proposal is applied or dismissed rather than
@@ -624,26 +637,25 @@ export const reviewInbox = defineReadAction({
           )
           .orderBy(asc(proposedChanges.createdAt));
 
+        // Who each one was addressed to, asked once for all of them. Most
+        // pending proposals in a busy workspace are other champions' drafted
+        // check-ins, and each would otherwise cost this member a query to
+        // learn that it is not theirs.
+        const recipients = await proposalRecipients(
+          tx,
+          context.workspaceId,
+          waiting.map((row) => row.id),
+        );
         for (const row of waiting) {
-          const reachable =
-            row.subjectType && row.subjectId
-              ? await canReach(
-                  tx,
-                  context.workspaceId,
-                  memberId,
-                  row.subjectType,
-                  row.subjectId,
-                  ACCESS_LEVELS.edit,
-                )
-              : await canReach(
-                  tx,
-                  context.workspaceId,
-                  memberId,
-                  "workspace",
-                  context.workspaceId,
-                  ACCESS_LEVELS.full,
-                );
-          if (!reachable) {
+          if (
+            !(await mayDecideProposal(
+              tx,
+              context.workspaceId,
+              memberId,
+              row,
+              recipients.get(row.id) ?? new Set(),
+            ))
+          ) {
             continue;
           }
           const age = daysPastDue(row.createdAt, now, timeZone) ?? 0;
@@ -654,15 +666,27 @@ export const reviewInbox = defineReadAction({
             // which is what the acknowledgement grouping already expresses, so
             // the same escalation threshold decides when it stops being new.
             group: acknowledgementGroup(age, escalateAfter),
-            title: `Decide on the proposed ${row.action.replace(/\./g, " ")}`,
+            title: proposalHeadline(
+              row.action,
+              row.goalTitle ?? row.kpiTitle ?? null,
+            ),
             meta: `Agent proposal · ${publishedAgo(age)}`,
             dueLabel: acknowledgementDueLabel(age, escalateAfter),
             dueOn: dueLocalDate(row.createdAt, timeZone),
             daysPastDue: age,
-            href: "/admin/agents",
+            // The row itself, on the one screen every member can open. It is
+            // decided there, so a link from anywhere else (a message, the
+            // command line) lands on the decision rather than beside it.
+            href: `/review#proposal-${row.id}`,
             actionLabel: "Review the proposal",
             subjectId: row.subjectId ?? context.workspaceId,
             checkInId: null,
+            proposal: {
+              id: row.id,
+              action: row.action,
+              aiGenerated: row.aiGenerated,
+              preview: proposalPreview(row.payload as Record<string, unknown>),
+            },
           });
         }
 

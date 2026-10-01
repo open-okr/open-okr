@@ -45,7 +45,7 @@ const asAdmin = async () => ({
 });
 
 /** One write through the pipeline, so there is a row to find. */
-async function write(note: string): Promise<void> {
+async function write(note: string, channel?: string): Promise<void> {
   const wb = await workerDb();
   await runOperation(
     { pool: wb.appPool },
@@ -53,6 +53,7 @@ async function write(note: string): Promise<void> {
       action: "test.note",
       workspaceId,
       actor: { kind: "human", userId },
+      ...(channel ? { channel } : {}),
       async execute() {
         return {
           result: undefined,
@@ -229,5 +230,197 @@ describe("exporting the trail", () => {
     const payload = rows[0]?.payload as { action?: string; rowCount?: number };
     expect(payload.action).toBe("test.note");
     expect(payload.rowCount).toBe(0);
+  });
+});
+
+/**
+ * The trail on the screen, a page at a time (completeness review L-19).
+ *
+ * The screen could verify the chain and export it and could not show it. What
+ * is proved here is the read behind the table: newest first, narrowed the way
+ * the export narrows, paged by a cursor that neither repeats nor skips a row,
+ * carrying less than the export does, and refused to anybody below `full`.
+ */
+describe("browsing the trail", () => {
+  /** The member id the pipeline recorded for the founding administrator. */
+  async function adminMemberId(): Promise<string> {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, userId],
+    );
+    return rows[0]?.id as string;
+  }
+
+  it("shows the newest first, and says which rows have a position yet", async () => {
+    const wb = await workerDb();
+    await write("older");
+    await chainWorkspace(wb.appPool, workspaceId);
+    await write("newer, not chained yet");
+
+    const page = await callAction(await asAdmin(), "audit.list", {
+      action: "test.note",
+    });
+
+    expect(page.rows).toHaveLength(2);
+    expect(page.more).toBe(false);
+    const [newest, oldest] = page.rows;
+    expect(newest?.chained).toBe(false);
+    expect(newest?.seq).toBeNull();
+    expect(oldest?.chained).toBe(true);
+    expect(oldest?.seq).toBeGreaterThan(0);
+    expect(Date.parse(newest?.at ?? "")).toBeGreaterThanOrEqual(
+      Date.parse(oldest?.at ?? ""),
+    );
+  });
+
+  it("pages by a cursor, with no row twice and none missed", async () => {
+    for (const note of ["one", "two", "three", "four", "five"]) {
+      await write(note);
+    }
+
+    const seen: string[] = [];
+    let cursor: { at: string; id: string } | undefined;
+    const pages: boolean[] = [];
+    for (;;) {
+      const page = await callAction(await asAdmin(), "audit.list", {
+        action: "test.note",
+        limit: 2,
+        ...(cursor ? { cursor } : {}),
+      });
+      seen.push(...page.rows.map((row) => row.id));
+      pages.push(page.more);
+      const last = page.rows.at(-1);
+      if (!page.more || !last) {
+        break;
+      }
+      cursor = { at: last.at, id: last.id };
+    }
+
+    // Two, two and one: the last page is the one that says there is no more.
+    expect(pages).toEqual([true, true, false]);
+    expect(seen).toHaveLength(5);
+    expect(new Set(seen).size).toBe(5);
+
+    // And the order across pages is the order of one long page.
+    const whole = await callAction(await asAdmin(), "audit.list", {
+      action: "test.note",
+    });
+    expect(whole.rows.map((row) => row.id)).toEqual(seen);
+  });
+
+  it("narrows by action, actor, target type and date, as the export does", async () => {
+    const wb = await workerDb();
+    await write("findable");
+    const memberId = await adminMemberId();
+
+    const byAction = await callAction(await asAdmin(), "audit.list", {
+      action: "test.note",
+    });
+    expect(byAction.rows).toHaveLength(1);
+    expect(byAction.rows.every((row) => row.action === "test.note")).toBe(true);
+
+    const byActor = await callAction(await asAdmin(), "audit.list", {
+      actorMemberId: memberId,
+    });
+    expect(byActor.rows.length).toBeGreaterThan(0);
+    expect(byActor.rows.every((row) => row.actorMemberId === memberId)).toBe(
+      true,
+    );
+
+    // A member who has done nothing has nothing to show.
+    const quiet = newId();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, 'Quiet', $2)",
+      [quiet, `${quiet.slice(0, 13)}@example.com`],
+    );
+    const { rows: quietRows } = await wb.admin.query<{ id: string }>(
+      `insert into workspace_members (id, workspace_id, user_id, name, status)
+       values (gen_random_uuid(), $1, $2, 'Quiet', 'active') returning id`,
+      [workspaceId, quiet],
+    );
+    const nobody = await callAction(await asAdmin(), "audit.list", {
+      actorMemberId: quietRows[0]?.id as string,
+    });
+    expect(nobody.rows).toEqual([]);
+
+    const byTarget = await callAction(await asAdmin(), "audit.list", {
+      targetType: "workspace",
+    });
+    expect(byTarget.rows.length).toBeGreaterThan(0);
+    expect(byTarget.rows.every((row) => row.targetType === "workspace")).toBe(
+      true,
+    );
+    const noTarget = await callAction(await asAdmin(), "audit.list", {
+      targetType: "nothing_is_this",
+    });
+    expect(noTarget.rows).toEqual([]);
+
+    const future = await callAction(await asAdmin(), "audit.list", {
+      from: "2099-01-01T00:00:00.000Z",
+    });
+    expect(future.rows).toEqual([]);
+    const past = await callAction(await asAdmin(), "audit.list", {
+      to: "2000-01-01T00:00:00.000Z",
+    });
+    expect(past.rows).toEqual([]);
+    const since = await callAction(await asAdmin(), "audit.list", {
+      from: "2000-01-01T00:00:00.000Z",
+      action: "test.note",
+    });
+    expect(since.rows).toHaveLength(1);
+  });
+
+  it("refuses a range that ends before it starts, as the export does", async () => {
+    await expect(
+      callAction(await asAdmin(), "audit.list", {
+        from: "2026-02-01T00:00:00.000Z",
+        to: "2026-01-01T00:00:00.000Z",
+      }),
+    ).rejects.toThrow(/before its start/);
+  });
+
+  it("names the channel a write came from, and leaves the payload out", async () => {
+    await write("a secret-looking note", "slack");
+
+    const page = await callAction(await asAdmin(), "audit.list", {
+      action: "test.note",
+    });
+
+    expect(page.rows[0]?.channel).toBe("slack");
+    // The payload is the export's to carry, and the export records that it
+    // was taken. The list hands over the one fact the screen shows.
+    expect(JSON.stringify(page)).not.toContain("secret-looking");
+    expect(Object.keys(page.rows[0] ?? {})).not.toContain("payload");
+  });
+
+  it("is refused to a member below full, the way every admin read is", async () => {
+    const wb = await workerDb();
+    const plain = newId();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, 'Plain', $2)",
+      [plain, `${plain.slice(0, 13)}@example.com`],
+    );
+    // Nothing raises them above the `edit` every active member holds.
+    await wb.admin.query(
+      `insert into workspace_members (id, workspace_id, user_id, name, status)
+       values (gen_random_uuid(), $1, $2, 'Plain', 'active')`,
+      [workspaceId, plain],
+    );
+
+    await expect(
+      callAction(
+        {
+          pool: wb.appPool,
+          workspaceId,
+          actor: { kind: "human", userId: plain },
+        },
+        "audit.list",
+        {},
+      ),
+    ).rejects.toMatchObject({
+      code: "not_found",
+      message: "No such workspace, or you do not have access to it.",
+    });
   });
 });

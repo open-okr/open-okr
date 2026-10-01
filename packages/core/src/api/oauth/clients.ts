@@ -19,6 +19,7 @@ import {
   type WorkspaceTx,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
+import { instanceNameOr } from "../../secrets/instance-registry.ts";
 
 /**
  * The clients an instance knows about before anybody configures anything.
@@ -28,18 +29,50 @@ import { eq } from "drizzle-orm";
  */
 export const ALLOW_LISTED_CLIENTS: readonly {
   readonly clientId: string;
+  /** What the row is written with, the first time the client is used. */
   readonly name: string;
+  /**
+   * What a person reads instead, on this instance (completeness review M-33).
+   *
+   * The command line is the instance's own, so the consent screen names the
+   * instance rather than the software. Applied when shown rather than when
+   * written, because the row is written once, the first time anybody uses
+   * the client, and outlives any rename.
+   */
+  readonly displayName?: (instanceName: string) => string;
   readonly redirectUris: readonly string[];
 }[] = [
   {
     clientId: "openokr-cli",
     name: "The OpenOKR command line",
+    displayName: (instanceName) => `The ${instanceName} command line`,
     // A loopback address with any port, which is what a local tool binds. The
     // port is not known in advance, so both forms are listed and the port is
     // compared separately by `redirectAllowed`.
     redirectUris: ["http://127.0.0.1/callback", "http://[::1]/callback"],
   },
 ];
+
+/**
+ * The name a person reads for a client.
+ *
+ * An allow-listed client whose row still carries the name it was written with
+ * is named for this instance. One whose name an operator edited keeps the
+ * edit, and every registered client keeps the name it registered with: a
+ * client choosing what to call itself is exactly what the consent screen is
+ * there to show.
+ */
+export function clientDisplayName(
+  client: { readonly clientId: string; readonly name: string },
+  instanceName: string | undefined,
+): string {
+  const entry = ALLOW_LISTED_CLIENTS.find(
+    (candidate) => candidate.clientId === client.clientId,
+  );
+  return entry?.displayName && client.name === entry.name
+    ? entry.displayName(instanceNameOr(instanceName))
+    : client.name;
+}
 
 /** Why a client was refused, in words the error response carries. */
 export type ClientRejection =

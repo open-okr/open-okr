@@ -120,6 +120,32 @@ channel decides, because §5.4's last line is that snoozing never silences the
 review inbox. The channel is where the product goes to find them; the product
 is where the obligation lives.
 
+**A rule's own channel is checked like the member's** (P6-G21 made the
+override route; completeness review M-23 found it was never checked). Steps 2
+and 3 were asked of the member's primary channel only, so a rule routed to
+Slack went to Slack for a member who had never linked it, and the driver
+dropped it there. The override now goes first through the same two questions:
+
+| The rule's channel | What happens |
+|---|---|
+| Reaches the member | That channel. No fallback |
+| Not connected, or not linked | The member's own route, steps 2 and 3, which ends at email. A member who asked for in-app only stays in-app |
+
+Why the member's own channel before email: it is the one other thing the
+product knows about where this person reads. Why not a reconnect notice: that
+notice is about the member's own channel, and a rule the workspace routed
+somewhere else is the workspace's to fix.
+
+**The reason is on the nudge row**, in `fallback_reason` (migration 0102),
+as well as on the message. The nudge is the product's record of speaking, and
+it could say why a nudge was suppressed but not why it arrived by email.
+
+**Given** a rule routed to Slack and a member who never linked Slack,
+**when** the rule fires,
+**then** it arrives on their own channel, or by email when that cannot reach
+them either, and both the nudge and the message say that the rule's channel
+could not reach them and why.
+
 ### 3.1 Failure and the one-time notice
 
 A send that fails writes `channel_messages.status = 'failed'` with the
@@ -183,9 +209,32 @@ Every inbound request, in this order, before anything reads the body as data:
 
 | Step | Check | On failure |
 |---|---|---|
-| 0 | *Which workspace is this?* Added at P5-T02a, because the eight steps below all presume a tenant and an inbound request has not named one. `channel_installations` answers it through a second policy key; §2 was silent on where that mapping lives, and the first implementation put it on `channel_connections`, where forced row-level security answered every lookup with nothing | Silence |
+| 0 | *Which workspace is this?* Added at P5-T02a, because the eight steps below all presume a tenant and an inbound request has not named one. `channel_installations` answers it through a second policy key; §2 was silent on where that mapping lives, and the first implementation put it on `channel_connections`, where forced row-level security answered every lookup with nothing | A request that names no tenant: silence. One that names a tenant nobody installed, or one with no usable connection: **the same 401 as step 1** (completeness review L-10). This row said silence for both until then, which let a caller with no secret list the installed tenants by sending a junk signature and comparing 200 with 401 |
 | 1 | Signature over the raw bytes, per provider | 401, nothing parsed. **One provider cannot do this, found at P5-T05:** Telegram does not sign the body at all. It echoes a shared secret, chosen when the webhook is registered, and that is the strongest claim it makes available. The comparison is still timing-safe and the endpoint still refuses before parsing, but a tampered body under a valid secret passes on Telegram and fails on Slack. The difference is structural rather than an oversight, and there is a test that states it |
 | 2 | Timestamp inside the replay window | 401 |
+
+**Step 0 comes before step 1 for three providers, and that is forced.** Slack,
+WhatsApp and Telegram sign with a secret each workspace holds, so the
+signature cannot be checked until the workspace is known. Teams can: Microsoft
+signs with keys it publishes, so its token's signature, issuer, expiry and
+service URL are checked before step 0, and only the audience, which is the
+workspace's own app id, waits until after (L-10).
+
+**Every refusal from step 0 to step 2 is one answer** (L-10): an empty 401,
+never sooner than 250 ms after the request arrived. The floor is what keeps
+the extra read, decryption and MAC an installed tenant costs from showing in
+the timing. Meta's GET handshake is refused the same way with 403, its own
+convention. An operator can still tell the reasons apart on
+`openokr_channel_inbound_refusals_total`, labelled by provider and reason and
+nothing else.
+
+| Provider | Tenant named by | Before L-10: unknown tenant / bad signature | Since |
+|---|---|---|---|
+| Slack | `team_id` on the payload | 200 / 401 | 401 / 401 |
+| Teams | `channelData.tenant.id` | 200 / 401, and a forged token for an installed tenant cost a fetch of Microsoft's keys the unknown one did not | 401 / 401, the token checked before the lookup |
+| WhatsApp POST | `metadata.phone_number_id` | 200 / 401 | 401 / 401 |
+| WhatsApp GET handshake | `phone_number_id` on the query | 403 / 403, at different speeds | 403 / 403, after the floor |
+| Telegram | the bot id in the path | 200 / 401 | 401 / 401 |
 | 3 | The delivery id has not been seen | 200, ignored as a duplicate |
 | 4 | The sender resolves to a verified identity | 200, no reply |
 | 5 | The member is active and not suspended | 200, no reply |
@@ -303,7 +352,7 @@ what it most needs, so the narrative and the values are asked last.
 | C1 | ~~Does the channel work land before a relay host exists?~~ Answered 27 August 2026 | No. The relay was cut out as P5-T01a and built first, because routing nudges into a queue nobody drains would have stacked a second layer of undelivered work on the first |
 | C2 | Is a member allowed more than one verified identity per provider? | No. Two identities is two people or one person confusing the audit trail. **Built at P5-T02a**, and enforced by the database rather than by a check: two unique indexes, one each way |
 | C3 | ~~Where do WhatsApp templates live?~~ **Answered 29 August 2026, and my position was wrong** | Not in `packages/method`. §11 is the *threshold* registry, which holds numbers rather than words, and a template is not canon at all: it is registered and approved inside one customer's own Meta Business account, so two workspaces cannot share one and no document could name them for everybody. Agung's answer: synchronise them from Meta, let an administrator choose which a nudge uses, and fill their variables from the product's own data. **Built at P5-T04b-a** (the sync) and P5-T04b-b (the mapping and the variables) |
-| C4 | Does a space channel post need its own subscription model? | Not in v1. A space channel is configured on the connection and posts what the space's own feed would show |
+| C4 | Does a space channel post need its own subscription model? | Not in v1. **Corrected at completeness review M-23**: this said the channel is configured on the connection and posts what the space's own feed would show, and neither was built. What was built is what the plan set names: the channel is a space setting (`slackChannel`, `teamsChannel` in §4.14's space scope), because which channel a team reads is the team's decision; and what it receives is the week's digest, posted by the facilitator from S-22's digest step once the session has closed (`sessions.postDigest`), once per digest per channel. **Still open, for a person:** §6.4 addresses `session.due_soon`, `session.open` and `digest.weekly` to the space as well as to people. A proactive post is a nudge row, and a nudge row needs one member to address. Posting those three to a space's channel on the product's own initiative needs a decision about how such a message is recorded, deduplicated and held for quiet hours, so it was not built |
 
 ## Teams, and what a third provider proved (P5-T03a)
 
@@ -346,6 +395,45 @@ URL button on Slack and a URL keyboard button on Telegram. A command carries the
 Block Kit action, or `callback_data`. A provider with no buttons at all gets the
 words to type, which is the degradation the builder was missing: it printed
 `okr:resolve abc` as a link, and a command button is not a link.
+
+### The check-in card (completeness review M-23)
+
+AI-NATIVE-PLAN §5.3 makes the check-in "a modal on Slack and Teams". Slack had
+its modal from P5-T02b; Teams asked the questions one message at a time. An
+adaptive card with inputs is Teams' modal.
+
+| Step | Slack | Teams |
+|---|---|---|
+| Asked for | `checkin <goal>` with a trigger id | `checkin <goal>`, typed or pressed on a nudge |
+| The form | `views.open` with `checkInView` | a reply carrying `checkInCard` |
+| Submitted | a `view_submission`, read in `beforeMessage` | a `message` whose `value` holds the answers and the card's `form` and `goal`, read in `instead` |
+| Written by | `submitCheckIn`, the conversational path's own write | the same |
+
+**Read after §6's checks, not before them.** Slack's submission never reaches
+the message path, so its route looks the member up on its own. A Teams
+submission is an ordinary activity: it is verified, deduplicated, resolved to a
+linked active member and rate limited by the shared door first, and only then
+read as a form. The card carries the goal because Teams hands the answers back
+with no memory of which card they came from; nothing else is trusted from it,
+and `can()` decides whether the member may check that goal in.
+
+The key results are not on the card, for the reason they are not on Slack's
+modal: a form that dropped a number somebody typed would be worse than one that
+never asked.
+
+## Posts to a space's channel (completeness review M-23)
+
+§5.2 gives Slack per-space channel posts and Teams channel posts. The port has
+had `sendToChannel` since P2-T05 and nothing called it.
+
+| | What was built |
+|---|---|
+| Where the link lives | The space's own settings, one channel id per provider, set by whoever manages the space. The field is offered only for a connected provider |
+| What is posted | The week's digest, by the facilitator, from S-22's digest step after the close. The space's own name heads it and a link opens the session |
+| How | One `channel_messages` row per linked, connected provider, with no member and a `target`, and its outbox row, in the Operation's transaction. The relay posts it with `sendToChannel` |
+| Deduplicated | By the digest and the provider. Pressing twice posts once |
+| Quiet hours | Not applied: a person pressed the button, and a channel has no night of its own. The product posting on its own initiative is the open question in C4 |
+| Failure | Recorded on the row. The connection is not marked broken, because one space's wrong channel id is not the connection failing |
 
 ## WhatsApp, and the provider that limits what may be said (P5-T04a)
 

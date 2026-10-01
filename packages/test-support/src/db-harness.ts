@@ -333,22 +333,39 @@ export const workerDb = async (): Promise<WorkerDb> => {
     }
   });
 
-  const admin = new pg.Pool({
-    ...connectionOptions(databaseName, testDbEnv.superuser),
-    max: 2,
-  });
-  const appPool = new pg.Pool({
-    ...connectionOptions(databaseName, testDbEnv.appRole),
-    max: 5,
-  });
-  const pooledAppPool = new pg.Pool({
-    ...connectionOptions(
-      databaseName,
-      testDbEnv.appRole,
-      testDbEnv.pgbouncerPort,
-    ),
-    max: 10,
-  });
+  // Every connection these pools open, until it has actually closed. `close()`
+  // waits on this before its forced drop, for the reason given there.
+  const open = new Set<pg.PoolClient>();
+  const tracked = (pool: pg.Pool): pg.Pool => {
+    pool.on("connect", (client) => {
+      open.add(client);
+      client.once("end", () => open.delete(client));
+    });
+    return pool;
+  };
+
+  const admin = tracked(
+    new pg.Pool({
+      ...connectionOptions(databaseName, testDbEnv.superuser),
+      max: 2,
+    }),
+  );
+  const appPool = tracked(
+    new pg.Pool({
+      ...connectionOptions(databaseName, testDbEnv.appRole),
+      max: 5,
+    }),
+  );
+  const pooledAppPool = tracked(
+    new pg.Pool({
+      ...connectionOptions(
+        databaseName,
+        testDbEnv.appRole,
+        testDbEnv.pgbouncerPort,
+      ),
+      max: 10,
+    }),
+  );
 
   worker = {
     databaseName,
@@ -368,8 +385,46 @@ export const workerDb = async (): Promise<WorkerDb> => {
       await admin.query(`truncate table ${names} restart identity cascade`);
     },
     async close() {
-      await Promise.all([admin.end(), appPool.end(), pooledAppPool.end()]);
+      // A pool a test already ended is skipped: `end` throws on a second
+      // call, and this runs after every file's own teardown.
+      await Promise.all(
+        [admin, appPool, pooledAppPool]
+          .filter((pool) => !pool.ended)
+          .map((pool) => pool.end()),
+      );
+      // **`Pool.end` resolves when its clients leave the pool, not when their
+      // connections have closed.** A forced drop straight after it could reach
+      // a connection still on its way out: the server kills it, and the
+      // client, in no pool any more, raises `57P01` with nobody listening.
+      // Continuous integration failed a whole shard on exactly that, on
+      // 30 September 2026, with every one of its 3,298 tests passing. So the
+      // drop waits for the last of them to close, bounded so a connection
+      // that never reports it cannot hold a file open.
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 5_000);
+        Promise.all(
+          [...open].map(
+            (client) =>
+              new Promise<void>((ended) => client.once("end", () => ended())),
+          ),
+        ).then(() => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
       worker = undefined;
+      // **Dropped here, when its file ends, not at the next run** (completeness
+      // review L-03). Every test file runs in a fresh fork, so every file
+      // cloned its own database, and `sweepOrphans` only cleared them when the
+      // next run began. A whole run of 6,029 tests then held some four
+      // hundred clones at once, filled the 3.8 GB tmpfs Docker Desktop gives
+      // Postgres, and crashed the server into recovery mid-run. The name is
+      // this process's own, so nobody else is using it, and a later file in
+      // the same fork clones it again on first use. Best effort: a drop that
+      // fails is left for the sweep, as before.
+      await withSuperuser("postgres", (client) =>
+        client.query(`drop database if exists ${databaseName} with (force)`),
+      ).catch(() => undefined);
     },
   };
   return worker;

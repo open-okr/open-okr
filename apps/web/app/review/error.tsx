@@ -7,5 +7,5 @@ export default function ReviewError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="what you owe" />;
+  return <SegmentError {...props} headingKey="segmentError.review" />;
 }

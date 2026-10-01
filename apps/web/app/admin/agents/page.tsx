@@ -52,16 +52,22 @@ function scheduleName(trigger: string, t: (key: string) => string): string {
 }
 
 const SCHEDULE_LABEL: Record<string, string> = {
-  manual: "Only when asked",
-  continuous: "On every write",
-  nightly: "Nightly",
-  hourly: "On the hour",
+  manual: "admin.agents.scheduleManual",
+  continuous: "admin.agents.scheduleContinuous",
+  nightly: "admin.agents.scheduleNightly",
+  hourly: "admin.agents.scheduleHourly",
   // Added with the two schedule values P4-T05b opened up. A schedule with no
   // label here would have rendered the raw enum, which is the kind of leak a
   // map like this exists to prevent.
-  daily: "Once a day",
-  weekly: "Once a week",
+  daily: "admin.agents.scheduleDaily",
+  weekly: "admin.agents.scheduleWeekly",
 };
+
+/** An agent's schedule in words, or the raw value for one with no label. */
+function scheduleLabel(schedule: string, t: (key: string) => string): string {
+  const key = SCHEDULE_LABEL[schedule];
+  return key === undefined ? schedule : t(key);
+}
 
 /**
  * The four access levels a scope binding may carry (P6-G13b).
@@ -71,10 +77,10 @@ const SCHEDULE_LABEL: Record<string, string> = {
  * bundle and the build fails on `dns` and `fs`.
  */
 const BINDING_LEVELS = [
-  { value: ACCESS_LEVELS.view, label: "view" },
-  { value: ACCESS_LEVELS.comment, label: "comment" },
-  { value: ACCESS_LEVELS.edit, label: "edit" },
-  { value: ACCESS_LEVELS.full, label: "full" },
+  { value: ACCESS_LEVELS.view, labelKey: "admin.agents.levelView" },
+  { value: ACCESS_LEVELS.comment, labelKey: "admin.agents.levelComment" },
+  { value: ACCESS_LEVELS.edit, labelKey: "admin.agents.levelEdit" },
+  { value: ACCESS_LEVELS.full, labelKey: "admin.agents.levelFull" },
 ];
 
 export default async function AgentsPage() {
@@ -168,10 +174,12 @@ export default async function AgentsPage() {
                       {agent.name}
                     </span>
                     <Chip tone={agent.enabled ? "ok" : "neutral"}>
-                      {agent.enabled ? "On" : "Off"}
+                      {agent.enabled
+                        ? t("admin.agents.on")
+                        : t("admin.agents.off")}
                     </Chip>
                     <Chip tone="neutral">
-                      {SCHEDULE_LABEL[agent.schedule] ?? agent.schedule}
+                      {scheduleLabel(agent.schedule, t)}
                     </Chip>
                     <Chip tone="agent">{agent.autonomy}</Chip>
                     <span className="ml-auto">
@@ -191,7 +199,10 @@ export default async function AgentsPage() {
                     autonomy={agent.autonomy}
                     name={agent.name}
                     autonomies={[...AGENT_AUTONOMIES]}
-                    levels={BINDING_LEVELS}
+                    levels={BINDING_LEVELS.map((one) => ({
+                      value: one.value,
+                      label: t(one.labelKey),
+                    }))}
                   />
                 </li>
               ))}
@@ -231,6 +242,17 @@ export default async function AgentsPage() {
                       </span>
                     </span>
                     <span className="flex items-center gap-2">
+                      {/* How far a run through a task list has got (M-11).
+                          The Coach's and the Champion's runs carry no list,
+                          so they show none. */}
+                      {run.taskCount > 0 ? (
+                        <span className="text-xs tabular-nums text-ink-3">
+                          {t("admin.agents.stepsDone", {
+                            done: Math.min(run.currentTaskIndex, run.taskCount),
+                            total: run.taskCount,
+                          })}
+                        </span>
+                      ) : null}
                       <Chip tone={STATUS_TONE[run.status] ?? "neutral"}>
                         {run.status}
                       </Chip>

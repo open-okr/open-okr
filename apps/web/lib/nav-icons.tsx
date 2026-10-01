@@ -1,4 +1,5 @@
 import {
+  ArchiveRestore,
   Armchair,
   BarChart3,
   Bell,
@@ -25,6 +26,7 @@ import {
   Search,
   Shield,
   SlidersHorizontal,
+  Sparkle,
   Sparkles,
   Target,
   Trophy,
@@ -73,6 +75,10 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "account-security": <Shield className="size-full" />,
   "account-api-tokens": <KeyRound className="size-full" />,
   "account-connections": <Plug className="size-full" />,
+  // The single spark of the AI console's pair: the same subject, seen from
+  // one person's side (completeness review M-36). A key would be read as a
+  // second API tokens row one line above it.
+  "account-ai": <Sparkle className="size-full" />,
 
   // The admin sections. They had none until the section navigation started
   // drawing them, which is why nine labels sat in a plain column while every
@@ -101,6 +107,9 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "admin-channels": <Radio className="size-full" />,
   "admin-nudges": <Bell className="size-full" />,
   "admin-invitations": <UserPlus className="size-full" />,
+  // A box with an arrow out of it, which is what restoring from deleted
+  // items is. Not a bin: nothing on the screen is thrown away.
+  "admin-deleted": <ArchiveRestore className="size-full" />,
   "admin-imports": <Upload className="size-full" />,
   "admin-ai": <Sparkles className="size-full" />,
   "admin-agents": <Bot className="size-full" />,

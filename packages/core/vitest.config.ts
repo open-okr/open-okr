@@ -18,6 +18,7 @@ export default defineConfig({
   },
   test: {
     globalSetup: [join(testSupport, "src/db-harness.ts")],
+    setupFiles: [join(testSupport, "src/db-file-teardown.ts")],
     env: {
       OPENOKR_DB_PROJECT: "core",
     },

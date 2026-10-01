@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
+import { AGENT_RUN_STEP_TOPIC } from "../agents/run-steps.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import {
   dispatchOutbox,
@@ -124,6 +125,31 @@ describe("invitation email", () => {
     expect(sent[0]?.text).toContain("https://okr.example.com/join/tok-1");
   });
 
+  it("names the instance it invites somebody to (M-33)", async () => {
+    const { sent, deps } = recorder();
+    await dispatchOutbox(
+      delivery("invitation.email", { to: "sam@example.com", token: "tok-1" }),
+      { ...deps, instanceName: "OKR Goal" },
+    );
+    expect(sent[0]?.subject).toBe("You have been invited to OKR Goal");
+    expect(sent[0]?.text).toContain(
+      "You have been invited to a workspace on OKR Goal.",
+    );
+    expect(JSON.stringify(sent[0])).not.toContain("OpenOKR");
+  });
+
+  it("says OpenOKR when the host gives no name", async () => {
+    const { sent, deps } = recorder();
+    await dispatchOutbox(
+      delivery("invitation.email", { to: "sam@example.com", token: "tok-1" }),
+      deps,
+    );
+    expect(sent[0]?.subject).toBe("You have been invited to OpenOKR");
+    expect(sent[0]?.text).toContain(
+      "You have been invited to a workspace on OpenOKR.",
+    );
+  });
+
   it("fails permanently when the row has no token, because no retry will add one", async () => {
     const { deps } = recorder();
     await expect(
@@ -166,6 +192,56 @@ describe("embedding", () => {
     const { deps } = recorder();
     await expect(
       dispatchOutbox(delivery(EMBED_TOPIC, { workspaceId: "w1" }), deps),
+    ).rejects.toMatchObject({ name: "PermanentDispatchError" });
+  });
+});
+
+describe("agent run steps (M-11)", () => {
+  const step = (payload: Record<string, unknown>) =>
+    delivery(AGENT_RUN_STEP_TOPIC, payload);
+  const job = { workspaceId: "w1", runId: "r1", taskIndex: 2 };
+
+  it("hands the step to the host's runner", async () => {
+    const { skipped, deps } = recorder();
+    const taken: unknown[] = [];
+    await dispatchOutbox(step(job), {
+      ...deps,
+      continueAgentRun: async (given) => {
+        taken.push(given);
+        return { kind: "stepped" };
+      },
+    });
+    expect(taken).toEqual([job]);
+    expect(skipped).toEqual([]);
+  });
+
+  it("reports a step the runner skipped, rather than failing it", async () => {
+    const { skipped, deps } = recorder();
+    await dispatchOutbox(step(job), {
+      ...deps,
+      continueAgentRun: async () => ({
+        kind: "skipped",
+        reason: "the run is cancelled",
+      }),
+    });
+    expect(skipped).toEqual([[AGENT_RUN_STEP_TOPIC, "the run is cancelled"]]);
+  });
+
+  it("skips when this process runs no agents", async () => {
+    const { skipped, deps } = recorder();
+    await dispatchOutbox(step(job), deps);
+    expect(skipped).toEqual([
+      [AGENT_RUN_STEP_TOPIC, "this process runs no agents"],
+    ]);
+  });
+
+  it("fails permanently on a row that names no task index", async () => {
+    const { deps } = recorder();
+    await expect(
+      dispatchOutbox(step({ workspaceId: "w1", runId: "r1" }), {
+        ...deps,
+        continueAgentRun: async () => ({ kind: "stepped" }),
+      }),
     ).rejects.toMatchObject({ name: "PermanentDispatchError" });
   });
 });
@@ -215,5 +291,9 @@ describe("the table against the code that enqueues", () => {
     // scan above cannot see.
     expect(EMBED_TOPIC in OUTBOX_HANDLERS).toBe(true);
     expect(CHANNEL_MESSAGE_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    // Enqueued by `agents.startRun` and by the run executor in
+    // `packages/agents`, which this scan does not read (M-11). The executor
+    // wrote it from P2-T17 with nothing to read it.
+    expect(AGENT_RUN_STEP_TOPIC in OUTBOX_HANDLERS).toBe(true);
   });
 });

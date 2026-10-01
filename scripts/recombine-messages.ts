@@ -23,7 +23,8 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+// TypeScript 7 no longer exports the compiler API this walks.
+import ts from "typescript5";
 
 /**
  * The checkout, found rather than assumed.

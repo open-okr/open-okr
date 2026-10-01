@@ -1,13 +1,15 @@
 "use server";
 
 /**
- * The four steps of S-34, each one a write the product already had (P6-G26).
+ * The five steps of S-34, each one a write the product already had (P6-G26,
+ * P8-T12).
  *
  * **Nothing new is stored to make onboarding work.** The timezone and language
  * are the §4.14 general settings, the rhythm is `rhythm.update`, the invitation
- * is `invitations.createLink`, and the demo is the builder P3-T17 wrote. What
- * the wizard adds is the order and the offer, which is why skipping a step
- * costs nothing: the default was already resolved at provisioning.
+ * is `invitations.createLink`, the template is the applier P8-T12 wrote, and
+ * the demo is the builder P3-T17 wrote. What the wizard adds is the order and
+ * the offer, which is why skipping a step costs nothing: the default was
+ * already resolved at provisioning.
  *
  * **The demo is called as a function, not through the registry, and the plan's
  * own description of P3-T17 is what is wrong here.** That row says it built
@@ -25,6 +27,7 @@ import {
   OperationError,
   type StartingTemplateKey,
 } from "@openokr/core";
+import type { CheckInFrequency } from "@openokr/method";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
@@ -72,9 +75,15 @@ export async function saveBasics(input: {
   return { error: null };
 }
 
-/** Step two: how often the practice asks for a check-in. */
+/**
+ * Step two: how often the practice asks for a check-in.
+ *
+ * Any of the method's frequencies, not only the three the step offers: a
+ * reopened wizard opens on whatever the rhythm card set, and Continue has to
+ * be able to keep it (L-08).
+ */
 export async function saveRhythm(input: {
-  defaultCheckInFrequency?: "weekly" | "biweekly" | "monthly";
+  defaultCheckInFrequency?: CheckInFrequency;
   checkInAnchorDay?: number;
 }): Promise<StepResult> {
   const { userId, ...ctx } = await context();
@@ -111,7 +120,7 @@ export async function inviteSomebody(input: {
 }
 
 /**
- * Step four: a workspace with something in it, or an empty one.
+ * Step five: a workspace with something in it, or an empty one.
  *
  * **Idempotent by the builder's own check**, which asks whether any company
  * objective exists rather than keeping a flag: it is the thing the builder

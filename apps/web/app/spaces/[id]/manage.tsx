@@ -143,6 +143,9 @@ export async function SpaceManagement({
                     />
                     <select
                       name="role"
+                      aria-label={t("spaces.detail.manage.roleFor", {
+                        name: member.name,
+                      })}
                       defaultValue={member.role}
                       className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink"
                     >

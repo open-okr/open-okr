@@ -17,20 +17,36 @@
  * open its own transaction, and `apps/web` may not do that. Both grant types
  * are one call into `packages/core`, which is also what makes them testable
  * without a running server.
+ *
+ * **Limited per caller address** (completeness review M-12). Every secret here
+ * is 32 random bytes, so the limit is not what stops guessing; it is what stops
+ * one address turning a public endpoint into a load on the database. The
+ * allowance is the REST surface's rather than registration's, because an office
+ * of agents behind one address each refresh when an hour-long access token runs
+ * out, and a redemption is one lookup by hash.
  */
 import { loadEnv } from "@openokr/config";
 import {
+  API_RATE_LIMIT,
+  API_RATE_WINDOW_SECONDS,
+  callerAddress,
   redeemCodeForTokens,
   refreshForTokens,
   resourceIdentifier,
   type TokenOutcome,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
+import { getCache } from "../../../../lib/cache";
 import { getPool } from "../../../../lib/pool";
+import { retryAfter } from "../../../../lib/retry-after";
 
 export const dynamic = "force-dynamic";
 
-const json = (body: unknown, status: number): Response =>
+const json = (
+  body: unknown,
+  status: number,
+  extra?: Readonly<Record<string, string>>,
+): Response =>
   new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -38,6 +54,7 @@ const json = (body: unknown, status: number): Response =>
       // RFC 6749 §5.1: a token response is never cached, anywhere, by anything.
       "cache-control": "no-store",
       pragma: "no-cache",
+      ...extra,
     },
   });
 
@@ -70,6 +87,24 @@ const answer = (outcome: TokenOutcome): Response =>
     : refusal(outcome.error, outcome.description);
 
 export async function POST(request: NextRequest): Promise<Response> {
+  const limited = await getCache().rateLimit(
+    `oauth:token:${callerAddress(request.headers)}`,
+    API_RATE_LIMIT,
+    API_RATE_WINDOW_SECONDS,
+  );
+  if (!limited.allowed) {
+    // RFC 6749's word for a server refusing for now rather than for good.
+    return json(
+      {
+        error: "temporarily_unavailable",
+        error_description:
+          "That is a lot of token requests from one address. Try again shortly.",
+      },
+      429,
+      { "retry-after": retryAfter(limited.resetSeconds) },
+    );
+  }
+
   // RFC 6749 says form encoding, and every client sends it. A JSON body is
   // accepted as well because several agent runtimes send one, and refusing it
   // would be pedantry that costs a support hour.

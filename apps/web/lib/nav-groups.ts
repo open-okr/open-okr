@@ -3,6 +3,7 @@ import {
   type NavigationGroup,
   type NavigationItem,
 } from "@openokr/core";
+import type { TerminologyOverrides, TermKey } from "@openokr/method";
 
 /**
  * The heading each sidebar block wears (UIUX-PLAN.md §3).
@@ -32,6 +33,37 @@ export interface NavBlock {
 }
 
 /**
+ * The sidebar entries named after one of the method's terms, and in which
+ * number (completeness review M-14).
+ *
+ * A workspace that calls a space a team expects the sidebar to say Teams. Only
+ * a rename replaces the registry's label: the sidebar's labels are the
+ * registry's English, and filling these three from the catalogue for a reader
+ * in Bahasa Melayu would translate three entries of fifteen.
+ */
+const TERM_ITEMS: Readonly<
+  Record<string, readonly [TermKey, "singular" | "plural"]>
+> = {
+  cycle: ["cycle", "singular"],
+  kpis: ["kpi", "plural"],
+  spaces: ["space", "plural"],
+};
+
+/** Raised first letter, because a sidebar entry reads as a heading does. */
+const asHeading = (label: string) =>
+  label.charAt(0).toUpperCase() + label.slice(1);
+
+/** An item's sidebar label, in the workspace's own word when it has one. */
+export function navLabel(
+  item: Pick<NavigationItem, "id" | "label">,
+  renamed: TerminologyOverrides = {},
+): string {
+  const term = TERM_ITEMS[item.id];
+  const label = term ? renamed[term[0]]?.[term[1]] : undefined;
+  return label === undefined ? item.label : asHeading(label);
+}
+
+/**
  * Splits a flat item list into §3's blocks, in `NAVIGATION_GROUPS` order.
  *
  * Empty blocks are dropped rather than rendered as a heading with nothing
@@ -44,9 +76,13 @@ export interface NavBlock {
  */
 export function navBlocks(
   items: readonly NavigationItem[],
+  renamed: TerminologyOverrides = {},
 ): readonly NavBlock[] {
   return NAVIGATION_GROUPS.map((id) => {
-    const label = LABELS[id];
+    // The Spaces block is headed by the term, so it follows a rename the way
+    // the Spaces entry does (M-14).
+    const plural = id === "spaces" ? renamed.space?.plural : undefined;
+    const label = plural === undefined ? LABELS[id] : asHeading(plural);
     return {
       id,
       ...(label === undefined ? {} : { label }),

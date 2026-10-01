@@ -19,7 +19,7 @@ function ResetPasswordForm() {
     return (
       <AuthCard
         title={t("auth.resetPassword.thatLinkHasExpired")}
-        description="Reset links last an hour and can be used once."
+        description={t("auth.resetPassword.resetLinksLastAnHour")}
         footer={
           <Link
             href="/forgot-password"
@@ -47,7 +47,7 @@ function ResetPasswordForm() {
     setPending(false);
 
     if (failure) {
-      setError("That link has expired or was already used. Ask for a new one.");
+      setError(t("auth.resetPassword.thatLinkHasExpiredOrUsed"));
       return;
     }
     router.push("/sign-in");
@@ -57,7 +57,7 @@ function ResetPasswordForm() {
     <AuthCard title={t("auth.resetPassword.chooseANewPassword")}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field
-          label="New password"
+          label={t("auth.resetPassword.newPassword")}
           name="password"
           type="password"
           autoComplete="new-password"
@@ -65,7 +65,9 @@ function ResetPasswordForm() {
           required
         />
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? "Saving…" : "Set password"}
+          {pending
+            ? t("auth.resetPassword.saving")
+            : t("auth.resetPassword.setPassword")}
         </Button>
       </form>
       <FormError>{error}</FormError>

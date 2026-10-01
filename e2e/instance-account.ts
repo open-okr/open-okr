@@ -20,7 +20,7 @@
  * The first-run wizard spec does not sign in as this account. It runs against
  * its own separate instance, one that has never been set up, which is the
  * entire point of the second database. It does share `skipOnboarding` below,
- * because both instances owe their first owner the same four questions.
+ * because both instances owe their first owner the same five steps.
  */
 
 /**

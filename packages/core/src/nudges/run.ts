@@ -117,6 +117,8 @@ export interface NudgeRunInput {
   readonly scope?: AgentScope;
   /** The instance's address, for the links in what it sends (H-12). */
   readonly baseUrl?: string;
+  /** What the instance calls itself, in what it sends (M-33). */
+  readonly instanceName?: string;
 }
 
 export interface NudgeRunResult {
@@ -391,19 +393,20 @@ export async function runDueNudgesInTx(
     memberIds: [...new Set(deliverable.map((n) => n.recipientMemberId))],
     now: at,
   });
-  const withNotices = [
-    ...deliverable,
-    ...unreachable.map((memberId) => ({
-      ruleKey: "channel.reconnect_needed",
-      kind: "rhythm" as const,
-      subjectType: "member" as const,
-      subjectId: memberId,
-      recipientMemberId: memberId,
-      channel: "in_app",
-      escalationStep: 0,
-      urgent: false,
-    })),
-  ] as typeof deliverable;
+  // Typed rather than cast, so the rule key is checked against the catalogue
+  // like every other one (completeness review L-16). The cast this replaced
+  // would have accepted any string.
+  const notices = unreachable.map((memberId): (typeof deliverable)[number] => ({
+    ruleKey: "channel.reconnect_needed",
+    kind: "rhythm",
+    subjectType: "member",
+    subjectId: memberId,
+    recipientMemberId: memberId,
+    channel: "in_app",
+    escalationStep: 0,
+    urgent: false,
+  }));
+  const withNotices = [...deliverable, ...notices];
 
   const decided: {
     nudge: (typeof deliverable)[number];
@@ -455,6 +458,7 @@ export async function runDueNudgesInTx(
     workspaceId,
     now: at,
     ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+    ...(input.instanceName ? { instanceName: input.instanceName } : {}),
   });
 
   const sent = ids.filter((written) => written.sent).length;

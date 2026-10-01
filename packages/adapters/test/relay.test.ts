@@ -1,6 +1,10 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { OutboxRelay, PermanentDispatchError } from "../src/relay.ts";
+import {
+  OutboxRelay,
+  PermanentDispatchError,
+  purgeSettledOutbox,
+} from "../src/relay.ts";
 
 /**
  * The outbox relay (TECHNICAL-PLAN §5, "the outbox contract").
@@ -537,5 +541,97 @@ describe("the relay is fair between workspaces", () => {
     expect(new Set(keys).size).toBe(8);
     expect(first.delivered).toHaveLength(4);
     expect(second.delivered).toHaveLength(4);
+  });
+});
+
+describe("what a delivered row keeps (completeness review M-19)", () => {
+  it("strips the fields its topic names when it is delivered, and keeps the rest", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "invitation.email", "invitation.email:l1", {
+      linkId: "l1",
+      workspaceId: "w1",
+      to: "somebody@example.com",
+      token: "raw-secret-token",
+    });
+    await enqueue(wb.admin, "board.changed", "board.changed:b1", {
+      to: "a stage name, not an address",
+    });
+    const relay = new OutboxRelay(wb.admin, {
+      dispatch: collector().dispatch,
+      redactOnDelivery: { "invitation.email": ["to", "token"] },
+    });
+    expect(await relay.drainOnce()).toBe(2);
+
+    const { rows } = await wb.admin.query<{
+      topic: string;
+      payload: Record<string, unknown>;
+    }>("select topic, payload from outbox order by topic");
+    expect(rows).toEqual([
+      {
+        topic: "board.changed",
+        payload: { to: "a stage name, not an address" },
+      },
+      {
+        topic: "invitation.email",
+        payload: { linkId: "l1", workspaceId: "w1" },
+      },
+    ]);
+  });
+
+  it("keeps a pending row whole, because it has not been sent yet", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "invitation.email", "invitation.email:l2", {
+      to: "somebody@example.com",
+      token: "raw-secret-token",
+    });
+    const relay = new OutboxRelay(wb.admin, {
+      dispatch: async () => {
+        throw new Error("the mail server is down");
+      },
+      redactOnDelivery: { "invitation.email": ["to", "token"] },
+    });
+    await relay.drainOnce();
+    const { rows } = await wb.admin.query<{ payload: Record<string, unknown> }>(
+      "select payload from outbox",
+    );
+    expect(rows[0]?.payload).toMatchObject({ token: "raw-secret-token" });
+  });
+});
+
+describe("purgeSettledOutbox (completeness review M-19)", () => {
+  it("removes delivered and dead-lettered rows past the window, and never a pending one", async () => {
+    const wb = await workerDb();
+    const age = (key: string, column: string) =>
+      wb.admin.query(
+        `update outbox set ${column} = now() - interval '40 days' where idempotency_key = $1`,
+        [key],
+      );
+    await enqueue(wb.admin, "t", "old-delivered");
+    await enqueue(wb.admin, "t", "old-dead");
+    await enqueue(wb.admin, "t", "fresh-delivered");
+    await enqueue(wb.admin, "t", "old-pending", {}, 40 * 86_400);
+    await age("old-delivered", "delivered_at");
+    await age("old-dead", "dead_lettered_at");
+    await wb.admin.query(
+      "update outbox set delivered_at = now() where idempotency_key = 'fresh-delivered'",
+    );
+
+    expect(await purgeSettledOutbox(wb.admin, 30)).toBe(2);
+    const { rows } = await wb.admin.query<{ idempotency_key: string }>(
+      "select idempotency_key from outbox order by idempotency_key",
+    );
+    expect(rows.map((row) => row.idempotency_key)).toEqual([
+      "fresh-delivered",
+      "old-pending",
+    ]);
+  });
+
+  it("keeps everything when retention is zero", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "t", "delivered");
+    await wb.admin.query(
+      "update outbox set delivered_at = now() - interval '400 days'",
+    );
+    expect(await purgeSettledOutbox(wb.admin, 0)).toBe(0);
   });
 });

@@ -15,5 +15,5 @@ export default function HomeError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="your Work Map" />;
+  return <SegmentError {...props} headingKey="segmentError.home" />;
 }

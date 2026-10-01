@@ -73,6 +73,7 @@ import {
   updateFeatureSetting,
   updatePrompt,
 } from "./ai-models.ts";
+import { readPrivacySettings, updatePrivacySettings } from "./ai-privacy.ts";
 import {
   readBudgets,
   readUsageSummary,
@@ -98,7 +99,7 @@ import {
   readPendingDevice,
   revokeApiToken,
 } from "./api-tokens.ts";
-import { exportAudit, verifyAudit } from "./audit.ts";
+import { exportAudit, listAudit, verifyAudit } from "./audit.ts";
 import {
   claimUpload,
   getBlobForDownload,
@@ -182,6 +183,7 @@ import {
 } from "./cycle-workflow.ts";
 import {
   archiveCycle,
+  closeCycle,
   createCycle,
   ensureCurrentCycle,
   feedForwardCycle,
@@ -197,6 +199,8 @@ import {
   updateRhythmSettings,
 } from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
+import { listDeletedItems } from "./deleted-items.ts";
+import { postDigest } from "./digest-posts.ts";
 import {
   attachFile,
   createDocument,
@@ -207,6 +211,7 @@ import {
   publishDocument,
   readDocument,
   readDocumentDifference,
+  restoreDocument,
   updateDocument,
 } from "./documents.ts";
 import { exportList, listMyExports } from "./exports.ts";
@@ -223,6 +228,7 @@ import {
   createKeyResult,
   deleteGoal,
   goalReviewDecision,
+  linkKeyResultKpi,
   listDueGoals,
   listGoals,
   moveGoalToCycle,
@@ -232,6 +238,7 @@ import {
   recordKeyResultValue,
   removeKeyResult,
   reopenGoal,
+  restoreGoal,
   rewriteKeyResult,
   unlinkKeyResultKpi,
   updateGoal,
@@ -252,6 +259,7 @@ import {
   listInitiatives,
   readCapacity,
   readInitiative,
+  restoreInitiative,
   unlinkInitiativeKeyResult,
   updateInitiative,
 } from "./initiatives.ts";
@@ -269,11 +277,13 @@ import {
   createKpiCategory,
   createKpiTree,
   launchKpiRecovery,
+  listKpis,
   readKpiDetail,
   readKpiGrid,
   readKpiTree,
   readRecoveryBoard,
   readRecoveryDraft,
+  readSpaceKpiTrees,
   recordKpiValue,
   setKpiFormulaAction,
   updateKpi,
@@ -304,6 +314,7 @@ import {
   convertToGuest,
   directory,
   eraseMember,
+  exportMine,
   importMember,
   orgChart,
   possibleManagersFor,
@@ -315,6 +326,10 @@ import {
   updateOwnProfile,
 } from "./people.ts";
 import { exportArchive, importArchive } from "./portability.ts";
+import {
+  applyAgentProposal,
+  dismissAgentProposal,
+} from "./proposal-decisions.ts";
 import { reviewInbox } from "./review.ts";
 import {
   clusterRetroNotes,
@@ -324,7 +339,7 @@ import {
   proposeFromLearnings,
 } from "./review-assists.ts";
 import { narrateDigest, narrateTrend, readDigest } from "./rhythm-assists.ts";
-import { readPaletteJump, runSearch } from "./search.ts";
+import { findEntities, readPaletteJump, runSearch } from "./search.ts";
 import {
   addRetroNote,
   addReviewAction,
@@ -412,6 +427,12 @@ import {
   updateSpaceSettings,
 } from "./spaces.ts";
 import {
+  listSSOConnections,
+  removeSSOConnection,
+  setSSOConnectionEnabled,
+  updateSSOConnection,
+} from "./sso.ts";
+import {
   addChecklistItem,
   assignTask,
   createTask,
@@ -422,15 +443,19 @@ import {
   readLinkedWork,
   readTask,
   removeChecklistItem,
+  restoreTask,
   setChecklistItem,
   unassignTask,
   updateTask,
 } from "./tasks.ts";
+import { finishOwnTour, readOwnTour } from "./tour.ts";
+import { decomposeKeyResult, summariseThread } from "./work-assists.ts";
 import {
   changeWorkspacePlan,
   finishOnboarding,
   provisionWorkspace,
   renameWorkspace,
+  reopenOnboarding,
   setWorkspaceLifecycle,
   setWorkspaceState,
 } from "./workspace.ts";
@@ -441,13 +466,18 @@ import {
  */
 export const ACTION_MAP = {
   "workspace.overview": workspaceOverview,
+  "workspace.deletedItems": listDeletedItems,
   "workspace.rename": renameWorkspace,
   "workspace.finishOnboarding": finishOnboarding,
+  "workspace.reopenOnboarding": reopenOnboarding,
   "workspace.changePlan": changeWorkspacePlan,
   "workspace.setLifecycle": setWorkspaceLifecycle,
   "workspace.setState": setWorkspaceState,
   "workspace.provision": provisionWorkspace,
   "people.updateOwnProfile": updateOwnProfile,
+  "people.readOwnTour": readOwnTour,
+  "people.finishOwnTour": finishOwnTour,
+  "people.exportMine": exportMine,
   "people.importMember": importMember,
   "people.updateMember": updateMember,
   "people.setAdministrator": setAdministrator,
@@ -528,6 +558,8 @@ export const ACTION_MAP = {
   // P8-T10. The audit trail, filtered out as a file, and the chain checked.
   "audit.export": exportAudit,
   "audit.verify": verifyAudit,
+  // Completeness review L-19. The trail read a page at a time, for the screen.
+  "audit.list": listAudit,
   "settings.readWorkspaceSettings": readWorkspaceSettings,
   // P8-G05. The member-visible half, so an ordinary member is not refused on
   // their own Overview by an admin read.
@@ -561,6 +593,14 @@ export const ACTION_MAP = {
   "ai.setBudget": setBudget,
   "ai.removeBudget": removeBudget,
   "ai.readUsageSummary": readUsageSummary,
+  "ai.readPrivacySettings": readPrivacySettings,
+  "ai.updatePrivacySettings": updatePrivacySettings,
+  // Single sign-on connections. Adding one is still `POST /api/v1/admin/sso`,
+  // which predates these; changing, switching and removing one are here.
+  "sso.listConnections": listSSOConnections,
+  "sso.updateConnection": updateSSOConnection,
+  "sso.setConnectionEnabled": setSSOConnectionEnabled,
+  "sso.removeConnection": removeSSOConnection,
   "agents.list": readAgents,
   "agents.create": createAgent,
   "agents.setAutonomy": setAgentAutonomy,
@@ -575,6 +615,8 @@ export const ACTION_MAP = {
   "proposals.list": listProposedChanges,
   "proposals.bulkApply": bulkApplyProposedChanges,
   "proposals.bulkDismiss": bulkDismissProposedChanges,
+  "proposals.apply": applyAgentProposal,
+  "proposals.dismiss": dismissAgentProposal,
   "spaces.list": listSpaces,
   "spaces.read": readSpace,
   "spaces.create": createSpace,
@@ -594,6 +636,7 @@ export const ACTION_MAP = {
   "cycles.archive": archiveCycle,
   "cycles.snapshot": snapshotCycle,
   "cycles.feedForward": feedForwardCycle,
+  "cycles.close": closeCycle,
   "cycles.scorecard": readScorecard,
   "rhythm.read": readRhythmSettings,
   "rhythm.update": updateRhythmSettings,
@@ -619,11 +662,13 @@ export const ACTION_MAP = {
   "documents.update": updateDocument,
   "documents.publish": publishDocument,
   "documents.delete": deleteDocument,
+  "documents.restore": restoreDocument,
   "attachments.list": listAttachments,
   "attachments.attach": attachFile,
   "attachments.detach": detachFile,
   "search.query": runSearch,
   "search.jump": readPaletteJump,
+  "search.entities": findEntities,
   "exports.list": exportList,
   "exports.mine": listMyExports,
   "imports.listRuns": listImportRuns,
@@ -644,12 +689,14 @@ export const ACTION_MAP = {
   "tasks.setChecklistItem": setChecklistItem,
   "tasks.removeChecklistItem": removeChecklistItem,
   "tasks.delete": deleteTask,
+  "tasks.restore": restoreTask,
   "tasks.linkedWork": readLinkedWork,
   "initiatives.list": listInitiatives,
   "initiatives.read": readInitiative,
   "initiatives.create": createInitiative,
   "initiatives.update": updateInitiative,
   "initiatives.delete": deleteInitiative,
+  "initiatives.restore": restoreInitiative,
   "initiatives.linkKeyResult": linkInitiativeKeyResult,
   "initiatives.unlinkKeyResult": unlinkInitiativeKeyResult,
   "initiatives.capacity": readCapacity,
@@ -659,6 +706,7 @@ export const ACTION_MAP = {
   "goals.update": updateGoal,
   "goals.close": closeGoal,
   "goals.delete": deleteGoal,
+  "goals.restore": restoreGoal,
   "goals.reviewDecision": goalReviewDecision,
   "goals.reopen": reopenGoal,
   "goals.reassignRole": reassignGoalRole,
@@ -667,6 +715,7 @@ export const ACTION_MAP = {
   "goals.updateKeyResult": updateKeyResult,
   "goals.recordValue": recordKeyResultValue,
   "goals.removeKeyResult": removeKeyResult,
+  "goals.linkKpi": linkKeyResultKpi,
   "goals.unlinkKpi": unlinkKeyResultKpi,
   "goals.keyResultHistory": readKeyResultHistory,
   "goals.due": listDueGoals,
@@ -676,6 +725,8 @@ export const ACTION_MAP = {
   "goals.suggestMeasure": suggestMeasure,
   "goals.suggestParent": suggestParent,
   "goals.parseFilter": parseListFilter,
+  // §2.4's decomposition, which no task had built (completeness review M-09).
+  "goals.decomposeKeyResult": decomposeKeyResult,
   "goals.startCheckIn": startCheckIn,
   "goals.publishCheckIn": publishCheckIn,
   "goals.importCheckIn": importCheckIn,
@@ -699,12 +750,14 @@ export const ACTION_MAP = {
   "kpis.create": createKpi,
   "kpis.record": recordKpiValue,
   "kpis.grid": readKpiGrid,
+  "kpis.list": listKpis,
   "kpis.setFormula": setKpiFormulaAction,
   "kpis.createTree": createKpiTree,
   "kpis.launchRecovery": launchKpiRecovery,
   "kpis.recoveryDraft": readRecoveryDraft,
   "kpis.recoveryBoard": readRecoveryBoard,
   "kpis.tree": readKpiTree,
+  "kpis.spaceTrees": readSpaceKpiTrees,
   "kpis.detail": readKpiDetail,
   "kpis.update": updateKpi,
   "alignment.dismissFinding": dismissAlignmentFinding,
@@ -712,6 +765,8 @@ export const ACTION_MAP = {
   "review.inbox": reviewInbox,
   // Comments and reactions (P3-T16)
   "comments.list": listCommentsAction,
+  // §2.4's thread summary (completeness review M-09).
+  "comments.summarise": summariseThread,
   "comments.create": createCommentAction,
   // P6-T04b. A comment an import found, kept as its author wrote it.
   "comments.importComment": importCommentAction,
@@ -761,6 +816,7 @@ export const ACTION_MAP = {
   "sessions.confidenceTrend": confidenceTrend,
   "sessions.listCommitments": listSessionCommitments,
   "sessions.setCoordinatorNote": setCoordinatorNote,
+  "sessions.postDigest": postDigest,
   "sessions.readStreak": readStreak,
   "sessions.digest": readDigest,
   "sessions.narrateDigest": narrateDigest,

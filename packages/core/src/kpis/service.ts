@@ -118,6 +118,51 @@ export async function upsertKpiRecord(
   };
 }
 
+export interface KpiReading {
+  readonly actualValue: number;
+  /** Null when the period was recorded without one. */
+  readonly targetValue: number | null;
+}
+
+/**
+ * The newest period that has an actual value, or null when nothing is recorded.
+ *
+ * One definition, because two readers need the same answer: the achievement
+ * below, and the key results that read this KPI (completeness review M-07). A
+ * key result showing one period's value beside a progress bar computed from
+ * another would be two numbers for one measure.
+ */
+export async function latestKpiReading(
+  tx: OperationTx,
+  workspaceId: string,
+  kpiId: string,
+): Promise<KpiReading | null> {
+  const [latest] = await tx
+    .select({
+      actualValue: kpiRecords.actualValue,
+      targetValue: kpiRecords.targetValue,
+    })
+    .from(kpiRecords)
+    .where(
+      activeOnly(
+        kpiRecords,
+        eq(kpiRecords.workspaceId, workspaceId),
+        eq(kpiRecords.kpiId, kpiId),
+        isNotNull(kpiRecords.actualValue),
+      ),
+    )
+    .orderBy(desc(kpiRecords.periodStart))
+    .limit(1);
+  if (!latest || latest.actualValue === null) {
+    return null;
+  }
+  return {
+    actualValue: Number(latest.actualValue),
+    targetValue:
+      latest.targetValue === null ? null : Number(latest.targetValue),
+  };
+}
+
 export interface KpiRecomputeResult {
   readonly achievementPct: number | null;
   /** §6.5's displayed figure. Equal to achievement unless a recovery is open. */
@@ -211,28 +256,12 @@ export async function recomputeKpi(
     };
   }
 
-  const [latest] = await tx
-    .select({
-      actualValue: kpiRecords.actualValue,
-      targetValue: kpiRecords.targetValue,
-    })
-    .from(kpiRecords)
-    .where(
-      activeOnly(
-        kpiRecords,
-        eq(kpiRecords.workspaceId, workspaceId),
-        eq(kpiRecords.kpiId, kpiId),
-        isNotNull(kpiRecords.actualValue),
-      ),
-    )
-    .orderBy(desc(kpiRecords.periodStart))
-    .limit(1);
+  const latest = await latestKpiReading(tx, workspaceId, kpiId);
 
-  const actual =
-    latest?.actualValue == null ? null : Number(latest.actualValue);
+  const actual = latest?.actualValue ?? null;
   const target =
     latest?.targetValue != null
-      ? Number(latest.targetValue)
+      ? latest.targetValue
       : kpi.targetDefault != null
         ? Number(kpi.targetDefault)
         : null;

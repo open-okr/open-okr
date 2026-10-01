@@ -24,7 +24,7 @@ import {
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
-import { eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import {
   resolveMemberAccessLevel,
@@ -79,6 +79,50 @@ export async function isLastFullAccessHolder<
     }
   }
   return true;
+}
+
+/**
+ * Who holds full access to the workspace: its administrators (completeness
+ * review M-29). By the rule `isLastFullAccessHolder` counts with, so the two
+ * cannot disagree about who is one. Active humans only: an agent never holds
+ * workspace-wide access, and a suspended administrator is told nothing.
+ */
+export async function workspaceAdministratorIds<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, workspaceId: string): Promise<readonly string[]> {
+  const context = await resolveSubjectContext(
+    tx,
+    "workspace",
+    workspaceId,
+    workspaceId,
+  );
+  if (!context) {
+    return [];
+  }
+  const members = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.kind, "human"),
+        eq(workspaceMembers.status, "active"),
+      ),
+    )
+    .orderBy(asc(workspaceMembers.createdAt));
+  const administrators: string[] = [];
+  for (const member of members) {
+    const level = await resolveMemberAccessLevel(tx, {
+      workspaceId,
+      memberId: member.id,
+      contextId: context.contextId,
+    });
+    if (level >= ACCESS_LEVELS.full) {
+      administrators.push(member.id);
+    }
+  }
+  return administrators;
 }
 
 const LAST_OWNER_MESSAGE =

@@ -4,6 +4,10 @@ import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { COPILOT_SYSTEM, passagesFor } from "../src/drafter.ts";
 import { processNextTask } from "../src/run-executor.ts";
+import { mockRunModel } from "./mock-model.ts";
+
+/** A model the run may use, so what is under test is the binding check (M-11). */
+const RUN_OPTIONS = { model: mockRunModel() };
 
 /**
  * An instruction hidden in retrieved content cannot widen what an agent may
@@ -162,10 +166,14 @@ describe("an instruction injected into retrieved content", () => {
       ],
     });
 
-    const result = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const result = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
 
     expect(result.logEntry.kind).toBe("denied");
     expect(await spaceName(otherSpaceId)).toBe("Finance");
@@ -225,10 +233,14 @@ describe("an instruction injected into retrieved content", () => {
     });
 
     const wb = await workerDb();
-    const result = await processNextTask(wb.appPool, {
-      workspaceId,
-      runId: run.id,
-    });
+    const result = await processNextTask(
+      wb.appPool,
+      {
+        workspaceId,
+        runId: run.id,
+      },
+      RUN_OPTIONS,
+    );
     expect(result.logEntry.kind).toBe("error");
     expect(await spaceName(ownSpaceId)).toBe(before);
   });

@@ -7,5 +7,5 @@ export default function KpisError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the KPIs" />;
+  return <SegmentError {...props} headingKey="segmentError.kpis" />;
 }

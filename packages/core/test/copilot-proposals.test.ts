@@ -423,3 +423,320 @@ describe("a copilot proposal is not the workspace's reading", () => {
     expect(feed.map((item) => item.kind)).toContain("goal.created");
   });
 });
+
+/**
+ * The rest of the catalogue (completeness review M-09).
+ *
+ * The copilot could propose an objective and nothing under one. These are the
+ * three writes that follow it in a sentence: a key result for an objective,
+ * and an initiative or a task behind a key result. Each is proved the way the
+ * first one is, through the apply and, where it has one, the undo. The tests
+ * that matter most are the access ones: a list the model points into is the
+ * member's editable things and nothing else.
+ */
+describe("the rest of the catalogue", () => {
+  let goalId: string;
+  let keyResultId: string;
+  let spaceId: string;
+  const GOAL_TITLE = "Raise mid-market activation";
+  const KEY_RESULT_TITLE = "Trial to paid conversion from 18% to 30%";
+
+  const createGoal = async (title: string) =>
+    (
+      (await call("goals.create", {
+        title,
+        cycleId: (
+          (await call("cycles.current", { mode: "quarterly" })) as {
+            id: string;
+          }
+        ).id,
+        spaceId,
+        level: "team",
+        ownerKind: "space",
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        weight: 1,
+      })) as { id: string }
+    ).id;
+
+  /** Lowers this member's bindings on one resource's context to `level`. */
+  const lowerOn = async (
+    resourceType: string,
+    resourceId: string,
+    level: number,
+  ) => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update access_bindings set level = $3
+        where workspace_id = $1
+          and context_id in (
+            select id from access_contexts
+             where resource_type = $2 and resource_id = $4
+          )`,
+      [workspaceId, resourceType, level, resourceId],
+    );
+  };
+
+  beforeEach(async () => {
+    spaceId = ((await call("spaces.list", {})) as { id: string }[])[0]
+      ?.id as string;
+    goalId = await createGoal(GOAL_TITLE);
+    keyResultId = (
+      (await call("goals.addKeyResult", {
+        goalId,
+        title: KEY_RESULT_TITLE,
+        direction: "increase",
+        indicatorType: "lagging",
+        baselineValue: 18,
+        targetValue: 30,
+        weight: 1,
+      })) as { id: string }
+    ).id;
+  });
+
+  const keyResult = (fields: Record<string, unknown> = {}) => ({
+    action: "goals.addKeyResult",
+    fields: {
+      title: "Cut time to first value from nine days to three",
+      unit: "days",
+      direction: "reduce",
+      indicatorType: "leading",
+      baseline: 9,
+      target: 3,
+      objectiveNumber: 1,
+      ...fields,
+    },
+    why: "Activation turns on how quickly a trial sees value.",
+  });
+
+  const initiative = (fields: Record<string, unknown> = {}) => ({
+    action: "initiatives.create",
+    fields: {
+      title: "Hand every trial to finance by day ten",
+      description: "A named owner for the handover.",
+      keyResultNumber: 1,
+      ...fields,
+    },
+    why: "The handover is where trials stall.",
+  });
+
+  const task = (fields: Record<string, unknown> = {}) => ({
+    action: "tasks.create",
+    fields: {
+      title: "Draft the handover note",
+      keyResultNumber: 1,
+      ...fields,
+    },
+    why: "The first step of the handover.",
+  });
+
+  it("offers all four, each pointing only at what the member may edit", async () => {
+    const drafter = new ProposingDrafter(null);
+    await propose(drafter);
+
+    const shown = drafter.seen[0];
+    expect(shown?.options.map((option) => option.action)).toEqual([
+      "goals.create",
+      "goals.addKeyResult",
+      "initiatives.create",
+      "tasks.create",
+    ]);
+    const choices = Object.fromEntries(
+      (shown?.options ?? []).map((option) => [option.action, option.choices]),
+    );
+    expect(choices["goals.addKeyResult"]).toEqual({
+      objectives: [GOAL_TITLE],
+    });
+    expect(choices["initiatives.create"]).toEqual({
+      keyResults: [`${KEY_RESULT_TITLE} (${GOAL_TITLE})`],
+    });
+    // Labels only, for all four, and still no identifier to copy.
+    expect(JSON.stringify(shown?.options)).not.toContain(goalId);
+    expect(JSON.stringify(shown?.options)).not.toContain(keyResultId);
+    expect(JSON.stringify(shown?.options)).not.toContain(spaceId);
+  });
+
+  it("does not list an objective the member may only read", async () => {
+    const readOnly = await createGoal("Somebody else's objective");
+    await lowerOn("goal", readOnly, 10);
+
+    const drafter = new ProposingDrafter(keyResult({ objectiveNumber: 2 }));
+    // Pointing at the second objective is pointing past the end: the one they
+    // cannot edit was never on the list.
+    expect(await propose(drafter)).toBeNull();
+    const shown = drafter.seen[0]?.options.find(
+      (option) => option.action === "goals.addKeyResult",
+    );
+    expect(shown?.choices.objectives).toEqual([GOAL_TITLE]);
+    expect(await storedProposals()).toEqual([]);
+  });
+
+  it("does not offer work behind a key result in a space the member may only read", async () => {
+    await lowerOn("space", spaceId, 10);
+
+    const drafter = new ProposingDrafter(initiative());
+    expect(await propose(drafter)).toBeNull();
+    const offered = drafter.seen[0]?.options.map((option) => option.action);
+    expect(offered).not.toContain("initiatives.create");
+    expect(offered).not.toContain("tasks.create");
+    // And not an objective in that space either, which `goals.create` would
+    // refuse there anyway.
+    expect(offered).not.toContain("goals.create");
+  });
+
+  it("offers nothing at all to a member who may edit nothing, and asks no model", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update access_bindings set level = 40 where workspace_id = $1",
+      [workspaceId],
+    );
+    const drafter = new ProposingDrafter(task());
+    expect(await propose(drafter)).toBeNull();
+    expect(drafter.seen).toEqual([]);
+    expect(await storedProposals()).toEqual([]);
+  });
+
+  it("adds a key result through the normal Operation, owned by the asking member", async () => {
+    const proposed = await propose(new ProposingDrafter(keyResult()));
+    expect(proposed?.action).toBe("goals.addKeyResult");
+    expect(proposed?.preview).toContainEqual({
+      label: "Objective",
+      value: GOAL_TITLE,
+    });
+
+    const applied = (await call("copilot.applyProposal", {
+      id: proposed?.id as string,
+    })) as { result: { id: string } | null };
+    const created = applied.result?.id as string;
+
+    const goal = (await call("goals.read", { id: goalId })) as {
+      keyResults: {
+        id: string;
+        title: string;
+        ownerId: string | null;
+        dueOn: string | null;
+        baselineValue: number;
+        targetValue: number;
+        unit: string | null;
+      }[];
+    };
+    const added = goal.keyResults.find((one) => one.id === created);
+    expect(added).toMatchObject({
+      title: "Cut time to first value from nine days to three",
+      ownerId: ownerMemberId,
+      baselineValue: 9,
+      targetValue: 3,
+      unit: "days",
+    });
+    // KR-3 asks for a date, and the cycle's last day is the one the product
+    // gives every drafted key result.
+    const cycle = (await call("cycles.current", { mode: "quarterly" })) as {
+      endsOn: string;
+    };
+    expect(added?.dueOn).toBe(cycle.endsOn);
+
+    const wb = await workerDb();
+    const audit = await wb.admin.query<{ action: string }>(
+      "select action from audit_events where target_id = $1",
+      [created],
+    );
+    expect(audit.rows.map((row) => row.action)).toContain("goals.addKeyResult");
+  });
+
+  it("says a key result cannot be undone, because nothing removes one", async () => {
+    const proposed = await propose(new ProposingDrafter(keyResult()));
+    const listed = (await call("copilot.proposals", { threadId })) as {
+      reversible: boolean;
+    }[];
+    expect(listed[0]?.reversible).toBe(false);
+    await call("copilot.applyProposal", { id: proposed?.id as string });
+    await expect(
+      call("copilot.undoProposal", { id: proposed?.id as string }),
+    ).rejects.toThrow(/no reverse/);
+  });
+
+  it("refuses a key result the schema will not take", async () => {
+    expect(
+      await propose(new ProposingDrafter(keyResult({ direction: "sideways" }))),
+    ).toBeNull();
+    expect(
+      await propose(new ProposingDrafter(keyResult({ target: "thirty" }))),
+    ).toBeNull();
+    expect(await storedProposals()).toEqual([]);
+  });
+
+  it("starts an initiative behind the key result, and undoes it", async () => {
+    const proposed = await propose(new ProposingDrafter(initiative()));
+    expect(proposed?.action).toBe("initiatives.create");
+
+    const applied = (await call("copilot.applyProposal", {
+      id: proposed?.id as string,
+    })) as { result: { id: string } | null };
+    const initiativeId = applied.result?.id as string;
+
+    const behind = (await call("initiatives.list", { keyResultId })) as {
+      id: string;
+      title: string;
+    }[];
+    expect(behind.map((one) => one.title)).toEqual([
+      "Hand every trial to finance by day ten",
+    ]);
+
+    await call("copilot.undoProposal", { id: proposed?.id as string });
+    expect(
+      (await call("initiatives.list", { keyResultId })) as unknown[],
+    ).toEqual([]);
+    const wb = await workerDb();
+    const audit = await wb.admin.query<{ action: string }>(
+      "select action from audit_events where target_id = $1",
+      [initiativeId],
+    );
+    expect(audit.rows.map((row) => row.action)).toEqual(
+      expect.arrayContaining(["initiatives.create", "initiatives.delete"]),
+    );
+  });
+
+  it("adds a task behind the key result, for the asking member", async () => {
+    const proposed = await propose(new ProposingDrafter(task()));
+    expect(proposed?.action).toBe("tasks.create");
+
+    const applied = (await call("copilot.applyProposal", {
+      id: proposed?.id as string,
+    })) as { result: { id: string } | null };
+    const taskId = applied.result?.id as string;
+
+    const wb = await workerDb();
+    const stored = await wb.admin.query<{
+      title: string;
+      key_result_id: string | null;
+      space_id: string;
+    }>("select title, key_result_id, space_id from tasks where id = $1", [
+      taskId,
+    ]);
+    expect(stored.rows[0]).toEqual({
+      title: "Draft the handover note",
+      key_result_id: keyResultId,
+      space_id: spaceId,
+    });
+    const assigned = await wb.admin.query<{ member_id: string }>(
+      "select member_id from task_assignees where task_id = $1 and deleted_at is null",
+      [taskId],
+    );
+    expect(assigned.rows.map((row) => row.member_id)).toEqual([ownerMemberId]);
+  });
+
+  it("is refused by the permission layer when access was lowered after the proposal", async () => {
+    const proposed = await propose(new ProposingDrafter(task()));
+    // Offered while they could edit the space; applied after they could not.
+    // The offer does not authorise anything: the action decides again.
+    await lowerOn("space", spaceId, 10);
+    await expect(
+      call("copilot.applyProposal", { id: proposed?.id as string }),
+    ).rejects.toThrow();
+    const wb = await workerDb();
+    const tasks = await wb.admin.query<{ count: string }>(
+      "select count(*) from tasks",
+    );
+    expect(tasks.rows[0]?.count).toBe("0");
+  });
+});

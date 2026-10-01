@@ -7,5 +7,5 @@ export default function MethodError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="this rule" />;
+  return <SegmentError {...props} headingKey="segmentError.method" />;
 }

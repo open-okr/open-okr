@@ -30,24 +30,28 @@ export const goalsTemplate: EntityTemplate = {
         "The identifier the source system uses for this objective. Re-running the file finds this row by it rather than creating a second one.",
       aliases: ["externalId", "id", "sourceId", "legacyId", "objectiveId"],
       required: true,
+      example: "OBJ-1",
     },
     {
       field: "title",
       describe: "The objective itself.",
       aliases: ["title", "objective", "name", "goal"],
       required: true,
+      example: "Make the first week obvious for every new team",
     },
     {
       field: "description",
       describe: "Context, as plain text. Blank lines separate paragraphs.",
       aliases: ["description", "context", "notes", "detail"],
       required: false,
+      example: "Most new teams stall before their first check-in.",
     },
     {
       field: "level",
       describe: `One of: ${GOAL_LEVELS.join(", ")}.`,
       aliases: ["level", "tier", "scope"],
       required: true,
+      example: "company",
     },
     {
       field: "cycle",
@@ -55,18 +59,21 @@ export const goalsTemplate: EntityTemplate = {
         "The cycle this objective belongs to, by name or label. Leave it empty and give a start and an end instead.",
       aliases: ["cycle", "quarter", "period"],
       required: false,
+      example: "",
     },
     {
       field: "startsOn",
       describe: "The first day, when the objective carries its own timeframe.",
       aliases: ["startsOn", "startDate", "start", "from"],
       required: false,
+      example: "2027-01-01",
     },
     {
       field: "endsOn",
       describe: "The last day, when the objective carries its own timeframe.",
       aliases: ["endsOn", "endDate", "end", "due", "to"],
       required: false,
+      example: "2027-03-31",
     },
     {
       field: "space",
@@ -74,18 +81,21 @@ export const goalsTemplate: EntityTemplate = {
         "The space that owns it, by name. Leave it empty for a workspace-level objective.",
       aliases: ["space", "team", "department", "unit"],
       required: false,
+      example: "",
     },
     {
       field: "champion",
       describe: "The member who runs it, by email address.",
       aliases: ["champion", "owner", "accountable", "responsible"],
       required: true,
+      example: "alex@example.com",
     },
     {
       field: "reviewer",
       describe: "The member who reviews it, by email address.",
       aliases: ["reviewer", "manager", "approver"],
       required: true,
+      example: "sam@example.com",
     },
     {
       field: "parent",
@@ -93,6 +103,7 @@ export const goalsTemplate: EntityTemplate = {
         "The objective this one aligns to, by its identifier in this same file or by its id here.",
       aliases: ["parent", "parentId", "alignsTo", "parentObjective"],
       required: false,
+      example: "",
     },
     {
       field: "weight",
@@ -100,6 +111,7 @@ export const goalsTemplate: EntityTemplate = {
         "How much of the parent this objective carries. One by default.",
       aliases: ["weight", "contribution"],
       required: false,
+      example: "1",
     },
   ],
 

@@ -27,11 +27,11 @@ import { runChampionAction, runCoachAction } from "./actions";
 
 type Cadence = "hourly" | "daily" | "weekly" | "cycle";
 
-const CHAMPION_RUNS: readonly { cadence: Cadence; label: string }[] = [
-  { cadence: "hourly", label: "Nudge queue" },
-  { cadence: "daily", label: "Daily sweep" },
-  { cadence: "weekly", label: "Session lifecycle" },
-  { cadence: "cycle", label: "Cycle countdown" },
+const CHAMPION_RUNS: readonly { cadence: Cadence; labelKey: string }[] = [
+  { cadence: "hourly", labelKey: "admin.agents.runControls.nudgeQueue" },
+  { cadence: "daily", labelKey: "admin.agents.runControls.dailySweep" },
+  { cadence: "weekly", labelKey: "admin.agents.runControls.sessionLifecycle" },
+  { cadence: "cycle", labelKey: "admin.agents.runControls.cycleCountdown" },
 ];
 
 export function RunControls({ drafting }: { drafting: boolean }) {
@@ -52,12 +52,14 @@ export function RunControls({ drafting }: { drafting: boolean }) {
           // Named rather than swallowed. A run that failed silently would
           // leave an administrator watching a list that never changes.
           setProblem(
-            error instanceof Error ? error.message : "The run did not finish.",
+            error instanceof Error
+              ? error.message
+              : t("admin.agents.runControls.runDidNotFinish"),
           );
         }
       });
     },
-    [router],
+    [router, t],
   );
 
   return (
@@ -79,8 +81,8 @@ export function RunControls({ drafting }: { drafting: boolean }) {
       <CardBody className="flex flex-col gap-3">
         <p className="text-sm text-ink-2">
           {drafting
-            ? "A provider is configured, so a run may also draft check-ins and recovery titles. Everything it drafts is a proposal somebody applies."
-            : "No AI provider is configured. Every trigger, ladder and corridor still fires; nothing is drafted."}
+            ? t("admin.agents.runControls.draftingExplained")
+            : t("admin.agents.runControls.deterministicExplained")}
         </p>
 
         <span className="flex flex-wrap gap-2">
@@ -92,7 +94,7 @@ export function RunControls({ drafting }: { drafting: boolean }) {
               disabled={pending}
               onClick={() => run(() => runChampionAction(entry.cadence))}
             >
-              {entry.label}
+              {t(entry.labelKey)}
             </Button>
           ))}
           <Button

@@ -23,7 +23,11 @@
  * always answerable, so there is no state in which escalation stops working.
  */
 import { activeOnly, nudgeRules, type WorkspaceTx } from "@openokr/db";
-import { type ResolvedThresholds, THRESHOLDS } from "@openokr/method";
+import {
+  type ResolvedThresholds,
+  THRESHOLDS,
+  type TriggerKey,
+} from "@openokr/method";
 import { eq } from "drizzle-orm";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -32,7 +36,7 @@ type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
 /** The three §11 ladders a workspace may replace, and who owns each. */
 export interface LadderOwner {
   /** The rule the editor hangs this ladder on. */
-  readonly ruleKey: string;
+  readonly ruleKey: TriggerKey;
   /** The §11 registry key whose default is the canon ladder. */
   readonly threshold: keyof ResolvedThresholds;
   /** The rungs, in the order they must increase. */

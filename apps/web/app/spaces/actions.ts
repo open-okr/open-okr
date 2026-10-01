@@ -157,10 +157,23 @@ export async function updateSpaceSettings(
   const id = String(formData.get("id") ?? "");
   const strictness = String(formData.get("coachStrictness") ?? "");
   const frequency = String(formData.get("defaultCheckInFrequency") ?? "");
+  // The space's channels (M-23). The card draws a field only for a provider
+  // the workspace has connected, so an absent field means "not offered" and is
+  // left alone; an empty one is somebody clearing it, which unlinks it.
+  const channel = (name: string) => {
+    const value = formData.get(name);
+    if (value === null) {
+      return {};
+    }
+    const trimmed = String(value).trim();
+    return { [name]: trimmed === "" ? null : trimmed };
+  };
 
   return run(["/spaces", `/spaces/${id}`], (context) =>
     callAction(context, "spaces.updateSettings", {
       id,
+      ...channel("slackChannel"),
+      ...channel("teamsChannel"),
       // An unchecked checkbox sends nothing at all, which is what makes this
       // false rather than absent: the form always renders the box, so its
       // absence is a decision and not a field the screen left out.

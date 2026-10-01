@@ -90,15 +90,18 @@ function OneBlocker({
     <div className="flex flex-col gap-1.5 border-t border-line pt-2 first:border-0 first:pt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-2.5">
         <span className="min-w-0 text-sm text-ink">
-          {blocker.keyResultTitle ?? "No key result named"}
+          {blocker.keyResultTitle ??
+            t("session.detail.blockerPanel.noKeyResultNamed")}
           <span className="ml-1.5 text-xs text-ink-3">
             {blocker.type.replace(/_/g, " ")} · {blocker.ownerName}
           </span>
         </span>
         <Chip tone={blocker.resolved ? "ok" : blocker.overdue ? "bad" : "warn"}>
           {blocker.resolved
-            ? "resolved"
-            : `${Math.round(blocker.hoursOpen)}h open`}
+            ? t("session.detail.blockerPanel.resolved")
+            : t("session.detail.blockerPanel.hoursOpen", {
+                hours: Math.round(blocker.hoursOpen),
+              })}
         </Chip>
       </div>
       <p className="text-xs text-ink-2">{blocker.nextAction}</p>
@@ -113,7 +116,9 @@ function OneBlocker({
               size="sm"
               disabled={resolving}
             >
-              {resolving ? "Resolving…" : "Resolve"}
+              {resolving
+                ? t("session.detail.blockerPanel.resolving")
+                : t("session.detail.blockerPanel.resolve")}
             </Button>
           </form>
 
@@ -126,7 +131,13 @@ function OneBlocker({
             <select
               name="ownerId"
               defaultValue=""
-              aria-label={`Reassign ${blocker.keyResultTitle ?? "this blocker"}`}
+              aria-label={
+                blocker.keyResultTitle === null
+                  ? t("session.detail.blockerPanel.reassignThisBlocker")
+                  : t("session.detail.blockerPanel.reassignTitle", {
+                      title: blocker.keyResultTitle,
+                    })
+              }
               className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
             >
               <option value="">
@@ -222,7 +233,9 @@ function Raise({
         disabled={pending}
         className="self-start"
       >
-        {pending ? "Raising…" : "Raise a blocker"}
+        {pending
+          ? t("session.detail.blockerPanel.raising")
+          : t("session.detail.blockerPanel.raiseABlocker")}
       </Button>
       <Problem state={state} />
     </form>
@@ -258,7 +271,11 @@ export function BlockerPanel({
           </p>
         </div>
         <Chip tone={open.length > 0 ? "warn" : "ok"}>
-          {open.length === 0 ? "none open" : `${open.length} open`}
+          {open.length === 0
+            ? t("session.detail.blockerPanel.noneOpen")
+            : t("session.detail.countOpen", {
+                count: open.length,
+              })}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">

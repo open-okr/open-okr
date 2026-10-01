@@ -1,4 +1,10 @@
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  type MessageValues,
+} from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
@@ -64,29 +70,37 @@ export interface RegisterSpace {
 }
 
 /** What settles an entry, and what it means. Never a bare tick. */
-function stateOf(entry: RegisterEntry): {
+function stateOf(
+  entry: RegisterEntry,
+  t: (key: string, values?: MessageValues) => string,
+): {
   label: string;
   tone: "ok" | "neutral" | "warn" | "bad";
   detail: string;
 } {
   if (entry.confirmed) {
     return {
-      label: "Confirmed",
+      label: t("cycle.dependencyRegister.confirmed"),
       tone: "ok",
-      detail: "The providing team has agreed to it.",
+      detail: t("cycle.dependencyRegister.confirmedDetail"),
     };
   }
   if (entry.riskOwnerId) {
     return {
-      label: "Risk owned",
+      label: t("cycle.dependencyRegister.riskOwned"),
       tone: "warn",
-      detail: `Nobody has agreed. ${entry.riskOwnerName ?? "Somebody"} carries it.`,
+      detail:
+        entry.riskOwnerName !== null
+          ? t("cycle.dependencyRegister.riskOwnedDetail", {
+              name: entry.riskOwnerName,
+            })
+          : t("cycle.dependencyRegister.riskOwnedBySomebody"),
     };
   }
   return {
-    label: "Unsettled",
+    label: t("cycle.dependencyRegister.unsettled"),
     tone: "bad",
-    detail: "Gate 4 is red while this is neither confirmed nor risk-owned.",
+    detail: t("cycle.dependencyRegister.unsettledDetail"),
   };
 }
 
@@ -125,7 +139,11 @@ export async function DependencyRegister({
           </p>
         </div>
         <Chip tone={blocking > 0 ? "bad" : "ok"}>
-          {blocking > 0 ? `${blocking} unsettled` : `${entries.length} settled`}
+          {blocking > 0
+            ? t("cycle.dependencyRegister.countUnsettled", { count: blocking })
+            : t("cycle.dependencyRegister.countSettled", {
+                count: entries.length,
+              })}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
@@ -136,7 +154,7 @@ export async function DependencyRegister({
         ) : (
           <ul className="flex flex-col gap-2.5">
             {ordered.map((entry) => {
-              const state = stateOf(entry);
+              const state = stateOf(entry, t);
               return (
                 <li
                   key={entry.id}

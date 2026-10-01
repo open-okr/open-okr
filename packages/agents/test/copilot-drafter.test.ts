@@ -411,3 +411,47 @@ describe("proposing an action", () => {
     expect(provider.requests).toEqual([]);
   });
 });
+
+/**
+ * What each call says it carries (completeness review M-10).
+ *
+ * The egress guard lets an assist through on a workspace that keeps
+ * retrieval here, and withholds the copilot's passages. That only works if
+ * every call names itself correctly: an assist marked as retrieval would
+ * vanish on the `assists` level for no reason anybody could see, and the
+ * copilot marked as an assist would send the passages the level exists to
+ * keep.
+ */
+describe("what each call carries", () => {
+  it("marks the copilot's passages as retrieval, streamed or not", async () => {
+    const { drafter, provider } = drafterOver(["Behind.\nSOURCES: 1"]);
+    await drafter.answerGrounded?.(question);
+    await collect(streamOf(drafter, question));
+    expect(provider.requests.map((request) => request.purpose)).toEqual([
+      "retrieval",
+      "retrieval",
+    ]);
+  });
+
+  it("marks an assist as an assist", async () => {
+    const provider = new ExtractingProvider(
+      JSON.stringify({ rewritten: "Raise activation from 41% to 55%" }),
+    );
+    const drafter = createProviderDrafter({
+      provider,
+      model: "test-model",
+      costCapUsd: 2,
+      costInPerMillion: 1,
+      costOutPerMillion: 2,
+    });
+    await drafter.rewriteForRule?.({
+      text: "Improve activation",
+      ruleId: "KR-1",
+      rulePrompt: "Is there a number?",
+      goalTitle: "Raise mid-market activation",
+    });
+    expect(provider.requests.map((request) => request.purpose)).toEqual([
+      "assist",
+    ]);
+  });
+});

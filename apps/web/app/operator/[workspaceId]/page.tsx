@@ -59,12 +59,22 @@ const STATE_TONE: Record<string, ChipProps["tone"]> = {
   closed: "neutral",
 };
 
-/** What a member of this workspace can actually do right now. */
-const STATE_CONSEQUENCE: Record<string, string> = {
-  suspended:
-    "Members can read everything and change nothing, except their own settings and who is in the workspace.",
-  closed:
-    "The workspace is frozen. Members can still read it and still export it.",
+/**
+ * The band's heading and what a member of this workspace can actually do right
+ * now. Catalogue keys, one whole sentence per state.
+ */
+const STATE_BAND: Record<
+  string,
+  { readonly heading: string; readonly consequence: string }
+> = {
+  suspended: {
+    heading: "operator.workspace.thisWorkspaceIsSuspended",
+    consequence: "operator.workspace.consequenceSuspended",
+  },
+  closed: {
+    heading: "operator.workspace.thisWorkspaceIsClosed",
+    consequence: "operator.workspace.consequenceClosed",
+  },
 };
 
 /** The band's own colour, which is the state's colour. */
@@ -159,7 +169,7 @@ export default async function OperatorWorkspacePage({
       one.endedAt === null,
   );
   const plans = await readPlans(pool);
-  const consequence = STATE_CONSEQUENCE[tenant.tenantState];
+  const band = STATE_BAND[tenant.tenantState];
   const { t } = await getTranslations();
 
   return (
@@ -187,7 +197,7 @@ export default async function OperatorWorkspacePage({
 
       {/* Only when there is something to say. An active workspace gets no
        * band, because "this workspace is fine" is not news. */}
-      {consequence ? (
+      {band ? (
         <div
           className={`rounded-lg border-l-4 border-y border-r px-4 py-3 ${
             BAND_STYLE[tenant.tenantState] ?? "border-line bg-raised text-ink-2"
@@ -195,10 +205,12 @@ export default async function OperatorWorkspacePage({
         >
           <p className="font-semibold text-sm">
             {tenant.tenantState === "closed" && tenant.closedAt
-              ? `Closed on ${day(tenant.closedAt)}`
-              : `This workspace is ${tenant.tenantState}`}
+              ? t("operator.workspace.closedOn", {
+                  date: day(tenant.closedAt),
+                })
+              : t(band.heading)}
           </p>
-          <p className="mt-1 text-sm opacity-90">{consequence}</p>
+          <p className="mt-1 text-sm opacity-90">{t(band.consequence)}</p>
         </div>
       ) : null}
 
@@ -212,8 +224,13 @@ export default async function OperatorWorkspacePage({
            * misses it reads a stale figure as a live one. */}
           <p className="text-ink-3 text-xs">
             {usage
-              ? `measured ${new Date(usage.measuredAt).toISOString().replace("T", " ").slice(0, 16)}`
-              : "never measured"}
+              ? t("operator.workspace.measuredAt", {
+                  at: new Date(usage.measuredAt)
+                    .toISOString()
+                    .replace("T", " ")
+                    .slice(0, 16),
+                })
+              : t("operator.workspace.neverMeasuredShort")}
           </p>
         </div>
 
@@ -233,15 +250,29 @@ export default async function OperatorWorkspacePage({
              * rhythm and put a date where a reader was scanning integers. A
              * date is a different kind of fact and it reads below. */}
             <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-4 sm:divide-y-0">
-              <Count label="members" value={String(usage.memberCount)} />
-              <Count label="goals" value={String(usage.goalCount)} />
-              <Count label="check-ins" value={String(usage.checkInCount)} />
-              <Count label="storage" value={formatBytes(usage.storageBytes)} />
+              <Count
+                label={t("operator.workspace.countMembers")}
+                value={String(usage.memberCount)}
+              />
+              <Count
+                label={t("operator.workspace.countGoals")}
+                value={String(usage.goalCount)}
+              />
+              <Count
+                label={t("operator.workspace.countCheckIns")}
+                value={String(usage.checkInCount)}
+              />
+              <Count
+                label={t("operator.workspace.countStorage")}
+                value={formatBytes(usage.storageBytes)}
+              />
             </div>
             <p className="border-line border-t px-4 py-2.5 text-ink-2 text-sm">
               {usage.lastActivityAt
-                ? `Last activity ${day(usage.lastActivityAt)}`
-                : "No activity has ever been recorded."}
+                ? t("operator.workspace.lastActivity", {
+                    date: day(usage.lastActivityAt),
+                  })
+                : t("operator.workspace.noActivityRecorded")}
             </p>
           </div>
         ) : (
@@ -305,9 +336,18 @@ export default async function OperatorWorkspacePage({
         current={tenant.planKey}
         plans={plans.map((plan) => ({
           key: plan.key,
-          label: `${plan.name}, ${
-            plan.seats === null ? "unlimited seats" : `${plan.seats} seats`
-          }`,
+          label:
+            plan.seats === null
+              ? t("operator.workspace.planUnlimitedSeats", { name: plan.name })
+              : plan.seats === 1
+                ? t("operator.workspace.planSeatsOne", {
+                    name: plan.name,
+                    count: plan.seats,
+                  })
+                : t("operator.workspace.planSeatsOther", {
+                    name: plan.name,
+                    count: plan.seats,
+                  }),
         }))}
         workspaceId={tenant.workspaceId}
         workspaceName={tenant.name}

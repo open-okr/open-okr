@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import { withMessages } from "./screen-text.ts";
 
 /**
  * The feed reaches all four scopes S-31 names (P6-G11b, GAP-AUDIT G-01).
@@ -21,8 +22,11 @@ const at = (path: string) =>
 const panel = at("../lib/feed-panel.tsx");
 
 const SURFACES: ReadonlyArray<readonly [string, string, string]> = [
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
   ["../app/goals/[id]/page.tsx", "activities.goalFeed", "/goals/${id}"],
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
   ["../app/spaces/[id]/page.tsx", "activities.spaceFeed", "/spaces/${id}"],
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
   ["../app/people/[id]/page.tsx", "activities.profileFeed", "/people/${id}"],
 ];
 
@@ -71,12 +75,16 @@ describe("the feed at every scope", () => {
     // A renderer describes the subject and never the actor, so a page that
     // read the actor's name off the row would print nothing.
     expect(panel).toContain("names.get(item.actorMemberId)");
-    expect(panel).toContain('"OpenOKR"');
+    // The fallback name for a system actor is the instance's own, not the
+    // software's (completeness review M-33).
+    expect(panel).toContain("await getInstanceName()");
+    expect(withMessages(panel)).not.toContain("OpenOKR");
   });
 
   test("the older link carries the last row's own key", () => {
     // Which is what keeps a page stable while new rows arrive above it.
     expect(panel).toContain("const last = items.at(-1)");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
     expect(panel).toContain("at=${encodeURIComponent(last.at)}&id=${last.id}");
   });
 });

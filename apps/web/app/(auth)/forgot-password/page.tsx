@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
     setPending(false);
 
     if (failure && failure.status === 429) {
-      setError("Too many requests. Wait a minute and try again.");
+      setError(t("auth.forgotPassword.tooManyRequests"));
       return;
     }
     setSent(true);
@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
     return (
       <AuthCard
         title={t("auth.forgotPassword.checkYourEmail")}
-        description="If that address has an account, a reset link is on its way. The link expires in an hour."
+        description={t("auth.forgotPassword.ifThatAddressHasAnAccount")}
       >
         <Link
           href="/sign-in"
@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthCard
       title={t("auth.forgotPassword.resetYourPassword")}
-      description="We will email you a link to set a new one."
+      description={t("auth.forgotPassword.weWillEmailYouALink")}
       footer={
         <Link
           href="/sign-in"
@@ -69,14 +69,16 @@ export default function ForgotPasswordPage() {
     >
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field
-          label="Email"
+          label={t("people.detail.profileForm.email")}
           name="email"
           type="email"
           autoComplete="email"
           required
         />
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? "Sending…" : "Send reset link"}
+          {pending
+            ? t("auth.forgotPassword.sending")
+            : t("auth.forgotPassword.sendResetLink")}
         </Button>
       </form>
       <FormError>{error}</FormError>

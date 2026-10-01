@@ -7,5 +7,5 @@ export default function SessionError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="this session" />;
+  return <SegmentError {...props} headingKey="segmentError.session" />;
 }

@@ -40,7 +40,7 @@ export interface Trigger {
 }
 
 /** §6.4's first table: the rhythm the Champion guards. */
-const RHYTHM: readonly Trigger[] = [
+const RHYTHM_ROWS = [
   {
     key: "checkin.due_soon",
     title: "Check-in due tomorrow",
@@ -241,14 +241,16 @@ const RHYTHM: readonly Trigger[] = [
     recipient: "The member, by email and in-app",
     escalates: false,
   },
-].map((entry) => ({
+] as const;
+
+const RHYTHM = RHYTHM_ROWS.map((entry) => ({
   ...entry,
   owner: "champion" as const,
   deterministic: true,
-}));
+})) satisfies readonly Trigger[];
 
 /** §6.4's second table: the quality the Coach guards. */
-const QUALITY: readonly Trigger[] = [
+const QUALITY_ROWS = [
   {
     key: "quality.draft_failing",
     title: "Draft failing a quality check",
@@ -371,7 +373,27 @@ const QUALITY: readonly Trigger[] = [
     recipient: "Sponsor",
     deterministic: true,
   },
-].map((entry) => ({ ...entry, owner: "coach" as const, escalates: false }));
+] as const;
+
+const QUALITY = QUALITY_ROWS.map((entry) => ({
+  ...entry,
+  owner: "coach" as const,
+  escalates: false,
+})) satisfies readonly Trigger[];
+
+/**
+ * Every key the catalogue defines, as a type (completeness review L-16).
+ *
+ * The rule that a message citing an undefined key fails the build was a
+ * runtime throw: seven places in the nudge engine check `isTriggerKey` before
+ * writing a row, which catches a misspelt key the first time that path runs
+ * and not before. Code that names a key names this type instead, so a typo
+ * is a type error in `pnpm typecheck`. The throws stay, because a key read
+ * back from a stored row or a form is only a string until it is checked.
+ */
+export type TriggerKey =
+  | (typeof RHYTHM_ROWS)[number]["key"]
+  | (typeof QUALITY_ROWS)[number]["key"];
 
 export const TRIGGER_CATALOGUE: readonly Trigger[] = [...RHYTHM, ...QUALITY];
 
@@ -389,7 +411,7 @@ export function trigger(key: string): Trigger | undefined {
  * calls it over every key the documents cite. A message citing a key nothing
  * defines is the failure both are there to prevent.
  */
-export function isTriggerKey(key: string): boolean {
+export function isTriggerKey(key: string): key is TriggerKey {
   return BY_KEY.has(key);
 }
 

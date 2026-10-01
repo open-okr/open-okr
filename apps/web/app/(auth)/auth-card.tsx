@@ -82,7 +82,10 @@ export function Field({
   label: string;
   className?: string;
 } & InputHTMLAttributes<HTMLInputElement>) {
-  const id = `field-${input.name}`;
+  // A caller's own id wins, so one screen can hold two forms that ask for
+  // the same field, as the single sign-on screen does while a connection is
+  // being edited beside the add form.
+  const id = input.id ?? `field-${input.name}`;
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-sm font-medium text-ink-2">

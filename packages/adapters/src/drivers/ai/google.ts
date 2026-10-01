@@ -79,6 +79,16 @@ export interface GoogleGenAIClient {
   };
 }
 
+/**
+ * Where every request goes: the Gemini API, the SDK's own default (M-10).
+ *
+ * Passed explicitly, with Vertex turned off, because the SDK otherwise reads
+ * `GOOGLE_GEMINI_BASE_URL` and `GOOGLE_GENAI_USE_VERTEXAI` from the process
+ * environment. The egress guard checks the host this names, and a host an
+ * environment variable chose would be one the allow-list never saw.
+ */
+export const GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/";
+
 export interface GoogleProviderOptions {
   readonly apiKey?: string;
   /** Injected for contract tests in place of a real client. */
@@ -133,7 +143,12 @@ export class GoogleProvider implements AIProvider {
 
   constructor(options: GoogleProviderOptions) {
     this.#client =
-      options.client ?? new GoogleGenAI({ apiKey: options.apiKey });
+      options.client ??
+      new GoogleGenAI({
+        apiKey: options.apiKey,
+        vertexai: false,
+        httpOptions: { baseUrl: GOOGLE_BASE_URL },
+      });
     this.#defaultContextWindow = options.defaultContextWindow ?? 1_000_000;
   }
 

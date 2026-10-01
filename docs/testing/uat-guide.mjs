@@ -207,7 +207,7 @@ export const GUIDE = {
     purpose: "Close goals and the quarter, and record the result",
     screens: "Goals / <goal>, Cycle phase 7, Scorecard, Cycles card",
     who: "Sara, Admin",
-    flow: ["Closing a goal needs a retrospective", "Close and reopen a goal", "Score every key result in phase 7", "Record the result on the scorecard", "Archive the old cycle", "Look for the quarterly review"],
+    flow: ["Closing a goal needs a retrospective", "Close and reopen a goal", "Score every key result and close the cycle in phase 7", "See the result on the scorecard and the inheritance in the next quarter", "Archive the old cycle", "Look for the quarterly review"],
     needs: ["M15"],
     gives: "A closed cycle and a scorecard row",
     setup: "",

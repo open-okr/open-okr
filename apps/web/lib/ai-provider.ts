@@ -19,26 +19,39 @@
  * request** (H-07). A workspace administrator there is not the operator, and
  * a base URL pointed at a metadata address or the database host would be a
  * request the server makes for them.
+ *
+ * **Every provider carries the workspace's egress controls** (M-10). They are
+ * read here, per build, and handed to `createAIProvider`, which will not build
+ * a provider without them. What a control withholds or replaces is written to
+ * the audit trail as counts and a host, never as text.
  */
 import {
-  type AIProvider,
   type AIProviderConfig,
   createAIProvider,
+  type GuardedAIProvider,
 } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
 import {
   findSeededModel,
   isCloudEnabled,
   type ResolvedAICredential,
+  recordAIEgressWithheld,
   resolveAICredential,
+  resolveAIPrivacySettings,
   resolveTierRoute,
 } from "@openokr/core";
 import type { ModelTier } from "@openokr/db";
+import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
 
 export interface RoutedProvider {
-  readonly provider: AIProvider;
+  /**
+   * Guarded: `permits` says whether a request of a given purpose would be let
+   * through, so a host can leave a feature out rather than offer a button
+   * that can only fail.
+   */
+  readonly provider: GuardedAIProvider;
   readonly modelId: string;
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
@@ -49,7 +62,12 @@ type Resolved = Exclude<ResolvedAICredential, { source: "off" }>;
 /** The adapter configuration for a resolved credential, or null. */
 export function providerConfigFor(
   resolved: Resolved,
-  options: { readonly guardOutbound: boolean; readonly appUrl: string },
+  options: {
+    readonly guardOutbound: boolean;
+    readonly appUrl: string;
+    /** What the provider's dashboard lists this app as (M-33). */
+    readonly appName: string;
+  },
 ): AIProviderConfig | null {
   switch (resolved.provider) {
     case "anthropic":
@@ -60,7 +78,7 @@ export function providerConfigFor(
       return {
         provider: "openrouter",
         apiKey: resolved.apiKey,
-        appName: "OpenOKR",
+        appName: options.appName,
         appUrl: options.appUrl,
       };
     case "ollama":
@@ -89,10 +107,19 @@ export function providerConfigFor(
  * Null is an ordinary answer: every assist has a manual path, and every agent
  * has its deterministic form. An unpriced model is refused, as it always was,
  * because a model that meters as zero would make the run cap meaningless.
+ *
+ * **`forUser` is the signed-in person a request is for** (completeness review
+ * M-36). Their own key for the routed provider answers it when they stored
+ * one, which is AI-NATIVE-PLAN §3.3's "user key, then workspace". It changes
+ * whose account pays and nothing else: the tier still picks the provider and
+ * the model, and the egress controls below wrap the provider whichever key it
+ * holds. Nothing an agent or the scheduler asks passes it, so the Coach and
+ * the Champion always run on the workspace's key.
  */
 export async function providerForTier(
   workspaceId: string,
   tier: ModelTier,
+  forUser?: string,
 ): Promise<RoutedProvider | null> {
   const pool = getPool();
   const route = await resolveTierRoute(pool, { workspaceId, tier });
@@ -106,6 +133,7 @@ export async function providerForTier(
   const resolved = await resolveAICredential(pool, getKeyRing(), process.env, {
     workspaceId,
     provider: route.provider,
+    ...(forUser ? { userId: forUser } : {}),
   });
   if (resolved.source === "off") {
     return null;
@@ -113,12 +141,18 @@ export async function providerForTier(
   const config = providerConfigFor(resolved, {
     guardOutbound: await isCloudEnabled(pool),
     appUrl: loadEnv().BETTER_AUTH_URL,
+    appName: await getInstanceName(),
   });
   if (!config) {
     return null;
   }
+  const policy = await resolveAIPrivacySettings(pool, workspaceId);
   return {
-    provider: createAIProvider(config),
+    provider: createAIProvider(config, {
+      policy,
+      onWithheld: (event) =>
+        recordAIEgressWithheld(pool, { workspaceId, ...event }),
+    }),
     modelId: route.modelId,
     costInPerMillion: priced.costInPerMillion,
     costOutPerMillion: priced.costOutPerMillion,

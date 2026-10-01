@@ -33,48 +33,56 @@ export const kpisTemplate: EntityTemplate = {
       describe: "The identifier the source system uses for this KPI.",
       aliases: ["externalId", "id", "sourceId", "legacyId", "indicatorId"],
       required: true,
+      example: "KPI-1",
     },
     {
       field: "title",
       describe: "What is being measured.",
       aliases: ["title", "kpi", "indicator", "name", "metric"],
       required: true,
+      example: "Weekly active teams",
     },
     {
       field: "frequency",
       describe: `How often it is recorded. One of: ${KPI_FREQUENCY_VALUES.join(", ")}.`,
       aliases: ["frequency", "occurrence", "cadence", "period"],
       required: true,
+      example: "weekly",
     },
     {
       field: "direction",
       describe: `One of: ${KPI_DIRECTION_VALUES.join(", ")}. Higher is better by default.`,
       aliases: ["direction", "polarity", "better"],
       required: false,
+      example: "higher_better",
     },
     {
       field: "indicatorType",
       describe: `One of: ${INDICATOR_TYPES.join(", ")}. Lagging by default, and flagged for review.`,
       aliases: ["indicatorType", "type"],
       required: false,
+      example: "lagging",
     },
     {
       field: "tier",
       describe: `One of: ${KPI_TIERS.join(", ")}. Output by default.`,
       aliases: ["tier", "layer", "kind"],
       required: false,
+      example: "outcome",
     },
     {
       field: "aggregate",
       describe: `How a period's values combine. One of: ${KPI_AGGREGATES.join(", ")}.`,
       aliases: ["aggregate", "aggregation", "rollup"],
       required: false,
+      example: "max",
     },
     {
       field: "unit",
       describe: "What the numbers are in.",
       aliases: ["unit", "uom"],
       required: false,
+      example: "teams",
     },
     {
       field: "space",
@@ -82,6 +90,7 @@ export const kpisTemplate: EntityTemplate = {
         "The space that owns it, by name. Leave it empty for a workspace-level KPI.",
       aliases: ["space", "team", "department"],
       required: false,
+      example: "",
     },
     {
       field: "targetDefault",
@@ -89,6 +98,7 @@ export const kpisTemplate: EntityTemplate = {
         "The target every period gets when a record does not carry one.",
       aliases: ["targetDefault", "target", "defaultTarget"],
       required: false,
+      example: "400",
     },
     {
       field: "healthyPct",
@@ -96,6 +106,7 @@ export const kpisTemplate: EntityTemplate = {
         "Achievement at or above which the KPI is healthy. The canon default when empty.",
       aliases: ["healthyPct", "healthy", "greenAt"],
       required: false,
+      example: "",
     },
     {
       field: "watchPct",
@@ -103,6 +114,7 @@ export const kpisTemplate: EntityTemplate = {
         "Achievement at or above which the KPI is on watch. The canon default when empty.",
       aliases: ["watchPct", "watch", "amberAt"],
       required: false,
+      example: "",
     },
   ],
 

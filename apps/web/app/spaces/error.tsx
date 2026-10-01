@@ -7,5 +7,5 @@ export default function SpacesError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the spaces" />;
+  return <SegmentError {...props} headingKey="segmentError.spaces" />;
 }

@@ -8,7 +8,10 @@
  *
  * **A schema of its own, not a dump.** The tables here carry the columns the
  * connector reads and nothing else: FlowyTeam's own `objectives` has thirty and
- * this needs four. A dump would be a second schema to keep current, and the
+ * this needs four. The tables no domain reads carry a few of their real columns
+ * so their rows look like what an operator would be told about, and the two
+ * with no `company_id` on a real instance have none here either. A dump would
+ * be a second schema to keep current, and the
  * connector deliberately reads through `information_schema` and a handful of
  * named columns rather than assuming a shape.
  *
@@ -94,13 +97,16 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
     optional: true,
   },
   {
+    // No `company_id`, as on the real table: a row belongs to a company only
+    // through its team, which is what the unread-table count has to follow.
     name: "employee_teams",
-    columns: "id int primary key, company_id int",
+    columns: "id int primary key, team_id int, user_id int",
     optional: true,
   },
   {
     name: "performance_settings",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, cycle_type varchar(32), color_pass int, color_fail int, label_okr varchar(191)",
     optional: true,
   },
   {
@@ -123,17 +129,21 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "indicator_calculates",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id bigint primary key, company_id int, indicator_id bigint, indicator_calc_id bigint",
     optional: true,
   },
   {
     name: "indicator_accesses",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id bigint primary key, company_id int, indicator_id bigint, user_id int, permissions varchar(16), view_options varchar(16)",
     optional: true,
   },
   {
+    // A bare pivot on the real instance: no id and no `company_id`, so it
+    // belongs to a company through its key result.
     name: "keyresult_indicator",
-    columns: "id int primary key, company_id int",
+    columns: "key_result_id int, indicator_id bigint",
     optional: true,
   },
   {
@@ -156,7 +166,8 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "checkins",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id bigint primary key, company_id int, user_id int, start_date date, end_date date, feeling int, question text, answer text",
     optional: true,
   },
   {
@@ -167,22 +178,26 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "objective_accesses",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id bigint primary key, company_id int, objective_id int, user_id int, permissions varchar(16), view_options varchar(16)",
     optional: true,
   },
   {
     name: "objective_discussions",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, objective_id int, user_id int, parent_id int, message text",
     optional: true,
   },
   {
     name: "keyresult_discussions",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, key_result_id int, user_id int, parent_id int, message text",
     optional: true,
   },
   {
     name: "key_result_files",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, user_id int, key_result_checkin_id bigint, filename varchar(191)",
     optional: true,
   },
   {
@@ -198,7 +213,8 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "task_boards",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, title varchar(191), slug varchar(191)",
     optional: true,
   },
   {
@@ -209,7 +225,7 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "task_category",
-    columns: "id int primary key, company_id int",
+    columns: "id int primary key, company_id int, category_name varchar(191)",
     optional: true,
   },
   {
@@ -243,19 +259,112 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
     optional: true,
   },
   {
+    name: "project_time_logs",
+    columns:
+      "id int primary key, company_id int, project_id int, task_id int, user_id int, total_minutes int",
+    optional: true,
+  },
+  {
     name: "reward_settings",
-    columns: "id int primary key, company_id int",
+    columns: "id int primary key, company_id int, calculate_okr tinyint",
     optional: true,
   },
   {
     name: "scores",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, employee_id int, performance_cycle_id int, score int, reason text",
     optional: true,
   },
   {
     name: "performance_records",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, model_id int, model_type varchar(191), performance_cycle_id int, result_value double",
     optional: true,
+  },
+];
+
+/**
+ * What the company holds in the tables no domain reads (completeness review
+ * M-16), so the report has something to name.
+ *
+ * Every row is the first company's. Which company a row belongs to is the fact
+ * the count is tested on, so a suite that needs the second company's rows adds
+ * them itself. The two tables with no `company_id` belong to company 7 through
+ * a team and a key result that company 7 holds.
+ */
+const UNREAD_ROWS: readonly { table: string; sql: string }[] = [
+  {
+    table: "employee_teams",
+    sql: "insert into employee_teams (id, team_id, user_id) values (1, 1, 1), (2, 2, 2)",
+  },
+  {
+    table: "performance_settings",
+    sql: "insert into performance_settings (id, company_id, cycle_type, color_pass, color_fail, label_okr) values (1, 7, 'quarterly', 75, 50, 'Goals')",
+  },
+  {
+    table: "objective_accesses",
+    sql: "insert into objective_accesses (id, company_id, objective_id, user_id, permissions, view_options) values (1, 7, 1, 2, 'update', 'everyone')",
+  },
+  {
+    table: "objective_discussions",
+    sql: `insert into objective_discussions (id, company_id, objective_id, user_id, parent_id, message) values
+            (1, 7, 1, 1, null, 'Kick-off notes'),
+            (2, 7, 1, 2, 1,    'Agreed'),
+            (3, 7, 2, 2, null, 'Retention first')`,
+  },
+  {
+    table: "keyresult_discussions",
+    sql: `insert into keyresult_discussions (id, company_id, key_result_id, user_id, parent_id, message) values
+            (1, 7, 1, 1, null, 'Is 40 realistic?'),
+            (2, 7, 1, 2, 1,    'It is if onboarding ships.')`,
+  },
+  {
+    table: "keyresult_indicator",
+    sql: "insert into keyresult_indicator (key_result_id, indicator_id) values (1, 1), (2, 2)",
+  },
+  {
+    table: "checkins",
+    sql: `insert into checkins (id, company_id, user_id, start_date, end_date, feeling, question, answer) values
+            (100, 7, 1, '2026-01-01', '2026-01-31', 4, '["How did the month go?"]', '["Better than it looks"]'),
+            (101, 7, 3, '2026-02-01', '2026-02-28', 2, '["How did the month go?"]', '["Slipping"]')`,
+  },
+  {
+    table: "key_result_files",
+    sql: "insert into key_result_files (id, company_id, user_id, key_result_checkin_id, filename) values (1, 7, 1, 1, 'evidence.pdf')",
+  },
+  {
+    table: "indicator_accesses",
+    sql: "insert into indicator_accesses (id, company_id, indicator_id, user_id, permissions, view_options) values (1, 7, 1, 2, 'read', 'team')",
+  },
+  {
+    table: "indicator_calculates",
+    sql: "insert into indicator_calculates (id, company_id, indicator_id, indicator_calc_id) values (1, 7, 3, 1), (2, 7, 3, 2)",
+  },
+  {
+    table: "task_boards",
+    sql: "insert into task_boards (id, company_id, title, slug) values (1, 7, 'Sales pipeline', 'sales-pipeline')",
+  },
+  {
+    table: "task_category",
+    sql: "insert into task_category (id, company_id, category_name) values (1, 7, 'Sales'), (2, 7, 'Support')",
+  },
+  {
+    table: "project_time_logs",
+    sql: "insert into project_time_logs (id, company_id, project_id, task_id, user_id, total_minutes) values (1, 7, 1, 1, 1, 90)",
+  },
+  {
+    table: "performance_records",
+    sql: "insert into performance_records (id, company_id, model_id, model_type, performance_cycle_id, result_value) values (1, 7, 7, 'App\\\\Models\\\\Company', 1, 62.5)",
+  },
+  {
+    table: "reward_settings",
+    sql: "insert into reward_settings (id, company_id, calculate_okr) values (1, 7, 1)",
+  },
+  {
+    table: "scores",
+    sql: `insert into scores (id, company_id, employee_id, performance_cycle_id, score, reason) values
+            (1, 7, 1, 1, 10, 'Hit the target'),
+            (2, 7, 2, 1, 5,  'Helped a colleague hit theirs')`,
   },
 ];
 
@@ -294,6 +403,12 @@ export interface SeededSource {
   readonly url: string;
   /** Runs a statement as an administrator, which the connector cannot. */
   run(sql: string, values?: readonly unknown[]): Promise<void>;
+  /**
+   * Every table in the database and MySQL's checksum of its rows, read as an
+   * administrator. Two equal snapshots mean no table was added, dropped or
+   * changed in between, which is the claim "the source is read-only" makes.
+   */
+  snapshot(): Promise<Readonly<Record<string, string>>>;
   drop(): Promise<void>;
 }
 
@@ -410,10 +525,12 @@ export async function seedSource(
        (1, 7, 1, 1, 100, '2026-01-01', '2026-01-31', 8, 18, null, '2026-02-01 09:00:00'),
        (2, 7, 2, 1, 100, '2026-01-01', '2026-01-31', 6, 7,  null, '2026-02-01 09:00:00')`,
   );
-  await source.query(
-    `insert into checkin_reviews (id, company_id, user_id, checkin_id, review, created_at) values
-       (1, 7, 2, 100, 'Read, thank you.', '2026-02-02 10:00:00')`,
-  );
+  if (!dropped.has("checkin_reviews")) {
+    await source.query(
+      `insert into checkin_reviews (id, company_id, user_id, checkin_id, review, created_at) values
+         (1, 7, 2, 100, 'Read, thank you.', '2026-02-02 10:00:00')`,
+    );
+  }
   // **People, and every shape the mapper has to answer for.** One ordinary
   // person, one with a job title, one with no address at all, one belonging to
   // the other company, and one deleted employee row whose user still exists.
@@ -600,6 +717,11 @@ export async function seedSource(
          (6, 7, 1, 4, 'orphan.pdf',   'dddd4444.pdf', '9',  null, null, null, null)`,
     );
   }
+  for (const { table, sql } of UNREAD_ROWS) {
+    if (!dropped.has(table)) {
+      await source.query(sql);
+    }
+  }
   await source.end();
 
   return {
@@ -609,6 +731,25 @@ export async function seedSource(
       const connection = await connect(database);
       try {
         await connection.query(sql, values ? [...values] : []);
+      } finally {
+        await connection.end();
+      }
+    },
+    async snapshot() {
+      const connection = await connect(database);
+      try {
+        const [tables] = (await connection.query(
+          "select table_name as name from information_schema.tables where table_schema = ? order by table_name",
+          [database],
+        )) as [{ name: string }[], unknown];
+        const list = tables.map((row) => `\`${row.name}\``).join(", ");
+        const [sums] = (await connection.query(`checksum table ${list}`)) as [
+          { Table: string; Checksum: number | string | null }[],
+          unknown,
+        ];
+        return Object.fromEntries(
+          sums.map((row) => [row.Table, String(row.Checksum)]),
+        );
       } finally {
         await connection.end();
       }

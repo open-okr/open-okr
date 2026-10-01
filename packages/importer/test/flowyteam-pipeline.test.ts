@@ -8,6 +8,10 @@
  * workspace and leave both sets of rows intact and telling apart by
  * `legacy_type`, which is the claim the whole legacy-key design rests on. And
  * that a full run twice over changes nothing the second time.
+ *
+ * Two more since completeness review M-16: every run names each source table
+ * no domain reads and how many rows it holds, and a full real run leaves every
+ * table in the source exactly as it was.
  */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -21,8 +25,10 @@ import {
   selectDomains,
   UnknownDomainError,
 } from "../src/flowyteam/domains.ts";
+import { render } from "../src/flowyteam/report.ts";
 import { runFlowyteamImport } from "../src/flowyteam/run.ts";
 import { openSource, type Source } from "../src/flowyteam/source.ts";
+import { UNREAD_TABLES } from "../src/flowyteam/unread.ts";
 import {
   available,
   SEEDED,
@@ -351,6 +357,38 @@ describe.skipIf(!runnable)("the whole pipeline", () => {
     // Nothing created, and every row read still accounted for.
     expect(second.report.written).toBe(0);
     expect(second.report.skipped).toBe(first.report.skipped);
+  });
+
+  /**
+   * Completeness review M-16. The fixture gives the company rows in every
+   * table no domain reads, so a report that leaves one out is a silent drop.
+   */
+  it("names every table it does not read, with the count, in a dry run as well as a real one", async () => {
+    const everyOne = UNREAD_TABLES.map((one) => one.table);
+
+    const dry = await run(false);
+    expect(dry.report.unreadTables.map((one) => one.table)).toEqual(everyOne);
+    const printed = render(dry.report, dry.runId);
+    expect(printed).toContain(
+      `Not read: ${everyOne.length} source table(s) hold rows that this import does not bring across.`,
+    );
+    expect(printed).toContain(
+      "Not read by this import, so not brought across:",
+    );
+    expect(printed).toContain("  objective_discussions: 3 in this company");
+    expect(printed).toContain("  keyresult_indicator: 2 in this company");
+
+    const real = await run(true);
+    expect(real.report.unreadTables).toEqual(dry.report.unreadTables);
+  });
+
+  it("acceptance: leaves the source exactly as it found it, every table and every row", async () => {
+    const before = await seeded.snapshot();
+    // A real run, and every domain, because that is the one with the most
+    // reason to touch anything.
+    await run(true);
+    expect(await seeded.snapshot()).toEqual(before);
+    expect(Object.keys(before)).toContain(`${seeded.database}.scores`);
   });
 
   it("the summary names every skip and every flag", async () => {

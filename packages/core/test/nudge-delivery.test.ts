@@ -48,7 +48,8 @@ const runAt = async (iso: string) => {
 async function nudgeRows() {
   const wb = await workerDb();
   const found = await wb.admin.query(
-    `select rule_key, channel, sent_at, scheduled_for, suppressed_reason
+    `select rule_key, channel, sent_at, scheduled_for, suppressed_reason,
+            fallback_reason, recipient_member_id
      from nudges where workspace_id = $1 order by rule_key`,
     [workspaceId],
   );
@@ -58,6 +59,8 @@ async function nudgeRows() {
     sent_at: Date | null;
     scheduled_for: Date;
     suppressed_reason: string | null;
+    fallback_reason: string | null;
+    recipient_member_id: string;
   }>;
 }
 
@@ -211,6 +214,50 @@ describe("what a nudge says", () => {
         url: `https://okr.example.com/check-in?goal=${goalId}`,
       },
     ]);
+  });
+
+  it("names the instance it came from, in the subject and on the button (M-33)", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set primary_channel = 'slack' where id = $1",
+      [ownerMemberId],
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "channels.connect", {
+      provider: "slack",
+      credentials: "xoxb-token",
+    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.linkIdentity",
+      { provider: "slack", externalId: "U-owner" },
+    );
+    await callAction(
+      {
+        pool: wb.appPool,
+        ...context(),
+        baseUrl: BASE,
+        instanceName: "OKR Goal",
+      },
+      "nudges.run",
+      { now: `${dueOn}T09:00:00Z` },
+    );
+    const slack = (await messageRows()).find(
+      (row) =>
+        row.provider === "slack" &&
+        String(row.payload.text).includes("Rule: checkin.due"),
+    );
+    expect(slack?.payload.subject).toBe(
+      "OKR Goal: Check-in due today: Become the preferred platform for mid-market teams",
+    );
+    expect(slack?.payload.buttons).toEqual([
+      { label: "Check in", url: `okr:checkin ${goalId}` },
+      {
+        label: "Open in OKR Goal",
+        url: `https://okr.example.com/check-in?goal=${goalId}`,
+      },
+    ]);
+    // Nothing else in it is the software's name.
+    expect(JSON.stringify(slack?.payload)).not.toContain("OpenOKR");
   });
 
   it("still names the goal when the host knows no address, with no link", async () => {
@@ -407,6 +454,34 @@ describe("a channel that cannot be reached", () => {
     ).toEqual([]);
   });
 
+  it("records why on the nudge row, not only on the message", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set primary_channel = 'slack' where id = $1",
+      [ownerMemberId],
+    );
+
+    await runAt(`${dueOn}T09:00:00Z`);
+    const owed = (await nudgeRows()).filter(
+      (row) =>
+        row.rule_key.startsWith("checkin.") &&
+        row.recipient_member_id === ownerMemberId &&
+        row.sent_at !== null,
+    );
+    expect(owed.length).toBeGreaterThan(0);
+    for (const row of owed) {
+      expect(row.channel).toBe("email");
+      expect(row.fallback_reason).toMatch(/slack is not connected/);
+    }
+  });
+
+  it("leaves the reason empty when the message went where it was meant to", async () => {
+    await runAt(`${dueOn}T09:00:00Z`);
+    const sent = (await nudgeRows()).filter((row) => row.sent_at !== null);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.every((row) => row.fallback_reason === null)).toBe(true);
+  });
+
   it("routes around a connection the last send broke", async () => {
     const wb = await workerDb();
     await wb.admin.query(
@@ -434,6 +509,106 @@ describe("a channel that cannot be reached", () => {
     expect(String(messages[0]?.payload.fallbackReason)).toMatch(
       /not connected/,
     );
+  });
+});
+
+/**
+ * A rule the workspace routed to one channel (P6-G21, completeness review
+ * M-23).
+ *
+ * The override was read and never checked. A member who had not linked the
+ * channel the rule named had their nudge queued there anyway, the driver
+ * suppressed it for want of an account, and no email followed.
+ */
+describe("a rule routed to its own channel", () => {
+  const CHECK_IN_RULES = ["checkin.due_soon", "checkin.due", "checkin.overdue"];
+
+  const routeCheckInsTo = async (channel: string) => {
+    const wb = await workerDb();
+    for (const ruleKey of CHECK_IN_RULES) {
+      await callAction({ pool: wb.appPool, ...context() }, "nudges.setRule", {
+        ruleKey,
+        channelOverride: channel,
+      } as never);
+    }
+  };
+
+  const ownerCheckIns = async () =>
+    (await nudgeRows()).filter(
+      (row) =>
+        CHECK_IN_RULES.includes(row.rule_key) &&
+        row.recipient_member_id === ownerMemberId &&
+        row.sent_at !== null,
+    );
+
+  it("goes there when the member can be reached on it", async () => {
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "channels.connect", {
+      provider: "slack",
+      credentials: "xoxb-token",
+    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.linkIdentity",
+      { provider: "slack", externalId: "U-owner" },
+    );
+    await routeCheckInsTo("slack");
+
+    await runAt(`${dueOn}T09:00:00Z`);
+    const rows = await ownerCheckIns();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.channel === "slack")).toBe(true);
+    expect(rows.every((row) => row.fallback_reason === null)).toBe(true);
+  });
+
+  it("falls back to email, with the reason on the nudge and the message, when they cannot (acceptance)", async () => {
+    const wb = await workerDb();
+    // Connected, and the owner never linked an account: the override would
+    // have been queued to Slack and dropped by the driver.
+    await callAction({ pool: wb.appPool, ...context() }, "channels.connect", {
+      provider: "slack",
+      credentials: "xoxb-token",
+    });
+    await routeCheckInsTo("slack");
+
+    await runAt(`${dueOn}T09:00:00Z`);
+    const rows = await ownerCheckIns();
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.channel).toBe("email");
+      expect(row.fallback_reason).toMatch(/routed to slack/);
+      expect(row.fallback_reason).toMatch(/has not linked their slack account/);
+    }
+
+    const messages = await messageRows();
+    expect(messages.some((row) => row.provider === "slack")).toBe(false);
+    const owed = messages.filter((row) =>
+      String(row.payload.text).includes("Rule: checkin."),
+    );
+    expect(owed.length).toBeGreaterThan(0);
+    expect(String(owed[0]?.payload.fallbackReason)).toMatch(/routed to slack/);
+  });
+
+  it("falls back when the override's provider is not connected at all", async () => {
+    await routeCheckInsTo("teams");
+
+    await runAt(`${dueOn}T09:00:00Z`);
+    const rows = await ownerCheckIns();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.channel === "email")).toBe(true);
+    expect(rows[0]?.fallback_reason).toMatch(/teams is not connected/);
+  });
+
+  it("does not tell the member to reconnect a channel they never chose", async () => {
+    // The reconnect notice is about the member's own primary channel. A rule
+    // the workspace routed somewhere else is the workspace's to fix.
+    await routeCheckInsTo("teams");
+    await runAt(`${dueOn}T09:00:00Z`);
+    expect(
+      (await nudgeRows()).filter(
+        (row) => row.rule_key === "channel.reconnect_needed",
+      ),
+    ).toEqual([]);
   });
 });
 

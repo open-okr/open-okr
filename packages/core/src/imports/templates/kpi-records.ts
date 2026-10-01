@@ -25,6 +25,7 @@ export const kpiRecordsTemplate: EntityTemplate = {
         "The KPI, by the identifier the KPI file used, by its short id, or by its id here.",
       aliases: ["kpi", "indicator", "kpiId", "indicatorId", "metric"],
       required: true,
+      example: "KPI-1",
     },
     {
       field: "on",
@@ -32,24 +33,28 @@ export const kpiRecordsTemplate: EntityTemplate = {
         "Any day inside the period. The period itself is worked out from the KPI's frequency.",
       aliases: ["on", "date", "period", "periodStart", "month"],
       required: true,
+      example: "2027-01-04",
     },
     {
       field: "actualValue",
       describe: "What was achieved. Leave it empty to record a target only.",
       aliases: ["actualValue", "actual", "value", "result"],
       required: false,
+      example: "380",
     },
     {
       field: "targetValue",
       describe: "The target for this period. The KPI's default when empty.",
       aliases: ["targetValue", "target", "plan"],
       required: false,
+      example: "400",
     },
     {
       field: "remark",
       describe: "A note on the period.",
       aliases: ["remark", "note", "comment", "commentary"],
       required: false,
+      example: "Two customers paused for the holidays.",
     },
   ],
 

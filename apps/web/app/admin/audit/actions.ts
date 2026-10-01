@@ -6,15 +6,17 @@ import {
   OperationError,
 } from "@openokr/core";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /**
- * The two audit actions, reached from the admin screen (P8-T10).
+ * The three audit actions, reached from the admin screen (P8-T10, and
+ * completeness review L-19 for the list).
  *
- * Server actions rather than bespoke REST routes, so both go through the
+ * Server actions rather than bespoke REST routes, so all three go through the
  * action registry that declares what they need and records what they did. The
- * screen supplies a filter and gets back a verdict or a file; neither the
- * query nor the access level is decided here.
+ * screen supplies a filter and gets back a verdict, a page of rows or a file;
+ * neither the query nor the access level is decided here.
  */
 
 async function actionContext() {
@@ -38,6 +40,7 @@ export interface ChainResult {
 
 /** Checks the chain and says where it breaks, if it does. */
 export async function verifyChain(): Promise<ChainResult> {
+  const { t } = await getTranslations();
   try {
     return await callAction(await actionContext(), "audit.verify", {});
   } catch (error) {
@@ -50,16 +53,105 @@ export async function verifyChain(): Promise<ChainResult> {
       error:
         error instanceof OperationError
           ? error.message
-          : "The chain could not be checked.",
+          : t("admin.audit.actions.chainCouldNotBeChecked"),
     };
   }
 }
 
-export interface AuditExportRequest {
+/**
+ * One filter, for the list and the file alike.
+ *
+ * The screen has one form and two buttons, so what somebody browsed is what
+ * they take away. Dates arrive as `YYYY-MM-DD` from the form.
+ */
+export interface AuditFilterRequest {
   readonly from?: string;
   readonly to?: string;
   readonly action?: string;
+  readonly actorMemberId?: string;
   readonly targetType?: string;
+}
+
+/**
+ * The filter as the actions take it.
+ *
+ * A date arrives from the form as `YYYY-MM-DD` and the actions want an
+ * instant, so the start of the day and the end of it are filled in here. The
+ * end is inclusive: somebody asking for "to the 31st" means the whole of the
+ * 31st, and a range that quietly stopped at midnight would drop a day's rows
+ * without saying so.
+ */
+function filterInput(request: AuditFilterRequest) {
+  return {
+    ...(request.from ? { from: `${request.from}T00:00:00.000Z` } : {}),
+    ...(request.to ? { to: `${request.to}T23:59:59.999Z` } : {}),
+    ...(request.action ? { action: request.action } : {}),
+    ...(request.actorMemberId ? { actorMemberId: request.actorMemberId } : {}),
+    ...(request.targetType ? { targetType: request.targetType } : {}),
+  };
+}
+
+/** One row of the trail as the screen draws it. Never the payload. */
+export interface AuditRow {
+  readonly id: string;
+  readonly seq: number | null;
+  readonly at: string;
+  readonly actorKind: "human" | "agent" | "system" | "operator";
+  readonly actorMemberId: string | null;
+  readonly actorOperatorUserId: string | null;
+  readonly channel: string | null;
+  readonly action: string;
+  readonly targetType: string;
+  readonly targetId: string | null;
+  readonly chained: boolean;
+}
+
+export interface AuditPageResult {
+  readonly rows?: readonly AuditRow[];
+  readonly more?: boolean;
+  /**
+   * The read was refused. Kept apart from `error` because the screen says a
+   * different thing: nothing went wrong, this person may not look.
+   */
+  readonly denied?: boolean;
+  readonly error?: string;
+}
+
+/**
+ * One page of the trail, newest first.
+ *
+ * `cursor` is the last row the screen already holds, and absent means the
+ * newest page.
+ */
+export async function browseAudit(
+  request: AuditFilterRequest & {
+    readonly cursor?: { readonly at: string; readonly id: string };
+  },
+): Promise<AuditPageResult> {
+  const { t } = await getTranslations();
+  // Outside the `try`, because a visitor with no session is sent to sign in
+  // by a thrown redirect, and catching it here would turn that into an error
+  // message on a page they cannot see.
+  const context = await actionContext();
+  try {
+    const page = await callAction(context, "audit.list", {
+      ...filterInput(request),
+      ...(request.cursor ? { cursor: request.cursor } : {}),
+    });
+    return { rows: page.rows, more: page.more };
+  } catch (error) {
+    // A read refuses the way the access getter does, with not-found, so a
+    // member below `full` and a stranger read the same answer (P6-G31).
+    if (error instanceof OperationError && error.code === "not_found") {
+      return { denied: true };
+    }
+    return {
+      error:
+        error instanceof OperationError
+          ? error.message
+          : t("admin.audit.actions.trailCouldNotBeRead"),
+    };
+  }
 }
 
 export interface AuditExportResult {
@@ -70,25 +162,15 @@ export interface AuditExportResult {
   readonly error?: string;
 }
 
-/**
- * Takes the trail out as a file.
- *
- * A date arrives from the form as `YYYY-MM-DD` and the action wants an
- * instant, so the start of the day and the end of it are filled in here. The
- * end is inclusive: somebody asking for "to the 31st" means the whole of the
- * 31st, and a range that quietly stopped at midnight would drop a day's rows
- * without saying so.
- */
+/** Takes the trail out as a file, narrowed by the same filter as the list. */
 export async function exportAudit(
-  request: AuditExportRequest,
+  request: AuditFilterRequest,
 ): Promise<AuditExportResult> {
+  const { t } = await getTranslations();
   try {
     const result = await callAction(await actionContext(), "audit.export", {
       limit: AUDIT_EXPORT_CEILING,
-      ...(request.from ? { from: `${request.from}T00:00:00.000Z` } : {}),
-      ...(request.to ? { to: `${request.to}T23:59:59.999Z` } : {}),
-      ...(request.action ? { action: request.action } : {}),
-      ...(request.targetType ? { targetType: request.targetType } : {}),
+      ...filterInput(request),
     });
     return {
       filename: result.filename,
@@ -101,7 +183,7 @@ export async function exportAudit(
       error:
         error instanceof OperationError
           ? error.message
-          : "The export could not be built.",
+          : t("admin.audit.actions.exportCouldNotBeBuilt"),
     };
   }
 }

@@ -39,21 +39,6 @@ import { IDLE, type LifecycleState } from "../lifecycle-state.ts";
  * so any other target already has a second full-access holder in the room.
  */
 
-/** One sentence per control, in the confirm dialog and beside the button. */
-const CONSEQUENCES = {
-  suspend:
-    "Suspend this member? Every access they hold stops at once and they " +
-    "cannot sign in. Their check-ins, comments and authorship all stay, and " +
-    "restoring gives the access back.",
-  restore:
-    "Restore this member? The access they held before the suspension " +
-    "becomes theirs again and they can sign in.",
-  guest:
-    "Convert this member to a guest? Every binding they hold is removed, so " +
-    "they keep only what they are invited to from now on. Nothing they wrote " +
-    "is touched, and converting back is not one click.",
-} as const;
-
 function Outcome({ state }: { readonly state: LifecycleState }) {
   if (state.kind === "idle") {
     return null;
@@ -174,7 +159,9 @@ function EraseControl({
               size="sm"
               disabled={pending}
             >
-              {pending ? "Erasing…" : "Erase this member"}
+              {pending
+                ? t("people.detail.lifecycleControls.erasing")
+                : t("people.detail.lifecycleControls.eraseThisMember")}
             </Button>
             <Button
               type="button"
@@ -242,8 +229,8 @@ export function LifecycleControls({
           </h2>
           <p className="text-xs text-ink-3">
             {isSelf
-              ? "This is your own profile. Anything here applies to you, and the workspace refuses whatever would leave it without an owner."
-              : "What to do when somebody leaves, changes relationship or asks to be erased. The workspace refuses anything that would leave it without an owner."}
+              ? t("people.detail.lifecycleControls.ownProfileIntro")
+              : t("people.detail.lifecycleControls.othersProfileIntro")}
           </p>
         </div>
       </CardHeader>
@@ -252,19 +239,19 @@ export function LifecycleControls({
           <ConfirmedControl
             action={restoreMemberAction}
             memberId={memberId}
-            label="Restore"
-            busyLabel="Restoring…"
-            question={CONSEQUENCES.restore}
-            hint="Gives back the access the suspension took."
+            label={t("people.detail.lifecycleControls.restore")}
+            busyLabel={t("people.detail.lifecycleControls.restoring")}
+            question={t("people.detail.lifecycleControls.restoreQuestion")}
+            hint={t("people.detail.lifecycleControls.restoreHint")}
           />
         ) : (
           <ConfirmedControl
             action={suspendMemberAction}
             memberId={memberId}
-            label="Suspend"
-            busyLabel="Suspending…"
-            question={CONSEQUENCES.suspend}
-            hint="Stops every access. Nothing they wrote is removed."
+            label={t("people.detail.lifecycleControls.suspend")}
+            busyLabel={t("people.detail.lifecycleControls.suspending")}
+            question={t("people.detail.lifecycleControls.suspendQuestion")}
+            hint={t("people.detail.lifecycleControls.suspendHint")}
           />
         )}
 
@@ -303,10 +290,10 @@ export function LifecycleControls({
           <ConfirmedControl
             action={convertToGuestAction}
             memberId={memberId}
-            label="Convert to a guest"
-            busyLabel="Converting…"
-            question={CONSEQUENCES.guest}
-            hint="Removes every binding. They keep what they are invited to."
+            label={t("people.detail.lifecycleControls.convertToAGuest")}
+            busyLabel={t("people.detail.lifecycleControls.converting")}
+            question={t("people.detail.lifecycleControls.guestQuestion")}
+            hint={t("people.detail.lifecycleControls.guestHint")}
           />
         )}
 

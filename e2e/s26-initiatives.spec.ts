@@ -201,3 +201,39 @@ test("the initiative lists its tasks, and its progress matches them", async () =
   ).toBeVisible();
   await expect(page.getByText("No tasks yet")).toBeVisible();
 });
+
+/**
+ * S-26's documents, and the discussion beside them (completeness review
+ * M-01).
+ *
+ * S-26 asks for documents on an initiative and REQUIREMENTS §4 puts comments
+ * everywhere. The goal page was the only page with either; this one mounts
+ * the same panels, and a comment on an initiative is a row the table itself
+ * refused until migration 0103.
+ */
+test("the initiative carries documents and a discussion", async () => {
+  // Still on the initiative from the case above.
+  await expect(page.getByTestId("document-count")).toBeVisible({
+    timeout: 15_000,
+  });
+  const thread = page.getByTestId("comment-thread");
+  await expect(thread).toBeVisible();
+
+  await thread
+    .getByPlaceholder("Write a comment...")
+    .fill("The flow needs a second designer.");
+  await thread.getByRole("button", { name: "Post" }).click();
+  await expect(thread).toContainText("The flow needs a second designer.", {
+    timeout: 15_000,
+  });
+
+  await expect(async () => {
+    const { rows } = await pool.query<{ subject_type: string }>(
+      `select c.subject_type from comments c
+         join initiatives i on i.id = c.subject_id
+        where i.workspace_id = $1 and i.title = $2 and c.deleted_at is null`,
+      [workspaceId, TITLE],
+    );
+    expect(rows.map((row) => row.subject_type)).toEqual(["initiative"]);
+  }).toPass({ timeout: 15_000 });
+});

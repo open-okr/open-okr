@@ -499,6 +499,48 @@ Given a suspended member, when they call `goals.publishDraftedCheckIn`, then it
 is refused with the same message `goals.startCheckIn` refuses them with, and no
 check-in row exists.
 
+### 11.2 Deciding a proposal from the review inbox (completeness review M-08)
+
+`proposals.bulkApply` needs `full` on the workspace, and the inbox row linked to
+`/admin/agents`, which refuses anybody below `full`. So a champion who was not
+an administrator was told they owed a decision on their own drafted check-in and
+could not make it. A KPI owner fared worse: a KPI has no access context, so the
+recovery proposal nudged to them was listed for nobody.
+
+The row is now decided where it is listed, through two member actions.
+`mayDecideProposal` in `packages/core/src/review/proposals.ts` is the one rule
+the inbox lists by and both actions check, so the two cannot disagree.
+
+| Proposal | Who decides it |
+|---|---|
+| Carried by a nudge (`nudges.proposal_id`) | That nudge's recipient, who still needs `edit` on a subject the access model resolves |
+| Carried by no nudge, subject resolvable | Any member with `edit` on the subject |
+| Carried by no nudge, no subject or one with no context | Workspace administrators (`full`) |
+
+| Action | What it does |
+|---|---|
+| `proposals.apply` | Runs the proposed action as the member through `callAction`, so its own level and checks decide, then records the decision. Refused for an agent actor, and for a proposal whose action is itself a `proposals.*` decision |
+| `proposals.dismiss` | Records the dismissal. Refused for an agent actor |
+
+A proposal the member may not decide, or a copilot proposal, is not-found. The
+administrator's bulk queue on `/admin/agents` is unchanged.
+
+Given a drafted check-in nudged to a champion who administers nothing, when
+they open the review inbox, then the row names the goal, shows what would be
+published, links to `/review#proposal-<id>`, and applying it publishes a
+check-in in their name.
+
+Given the same proposal, when the goal's reviewer or an administrator opens the
+inbox or calls `proposals.apply`, then it is not listed and the call is
+not-found.
+
+Given a recovery proposal nudged to a KPI's owner, when the owner applies it
+from the inbox, then the recovery objective is launched and they are its
+decider.
+
+Given any pending proposal, when an agent actor calls `proposals.apply` or
+`proposals.dismiss`, then it is refused and the proposal stays pending.
+
 ## 12. What P4-T06a built: the Coach, and two deviations from §1
 
 The Coach is seeded at provisioning beside the Champion, `kind = 'coach'`,

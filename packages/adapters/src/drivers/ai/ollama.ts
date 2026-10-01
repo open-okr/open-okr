@@ -11,6 +11,9 @@ export const OLLAMA_DEFAULT_TIER_MODELS: TierModelMap = {
   embed: "nomic-embed-text",
 };
 
+/** A local install's own default address, and so a local egress target. */
+export const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434/v1";
+
 export interface OllamaProviderOptions {
   /** Defaults to a local install's own default address. */
   readonly baseUrl?: string;
@@ -23,7 +26,7 @@ export class OllamaProvider extends OpenAiCompatibleProvider {
       // Ollama's OpenAI-compatible endpoint does not check this value, but
       // the client requires a non-empty string to construct.
       apiKey: "ollama",
-      baseURL: options.baseUrl ?? "http://localhost:11434/v1",
+      baseURL: options.baseUrl ?? OLLAMA_DEFAULT_BASE_URL,
       fetch: options.fetch,
       defaultContextWindow: 128_000,
     });

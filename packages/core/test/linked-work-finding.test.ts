@@ -202,6 +202,45 @@ describe("the finding the Coach raises about finished work", () => {
   });
 });
 
+describe("an initiative's work is linked work too (completeness review M-26)", () => {
+  /** An initiative serving one key result, with one task of its own. */
+  const initiativeWithTask = async (keyResultId: string) => {
+    const initiative = (await call("initiatives.create", {
+      spaceId,
+      title: "Rebuild the activation flow",
+      ownerId: ownerMemberId,
+      keyResultIds: [keyResultId],
+    })) as { id: string };
+    const task = (await call("tasks.create", {
+      spaceId,
+      title: "Rewrite the first-run screen",
+      initiativeId: initiative.id,
+    })) as { id: string };
+    return task.id;
+  };
+
+  it("raises the finding when the initiative's tasks are done and the measure is not", async () => {
+    const taskId = await initiativeWithTask(firstKeyResult);
+    await call("tasks.update", { id: taskId, status: "done" });
+    await sweep();
+
+    const linked = (await findings()).find(
+      (row) => row.subject_key_result_id === firstKeyResult,
+    );
+    expect(linked?.reason).toContain("1 of 1 linked task complete");
+  });
+
+  it("says nothing while the initiative's task is open, though every task naming the key result is done", async () => {
+    await initiativeWithTask(firstKeyResult);
+    await finishWorkOn(firstKeyResult, "Email the dormant teams");
+    await sweep();
+
+    expect(
+      (await findings()).filter((row) => row.subject_key_result_id !== null),
+    ).toEqual([]);
+  });
+});
+
 describe("test plan: two measures, two findings, two decisions", () => {
   it("raises one per diverging key result rather than one per goal", async () => {
     await finishWorkOn(firstKeyResult, "Rewrite the first-run screen");

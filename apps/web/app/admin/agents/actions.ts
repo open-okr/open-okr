@@ -4,6 +4,8 @@ import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { getInstanceName } from "../../../lib/instance-name";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /**
@@ -32,6 +34,9 @@ export async function runChampionAction(
   cadence: "hourly" | "daily" | "weekly" | "cycle",
 ) {
   const { session, workspace } = await requireWorkspace();
+  // No reader passed: this is the Champion's run, whoever pressed the button,
+  // so it speaks on the workspace's key and never on the administrator's own
+  // (completeness review M-36).
   const drafter = await drafterFor(workspace.workspaceId);
   await callAction(
     {
@@ -39,6 +44,8 @@ export async function runChampionAction(
       workspaceId: workspace.workspaceId,
       actor: { kind: "human", userId: session.user.id },
       ...(drafter ? { drafter } : {}),
+      // The name what it sends carries, as the scheduler's runs do (M-33).
+      instanceName: await getInstanceName(),
     },
     "agents.runChampion",
     { cadence },
@@ -48,6 +55,7 @@ export async function runChampionAction(
 
 export async function runCoachAction() {
   const { session, workspace } = await requireWorkspace();
+  // The Coach's run, on the workspace's key, for the same reason (M-36).
   const drafter = await drafterFor(workspace.workspaceId);
   await callAction(
     {
@@ -55,6 +63,7 @@ export async function runCoachAction() {
       workspaceId: workspace.workspaceId,
       actor: { kind: "human", userId: session.user.id },
       ...(drafter ? { drafter } : {}),
+      instanceName: await getInstanceName(),
     },
     "agents.runCoach",
     {},
@@ -215,10 +224,10 @@ export async function bindAgentScopeAction(input: {
 }): Promise<{ error: string | null }> {
   const { session, workspace } = await requireWorkspace();
   if (input.resourceType === "workspace") {
-    return {
-      error:
-        "An agent is bound to named spaces, goals and KPI trees, never to the whole workspace.",
-    };
+    // Named spaces, goals and KPI trees only, never to the whole workspace:
+    // the refusal says so in the reader's own language.
+    const { t } = await getTranslations();
+    return { error: t("admin.agents.actions.neverTheWholeWorkspace") };
   }
   try {
     await callAction(

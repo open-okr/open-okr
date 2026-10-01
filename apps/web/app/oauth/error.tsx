@@ -7,5 +7,5 @@ export default function OauthError(props: {
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
-  return <SegmentError {...props} what="the consent screen" />;
+  return <SegmentError {...props} headingKey="segmentError.oauth" />;
 }

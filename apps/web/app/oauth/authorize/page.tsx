@@ -5,6 +5,7 @@ import {
 } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { redirect } from "next/navigation";
+import { getInstanceName } from "../../../lib/instance-name";
 import { instanceIssuer } from "../../../lib/issuer";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -66,6 +67,8 @@ export default async function AuthorisePage({
     workspaceId: workspace.workspaceId,
     request,
     issuer,
+    // The command line is named for this instance (M-33).
+    instanceName: await getInstanceName(),
   });
 
   if (check.kind === "refused" && check.refusal.kind === "redirect") {

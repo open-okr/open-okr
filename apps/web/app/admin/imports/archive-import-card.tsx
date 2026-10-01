@@ -64,12 +64,12 @@ export function ArchiveImportCard() {
         });
       };
       reader.onerror = () => {
-        setError("Could not read the file.");
+        setError(t("admin.imports.archiveImportCard.couldNotReadTheFile"));
         setStage("idle");
       };
       reader.readAsDataURL(file);
     },
-    [passphrase],
+    [passphrase, t],
   );
 
   const handleConfirm = useCallback(() => {
@@ -105,6 +105,14 @@ export function ArchiveImportCard() {
     Object.values(diff.created).reduce((sum, n) => sum + n, 0);
   const totalSkipped = (diff: ImportResult["difference"]) =>
     Object.values(diff.skipped).reduce((sum, n) => sum + n, 0);
+  const rowsPhrase = (count: number) =>
+    count === 1
+      ? t("common.count.rowOne", { count })
+      : t("common.count.rowOther", { count });
+  const membersPhrase = (count: number) =>
+    count === 1
+      ? t("common.count.memberOne", { count })
+      : t("common.count.memberOther", { count });
 
   return (
     <Card>
@@ -169,8 +177,8 @@ export function ArchiveImportCard() {
 
             <h4 className="text-xs font-semibold text-ink-3">
               {preview.alreadyImported
-                ? "Previous import result"
-                : "Preview: what this import will do"}
+                ? t("admin.imports.archiveImportCard.previousImportResult")
+                : t("admin.imports.archiveImportCard.previewWhatThisImport")}
             </h4>
 
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -234,7 +242,9 @@ export function ArchiveImportCard() {
                   onClick={handleConfirm}
                   disabled={pending}
                 >
-                  {pending ? "Importing..." : "Confirm import"}
+                  {pending
+                    ? t("admin.imports.archiveImportCard.importing")
+                    : t("admin.imports.archiveImportCard.confirmImport")}
                 </Button>
               )}
               <Button variant="ghost" onClick={handleReset}>
@@ -252,14 +262,19 @@ export function ArchiveImportCard() {
                 {t("admin.imports.archiveImportCard.imported")}
               </Chip>
               <span className="text-sm text-ink">
-                {t("admin.imports.archiveImportCard.rowsCreatedSkipped", {
-                  difference: totalCreated(result.difference),
-                  difference2: totalSkipped(result.difference),
-                  merged:
-                    result.difference.merged.length > 0
-                      ? `, ${result.difference.merged.length} member(s) merged`
-                      : "",
-                })}
+                {result.difference.merged.length > 0
+                  ? t(
+                      "admin.imports.archiveImportCard.rowsCreatedSkippedMerged",
+                      {
+                        rows: rowsPhrase(totalCreated(result.difference)),
+                        skipped: totalSkipped(result.difference),
+                        members: membersPhrase(result.difference.merged.length),
+                      },
+                    )
+                  : t("admin.imports.archiveImportCard.rowsCreatedAndSkipped", {
+                      rows: rowsPhrase(totalCreated(result.difference)),
+                      skipped: totalSkipped(result.difference),
+                    })}
               </span>
             </div>
             <Button variant="ghost" onClick={handleReset}>

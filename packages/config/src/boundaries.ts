@@ -111,6 +111,11 @@ const VENDOR_SDKS: readonly string[] = [
   "@opentelemetry/exporter-prometheus",
   "@opentelemetry/exporter-trace-otlp-http",
   "@opentelemetry/resources",
+  // Image processing (completeness review M-24). Not a service, but a native
+  // library behind the ImageProcessor port, so what decodes a stranger's bytes
+  // is one driver rather than whichever module needed a thumbnail. `next`
+  // reaches it on its own for its image optimiser, which is not this code.
+  "sharp",
   // Databases this product does not run on. Postgres is the only required
   // service, so a client for anything else is a vendor SDK like any other.
   // `mysql2` is here rather than absent because the FlowyTeam importer does

@@ -213,10 +213,13 @@ export default async function ChannelsPage() {
                       </span>
                       {template.variables > 0 ? (
                         <Chip tone="neutral">
-                          {t("admin.channels.variable", {
-                            variables: template.variables,
-                            variables2: template.variables === 1 ? "" : "s",
-                          })}
+                          {template.variables === 1
+                            ? t("common.count.variableOne", {
+                                count: template.variables,
+                              })
+                            : t("common.count.variableOther", {
+                                count: template.variables,
+                              })}
                         </Chip>
                       ) : null}
                     </span>

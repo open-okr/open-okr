@@ -28,6 +28,7 @@ import {
   Chip,
   useTranslations,
 } from "@openokr/ui";
+import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import {
@@ -35,6 +36,7 @@ import {
   captureLearningAction,
   completeActionAction,
   draftNextCycleAction,
+  proposeFromLearningsAction,
 } from "./actions";
 
 export interface Forward {
@@ -70,14 +72,28 @@ export interface Forward {
   readonly carried: number;
 }
 
+/** One next-cycle objective the assist proposed, citing its learning. */
+interface ProposedDraft {
+  readonly title: string;
+  readonly learningText: string;
+  readonly why: string;
+}
+
 export function ForwardPanel({
   sessionId,
   forward,
   canEdit,
+  assistAvailable = false,
 }: {
   readonly sessionId: string;
   readonly forward: Forward;
   readonly canEdit: boolean;
+  /**
+   * Whether a provider may propose drafts from the carried learnings
+   * (AI-NATIVE-PLAN §2.3, completeness review M-09). False is the normal case
+   * and the stage is then exactly what it was.
+   */
+  readonly assistAvailable?: boolean;
 }) {
   const { t } = useTranslations();
 
@@ -89,6 +105,18 @@ export function ForwardPanel({
   const [carry, setCarry] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftWhy, setDraftWhy] = useState("");
+  const [proposed, setProposed] = useState<readonly ProposedDraft[] | null>(
+    null,
+  );
+  const [proposing, startProposing] = useTransition();
+  const [proposalNotice, setProposalNotice] = useState<string | null>(null);
+  // Offered only where there is something to propose from: §8.9 hands the
+  // carried learnings forward, and a proposal from nothing would be one
+  // somebody could have typed unaided.
+  const canPropose =
+    canEdit &&
+    assistAvailable &&
+    forward.learnings.some((entry) => entry.carryForward);
   const [what, setWhat] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [dueOn, setDueOn] = useState("");
@@ -102,12 +130,14 @@ export function ForwardPanel({
           router.refresh();
         } catch (error) {
           setProblem(
-            error instanceof Error ? error.message : "That did not save.",
+            error instanceof Error
+              ? error.message
+              : t("session.detail.thatDidNotSave"),
           );
         }
       });
     },
-    [router],
+    [router, t],
   );
 
   return (
@@ -124,8 +154,13 @@ export function ForwardPanel({
             {t("common.carried2", { carried: forward.carried })}
           </Chip>
           <Chip tone={forward.actions.length === 0 ? "warn" : "ok"}>
-            {forward.actions.length}{" "}
-            {forward.actions.length === 1 ? "action" : "actions"}
+            {forward.actions.length === 1
+              ? t("session.detail.forward.actionCountOne", {
+                  count: forward.actions.length,
+                })
+              : t("session.detail.forward.actionCountOther", {
+                  count: forward.actions.length,
+                })}
           </Chip>
         </span>
       </CardHeader>
@@ -174,7 +209,13 @@ export function ForwardPanel({
                       {note.text}
                     </span>
                     <Chip tone={note.votes === 0 ? "neutral" : "ok"}>
-                      {note.votes} {note.votes === 1 ? "dot" : "dots"}
+                      {note.votes === 1
+                        ? t("session.detail.dotCountOne", {
+                            count: note.votes,
+                          })
+                        : t("session.detail.dotCountOther", {
+                            count: note.votes,
+                          })}
                     </Chip>
                     <Button
                       type="button"
@@ -185,7 +226,9 @@ export function ForwardPanel({
                         run(() =>
                           captureLearningAction(
                             sessionId,
-                            `We learned that ${note.text}`,
+                            t("session.detail.forward.weLearnedThatNote", {
+                              text: note.text,
+                            }),
                             true,
                             note.noteId,
                           ),
@@ -223,7 +266,9 @@ export function ForwardPanel({
                   disabled={pending}
                   onClick={() => {
                     if (learning.trim().length === 0) {
-                      setProblem("Write the learning first.");
+                      setProblem(
+                        t("session.detail.forward.writeTheLearningFirst"),
+                      );
                       return;
                     }
                     run(async () => {
@@ -278,6 +323,103 @@ export function ForwardPanel({
             </ul>
           )}
 
+          {canPropose ? (
+            <div
+              className="flex flex-col gap-1.5"
+              data-testid="propose-from-learnings"
+            >
+              {proposed === null ? (
+                <Button
+                  type="button"
+                  variant="ai"
+                  size="sm"
+                  className="self-start"
+                  disabled={proposing || pending}
+                  onClick={() => {
+                    setProposalNotice(null);
+                    startProposing(async () => {
+                      try {
+                        const result =
+                          await proposeFromLearningsAction(sessionId);
+                        setProposed(result);
+                        if (result === null) {
+                          setProposalNotice(
+                            t("assists.reading.nothingThisTime"),
+                          );
+                        }
+                      } catch {
+                        setProposalNotice(t("assists.reading.couldNotRun"));
+                      }
+                    });
+                  }}
+                >
+                  <Sparkles className="size-3" />
+                  {proposing
+                    ? t("assists.reading.working")
+                    : t("session.detail.forward.proposeFromLearnings")}
+                </Button>
+              ) : (
+                <section
+                  aria-label={t("session.detail.forward.proposeFromLearnings")}
+                  className="flex flex-col gap-1.5 rounded-md border border-line bg-surface p-2.5"
+                >
+                  <span className="flex items-center gap-2">
+                    <Chip tone="agent">{t("common.ai")}</Chip>
+                    <span className="text-xs text-ink-4">
+                      {t("session.detail.forward.useOneThenEdit")}
+                    </span>
+                  </span>
+                  <ul className="flex flex-col gap-1.5">
+                    {proposed.map((draft) => (
+                      <li
+                        key={`${draft.title}-${draft.learningText}`}
+                        className="flex flex-col gap-0.5 rounded-md border border-line p-2"
+                      >
+                        <span className="text-sm text-ink">{draft.title}</span>
+                        <span className="text-xs text-ink-3">
+                          {t("session.detail.forward.fromTheLearning", {
+                            text: draft.learningText,
+                          })}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="self-start"
+                          disabled={pending}
+                          onClick={() => {
+                            setDraftTitle(draft.title);
+                            setDraftWhy(
+                              draft.why.trim() === ""
+                                ? draft.learningText
+                                : draft.why,
+                            );
+                          }}
+                        >
+                          {t("session.detail.forward.useThisDraft")}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="self-start"
+                    onClick={() => setProposed(null)}
+                  >
+                    {t("common.dismiss")}
+                  </Button>
+                </section>
+              )}
+              {proposalNotice ? (
+                <p role="status" className="text-xs text-ink-4">
+                  {proposalNotice}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           {canEdit ? (
             <div className="flex flex-col gap-1.5">
               <label className="flex flex-col gap-1" htmlFor="draft-title">
@@ -317,9 +459,7 @@ export function ForwardPanel({
                       draftTitle.trim().length === 0 ||
                       draftWhy.trim().length === 0
                     ) {
-                      setProblem(
-                        "A draft needs a title and a why. Without the why the next cycle cannot prioritise it.",
-                      );
+                      setProblem(t("session.detail.forward.aDraftNeedsATitle"));
                       return;
                     }
                     run(async () => {
@@ -374,11 +514,15 @@ export function ForwardPanel({
                         )
                       }
                     >
-                      {action.done ? "Reopen it" : "Done"}
+                      {action.done
+                        ? t("session.detail.forward.reopenIt")
+                        : t("board.done")}
                     </Button>
                   ) : (
                     <Chip tone={action.done ? "ok" : "warn"}>
-                      {action.done ? "done" : "open"}
+                      {action.done
+                        ? t("session.detail.done")
+                        : t("common.open")}
                     </Chip>
                   )}
                 </li>
@@ -442,12 +586,12 @@ export function ForwardPanel({
                   disabled={pending}
                   onClick={() => {
                     if (what.trim().length === 0) {
-                      setProblem("Say what happens.");
+                      setProblem(t("session.detail.forward.sayWhatHappens"));
                       return;
                     }
                     if (ownerId === "" || dueOn === "") {
                       setProblem(
-                        "Every action has a name and a date, or it is a wish.",
+                        t("session.detail.forward.everyActionHasANameAndADate"),
                       );
                       return;
                     }

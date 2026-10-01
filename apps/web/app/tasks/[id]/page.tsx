@@ -3,8 +3,11 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
+import { readConversation } from "../../../lib/conversation.ts";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -24,19 +27,22 @@ import { ChecklistLine, DueDateField, RailButton } from "./controls.tsx";
 /**
  * One task (UIUX-PLAN.md §6 S-28, P5-T11).
  *
- * Title, status, description, checklist and a right rail with assignees, the
- * due date, the initiative and the key result it serves. Comments and the
- * activity list are not here: the comment surface is P3-T16's and hanging it on
- * a task is its own change, so this says so rather than drawing an empty panel.
+ * Title, status, description, checklist, files, the discussion, and a right
+ * rail with assignees, the due date, the initiative and the key result it
+ * serves. The files and the discussion are the goal page's own two panels,
+ * mounted here at completeness review M-01. Until then this page told its
+ * reader a task kept neither, which the actions had allowed all along.
  *
  * **The key result on the rail is a link, not a number.** Nothing on this page
  * turns a finished task into progress.
+ *
+ * Each status names the catalogue key its label is read from.
  */
 const STATUS_OPTIONS = [
-  { value: "backlog", label: "Backlog" },
-  { value: "todo", label: "To do" },
-  { value: "in_progress", label: "In progress" },
-  { value: "done", label: "Done" },
+  { value: "backlog", label: "board.backlog" },
+  { value: "todo", label: "board.toDo" },
+  { value: "in_progress", label: "common.inProgress" },
+  { value: "done", label: "board.done" },
 ] as const;
 
 export default async function TaskPage({
@@ -82,7 +88,20 @@ export default async function TaskPage({
         (one) => one.kind === "human",
       )
     : [];
+  // The files and the discussion S-28 asks for (completeness review M-01).
+  // Both actions took a task since P5-T12 and P6-T04b; this page said they
+  // did not.
+  const attachments = await callAction(context, "attachments.list", {
+    subjectType: "task",
+    subjectId: id,
+  });
+  const conversation = await readConversation(context, "task", id);
+
   const assigned = new Set(task.assignees.map((one) => one.id));
+  const statusOptions = STATUS_OPTIONS.map((one) => ({
+    value: one.value,
+    label: t(one.label),
+  }));
 
   return (
     <div className="flex w-full flex-col gap-4.5 xl:flex-row">
@@ -100,14 +119,14 @@ export default async function TaskPage({
             </div>
             {canEdit ? (
               <InlineSelect
-                label="Status"
+                label={t("checkIn.composer.status")}
                 value={task.status}
-                options={STATUS_OPTIONS}
+                options={statusOptions}
                 onSave={setTaskStatusAction.bind(null, task.id)}
               />
             ) : (
               <Chip tone="neutral">
-                {STATUS_OPTIONS.find((one) => one.value === task.status)
+                {statusOptions.find((one) => one.value === task.status)
                   ?.label ?? task.status}
               </Chip>
             )}
@@ -181,16 +200,22 @@ export default async function TaskPage({
           </CardBody>
         </Card>
 
+        <Attachments
+          subjectType="task"
+          subjectId={id}
+          attachments={attachments}
+          canEdit={canEdit}
+        />
+
         <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {t("tasks.detail.whatIsNotHere")}
-            </h2>
-          </CardHeader>
           <CardBody>
-            <p className="text-sm text-ink-3">
-              {t("tasks.detail.commentsAndTheActivity")}
-            </p>
+            <SubjectComments
+              subjectType="task"
+              subjectId={id}
+              comments={conversation.comments}
+              reactions={conversation.reactions}
+              currentMemberId={workspace.memberId}
+            />
           </CardBody>
         </Card>
       </div>
@@ -219,8 +244,10 @@ export default async function TaskPage({
                     </span>
                     {canEdit ? (
                       <RailButton
-                        label={`Unassign ${one.name}`}
-                        text="Remove"
+                        label={t("tasks.detail.unassignName", {
+                          name: one.name,
+                        })}
+                        text={t("common.remove")}
                         onRun={unassignTaskAction.bind(null, task.id, one.id)}
                       />
                     ) : null}
@@ -235,8 +262,8 @@ export default async function TaskPage({
                   .map((one) => (
                     <RailButton
                       key={one.id}
-                      label={`Assign ${one.name}`}
-                      text={`Assign ${one.name}`}
+                      label={t("tasks.detail.assignName", { name: one.name })}
+                      text={t("tasks.detail.assignName", { name: one.name })}
                       onRun={assignTaskAction.bind(null, task.id, one.id)}
                     />
                   ))
@@ -251,7 +278,7 @@ export default async function TaskPage({
             </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-2 text-sm">
-            <Row label="Due">
+            <Row label={t("board.due")}>
               {canEdit ? (
                 <DueDateField
                   dueOn={task.dueOn}
@@ -259,22 +286,24 @@ export default async function TaskPage({
                   onSave={setDueOnAction.bind(null, task.id)}
                 />
               ) : (
-                <span className="text-ink-2">{task.dueOn ?? "No date"}</span>
+                <span className="text-ink-2">
+                  {task.dueOn ?? t("tasks.detail.noDate")}
+                </span>
               )}
             </Row>
-            <Row label="Initiative">
+            <Row label={t("tasks.detail.initiative")}>
               {task.initiativeId ? (
                 <Link
                   href={`/initiatives/${task.initiativeId}`}
                   className="text-brand-text hover:underline"
                 >
-                  {task.initiativeTitle ?? "An initiative"}
+                  {task.initiativeTitle ?? t("tasks.detail.anInitiative")}
                 </Link>
               ) : (
                 <span className="text-ink-3">{t("tasks.detail.none")}</span>
               )}
             </Row>
-            <Row label="Key result">
+            <Row label={t("common.keyResult")}>
               {task.keyResultTitle ? (
                 <span className="text-ink-2">{task.keyResultTitle}</span>
               ) : (
@@ -290,12 +319,7 @@ export default async function TaskPage({
          * which `two-column-rows.test.ts` now refuses.
          */}
         {level >= ACCESS_LEVELS.full ? (
-          <DeleteControl
-            subject="task"
-            id={id}
-            what="this task"
-            returnTo="/board"
-          />
+          <DeleteControl subject="task" id={id} returnTo="/board" />
         ) : null}
       </div>
     </div>

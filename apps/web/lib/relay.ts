@@ -36,11 +36,13 @@ import {
   TelegramChannel,
   WhatsAppChannel,
 } from "@openokr/adapters";
+import { continueAgentRun } from "@openokr/agents";
 import { type Env, loadEnv } from "@openokr/config";
 import {
   dispatchOutbox,
   memberEmail,
   memberExternalId,
+  OUTBOX_REDACT_ON_DELIVERY,
   type OutboxDelivery,
   type OutboxHandlerDeps,
   openConnection,
@@ -51,12 +53,15 @@ import {
 } from "@openokr/core";
 import { providerForTier } from "./ai-provider";
 import { drafterFor } from "./drafter";
+import { embedFor } from "./embedder";
+import { getInstanceName } from "./instance-name";
 import { getMailSettings, mailerFrom } from "./mail";
 import { getPool } from "./pool";
 import { getRealtime } from "./realtime";
 import { getKeyRing } from "./secrets";
-import { getStorage } from "./storage";
+import { getStorage, readStoredFile } from "./storage";
 import { getTelemetry } from "./telemetry";
+import { getFileScanner } from "./upload-ports";
 
 /** How long one delivery may take before another relay may claim the row. */
 const LEASE_SECONDS = 120;
@@ -73,39 +78,6 @@ const reason = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /**
- * The embedding function for one workspace, or null.
- *
- * **Resolved per delivery rather than once at start.** A provider key is a
- * setting somebody can add at three in the afternoon, and a relay that resolved
- * its provider at boot would ignore it until the next restart.
- *
- * Null is an ordinary answer, not a failure: the chunk is stored with no
- * vector, full-text retrieval keeps working, and the vector fills in when a
- * provider arrives and the content next changes.
- */
-async function embedFor(workspaceId: string) {
-  // Whichever provider the workspace routes the embed tier to, rather than
-  // OpenRouter always (completeness review H-27). An unpriced model is still
-  // refused: an unmetered embedding loop is the one place a runaway cost would
-  // not show until the bill.
-  const routed = await providerForTier(workspaceId, "embed");
-  if (!routed) {
-    return undefined;
-  }
-  return async (inputs: readonly string[]) => {
-    const result = await routed.provider.embed({
-      model: routed.modelId,
-      input: [...inputs],
-    });
-    return {
-      vectors: result.vectors,
-      dimensions: result.dimensions,
-      model: routed.modelId,
-    };
-  };
-}
-
-/**
  * What one delivery is handed.
  *
  * Built per delivery, for the same reason `getMailSettings` is read per use:
@@ -120,9 +92,13 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
   // Never fatal to a delivery: an instance with no mail configured should skip
   // its invitation rows, not fail them.
   const mail = await getMailSettings().catch(() => null);
+  // Resolved when it sends, for the same reason (completeness review M-33):
+  // a rename should reach the next invitation. Never throws.
+  const instanceName = await getInstanceName();
 
   return {
     pool: getPool(),
+    instanceName,
     ...(workspaceId ? { embed: await embedFor(workspaceId) } : {}),
     /**
      * The workspace AI drafter, for a copilot run (P4-T14b-b).
@@ -130,8 +106,25 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
      * Resolved per delivery rather than per process, for the reason every
      * other dependency here is: provider keys and tier routing live in the
      * database and an administrator can change either while this runs.
+     *
+     * For the member who asked, so their own key answers them where they
+     * stored one (completeness review M-36).
      */
-    drafterFor: (id: string) => drafterFor(id),
+    drafterFor: (id: string, forUser?: string) =>
+      drafterFor(id, "balanced", forUser),
+    /**
+     * One step of an agent run (completeness review M-11).
+     *
+     * The model comes from `providerForTier`, the one place a provider is
+     * built, so the workspace's egress controls ride on it. Resolved per
+     * step, for the reason everything else here is resolved per delivery:
+     * an administrator can switch the provider off while a run is going,
+     * and the next step should see that.
+     */
+    continueAgentRun: (job) =>
+      continueAgentRun(getPool(), job, {
+        modelFor: (id, tier) => providerForTier(id, tier),
+      }),
     async publish(channel, event, data) {
       await getRealtime().publish(channel, { name: event, data });
     },
@@ -147,6 +140,14 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
       const stored = await getStorage().put(key, body, { contentType });
       return { key: stored.key, size: stored.size };
     },
+    // A held file's bytes, read back for its virus scan (completeness review
+    // M-24). Null when the object is gone, which the scan records rather
+    // than retries.
+    getFile: readStoredFile,
+    // Resolved only when a scan is delivered, so no other topic pays for
+    // reading the setting. Null means no scanner, and the handler keeps the
+    // file held rather than releasing it unscanned.
+    scanner: getFileScanner,
     ...(mail
       ? {
           async sendMail(message) {
@@ -162,11 +163,27 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
            * before P5-T03 exists should get.
            */
           async sendChannel(message) {
-            if (!workspaceId || !message.memberId) {
+            if (!workspaceId) {
               return {
                 delivered: false,
-                suppressedReason: "the message names no member to reach",
+                suppressedReason: "the message names no workspace",
               };
+            }
+            if (!message.memberId) {
+              // A post to a space's own channel (completeness review M-23),
+              // or nothing at all.
+              return message.target
+                ? postToSpaceChannel(workspaceId, message.provider, {
+                    target: message.target,
+                    text: message.text,
+                    ...(message.subject ? { subject: message.subject } : {}),
+                    ...(message.buttons ? { buttons: message.buttons } : {}),
+                    idempotencyKey: message.idempotencyKey,
+                  })
+                : {
+                    delivered: false,
+                    suppressedReason: "the message names no member to reach",
+                  };
             }
             const outbound = {
               text: message.text,
@@ -187,6 +204,8 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
             if (message.provider === "email") {
               const channel = new EmailChannel({
                 mailer: mailerFrom(mail),
+                // The subject a message that brings none is sent under.
+                defaultSubject: instanceName,
                 addressFor: (recipient) =>
                   memberEmail(getPool(), workspaceId, recipient.memberId),
               });
@@ -333,6 +352,74 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
 }
 
 /**
+ * Posts one message to a space's own channel (completeness review M-23).
+ *
+ * Slack and Teams only, the two §5.2 gives channel posts. The connection is
+ * opened per delivery, as it is for a member's message, and the target is the
+ * channel id the space linked. Anything else suppresses with a reason rather
+ * than failing, because a provider that cannot post to a channel is a fact
+ * about the provider and retrying will not change it.
+ */
+async function postToSpaceChannel(
+  workspaceId: string,
+  provider: string,
+  message: {
+    readonly target: string;
+    readonly text: string;
+    readonly subject?: string;
+    readonly buttons?: readonly { label: string; url: string }[];
+    readonly idempotencyKey: string;
+  },
+): Promise<{ delivered: boolean; suppressedReason?: string }> {
+  const { target, ...outbound } = message;
+  if (provider === "slack") {
+    const connection = await openConnection(getPool(), getKeyRing(), {
+      workspaceId,
+      provider: "slack",
+    });
+    const secret = connection ? parseSlackSecret(connection.secret) : null;
+    if (!secret) {
+      return {
+        delivered: false,
+        suppressedReason:
+          "Slack is not connected, or its stored credentials are not readable",
+      };
+    }
+    return new SlackChannel({
+      botToken: secret.botToken,
+      signingSecret: secret.signingSecret,
+      // A channel post has no member to resolve.
+      slackUserFor: () => null,
+    }).sendToChannel(target, outbound);
+  }
+  if (provider === "teams") {
+    const connection = await openConnection(getPool(), getKeyRing(), {
+      workspaceId,
+      provider: "teams",
+    });
+    const secret = connection ? parseTeamsSecret(connection.secret) : null;
+    if (!secret) {
+      return {
+        delivered: false,
+        suppressedReason:
+          "Teams is not connected, or its stored credentials are not readable",
+      };
+    }
+    const serviceUrl = connection?.config.serviceUrl;
+    return new TeamsChannel({
+      appId: secret.appId,
+      appPassword: secret.appPassword,
+      ...(typeof serviceUrl === "string" ? { serviceUrl } : {}),
+      conversationFor: () => null,
+    }).sendToChannel(target, outbound);
+  }
+  return {
+    delivered: false,
+    suppressedReason: `${provider} does not post to a channel`,
+  };
+}
+
+/**
  * Whether this process drains the queue.
  *
  * Read through the validated environment rather than `process.env` directly, so
@@ -367,6 +454,9 @@ export function startRelay(): OutboxRelay | null {
 
   const relay = new OutboxRelay(getPool(), {
     leaseSeconds: LEASE_SECONDS,
+    // A delivered invitation keeps neither its token nor its address
+    // (completeness review M-19). Core names the fields per topic.
+    redactOnDelivery: OUTBOX_REDACT_ON_DELIVERY,
     // Passing this also registers the two queue gauges, which are read at
     // scrape time rather than written during a drain (P7-T06b). That is what
     // makes a relay that has stopped legible: counters go quiet and look like

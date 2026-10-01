@@ -44,8 +44,17 @@ const MAX_COLUMN_WIDTH = 60;
 /** How narrow a column may be, so a one-character heading is still readable. */
 const MIN_COLUMN_WIDTH = 10;
 
-/** One table as the bytes of an `.xlsx` file. */
-export async function toXlsx(table: CsvTable): Promise<Buffer> {
+/**
+ * One table as the bytes of an `.xlsx` file.
+ *
+ * `sheet` names the one sheet. An export leaves it as "Export"; an import
+ * template names it after its entity (M-17), so the workbook somebody fills in
+ * says which of the six files it is.
+ */
+export async function toXlsx(
+  table: CsvTable,
+  options: { readonly sheet?: string } = {},
+): Promise<Buffer> {
   const header = table.columns.map((column) => ({
     value: column,
     fontWeight: "bold" as const,
@@ -57,7 +66,7 @@ export async function toXlsx(table: CsvTable): Promise<Buffer> {
     // Named rather than left as "Sheet1", because a person who exports four
     // lists into one folder has four files and needs to know which is which
     // with the file open.
-    sheet: "Export",
+    sheet: options.sheet ?? "Export",
     // The heading stays put while somebody scrolls a thousand rows. Without it
     // a large export is unreadable past the first screen, and a large export is
     // exactly what this format is for.

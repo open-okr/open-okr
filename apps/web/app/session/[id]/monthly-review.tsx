@@ -33,10 +33,11 @@ import {
   setTrendAction,
 } from "./actions";
 
+/** `labelKey` is a catalogue key, so the words are the reader's language. */
 const TRENDS = [
-  { value: "improving", label: "Improving" },
-  { value: "flat", label: "Flat" },
-  { value: "declining", label: "Declining" },
+  { value: "improving", labelKey: "session.detail.monthlyReview.improving" },
+  { value: "flat", labelKey: "session.detail.monthlyReview.flat" },
+  { value: "declining", labelKey: "cycle.baseline.declining" },
 ] as const;
 
 const SIGNAL_TONE: Record<string, "ok" | "warn" | "bad"> = {
@@ -123,12 +124,14 @@ export function MonthlyReview({
           router.refresh();
         } catch (error) {
           setProblem(
-            error instanceof Error ? error.message : "That did not save.",
+            error instanceof Error
+              ? error.message
+              : t("session.detail.thatDidNotSave"),
           );
         }
       });
     },
-    [router],
+    [router, t],
   );
 
   const recorded = new Map(trends.map((entry) => [entry.goalId, entry]));
@@ -194,7 +197,7 @@ export function MonthlyReview({
                         )
                       }
                     >
-                      {option.label}
+                      {t(option.labelKey)}
                     </Button>
                   ))}
                   {entry ? null : (
@@ -230,7 +233,9 @@ export function MonthlyReview({
                       {dependency.keyResultTitle}
                     </span>
                     <Chip tone={dependency.confirmed ? "ok" : "warn"}>
-                      {dependency.confirmed ? "confirmed" : "unconfirmed"}
+                      {dependency.confirmed
+                        ? t("common.confirmed")
+                        : t("session.detail.monthlyReview.unconfirmed")}
                     </Chip>
                     {dependency.confirmed || dependency.riskOwnerId ? null : (
                       // §5.4: unconfirmed and unowned is what holds publish

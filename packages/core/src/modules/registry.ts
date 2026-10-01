@@ -327,6 +327,17 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         // so a page added here cannot go missing the way this one did.
         minLevel: ACCESS_LEVELS.view,
       },
+      {
+        id: "account-ai",
+        label: "Your AI keys",
+        href: "/account/ai",
+        section: "sidebar",
+        group: "account",
+        // Every member. A key of your own pays for your own requests and
+        // nobody else's, and a member whose level cannot store one is still
+        // told whether the workspace takes them (completeness review M-36).
+        minLevel: ACCESS_LEVELS.view,
+      },
     ],
   },
   {
@@ -425,6 +436,15 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         // An invitation adds a member to the workspace, which is the same
         // authority the other org-structural writes ask for. The screen also
         // names email addresses (P6-G06).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
+        id: "admin-deleted",
+        label: "Deleted items",
+        href: "/admin/deleted",
+        section: "admin",
+        // Every restore on it asks `full` on the workspace before it asks
+        // anything of the row, which is what the deletes asked (M-13).
         minLevel: ACCESS_LEVELS.full,
       },
       {

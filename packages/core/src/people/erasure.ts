@@ -24,9 +24,14 @@
  * none: it reports success having left half the identifiers behind.
  */
 import {
+  accounts,
+  activeOnly,
   aiMessages,
   aiThreads,
   apiTokens,
+  // Aliased: the rest of core imports the OKR meetings table under this name,
+  // and these are sign-in sessions.
+  sessions as authSessions,
   channelIdentities,
   channelLinkCodes,
   channelMessages,
@@ -34,9 +39,16 @@ import {
   oauthAccessTokens,
   oauthGrants,
   oauthRefreshTokens,
+  passkeys,
+  twoFactors,
+  users,
   type WorkspaceTx,
+  withUser,
+  workspaceMembers,
 } from "@openokr/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, ne } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import type { Pool } from "pg";
 
 /**
  * How much this erasure removed, by table.
@@ -260,5 +272,102 @@ export async function sweepPersonalData(
     oauthTokens: oauthTokenCount,
     copilotThreads: threadIds.length,
     copilotMessages: messageCount,
+  };
+}
+
+export interface AccountErasure {
+  /** Whether the sign-in account was anonymised along with the member. */
+  readonly anonymised: boolean;
+  /** Other workspaces the person still belongs to, which is why it was not. */
+  readonly otherWorkspaces: number;
+  readonly sessionsRevoked: number;
+  readonly credentialsRemoved: number;
+}
+
+/**
+ * The sign-in account behind an erased member (completeness review M-18).
+ *
+ * Erasure anonymised the member and left the `users` row holding the
+ * person's name and email for good. One account can belong to several
+ * workspaces, though, and one workspace's administrator cannot erase somebody
+ * from the others. Akmal's decision of 28 September 2026: the account is
+ * anonymised, its sessions revoked and its credentials removed only when the
+ * person belongs to no other workspace. Otherwise it is left for the
+ * workspaces they are still in, and the result says how many.
+ *
+ * The count of other memberships is read under the person's own identity and
+ * no workspace, which is the one question `own_memberships` answers across
+ * tenants; the erasing transaction can only see its own workspace.
+ */
+export async function eraseAccountIfAlone(
+  tx: WorkspaceTx,
+  pool: Pool,
+  input: { readonly workspaceId: string; readonly userId: string },
+): Promise<AccountErasure> {
+  const memberships = await withUser(drizzle(pool), input.userId, (own) =>
+    own
+      .select({ workspaceId: workspaceMembers.workspaceId })
+      .from(workspaceMembers)
+      .where(
+        activeOnly(
+          workspaceMembers,
+          eq(workspaceMembers.userId, input.userId),
+          ne(workspaceMembers.workspaceId, input.workspaceId),
+        ),
+      ),
+  );
+  if (memberships.length > 0) {
+    return {
+      anonymised: false,
+      otherWorkspaces: memberships.length,
+      sessionsRevoked: 0,
+      credentialsRemoved: 0,
+    };
+  }
+
+  // openokr:allow-mutation: the erasing Operation's own transaction. The
+  // account is identity data outside any workspace, and this is the one
+  // write that may remove it.
+  await tx
+    .update(users)
+    .set({
+      name: "Erased user",
+      // Unique and undeliverable: `.invalid` is reserved by RFC 2606, so this
+      // can never be registered, never receive mail and never collide.
+      email: `erased-${input.userId}@erased.invalid`,
+      emailVerified: false,
+      image: null,
+      twoFactorEnabled: false,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, input.userId));
+  // openokr:allow-mutation: as above.
+  const revoked = await tx
+    .delete(authSessions)
+    .where(eq(authSessions.userId, input.userId))
+    .returning({ id: authSessions.id });
+  // openokr:allow-mutation: as above. Passwords, identity-provider tokens,
+  // passkeys and second factors: nothing that could sign this account in.
+  const removedAccounts = await tx
+    .delete(accounts)
+    .where(eq(accounts.userId, input.userId))
+    .returning({ id: accounts.id });
+  // openokr:allow-mutation: as above.
+  const removedPasskeys = await tx
+    .delete(passkeys)
+    .where(eq(passkeys.userId, input.userId))
+    .returning({ id: passkeys.id });
+  // openokr:allow-mutation: as above.
+  const removedFactors = await tx
+    .delete(twoFactors)
+    .where(eq(twoFactors.userId, input.userId))
+    .returning({ id: twoFactors.id });
+
+  return {
+    anonymised: true,
+    otherWorkspaces: 0,
+    sessionsRevoked: revoked.length,
+    credentialsRemoved:
+      removedAccounts.length + removedPasskeys.length + removedFactors.length,
   };
 }

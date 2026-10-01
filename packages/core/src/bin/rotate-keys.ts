@@ -34,7 +34,8 @@ try {
   const report = await rotateInstanceSecrets(pool, ring);
   process.stdout.write(
     `Rotation complete. ${report.examined} secret(s) examined ` +
-      `(${report.workspaceSecrets} held by workspaces), ` +
+      `(${report.workspaceSecrets} held by workspaces, ` +
+      `${report.accountTokens} identity-provider token(s) on accounts), ` +
       `${report.rewrapped} re-wrapped, ${report.current} already current.\n`,
   );
   if (report.rewrapped > 0) {

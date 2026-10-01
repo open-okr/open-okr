@@ -9,6 +9,9 @@ export const OPENAI_DEFAULT_TIER_MODELS: TierModelMap = {
   embed: "text-embedding-3-large",
 };
 
+/** Where every request goes. Named so the egress guard reads the same one. */
+export const OPENAI_BASE_URL = "https://api.openai.com/v1";
+
 export interface OpenAiProviderOptions {
   readonly apiKey: string;
   readonly fetch?: typeof fetch;
@@ -18,7 +21,7 @@ export class OpenAiProvider extends OpenAiCompatibleProvider {
   constructor(options: OpenAiProviderOptions) {
     super({
       apiKey: options.apiKey,
-      baseURL: "https://api.openai.com/v1",
+      baseURL: OPENAI_BASE_URL,
       fetch: options.fetch,
       defaultContextWindow: 128_000,
     });

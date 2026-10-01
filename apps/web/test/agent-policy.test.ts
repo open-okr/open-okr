@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { AGENT_AUTONOMIES } from "@openokr/db";
 import { describe, expect, test } from "vitest";
+import { withMessages } from "./screen-text.ts";
 
 /**
  * An agent's write policy and its scope are set from the product
@@ -45,9 +46,9 @@ describe("the agent policy card", () => {
   test("says what each policy does, not just its name", () => {
     // "Scoped direct" is the one that writes without asking, and a screen
     // that offers it as a bare label gets it chosen by accident.
-    expect(card).toContain("commits nothing at all");
-    expect(card).toContain("into the review queue");
-    expect(card).toContain("only inside the scopes bound below");
+    expect(withMessages(card)).toContain("commits nothing at all");
+    expect(withMessages(card)).toContain("into the review queue");
+    expect(withMessages(card)).toContain("only inside the scopes bound below");
   });
 
   test("confirms before widening an agent to direct writes", () => {

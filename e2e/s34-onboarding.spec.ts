@@ -1,32 +1,60 @@
 /**
- * Onboarding does not come back (screen S-34, P6-G26).
+ * Onboarding does not come back on its own, and an administrator can bring it
+ * back (screen S-34, P6-G26, completeness review L-08).
  *
  * **The half `registration-to-dashboard.spec.ts` cannot prove.** That spec is
- * the one that registers, so it is the only place the wizard can be walked at
- * all, and it skips all four steps there. By the time this file runs the
- * instance has been onboarded once, which is exactly the state worth asserting:
- * the wizard refuses to appear again, and refuses anybody it was never for.
+ * the one that registers, so it is the only place the wizard can be walked on
+ * a first visit, and it skips all five steps there. By the time this file runs
+ * the instance has been onboarded once, which is exactly the state worth
+ * asserting: the wizard refuses to appear again, and refuses anybody it was
+ * never for.
  *
  * Together the two cover P6-G26's test plan: skipping every step leaves a
  * working workspace, onboarding does not reappear once finished, and a second
  * owner does not see it.
+ *
+ * **And S-34's "a dismissed onboarding is resumable from admin"** (L-08), last
+ * in the file because it opens the setup again. It finishes it again before it
+ * ends, and the `afterAll` below puts the flag back even if it fails halfway:
+ * a workspace left pending would send the founder to the setup screen in every
+ * later spec.
  */
+import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
+import pg from "pg";
 import { expect, test } from "./fixtures.ts";
-import { goTo, signIn } from "./instance-account.ts";
+import { goTo, signIn, skipOnboarding } from "./instance-account.ts";
+
+const CONNECTION = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : connectionOptions(
+      process.env.E2E_DATABASE ?? "openokr_e2e",
+      testDbEnv.superuser,
+    );
 
 test.describe.configure({ mode: "serial" });
 
 let context: BrowserContext;
 let page: Page;
+let pool: pg.Pool;
 
 test.beforeAll(async ({ browser }) => {
+  pool = new pg.Pool(CONNECTION);
   context = await browser.newContext();
   page = await context.newPage();
   await signIn(page);
 });
 
 test.afterAll(async () => {
+  // Left as this spec found it, whatever happened above. The last test
+  // finishes the setup it reopened; this is for when it did not get there.
+  await pool
+    ?.query(
+      `update workspaces
+          set settings = jsonb_set(settings, '{onboardingDone}', 'true'::jsonb)`,
+    )
+    .catch(() => undefined);
+  await pool?.end();
   await context?.close();
 });
 
@@ -57,7 +85,7 @@ test("asking for it directly is refused, rather than shown again", async () => {
 });
 
 test("skipping every step left the documented defaults in place", async () => {
-  // The acceptance line's second half. The wizard was skipped four times in
+  // The acceptance line's second half. The wizard was skipped five times in
   // `registration-to-dashboard`, so what the workspace holds now is what
   // provisioning resolved: §4.14's defaults, not blanks.
   await goTo(page, "/admin/general");
@@ -74,4 +102,57 @@ test("skipping every step left the documented defaults in place", async () => {
   await expect(
     page.locator('select[name="defaultCheckInFrequency"]'),
   ).toHaveValue("weekly");
+});
+
+test("an administrator opens the setup again from General, and every answer is kept", async () => {
+  // S-34: "A dismissed onboarding is resumable from admin" (L-08). It was
+  // not: once finished, the wizard sent everybody home and nothing could
+  // change its mind.
+  await goTo(page, "/admin/general");
+  await expect(page.getByTestId("setup-state")).toContainText("Finished", {
+    timeout: 15_000,
+  });
+  const timezone = await page.getByLabel("Timezone").inputValue();
+
+  await page.getByTestId("reopen-onboarding").click();
+  await expect(page).toHaveURL(/\/welcome$/, { timeout: 15_000 });
+  // Arrival waited out, for the reason `skipOnboarding` gives: the wizard is
+  // briefly mounted twice as the navigation settles.
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByTestId("welcome-skip")).toHaveCount(1, {
+    timeout: 15_000,
+  });
+
+  // The wizard opens on what the workspace holds now, not on blanks or on
+  // the defaults, which is what makes reopening it safe.
+  await expect(
+    page.getByLabel("What is this workspace called?"),
+  ).not.toHaveValue("", { timeout: 15_000 });
+  await expect(page.getByLabel("Which clock does it keep?")).toHaveValue(
+    timezone,
+  );
+
+  // While it is open, the front door sends an administrator to it, and
+  // General offers the way back in rather than a second reopen.
+  await goTo(page, "/");
+  await expect(page).toHaveURL(/\/welcome$/, { timeout: 15_000 });
+  await goTo(page, "/admin/general");
+  await expect(page.getByTestId("continue-onboarding")).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByTestId("continue-onboarding").click();
+
+  // Skipping every step finishes it again and changes nothing.
+  await skipOnboarding(page);
+  await expect(page).toHaveURL(/^https?:\/\/[^/]+\/$/, { timeout: 15_000 });
+
+  await goTo(page, "/admin/general");
+  await expect(page.getByTestId("setup-state")).toContainText("Finished", {
+    timeout: 15_000,
+  });
+  await expect(page.getByLabel("Timezone")).toHaveValue(timezone);
+  await goTo(page, "/admin/rhythm");
+  await expect(
+    page.locator('select[name="defaultCheckInFrequency"]'),
+  ).toHaveValue("weekly", { timeout: 15_000 });
 });

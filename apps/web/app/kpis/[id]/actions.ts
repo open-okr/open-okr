@@ -9,7 +9,9 @@
  */
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { assistContext } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
 
@@ -43,13 +45,12 @@ export async function setFormula(
 ): Promise<WriteState> {
   const formula = fold(operator, references);
   if (!formula) {
-    return { error: "A formula needs at least one source KPI." };
+    const { t } = await getTranslations();
+    return { error: t("kpis.detail.actions.formulaNeedsASource") };
   }
   if (references.length === 1) {
-    return {
-      error:
-        "One source is a copy, not a calculation. Pick a second, or leave this KPI entered by hand.",
-    };
+    const { t } = await getTranslations();
+    return { error: t("kpis.detail.actions.oneSourceIsACopy") };
   }
   const { session, workspace } = await requireWorkspace();
   try {
@@ -71,4 +72,16 @@ export async function setFormula(
   revalidatePath(`/kpis/${kpiId}`);
   revalidatePath("/kpis");
   return NO_ERROR;
+}
+
+/**
+ * §2.2's trend narration, beside the chart (completeness review M-09).
+ *
+ * A read that writes nothing. Null covers the provider being off, the switch
+ * being off, a series too short to be a trend, and a narration that stated a
+ * number the series does not hold: from the reader's side all four mean the
+ * chart is the whole answer.
+ */
+export async function narrateTrendAction(kpiId: string) {
+  return callAction(await assistContext(), "kpis.narrateTrend", { kpiId });
 }

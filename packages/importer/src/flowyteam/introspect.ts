@@ -4,12 +4,18 @@
  *
  * **Two lists, not one.** A core table is one without which nothing imports:
  * no `objectives` means there is no OKR history here and the run is refused by
- * name. An expected table is one a domain needs, and its absence is a fact
- * about this instance rather than a fault: `flowy_prod`, a real older
- * FlowyTeam, has no `objective_discussions`, and refusing to import a company's
- * whole quarter because a discussion table is missing would be absurd. Absent
- * expected tables are recorded, and the mappers in P6-T03 and P6-T04 read that
- * record rather than each discovering it again.
+ * name. An expected table is one a domain reads, and its absence is a fact
+ * about this instance rather than a fault: an instance from before check-in
+ * reviews has no `checkin_reviews`, and refusing to import a company's whole
+ * quarter because of it would be absurd. Absent expected tables are recorded,
+ * and the mappers in P6-T03 and P6-T04 read that record rather than each
+ * discovering it again.
+ *
+ * **A table no domain reads is on neither list** (completeness review M-16).
+ * It lives in `unread.ts`, which counts it for the company and has the report
+ * name it. Listing one here made its absence read as a domain importing
+ * nothing: `flowy_prod`, a real older FlowyTeam, has no discussion tables, and
+ * no domain reads those anyway.
  *
  * **The version comes from the `migrations` table, not from a guess.**
  * FlowyTeam is Laravel, so the applied migrations are rows with dated names.
@@ -40,47 +46,35 @@ export const CORE_TABLES = [
 ] as const;
 
 /**
- * Wanted by a domain, and absent on some real instances.
+ * Read by a domain, and absent on some real instances.
  *
  * Grouped by the domain that reads them, so the report says "the tasks domain
  * cannot import: sub_tasks is missing" rather than listing table names a reader
  * has to map back to a feature themselves.
+ *
+ * Only tables a mapper actually reads. A test checks every one appears in a
+ * statement the connector sends, and the tables it reads none of are in
+ * `UNREAD_TABLES` instead.
  */
 export const EXPECTED_TABLES: Readonly<Record<string, readonly string[]>> = {
-  organisation: ["designations", "other_departments", "employee_teams"],
-  rhythm: ["performance_settings"],
-  kpis: [
-    "indicator_types",
-    "indicators",
-    "indicator_records",
-    "indicator_calculates",
-    "indicator_accesses",
-    "keyresult_indicator",
-  ],
+  organisation: ["designations", "other_departments"],
+  kpis: ["indicator_types", "indicators", "indicator_records"],
   okrs: [
     "key_result_records",
     "objective_checkins",
     "key_result_checkins",
-    "checkins",
     "checkin_reviews",
-    "objective_accesses",
-    "objective_discussions",
-    "keyresult_discussions",
-    "key_result_files",
   ],
   work: [
     "projects",
     "project_members",
-    "task_boards",
     "taskboard_columns",
-    "task_category",
     "tasks",
     "sub_tasks",
     "tasks_accesses",
     "task_comments",
     "task_files",
   ],
-  points: ["reward_settings", "scores", "performance_records"],
 };
 
 export interface SourceVersion {

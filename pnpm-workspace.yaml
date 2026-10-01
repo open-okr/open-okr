@@ -15,9 +15,19 @@ allowBuilds:
   protobufjs: true
 
 catalog:
-  # Pinned to 5.9.x by the P1-T01 decision. The 7.x bump (dependabot PR #5)
-  # broke typecheck repo-wide; adopting 7.x is its own task, not a bot merge.
-  typescript: 5.9.3
+  # The native compiler, adopted on 30 September 2026 after measuring it: the
+  # web app checks in 6 seconds and 2.8 GB single-threaded, against 18 seconds
+  # and 3.4 GB on 5.9. It was pinned to 5.9 at P1-T01 because dependabot's bump
+  # broke typecheck; the two differences it found were named and fixed in the
+  # same change (Node's types are named in the base tsconfig, and one load's
+  # return type is written out). Next.js 16.3 type-checks through the `tsc`
+  # command by default, so the build runs on it too.
+  typescript: 7.0.2
+  # TypeScript 7 no longer exports the compiler API (`createSourceFile`,
+  # `forEachChild`). The two web tests and the one script that walk a syntax
+  # tree read it from 5.9 under this name, so nothing else can pick it up by
+  # accident. Same package, same licence.
+  typescript5: npm:typescript@5.9.3
   vitest: 5.0.2
   "@types/node": 26.6.2
   # 0.45.2 is the first release past GHSA-gpj5-g38j-94v9 (SQL injection via
@@ -37,6 +47,13 @@ catalog:
   # SDK, behind the Mailer port.
   nodemailer: ^10.0.10
   "@types/nodemailer": ^8.0.2
+  # Image re-encoding and thumbnails (completeness review M-24), approved by
+  # the human on 28 September 2026. Apache-2.0, and its prebuilt libvips
+  # binaries are LGPL-3.0-or-later, which the licence gate already allows.
+  # The same range `next` asks for as its own optional dependency, so the
+  # lockfile holds one copy. Confined to packages/adapters behind the
+  # ImageProcessor port; `pnpm check:boundaries` refuses it anywhere else.
+  sharp: ^0.35.4
   # Already used by the environment schema. Shared here so the action contract
   # registry validates against the same version the boundary does.
   zod: 4.6.5

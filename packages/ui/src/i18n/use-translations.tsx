@@ -1,5 +1,6 @@
 "use client";
 
+import type { TerminologyOverrides } from "@openokr/method";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 import {
   CATALOGUES,
@@ -31,21 +32,29 @@ export interface TranslationsProviderProps {
    * injection seam (`buildPseudoCatalogue()`), not something a real screen
    * passes. */
   readonly catalogueOverride?: Catalogue;
+  /**
+   * The workspace's own words for the method's terms (M-14). The root layout
+   * resolves them on the server, as it does the locale, so a client component
+   * says "Add ambition" exactly where the server said it. Absent before
+   * sign-in, where there is no workspace to ask.
+   */
+  readonly renamed?: TerminologyOverrides;
 }
 
 export function TranslationsProvider({
   locale,
   children,
   catalogueOverride,
+  renamed,
 }: TranslationsProviderProps) {
   const value = useMemo<TranslationsContextValue>(() => {
     const catalogue = catalogueOverride ?? CATALOGUES[locale];
     return {
       locale,
       t: (key: string, values?: MessageValues) =>
-        translate(catalogue, key, values),
+        translate(catalogue, key, values, renamed),
     };
-  }, [locale, catalogueOverride]);
+  }, [locale, catalogueOverride, renamed]);
 
   return (
     <TranslationsContext.Provider value={value}>

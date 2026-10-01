@@ -11,7 +11,11 @@ import { ActionForm } from "../cycle/action-form.tsx";
 import { markRead, mute, snooze } from "./actions.ts";
 import { InboxLive } from "./inbox-live.tsx";
 import { SNOOZE_CHOICES } from "./snooze-choices.ts";
-import { REASON_LABELS, subjectLink, subjectName } from "./subject-link.ts";
+import {
+  REASON_LABEL_KEYS,
+  subjectLink,
+  subjectNameKey,
+} from "./subject-link.ts";
 
 /**
  * Inbox, "what happened" (UIUX-PLAN.md §4 S-03, P6-G07a).
@@ -47,11 +51,18 @@ import { REASON_LABELS, subjectLink, subjectName } from "./subject-link.ts";
 
 type Row = Awaited<ReturnType<typeof callAction<"notifications.list">>>[number];
 
-const FILTERS = [
-  { id: "", label: "Everything" },
-  { id: "unread", label: "Unread" },
-  ...Object.entries(REASON_LABELS).map(([id, label]) => ({ id, label })),
-] as const;
+const FILTERS: readonly {
+  readonly id: string;
+  /** A catalogue key for the filters this page owns. */
+  readonly labelKey?: string;
+}[] = [
+  { id: "", labelKey: "search.everything" },
+  { id: "unread", labelKey: "inbox.unread" },
+  ...Object.entries(REASON_LABEL_KEYS).map(([id, labelKey]) => ({
+    id,
+    labelKey,
+  })),
+];
 
 export default async function InboxPage({
   searchParams,
@@ -59,6 +70,10 @@ export default async function InboxPage({
   searchParams: Promise<{ filter?: string }>;
 }) {
   const { t } = await getTranslations();
+  const headingFor = (subjectType: string | null): string => {
+    const key = subjectNameKey(subjectType);
+    return key ? t(key) : (subjectType ?? "");
+  };
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -144,7 +159,7 @@ export default async function InboxPage({
                   : "rounded-full bg-raised px-2.5 py-1 text-xs font-semibold text-ink-3 hover:text-ink"
               }
             >
-              {one.label}
+              {one.labelKey ? t(one.labelKey) : one.id}
             </Link>
           ))}
         </CardBody>
@@ -155,8 +170,8 @@ export default async function InboxPage({
           <CardBody>
             <p className="text-sm text-ink-2">
               {active === ""
-                ? "Nothing new."
-                : "Nothing here under that filter."}
+                ? t("inbox.nothingNew")
+                : t("inbox.nothingHereUnderThat")}
             </p>
             <p className="mt-1 text-xs text-ink-3">
               {t("inbox.aRowAppearsWhen")}
@@ -186,10 +201,10 @@ export default async function InboxPage({
                 <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
                   {href ? (
                     <Link href={href} className="hover:text-ink">
-                      {subjectName(first.subjectType)}
+                      {headingFor(first.subjectType)}
                     </Link>
                   ) : (
-                    subjectName(first.subjectType)
+                    headingFor(first.subjectType)
                   )}
                   <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
                     {held.length}
@@ -268,7 +283,9 @@ async function NotificationRow({
   const line =
     row.rendered ??
     (rule ? rule.fires : null) ??
-    (ruleName === null ? "Something happened here." : `Reminder: ${ruleName}`);
+    (ruleName === null
+      ? t("inbox.somethingHappenedHere")
+      : t("inbox.reminder", { rule: ruleName }));
 
   return (
     <div className="flex items-start gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5">
@@ -283,7 +300,9 @@ async function NotificationRow({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <Chip tone={reasonTone(row.reason)}>
-            {REASON_LABELS[row.reason] ?? row.reason}
+            {REASON_LABEL_KEYS[row.reason]
+              ? t(REASON_LABEL_KEYS[row.reason] as string)
+              : row.reason}
           </Chip>
           {row.readAt === null ? (
             <span className="sr-only">{t("inbox.unread")}</span>
@@ -322,7 +341,7 @@ async function NotificationRow({
               value={String(choice.minutes)}
             />
             <Button type="submit" variant="ghost" size="sm">
-              {choice.label}
+              {t(choice.labelKey)}
             </Button>
           </ActionForm>
         ))}

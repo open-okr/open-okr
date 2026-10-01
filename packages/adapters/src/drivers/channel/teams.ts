@@ -37,6 +37,7 @@ import type {
   DeliveryResult,
   InboundMessage,
   InboundRequest,
+  InboundSubmission,
 } from "../../ports/channel.ts";
 
 /** Where a bot's outbound token comes from. */
@@ -61,11 +62,18 @@ const COMMAND_SCHEME = "okr:";
  *
  * Microsoft rotates these, and a driver that fetched them per request would add
  * a round trip to every inbound message. Twenty-four hours is what the Bot
- * Framework's own guidance suggests, and a token signed by a key that has just
- * rotated in is refused until the cache turns over, which is a delay rather than
- * a wrong answer.
+ * Framework's own guidance suggests. A token signed by a key that has just
+ * rotated in is not left waiting for the cache to turn over: an unknown key id
+ * fetches the set again, no more than once an hour.
  */
 const KEY_CACHE_SECONDS = 24 * 60 * 60;
+
+/**
+ * How soon a token naming a key the cache does not hold may fetch the set
+ * again. Short enough that a key Microsoft has just rotated in is refused for
+ * an hour at most, long enough that made-up key ids cost one request an hour.
+ */
+const UNKNOWN_KEY_REFRESH_SECONDS = 60 * 60;
 
 const CAPABILITIES: ChannelCapabilities = {
   outbound: true,
@@ -97,6 +105,13 @@ export interface TeamsChannelOptions {
   readonly fetch?: typeof globalThis.fetch;
   /** Test seam, so a verification test can supply its own clock. */
   readonly now?: () => Date;
+  /**
+   * Where the inbound token's keys come from, when a caller already holds
+   * them. The inbound door passes the one it checked the token with, so the
+   * keys are fetched once rather than once per request. Absent, the driver
+   * keeps its own.
+   */
+  readonly signingKeys?: TeamsSigningKeys;
 }
 
 /**
@@ -192,6 +207,177 @@ function sameString(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+/**
+ * Microsoft's published signing keys, fetched once and then cached.
+ *
+ * **A thing of its own so that more than one caller can hold the same cache**
+ * (completeness review L-10). The inbound door builds a new driver for every
+ * request, because the credentials are per workspace, so a cache inside the
+ * driver was a cache that lived for one request: every Teams message fetched
+ * both of Microsoft's documents again. The door now checks the token before it
+ * knows the workspace, and then the driver checks it again with the audience,
+ * which would have doubled that. One source shared by both turns it into one
+ * fetch a day.
+ *
+ * **A key it has not seen fetches the set again, at most once an hour.** While
+ * the cache lived for one request, `KEY_CACHE_SECONDS`' accepted delay after
+ * Microsoft rotates a key in was theoretical. Shared, it would be up to a day
+ * of refused messages. The hour is there because the key id is the caller's
+ * to choose, and a stream of made-up ids must not become a stream of requests
+ * to Microsoft.
+ */
+export class TeamsSigningKeys {
+  readonly #fetch: typeof globalThis.fetch | undefined;
+  readonly #now: () => Date;
+  #cached: { keys: readonly JsonWebKey[]; expiresAt: number } | null = null;
+  /** When the set was last asked for, whether or not that worked. */
+  #lastAttempt = Number.NEGATIVE_INFINITY;
+
+  constructor(
+    options: {
+      /** Test seam. Defaults to global `fetch`, read when it is needed. */
+      readonly fetch?: typeof globalThis.fetch;
+      readonly now?: () => Date;
+    } = {},
+  ) {
+    this.#fetch = options.fetch;
+    this.#now = options.now ?? (() => new Date());
+  }
+
+  /** The published key with this id, or undefined. Throws when unreachable. */
+  async find(kid: string): Promise<JsonWebKey | undefined> {
+    const now = this.#now().getTime();
+    const current =
+      this.#cached && this.#cached.expiresAt > now
+        ? this.#cached.keys
+        : await this.#refresh(now);
+    const found = current.find((one) => one.kid === kid);
+    if (found || now - this.#lastAttempt < UNKNOWN_KEY_REFRESH_SECONDS * 1000) {
+      return found;
+    }
+    return (await this.#refresh(now)).find((one) => one.kid === kid);
+  }
+
+  async #refresh(now: number): Promise<readonly JsonWebKey[]> {
+    this.#lastAttempt = now;
+    const fetch = this.#fetch ?? globalThis.fetch;
+    const configuration = await fetch(OPENID_CONFIGURATION);
+    if (!configuration.ok) {
+      throw new Error(
+        `Could not read Teams' key configuration: HTTP ${configuration.status}`,
+      );
+    }
+    const { jwks_uri } = (await configuration.json()) as {
+      jwks_uri?: string;
+    };
+    if (!jwks_uri) {
+      throw new Error("Teams' key configuration named no key set.");
+    }
+
+    const set = await fetch(jwks_uri);
+    if (!set.ok) {
+      throw new Error(`Could not read Teams' keys: HTTP ${set.status}`);
+    }
+    const { keys } = (await set.json()) as { keys?: JsonWebKey[] };
+    this.#cached = {
+      keys: keys ?? [],
+      expiresAt: now + KEY_CACHE_SECONDS * 1000,
+    };
+    return this.#cached.keys;
+  }
+}
+
+/**
+ * Every check on an inbound token that needs no workspace, and the audience
+ * the token was issued for.
+ *
+ * Four of the driver's five checks hold for any bot: the signature against a
+ * key Microsoft published, the issuer, the expiry, and the service URL the
+ * token binds. Only the audience is this bot's own app id, which is in the
+ * workspace's stored credential. So the inbound door runs this before it looks
+ * up a workspace (completeness review L-10), and a forged token is refused
+ * without the lookup that would tell a tenant this instance knows from one it
+ * does not. Null for any token that fails, the audience otherwise, and the
+ * caller that holds the credential compares it.
+ */
+export async function verifyTeamsToken(
+  request: InboundRequest,
+  options: { readonly keys: TeamsSigningKeys; readonly now?: () => Date },
+): Promise<string | null> {
+  const header = request.headers.authorization ?? request.headers.Authorization;
+  const match = /^Bearer\s+(\S+)$/i.exec((header ?? "").trim());
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const token = decodeToken(match[1]);
+  if (!token) {
+    return null;
+  }
+
+  const algorithm = token.header.alg;
+  const kid = token.header.kid;
+  if (algorithm !== "RS256" || typeof kid !== "string") {
+    // Only RS256, named explicitly: accepting whatever the header asks for is
+    // how a `none` algorithm gets through.
+    return null;
+  }
+
+  let jwk: JsonWebKey | undefined;
+  try {
+    jwk = await options.keys.find(kid);
+  } catch {
+    // Microsoft unreachable. Refusing is the safe answer: the alternative is
+    // accepting an unverified activity while their endpoint is down.
+    return null;
+  }
+  if (jwk?.kty !== "RSA" || !jwk.n || !jwk.e) {
+    return null;
+  }
+
+  let verified = false;
+  try {
+    const key = createPublicKey({
+      key: { kty: "RSA", n: jwk.n, e: jwk.e },
+      format: "jwk",
+    });
+    verified = createVerify("RSA-SHA256")
+      .update(token.signed)
+      .verify(key, token.signature);
+  } catch {
+    return null;
+  }
+  if (!verified) {
+    return null;
+  }
+
+  const payload = token.payload;
+  if (typeof payload.iss !== "string" || !sameString(payload.iss, ISSUER)) {
+    return null;
+  }
+  const audience = payload.aud;
+  if (typeof audience !== "string") {
+    return null;
+  }
+  const now = options.now ?? (() => new Date());
+  const expiry = typeof payload.exp === "number" ? payload.exp * 1000 : 0;
+  if (expiry <= now().getTime()) {
+    return null;
+  }
+
+  const claimed = payload.serviceUrl;
+  const actual = serviceUrlOf(request.rawBody);
+  if (typeof claimed !== "string" || !actual) {
+    return null;
+  }
+  return sameString(
+    withoutTrailingSlashes(claimed),
+    withoutTrailingSlashes(actual),
+  )
+    ? audience
+    : null;
+}
+
 export class TeamsChannel implements Channel {
   readonly provider: ChannelProvider = "teams";
   readonly #appId: string;
@@ -201,10 +387,10 @@ export class TeamsChannel implements Channel {
   readonly #fetch: typeof globalThis.fetch;
   readonly #now: () => Date;
 
+  readonly #signingKeys: TeamsSigningKeys;
+
   /** The outbound token, and when it stops being usable. */
   #token: { value: string; expiresAt: number } | null = null;
-  /** The published signing keys, and when they should be fetched again. */
-  #keys: { keys: readonly JsonWebKey[]; expiresAt: number } | null = null;
 
   constructor(options: TeamsChannelOptions) {
     this.#appId = options.appId;
@@ -213,6 +399,9 @@ export class TeamsChannel implements Channel {
     this.#conversationFor = options.conversationFor;
     this.#fetch = options.fetch ?? globalThis.fetch;
     this.#now = options.now ?? (() => new Date());
+    this.#signingKeys =
+      options.signingKeys ??
+      new TeamsSigningKeys({ fetch: this.#fetch, now: this.#now });
   }
 
   /**
@@ -287,6 +476,35 @@ export class TeamsChannel implements Channel {
     target: string,
     message: ChannelMessage,
   ): Promise<DeliveryResult> {
+    return this.#post(target, toActivity(message));
+  }
+
+  /**
+   * Sends a card the caller built, such as the check-in form (completeness
+   * review M-23).
+   *
+   * Not on the `Channel` port, for the reason Slack's `openView` is not: a
+   * port method two of the four providers cannot honour is a port that lies.
+   * `text` is the preview a notification shows and what a client that cannot
+   * draw the card falls back to.
+   */
+  async sendCard(
+    target: string,
+    card: Record<string, unknown>,
+    text: string,
+  ): Promise<DeliveryResult> {
+    return this.#post(target, {
+      type: "message",
+      textFormat: "markdown",
+      text,
+      attachments: [{ contentType: ADAPTIVE_CARD_TYPE, content: card }],
+    });
+  }
+
+  async #post(
+    target: string,
+    activity: Record<string, unknown>,
+  ): Promise<DeliveryResult> {
     if (!this.#serviceUrl) {
       // Not a failure: a workspace whose bot has never been spoken to has no
       // endpoint to send to, and there is no way to discover one. Saying so is
@@ -306,7 +524,7 @@ export class TeamsChannel implements Channel {
         authorization: `Bearer ${token}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify(toActivity(message)),
+      body: JSON.stringify(activity),
     });
 
     if (response.status === 403 || response.status === 404) {
@@ -329,38 +547,6 @@ export class TeamsChannel implements Channel {
     };
   }
 
-  /** Microsoft's published signing keys, cached. */
-  async #signingKeys(): Promise<readonly JsonWebKey[]> {
-    const now = this.#now().getTime();
-    if (this.#keys && this.#keys.expiresAt > now) {
-      return this.#keys.keys;
-    }
-
-    const configuration = await this.#fetch(OPENID_CONFIGURATION);
-    if (!configuration.ok) {
-      throw new Error(
-        `Could not read Teams' key configuration: HTTP ${configuration.status}`,
-      );
-    }
-    const { jwks_uri } = (await configuration.json()) as {
-      jwks_uri?: string;
-    };
-    if (!jwks_uri) {
-      throw new Error("Teams' key configuration named no key set.");
-    }
-
-    const set = await this.#fetch(jwks_uri);
-    if (!set.ok) {
-      throw new Error(`Could not read Teams' keys: HTTP ${set.status}`);
-    }
-    const { keys } = (await set.json()) as { keys?: JsonWebKey[] };
-    this.#keys = {
-      keys: keys ?? [],
-      expiresAt: now + KEY_CACHE_SECONDS * 1000,
-    };
-    return this.#keys.keys;
-  }
-
   /**
    * Verifies the token Microsoft signed, before anything reads the body.
    *
@@ -377,81 +563,17 @@ export class TeamsChannel implements Channel {
    * The last is the one it would be easiest to leave out and the one whose
    * absence is worst: the service URL is where this driver sends, so a token
    * that did not bind it would let a caller choose the destination.
+   *
+   * Four of the five are `verifyTeamsToken`, because they need no workspace
+   * and the inbound door runs them before it knows one. The audience is the
+   * one only this driver can check, because only it holds the app id.
    */
   async verifyInbound(request: InboundRequest): Promise<boolean> {
-    const header =
-      request.headers.authorization ?? request.headers.Authorization;
-    const match = /^Bearer\s+(\S+)$/i.exec((header ?? "").trim());
-    if (!match?.[1]) {
-      return false;
-    }
-
-    const token = decodeToken(match[1]);
-    if (!token) {
-      return false;
-    }
-
-    const algorithm = token.header.alg;
-    const kid = token.header.kid;
-    if (algorithm !== "RS256" || typeof kid !== "string") {
-      // Only RS256, named explicitly: accepting whatever the header asks for is
-      // how a `none` algorithm gets through.
-      return false;
-    }
-
-    let keys: readonly JsonWebKey[];
-    try {
-      keys = await this.#signingKeys();
-    } catch {
-      // Microsoft unreachable. Refusing is the safe answer: the alternative is
-      // accepting an unverified activity while their endpoint is down.
-      return false;
-    }
-    const jwk = keys.find((one) => one.kid === kid);
-    if (jwk?.kty !== "RSA" || !jwk.n || !jwk.e) {
-      return false;
-    }
-
-    let verified = false;
-    try {
-      const key = createPublicKey({
-        key: { kty: "RSA", n: jwk.n, e: jwk.e },
-        format: "jwk",
-      });
-      verified = createVerify("RSA-SHA256")
-        .update(token.signed)
-        .verify(key, token.signature);
-    } catch {
-      return false;
-    }
-    if (!verified) {
-      return false;
-    }
-
-    const payload = token.payload;
-    if (typeof payload.iss !== "string" || !sameString(payload.iss, ISSUER)) {
-      return false;
-    }
-    if (
-      typeof payload.aud !== "string" ||
-      !sameString(payload.aud, this.#appId)
-    ) {
-      return false;
-    }
-    const expiry = typeof payload.exp === "number" ? payload.exp * 1000 : 0;
-    if (expiry <= this.#now().getTime()) {
-      return false;
-    }
-
-    const claimed = payload.serviceUrl;
-    const actual = serviceUrlOf(request.rawBody);
-    if (typeof claimed !== "string" || !actual) {
-      return false;
-    }
-    return sameString(
-      withoutTrailingSlashes(claimed),
-      withoutTrailingSlashes(actual),
-    );
+    const audience = await verifyTeamsToken(request, {
+      keys: this.#signingKeys,
+      now: this.#now,
+    });
+    return audience !== null && sameString(audience, this.#appId);
   }
 
   /**
@@ -530,6 +652,17 @@ export function stripMentions(text: string): string {
 /** The schema version every card below declares. */
 const ADAPTIVE_CARD_VERSION = "1.5";
 
+/** What an activity's attachment says it is when it carries a card. */
+const ADAPTIVE_CARD_TYPE = "application/vnd.microsoft.card.adaptive";
+
+/**
+ * What the check-in card's submit carries to say it is the check-in card.
+ *
+ * The same name Slack's modal uses as its `callback_id`, so the two forms are
+ * recognisably one thing in a log.
+ */
+const CHECK_IN_FORM = "openokr_check_in";
+
 /**
  * One message as an adaptive card (P5-T03b).
  *
@@ -606,10 +739,145 @@ export function toActivity(message: ChannelMessage): Record<string, unknown> {
     text: message.text,
     attachments: [
       {
-        contentType: "application/vnd.microsoft.card.adaptive",
+        contentType: ADAPTIVE_CARD_TYPE,
         content: toAdaptiveCard(message),
       },
     ],
+  };
+}
+
+/**
+ * The check-in form, as an adaptive card (AI-NATIVE-PLAN §5.3, completeness
+ * review M-23).
+ *
+ * §5.3 asks for "a modal on Slack and Teams". Slack's is `checkInView`; this is
+ * Teams' equivalent, the same three questions in METHOD.md §3.2's order in one
+ * card, so a member sees them all at once and can change an answer before
+ * sending. Both end in the one registry write the conversational path uses.
+ *
+ * **The key results are not on the form**, for the reason they are not on
+ * Slack's: a form that dropped a number somebody typed would be worse than
+ * one that never asked, and until both forms carry them the values stay with
+ * the conversational path and the browser.
+ *
+ * **The submit carries the goal.** Teams hands the answers back as an activity
+ * with no memory of which card they came from, so the card says so itself.
+ * Nothing is trusted from it: the write runs as the member who pressed it, and
+ * `can()` decides whether they may check that goal in.
+ *
+ * The words are English, as every chat message this product sends is today.
+ */
+export function checkInCard(input: {
+  readonly goalId: string;
+  readonly goalTitle: string;
+  readonly statuses: readonly string[];
+}): Record<string, unknown> {
+  return {
+    type: "AdaptiveCard",
+    $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+    version: ADAPTIVE_CARD_VERSION,
+    body: [
+      {
+        type: "TextBlock",
+        text: input.goalTitle,
+        weight: "Bolder",
+        wrap: true,
+      },
+      {
+        type: "Input.ChoiceSet",
+        id: "status",
+        label: "How is it going?",
+        style: "compact",
+        isRequired: true,
+        errorMessage: "Choose how it is going.",
+        choices: input.statuses.map((status) => ({
+          title: status.replace(/_/g, " "),
+          value: status,
+        })),
+      },
+      {
+        type: "Input.Number",
+        id: "confidence",
+        label: "How confident are you it lands, 0 to 10?",
+        min: 0,
+        max: 10,
+        isRequired: true,
+        errorMessage: "A number from 0 to 10.",
+      },
+      {
+        type: "Input.Text",
+        id: "narrative",
+        label: "One line on why",
+        isMultiline: true,
+        isRequired: true,
+        errorMessage: "Say a line about why.",
+      },
+    ],
+    actions: [
+      {
+        type: "Action.Submit",
+        title: "Publish",
+        data: { form: CHECK_IN_FORM, goal: input.goalId },
+      },
+    ],
+  };
+}
+
+/**
+ * Reads a submitted check-in card, or null when this activity is not one.
+ *
+ * Teams merges every input's answer into the activity's `value` beside the
+ * submit's own `data`, so `form` and `goal` are the card's markers and the rest
+ * are answers. Flattened to strings here because that is provider knowledge:
+ * a client may send a number input as a number, and `packages/core` should
+ * receive one answer per field in one shape, as it does from Slack.
+ *
+ * Only ever called on bytes `verifyInbound` has accepted.
+ */
+export function parseCardSubmission(payload: string): InboundSubmission | null {
+  let activity: Record<string, unknown>;
+  try {
+    activity = JSON.parse(payload) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (activity.type !== "message") {
+    return null;
+  }
+  const value = activity.value as Record<string, unknown> | undefined;
+  if (
+    !value ||
+    typeof value !== "object" ||
+    value.form !== CHECK_IN_FORM ||
+    typeof value.goal !== "string" ||
+    value.goal === ""
+  ) {
+    return null;
+  }
+  const conversation = activity.conversation as
+    | Record<string, unknown>
+    | undefined;
+  if (typeof conversation?.id !== "string" || conversation.id === "") {
+    return null;
+  }
+
+  const fields: Record<string, string> = {};
+  for (const [name, answer] of Object.entries(value)) {
+    if (name === "form" || name === "goal") {
+      continue;
+    }
+    if (typeof answer === "string") {
+      fields[name] = answer;
+    } else if (typeof answer === "number" && Number.isFinite(answer)) {
+      fields[name] = String(answer);
+    }
+  }
+
+  return {
+    provider: "teams",
+    externalSenderId: conversation.id,
+    reference: value.goal,
+    fields,
   };
 }
 

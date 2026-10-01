@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { NOTIFICATION_REASONS } from "@openokr/db";
 import { describe, expect, test } from "vitest";
+import { withMessages } from "./screen-text.ts";
 
 /**
  * The watch control reaches every subject that has a subscription list
@@ -66,7 +67,9 @@ describe("the watch control", () => {
     // §6.4's rule that a snooze never hides a review obligation, one layer
     // down: a member subscribed because they are the reviewer should not
     // discover later that they switched an obligation off.
-    expect(control).toContain("Turning this off does not remove the");
+    expect(withMessages(control)).toContain(
+      "Turning this off does not remove the",
+    );
     expect(control).toContain(
       'OBLIGATION = new Set(["review", "role", "check_in"])',
     );

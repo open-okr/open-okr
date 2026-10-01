@@ -57,6 +57,12 @@ services:
     environment:
       NODE_ENV: production
       OPENOKR_INSTANCE_NAME: ${OPENOKR_INSTANCE_NAME:-OpenOKR}
+      # The optional virus scan. Blank means no scan, which is the default;
+      # name a clamd this network can reach to hold every upload until it has
+      # been scanned. No scanner runs in this file: Postgres stays the only
+      # service the product needs.
+      OPENOKR_CLAMD_HOST: ${OPENOKR_CLAMD_HOST:-}
+      OPENOKR_CLAMD_PORT: ${OPENOKR_CLAMD_PORT:-3310}
     volumes:
       - storage:/app/storage
     expose:

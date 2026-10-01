@@ -17,9 +17,11 @@
  * the real run does not do.
  */
 import { randomUUID } from "node:crypto";
-import type { WorkspaceTx } from "@openokr/db";
+import { enqueueOutbox, type WorkspaceTx } from "@openokr/db";
 import { sql } from "drizzle-orm";
 import { generateStorageKey } from "../blobs/provisioning.ts";
+import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
+import { INDEX_TOPIC } from "../search/subjects.ts";
 import type { ReadArchiveResult } from "./archive.ts";
 import { EXPORTED_TABLES, isDeferred } from "./policy.ts";
 
@@ -279,6 +281,28 @@ function remapRow(
 
 // ── The import ────────────────────────────────────────────────────────────
 
+/**
+ * The tables whose rows the search index holds, by the entity type the index
+ * worker reads them as (completeness review M-31).
+ *
+ * An import writes rows straight into these tables rather than through the
+ * Operation pipeline's per-write enqueue, and `policy.ts` says the index is
+ * "rebuilt after load". Nothing rebuilt it, so a workspace moved between
+ * instances arrived with every goal, document and comment present and search
+ * returning nothing. The embedding index had the same gap.
+ */
+const INDEXED_TABLES: Readonly<Record<string, string>> = {
+  goals: "goal",
+  key_results: "key_result",
+  kpis: "kpi",
+  initiatives: "initiative",
+  tasks: "task",
+  documents: "document",
+  comments: "comment",
+  check_ins: "check_in",
+  okr_sessions: "session",
+};
+
 export async function importWorkspace(
   options: ImportWorkspaceOptions,
 ): Promise<ImportDifference> {
@@ -293,6 +317,8 @@ export async function importWorkspace(
 
   const created: Record<string, number> = {};
   const skipped: Record<string, number> = {};
+  // Rows this run actually wrote, per indexed table, for the enqueue at the end.
+  const written = new Map<string, string[]>();
   const deferredUpdates: {
     table: string;
     id: string;
@@ -393,6 +419,11 @@ export async function importWorkspace(
         await tx.execute(sql.raw(`RELEASE SAVEPOINT ${sp}`));
         if ((result.rowCount ?? 0) > 0) {
           tableCreated++;
+          if (table in INDEXED_TABLES) {
+            const ids = written.get(table) ?? [];
+            ids.push(remappedId);
+            written.set(table, ids);
+          }
         } else {
           tableSkipped++;
         }
@@ -420,6 +451,29 @@ export async function importWorkspace(
         sql`update ${sql.identifier(update.table)} set ${sql.identifier(update.column)} = ${update.value} where id = ${update.id}`,
       );
     }
+
+    // Rebuild the search and embedding projections for what arrived, through
+    // the outbox in this same transaction, which is the only way a write may
+    // cause a side effect. After the deferred pass, so the index worker reads
+    // each row with its parent pointers already set.
+    for (const [table, ids] of written) {
+      const entityType = INDEXED_TABLES[table] as string;
+      for (const entityId of ids) {
+        const payload = { workspaceId, entityType, entityId };
+        await enqueueOutbox(tx, {
+          topic: INDEX_TOPIC,
+          payload,
+          idempotencyKey: `${INDEX_TOPIC}:${entityType}:${entityId}:import:${randomUUID()}`,
+        });
+        if (isEmbeddableSubject(entityType)) {
+          await enqueueOutbox(tx, {
+            topic: EMBED_TOPIC,
+            payload,
+            idempotencyKey: `${EMBED_TOPIC}:${entityType}:${entityId}:import:${randomUUID()}`,
+          });
+        }
+      }
+    }
   }
 
   // Blob re-upload
@@ -446,9 +500,13 @@ export async function importWorkspace(
 
     const storageKey = generateStorageKey(workspaceId, row.filename);
     await options.storage.put(storageKey, bytes);
+    // The thumbnail key goes too (completeness review M-24). It named an
+    // object under the old workspace's prefix, the archive carries the file
+    // and not the preview made of it, and a restored image showing its type
+    // icon is better than one pointing across a tenant boundary.
     // openokr:allow-mutation: the calling Operation's own transaction.
     await tx.execute(
-      sql`update blobs set storage_key = ${storageKey} where id = ${remappedBlobId}`,
+      sql`update blobs set storage_key = ${storageKey}, thumbnail_key = null where id = ${remappedBlobId}`,
     );
   }
 

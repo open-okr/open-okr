@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "../../../packages/ui/src/styles/tokens.css";
+/* The editor's base rules, which TipTap would otherwise inject inline and the
+ * Content-Security-Policy refuses. In `base`, for the reason the block below
+ * gives: a utility on an editor must still be able to win. */
+@import "../../../packages/ui/src/styles/prosemirror.css" layer(base);
 
 /* packages/ui/src lives outside apps/web's own tree, so Tailwind v4's
  * automatic content detection (which scans relative to this file) never
@@ -26,5 +30,26 @@
 
   * {
     border-color: var(--color-line);
+  }
+}
+
+/* The first-visit tour's outline (UIUX-PLAN S-34, completeness review L-08).
+ *
+ * The tour card puts the stop it is showing on `<html>` as `data-tour-stop`,
+ * and each rule below outlines the thing that stop names. Here rather than in
+ * the components, so the sidebar, the top bar and the cycle strip do not have
+ * to know a tour exists; a stop whose thing is not on screen outlines nothing.
+ *
+ * The focus ring's own colour and width, because it is the one outline the
+ * design system already holds to §7's 3 to 1 on both themes. No animation, so
+ * there is nothing for reduced motion to switch off. */
+@layer components {
+  :root[data-tour-stop="work-map"] [data-tour-target="work-map"],
+  :root[data-tour-stop="review"] nav a[href="/review"],
+  :root[data-tour-stop="cycle-strip"] .cycle-strip,
+  :root[data-tour-stop="cycle-strip"] [data-tour-target="cycle-strip"],
+  :root[data-tour-stop="search"] .topbar-shell label:has(input[type="search"]) {
+    outline: 2px solid var(--color-brand-strong);
+    outline-offset: 3px;
   }
 }

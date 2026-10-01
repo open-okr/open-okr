@@ -33,7 +33,12 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
-import { archiveCycleInTx, feedForwardInTx } from "../cycles/archive.ts";
+import {
+  archiveCycleInTx,
+  closeCycleInTx,
+  feedForwardInTx,
+  feedFromClosedPredecessorInTx,
+} from "../cycles/archive.ts";
 import {
   cyclePeriodFor,
   formatLocalDate,
@@ -301,12 +306,13 @@ export const ensureCurrentCycle = defineWriteAction({
      * Which cadence's period to ensure, defaulting to the workspace's own
      * (P6-G14b).
      *
-     * **The default is the most recent cycle's cadence, and that surprised a
-     * caller.** A workspace that opens an annual cycle for §2.1's frame has an
-     * annual cycle as its most recent, so the next bare `ensureCurrent` builds
-     * the annual period containing today rather than the quarter. Phase 0's
-     * "send this into the quarter" wants a quarter whatever the frame did, and
-     * says so here instead of hoping.
+     * **The default used to be the most recent cycle's cadence, and that
+     * surprised a caller.** A workspace that opened an annual cycle for §2.1's
+     * frame had an annual cycle as its most recent, so the next bare
+     * `ensureCurrent` built the annual period containing today rather than the
+     * quarter. The default now reads the quarterly-mode cycles first
+     * (completeness review M-06), and phase 0's "send this into the quarter"
+     * still names the quarter, because it wants one whatever the frame did.
      */
     cadence: z.enum(CYCLE_CADENCES).optional(),
   }),
@@ -324,6 +330,12 @@ export const ensureCurrentCycle = defineWriteAction({
         timeZone,
         now: new Date(),
       });
+      // §8.9's inheritance, when the cycle before this one closed with nowhere
+      // to send it (M-05). Only on creation: a cycle that already existed was
+      // either fed at that close or has nothing waiting for it.
+      const inherited = ensured.created
+        ? await feedFromClosedPredecessorInTx(tx, workspaceId, ensured.id)
+        : null;
       const [row] = await tx
         .select(CYCLE_COLUMNS)
         .from(cycles)
@@ -338,13 +350,27 @@ export const ensureCurrentCycle = defineWriteAction({
           kind: ensured.created ? "cycle.created" : "cycle.resolved",
           subjectType: "cycle",
           subjectId: ensured.id,
-          payload: { name: ensured.name },
+          payload: {
+            name: ensured.name,
+            ...(inherited ? { inheritedFrom: inherited.fromName } : {}),
+          },
         },
         audit: {
           action: "cycles.ensureCurrent",
           targetType: "cycle",
           targetId: ensured.id,
-          payload: { name: ensured.name, created: ensured.created },
+          payload: {
+            name: ensured.name,
+            created: ensured.created,
+            ...(inherited
+              ? {
+                  inheritedFrom: inherited.fromCycleId,
+                  priorScores: inherited.result.priorScores,
+                  issues: inherited.result.issues,
+                  processPriority: inherited.result.processPriority,
+                }
+              : {}),
+          },
         },
       };
     },
@@ -358,6 +384,18 @@ export const createCycle = defineWriteAction({
     /** A date inside the period to create, not the period's own start. */
     on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     cadence: z.enum(CYCLE_CADENCES).optional(),
+    /**
+     * Which of METHOD.md §2.1's two horizons to create, when no cadence is
+     * named (completeness review M-06).
+     *
+     * The cycle screen asks for a horizon, not a cadence: "the annual cycle
+     * containing this date" or "the quarterly one". Annual has one cadence,
+     * and the quarterly horizon takes whichever the workspace already
+     * practises, so a workspace running half-years gets a half-year. A
+     * cadence and a mode that disagree are refused rather than one of them
+     * being quietly ignored.
+     */
+    mode: z.enum(["annual", "quarterly"]).optional(),
     firstCycle: z.boolean().default(false),
     sponsorId: z.uuid().nullable().optional(),
     facilitatorId: z.uuid().nullable().optional(),
@@ -382,8 +420,19 @@ export const createCycle = defineWriteAction({
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       await assertLegacyKeyFree(tx, workspaceId, cycles, input.legacy, "cycle");
+      if (
+        input.cadence &&
+        input.mode &&
+        (input.cadence === "annual") !== (input.mode === "annual")
+      ) {
+        throw new OperationError(
+          "forbidden",
+          `A ${input.cadence} cadence does not make a ${input.mode} cycle. Name one or the other.`,
+        );
+      }
       const cadence =
-        input.cadence ?? (await resolveWorkspaceCadence(tx, workspaceId));
+        input.cadence ??
+        (await resolveWorkspaceCadence(tx, workspaceId, input.mode));
       const period = cyclePeriodFor(cadence, parseLocalDate(input.on));
       const timeZone = await workspaceTimeZone(tx, workspaceId);
       const created = await createCycleInTx(tx, {
@@ -398,6 +447,14 @@ export const createCycle = defineWriteAction({
         ...(input.name ? { name: input.name } : {}),
         ...(input.legacy ? { legacy: input.legacy } : {}),
       });
+      // The same inheritance `cycles.ensureCurrent` hands on (M-05). Creating
+      // next quarter after this one closed is the order §8.10 asks for, so it
+      // is the usual way the feed-forward lands.
+      const inherited = await feedFromClosedPredecessorInTx(
+        tx,
+        workspaceId,
+        created.id,
+      );
       const [row] = await tx
         .select(CYCLE_COLUMNS)
         .from(cycles)
@@ -412,7 +469,10 @@ export const createCycle = defineWriteAction({
           kind: "cycle.created",
           subjectType: "cycle",
           subjectId: created.id,
-          payload: { name: created.name },
+          payload: {
+            name: created.name,
+            ...(inherited ? { inheritedFrom: inherited.fromName } : {}),
+          },
         },
         audit: {
           action: "cycles.create",
@@ -422,6 +482,14 @@ export const createCycle = defineWriteAction({
             name: created.name,
             startsOn: created.startsOn,
             endsOn: created.endsOn,
+            ...(inherited
+              ? {
+                  inheritedFrom: inherited.fromCycleId,
+                  priorScores: inherited.result.priorScores,
+                  issues: inherited.result.issues,
+                  processPriority: inherited.result.processPriority,
+                }
+              : {}),
           },
         },
       };
@@ -1202,6 +1270,12 @@ export const setAnnualFrame = defineWriteAction({
  * which METHOD.md §8.9 calls archiving and the plan calls the archive job. Two
  * different acts cannot share one verb, so the newer one is named for what it
  * writes.
+ *
+ * **`cycles.close` runs this as part of the close** (M-05), so no screen calls
+ * it any more. It stays for the two callers that record a result without
+ * closing: the demo builder, whose previous quarter has no retrospective, and
+ * a re-run from the API before the close. It refuses a closed cycle, whose
+ * result was fixed when it closed.
  */
 export const snapshotCycle = defineWriteAction({
   name: "cycles.snapshot",
@@ -1327,22 +1401,33 @@ export const readScorecard = defineReadAction({
   },
 });
 
+const feedForwardOutput = z.object({
+  priorScores: z.number().int(),
+  issues: z.number().int(),
+  frameCarried: z.boolean(),
+  /** Rows of the mapping this build cannot fill, each naming its task. Empty since P4-T12-b. */
+  waiting: z.array(z.string()),
+  /**
+   * The process-health statement the next cycle now holds as a Phase 3
+   * priority, or null when the survey went unanswered (M-05).
+   */
+  processPriority: z.string().nullable(),
+  /** Whether the learnings reached the next cycle's input pack. */
+  packNote: z.boolean(),
+});
+
+/**
+ * **`cycles.close` feeds the next cycle itself** (M-05), and creating a cycle
+ * after a close feeds it too, so no screen calls this any more. It stays as an
+ * idempotent re-run for the API and the command line: running it again adds
+ * nothing that is already there.
+ */
 export const feedForwardCycle = defineWriteAction({
   name: "cycles.feedForward",
   summary:
-    "Hands METHOD.md §8.9's inheritance to the next cycle: prior scores, carried work as issues at impact four, and the annual frame.",
+    "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
   input: z.object({ fromCycleId: z.uuid(), toCycleId: z.uuid() }),
-  output: z.object({
-    priorScores: z.number().int(),
-    issues: z.number().int(),
-    frameCarried: z.boolean(),
-    /** Rows of the mapping this build cannot fill, each naming its task. Empty since P4-T12-b. */
-    waiting: z.array(z.string()),
-    /** Whether the lowest process-health statement became an issue. */
-    processHealthIssue: z.boolean(),
-    /** Whether the learnings reached the next cycle's input pack. */
-    packNote: z.boolean(),
-  }),
+  output: feedForwardOutput,
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
@@ -1371,6 +1456,95 @@ export const feedForwardCycle = defineWriteAction({
             from: input.fromCycleId,
             priorScores: result.priorScores,
             issues: result.issues,
+          },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Closes a cycle (METHOD.md §2.2 phase 7, §8.9; completeness review M-05).
+ *
+ * §8.9: "At close, the product feeds the next cycle automatically." One
+ * Operation records the archive, marks the cycle closed and feeds the next
+ * cycle of the same mode when it exists. Refused until phase 7 is complete,
+ * with the reason; `closeCycleInTx` says why there is no override.
+ *
+ * `full`, the same as publishing: closing is the other end of the act that
+ * publication starts, and it fixes the result the scorecard will show for good.
+ * Not destructive in the registry's sense, because nothing a person can see is
+ * removed.
+ */
+export const closeCycle = defineWriteAction({
+  name: "cycles.close",
+  summary:
+    "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.object({
+    cycleId: z.uuid(),
+    snapshots: z.number().int(),
+    resultValue: z.number().nullable(),
+    verdict: z.string().nullable(),
+    /** The cycle fed at close, or null when the next one does not exist yet. */
+    fedInto: feedForwardOutput
+      .extend({ cycleId: z.uuid(), name: z.string() })
+      .nullable(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
+      const closed = await closeCycleInTx(
+        tx,
+        workspaceId,
+        input.cycleId,
+        rhythm.thresholds,
+      );
+      const fedInto = closed.fedInto
+        ? {
+            cycleId: closed.fedInto.cycleId,
+            name: closed.fedInto.name,
+            ...closed.fedInto.result,
+            waiting: [...closed.fedInto.result.waiting],
+          }
+        : null;
+      return {
+        result: {
+          cycleId: input.cycleId,
+          snapshots: closed.archive.snapshots,
+          resultValue: closed.archive.resultValue,
+          verdict: closed.archive.verdict,
+          fedInto,
+        },
+        activity: {
+          kind: "cycle.closed" as const,
+          subjectType: "cycle" as const,
+          subjectId: input.cycleId,
+          payload: {
+            name: closed.name,
+            verdict: closed.archive.verdict,
+            fedInto: closed.fedInto?.name ?? null,
+          },
+        },
+        audit: {
+          action: "cycles.close",
+          targetType: "cycle",
+          targetId: input.cycleId,
+          payload: {
+            name: closed.name,
+            snapshots: closed.archive.snapshots,
+            resultValue: closed.archive.resultValue,
+            verdict: closed.archive.verdict,
+            fedInto: fedInto
+              ? {
+                  cycleId: fedInto.cycleId,
+                  priorScores: fedInto.priorScores,
+                  issues: fedInto.issues,
+                  processPriority: fedInto.processPriority,
+                  packNote: fedInto.packNote,
+                }
+              : null,
           },
         },
       };

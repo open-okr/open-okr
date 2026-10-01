@@ -45,4 +45,17 @@ describe("RichTextEditor", () => {
     });
     expect(container.querySelector('[contenteditable="false"]')).toBeTruthy();
   });
+
+  /**
+   * Completeness review L-22. The element TipTap would add is exactly what the
+   * Content-Security-Policy refuses, so it must never be added; the rules it
+   * carried are in `styles/prosemirror.css`.
+   */
+  test("adds no inline style element for the policy to refuse", async () => {
+    const { container } = render(<RichTextEditor content={SIMPLE_DOC} />);
+    await waitFor(() => {
+      expect(container.querySelector('[contenteditable="true"]')).toBeTruthy();
+    });
+    expect(document.head.querySelector("style[data-tiptap-style]")).toBeNull();
+  });
 });

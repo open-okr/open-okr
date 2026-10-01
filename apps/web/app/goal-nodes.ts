@@ -18,24 +18,32 @@ import type { MapNode } from "./work-map.tsx";
  * questions, one row shape.
  */
 
+/** The translate function a server page already holds. */
+type Translate = (
+  key: string,
+  values?: Readonly<Record<string, string | number>>,
+) => string;
+
 type Goal = Awaited<
   ReturnType<typeof callAction<"goals.list">>
 >["goals"][number];
 
 /** What happens next on this goal, in the words the cadence already uses. */
-function nextStepFor(goal: Goal): string {
+function nextStepFor(t: Translate, goal: Goal): string {
   if (goal.closedAt) {
-    return `closed · ${goal.successStatus ?? "no outcome"}`;
+    return goal.successStatus
+      ? t("goalNodes.closed", { outcome: goal.successStatus })
+      : t("goalNodes.closedNoOutcome");
   }
   if (goal.daysPastDue !== null && goal.daysPastDue > 0) {
-    return `check-in ${goal.daysPastDue} day${
-      goal.daysPastDue === 1 ? "" : "s"
-    } overdue`;
+    return goal.daysPastDue === 1
+      ? t("goalNodes.checkInOverdueOne", { count: goal.daysPastDue })
+      : t("goalNodes.checkInOverdueOther", { count: goal.daysPastDue });
   }
   if (goal.nextCheckInOn) {
-    return `check in by ${goal.nextCheckInOn}`;
+    return t("goalNodes.checkInBy", { date: goal.nextCheckInOn });
   }
-  return "no cadence set";
+  return t("goalNodes.noCadence");
 }
 
 /**
@@ -46,6 +54,7 @@ function nextStepFor(goal: Goal): string {
  * to be a chip in a card that no longer exists.
  */
 export function mapNodesFor(
+  t: Translate,
   goal: Goal,
   depth: number,
   note?: string,
@@ -72,9 +81,12 @@ export function mapNodesFor(
           : confidences.reduce((sum, value) => sum + value, 0) /
             confidences.length,
       timeframe: goal.timeframe
-        ? `${goal.timeframe.startsOn} to ${goal.timeframe.endsOn}`
+        ? t("goalNodes.timeframe", {
+            startsOn: goal.timeframe.startsOn,
+            endsOn: goal.timeframe.endsOn,
+          })
         : null,
-      nextStep: nextStepFor(goal),
+      nextStep: nextStepFor(t, goal),
       goalId: goal.id,
       keyResultId: null,
       currentValue: null,
@@ -96,9 +108,16 @@ export function mapNodesFor(
       progressPct: keyResult.progressPct,
       confidence: keyResult.confidence,
       timeframe: keyResult.dueOn,
-      nextStep: `${keyResult.currentValue} of ${keyResult.targetValue}${
-        keyResult.unit ? ` ${keyResult.unit}` : ""
-      }`,
+      nextStep: keyResult.unit
+        ? t("goalNodes.progressWithUnit", {
+            current: keyResult.currentValue,
+            target: keyResult.targetValue,
+            unit: keyResult.unit,
+          })
+        : t("goalNodes.progress", {
+            current: keyResult.currentValue,
+            target: keyResult.targetValue,
+          }),
       goalId: goal.id,
       keyResultId: keyResult.id,
       currentValue: keyResult.currentValue,
@@ -107,4 +126,51 @@ export function mapNodesFor(
   }
 
   return rows;
+}
+
+/**
+ * The whole set as a tree: parents before children, key results under the
+ * goal that owns them.
+ *
+ * A goal whose parent is not in the set is drawn at the root rather than
+ * dropped, the same way the explorer treats one: a tree that silently omits
+ * work is worse than one that shows it at the wrong indent. Here rather than
+ * in the Work Map's page since completeness review M-22, because the space
+ * home draws a space's goals as the same tree and a second copy would drift.
+ */
+export function goalTreeNodes(t: Translate, goals: readonly Goal[]): MapNode[] {
+  const present = new Set(goals.map((goal) => goal.id));
+  const childrenOf = new Map<string, Goal[]>();
+  const roots: Goal[] = [];
+  for (const goal of goals) {
+    const parent = goal.parentGoalId;
+    if (parent && present.has(parent)) {
+      const siblings = childrenOf.get(parent);
+      if (siblings) {
+        siblings.push(goal);
+      } else {
+        childrenOf.set(parent, [goal]);
+      }
+    } else {
+      roots.push(goal);
+    }
+  }
+
+  const out: MapNode[] = [];
+  const seen = new Set<string>();
+  const walk = (goal: Goal, depth: number): void => {
+    if (seen.has(goal.id)) {
+      // Unreachable through the interface, reachable through a bad import.
+      return;
+    }
+    seen.add(goal.id);
+    out.push(...mapNodesFor(t, goal, depth));
+    for (const child of childrenOf.get(goal.id) ?? []) {
+      walk(child, depth + 1);
+    }
+  };
+  for (const root of roots) {
+    walk(root, 0);
+  }
+  return out;
 }

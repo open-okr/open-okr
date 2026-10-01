@@ -1,8 +1,11 @@
 import {
   ACCESS_LEVELS,
+  ASSIST_FEATURE_KEYS,
   callAction,
   excerptRichText,
   OperationError,
+  REVIEW_ASSIST_KEYS,
+  THREAD_SUMMARY_MINIMUM,
 } from "@openokr/core";
 import type { ResolvedThresholds } from "@openokr/method";
 import {
@@ -14,16 +17,25 @@ import {
   Chip,
   formatMeasure,
 } from "@openokr/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { assistOffered } from "../../../lib/assists";
+import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
+import { readConversation } from "../../../lib/conversation.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { readKpiOptions } from "../../../lib/kpi-options.ts";
+import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
-import { SubjectDocuments } from "../../documents/subject-documents.tsx";
+import {
+  readSubjectDocuments,
+  SubjectDocuments,
+} from "../../documents/subject-documents.tsx";
 import {
   closeGoal,
   editGoal,
@@ -32,10 +44,12 @@ import {
   reopenGoal,
 } from "./actions.ts";
 import { CoachStrip } from "./coach-strip";
-import { GoalComments } from "./goal-comments.tsx";
+import { DecomposeKeyResult } from "./decompose.tsx";
 import { GoalWrites } from "./goal-writes.tsx";
 import { Rail } from "./rail.tsx";
+import { RetrospectiveField } from "./retrospective-field.tsx";
 import { Sparkline } from "./sparkline.tsx";
+import { ThreadSummary } from "./thread-summary.tsx";
 
 /**
  * A goal (UIUX-PLAN.md §4 S-14, P3-T04).
@@ -179,51 +193,69 @@ export default async function GoalPage({
   // this page does.
   // Documents on this goal. The query has already dropped anybody else's
   // draft, so this list is safe to render as it comes (P5-T12).
-  const documents = (
-    await callAction(context, "documents.list", {
-      subjectType: "goal",
-      subjectId: id,
-    })
-  ).map((document) => ({
-    id: document.id,
-    title: document.title,
-    state: document.state,
-    authorName: document.authorName,
-    versionCount: document.versionCount,
-    updatedAt: document.updatedAt,
-  }));
+  const documents = await readSubjectDocuments(context, "goal", id);
 
-  const comments = await callAction(context, "comments.list", {
+  const conversation = await readConversation(context, "goal", id);
+
+  // The files on this goal (completeness review M-01). `attachments.attach`
+  // took a goal from the start; the panel was only ever mounted elsewhere.
+  const attachments = await callAction(context, "attachments.list", {
     subjectType: "goal",
     subjectId: id,
   });
-  // One read per comment. A thread is small, and the alternative is a batched
-  // read nobody has needed yet; if a goal ever carries hundreds of comments,
-  // that is the moment to add one rather than now.
-  const reactions = new Map<
-    string,
-    {
-      emoji: string;
-      count: number;
-      own: boolean;
-      ownReactionId: string | null;
-    }[]
-  >();
-  for (const comment of comments) {
-    const groups = await callAction(context, "reactions.list", {
-      subjectType: "comment",
-      subjectId: comment.id,
-    });
-    reactions.set(
-      comment.id,
-      groups.map((group) => ({
-        emoji: group.emoji,
-        count: group.count,
-        own: group.own,
-        ownReactionId: group.ownReactionId,
-      })),
-    );
-  }
+
+  // Key results measured by hand, which the writes card can link to a KPI
+  // (M-07). Offered on the same terms as the value form: an editor, on a goal
+  // that is still open. The KPI list is read only when there is something to
+  // link, so a goal page with nothing to offer pays nothing for it.
+  const unlinkedKeyResults =
+    canEdit && !closed
+      ? goal.keyResults
+          .filter((keyResult) => keyResult.kpiId === null)
+          .map((keyResult) => ({ id: keyResult.id, title: keyResult.title }))
+      : [];
+  const kpiOptions =
+    unlinkedKeyResults.length > 0 ? await readKpiOptions(context) : [];
+
+  // The assists this page can offer (completeness review M-09), each asked
+  // whether a provider may run it here and each only where it has something
+  // to work on. With AI off all three are false and the page is what it was.
+  // The draft retrospective and the decomposition are for somebody who may
+  // change this goal; the thread summary is for anybody who may read it.
+  const open = canEdit && !closed;
+  const [retrospectiveOffered, threadSummaryOffered, decomposeOffered] =
+    await Promise.all([
+      open
+        ? assistOffered(
+            workspace.workspaceId,
+            REVIEW_ASSIST_KEYS.draftRetrospective,
+            "balanced",
+            session.user.id,
+          )
+        : false,
+      conversation.comments.length >= THREAD_SUMMARY_MINIMUM
+        ? assistOffered(
+            workspace.workspaceId,
+            ASSIST_FEATURE_KEYS.summariseThread,
+            "balanced",
+            session.user.id,
+          )
+        : false,
+      open && goal.keyResults.length > 0
+        ? assistOffered(
+            workspace.workspaceId,
+            ASSIST_FEATURE_KEYS.decomposeKeyResult,
+            "deep",
+            session.user.id,
+          )
+        : false,
+    ]);
+  const workSpaces = decomposeOffered
+    ? (await callAction(context, "spaces.list", {})).map((space) => ({
+        id: space.id,
+        name: space.name,
+      }))
+    : [];
 
   const cycles = await callAction(context, "cycles.list", {});
   const cycleEndsOn =
@@ -251,7 +283,9 @@ export default async function GoalPage({
             </div>
             <Chip tone={closed ? "neutral" : "brand"}>
               {closed
-                ? `closed · ${goal.successStatus}`
+                ? t("goals.detail.closedStatus", {
+                    status: String(goal.successStatus),
+                  })
                 : goal.health.replace("_", " ")}
             </Chip>
             <WatchControl subjectType="goal" subjectId={id} initial={watch} />
@@ -269,13 +303,21 @@ export default async function GoalPage({
             </div>
             {goal.nextCheckInOn ? (
               <p className="text-xs text-ink-3">
-                {t("goals.detail.nextCheckInDue", {
-                  nextCheckInOn: goal.nextCheckInOn,
-                  overdue:
-                    goal.daysPastDue !== null && goal.daysPastDue > 0
-                      ? ` · ${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
-                      : "",
-                })}
+                {goal.daysPastDue !== null && goal.daysPastDue > 0
+                  ? t("goals.detail.nextCheckInDueOverdue", {
+                      date: goal.nextCheckInOn,
+                      days:
+                        goal.daysPastDue === 1
+                          ? t("common.count.dayOne", {
+                              count: goal.daysPastDue,
+                            })
+                          : t("common.count.dayOther", {
+                              count: goal.daysPastDue,
+                            }),
+                    })
+                  : t("goals.detail.nextCheckInDueOn", {
+                      date: goal.nextCheckInOn,
+                    })}
               </p>
             ) : (
               <p className="text-xs text-ink-3">
@@ -284,7 +326,7 @@ export default async function GoalPage({
             )}
             <p className="text-xs text-ink-3">
               {goal.contributionStatement ??
-                "No parent and no contribution statement, so publish gate 3 is red."}
+                t("goals.detail.noParentNoContribution")}
             </p>
             {goal.progressPct === 0 ? (
               <p className="text-xs text-ink-4">
@@ -357,11 +399,31 @@ export default async function GoalPage({
                         target={keyResult.targetValue}
                         horizonAt={horizonFor(keyResult.dueOn)}
                       />
+                      {decomposeOffered ? (
+                        <DecomposeKeyResult
+                          goalId={goal.id}
+                          keyResultId={keyResult.id}
+                          keyResultTitle={keyResult.title}
+                          spaces={workSpaces}
+                          defaultSpaceId={goal.spaceId}
+                        />
+                      ) : null}
                     </span>
                     <span className="flex flex-none flex-col items-end gap-1">
                       <span className="text-sm font-bold text-ink">
                         {formatMeasure(keyResult.currentValue, keyResult.unit)}
                       </span>
+                      {/* The work behind this measure, as a board (M-02): the
+                          tasks that name it and its initiatives' tasks. */}
+                      <Link
+                        href={`/board?keyResult=${keyResult.id}`}
+                        aria-label={t("goals.detail.workBoardFor", {
+                          title: keyResult.title,
+                        })}
+                        className="text-xs font-semibold text-brand-text hover:underline"
+                      >
+                        {t("goals.detail.workBoard")}
+                      </Link>
                       {canEdit && !closed && keyResult.kpiId === null ? (
                         <ActionForm
                           action={recordValue}
@@ -594,7 +656,7 @@ export default async function GoalPage({
             <CardBody className="flex flex-col gap-1.5">
               <p className="text-sm text-ink-2">
                 {excerptRichText(goal.retrospective.body as never, 2000) ||
-                  "Written, but empty."}
+                  t("goals.detail.writtenButEmpty")}
               </p>
               <p className="text-xs text-ink-4">
                 {t("goals.detail.keptWhetherTheGoal")}
@@ -607,7 +669,7 @@ export default async function GoalPage({
           <Card>
             <CardHeader>
               <h2 className="text-sm font-bold text-ink">
-                {closed ? "Reopen" : "Close"}
+                {closed ? t("goals.detail.reopen") : t("shell.shortcuts.close")}
               </h2>
             </CardHeader>
             <CardBody>
@@ -668,16 +730,9 @@ export default async function GoalPage({
                       className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
                     />
                   </div>
-                  <label className="sr-only" htmlFor="close-retrospective">
-                    {t("goals.detail.theRetrospective")}
-                  </label>
-                  <textarea
-                    id="close-retrospective"
-                    name="retrospective"
-                    rows={4}
-                    required
-                    placeholder={t("goals.detail.whatHappenedAndWhat")}
-                    className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  <RetrospectiveField
+                    goalId={goal.id}
+                    offered={retrospectiveOffered}
                   />
                   <Button
                     type="submit"
@@ -699,14 +754,21 @@ export default async function GoalPage({
           canEdit={canEdit}
         />
 
+        <Attachments
+          subjectType="goal"
+          subjectId={id}
+          attachments={attachments}
+          canEdit={canEdit}
+        />
+
         <Card>
-          <CardBody>
-            <GoalComments
-              goalId={id}
-              comments={comments.map((comment) => ({
-                ...comment,
-                reactions: reactions.get(comment.id) ?? [],
-              }))}
+          <CardBody className="flex flex-col gap-3">
+            {threadSummaryOffered ? <ThreadSummary goalId={id} /> : null}
+            <SubjectComments
+              subjectType="goal"
+              subjectId={id}
+              comments={conversation.comments}
+              reactions={conversation.reactions}
               currentMemberId={workspace.memberId}
             />
           </CardBody>
@@ -727,6 +789,8 @@ export default async function GoalPage({
               id: keyResult.id,
               title: keyResult.title,
             }))}
+          unlinkedKeyResults={unlinkedKeyResults}
+          kpis={kpiOptions}
           canAdminister={canAdminister}
         />
 
@@ -744,7 +808,7 @@ export default async function GoalPage({
          */}
         <FeedPanel
           title={t("common.activity")}
-          explains="What has happened to this goal, its key results and its check-ins, newest first."
+          explains={t("goals.detail.feedExplains")}
           items={feedItems}
           names={feedNames}
           timeZone={String(feedSettings.settings.timezone ?? "UTC")}

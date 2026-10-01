@@ -23,8 +23,13 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type CsvTable, toCsv } from "../exports/csv.ts";
 
-/** What an auditor narrows the trail by. */
-export interface AuditExportFilter {
+/**
+ * What an auditor narrows the trail by.
+ *
+ * One shape for the file and for the screen (completeness review L-19), so a
+ * filter somebody browsed with is the filter the export takes, row for row.
+ */
+export interface AuditFilter {
   /** Inclusive, on the recorded time. */
   readonly from?: Date;
   /** Inclusive, on the recorded time. */
@@ -37,6 +42,9 @@ export interface AuditExportFilter {
   readonly targetType?: string;
   /** One target, by id. */
   readonly targetId?: string;
+}
+
+export interface AuditExportFilter extends AuditFilter {
   /**
    * How many rows at most.
    *
@@ -67,18 +75,16 @@ export interface AuditExport {
 }
 
 /**
- * The rows one filter matches, oldest first.
+ * The where clauses one filter asks for, the workspace always among them.
  *
- * Sequence order rather than time order, because the chain is defined on the
- * sequence and two rows can share a timestamp. Rows with no position yet sort
- * last, which is where they belong: they are the tail the chainer has not
- * reached.
+ * Shared by the export and the screen's list (completeness review L-19), so
+ * the rows somebody browsed and the rows the file then carries are chosen by
+ * the same code rather than by two readings of one filter.
  */
-export async function exportAuditRows(
-  pool: Pool,
+export function auditFilterClauses(
   workspaceId: string,
-  filter: AuditExportFilter,
-): Promise<AuditExport> {
+  filter: AuditFilter,
+): SQL[] {
   // **The workspace is named here as well as in the tenant setting.** The
   // floor is the floor, not the only scope: a connection that bypasses
   // row-level security would otherwise hand an export one workspace asked for
@@ -103,11 +109,28 @@ export async function exportAuditRows(
   if (filter.targetId) {
     clauses.push(eq(auditEvents.targetId, filter.targetId));
   }
+  return clauses;
+}
+
+/**
+ * The rows one filter matches, oldest first.
+ *
+ * Sequence order rather than time order, because the chain is defined on the
+ * sequence and two rows can share a timestamp. Rows with no position yet sort
+ * last, which is where they belong: they are the tail the chainer has not
+ * reached.
+ */
+export async function exportAuditRows(
+  pool: Pool,
+  workspaceId: string,
+  filter: AuditExportFilter,
+): Promise<AuditExport> {
+  const clauses = auditFilterClauses(workspaceId, filter);
 
   // One more than asked for, so "there were more" is an answer rather than a
   // guess from a full page.
-  const rows = await withWorkspace(drizzle(pool), workspaceId, (tx) => {
-    const query = tx
+  const rows = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+    tx
       .select({
         seq: auditEvents.seq,
         at: auditEvents.at,
@@ -121,10 +144,10 @@ export async function exportAuditRows(
         rowHash: auditEvents.rowHash,
       })
       .from(auditEvents)
+      .where(and(...clauses))
       .orderBy(asc(auditEvents.seq), asc(auditEvents.at))
-      .limit(filter.limit + 1);
-    return clauses.length > 0 ? query.where(and(...clauses)) : query;
-  });
+      .limit(filter.limit + 1),
+  );
 
   return {
     rows: rows.slice(0, filter.limit).map((row) => ({

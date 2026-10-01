@@ -303,6 +303,34 @@ describe("ensuring the current cycle", () => {
     );
     expect(all).toHaveLength(1);
   });
+
+  it("answers the quarter even once next year's annual cycle is the newest", async () => {
+    // Completeness review M-06. An annual cycle is §2.1's second horizon, not
+    // a change of rhythm, and the default read the newest cycle only: opening
+    // next year's frame made the next bare call build the annual period
+    // containing today instead of finding the quarter.
+    const wb = await workerDb();
+    const quarter = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    const nextYear = new Date().getUTCFullYear() + 1;
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "cycles.create", {
+      on: `${nextYear}-06-30`,
+      mode: "annual",
+      firstCycle: false,
+    });
+
+    const ensured = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.ensureCurrent",
+      {},
+    );
+    expect(ensured.created).toBe(false);
+    expect(ensured.id).toBe(quarter?.id);
+    expect(ensured.mode).toBe("quarterly");
+  });
 });
 
 describe("creating a cycle by hand", () => {
@@ -357,6 +385,91 @@ describe("creating a cycle by hand", () => {
       },
     );
     expect(created.publicationDeadline).toBe("2027-03-25");
+  });
+
+  it("creates the annual cycle when the annual horizon is asked for", async () => {
+    // Completeness review M-06: the cycle screen asks for a horizon, and
+    // before `mode` existed the browser could only ever make the quarter.
+    const wb = await workerDb();
+    const created = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.create",
+      { on: "2027-05-14", mode: "annual", firstCycle: false },
+    );
+    expect(created.name).toBe("2027");
+    expect(created.mode).toBe("annual");
+    expect(created.cadence).toBe("annual");
+    expect(created.startsOn).toBe("2027-01-01");
+    expect(created.endsOn).toBe("2027-12-31");
+    // §2.2: phase 0 runs only in an annual cycle, and it is where one starts.
+    expect(created.phase).toBe(0);
+  });
+
+  it("keeps making quarters once an annual cycle is the newest", async () => {
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "cycles.create", {
+      on: "2027-05-14",
+      mode: "annual",
+      firstCycle: false,
+    });
+    const next = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.create",
+      { on: "2027-08-10", firstCycle: false },
+    );
+    expect(next.name).toBe("Q3 2027");
+    expect(next.mode).toBe("quarterly");
+  });
+
+  it("makes a quarter when asked, even in a workspace that has only years", async () => {
+    // A workspace imported with annual cycles alone practises an annual
+    // cadence, and a bare call keeps it. Asking for the quarterly horizon is
+    // how its first quarter is made, and the fallback cadence answers.
+    const wb = await workerDb();
+    const provisioned = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.archive",
+      {
+        id: provisioned?.id as string,
+      },
+    );
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "cycles.create", {
+      on: "2027-05-14",
+      mode: "annual",
+      firstCycle: false,
+    });
+
+    const bare = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.create",
+      { on: "2028-03-01", firstCycle: false },
+    );
+    expect(bare.mode).toBe("annual");
+
+    const quarter = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.create",
+      { on: "2027-08-10", mode: "quarterly", firstCycle: false },
+    );
+    expect(quarter.name).toBe("Q3 2027");
+    expect(quarter.cadence).toBe("quarterly");
+  });
+
+  it("refuses a cadence and a mode that disagree, rather than picking one", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction({ pool: wb.appPool, ...context(OWNER) }, "cycles.create", {
+        on: "2027-05-14",
+        cadence: "annual",
+        mode: "quarterly",
+        firstCycle: false,
+      }),
+    ).rejects.toThrow(/does not make a quarterly cycle/i);
   });
 });
 
@@ -922,10 +1035,12 @@ describe("frame.annualObjectives (P6-G14b)", () => {
         weight: 1,
       },
     );
-    // Named, not inferred. `ensureCurrent` defaults to the most recent
-    // cycle's cadence, and the annual cycle above is now the most recent, so a
-    // bare call here builds the annual period containing today. That is what
-    // this test caught, and `sendForward` had the same bug.
+    // Named, not inferred. `ensureCurrent` used to default to the most recent
+    // cycle's cadence, and the annual cycle above is the most recent, so a
+    // bare call here built the annual period containing today. That is what
+    // this test caught, and `sendForward` had the same bug. The default reads
+    // the quarterly-mode cycles first since M-06; the name stays, because a
+    // caller that wants a quarter should say so.
     const quarter = await callAction(
       { pool: wb.appPool, ...context(OWNER) },
       "cycles.ensureCurrent",

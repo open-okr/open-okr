@@ -1,7 +1,9 @@
 import { endSupportSession, liveSupportSession } from "@openokr/core";
+import type { MessageValues } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./pool";
 import { requireSession } from "./session";
+import { getTranslations } from "./translations";
 
 /**
  * Somebody from outside the organisation is in this workspace right now
@@ -50,17 +52,25 @@ async function revoke(formData: FormData): Promise<void> {
 }
 
 /** Whole hours and minutes, because "in 3h 20m" is what somebody asks. */
-function remaining(until: Date): string {
+function remaining(
+  t: (key: string, values?: MessageValues) => string,
+  until: Date,
+): string {
   const ms = new Date(until).getTime() - Date.now();
   if (ms <= 0) {
-    return "less than a minute";
+    return t("lib.supportBanner.lessThanAMinute");
   }
   const minutes = Math.floor(ms / 60000);
   const hours = Math.floor(minutes / 60);
   if (hours === 0) {
-    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+    return minutes === 1
+      ? t("common.count.minuteOne", { count: minutes })
+      : t("common.count.minuteOther", { count: minutes });
   }
-  return `${hours}h ${minutes % 60}m`;
+  return t("lib.supportBanner.hoursAndMinutes", {
+    hours,
+    minutes: minutes % 60,
+  });
 }
 
 export async function SupportBanner({
@@ -72,6 +82,7 @@ export async function SupportBanner({
   if (!live?.expiresAt) {
     return null;
   }
+  const { t } = await getTranslations();
 
   return (
     <div
@@ -83,8 +94,9 @@ export async function SupportBanner({
     >
       <div className="flex-1">
         <p className="font-semibold text-sm">
-          OpenOKR support is in this workspace, for another{" "}
-          {remaining(live.expiresAt)}.
+          {t("lib.supportBanner.supportIsHere", {
+            remaining: remaining(t, live.expiresAt),
+          })}
         </p>
         {/* The reason is somebody's own sentence and usually ends in a
          * stop. Appending another gave "not arriving.. Everything", so the
@@ -92,7 +104,7 @@ export async function SupportBanner({
          * words it did not write. */}
         <p className="mt-1 text-sm opacity-90">{live.reason}</p>
         <p className="mt-1 text-sm opacity-90">
-          Everything they do is in your audit log, attributed to them.
+          {t("lib.supportBanner.everythingIsAudited")}
         </p>
       </div>
       <form action={revoke}>
@@ -104,7 +116,7 @@ export async function SupportBanner({
           className="whitespace-nowrap rounded-md border border-bad-dot px-3 py-1.5 font-medium text-sm"
           type="submit"
         >
-          End it now
+          {t("lib.supportBanner.endItNow")}
         </button>
       </form>
     </div>

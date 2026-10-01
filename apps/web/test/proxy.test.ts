@@ -90,9 +90,9 @@ describe("proxy", () => {
     }
   });
 
-  it("skips Next's own assets", () => {
+  it("skips Next's own assets and the tab icons", () => {
     expect(config.matcher).toEqual([
-      "/((?!_next/static|_next/image|favicon.ico).*)",
+      "/((?!_next/static|_next/image|favicon.ico|icon.svg).*)",
     ]);
   });
 });

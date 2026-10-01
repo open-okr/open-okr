@@ -1,14 +1,18 @@
 import { createSign, generateKeyPairSync, type KeyObject } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  checkInCard,
+  parseCardSubmission,
   stripMentions,
   TeamsChannel,
   TeamsPermanentError,
+  TeamsSigningKeys,
   teamsDeliveryId,
   teamsServiceUrl,
   teamsTenantId,
   toActivity,
   toAdaptiveCard,
+  verifyTeamsToken,
 } from "../src/drivers/channel/teams.ts";
 
 /**
@@ -448,6 +452,124 @@ describe("verifying an inbound activity", () => {
   });
 });
 
+/**
+ * The checks that need no workspace (completeness review L-10).
+ *
+ * The inbound door runs these before it looks a workspace up, so a forged
+ * token is refused without the lookup whose outcome would tell a caller which
+ * tenants this instance knows.
+ */
+describe("verifying a token before the workspace is known", () => {
+  const keys = () => new TeamsSigningKeys({ fetch: stubFetch, now: () => NOW });
+  const check = (token: string, source = keys(), body = activity()) =>
+    verifyTeamsToken(
+      { headers: { authorization: `Bearer ${token}` }, rawBody: body },
+      { keys: source, now: () => NOW },
+    );
+
+  it("accepts a token for any bot, and says which bot it was for", async () => {
+    // The audience is the one check it cannot make, because the app id is in
+    // the workspace's credential. It hands the audience back instead.
+    expect(await check(sign(goodClaims()))).toBe(APP_ID);
+    expect(await check(sign({ ...goodClaims(), aud: "another-app-id" }))).toBe(
+      "another-app-id",
+    );
+  });
+
+  it("refuses everything else the driver refuses", async () => {
+    const other = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    for (const token of [
+      sign(goodClaims(), { key: other.privateKey }),
+      sign({ ...goodClaims(), iss: "https://login.microsoftonline.com/" }),
+      sign({ ...goodClaims(), exp: Math.floor(NOW.getTime() / 1000) - 1 }),
+      sign({ ...goodClaims(), serviceUrl: "https://attacker.example/" }),
+      sign({ ...goodClaims(), aud: 42 }),
+      "not.a.jwt",
+    ]) {
+      expect(await check(token)).toBeNull();
+    }
+  });
+
+  it("shares its keys with the driver, so a request fetches them once", async () => {
+    const shared = keys();
+    const token = sign(goodClaims());
+    const teams = driver({ signingKeys: shared });
+
+    expect(await check(token, shared)).toBe(APP_ID);
+    expect(
+      await teams.verifyInbound({
+        headers: { authorization: `Bearer ${token}` },
+        rawBody: activity(),
+      }),
+    ).toBe(true);
+    // And the driver still owns the audience check.
+    expect(
+      await driver({
+        appId: "another-app-id",
+        signingKeys: shared,
+      }).verifyInbound({
+        headers: { authorization: `Bearer ${token}` },
+        rawBody: activity(),
+      }),
+    ).toBe(false);
+
+    expect(
+      calls.filter(
+        (call) => new URL(call.url).host === "login.botframework.com",
+      ),
+    ).toHaveLength(1);
+  });
+
+  /**
+   * A shared cache lives for a day, so a key Microsoft rotates in would be
+   * refused until it turned over. An unknown id fetches again instead, but
+   * not more than once an hour, because the id is the caller's to choose.
+   */
+  it("fetches again for a key it has not seen, at most once an hour", async () => {
+    let clock = NOW.getTime();
+    const source = new TeamsSigningKeys({
+      fetch: stubFetch,
+      now: () => new Date(clock),
+    });
+    const rotated = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const newToken = sign(
+      { ...goodClaims(), exp: Math.floor(NOW.getTime() / 1000) + 3 * 3600 },
+      { header: { kid: "rotated-in" }, key: rotated.privateKey },
+    );
+    const at = (token: string) =>
+      verifyTeamsToken(
+        { headers: { authorization: `Bearer ${token}` }, rawBody: activity() },
+        { keys: source, now: () => new Date(clock) },
+      );
+    const keyFetches = () =>
+      calls.filter(
+        (call) => new URL(call.url).host === "login.botframework.com",
+      ).length;
+
+    expect(await at(sign(goodClaims()))).toBe(APP_ID);
+    expect(keyFetches()).toBe(1);
+
+    // Microsoft publishes the new key alongside the old one.
+    const jwk = rotated.publicKey.export({ format: "jwk" });
+    keysAnswer = {
+      keys: [
+        ...(jwks() as { keys: unknown[] }).keys,
+        { ...jwk, kid: "rotated-in", kty: "RSA" },
+      ],
+    };
+
+    // Inside the hour: refused, and Microsoft is not asked again.
+    clock += 30 * 60 * 1000;
+    expect(await at(newToken)).toBeNull();
+    expect(keyFetches()).toBe(1);
+
+    // After it: fetched once more, and accepted.
+    clock += 31 * 60 * 1000;
+    expect(await at(newToken)).toBe(APP_ID);
+    expect(keyFetches()).toBe(2);
+  });
+});
+
 describe("reading an inbound activity", () => {
   it("takes the conversation as the sender, because that is what a reply reaches", async () => {
     const parsed = await driver().parseInbound(activity());
@@ -509,6 +631,219 @@ describe("what the endpoint reads before the driver does", () => {
   it("finds the service URL, which is what outbound needs", () => {
     expect(teamsServiceUrl(activity())).toBe(SERVICE_URL);
     expect(teamsServiceUrl("{}")).toBeNull();
+  });
+});
+
+/**
+ * The check-in form (AI-NATIVE-PLAN §5.3, completeness review M-23).
+ *
+ * §5.3 says a check-in is "a modal on Slack and Teams". Slack had one from
+ * P5-T02b; Teams asked the questions one message at a time. An adaptive card
+ * with inputs is what Teams has instead of a modal, and pressing its submit
+ * sends the answers back as an activity whose `value` holds one entry per
+ * input plus whatever the card's own action carried.
+ *
+ * The submission below is what Teams posts for an `Action.Submit` in a
+ * one-to-one chat, recorded from the Bot Framework's shape: a `message` with
+ * no text, the inputs merged into `value` beside the action's `data`, and the
+ * conversation it came from.
+ */
+describe("the check-in form", () => {
+  const STATUSES = ["on_track", "caution", "off_track"];
+  const card = () =>
+    checkInCard({
+      goalId: "g-1",
+      goalTitle: "Become the preferred platform for mid-market teams",
+      statuses: STATUSES,
+    });
+
+  const submission = (value: Record<string, unknown>) =>
+    JSON.stringify({
+      type: "message",
+      id: "1727600400123",
+      timestamp: "2026-08-29T09:00:00.000Z",
+      localTimestamp: "2026-08-29T17:00:00.000+08:00",
+      serviceUrl: SERVICE_URL,
+      channelId: "msteams",
+      from: { id: "29:user-1", name: "Priya", aadObjectId: "aad-1" },
+      conversation: {
+        conversationType: "personal",
+        tenantId: "tenant-1",
+        id: "a:conversation-1",
+      },
+      recipient: { id: "28:bot-1", name: "OKR" },
+      replyToId: "1727600300456",
+      value,
+      channelData: {
+        tenant: { id: "tenant-1" },
+        source: { name: "message" },
+        legacy: { replyToId: "1727600300456" },
+      },
+      locale: "en-GB",
+    });
+
+  it("asks the three questions in one card, in §3.2's order", () => {
+    const built = card();
+    expect(built.type).toBe("AdaptiveCard");
+    expect(built.version).toBe("1.5");
+    const inputs = (built.body as Record<string, unknown>[]).filter((element) =>
+      String(element.type).startsWith("Input."),
+    );
+    expect(inputs.map((input) => input.id)).toEqual([
+      "status",
+      "confidence",
+      "narrative",
+    ]);
+    // Required, so Teams refuses an empty form before it is ever sent.
+    expect(inputs.every((input) => input.isRequired === true)).toBe(true);
+  });
+
+  it("names the goal, so the member knows what they are answering about", () => {
+    const body = card().body as Record<string, unknown>[];
+    expect(body[0]).toMatchObject({
+      type: "TextBlock",
+      text: "Become the preferred platform for mid-market teams",
+    });
+  });
+
+  it("offers every status, spelled for a person and sent as the product's own word", () => {
+    const status = (card().body as Record<string, unknown>[]).find(
+      (element) => element.id === "status",
+    );
+    expect(status?.choices).toEqual([
+      { title: "on track", value: "on_track" },
+      { title: "caution", value: "caution" },
+      { title: "off track", value: "off_track" },
+    ]);
+  });
+
+  it("asks for confidence as a number from 0 to 10", () => {
+    const confidence = (card().body as Record<string, unknown>[]).find(
+      (element) => element.id === "confidence",
+    );
+    expect(confidence).toMatchObject({ type: "Input.Number", min: 0, max: 10 });
+  });
+
+  it("carries the goal on its submit, because Teams hands the answers back with no memory of the card", () => {
+    expect(card().actions).toEqual([
+      {
+        type: "Action.Submit",
+        title: "Publish",
+        data: { form: "openokr_check_in", goal: "g-1" },
+      },
+    ]);
+  });
+
+  it("is sent as a card, with a line of text for the preview", async () => {
+    const result = await driver().sendCard("a:conversation-1", card(), "hi");
+    expect(result.delivered).toBe(true);
+
+    const sent = calls.find((call) => call.url.includes("/v3/conversations/"));
+    const activity = JSON.parse(sent?.body ?? "{}") as Record<string, unknown>;
+    expect(activity.type).toBe("message");
+    expect(activity.text).toBe("hi");
+    const attachments = activity.attachments as {
+      contentType: string;
+      content: Record<string, unknown>;
+    }[];
+    expect(attachments[0]?.contentType).toBe(
+      "application/vnd.microsoft.card.adaptive",
+    );
+    expect(attachments[0]?.content.actions).toEqual(card().actions);
+  });
+
+  it("suppresses a card rather than failing when the bot has never been messaged", async () => {
+    const result = await driver({ serviceUrl: undefined }).sendCard(
+      "a:conversation-1",
+      card(),
+      "hi",
+    );
+    expect(result.delivered).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("reads a submitted card into one answer per field", () => {
+    expect(
+      parseCardSubmission(
+        submission({
+          form: "openokr_check_in",
+          goal: "g-1",
+          status: "on_track",
+          confidence: "8",
+          narrative: "Two enterprise renewals landed early.",
+        }),
+      ),
+    ).toEqual({
+      provider: "teams",
+      // The conversation, which is the identity Teams links and the place the
+      // reply goes, exactly as for a typed message.
+      externalSenderId: "a:conversation-1",
+      reference: "g-1",
+      fields: {
+        status: "on_track",
+        confidence: "8",
+        narrative: "Two enterprise renewals landed early.",
+      },
+    });
+  });
+
+  it("reads a number a client sent as a number", () => {
+    const parsed = parseCardSubmission(
+      submission({
+        form: "openokr_check_in",
+        goal: "g-1",
+        status: "caution",
+        confidence: 6,
+        narrative: "Waiting on two renewals.",
+      }),
+    );
+    expect(parsed?.fields.confidence).toBe("6");
+  });
+
+  it("keeps the card's own markers out of the answers", () => {
+    const parsed = parseCardSubmission(
+      submission({
+        form: "openokr_check_in",
+        goal: "g-1",
+        status: "caution",
+        confidence: "5",
+        narrative: "x",
+      }),
+    );
+    expect(Object.keys(parsed?.fields ?? {}).sort()).toEqual([
+      "confidence",
+      "narrative",
+      "status",
+    ]);
+  });
+
+  it("is not a submission when the card was a command button, or no card at all", () => {
+    // A nudge's "Check in" button carries a command, which is a message.
+    expect(
+      parseCardSubmission(submission({ command: "checkin g-1" })),
+    ).toBeNull();
+    expect(parseCardSubmission(activity())).toBeNull();
+    expect(
+      parseCardSubmission(submission({ form: "something_else", goal: "g-1" })),
+    ).toBeNull();
+    expect(
+      parseCardSubmission(submission({ form: "openokr_check_in" })),
+    ).toBeNull();
+    expect(parseCardSubmission("not json")).toBeNull();
+  });
+
+  it("gives a submission no text, so nothing reads the answers as a command", async () => {
+    const parsed = await driver().parseInbound(
+      submission({
+        form: "openokr_check_in",
+        goal: "g-1",
+        status: "on_track",
+        confidence: "8",
+        narrative: "help",
+      }),
+    );
+    expect(parsed?.text).toBe("");
+    expect(parsed?.externalSenderId).toBe("a:conversation-1");
   });
 });
 

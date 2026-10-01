@@ -226,3 +226,51 @@ test("a word list takes this workspace's own terms, and keeps the method's", asy
     timeout: 15_000,
   });
 });
+
+/**
+ * A renamed term reaches the screens (completeness review M-14).
+ *
+ * The terminology card saved a rename and nothing on screen said it: a
+ * workspace that calls a space a team still read Spaces in its sidebar and on
+ * its Spaces page. The rename and the heading are two different screens, so
+ * only a browser proves the one reaches the other.
+ *
+ * **Put back before the test ends**, whatever it asserted. The suite runs on
+ * one workspace, and s01-mobile-navigation and s42-route-coverage both look
+ * for "Spaces" after this file.
+ */
+test("a renamed term is what every screen calls it, and the canon comes back", async () => {
+  const terminology = page.getByTestId("rhythm-card-terminology");
+  const rename = async (singular: string, plural: string) => {
+    await goTo(page, "/admin/rhythm");
+    await terminology.locator("input[name='label:space:singular']").fill(singular);
+    await terminology.locator("input[name='label:space:plural']").fill(plural);
+    await terminology.getByRole("button", { name: "Save" }).click();
+    await expect(outcome(page, "ok")).toContainText("Saved.", {
+      timeout: 15_000,
+    });
+  };
+
+  await rename("Team", "Teams");
+  try {
+    await goTo(page, "/spaces");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Teams" }).first(),
+    ).toBeVisible({ timeout: 15_000 });
+    // The sidebar entry, not only the page.
+    await expect(
+      page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: "Teams", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "New team" })).toBeVisible();
+  } finally {
+    // The canon's own words, which the action stores as no rename at all.
+    await rename("Space", "Spaces");
+  }
+
+  await goTo(page, "/spaces");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Spaces" }).first(),
+  ).toBeVisible({ timeout: 15_000 });
+});

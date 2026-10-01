@@ -13,6 +13,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { type CommitmentState, NO_ERROR } from "./commitment-state.ts";
 
@@ -48,7 +49,10 @@ export async function closeCommitmentsAction(
     .filter((item) => item.id !== "");
 
   if (items.length === 0) {
-    return { error: "Nothing was answered, so nothing was closed." };
+    // Nothing was answered, so nothing is closed: an unanswered verdict stays
+    // open rather than becoming "not delivered".
+    const { t } = await getTranslations();
+    return { error: t("session.detail.actions.nothingWasAnswered") };
   }
 
   try {
@@ -97,12 +101,16 @@ export async function setCommitmentsAction(
     }));
 
   if (items.length === 0) {
-    return { error: "Write at least one commitment before saving." };
+    const { t } = await getTranslations();
+    return { error: t("session.detail.actions.writeAtLeastOneCommitment") };
   }
   const ownerless = items.find((item) => item.ownerId === "");
   if (ownerless) {
+    const { t } = await getTranslations();
     return {
-      error: `"${ownerless.text}" has nobody against it. Every commitment names one person.`,
+      error: t("session.detail.actions.commitmentHasNobody", {
+        text: ownerless.text,
+      }),
     };
   }
 

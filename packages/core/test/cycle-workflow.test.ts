@@ -701,6 +701,59 @@ describe("the workflow actions", () => {
     ).rejects.toThrow(/already been calibrated/i);
   });
 
+  it("reads back what the calibration recorded, and who recorded it", async () => {
+    // Completeness review M-06. The row was written and never read, so phase
+    // 6 said "not calibrated" whatever had been recorded.
+    const wb = await workerDb();
+    const before = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    );
+    expect(before.calibration).toBeNull();
+
+    await callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
+      cycleId,
+      reason: "The regulator moved the launch window to November",
+    });
+
+    const after = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    );
+    expect(after.calibration?.reason).toBe(
+      "The regulator moved the launch window to November",
+    );
+    expect(after.calibration?.authorName).toBe("Workflow Owner");
+    expect(Number.isNaN(Date.parse(after.calibration?.at ?? ""))).toBe(false);
+  });
+
+  it("refuses to calibrate a cycle that is not there, in words", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
+        cycleId: "00000000-0000-4000-8000-000000000000",
+        reason: "The market moved under the set",
+      }),
+    ).rejects.toThrow(/no such cycle/i);
+  });
+
+  it("refuses to calibrate a closed cycle", async () => {
+    // The archive settles the record. A calibration afterwards would move a
+    // target on a set that has already been scored.
+    const wb = await workerDb();
+    await wb.admin.query("update cycles set status = 'closed' where id = $1", [
+      cycleId,
+    ]);
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
+        cycleId,
+        reason: "The market moved under the set",
+      }),
+    ).rejects.toThrow(/closed/i);
+  });
+
   it("promotes an issue into a priority in one write", async () => {
     const wb = await workerDb();
     const issue = await callAction(

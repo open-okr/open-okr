@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
@@ -26,12 +26,14 @@ const APP = fileURLToPath(new URL("../app", import.meta.url));
 const E2E = fileURLToPath(new URL("../../../e2e", import.meta.url));
 
 const NO_DIRECT_VISIT: Readonly<Record<string, string>> = {
+  // Counted as visited until M-30, because `/people` was: the directory link
+  // is followed, never typed.
+  "/people/[id]":
+    "reached by clicking a member in the directory and in the org chart in s33-people, which is how a member arrives there",
   "/documents/[id]":
     "reached by clicking its own goal's link in s29-documents, because there is no document index to navigate from",
   "/session/[id]/minutes":
     "reached from the session screen in sessions.spec.ts once a session has closed, which is the only state the minutes exist in",
-  "/forgot-password":
-    "the request half is covered in s35-join and the rest needs a delivered email, which the suite has no mailbox for",
   "/reset-password":
     "needs a token from a delivered email; the token path itself is proved in packages/core, and a spec here would have to read the outbox and forge the link",
   "/backup-code":
@@ -40,21 +42,10 @@ const NO_DIRECT_VISIT: Readonly<Record<string, string>> = {
     "development only, and notFound() in production, so there is nothing to open on the instance the suite builds",
   "/dev/rich-text":
     "development only, and notFound() in production, so there is nothing to open on the instance the suite builds",
-  "/admin/plan":
-    "cloud only, and notFound() with the flag off, so the self-hosted instance the suite builds does not have this screen at all",
-  // **The three operator routes, and the reason is the same one three times
-  // because it is one fact.** P8-T01b §7: an operator route answers not-found
-  // to anybody without a live grant, and `instance_operators` holds no rows on
-  // a self-hosted instance by design. The suite builds a self-hosted instance,
-  // so there is no account that can be granted and nothing to sign in as.
-  // Opening these needs a cloud fixture rather than a spec, which is P8's own
-  // row and not a gap to be closed here.
-  "/operator":
-    "an operator route on a self-hosted instance: not-found to everybody, because `instance_operators` holds no rows there by design",
-  "/operator/[workspaceId]":
-    "an operator route on a self-hosted instance: not-found to everybody, because `instance_operators` holds no rows there by design",
-  "/operator/instance":
-    "an operator route on a self-hosted instance: not-found to everybody, because `instance_operators` holds no rows there by design",
+  // `/admin/plan` and the three operator routes had reasons here until
+  // completeness review L-17: each answers not-found with `cloud.enabled`
+  // off. `s45-operator-console.spec.ts` turns the flag on for its own length
+  // and opens all four.
 };
 
 function everyRoute(dir: string): string[] {
@@ -104,13 +95,40 @@ const specs = readdirSync(E2E)
   .map((name) => readFileSync(join(E2E, name), "utf8"))
   .join("\n");
 
-/** Whether any spec names this url, with its parameters stripped. */
+/**
+ * A route segment that stands for a value: an interpolation, or a literal id
+ * or token. Never nothing, which is the whole point (completeness review
+ * M-30): stripping the parameter used to turn `/initiatives/[id]` into
+ * `/initiatives/`, a prefix every visit to `/initiatives` already carried, so
+ * the detail page counted as opened whenever its list was.
+ */
+const VALUE = String.raw`(?:\$\{[^}]+\}|[A-Za-z0-9_-]+)`;
+const escapeRegExp = (text: string) =>
+  text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Whether any spec names this url, segment by segment. */
 const visited = (route: string): boolean => {
   if (route === "/") {
     return /goTo\(page, "\/"\)|page\.goto\("\/"\)/.test(specs);
   }
-  const stem = route.replace(/\[[^\]]+\]/g, "").replace(/\/+$/, "");
-  return specs.includes(`"${stem}`) || specs.includes(`\`${stem}`);
+  const segments = route
+    .split("/")
+    .map((segment) =>
+      segment.startsWith("[") ? VALUE : escapeRegExp(segment),
+    );
+  // Opened by a quote or a backtick, and ended by one, a query or a fragment,
+  // so `/goals` is not visited by a spec that only names `/goals/studio`.
+  const whole = new RegExp(`["'\`]${segments.join("/")}(?=["'\`?#])`);
+  if (whole.test(specs)) {
+    return true;
+  }
+  // A url built by concatenation, `"/goals/" + id`, names its value outside
+  // the literal. Only a route that ends on its value can be written that way.
+  if (route.endsWith("]")) {
+    const prefix = segments.slice(0, -1).join("/");
+    return new RegExp(`["'\`]${prefix}/["'\`]\\s*\\+`).test(specs);
+  }
+  return false;
 };
 
 const routes = everyRoute(APP).sort();
@@ -137,6 +155,33 @@ describe("route coverage", () => {
     // Either a spec started opening it, in which case the line goes, or the
     // route was renamed, in which case the line points at nothing.
     expect(stale).toEqual([]);
+  });
+
+  test("a spec a reason names exists and goes near the route", () => {
+    // Completeness review M-30: a reason that says a spec reaches a screen by
+    // clicking is checked the only way a source test can, that the spec is
+    // there and names the route's own path.
+    const false_ = Object.entries(NO_DIRECT_VISIT).flatMap(([route, why]) => {
+      const named = [
+        ...why.matchAll(
+          /\b(s\d+[a-z]?-[a-z0-9-]+|[a-z][a-z0-9-]*\.spec\.ts)\b/g,
+        ),
+      ].map((match) => match[1] ?? "");
+      const stem = route.split("/[")[0] ?? route;
+      return named.flatMap((spec) => {
+        const file = join(
+          E2E,
+          spec.endsWith(".spec.ts") ? spec : `${spec}.spec.ts`,
+        );
+        if (!existsSync(file)) {
+          return [`${route}: ${spec} does not exist`];
+        }
+        return readFileSync(file, "utf8").includes(stem)
+          ? []
+          : [`${route}: ${spec} never mentions ${stem}`];
+      });
+    });
+    expect(false_).toEqual([]);
   });
 
   test("the reasons say something", () => {

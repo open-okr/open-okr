@@ -23,7 +23,18 @@
  */
 import { expect, test } from "./fixtures.ts";
 import type { BrowserContext, Page } from "@playwright/test";
+import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
+import pg from "pg";
 import { goTo, signIn } from "./instance-account.ts";
+
+const CONNECTION = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : connectionOptions(
+      process.env.E2E_DATABASE ?? "openokr_e2e",
+      // The superuser, for the reason `sessions.spec.ts` records: this looks
+      // a goal up by title before any tenant setting could be applied.
+      testDbEnv.superuser,
+    );
 
 test.describe.configure({ mode: "serial" });
 
@@ -88,6 +99,59 @@ test("the Draft Coach evaluates it, exactly as it does today", async () => {
   // The coach's own region is not named in every layout, so fall back to what
   // it renders: a §4 check id, which only the catalogue produces.
   await expect(page.getByText(/OBJ-\d/).first()).toBeVisible({
+    timeout: 15_000,
+  });
+});
+
+/**
+ * The goal page's assists, absent with the provider off (completeness review
+ * M-09).
+ *
+ * The same criterion as the drafting step, on the screen M-09 gave three
+ * assists: the retrospective draft in the close form, the thread summary and
+ * the decomposition of a key result. The close form itself, which is the
+ * deterministic path the retrospective draft sits beside, is still whole.
+ */
+test("the goal page offers no assist, and its close form is whole", async () => {
+  const pool = new pg.Pool(CONNECTION);
+  try {
+    const goal = (
+      await pool.query<{ id: string }>(
+        "select id from goals where title = $1 and deleted_at is null limit 1",
+        ["Reduce onboarding to two days for mid-market teams"],
+      )
+    ).rows[0];
+    if (!goal) {
+      throw new Error("The objective the create form added is not there.");
+    }
+    await goTo(page, `/goals/${goal.id}`);
+  } finally {
+    await pool.end();
+  }
+
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "Reduce onboarding to two days for mid-market teams",
+    }),
+  ).toBeVisible({ timeout: 15_000 });
+  for (const name of [
+    "Draft from the check-ins",
+    "Summarise the discussion",
+    "Draft the work",
+  ]) {
+    await expect(page.getByRole("button", { name })).toHaveCount(0);
+  }
+  await expect(page.getByLabel("The retrospective")).toBeVisible();
+});
+
+test("the KPI grid offers no suggestion, and its add form is whole", async () => {
+  await goTo(page, "/kpis");
+  await expect(page.getByText("Or describe it in a sentence")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Suggest the fields" }),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("What is being measured")).toBeVisible({
     timeout: 15_000,
   });
 });

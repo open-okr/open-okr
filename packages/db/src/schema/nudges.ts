@@ -110,6 +110,18 @@ export const nudges = pgTable("nudges", {
   suppressedReason: text("suppressed_reason", {
     enum: NUDGE_SUPPRESSION_REASONS,
   }),
+  /**
+   * Why it went somewhere other than where it was meant to (migration 0102,
+   * completeness review M-23).
+   *
+   * Null when it went to the channel it was routed to. Set when that channel
+   * could not reach the member and delivery fell back, to their own channel or
+   * to email: the provider not connected, or the member never linked it. The
+   * message log carried this and the nudge did not, so "why did I get this by
+   * email" had no answer on the row that is the product's record of speaking.
+   * Words from the router, never a provider's error text or an address.
+   */
+  fallbackReason: text("fallback_reason"),
   snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
   /**
    * The proposal this nudge carries, when it carries one (P4-T05c-a).

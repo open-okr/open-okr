@@ -29,6 +29,7 @@ import { trigger } from "@openokr/method";
 import { eq } from "drizzle-orm";
 import type { MessageButton, MessageDraft } from "../channels/builder.ts";
 import type { ChannelProviderKey } from "../channels/capabilities.ts";
+import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 
 /** The check-in rules, whose message offers the check-in itself. */
@@ -140,8 +141,11 @@ export async function nudgeDraft(
     readonly subjectId: string;
     readonly provider: ChannelProviderKey;
     readonly baseUrl?: string;
+    /** What the instance calls itself (M-33). Absent says "OpenOKR". */
+    readonly instanceName?: string;
   },
 ): Promise<MessageDraft> {
+  const name = instanceNameOr(input.instanceName);
   const title = trigger(input.ruleKey)?.title ?? input.ruleKey;
   const subject = await subjectOf(tx, input);
   const link = input.baseUrl
@@ -162,12 +166,12 @@ export async function nudgeDraft(
     }
   }
   if (link && !(input.provider === "email" && buttons.length > 0)) {
-    buttons.push({ label: "Open in OpenOKR", url: link });
+    buttons.push({ label: `Open in ${name}`, url: link });
   }
 
   const headline = subject.name ? `${title}: ${subject.name}` : title;
   return {
-    subject: `OpenOKR: ${headline}`,
+    subject: `${name}: ${headline}`,
     text: [
       headline,
       "",

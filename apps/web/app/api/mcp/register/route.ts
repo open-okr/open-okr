@@ -11,16 +11,27 @@
  * chose. Fetching it is the request-forgery problem in its plainest form, so it
  * goes through the outbound guard: literal host and every resolved address
  * checked, no redirect followed, size and time capped.
+ *
+ * **Limited per caller address** (completeness review M-12). Open means anybody
+ * can call it, not that anybody can call it without end: each call writes a
+ * row and may fetch a document, and there is no token yet to count against.
+ * The allowance is the device login's, for the same reason, and an agent
+ * registers once and then remembers what it was given.
  */
 import { outboundFetch } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
 import {
+  ADDRESS_RATE_LIMIT,
+  API_RATE_WINDOW_SECONDS,
+  callerAddress,
   parseClientMetadata,
   registerClientForInstance,
   registrationResponse,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
+import { getCache } from "../../../../lib/cache";
 import { getPool } from "../../../../lib/pool";
+import { retryAfter } from "../../../../lib/retry-after";
 
 export const dynamic = "force-dynamic";
 
@@ -28,12 +39,18 @@ const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "POST, OPTIONS",
   "access-control-allow-headers": "content-type",
+  // A browser-based client has to be able to read when to try again.
+  "access-control-expose-headers": "retry-after",
 } as const;
 
-const json = (body: unknown, status: number): Response =>
+const json = (
+  body: unknown,
+  status: number,
+  extra?: Readonly<Record<string, string>>,
+): Response =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", ...CORS },
+    headers: { "content-type": "application/json", ...CORS, ...extra },
   });
 
 export function OPTIONS(): Response {
@@ -41,6 +58,25 @@ export function OPTIONS(): Response {
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
+  const limited = await getCache().rateLimit(
+    `oauth:register:${callerAddress(request.headers)}`,
+    ADDRESS_RATE_LIMIT,
+    API_RATE_WINDOW_SECONDS,
+  );
+  if (!limited.allowed) {
+    // RFC 7591 has no code for this, so RFC 6749's own word for a server that
+    // is refusing for now rather than for good.
+    return json(
+      {
+        error: "temporarily_unavailable",
+        error_description:
+          "That is a lot of registrations from one address. Try again shortly.",
+      },
+      429,
+      { "retry-after": retryAfter(limited.resetSeconds) },
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;

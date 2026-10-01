@@ -29,10 +29,7 @@ export function SignUpForm() {
     setPending(false);
 
     if (failure) {
-      setError(
-        failure.message ??
-          "That did not work. Check your details and try again.",
-      );
+      setError(failure.message ?? t("auth.signUp.signUpForm.thatDidNotWork"));
       return;
     }
     router.push("/");
@@ -51,9 +48,14 @@ export function SignUpForm() {
       }
     >
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Name" name="name" autoComplete="name" required />
         <Field
-          label="Email"
+          label={t("common.name")}
+          name="name"
+          autoComplete="name"
+          required
+        />
+        <Field
+          label={t("people.detail.profileForm.email")}
           name="email"
           type="email"
           autoComplete="email"
@@ -61,7 +63,7 @@ export function SignUpForm() {
         />
         <div className="flex flex-col gap-1">
           <Field
-            label="Password"
+            label={t("auth.signUp.signUpForm.password")}
             name="password"
             type="password"
             autoComplete="new-password"
@@ -73,7 +75,9 @@ export function SignUpForm() {
           </p>
         </div>
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? "Creating…" : "Create account"}
+          {pending
+            ? t("auth.signUp.signUpForm.creating")
+            : t("auth.signUp.signUpForm.createAccount")}
         </Button>
       </form>
       <FormError>{error}</FormError>

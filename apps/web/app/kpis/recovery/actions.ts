@@ -10,6 +10,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
 
@@ -27,10 +28,8 @@ export async function launchRecovery(kpiId: string): Promise<WriteState> {
     if (!cycle) {
       // §4.1 gives a goal a cycle or a stated timeframe and never neither.
       // Inventing a window here would put dates on the team's behalf.
-      return {
-        error:
-          "There is no current cycle to put the recovery objective in. Open one first.",
-      };
+      const { t } = await getTranslations();
+      return { error: t("kpis.recovery.actions.noCurrentCycle") };
     }
     await callAction(context, "kpis.launchRecovery", {
       kpiId,

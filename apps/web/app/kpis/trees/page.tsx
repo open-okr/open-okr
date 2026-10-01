@@ -1,83 +1,25 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Card, CardBody, CardHeader } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
-import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
-import { LaunchRecovery } from "../recovery/launch.tsx";
 import { addDriver, addTree, fileIntoTree } from "./actions.ts";
+import { KpiTreeRows } from "./tree-rows.tsx";
 
 /**
  * The KPI driver tree (UIUX-PLAN.md §4 S-18, METHOD.md §6.3, P3-T14).
  *
- * Drawn as an indented tree rather than a free canvas, and that is a decision
- * rather than a shortcut. §6.3's reading rule is "find the unhealthy branch,
- * then find the leading drivers at its edge", which is a question about depth
- * and health, not about where a box sits. An indented tree answers it at a
- * glance, works on a phone, and needs no stored positions to go stale.
+ * The rows are `KpiTreeRows`, shared with the space home since completeness
+ * review M-22; why the tree is indented rather than drawn on a canvas is
+ * written there.
  *
  * Adding a driver hangs off the node it will drive: the link carries the parent
  * in the URL, so the form always knows what the new KPI is meant to move.
  */
-const stateTone = (state: string) =>
-  state === "healthy"
-    ? ("ok" as const)
-    : state === "watch"
-      ? ("warn" as const)
-      : state === "unhealthy"
-        ? ("bad" as const)
-        : state === "recovering"
-          ? ("info" as const)
-          : ("neutral" as const);
-
-interface Node {
-  readonly id: string;
-  readonly parentKpiId: string | null;
-  readonly title: string;
-  readonly unit: string | null;
-  readonly indicatorType: string;
-  readonly tier: string;
-  readonly state: string;
-  readonly achievementPct: number | null;
-  readonly effectivePct: number | null;
-  readonly healthyPct: number;
-  readonly recoveryGoalId: string | null;
-  readonly recoveryProgressPct: number | null;
-}
-
-/** Parents before children, with the depth as a number: the same flattening the
- * Work Map uses, and for the same reason. A nested render would put DOM depth at
- * the mercy of how deep somebody built their tree. */
-function flatten(nodes: readonly Node[]): { node: Node; depth: number }[] {
-  const childrenOf = new Map<string | null, Node[]>();
-  const ids = new Set(nodes.map((node) => node.id));
-  for (const node of nodes) {
-    // A node whose parent sits in another tree is drawn at the root here rather
-    // than dropped, so nothing disappears because of where it was filed.
-    const parent =
-      node.parentKpiId && ids.has(node.parentKpiId) ? node.parentKpiId : null;
-    const siblings = childrenOf.get(parent);
-    if (siblings) {
-      siblings.push(node);
-    } else {
-      childrenOf.set(parent, [node]);
-    }
-  }
-  const out: { node: Node; depth: number }[] = [];
-  const walk = (parent: string | null, depth: number) => {
-    for (const node of childrenOf.get(parent) ?? []) {
-      out.push({ node, depth });
-      walk(node.id, depth + 1);
-    }
-  };
-  walk(null, 0);
-  return out;
-}
-
 export default async function KpiTreesPage({
   searchParams,
 }: {
@@ -110,12 +52,14 @@ export default async function KpiTreesPage({
         ? { treeId: params.tree }
         : {}),
   });
-  const rows = flatten(tree.nodes as readonly Node[]);
   // Only the filing control needs this, and only while a named tree is empty.
   const unfiled =
     tree.treeId !== null && tree.nodes.length === 0
       ? (await callAction(context, "kpis.tree", { treeId: null })).nodes
       : [];
+  const underTitle = params.under
+    ? tree.nodes.find((node) => node.id === params.under)?.title
+    : undefined;
 
   return (
     <div className="flex w-full flex-col gap-3.5">
@@ -164,82 +108,29 @@ export default async function KpiTreesPage({
         <CardHeader>
           <h2 className="text-sm font-bold text-ink">
             {tree.treeId === null
-              ? "KPIs in no tree"
+              ? t("kpis.trees.kpisInNoTree")
               : (tree.trees.find((named) => named.id === tree.treeId)?.name ??
-                "Tree")}
+                t("goals.tree"))}
           </h2>
         </CardHeader>
         <CardBody className="p-0">
-          {rows.length === 0 ? (
+          {tree.nodes.length === 0 ? (
             <p className="p-3 text-sm text-ink-3">
               {t("kpis.trees.nothingInThisTree")}
             </p>
           ) : (
-            <ul className="flex flex-col">
-              {rows.map(({ node, depth }) => (
-                <li
-                  key={node.id}
-                  className="flex flex-wrap items-center gap-2 border-line border-b px-3 py-2 last:border-b-0"
-                  style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}
-                >
-                  <span className="min-w-0 flex-1 truncate text-sm text-ink">
-                    {node.title}
-                    {node.unit ? (
-                      <span className="text-ink-4"> ({node.unit})</span>
-                    ) : null}
-                  </span>
-                  <span className="text-xs text-ink-4">
-                    {node.indicatorType} · {node.tier}
-                  </span>
-                  <Bar
-                    value={node.achievementPct ?? 0}
-                    max={KPI_ACHIEVEMENT_MAX}
-                    className="w-24"
-                  />
-                  <span className="w-12 text-right text-xs text-ink-2 tabular-nums">
-                    {node.achievementPct === null
-                      ? "no data"
-                      : `${Math.round(node.achievementPct)}%`}
-                  </span>
-                  <Chip tone={stateTone(node.state)} dot>
-                    {node.state}
-                  </Chip>
-                  {node.recoveryGoalId ? (
-                    <Link
-                      href={`/goals/${node.recoveryGoalId}`}
-                      className="text-xs font-semibold text-brand-text hover:underline"
-                    >
-                      {t("kpis.trees.recovery", {
-                        recoveryProgressPct: Math.round(
-                          node.recoveryProgressPct ?? 0,
-                        ),
-                      })}
-                    </Link>
-                  ) : node.state === "unhealthy" && canEdit ? (
-                    <LaunchRecovery kpiId={node.id} />
-                  ) : null}
-                  <Link
-                    href={`/kpis/${node.id}`}
-                    className="text-xs text-ink-3 hover:underline"
-                  >
-                    {t("common.open")}
-                  </Link>
-                  {canEdit ? (
-                    <Link
-                      href={`/kpis/trees?${new URLSearchParams({
-                        // Carried so the form returns to the view it was
-                        // opened from, including the unfiled one.
-                        tree: tree.treeId ?? "none",
-                        under: node.id,
-                      }).toString()}`}
-                      className="text-xs font-semibold text-brand-text hover:underline"
-                    >
-                      {t("kpis.trees.addDriver")}
-                    </Link>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <KpiTreeRows
+              nodes={tree.nodes}
+              canEdit={canEdit}
+              addDriverHref={(nodeId) =>
+                `/kpis/trees?${new URLSearchParams({
+                  // Carried so the form returns to the view it was opened
+                  // from, including the unfiled one.
+                  tree: tree.treeId ?? "none",
+                  under: nodeId,
+                }).toString()}`
+              }
+            />
           )}
         </CardBody>
       </Card>
@@ -248,11 +139,9 @@ export default async function KpiTreesPage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              {t("kpis.trees.addADriverUnder", {
-                KPI:
-                  tree.nodes.find((node) => node.id === params.under)?.title ??
-                  "this KPI",
-              })}
+              {underTitle === undefined
+                ? t("kpis.trees.addADriverUnderThisKpi")
+                : t("kpis.trees.addADriverUnder", { KPI: underTitle })}
             </h2>
           </CardHeader>
           <CardBody>

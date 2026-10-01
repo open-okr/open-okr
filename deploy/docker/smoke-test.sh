@@ -45,6 +45,19 @@ db_query() {
   fi
 }
 
+# Waits until the proxy stops answering 502, which is what it says while the
+# application container it fronts has been recreated and has not opened its
+# port yet. Every command that restarts the app returns before that: upgrade,
+# rotate-key and restore alike (completeness review L-01).
+wait_until_serving() {
+  waited=0
+  until [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")" != "502" ]; do
+    waited=$((waited + 2))
+    [ "$waited" -lt 60 ] || fail "the app did not start listening $1"
+    sleep 2
+  done
+}
+
 cleanup() {
   # Volumes too. "From nothing" has to include the database volume: Postgres
   # sets its password only when it initialises an empty data directory, so a
@@ -70,8 +83,16 @@ on_exit() {
     echo "---------------------------------------------------------------" >&2
   fi
   cleanup
+  # Its own backups, which live in a directory made for this run rather than
+  # beside the script, where an operator's real ones would be (L-02).
+  if [ -n "${OPENOKR_BACKUP_DIR:-}" ]; then
+    rm -rf "$OPENOKR_BACKUP_DIR"
+  fi
 }
 trap on_exit EXIT
+
+OPENOKR_BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/openokr-smoke-backups.XXXXXX")"
+export OPENOKR_BACKUP_DIR
 
 echo "openokr: starting from nothing"
 cleanup
@@ -213,7 +234,7 @@ pass "the admin reached a provisioned workspace"
 # than assumed.
 # The image is already on this host, so the pull is skipped: reaching a
 # registry that does not have it takes minutes to fail and proves nothing.
-backups_before="$(ls -1d ./backups/*/ 2>/dev/null | wc -l | tr -d ' ')"
+backups_before="$(ls -1d "$OPENOKR_BACKUP_DIR"/*/ 2>/dev/null | wc -l | tr -d ' ')"
 OPENOKR_SKIP_PULL=1 ./openokr upgrade >/dev/null 2>&1 || fail "upgrade failed"
 pass "the upgrade command ran"
 
@@ -222,7 +243,7 @@ pass "the upgrade command ran"
 # restoring is the only way back. An upgrade that proceeded without a backup
 # would have removed the way back before anybody knew they needed it, so the
 # helper refuses. This is the assertion that the refusal is not theoretical.
-backups_after="$(ls -1d ./backups/*/ 2>/dev/null | wc -l | tr -d ' ')"
+backups_after="$(ls -1d "$OPENOKR_BACKUP_DIR"/*/ 2>/dev/null | wc -l | tr -d ' ')"
 [ "$backups_after" -gt "$backups_before" ] \
   || fail "the upgrade took no backup (before ${backups_before}, after ${backups_after})"
 pass "the upgrade took a backup first"
@@ -279,12 +300,7 @@ pass "re-running migrations is idempotent"
 #
 # The first boot needs none of this because `./openokr up` waits for health
 # itself. Only the restart path asserted straight off a log line.
-waited=0
-until [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")" != "502" ]; do
-  waited=$((waited + 2))
-  [ "$waited" -lt 60 ] || fail "the app did not start listening after the upgrade"
-  sleep 2
-done
+wait_until_serving "after the upgrade"
 pass "the app is serving again after the upgrade"
 
 curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
@@ -299,6 +315,7 @@ pass "the instance survived the upgrade"
 key_before="$(grep '^OPENOKR_ENCRYPTION_KEY=' secrets/app.env | cut -d= -f2-)"
 
 ./openokr rotate-key >/dev/null 2>&1 || fail "rotate-key failed"
+wait_until_serving "after the key rotation"
 pass "the root key rotated"
 
 key_after="$(grep '^OPENOKR_ENCRYPTION_KEY=' secrets/app.env | cut -d= -f2-)"
@@ -322,7 +339,7 @@ pass "the instance still works after rotation"
 # backup would restore, change something, restore, and find the backup's
 # state again with the instance still serving.
 ./openokr backup >/dev/null 2>&1 || fail "the backup failed"
-drill="$(ls -1dt ./backups/*/ | head -1)"
+drill="$(ls -1dt "$OPENOKR_BACKUP_DIR"/*/ | head -1)"
 pass "a backup was taken ($drill)"
 
 ./openokr verify-backup "$drill" >/dev/null 2>&1 \
@@ -334,6 +351,7 @@ name_before="$(db_query "select name from workspaces order by created_at limit 1
 db_query "update workspaces set name = 'Changed after the backup'" >/dev/null
 
 ./openokr restore "$drill" >/dev/null 2>&1 || fail "the restore failed"
+wait_until_serving "after the restore"
 pass "the backup restored"
 
 rows_after="$(db_query "select (select count(*) from workspaces) || ',' || (select count(*) from workspace_members) || ',' || (select count(*) from audit_events)")"

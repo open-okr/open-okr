@@ -83,6 +83,32 @@ is fixed by better objectives.
 
 **Stage 11 has a rule.** Every action has a name and a date, or it is a wish.
 
+## Closing the cycle
+
+Once every key result is scored and the team retro is written, phase 7 is
+complete and the cycle can close. **Close the cycle** is on phase 7, and on the
+scorecard for a cycle that has stopped being current. Until phase 7 is complete
+the control is disabled and lists what is still missing.
+
+Closing is one act. It records the result on the scorecard, marks the cycle
+closed, and feeds the next cycle:
+
+| From this cycle | Into the next cycle |
+|---|---|
+| Every key result and its score | Phase 2, the prior-cycle scoring list |
+| Every carry-forward item | Phase 2, the strategic issue list at impact 4 |
+| Learnings and the retrospective | Phase 1, the input pack |
+| The lowest process-health statement | Phase 3, a process priority |
+| The annual frame | Carried as reference |
+
+**The next cycle does not have to exist yet.** The review comes before anybody
+drafts the next cycle, so usually it does not. When it is created, it receives
+the same inheritance then. Phase 7 of the closed cycle shows its result, its
+verdict, and what the next cycle received.
+
+A closed cycle does not change: no new goals, no new sessions, no second
+result.
+
 ## Next
 
 - [The weekly rhythm](weekly.md)

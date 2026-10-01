@@ -44,8 +44,75 @@ prints them once it is saved: the entity ID, the assertion consumer service
 metadata document that states both. Hand your identity provider the metadata
 document, or the two addresses if it prefers them typed in.
 
-**A new provider takes effect on the next restart**, and so does its metadata
-document. The client is built once when the process starts.
+**A provider works from the next sign-in, with no restart**, and so does a
+SAML provider's metadata document. Every server process checks for a changed
+connection every few seconds and rebuilds its sign-in client when it finds
+one, so on a deployment with several processes the others follow within
+seconds. Nobody who is already signed in is signed out by it.
+
+### Changing, turning off and removing a connection
+
+Every connection on the screen has three controls.
+
+| Control | What it does |
+|---|---|
+| Edit | Opens the same form, filled in. Change the display name, the email domains, enforcement and the protocol's own fields. The client secret field is blank: leave it blank to keep the stored secret, or type a new one to replace it. The provider ID and the protocol cannot be changed, because the provider ID is part of the callback address your identity provider already holds. To use a different one, add a new connection |
+| Turn off, Turn on | Off means nobody signs in through it and it leaves the sign-in page. Nothing else about it changes, so turning it on again restores it as it was |
+| Remove | Asks first, and says the removal cannot be undone, then removes it. It cannot be brought back from the screen, and its provider ID is free to be used by a new connection |
+
+A change, turning a connection off and removing one all work from the next
+sign-in, within a few seconds, with no restart, like adding one.
+
+**Turning off or removing an enforced connection hands its domains back to
+passwords.** Enforcement is read only from connections that are on, so the
+moment one is off or removed, people on its domains sign in with a password
+again. The screen asks before doing either and names the domains.
+
+**A connection can be turned off in a frozen or read-only workspace.** A
+compromised identity provider has to be shut out whatever state the
+workspace is in, so turning a connection off, and on again, is allowed
+during a freeze like member and settings management. Editing or removing one
+waits until the workspace is active.
+
+**The same writes work over the API and the command line.** A new client
+secret sent that way is sealed under the root key exactly as the screen
+seals it.
+
+Each change is recorded in the audit log with the administrator who made it,
+and a new client secret is sealed under the root key like the first one. The
+secret itself never appears in the log.
+
+A connection changed or removed in the database directly is followed the same
+way: the next sign-in uses the new client id, endpoints or certificate, and a
+removed or disabled provider refuses the next sign-in through it.
+
+## What is encrypted at rest
+
+A credential the instance has to use again is sealed under its root key
+(`OPENOKR_ENCRYPTION_KEY`), each with a data key of its own, and
+`./openokr rotate-key` re-wraps every one. A credential it only has to check
+is hashed, so the original is never stored.
+
+| Stored | How |
+|---|---|
+| AI provider keys, chat channel credentials, SSO client secrets, the mail password | Sealed under the root key |
+| The access, refresh and ID tokens an OIDC provider issues when somebody signs in | Sealed under the root key. Opened only on the server, when a sign-in or a token refresh needs them |
+| Session tokens, API tokens, agent access tokens, directory sync tokens, invitation links | Hashed |
+| Passwords | Hashed by the sign-in library |
+| Authenticator app secrets and backup codes | Encrypted by the sign-in library under `BETTER_AUTH_SECRET` |
+
+**Identity-provider tokens stored before this release are in plain text until
+the data change seals them.** Run it once after upgrading, with the root key in
+the environment:
+
+```sh
+OPENOKR_ENCRYPTION_KEY=... pnpm db:change
+```
+
+It seals every token still in plain text and leaves the rest alone, so running
+it again changes nothing. On an instance nobody has signed into through OIDC
+it has nothing to do and needs no key. Until it runs, those tokens still work,
+and the next sign-in through the provider replaces them with sealed ones.
 
 **Enforcing refuses the local factors for the domains you list**: a password, a
 password reset and a passkey are all refused, and the person is told which
@@ -76,6 +143,12 @@ others push people rather than being polled.
 
 One bearer token per workspace, shown once, hashed at rest. Issuing a new one
 revokes the old.
+
+The token may make 600 requests a minute, the same allowance an API token
+has. Past that the directory is answered 429 with `Retry-After`, which says how
+long to wait, so a large first sync slows down rather than being refused for
+good. The limit is there so a runaway connector, or a leaked token, cannot hold
+the database for everybody else.
 
 Two refusals worth knowing: the directory cannot suspend the last person with
 full access, and losing a group is not leaving the workspace.
@@ -111,10 +184,50 @@ checked. The chain is built just behind the write path, so a busy workspace
 always has a short tail waiting for its position. Pending is never counted as
 verified and never reported as a break.
 
-**Export the trail** hands over a CSV narrowed by date, action or target,
-carrying each row's position and hash so the file and a later verification can
-be lined up against each other. The export is itself recorded, with the filter
+**Browse the trail** with one filter: a date range, an action, a person or
+agent, and a target type. **Show matching rows** lists them on the screen,
+newest first, fifty at a time with older rows a click away. Each row says
+when, who acted and through which channel when it was not the browser (Slack,
+the API, an external agent), the action, the target, and its position in the
+chain or that it is still waiting for one. The row's details stay out of the
+list.
+
+**Export as CSV** hands over the rows the same filter matches, with each
+row's details, position and hash, so the file and a later verification can be
+lined up against each other. The export is itself recorded, with the filter
 that was used.
+
+## Uploaded files
+
+Every file is checked against a type list and a 25 MB ceiling. SVG is not on
+the list, because it can carry script.
+
+**Every image is re-encoded before it is stored.** A PNG, JPEG, GIF or WebP is
+decoded and written out again in the type it claimed, so what is kept is
+pixels the instance drew, not the bytes that arrived. The EXIF block goes with
+it, and with that the camera and, from a phone, where the photo was taken. A
+file that claims to be an image and is not one is refused. So is an image of
+more than 100 megapixels, before it is decoded. A small preview is made at the
+same time and shown beside the file in the list.
+
+**A virus scan is optional, and off until you name a scanner.** Set
+`OPENOKR_CLAMD_HOST` to a ClamAV daemon (clamd) the instance can reach, and
+`OPENOKR_CLAMD_PORT` if it is not on 3310. From then on:
+
+| When | What happens |
+|---|---|
+| A file is uploaded | It is listed as "being checked" and cannot be opened |
+| clamd says it is clean | It opens as normal |
+| clamd names a signature | It is "held back" for good. The signature is on the audit row for `blobs.recordScan` |
+| clamd will not scan it, for example over its stream size limit | Held back too, because not checked is not clean. Raise clamd's `StreamMaxLength` to at least 25M |
+| clamd cannot be reached | The file stays held and the scan is tried again. After ten failed tries the relay logs a dead letter |
+
+Files uploaded before the scanner was named are not scanned after the fact.
+Removing the scanner while files are still being checked leaves those files
+held rather than releasing them unscanned, so let the queue clear first.
+Nothing runs clamd for you: it is a second service, and Postgres is the only
+one the product requires. Its signature updates need a connection, or a mirror
+on an isolated network.
 
 ## Reaching out
 
@@ -123,6 +236,27 @@ literal host and every resolved address, refuses private and metadata ranges,
 follows no redirect, and caps size and time. An instance with nothing
 configured makes no outbound request at all, which is what makes an air-gapped
 install work. See [the air-gap guide](../runbooks/air-gap.md).
+
+## Chat webhooks
+
+Slack, Microsoft Teams, WhatsApp and Telegram deliver to this instance's
+webhook addresses. Each request is checked against the credential the
+workspace saved before anything in it is read.
+
+**A request the instance will not act on gets one answer**, whatever the
+reason: an empty 401, never sooner than a quarter of a second. The reasons
+are a Slack workspace, Teams tenant, WhatsApp number or Telegram bot nobody
+connected here, a connection that was removed, and a signature that does not
+match. Different answers would let anybody find out which organisations use
+this instance. Meta's subscription check is refused with 403, the same way for
+every reason.
+
+So a provider reporting failed deliveries after you disconnect it is
+expected. If deliveries fail while it is connected, the signing secret or
+token saved here probably does not match the provider's. The
+`openokr_channel_inbound_refusals_total` counter says which, by its `reason`
+label: `unknown_tenant`, `no_connection` or `failed_verification`. See
+[observability](../runbooks/observability.md).
 
 ## Next
 

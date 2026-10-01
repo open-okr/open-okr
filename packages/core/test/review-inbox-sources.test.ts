@@ -345,12 +345,52 @@ describe("a session obligation", () => {
 
 describe("an agent proposal obligation", () => {
   it("reaches a member who can edit its subject", async () => {
-    await makeProposal({ type: "goal", id: goalId });
+    const id = await makeProposal({ type: "goal", id: goalId });
     const owed = await inbox(OWNER);
     const proposal = owed.obligations.find((row) => row.kind === "proposal");
     expect(proposal).toBeDefined();
     expect(proposal?.title).toContain("goals update");
+    // The subject is named, so the row says what it is about.
+    expect(proposal?.title).toContain("Make onboarding the reason people stay");
     expect(proposal?.actionLabel).toBe("Review the proposal");
+    expect(proposal?.proposal?.id).toBe(id);
+  });
+
+  it("links to the row it is decided on, never to an administrator's screen", async () => {
+    // Completeness review M-08. The reviewer here is an ordinary member with
+    // `edit` on the goal. The row used to send them to `/admin/agents`, which
+    // the admin layout refuses to anybody below `full`.
+    const id = await makeProposal({ type: "goal", id: goalId });
+    const theirs = await inbox(OTHER);
+    const proposal = theirs.obligations.find((row) => row.kind === "proposal");
+    expect(proposal?.href).toBe(`/review#proposal-${id}`);
+  });
+
+  it("falls back to workspace administration when its subject has no context of its own", async () => {
+    // A KPI resolves to no access context, so "edit on the subject" has no
+    // answer. The comment above the source promised administration as the
+    // fallback since P6-G02; the code asked the resolver anyway, caught its
+    // refusal as "no", and listed a KPI proposal for nobody at all.
+    const wb = await workerDb();
+    const kpi = await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.create",
+      {
+        title: "Net retention",
+        ownerKind: "member",
+        memberId: otherId,
+        frequency: "monthly",
+        direction: "higher_better",
+        indicatorType: "lagging",
+        tier: "output",
+        aggregate: "sum",
+      },
+    );
+    await makeProposal({ type: "kpi", id: kpi.id });
+    const owed = await inbox(OWNER);
+    const proposal = owed.obligations.find((row) => row.kind === "proposal");
+    expect(proposal?.title).toContain("Net retention");
+    expect(kinds(await inbox(OTHER))).not.toContain("proposal");
   });
 
   it("disappears once it is applied or dismissed", async () => {

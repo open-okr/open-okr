@@ -20,12 +20,36 @@ export interface CycleStripData {
   readonly phaseLabel: string;
   readonly blocking: string | null;
   readonly dueInDays: number;
+  /** The deadline in words, already in the reader's language. */
+  readonly due: string;
+}
+
+/** The translate function the shell already holds. */
+type Translate = (
+  key: string,
+  values?: Readonly<Record<string, string | number>>,
+) => string;
+
+function dueText(t: Translate, days: number): string {
+  if (days === 0) {
+    return t("shell.cycleStrip.dueToday");
+  }
+  if (days > 0) {
+    return days === 1
+      ? t("shell.cycleStrip.toPublishOne", { count: days })
+      : t("shell.cycleStrip.toPublishOther", { count: days });
+  }
+  const late = Math.abs(days);
+  return late === 1
+    ? t("shell.cycleStrip.overdueOne", { count: late })
+    : t("shell.cycleStrip.overdueOther", { count: late });
 }
 
 export async function loadCycleStrip(
   workspaceId: string,
   userId: string,
   level: number,
+  t: Translate,
 ): Promise<CycleStripData | null> {
   if (level < ACCESS_LEVELS.view) {
     return null;
@@ -63,12 +87,19 @@ export async function loadCycleStrip(
         ? null
         : reasons.length === 1
           ? reasons[0]
-          : `${reasons[0]} (and ${reasons.length - 1} more)`;
+          : t("shell.cycleStrip.andMore", {
+              first: reasons[0] ?? "",
+              count: reasons.length - 1,
+            });
 
     return {
-      phaseLabel: `Phase ${workflow.phase} · ${PHASE_TITLES[workflow.phase]}`,
+      phaseLabel: t("common.phase3", {
+        phase: workflow.phase,
+        phaseTitle: PHASE_TITLES[workflow.phase] ?? "",
+      }),
       blocking: blocking ?? null,
       dueInDays: workflow.daysToDeadline,
+      due: dueText(t, workflow.daysToDeadline),
     };
   } catch (error) {
     if (error instanceof OperationError) {

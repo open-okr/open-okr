@@ -67,9 +67,7 @@ export function ProcessHealthPanel({
   const submit = useCallback(() => {
     setProblem(null);
     if (chosen.some((value) => value === null)) {
-      setProblem(
-        "All five, together. The rhythm score reads two of them, so a partial answer leaves a hole in the diagnostic.",
-      );
+      setProblem(t("session.detail.processHealth.allFiveTogether"));
       return;
     }
     startTransition(async () => {
@@ -78,11 +76,13 @@ export function ProcessHealthPanel({
         router.refresh();
       } catch (error) {
         setProblem(
-          error instanceof Error ? error.message : "That did not save.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.thatDidNotSave"),
         );
       }
     });
-  }, [chosen, router, sessionId]);
+  }, [chosen, router, sessionId, t]);
 
   return (
     <Card role="region" aria-labelledby="process-health-heading">
@@ -95,8 +95,13 @@ export function ProcessHealthPanel({
             {t("session.detail.processHealth.okrProcessHealth")}
           </h2>
           <Chip tone="neutral">
-            {health.responses}{" "}
-            {health.responses === 1 ? "response" : "responses"}
+            {health.responses === 1
+              ? t("session.detail.processHealth.responseCountOne", {
+                  count: health.responses,
+                })
+              : t("session.detail.processHealth.responseCountOther", {
+                  count: health.responses,
+                })}
           </Chip>
           {health.submitted ? (
             <Chip tone="ok">{t("session.detail.processHealth.yoursIsIn")}</Chip>
@@ -131,7 +136,10 @@ export function ProcessHealthPanel({
                 // button sets, so without a name on each group a screen reader
                 // reads "1 2 3 4 5" five times with nothing to tell them apart.
                 <fieldset
-                  aria-label={`Score for statement ${entry.statementKey}`}
+                  aria-label={t(
+                    "session.detail.processHealth.scoreForStatement",
+                    { statementKey: entry.statementKey },
+                  )}
                   className="flex flex-wrap gap-1.5 border-0 p-0"
                 >
                   {SCORES.map((score) => (
@@ -161,7 +169,9 @@ export function ProcessHealthPanel({
         {canAnswer ? (
           <span>
             <Button type="button" size="sm" disabled={pending} onClick={submit}>
-              {health.submitted ? "Change my answers" : "Submit anonymously"}
+              {health.submitted
+                ? t("session.detail.processHealth.changeMyAnswers")
+                : t("session.detail.processHealth.submitAnonymously")}
             </Button>
           </span>
         ) : null}

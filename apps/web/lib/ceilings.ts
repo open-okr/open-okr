@@ -1,8 +1,6 @@
-import { callAction } from "@openokr/core";
 import type { ResolvedThresholds } from "@openokr/method";
 import { cache } from "react";
-import { getPool } from "./auth";
-import { requireWorkspace } from "./workspace";
+import { readRhythmForRequest } from "./rhythm";
 
 /**
  * The maxima a progress or achievement bar is drawn against (P8-G04).
@@ -35,19 +33,11 @@ export const KPI_ACHIEVEMENT_MAX = 200;
  *
  * `rhythm.read` is declared `view`, which matters: an ordinary member opens
  * every screen that draws a progress bar, and reaching for an admin read here
- * would lock them out of it exactly as P8-G05 did.
+ * would lock them out of it exactly as P8-G05 did. The read is shared with the
+ * workspace's terminology (M-14), so the two cost one call.
  */
 export const progressCeiling = cache(async (): Promise<number> => {
-  const { session, workspace } = await requireWorkspace();
-  const read = await callAction(
-    {
-      pool: getPool(),
-      workspaceId: workspace.workspaceId,
-      actor: { kind: "human" as const, userId: session.user.id },
-    },
-    "rhythm.read",
-    {},
-  );
+  const read = await readRhythmForRequest();
   // `rhythm.read` types its thresholds as an open record at the contract
   // boundary, the same cast the cycle page already makes for the same reason.
   const thresholds = read.thresholds as unknown as ResolvedThresholds;

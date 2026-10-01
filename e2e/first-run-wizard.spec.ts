@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures.ts";
-import { skipOnboarding } from "./instance-account.ts";
+import { goTo, skipOnboarding } from "./instance-account.ts";
 
 /**
  * The first-run wizard, in a browser (P1-T09).
@@ -39,9 +39,13 @@ test("an unconfigured instance sends you to the wizard, not to sign in", async (
   // no way to sign in is where the 30-minute budget usually goes.
   await page.goto("/sign-in");
   await expect(page).toHaveURL(/\/setup$/);
+  // This server is named by `OPENOKR_INSTANCE_NAME` (playwright.config.ts),
+  // and the name reaches the page before anybody has set anything up
+  // (completeness review M-33).
   await expect(
-    page.getByRole("heading", { name: "Set up OpenOKR" }),
+    page.getByRole("heading", { name: "Set up OKR Goal" }),
   ).toBeVisible();
+  await expect(page).toHaveTitle("OKR Goal");
 });
 
 test("it reports the deployment honestly, including what is not built yet", async ({
@@ -68,7 +72,13 @@ test("it reports the deployment honestly, including what is not built yet", asyn
 test("creating the first account finishes setup", async ({ page }) => {
   await page.goto("/setup/account");
 
-  await page.getByLabel("What should this instance be called?").fill("Acme OKR");
+  // Pre-filled with the deployment's name and left alone, so nothing is
+  // stored and the variable keeps deciding (M-33). It used to be pre-filled
+  // with "OpenOKR" and stored whatever it held, which is how the public demo
+  // lost its name for good.
+  await expect(
+    page.getByLabel("What should this instance be called?"),
+  ).toHaveValue("OKR Goal");
   await page.getByLabel("Your name").fill(ADMIN.name);
   await page.getByLabel("Email").fill(ADMIN.email);
   // Exact, because the reveal toggle beside it is named "Show password".
@@ -145,6 +155,18 @@ async function signInAsAdmin(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
 
+test("the sign-in page carries the deployment's name after setup", async ({
+  page,
+}) => {
+  // The wizard stored nothing, so the variable is still what names the
+  // instance: the tab and the heading both say so (M-33).
+  await page.goto("/sign-in");
+  await expect(
+    page.getByRole("heading", { name: "Sign in to OKR Goal" }),
+  ).toBeVisible();
+  await expect(page).toHaveTitle("OKR Goal");
+});
+
 test("the admin can sign in again", async ({ page }) => {
   // The acceptance criterion's actual words: a secured instance with an admin
   // exists. Proven by signing in as them on a fresh browser context.
@@ -185,4 +207,40 @@ test("the starter template left a first quarter to work from", async ({
   await expect(page.getByText("Weekly session").first()).toBeVisible({
     timeout: 15_000,
   });
+});
+
+/**
+ * Renaming the instance after setup (completeness review M-33).
+ *
+ * Nothing could change the name once the wizard had closed. General in admin
+ * can now, a saved name wins over the deployment's, and clearing the field
+ * hands the choice back to `OPENOKR_INSTANCE_NAME`. Last in the file because
+ * it changes what every page here says, and it leaves the instance named by
+ * its deployment again.
+ */
+test("an administrator renames the instance, and can hand the name back", async ({
+  page,
+}) => {
+  await signInAsAdmin(page);
+  await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+
+  // Through `goTo`, which retries a navigation the application superseded:
+  // signing in ends in a client-side push to `/` that can still be in flight
+  // here, and a bare `goto` then fails with ERR_ABORTED (it did on CI).
+  await goTo(page, "/admin/general");
+  const field = page.getByLabel("Instance name");
+  await expect(field).toHaveValue("OKR Goal");
+  // Said on the card, because a restart is the one thing a rename needs.
+  await expect(page.getByText(/after the next restart/)).toBeVisible();
+
+  const card = page.locator("form").filter({ has: field });
+  await field.fill("Acme OKR");
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveTitle("Acme OKR");
+  await expect(field).toHaveValue("Acme OKR");
+
+  await field.fill("");
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveTitle("OKR Goal");
+  await expect(field).toHaveValue("OKR Goal");
 });

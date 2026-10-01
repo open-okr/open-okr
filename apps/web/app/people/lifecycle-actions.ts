@@ -63,41 +63,35 @@ export async function suspendMemberAction(
   _previous: LifecycleState,
   form: FormData,
 ): Promise<LifecycleState> {
+  const { t } = await getTranslations();
   const memberId = String(form.get("memberId") ?? "");
-  return lifecycle(
-    memberId,
-    "Suspended. Every access they held is gone until they are restored.",
-    async (context) => {
-      await callAction(context, "people.suspend", { memberId });
-      return { export: null };
-    },
-  );
+  return lifecycle(memberId, t("people.actions.suspended"), async (context) => {
+    await callAction(context, "people.suspend", { memberId });
+    return { export: null };
+  });
 }
 
 export async function restoreMemberAction(
   _previous: LifecycleState,
   form: FormData,
 ): Promise<LifecycleState> {
+  const { t } = await getTranslations();
   const memberId = String(form.get("memberId") ?? "");
-  return lifecycle(
-    memberId,
-    "Restored. The access they held before the suspension is theirs again.",
-    async (context) => {
-      await callAction(context, "people.restore", { memberId });
-      return { export: null };
-    },
-  );
+  return lifecycle(memberId, t("people.actions.restored"), async (context) => {
+    await callAction(context, "people.restore", { memberId });
+    return { export: null };
+  });
 }
 
 export async function convertToGuestAction(
   _previous: LifecycleState,
   form: FormData,
 ): Promise<LifecycleState> {
+  const { t } = await getTranslations();
   const memberId = String(form.get("memberId") ?? "");
   return lifecycle(
     memberId,
-    "Converted to a guest. Every binding they held has been removed, so " +
-      "they now see only what they are invited to.",
+    t("people.actions.convertedToAGuest"),
     async (context) => {
       await callAction(context, "people.convertToGuest", { memberId });
       return { export: null };
@@ -117,6 +111,7 @@ export async function eraseMemberAction(
   _previous: LifecycleState,
   form: FormData,
 ): Promise<LifecycleState> {
+  const { t } = await getTranslations();
   const memberId = String(form.get("memberId") ?? "");
   const typed = String(form.get("confirmName") ?? "").trim();
 
@@ -134,19 +129,14 @@ export async function eraseMemberAction(
   if (typed !== name) {
     return {
       kind: "refused",
-      message: `Type ${name} exactly to confirm. Nothing has been erased.`,
+      message: t("people.actions.typeTheNameExactly", { name }),
     };
   }
 
-  return lifecycle(
-    memberId,
-    "Erased. Their personal data is gone and their history still reads " +
-      "under a placeholder identity. The export below is the only copy.",
-    async (context) => {
-      const result = await callAction(context, "people.erase", { memberId });
-      return { export: result.export };
-    },
-  );
+  return lifecycle(memberId, t("people.actions.erased"), async (context) => {
+    const result = await callAction(context, "people.erase", { memberId });
+    return { export: result.export };
+  });
 }
 
 /**

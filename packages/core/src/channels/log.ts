@@ -28,12 +28,19 @@ export async function queueChannelMessageInTx(
   tx: WorkspaceTx,
   input: {
     readonly workspaceId: string;
-    readonly memberId: string;
+    /**
+     * Who it is for. Null for a post to a space's own channel (completeness
+     * review M-23), which the design's §2.3 anticipated: a channel post has no
+     * single recipient, and `target` says where it goes instead.
+     */
+    readonly memberId: string | null;
     readonly channel: Exclude<DeliveryChannel, "in_app">;
     readonly message: BuiltMessage;
     readonly idempotencyKey: string;
     /** Recorded on the row so the log can say why this is not the primary. */
     readonly fallbackReason?: string;
+    /** The provider's own channel id, for a post that goes to no member. */
+    readonly target?: string;
   },
 ): Promise<QueuedMessage> {
   const [existing] = await tx
@@ -84,6 +91,7 @@ export async function queueChannelMessageInTx(
         ...(input.fallbackReason
           ? { fallbackReason: input.fallbackReason }
           : {}),
+        ...(input.target ? { target: input.target } : {}),
       },
       idempotencyKey: input.idempotencyKey,
       status: "queued" as const,

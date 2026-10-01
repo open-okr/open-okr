@@ -2,6 +2,7 @@ import { dismissSiteMessage, liveSiteMessagesFor } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./pool";
 import { requireSession } from "./session";
+import { getTranslations } from "./translations";
 
 /**
  * What the vendor is saying, on every screen of the workspace it reaches
@@ -46,6 +47,7 @@ export async function SiteMessages({
   if (messages.length === 0) {
     return null;
   }
+  const { t } = await getTranslations();
 
   return (
     <div className="mb-4.5 flex flex-col gap-2">
@@ -68,7 +70,7 @@ export async function SiteMessages({
                 className="whitespace-nowrap font-medium text-sm underline"
                 type="submit"
               >
-                Dismiss
+                {t("common.dismiss")}
               </button>
             </form>
           ) : null}

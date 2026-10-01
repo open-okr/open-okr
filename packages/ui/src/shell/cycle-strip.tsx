@@ -16,14 +16,19 @@ import { cn } from "../lib/cn.ts";
 export interface CycleStripProps {
   readonly phase: string;
   readonly blocking?: ReactNode;
-  readonly dueInDays: number;
+  /**
+   * The deadline in words, in the reader's language. The caller holds the
+   * catalogue; this component used to build "3 days to publish" in English
+   * itself (completeness review M-15).
+   */
+  readonly due: ReactNode;
   readonly className?: string;
 }
 
 export function CycleStrip({
   phase,
   blocking,
-  dueInDays,
+  due,
   className,
 }: CycleStripProps) {
   return (
@@ -47,13 +52,7 @@ export function CycleStrip({
           <span className="font-semibold text-warn">{blocking}</span>
         </>
       ) : null}
-      <span className="ml-auto font-bold">
-        {dueInDays === 0
-          ? "Due today"
-          : dueInDays > 0
-            ? `${dueInDays} day${dueInDays === 1 ? "" : "s"} to publish`
-            : `${Math.abs(dueInDays)} day${dueInDays === -1 ? "" : "s"} overdue`}
-      </span>
+      <span className="ml-auto font-bold">{due}</span>
     </div>
   );
 }

@@ -31,12 +31,22 @@ import {
  * **Archiving is offered beside creating, because they are one decision.** A
  * workspace moving to the next cycle is closing the one it is in, and putting
  * the two in different places is how a workspace ends up with two open cycles.
+ *
+ * **It creates a cycle in the horizon the reader is looking at** (completeness
+ * review M-06). The header's mode toggle already asks "annual or quarterly",
+ * so a second picker here would ask it twice. Before this the create always
+ * made the quarter, and no screen could make the annual cycle §2.1's frame
+ * lives in. **The new cycle opens once it exists**, because the reason to make
+ * next quarter or next year is to start planning in it, and the page would
+ * otherwise go on showing the one containing today.
  */
 export function CycleAdmin({
+  mode,
   currentCycleId,
   currentName,
   publicationDeadline,
 }: {
+  readonly mode: "annual" | "quarterly";
   readonly currentCycleId: string | null;
   readonly currentName: string | null;
   readonly publicationDeadline: string | null;
@@ -48,12 +58,16 @@ export function CycleAdmin({
   const [on, setOn] = useState("");
   const [deadline, setDeadline] = useState(publicationDeadline ?? "");
 
-  const run = (work: () => Promise<{ error: string | null }>) => {
+  const run = (work: () => Promise<{ error: string | null; id?: string }>) => {
     setProblem(null);
     start(async () => {
       const result = await work();
       if (result.error) {
         setProblem(result.error);
+        return;
+      }
+      if (result.id) {
+        router.push(`/cycle?cycle=${result.id}`);
         return;
       }
       router.refresh();
@@ -72,7 +86,9 @@ export function CycleAdmin({
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
         <label className="flex flex-col gap-1 text-xs text-ink-3">
-          {t("cycle.admin.createLabel")}
+          {mode === "annual"
+            ? t("cycle.admin.createAnnualLabel")
+            : t("cycle.admin.createLabel")}
           <div className="flex flex-wrap items-center gap-2.5">
             <input
               type="date"
@@ -87,12 +103,16 @@ export function CycleAdmin({
               size="sm"
               disabled={pending || on === ""}
               data-testid="create-cycle"
-              onClick={() => run(() => createCycle({ on }))}
+              onClick={() => run(() => createCycle({ on, mode }))}
             >
               {t("cycle.admin.create")}
             </Button>
           </div>
-          <span className="text-ink-4">{t("cycle.admin.createHelp")}</span>
+          <span className="text-ink-4">
+            {mode === "annual"
+              ? t("cycle.admin.createAnnualHelp")
+              : t("cycle.admin.createHelp")}
+          </span>
         </label>
 
         {currentCycleId ? (

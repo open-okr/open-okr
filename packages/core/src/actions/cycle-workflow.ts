@@ -33,6 +33,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { readClosureInTx } from "../cycles/archive.ts";
 import { localDateIn, parseLocalDate } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
@@ -292,6 +293,39 @@ export const readWorkflow = defineReadAction({
       ),
     }),
     capacityCuts: z.string().nullable(),
+    /**
+     * The one mid-cycle calibration METHOD.md §7.6 allows, or null while it is
+     * unused (completeness review M-06).
+     *
+     * `workflow.calibrate` wrote this row and nothing read it back, so phase 6
+     * rendered "not calibrated" whatever had been recorded. The reason is the
+     * whole record: §7.6 asks for a written reason naming the external change,
+     * and a date alone would say a target moved without saying why.
+     */
+    calibration: z
+      .object({
+        reason: z.string(),
+        at: z.string(),
+        authorName: z.string().nullable(),
+      })
+      .nullable(),
+    /**
+     * How the cycle closed, or null while it is open (M-05): the result the
+     * scorecard holds, and what the next cycle received. Read back from the
+     * rows the close wrote, so phase 7 can show it on every visit rather than
+     * only in the moment after the button.
+     */
+    closure: z
+      .object({
+        resultValue: z.number().nullable(),
+        verdict: z.string().nullable(),
+        nextCycle: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+        priorScores: z.number().int(),
+        carriedIssues: z.number().int(),
+        processPriority: z.string().nullable(),
+        packNote: z.boolean(),
+      })
+      .nullable(),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -423,6 +457,25 @@ export const readWorkflow = defineReadAction({
               eq(cycleFocusKeyResults.cycleId, input.cycleId),
             ),
           );
+        const [calibration] = await tx
+          .select({
+            reason: cycleCalibrations.reason,
+            at: cycleCalibrations.at,
+            authorName: workspaceMembers.name,
+          })
+          .from(cycleCalibrations)
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, cycleCalibrations.authorMemberId),
+          )
+          .where(
+            activeOnly(
+              cycleCalibrations,
+              eq(cycleCalibrations.workspaceId, context.workspaceId),
+              eq(cycleCalibrations.cycleId, input.cycleId),
+            ),
+          )
+          .limit(1);
         const sessionDates = (
           Array.isArray(cycle.sessionDates) ? cycle.sessionDates : []
         )
@@ -503,6 +556,17 @@ export const readWorkflow = defineReadAction({
                 : [],
           },
           capacityCuts: plainOf(capacity?.cuts),
+          calibration: calibration
+            ? {
+                reason: calibration.reason,
+                at: new Date(calibration.at).toISOString(),
+                authorName: calibration.authorName ?? null,
+              }
+            : null,
+          closure:
+            cycle.status === "closed"
+              ? await readClosureInTx(tx, context.workspaceId, cycle.id)
+              : null,
         };
       },
     );
@@ -1128,6 +1192,12 @@ export const calibrateCycle = defineWriteAction({
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
+      // Through the same door as every other write in this file (M-06). It
+      // skipped it, so an unknown cycle reached the insert and failed on the
+      // foreign key rather than as "No such cycle", and a closed cycle could be
+      // calibrated after its archive, when the record is meant to be settled.
+      await withGateRecompute(tx, workspaceId, input.cycleId);
+
       const [existing] = await tx
         .select({ id: cycleCalibrations.id })
         .from(cycleCalibrations)

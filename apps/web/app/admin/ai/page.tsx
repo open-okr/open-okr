@@ -19,6 +19,7 @@ import {
 import { AIForm } from "./ai-form.tsx";
 import {
   BudgetsCard,
+  egressStateOf,
   FeaturesCard,
   PrivacyCard,
   PromptsCard,
@@ -52,21 +53,30 @@ import {
  * disables nothing and hides nothing: it is the screen you use to turn it on.
  */
 
+/** Catalogue keys, so a tier and a provider are named in the reader's language. */
 const TIER_WORDS: Readonly<Record<string, string>> = {
-  fast: "Fast",
-  balanced: "Balanced",
-  deep: "Deep",
-  embed: "Embedding",
+  fast: "admin.ai.tierFast",
+  balanced: "admin.ai.tierBalanced",
+  deep: "admin.ai.tierDeep",
+  embed: "admin.ai.tierEmbed",
 };
 
 const PROVIDER_WORDS: Readonly<Record<string, string>> = {
-  anthropic: "Anthropic",
-  openai: "OpenAI",
-  google: "Google",
-  openrouter: "OpenRouter",
-  ollama: "Ollama",
-  "openai-compatible": "OpenAI-compatible",
+  anthropic: "admin.ai.providerAnthropic",
+  openai: "admin.ai.providerOpenai",
+  google: "admin.ai.providerGoogle",
+  openrouter: "admin.ai.providerOpenrouter",
+  ollama: "admin.ai.providerOllama",
+  "openai-compatible": "admin.ai.providerOpenaiCompatible",
 };
+
+/** The model capabilities a custom entry can declare, with their labels. */
+const CAPABILITIES = [
+  ["supportsTools", "admin.ai.capabilityTools"],
+  ["supportsVision", "admin.ai.capabilityVision"],
+  ["supportsJsonMode", "admin.ai.capabilityJsonMode"],
+  ["supportsStreaming", "admin.ai.capabilityStreaming"],
+] as const;
 
 /**
  * How far back the spend figures look.
@@ -84,6 +94,16 @@ const STATUS_TONE: Readonly<Record<string, "ok" | "bad" | "warn">> = {
 
 export default async function AdminAIPage() {
   const { t } = await getTranslations();
+  // A value the schema adds before the catalogue knows it is shown as itself
+  // rather than hidden.
+  const tierWord = (tier: string): string => {
+    const key = TIER_WORDS[tier];
+    return key ? t(key) : tier;
+  };
+  const providerWord = (provider: string): string => {
+    const key = PROVIDER_WORDS[provider];
+    return key ? t(key) : provider;
+  };
 
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
@@ -123,20 +143,29 @@ export default async function AdminAIPage() {
     Date.now() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
-  const [providers, models, routes, features, budgets, usage, prompts] =
-    await Promise.all([
-      callAction(context, "ai.readProviderConfig", {}),
-      callAction(context, "ai.readModelCatalog", {}),
-      callAction(context, "ai.readTierRouting", {}),
-      callAction(context, "ai.readFeatureSettings", {}),
-      callAction(context, "ai.readBudgets", {}),
-      callAction(context, "ai.readUsageSummary", { since }),
-      Promise.all(
-        knownPromptKeys().map((promptKey) =>
-          callAction(context, "ai.readPrompt", { promptKey }),
-        ),
+  const [
+    providers,
+    models,
+    routes,
+    features,
+    budgets,
+    usage,
+    prompts,
+    privacy,
+  ] = await Promise.all([
+    callAction(context, "ai.readProviderConfig", {}),
+    callAction(context, "ai.readModelCatalog", {}),
+    callAction(context, "ai.readTierRouting", {}),
+    callAction(context, "ai.readFeatureSettings", {}),
+    callAction(context, "ai.readBudgets", {}),
+    callAction(context, "ai.readUsageSummary", { since }),
+    Promise.all(
+      knownPromptKeys().map((promptKey) =>
+        callAction(context, "ai.readPrompt", { promptKey }),
       ),
-    ]);
+    ),
+    callAction(context, "ai.readPrivacySettings", {}),
+  ]);
 
   const configured = providers.filter((one) => one.hasWorkspaceCredential);
 
@@ -152,8 +181,8 @@ export default async function AdminAIPage() {
           </div>
           <Chip tone={configured.length > 0 ? "ok" : "neutral"}>
             {configured.length > 0
-              ? `${configured.length} configured`
-              : "not configured"}
+              ? t("admin.ai.configuredCount", { count: configured.length })
+              : t("admin.ai.notConfigured")}
           </Chip>
         </CardHeader>
       </Card>
@@ -171,7 +200,7 @@ export default async function AdminAIPage() {
             <Card key={kind}>
               <CardHeader className="justify-between">
                 <span className="flex items-center gap-2 text-sm font-medium text-ink">
-                  {PROVIDER_WORDS[kind] ?? kind}
+                  {providerWord(kind)}
                   {config?.enabled ? (
                     <Chip tone="ok">{t("admin.ai.on")}</Chip>
                   ) : (
@@ -213,6 +242,11 @@ export default async function AdminAIPage() {
                     />
                     {t("admin.ai.letMembersSupplyTheir")}
                   </label>
+                  {/* Where the other half of this switch lives, since it is
+                      on the member's own account rather than here (M-36). */}
+                  <p className="pl-6 text-xs text-ink-3">
+                    {t("admin.ai.membersStoreTheirs")}
+                  </p>
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
                     {t("admin.ai.baseUrlForA")}
                     <input
@@ -234,8 +268,8 @@ export default async function AdminAIPage() {
                   <input type="hidden" name="provider" value={kind} />
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
                     {config?.hasWorkspaceCredential
-                      ? "Replace the key. The current one is never shown, so there is nothing to check it against."
-                      : "Paste the provider key. It is encrypted on arrival and never displayed again."}
+                      ? t("admin.ai.replaceTheKeyHelp")
+                      : t("admin.ai.pasteTheProviderKey")}
                     <input
                       name="apiKey"
                       type="password"
@@ -245,7 +279,9 @@ export default async function AdminAIPage() {
                     />
                   </label>
                   <Button type="submit" variant="default" size="sm">
-                    {config?.hasWorkspaceCredential ? "Replace" : "Store"}
+                    {config?.hasWorkspaceCredential
+                      ? t("admin.ai.replace")
+                      : t("admin.ai.store")}
                   </Button>
                 </AIForm>
 
@@ -330,7 +366,7 @@ export default async function AdminAIPage() {
                       </span>
                     </td>
                     <td className="py-1.5 pr-3">
-                      {PROVIDER_WORDS[model.provider] ?? model.provider}
+                      {providerWord(model.provider)}
                     </td>
                     <td className="py-1.5 pr-3 tabular-nums">
                       {model.contextWindow.toLocaleString("en-GB")}
@@ -341,9 +377,7 @@ export default async function AdminAIPage() {
                     <td className="py-1.5 pr-3">
                       {model.tiers.length === 0
                         ? "—"
-                        : model.tiers
-                            .map((tier) => TIER_WORDS[tier] ?? tier)
-                            .join(", ")}
+                        : model.tiers.map((tier) => tierWord(tier)).join(", ")}
                     </td>
                     <td className="py-1.5">
                       {model.source === "custom" && model.id ? (
@@ -379,7 +413,7 @@ export default async function AdminAIPage() {
                 >
                   {AI_PROVIDER_KINDS.map((kind) => (
                     <option key={kind} value={kind}>
-                      {PROVIDER_WORDS[kind] ?? kind}
+                      {providerWord(kind)}
                     </option>
                   ))}
                 </select>
@@ -434,17 +468,10 @@ export default async function AdminAIPage() {
               </label>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-ink-2">
-              {(
-                [
-                  ["supportsTools", "Tools"],
-                  ["supportsVision", "Vision"],
-                  ["supportsJsonMode", "JSON mode"],
-                  ["supportsStreaming", "Streaming"],
-                ] as const
-              ).map(([name, label]) => (
+              {CAPABILITIES.map(([name, labelKey]) => (
                 <label key={name} className="flex items-center gap-1.5">
                   <input type="checkbox" name={name} className="size-3.5" />
-                  {label}
+                  {t(labelKey)}
                 </label>
               ))}
               <span className="text-ink-3">{t("admin.ai.tiers2")}</span>
@@ -456,7 +483,7 @@ export default async function AdminAIPage() {
                     value={tier}
                     className="size-3.5"
                   />
-                  {TIER_WORDS[tier] ?? tier}
+                  {tierWord(tier)}
                 </label>
               ))}
             </div>
@@ -485,13 +512,13 @@ export default async function AdminAIPage() {
               className="flex flex-col gap-1.5 border-t border-line pt-2.5 first:border-0 first:pt-0"
             >
               <span className="flex items-center gap-2 text-sm text-ink">
-                {TIER_WORDS[route.tier] ?? route.tier}
+                {tierWord(route.tier)}
                 <Chip tone={route.source === "unresolved" ? "warn" : "neutral"}>
                   {route.source === "policy"
-                    ? "set here"
+                    ? t("admin.ai.setHere")
                     : route.source === "seeded-default"
-                      ? "seeded default"
-                      : "nothing answers this yet"}
+                      ? t("admin.ai.seededDefault")
+                      : t("admin.ai.nothingAnswersThisYet")}
                 </Chip>
                 {route.modelId ? (
                   <code className="font-mono text-xs text-ink-3">
@@ -514,7 +541,7 @@ export default async function AdminAIPage() {
                     >
                       {AI_PROVIDER_KINDS.map((kind) => (
                         <option key={kind} value={kind}>
-                          {PROVIDER_WORDS[kind] ?? kind}
+                          {providerWord(kind)}
                         </option>
                       ))}
                     </select>
@@ -578,7 +605,10 @@ export default async function AdminAIPage() {
       <BudgetsCard budgets={budgets} />
       <FeaturesCard features={features} />
       <PromptsCard prompts={prompts} />
-      <PrivacyCard />
+      <PrivacyCard
+        privacy={privacy}
+        egress={egressStateOf(routes, providers)}
+      />
     </div>
   );
 }

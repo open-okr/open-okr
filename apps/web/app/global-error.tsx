@@ -1,5 +1,8 @@
 "use client";
 import { useTranslations } from "@openokr/ui";
+import { useEffect, useState } from "react";
+import { instanceNameForErrorPage } from "../lib/instance-name-action";
+import { useInstanceName } from "../lib/instance-name-context";
 
 /**
  * The last boundary (P6-G24a).
@@ -18,6 +21,10 @@ import { useTranslations } from "@openokr/ui";
  *
  * Deliberately plain. Whatever got here is a deployment fault, not a product
  * state, and the one useful thing is the digest that ties it to a log line.
+ *
+ * **It names the instance when it can** (M-33). The provider that would hand
+ * it the name is in the layout that failed, so it asks the server once it has
+ * rendered and says "OpenOKR" until the answer arrives, or if none does.
  */
 export default function GlobalError({
   error,
@@ -27,6 +34,23 @@ export default function GlobalError({
   readonly reset: () => void;
 }) {
   const { t } = useTranslations();
+  const fallback = useInstanceName();
+  const [instanceName, setInstanceName] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    instanceNameForErrorPage()
+      .then((name) => {
+        if (live) {
+          setInstanceName(name);
+        }
+      })
+      // A server that cannot answer this is the likeliest reason to be here.
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
 
   return (
     <html lang="en">
@@ -53,7 +77,9 @@ export default function GlobalError({
           }}
         >
           <h1 style={{ fontSize: "1.125rem", margin: "0 0 0.5rem" }}>
-            {t("globalError.openokrCouldNotStart")}
+            {t("globalError.couldNotStart", {
+              instanceName: instanceName ?? fallback,
+            })}
           </h1>
           <p style={{ fontSize: "0.875rem", margin: "0 0 1rem" }}>
             {t("globalError.somethingFailedBeforeAny")}

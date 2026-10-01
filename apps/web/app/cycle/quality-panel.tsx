@@ -139,6 +139,8 @@ export function QualityPanel({
   }, [set, thresholds]);
 
   const total = groups.reduce((sum, group) => sum + group.issues.length, 0);
+
+  const withIssues = groups.filter((g) => g.issues.length > 0).length;
   const mustFix = groups.reduce(
     (sum, group) =>
       sum + group.issues.filter((issue) => issue.status === "fail").length,
@@ -170,18 +172,23 @@ export function QualityPanel({
       ) : total === 0 ? (
         <p className="text-xs text-ok">
           {t("cycle.qualityPanel.everyCheckPassesAcrossObjective", {
-            length: set.length,
-            length2: set.length === 1 ? "" : "s",
+            objectives:
+              set.length === 1
+                ? t("common.count.objectiveOne", { count: set.length })
+                : t("common.count.objectiveOther", { count: set.length }),
           })}
         </p>
       ) : (
         <p className="text-xs text-ink-3">
           {t("cycle.qualityPanel.issueAcrossObjectiveEachOne", {
-            total,
-            total2: total === 1 ? "" : "s",
-            length: groups.filter((g) => g.issues.length > 0).length,
-            length2:
-              groups.filter((g) => g.issues.length > 0).length === 1 ? "" : "s",
+            issues:
+              total === 1
+                ? t("common.count.issueOne", { count: total })
+                : t("common.count.issueOther", { count: total }),
+            objectives:
+              withIssues === 1
+                ? t("common.count.objectiveOne", { count: withIssues })
+                : t("common.count.objectiveOther", { count: withIssues }),
           })}
         </p>
       )}
