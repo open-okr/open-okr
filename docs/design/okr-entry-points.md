@@ -1,5 +1,7 @@
 # OKR entry points: where a member goes to see and write an OKR
 
+> **Partly superseded on 1 October 2026.** Akmal decided that anybody can write an objective or key result at any time by default, and that an admin may restrict it. So §2's "keep every gate, and move the door" no longer holds: the door stays open unless a workspace closes it. §3.1, the sidebar regroup and the "OKRs" rename, is adopted in P9-T07a. §3.2's screen is built in P9-T07a and P9-T07b, extended with a diagram view. See [p9-t00-okr-writing.md](p9-t00-okr-writing.md) and [p9-t00-adaptable-practice.md](p9-t00-adaptable-practice.md) decision D5.
+
 Written after a usability complaint on 30 September 2026: the OKR surface is
 hard to navigate, there is no single place called OKR, and nothing on the
 objective screens creates an objective. A FlowyTeam screenshot was given as the
