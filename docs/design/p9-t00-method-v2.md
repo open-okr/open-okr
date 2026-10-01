@@ -223,7 +223,7 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 |---|---|---|
 | Continue | Still right as written | Nothing new |
 | Update | Change the wording, a key result, or a target | A dated change in the activity, with the previous value kept |
-| Start | Add a new objective or key result mid-cycle | Created and marked **added mid-cycle**, visible in lists and at the close |
+| Start | Add a new objective or key result mid-cycle | Created and marked **added mid-cycle**, visible in lists and at the close. OKRs created before the team publication window closes (§11) are the cycle's plan, not additions, and carry no mark |
 | Stop | It no longer matters | Closed as abandoned with a one-line reason |
 
 **Live or draft.** An objective added mid-cycle is live at once by default. A workspace may make new objectives start as drafts that their owner publishes, or that their reviewer approves (§12).
@@ -309,7 +309,7 @@ Confidence is asked every check-in, on every key result. It is shown as "x in 10
 
 *Source:* Wodtke: "you set a difficult number you have a 50% confidence in achieving"; "A confidence level of ten is also known as sandbagging."
 
-For committed key results, high confidence is right. A committed key result drafted below 0.7 is a risk: escalate now to find the resources, or make it aspirational. *Source:* Google's OKR playbook: "Teams who cannot credibly promise to deliver a 1.0 on a committed OKR must escalate promptly."
+For committed key results, high confidence is right. A committed key result below 0.7, whether drafted there or falling there at any check-in, is a risk: escalate now to find the resources, or make it aspirational. *Source:* Google's OKR playbook: "Teams who cannot credibly promise to deliver a 1.0 on a committed OKR must escalate promptly."
 
 ### 3.3 Score bands
 
@@ -939,7 +939,7 @@ The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice beh
 | Key result measures activity volume | More calls, to what end? If you can measure that impact, make it the key result |
 | Tagged key results are all lagging | You will only find out at the end. Add a leading indicator you can act on weekly |
 | Aspirational set near certain at draft | If this must be delivered, mark it committed. If it is a stretch, raise the targets |
-| Committed key result drafted below 0.7 confidence | A commitment nobody believes in is a risk. Escalate now, or make it aspirational |
+| Committed key result below 0.7 confidence, at drafting or at a check-in | A commitment nobody believes in is a risk. Escalate now, or make it aspirational |
 | More than five company objectives | If everything is a priority, nothing can be chosen. Which two would you drop? |
 | Not-doing list empty at the end of an annual Phase 3 | A list that accommodates everything is a to-do list, not a strategy |
 | Goal with no parent and no stated reason | Which priority does this move forward? If it stands alone, say why |
@@ -1019,7 +1019,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Draft near-certain threshold | Average above 0.90 on aspirational key results |
 | Draft comfortable boundary | 0.70 |
 | Draft moonshot boundary | 0.30 |
-| Committed draft floor | 0.7 |
+| Committed confidence floor | 0.7, at drafting and at every check-in |
 | Score band boundaries | 1.0, 0.6, 0.3 |
 | Committed expected score | 1.0 |
 | Aspirational expected average | 0.7 |

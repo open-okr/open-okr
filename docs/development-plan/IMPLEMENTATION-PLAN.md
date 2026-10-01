@@ -3166,7 +3166,7 @@ Depends on: P9-T01
 Goal: every rule that judges ambition knows which kind of promise it is judging.
 Deliverables:
 - **The data.** `goals.kind`, with the kind picker and chip.
-- **The rules.** Confidence, draft verdicts, score notes, the portfolio verdict and the root-cause threshold split by kind; the committed draft floor and its escalation.
+- **The rules.** Confidence, draft verdicts, score notes, the portfolio verdict and the root-cause threshold split by kind; the committed confidence floor and its escalation.
 - **The registry.** Six thresholds join it and four leave (the sandbagging and annotation parameters).
 - **Triggers.** The trigger catalogue is updated.
 - **Documents.** METHOD.md §1 principle 4, §2.8, §3.2 and §3.4 move in.
