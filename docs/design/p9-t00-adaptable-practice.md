@@ -21,7 +21,7 @@ The design gate for Phase 9. Written on 1 October 2026 for Akmal and Agung to ap
 | A reviewer on every goal, required by the database | Off, optional or required | Optional |
 | One kind of OKR | Committed and aspirational | Both, new objectives aspirational |
 | Key results must be numeric ranges | Metric, maintain, milestone, baseline | All four |
-| One target calibration per cycle, as a note unconnected to target edits; targets editable silently any time | Every target change recorded with its history; lowering needs a reason | No count limit |
+| One target calibration per cycle, as a note unconnected to target edits; targets editable silently any time | Every target change recorded with its history; easing one toward its baseline needs a reason | No count limit |
 | Penalty-based alignment score, level skips flagged | Share of goals aligned or standing alone with a reason | Healthy at 90% |
 | KPI health as a ratio to target | The KPI's own thresholds by target type, ratio only as fallback | Ratio fallback 90/70 |
 | Escalation reaches the sponsor in 48 hours | Ladders stop at the coordinator; the sponsor reads the digest | Sponsor off |
@@ -106,7 +106,7 @@ The gates in [`workflow.ts`](../../packages/method/src/workflow.ts) `publishGate
 
 ### 2.4 A cycle keeps the rules it was graded under
 
-`cycles.practice_snapshot` (jsonb) records the profile, the resolved practice and the scoring thresholds when a cycle closes. Scorecards, portfolio verdicts and the diagnostic of a closed cycle read the snapshot, so changing a band next quarter never rewrites last quarter. Open cycles read the live settings.
+`cycles.practice_snapshot` (jsonb) records the profile, the resolved practice and every threshold when a cycle closes, quality caps included, so a closed cycle's OKR-count warnings are as fixed as its score bands. Scorecards, portfolio verdicts and the diagnostic of a closed cycle read the snapshot, so changing a band next quarter never rewrites last quarter. Open cycles read the live settings.
 
 ### 2.5 Settings never destroy anything
 
@@ -134,6 +134,8 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 | `key_results` | `score_computed numeric`, `score_reason text` | `score_computed = score` where scored |
 | New `key_result_target_changes` | `workspace_id`, `key_result_id`, `from_value`, `to_value`, `reason`, `actor`, `changed_at`, `mid_cycle` | None |
 | `cycles` | `practice_snapshot jsonb` | Closed cycles get today's canon |
+| `cycles` | `teams_published_at timestamptz`, beside the existing `published_at`, for the second publish step (METHOD v2 §4.5) | None |
+| New `space_holidays` | `workspace_id`, `space_id`, `starts_on`, `ends_on`, `note` | None |
 | Root-cause enum | add `other`; sessions gain `secondary_root_cause` | None |
 | Blocker-type enum | add `approach`, `other` | None |
 | Close-decision enum | add `achieved`, `defer` | None |
@@ -149,12 +151,14 @@ New actions in the registry, which regenerates REST, OpenAPI, the CLI and the ag
 | Action | Access | Purpose |
 |---|---|---|
 | `practice.read`, `practice.update`, `practice.applyProfile` | read, `full` | The settings screen and the API |
-| `goals.tree` | read | One read for the list and the diagram: a cycle's objectives, key results, alignment and dependencies for a scope |
+| `goals.tree` | read | One read for the list and the diagram: a cycle's objectives, key results, alignment and dependencies for a scope, plus every parent in another cycle (an annual objective) as read-only context |
 | `goals.patch`, `goals.patchKeyResult` | edit | One field at a time, for inline editing, with an optimistic concurrency token, so a stale edit is refused with the current value rather than overwriting it |
 | `goals.changeTarget` | edit | Records the change in `key_result_target_changes`, asks the policy whether a reason is needed |
 | `goals.deleteKeyResult` | edit | Soft delete; there is no way to remove a key result today |
 | `goals.setKind` | edit | Committed or aspirational, recorded in the activity |
-| `goals.publishDraft`, `goals.approveDraft` | edit, reviewer | For workspaces whose mid-cycle objectives start as drafts |
+| `goals.publishDraft`, `goals.approveDraft` | edit, reviewer | For workspaces whose mid-cycle objectives start as drafts, and for a mid-cycle addition that is a draft until it passes the checks set to block |
+| `workflow.publish` gains `step: "company" \| "teams"` | full | The two publish steps (METHOD v2 §4.5) |
+| `spaces.setHolidays` | edit on the space | Holiday periods (METHOD v2 §7.4) |
 
 Removed: the `guided` input on `goals.create` and `goals.addKeyResult`. The two-release rule applies to the input field: it is accepted and ignored for one release.
 
@@ -179,24 +183,29 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 
 | Task | Title | METHOD v2 sections | Conformance differences it closes |
 |---|---|---|---|
-| P9-T01 | Practice settings: registry, storage and actions | §12, the preamble, terms | New: §12.1 against `PRACTICE` |
-| P9-T02 | One policy decides; anybody can write | §1 principle 11, §2.2, §2.3, §2.4, §2.6, §2.9 (writing) | "Team publication window", "Strategic issue minimum"; retire "Strategic issue bounds" |
-| P9-T03 | Enforcement levels for checks and gates | §4 intro, §4.1, §4.4, §4.5, §4.6 | Word lists ("to", "bring"); OBJ-1, OBJ-2 and KR-5 condition tables; "Objective length limit", "Strength score warn weight"; retire "Objective length bounds" |
+| P9-T01 | Practice settings: registry, storage and actions | §12 | New: §12.1 against `PRACTICE` |
+| P9-T02 | One policy decides; anybody can write; the first cycle is inferred | §1 principle 11, §2.2, §2.3, §2.4, §2.6, §2.9 (who may write, and when) | "Team publication window", "Strategic issue minimum"; retire "Strategic issue bounds" |
+| P9-T03 | Enforcement levels for checks and gates; publishing in two steps | §2.7 (all but its first sentence, which needs the levels setting), §4 intro, §4.1, §4.2's KR-1, KR-4 and KR-5, §4.4, §4.5, §4.6 | Word lists ("to", "bring"); OBJ-1, OBJ-2 and KR-5 condition tables; "Objective length limit", "Strength score warn weight"; retire "Objective length bounds" |
 | P9-T04 | The reviewer becomes optional | §2.5, OBJ-4 | None (behaviour) |
 | P9-T05 | The practice settings screen | none | None |
 | P9-T06 to P9-T10 | OKR writing, list and diagram | none ([p9-t00-okr-writing.md](p9-t00-okr-writing.md)) | None |
-| P9-T11 | Committed and aspirational OKRs | §1 principle 4, §2.8, §3.2, §3.4 | Six new scoring thresholds; retire the four sandbagging and annotation parameters |
-| P9-T12 | Kinds of key result | §2.10, §3.1, §4.2 | KR-2 condition table |
-| P9-T13 | Changing OKRs mid-cycle: the added-mid-cycle mark, live or draft creation, stop with a reason, calibration retired. Builds on the target history and reason rule P9-T06 introduces for inline target edits | §2.9 (changes), §7.6 | The four calibration sentences |
+| P9-T11 | Committed and aspirational OKRs | §1 principle 4, §2.8, §3.2, §3.4, §4.2's KR-6 | Six new scoring thresholds; retire the four sandbagging and annotation parameters |
+| P9-T12 | Kinds of key result | §2.10, §3.1, §4.2's opening, KR-2, KR-3 and KR-7 | KR-2 condition table |
+| P9-T13 | Changing OKRs mid-cycle: the added-mid-cycle mark, live or draft creation, stop with a reason, annual revisions, calibration retired. Builds on the target history and reason rule P9-T06 introduces | §2.1, §2.9 (the four moves, live or draft, changing a target), §7.6 | The four calibration sentences |
 | P9-T14 | Adjustable scores and cycles that keep their rules | §3.3, §12 snapshot paragraph | Score band values |
 | P9-T15 | A progress signal that knows the date | §3.5, §3.6, §3.7 | "Progress signal pace gaps", "Trend forecast minimum values", "Divergence window" |
 | P9-T16 | Alignment on ratios | §4.3, §5 | "Contribution minimum", "Alignment watch threshold"; retire "Alignment penalties" |
 | P9-T17 | KPI target types and their own thresholds | §6.1 to §6.4, §6.7 | None (behaviour) |
 | P9-T18 | Responding to an unhealthy KPI | §6.5, §6.6 | Recovery proposal delay value |
-| P9-T19 | Calmer escalation and cadence | §7.1 to §7.5, §11 cadence group | Blocker taxonomy and definitions; rituals; weekly steps |
-| P9-T20 | The quarterly review, re-timed | §8 | Review stages and purposes; root causes; close decisions and meanings; rhythm diagnostic; "Diagnostic rhythm threshold"; retire "Diagnostic rhythm-score threshold" |
-| P9-T21 | The coach's voice, and METHOD.md fully landed | §1, §9, §10, §11 framing, §13 | Trigger catalogue (AI-NATIVE-PLAN.md §6.4) and the P4-T00 coach watch list; deletes `p9-t00-method-v2.md` and METHOD.md's banner |
+| P9-T19a | Calmer escalation and cadence | §7.1, §7.2, §7.3, §7.5, the §11 cadence group | Blocker taxonomy and definitions; rituals; weekly steps; "Planning-open lead" for a quarter, 3 to 4 weeks |
+| P9-T19b | Holidays, and a rhythm that follows them | §7.4 | None (behaviour) |
+| P9-T20 | The quarterly review, re-timed, and the annual review | §8 | Review stages and purposes; root causes; close decisions and meanings; rhythm diagnostic; "Diagnostic rhythm threshold"; retire "Diagnostic rhythm-score threshold" |
+| P9-T21 | The coach's voice, and METHOD.md fully landed | The preamble and terms, §1, §9, §10, §11 framing, §13 | Trigger catalogue (AI-NATIVE-PLAN.md §6.4) and the P4-T00 coach watch list; deletes `p9-t00-method-v2.md` and METHOD.md's banner |
 | P9-T22 | Release 0.2.0 and the demo story | none | None |
+
+**One sentence waits for a decision already taken.** §2.7's first sentence, "A workspace chooses the levels it uses", needs a task that reads the levels setting. Akmal agreed on 2 October 2026 that gaps G-1 to G-4 from [the Northwind year](../scenarios/northwind-year/05-scenario-index.md) join this plan in P9-T01's commit; G-3 is that task, and the sentence moves with it.
+
+The preamble and terms move at P9-T21 rather than P9-T01, because they describe committed OKRs and key result kinds, which do not exist until P9-T11 and P9-T12.
 
 Order and dependencies: P9-T01, then P9-T02 to P9-T05 (the unblock wave), then P9-T06 to P9-T10 (writing). The model, alignment, KPI and rhythm waves follow in order. P9-T21 and P9-T22 close the phase.
 
@@ -208,7 +217,7 @@ Order and dependencies: P9-T01, then P9-T02 to P9-T05 (the unblock wave), then P
 | A2 | The same workspace switched to the governed profile | The member tries again | The create is refused with the reason and the rule key, from every caller alike |
 | A3 | An objective "Launch the new mobile app" with one key result that has a target, a date and an owner | The set is published | Publishing succeeds; OBJ-1 shows a warning with its coaching prompt |
 | A4 | A workspace that sets OBJ-1 to block | The same set is published | Publishing is refused until OBJ-1 passes or an admin overrides with a recorded reason |
-| A5 | A key result with target 100 | Its owner lowers it to 80 without a reason | Refused: "Lowering a target needs a written reason". With a reason it saves, and both 100 and 80 show at the close |
+| A5 | A key result from 40 to a target of 100 | Its owner eases the target to 80 without a reason | Refused: "Easing a target needs a written reason". With a reason it saves, and both 100 and 80 show at the close. Raising it to 110 saves with no reason |
 | A6 | A committed key result scored 1.0 at the close | The scoring reveal runs | No "too safe" note appears; a committed key result at 0.8 asks for its explanation |
 | A7 | A closed cycle scored under score bands 1.0 / 0.6 / 0.3 | An admin changes the bands to Doerr's colours | The closed cycle's verdicts are unchanged; the open cycle uses the new colours |
 | A8 | A workspace with reviewers off | A champion publishes a check-in | No acknowledgement is owed, and no reviewer step appears in any ladder |
