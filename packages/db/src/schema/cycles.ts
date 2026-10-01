@@ -196,6 +196,29 @@ export const rhythmSettings = pgTable("rhythm_settings", {
    * thresholds.
    */
   quietMode: boolean("quiet_mode").notNull().default(false),
+  /**
+   * The METHOD.md §12 profile the workspace chose (P9-T01). The starting
+   * point `practice` is laid over.
+   */
+  profile: text("profile", {
+    enum: [
+      "recommended",
+      "googleStyle",
+      "radicalFocus",
+      "lightweight",
+      "governed",
+    ],
+  })
+    .notNull()
+    .default("recommended"),
+  /**
+   * The practice settings this workspace changed on top of its profile,
+   * sparse, validated against `PRACTICE` in packages/method (P9-T01).
+   */
+  practice: jsonb("practice")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

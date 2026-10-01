@@ -20705,6 +20705,451 @@
         }
       }
     },
+    "/practice/read": {
+      "get": {
+        "operationId": "practice.read",
+        "summary": "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+        "tags": [
+          "practice"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "profile": {
+                          "type": "string",
+                          "enum": [
+                            "recommended",
+                            "googleStyle",
+                            "radicalFocus",
+                            "lightweight",
+                            "governed"
+                          ]
+                        },
+                        "overrides": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "practice": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "differsFromProfile": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "registry": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "item": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "group": {
+                                "type": "string"
+                              },
+                              "section": {
+                                "type": "string"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "default": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "item",
+                              "group",
+                              "section",
+                              "source",
+                              "options",
+                              "default"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "profiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "enum": [
+                                  "recommended",
+                                  "googleStyle",
+                                  "radicalFocus",
+                                  "lightweight",
+                                  "governed"
+                                ]
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "for": {
+                                "type": "string"
+                              },
+                              "practice": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "thresholds": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "for",
+                              "practice",
+                              "thresholds"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "profile",
+                        "overrides",
+                        "practice",
+                        "differsFromProfile",
+                        "registry",
+                        "profiles"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
+      }
+    },
+    "/practice/update": {
+      "post": {
+        "operationId": "practice.update",
+        "summary": "Changes some of this workspace's practice settings. A setting set to null goes back to its profile's value.",
+        "tags": [
+          "practice"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "profile": {
+                          "type": "string",
+                          "enum": [
+                            "recommended",
+                            "googleStyle",
+                            "radicalFocus",
+                            "lightweight",
+                            "governed"
+                          ]
+                        },
+                        "overrides": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "practice": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "differsFromProfile": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "profile",
+                        "overrides",
+                        "practice",
+                        "differsFromProfile"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "overrides": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "overrides"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/practice/applyProfile": {
+      "post": {
+        "operationId": "practice.applyProfile",
+        "summary": "Chooses one of the five METHOD.md §12.2 profiles. This workspace's own changes are kept.",
+        "tags": [
+          "practice"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "profile": {
+                          "type": "string",
+                          "enum": [
+                            "recommended",
+                            "googleStyle",
+                            "radicalFocus",
+                            "lightweight",
+                            "governed"
+                          ]
+                        },
+                        "overrides": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "practice": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "differsFromProfile": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "profile",
+                        "overrides",
+                        "practice",
+                        "differsFromProfile"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "profile": {
+                    "type": "string",
+                    "enum": [
+                      "recommended",
+                      "googleStyle",
+                      "radicalFocus",
+                      "lightweight",
+                      "governed"
+                    ]
+                  }
+                },
+                "required": [
+                  "profile"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/frame/annualObjectives": {
       "get": {
         "operationId": "frame.annualObjectives",

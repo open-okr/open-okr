@@ -253,7 +253,7 @@ The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An i
 `cycle_id` to cycles, `used bool`, `reason`, `at`, `author_member_id` to workspace_members.
 
 ### rhythm_settings *(one row per workspace)*
-`default_check_in_frequency`, `check_in_anchor_day`, `coach_strictness` (`advisory` / `warn` / `strict`), `overrides jsonb`, `labels jsonb`. `overrides` holds sparse deviations from the METHOD.md §11 registry, validated against the method package's schema; an unset key reads the canon default.
+`default_check_in_frequency`, `check_in_anchor_day`, `coach_strictness` (`advisory` / `warn` / `strict`), `overrides jsonb`, `labels jsonb`, `quiet_mode bool`, `profile` (`recommended` / `googleStyle` / `radicalFocus` / `lightweight` / `governed`, default `recommended`), `practice jsonb` (default `{}`, an object). `overrides` holds sparse deviations from the METHOD.md §11 registry, validated against the method package's schema; an unset key reads the canon default. `profile` and `practice` (0108, P9-T01) are the METHOD.md §12 practice settings: the chosen profile, and only what the workspace changed on top of it, validated against `PRACTICE`. No legacy source.
 
 ## 7. Goals, key results and check-ins (domain D)
 

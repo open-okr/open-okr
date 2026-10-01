@@ -8,7 +8,7 @@ This is the reference for four kinds of work:
 |---|---|
 | **Knowing how the product is meant to be used** | Read it straight through. Each quarter is a chapter |
 | **Testing the code** | Every step has an ID (`NW-Q2-07`) and a Given / When / Then. End-to-end specs and the manual acceptance workbook cite the ID they prove |
-| **Running the demo** | §6 lists the dates worth showing and what must be true on each. Placing the seed at one of them is gap G-4 |
+| **Running the demo** | §6 lists the dates worth showing and what must be true on each. P9-T22 places the seed at any of them |
 | **Writing the user guide** | Each step names the screen and the practice rule it shows. A guide page explains the steps that cite it |
 
 Written on 2 October 2026, against METHOD.md as revised for Phase 9 ([p9-t00-method-v2.md](../../design/p9-t00-method-v2.md)) and the Phase 9 plan ([p9-t00-adaptable-practice.md](../../design/p9-t00-adaptable-practice.md), [p9-t00-okr-writing.md](../../design/p9-t00-okr-writing.md)). Where a step needs something not built yet, it says which task builds it.
@@ -42,7 +42,7 @@ Written on 2 October 2026, against METHOD.md as revised for Phase 9 ([p9-t00-met
 
 ## 2. The cast
 
-Elena, who registers the workspace, and the seven people the demo seed creates carry the story. Six more are added by this scenario, each for a part of it, and the seed should create them when it builds this year (P9-T22, gap G-4). That is fourteen in all, the cast the manual workbook's "Year" sheet uses.
+Elena, who registers the workspace, and the seven people the demo seed creates carry the story. Six more are added by this scenario, each for a part of it, and the seed creates them when it builds this year (P9-T22). That is fourteen in all, the cast the manual workbook's "Year" sheet uses.
 
 | Person | Role | Reports to | Time zone | Part in the story | In the seed |
 |---|---|---|---|---|---|
@@ -79,7 +79,7 @@ The two agent members, the **OKR Coach** and the **OKR Champion**, ship with the
 | Finance and Operations | Hugo | Hugo | 14 | All year |
 | Growth | Yuki | Yuki | 5 | From 9 August |
 
-**Levels.** Company, department and team. Individual OKRs are off, as METHOD.md recommends (§2.7: "Individual OKRs are not for everyone and should never be required"). In Q4 Northwind decides to drop the department level for 2028, following Castro's advice to use as few levels as possible. P9-T01 declares that setting; making the screens read it is gap G-3.
+**Levels.** Company, department and team. Individual OKRs are off, as METHOD.md recommends (§2.7: "Individual OKRs are not for everyone and should never be required"). In Q4 Northwind decides to drop the department level for 2028, following Castro's advice to use as few levels as possible. P9-T01 declares that setting, and P9-T07a and P9-T16 make the screens read it.
 
 ## 4. Northwind's practice settings
 
@@ -125,7 +125,7 @@ Quarters follow the calendar. Weekly check-ins are on Mondays. "W3" means week 3
 
 ## 6. Dates worth showing in the demo
 
-The demo seed is built relative to the day it runs (P8-T13b). Placing "today" at one of these points of the year, with everything before it already true, is gap G-4, which joins P9-T22.
+The demo seed is built relative to the day it runs (P8-T13b). P9-T22 makes it able to place "today" at any of these points of the year, with everything before it already true.
 
 | Demo date | What a visitor sees | Steps that must already be true |
 |---|---|---|
@@ -168,5 +168,5 @@ Two cautions:
 | `NW-Q1-01` to `NW-Q4-nn` | Steps in each quarter, in date order |
 | **Screen** | The UIUX-PLAN screen number and route, for example S-13 `/goals` |
 | **Rule** | The METHOD.md section (revised text) the step exercises |
-| **Status** | **Today**: works in the product now. **P9-Tnn**: arrives with that Phase 9 task. **Gap**: no task builds it yet; [05-scenario-index.md](05-scenario-index.md) §3 lists every gap |
+| **Status** | **Today**: works in the product now. **P9-Tnn**: arrives with that Phase 9 task. [05-scenario-index.md](05-scenario-index.md) §3 records the four gaps the year found and the tasks that now build them |
 | Numbers | Every value is consistent across chapters: a key result that ends Q1 at 7 days starts Q2 there |

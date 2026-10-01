@@ -5681,6 +5681,85 @@
       "example": {}
     },
     {
+      "name": "practice.read",
+      "description": "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "practice.update",
+      "description": "Changes some of this workspace's practice settings. A setting set to null goes back to its profile's value.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "overrides": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "required": [
+          "overrides"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "overrides": {}
+      }
+    },
+    {
+      "name": "practice.applyProfile",
+      "description": "Chooses one of the five METHOD.md §12.2 profiles. This workspace's own changes are kept.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "recommended",
+              "googleStyle",
+              "radicalFocus",
+              "lightweight",
+              "governed"
+            ]
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "profile": "recommended"
+      }
+    },
+    {
       "name": "frame.annualObjectives",
       "description": "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
       "inputSchema": {

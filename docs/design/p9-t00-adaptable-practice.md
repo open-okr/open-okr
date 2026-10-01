@@ -42,27 +42,28 @@ A pure registry beside the existing threshold registry ([`thresholds.ts`](../../
 
 ```ts
 export const PRACTICE = {
-  "writing.when":        { options: ["anytime", "planningWindow", "afterPhases"], default: "anytime" },
-  "phases.enforcement":  { options: ["guided", "binding", "hidden"],               default: "guided" },
-  "writing.midCycleAs":  { options: ["live", "ownerDraft", "reviewerApproval"],    default: "live" },
-  "targets.lowerReason": { options: ["required", "optional"],                      default: "required" },
-  "okr.kinds":           { options: ["both", "aspirationalOnly", "committedOnly"], default: "both" },
-  "reviewer":            { options: ["off", "optional", "required"],               default: "optional" },
-  "checks.OBJ-1":        { options: ["block", "warn", "off"],                      default: "warn" },
-  // ... one entry per row of METHOD v2 §12.1, per check and per gate
-} satisfies Record<string, PracticeSetting>;
+  "writing.when":           { label: "Who may write OKRs, and when", options: ["anytime", "planningWindow", "afterPhases"], default: "anytime" },
+  "phases.enforcement":     { label: "Phase enforcement",            options: ["guided", "binding", "hidden"],               default: "guided" },
+  "writing.midCycleAs":     { label: "New objectives mid-cycle start as", options: ["live", "ownerDraft", "reviewerApproval"], default: "live" },
+  "reasons.easingTarget":   { label: "Reason when easing a target",  options: ["required", "optional"],                      default: "required" },
+  "reviewer":               { label: "Reviewer per goal",            options: ["off", "optional", "required"],               default: "optional" },
+  "checks.OBJ-1":           { label: "Check enforcement", item: "OBJ-1", options: ["asMethod", "block", "warn", "off"],   default: "asMethod" },
+  "gates.3":                { label: "Publish gate enforcement", item: "Gate 3", options: ["block", "warn", "off"],        default: "warn" },
+  // ... one entry per row of METHOD v2 §12.1, and per check, gate, level and key result kind
+};
 
-export const PROFILES = {
-  recommended: {},                                    // the defaults
-  googleStyle: { "levels.individual": "on", "levels.department": "off", "reviewer": "off" },
-  radicalFocus: { "phases.enforcement": "hidden", "quality.objectivesPerUnit": 1 /* threshold */ },
-  lightweight: { "phases.enforcement": "hidden", "reviewer": "off", "checkIn.frequency": "biweekly" },
-  governed: { "phases.enforcement": "binding", "writing.when": "planningWindow",
-              "writing.midCycleAs": "reviewerApproval", "reviewer": "required", "gates.3": "block" },
-} as const;
+export const PROFILES: Record<ProfileKey, { label; for; practice: PracticeOverrides; thresholds: ThresholdOverrides }>;
 
-export function resolvePractice(profile: ProfileKey, overrides: unknown): ResolvedPractice;
+export function resolvePractice(profile: string, overrides: unknown): ResolvedPractice;
 ```
+
+**As built at P9-T01** ([`practice.ts`](../../packages/method/src/practice.ts)):
+- **Every value is a word.** A number a profile sets, such as Radical Focus's one objective per team, is a §11 threshold, so a profile carries `practice` and `thresholds` separately.
+- **`asMethod`** is a check's default: the level §4 gives it, which for KR-1, KR-3, KR-7 and the cycle checks is more than one level. Overrides are block, warn or off.
+- **Storage.** `rhythm_settings.profile` names the profile and `rhythm_settings.practice` holds only the workspace's own changes. Resolution is defaults, then the profile, then the changes. Switching profile keeps the changes, and `differencesFromProfile` names the ones that now override the new profile, which `practice.applyProfile` returns and audits.
+- **Profile thresholds are applied from P9-T05.** `cadence.checkInFrequency`, which Lightweight sets, has its own non-null column, so applying a profile's thresholds is a write the settings screen has to decide, not a layer at read time.
+- **Strict mode is declared and not yet read.** The §11 threshold `quality.coachStrictness` (advisory, warn, strict) already does part of its job. P9-T03 makes strict mode the one home and retires the threshold's `strict`, so the value never has two.
+- **One row was added to §12.1**: "Root causes at the review", as §8.4 or optional. The approved Lightweight profile makes root causes optional, and no setting existed to say so.
 
 Every entry carries a Zod schema, a label, the METHOD.md section and a source line, exactly as a threshold does. The conformance suite gains one comparison: METHOD.md §12.1 against `PRACTICE`, in both directions, so a setting cannot exist in one and not the other.
 
@@ -126,7 +127,7 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 
 | Table | Change | Backfill (data-change runner) |
 |---|---|---|
-| `rhythm_settings` | `profile text not null default 'recommended'`, `practice jsonb not null default '{}'` | None |
+| `rhythm_settings` | `profile text not null default 'recommended'`, checked against the five profiles; `practice jsonb not null default '{}'`, checked to be an object (migration 0108, P9-T01) | None |
 | `goals` | `kind goal_kind not null default 'aspirational'` (`committed`, `aspirational`) | None; existing goals read aspirational |
 | `goals` | `added_mid_cycle_at timestamptz`, `standalone_reason text`, `draft_state goal_draft_state` (`draft`, `awaiting_approval`; null means it follows its cycle) | None |
 | `goals` | `reviewer_id` drops `not null` | None |
@@ -136,6 +137,7 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 | `cycles` | `practice_snapshot jsonb` | Closed cycles get today's canon |
 | `cycles` | `teams_published_at timestamptz`, beside the existing `published_at`, for the second publish step (METHOD v2 §4.5) | None |
 | New `space_holidays` | `workspace_id`, `space_id`, `starts_on`, `ends_on`, `note` | None |
+| New `member_leave` (G-2) | `workspace_id`, `member_id`, `starts_on`, `ends_on`, `delegate_member_id` | None |
 | Root-cause enum | add `other`; sessions gain `secondary_root_cause` | None |
 | Blocker-type enum | add `approach`, `other` | None |
 | Close-decision enum | add `achieved`, `defer` | None |
@@ -159,6 +161,8 @@ New actions in the registry, which regenerates REST, OpenAPI, the CLI and the ag
 | `goals.publishDraft`, `goals.approveDraft` | edit, reviewer | For workspaces whose mid-cycle objectives start as drafts, and for a mid-cycle addition that is a draft until it passes the checks set to block |
 | `workflow.publish` gains `step: "company" \| "teams"` | full | The two publish steps (METHOD v2 §4.5) |
 | `spaces.setHolidays` | edit on the space | Holiday periods (METHOD v2 §7.4) |
+| `goals.moveToSpace` (G-1) | edit on both spaces | Moves an objective with its key results, check-ins, dependencies and alignment, recorded as one dated change (METHOD v2 §2.9) |
+| `people.setLeave` (G-2) | the member, or `full` | Leave with a delegate (METHOD v2 §7.4) |
 
 Removed: the `guided` input on `goals.create` and `goals.addKeyResult`. The two-release rule applies to the input field: it is accepted and ignored for one release.
 
@@ -188,22 +192,23 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T03 | Enforcement levels for checks and gates; publishing in two steps | §2.7 (all but its first sentence, which needs the levels setting), §4 intro, §4.1, §4.2's KR-1, KR-4 and KR-5, §4.4, §4.5, §4.6 | Word lists ("to", "bring"); OBJ-1, OBJ-2 and KR-5 condition tables; "Objective length limit", "Strength score warn weight"; retire "Objective length bounds" |
 | P9-T04 | The reviewer becomes optional | §2.5, OBJ-4 | None (behaviour) |
 | P9-T05 | The practice settings screen | none | None |
-| P9-T06 to P9-T10 | OKR writing, list and diagram | none ([p9-t00-okr-writing.md](p9-t00-okr-writing.md)) | None |
+| P9-T06 to P9-T10 | OKR writing, list and diagram | none ([p9-t00-okr-writing.md](p9-t00-okr-writing.md)), except P9-T07a, which carries §2.7's first sentence with the level picker that reads the levels in use (G-3) | None |
 | P9-T11 | Committed and aspirational OKRs | §1 principle 4, §2.8, §3.2, §3.4, §4.2's KR-6 | Six new scoring thresholds; retire the four sandbagging and annotation parameters |
 | P9-T12 | Kinds of key result | §2.10, §3.1, §4.2's opening, KR-2, KR-3 and KR-7 | KR-2 condition table |
 | P9-T13 | Changing OKRs mid-cycle: the added-mid-cycle mark, live or draft creation, stop with a reason, annual revisions, calibration retired. Builds on the target history and reason rule P9-T06 introduces | §2.1, §2.9 (the four moves, live or draft, changing a target), §7.6 | The four calibration sentences |
+| P9-T13a | Moving an objective to another space (G-1) | §2.9's "When the organisation changes" | None (behaviour) |
 | P9-T14 | Adjustable scores and cycles that keep their rules | §3.3, §12 snapshot paragraph | Score band values |
 | P9-T15 | A progress signal that knows the date | §3.5, §3.6, §3.7 | "Progress signal pace gaps", "Trend forecast minimum values", "Divergence window" |
-| P9-T16 | Alignment on ratios | §4.3, §5 | "Contribution minimum", "Alignment watch threshold"; retire "Alignment penalties" |
+| P9-T16 | Alignment on ratios, over the levels in use (G-3) | §4.3, §5 | "Contribution minimum", "Alignment watch threshold"; retire "Alignment penalties" |
 | P9-T17 | KPI target types and their own thresholds | §6.1 to §6.4, §6.7 | None (behaviour) |
 | P9-T18 | Responding to an unhealthy KPI | §6.5, §6.6 | Recovery proposal delay value |
 | P9-T19a | Calmer escalation and cadence | §7.1, §7.2, §7.3, §7.5, the §11 cadence group | Blocker taxonomy and definitions; rituals; weekly steps; "Planning-open lead" for a quarter, 3 to 4 weeks |
-| P9-T19b | Holidays, and a rhythm that follows them | §7.4 | None (behaviour) |
+| P9-T19b | Holidays, leave, and a rhythm that follows them | §7.4, holidays and leave (G-2) | None (behaviour) |
 | P9-T20 | The quarterly review, re-timed, and the annual review | §8 | Review stages and purposes; root causes; close decisions and meanings; rhythm diagnostic; "Diagnostic rhythm threshold"; retire "Diagnostic rhythm-score threshold" |
 | P9-T21 | The coach's voice, and METHOD.md fully landed | The preamble and terms, §1, §9, §10, §11 framing, §13 | Trigger catalogue (AI-NATIVE-PLAN.md §6.4) and the P4-T00 coach watch list; deletes `p9-t00-method-v2.md` and METHOD.md's banner |
-| P9-T22 | Release 0.2.0 and the demo story | none | None |
+| P9-T22 | Release 0.2.0 and the demo story, placeable at any date of the Northwind year (G-4) | none | None |
 
-**One sentence waits for a decision already taken.** §2.7's first sentence, "A workspace chooses the levels it uses", needs a task that reads the levels setting. Akmal agreed on 2 October 2026 that gaps G-1 to G-4 from [the Northwind year](../scenarios/northwind-year/05-scenario-index.md) join this plan in P9-T01's commit; G-3 is that task, and the sentence moves with it.
+**The gaps the Northwind year found joined the plan at P9-T01**, as Akmal agreed on 2 October 2026: G-1 is P9-T13a, G-2 joins P9-T19b, G-3 is the level picker in P9-T07a and the levels in the alignment score in P9-T16, and G-4 extends P9-T22.
 
 The preamble and terms move at P9-T21 rather than P9-T01, because they describe committed OKRs and key result kinds, which do not exist until P9-T11 and P9-T12.
 

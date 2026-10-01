@@ -326,6 +326,11 @@ import {
 } from "./people.ts";
 import { exportArchive, importArchive } from "./portability.ts";
 import {
+  applyPracticeProfile,
+  readPractice,
+  updatePractice,
+} from "./practice.ts";
+import {
   applyAgentProposal,
   dismissAgentProposal,
 } from "./proposal-decisions.ts";
@@ -639,6 +644,9 @@ export const ACTION_MAP = {
   "cycles.scorecard": readScorecard,
   "rhythm.read": readRhythmSettings,
   "rhythm.update": updateRhythmSettings,
+  "practice.read": readPractice,
+  "practice.update": updatePractice,
+  "practice.applyProfile": applyPracticeProfile,
   "frame.annualObjectives": readAnnualObjectives,
   "frame.read": readAnnualFrame,
   "frame.set": setAnnualFrame,

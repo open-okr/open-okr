@@ -4074,6 +4074,57 @@
       "pages": false
     },
     {
+      "name": "practice read",
+      "action": "practice.read",
+      "method": "GET",
+      "path": "/practice/read",
+      "scope": "read",
+      "summary": "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "practice update",
+      "action": "practice.update",
+      "method": "POST",
+      "path": "/practice/update",
+      "scope": "write",
+      "summary": "Changes some of this workspace's practice settings. A setting set to null goes back to its profile's value.",
+      "flags": [
+        {
+          "name": "overrides",
+          "field": "overrides",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "practice applyProfile",
+      "action": "practice.applyProfile",
+      "method": "POST",
+      "path": "/practice/applyProfile",
+      "scope": "write",
+      "summary": "Chooses one of the five METHOD.md §12.2 profiles. This workspace's own changes are kept.",
+      "flags": [
+        {
+          "name": "profile",
+          "field": "profile",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "recommended",
+            "googleStyle",
+            "radicalFocus",
+            "lightweight",
+            "governed"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "frame annualObjectives",
       "action": "frame.annualObjectives",
       "method": "GET",

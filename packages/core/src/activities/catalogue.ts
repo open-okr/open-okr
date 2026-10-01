@@ -267,6 +267,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.updated": z.object({ name: z.string() }),
   "cycle.archived": z.object({ name: z.string() }),
   "rhythm.updated": z.object({ keys: z.array(z.string()) }),
+  // The METHOD.md §12 practice settings (P9-T01).
+  "practice.updated": z.object({ keys: z.array(z.string()) }),
+  "practice.profile_applied": z.object({ from: z.string(), to: z.string() }),
   "frame.set": z.object({ yearLabel: z.string() }),
   // The guided cycle workflow (P3-T03).
   "cycle.pack_item_set": z.object({

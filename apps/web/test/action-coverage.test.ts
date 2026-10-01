@@ -141,6 +141,20 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     why: "the model catalogue changes a model by removing it and adding it again with `ai.addCustomModel`, so there is no edit form",
   },
 
+  // The METHOD.md §12 practice settings (P9-T01). Their admin screen is
+  // P9-T05, which removes these three entries when it calls them.
+  "practice.read": {
+    apiOnly: true,
+    why: "the practice settings are declared and stored at P9-T01, and the S-36 practice cards that read them arrive at P9-T05; until then the API and the command line are the way in",
+  },
+  "practice.update": {
+    apiOnly: true,
+    why: "an administrator changes a practice setting through the API or the command line until the S-36 practice cards arrive at P9-T05",
+  },
+  "practice.applyProfile": {
+    apiOnly: true,
+    why: "an administrator chooses a profile through the API or the command line until the S-36 profile picker arrives at P9-T05",
+  },
   "workspace.overview": {
     apiOnly: true,
     why: "the Work Map composes its own reads for the map, the strip and the badges, and this answers a different shape for an API client",

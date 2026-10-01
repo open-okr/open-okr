@@ -826,3 +826,53 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 The registry's keys, types, valid ranges and defaults are data in `packages/method`. The workspace rhythm settings store only deviations, validated against that schema; an unset key reads the default. The conformance suite compares the defaults against this document.
 
 Every parameter has a default, so a workspace practises the full method correctly from the moment it is created. Tuning is an option, never a prerequisite.
+
+---
+
+## 12. Practice settings and profiles
+
+The non-numeric choices a workspace makes about its practice. Each has the recommended default first. Changing one is an audited admin action, and no setting can make the product refuse a read or lose data.
+
+### 12.1 The settings
+
+| Setting | Options | Default | Source |
+|---|---|---|---|
+| Who may write OKRs, and when | Any time · Planning window · After the phases | Any time | Doerr; Akmal, 1 October 2026 |
+| Phase enforcement | Guided · Binding · Hidden | Guided | No source requires phases before drafting |
+| New objectives mid-cycle start as | Live · Draft published by its owner · Draft approved by the reviewer | Live, marked added mid-cycle | whatmatters |
+| Reason when adding mid-cycle | Off · Optional · Required | Optional | OpenOKR default |
+| Reason when easing a target | Required · Optional | Required | whatmatters |
+| OKR kinds | Committed and aspirational · Aspirational only · Committed only | Both, new objectives aspirational | Google's OKR playbook |
+| Key result kinds | Metric, maintain, milestone, baseline: each on or off | All on | Lamorte; re:Work |
+| Reviewer per goal | Off · Optional · Required | Optional | OpenOKR default |
+| Check enforcement | Each check: Block · Warn · Off | As §4 | §4 |
+| Strict mode | Off · On | Off | OpenOKR default |
+| Publish gate enforcement | Each gate: Block · Warn · Off | Gates 1 and 2 block, 3 to 5 warn, 6 off | §4.5 |
+| Gate override | An admin with a recorded reason | On | REQUIREMENTS §3.2 |
+| Levels in use | Company, department, team, individual: each on or off | Company, department and team on, individual off | Castro; Cagan |
+| Progress roll-up from aligned goals | On · Off | Off | Perdoo (vendor) |
+| Confidence shown as | x in 10 · 0.0 to 1.0 · Percent | x in 10 | Wodtke |
+| Scoring | On · Off | On | Lamorte; Castro |
+| Score adjustment at close | Allowed with a reason · Not allowed | Allowed with a reason | Doerr |
+| Score colours | Google (0.6, 0.3) · Doerr (0.7, 0.4) | Google | re:Work; whatmatters |
+| Progress signal | Pace-aware · Absolute | Pace-aware | Microsoft Viva Goals (vendor) |
+| Critical confidence escalation | Off · On | Off | OpenOKR default |
+| Sponsor in escalation ladders | Off · On | Off | OpenOKR default |
+| Quarterly review format | One session · Review and retrospective separately | One session | Workpath (vendor) |
+| Root causes at the review | As §8.4 · Optional | As §8.4 | OpenOKR default |
+| Carry forward unfinished aspirational objectives | Proposed as Keep · Not proposed | Proposed | Google's OKR playbook |
+| Unhealthy KPI response | Offer the three responses · Draft a recovery OKR at once | Offer the three responses | Wodtke |
+
+### 12.2 Profiles
+
+A profile is a named starting point: choosing one sets the settings above, and every setting can still be changed afterwards. A workspace starts on **Recommended**.
+
+| Profile | For | What it sets differently from Recommended |
+|---|---|---|
+| **Recommended** | Most organisations | The defaults in this document |
+| **Google-style** | Organisations following Google's playbook closely | Individual level on. Department level off. Reviewer off. Google's score colours |
+| **Radical Focus** | Small companies and teams starting out, following Wodtke | One objective per team, three key results, warn above. Confidence as x in 10. Phases hidden. Weekly commitments and wins |
+| **Lightweight** | Teams that want to track OKRs without the planning workflow | Phases hidden. Reviewer off. Only gates 1 and 2. Check-ins every two weeks. Scoring on, root causes optional |
+| **Governed** | Organisations that run a formal planning process | Phases binding. Writing in the planning window. New objectives mid-cycle as drafts approved by the reviewer. Reviewer required. Gates 1 to 5 block. AL-3 on. Sponsor in the escalation ladders |
+
+*Source:* Google's OKR playbook, Wodtke's Radical Focus, Castro's two levels, and the configuration Perdoo and Microsoft Viva Goals offer (vendor).

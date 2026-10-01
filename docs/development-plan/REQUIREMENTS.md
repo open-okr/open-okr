@@ -64,7 +64,7 @@ One server-computed page per person: check-ins due as champion, acknowledgements
 
 ### 3.6 The weekly session
 
-A four-step ritual the product runs, not a meeting people remember to hold: confidence round (with optional private team voting revealed together), discuss every key result whose confidence fell, give every low score a next action due by the next check-in and a typed blocker with an owner where something is actually blocked, close last week's commitments and set this week's, then publish the digest. It ends with a rhythm streak that a skipped week breaks. Full specification in METHOD.md §7.
+A four-step ritual the product runs, not a meeting people remember to hold: confidence round (with optional private team voting revealed together), discuss every key result whose confidence fell, give every low score a next action due by the next check-in and a typed blocker with an owner where something is actually blocked, close last week's commitments and set this week's, then publish the digest. It ends with a rhythm streak that a skipped period breaks and a holiday does not. A space marks its holidays and a member marks their leave with a delegate, and nobody is nudged for either. Full specification in METHOD.md §7.
 
 ### 3.7 The quarterly review
 
@@ -106,7 +106,7 @@ One company-wide tree: goals, sub-goals, key results, initiatives and the KPIs t
 - **Commitments (P0).** Weekly, owned, linked to a key result, closed as delivered or not, plus the week's wins.
 - **Monthly review (P0).** Trend per objective, dependency and risk log, resource shifts, and the decision log where every decision names the key result it affects.
 - **Quarterly review session (P0).** METHOD.md §8 in full: eleven timed stages, room pulse, hidden-then-revealed scoring, round-robin narratives, kudos, dot-voted retro, the four management-retro questions, the eight-cause root-cause picker, the five-statement anonymous process health, the rhythm diagnostic, keep / modify / abandon / defer, learnings, decisions and actions, and exported minutes.
-- **Mid-cycle changes (P0).** Continue, update, start or stop any OKR at any point in the cycle, following Doerr (METHOD.md §2.9). Every change is visible in the activity and at the close. Easing a target, moving it toward its baseline, needs a written reason and keeps the original on record; "it got hard" is not a reason.
+- **Mid-cycle changes (P0).** Continue, update, start or stop any OKR at any point in the cycle, following Doerr (METHOD.md §2.9). Every change is visible in the activity and at the close. Easing a target, moving it toward its baseline, needs a written reason and keeps the original on record; "it got hard" is not a reason. When a team merges or splits, an objective moves to another space with its key results, check-ins, dependencies and alignment.
 - **Review inbox and digests (P0).** §3.5, plus daily and weekly digests in the member's own timezone and channel.
 
 ### Pillar C: The work (P0, Phase 5)

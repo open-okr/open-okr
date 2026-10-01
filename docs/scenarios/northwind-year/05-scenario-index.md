@@ -111,9 +111,9 @@ Each Phase 9 task card in IMPLEMENTATION-PLAN.md lists the steps it must make tr
 | NW-Q3-03 | Two KPIs below their floors for a second month | P9-T17 |
 | NW-Q3-04 | Two proposals; a recovery drafted and corrected; a driver as a key result | P9-T18 |
 | NW-Q3-05 | Recovery progress beside the real band | P9-T17 |
-| NW-Q3-06 | Holidays: no check-in due, no nudge, no broken streak | P9-T19b. Personal leave is gap G-2 |
-| NW-Q3-07 | Support merges into Customer Success | Gap G-1 |
-| NW-Q3-08 | A leader hands over her roles before leave | Today. Leave itself is gap G-2 |
+| NW-Q3-06 | Holidays and a week of leave: no check-in due, no nudge, no broken streak | P9-T19b |
+| NW-Q3-07 | Support merges into Customer Success; SU1 moves with it | Today (people), P9-T13a |
+| NW-Q3-08 | A leader hands over her roles and marks her leave with a delegate | Today (roles), P9-T19b |
 | NW-Q3-09 | A new team's first objective, mid-cycle, aligned with the keyboard | P9-T07b, P9-T10, P9-T12, P9-T13 |
 | NW-Q3-10 | The trend forecast warns before the status changes | P9-T15 |
 | NW-Q3-11 | A key result added mid-cycle is live once complete, a draft if not | P9-T12, P9-T13 |
@@ -139,21 +139,21 @@ Each Phase 9 task card in IMPLEMENTATION-PLAN.md lists the steps it must make tr
 | NW-Q4-10 | The review session; no "too safe" note | P9-T20 |
 | NW-Q4-11 | The retrospective; the recovery closed; carry-forward proposed | P9-T20, P9-T18 |
 | NW-Q4-12 | The scorecard, each column from its own snapshot | P9-T14 |
-| NW-Q4-13 | The department level turned off for 2028 | P9-T05. Gap G-3 |
+| NW-Q4-13 | The department level turned off for cycles from 2028 | P9-T05, P9-T07a, P9-T16 |
 | NW-Q4-14 | Q1 2028 drafted from what was kept | P9-T20 |
 | NW-Q4-15 | The year's workspace archive | Today |
 | NW-Q4-16 | The year's final digest names the wins | P9-T19a |
 
 ## 3. Gaps the year found
 
-Four things a realistic year needs that no task builds yet. Akmal agreed on 2 October 2026 where each belongs, and they join the plan in P9-T01's commit. Until then, the steps above mark them as gaps.
+Four things a realistic year needed that no task built. Akmal agreed on 2 October 2026 where each belongs, and they joined the plan in P9-T01's commit, so no step is a gap any more. The table stays as the record of why those tasks grew.
 
-| Gap | What is missing | Steps | Agreed home |
+| Gap | What was missing | Steps | Now built by |
 |---|---|---|---|
-| G-1 | **Moving a goal to another space.** A reorganisation moves people between spaces today, but their goals cannot follow: `goals.update` changes the level, never the space | NW-Q3-07 | A new task beside P9-T13. It moves check-ins, dependencies and alignment together and records the move. METHOD gains a paragraph on reorganising |
-| G-2 | **A member on leave.** Nothing holds a person's nudges, routes their reviews or covers their check-ins while they are away. Quiet hours cover a day, not eleven weeks | NW-Q3-06, NW-Q3-08 | P9-T19b, beside holidays. METHOD §7.4 gains leave and a delegate |
-| G-3 | **The "levels in use" setting.** P9-T01 declares it, but no task makes the level picker, OBJ-5 or the alignment score read it | NW-Q4-13 | P9-T07a for the picker, P9-T16 for alignment. §2.7's first sentence moves into METHOD with them |
-| G-4 | **A seed that can place the demo at any date of this year.** P9-T22 seeds a current story; this scenario needs every step before a chosen date to be true, including closed cycles graded under their own snapshots | All steps, README §6 | Extend P9-T22 |
+| G-1 | **Moving a goal to another space.** A reorganisation moves people between spaces today, but their goals cannot follow: `goals.update` changes the level, never the space | NW-Q3-07 | P9-T13a, with METHOD v2 §2.9's "When the organisation changes" |
+| G-2 | **A member on leave.** Nothing holds a person's nudges, routes their reviews or covers their check-ins while they are away. Quiet hours cover a day, not eleven weeks | NW-Q3-06, NW-Q3-08 | P9-T19b, with METHOD v2 §7.4's leave and delegate |
+| G-3 | **The "levels in use" setting.** P9-T01 declares it, but no task makes the level picker, OBJ-5 or the alignment score read it | NW-Q4-13 | P9-T07a for the picker, with §2.7's first sentence, and P9-T16 for alignment |
+| G-4 | **A seed that can place the demo at any date of this year.** P9-T22 seeds a current story; this scenario needs every step before a chosen date to be true, including closed cycles graded under their own snapshots | All steps, README §6 | P9-T22 |
 
 ## 4. Coverage
 
@@ -178,7 +178,8 @@ Every capability the year exercises, and the steps that exercise it.
 | Target changes, easing and its reasons, on quarterly and annual objectives | NW-Q1-24, NW-Q2-11, NW-Q2-22, NW-Q3-11 |
 | Check-ins, private votes, acknowledgements, Slack | NW-P-03, NW-Q1-15 |
 | Nudges and escalation ladders | NW-Q1-16, NW-Q1-19, NW-Q2-09, NW-Q2-14, NW-Q4-04 |
-| Holidays | NW-Q3-06, NW-Q3-16 |
+| Holidays and leave | NW-Q3-06, NW-Q3-08, NW-Q3-16 |
+| Reorganising: moving an objective between spaces | NW-Q3-07 |
 | Blockers | NW-Q1-19, NW-Q1-20 |
 | Monthly review | NW-Q1-18, NW-Q1-23, NW-Q2-08, NW-Q2-10, NW-Q2-17 |
 | Pace, trend and divergence signals | NW-Q1-21, NW-Q1-23, NW-Q3-10 |

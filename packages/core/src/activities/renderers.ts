@@ -225,6 +225,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Cycle "${asString(p.name, "a cycle")}" was archived`,
   "rhythm.updated": (p) =>
     `Rhythm settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "thresholds"})`,
+  "practice.updated": (p) =>
+    `Practice settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "settings"})`,
+  "practice.profile_applied": (p) =>
+    `The practice profile changed from ${String(p.from ?? "")} to ${String(p.to ?? "")}`,
   "cycle.pack_item_set": (p) =>
     `Input pack item ${Number(p.itemKey ?? 0)} was marked ${p.gathered ? "gathered" : "missing"}`,
   "cycle.pack_distributed": () => "The input pack was distributed",
