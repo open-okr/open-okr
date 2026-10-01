@@ -200,7 +200,7 @@ jobs:
       contents: write
       packages: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # The whole history, because the notes are assembled from the
           # changesets between this tag and the last.
