@@ -33,7 +33,7 @@ const LIB = fileURLToPath(new URL("../lib", import.meta.url));
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 
 /**
- * The four kinds of reason, each with what it has to prove.
+ * The five kinds of reason, each with what it has to prove.
  *
  * - **`caller`**: code outside the browser calls it, and names it: an
  *   importer, a worker, the pipeline, an operator console that goes through a
@@ -47,14 +47,41 @@ const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
  * - **`notBuilt`**: a screen that should exist and does not. It must name the
  *   finding in `docs/COMPLETENESS-REVIEW.md` that owns building it, so a gap
  *   is a tracked gap and never a quiet one.
+ * - **`plannedAs`**: the same thing for a screen the plan already owns rather
+ *   than a review finding. It must name a task in
+ *   `docs/development-plan/IMPLEMENTATION-PLAN.md`, which is the other place a
+ *   gap is tracked. Added at P8-G13a, whose five role actions land one task
+ *   before their screen: the gate's premise is that a gap is never quiet, and
+ *   a planned task is as public as a finding.
  */
 type Reason =
   | { readonly caller: string; readonly why: string }
   | { readonly answeredBy: string; readonly why: string }
   | { readonly apiOnly: true; readonly why: string }
-  | { readonly notBuilt: string; readonly why: string };
+  | { readonly notBuilt: string; readonly why: string }
+  | { readonly plannedAs: string; readonly why: string };
 
 const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
+  "roles.list": {
+    plannedAs: "P8-G13b",
+    why: "the matrix is read by the roles screen, which is the task after the one that added these; until then it is read through the command line and the API",
+  },
+  "roles.setPermission": {
+    plannedAs: "P8-G13b",
+    why: "moving one cell of the matrix is what the roles screen is for, and it lands with it",
+  },
+  "roles.create": {
+    plannedAs: "P8-G13b",
+    why: "adding a role belongs beside the matrix it starts from, on the same screen",
+  },
+  "roles.delete": {
+    plannedAs: "P8-G13b",
+    why: "removing a role has to say who holds it first, which is a count the roles screen draws",
+  },
+  "roles.assign": {
+    plannedAs: "P8-G13b",
+    why: "giving somebody a role belongs on the people screen, which the same task wires up",
+  },
   "workspace.provision": {
     caller: "packages/core/src/workspaces/provisioning.ts",
     why: "the pipeline calls it, from registration and the setup wizard",
@@ -230,6 +257,10 @@ const offeredOnTheApi = new Set(
 );
 
 const review = readFileSync(join(ROOT, "docs/COMPLETENESS-REVIEW.md"), "utf8");
+const plan = readFileSync(
+  join(ROOT, "docs/development-plan/IMPLEMENTATION-PLAN.md"),
+  "utf8",
+);
 
 const entries = Object.entries(NO_BROWSER_PATH);
 
@@ -308,6 +339,19 @@ describe("action coverage", () => {
         review.includes(`| ${reason.notBuilt} |`)
         ? []
         : [`${name}: ${reason.notBuilt} is not a finding in the review`];
+    });
+    expect(untracked).toEqual([]);
+  });
+
+  test("a screen the plan owns names a task that exists", () => {
+    const untracked = entries.flatMap(([name, reason]) => {
+      if (!("plannedAs" in reason)) {
+        return [];
+      }
+      return /^P\d-[TG]\d{2}[a-z]?$/.test(reason.plannedAs) &&
+        plan.includes(`### ${reason.plannedAs}:`)
+        ? []
+        : [`${name}: ${reason.plannedAs} is not a task in the plan`];
     });
     expect(untracked).toEqual([]);
   });
