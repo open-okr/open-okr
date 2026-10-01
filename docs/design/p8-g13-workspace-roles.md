@@ -180,8 +180,16 @@ space binding still grants the edit the role no longer does. P8-G13a is
 therefore additive by construction: every member keeps exactly what they had,
 and gains whatever their role adds.
 
-**List filtering is untouched in P8-G13a.** Every caller of `accessScopeFilter`
-asks for `view`, and every goal already carries a workspace-wide `view`
-binding, so no list changes. A list that one day asks for `edit` would need the
-role in that filter too, and the note is here so it is not discovered by
-somebody debugging an empty page.
+**That paragraph said list filtering could stay as it was, and it was wrong.**
+It argued that every caller asks for `view` and every goal already carries a
+workspace-wide `view` binding, so no list would change. The suite disagreed:
+`access-visible-ids.test.ts` holds `visibleResourceIds` and
+`getAccessScoped` to the same answer about the same resource, and a role read
+by one and not the other breaks that at once. A list would hide a row the
+detail screen then opens. `visibleResourceIds` reads the role layer too, by
+the same rule.
+
+`accessScopeFilter` is the remaining half and is genuinely untouched: its
+callers all ask for `view`, which the workspace-wide binding already grants.
+A list that asks for `edit` needs the role in that filter, and this note is
+here so it is not discovered by somebody debugging an empty page.

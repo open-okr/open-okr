@@ -854,6 +854,33 @@ export async function visibleResourceIds<
        )
      group by c.resource_id
     having max(b.level) >= ${requires}
+     union
+    -- The same role layer the getter reads (P8-G13a). Without it this answer
+    -- and the getter disagree about the same resource, which is what the
+    -- visible-ids test holds them to: a list would hide a row the detail
+    -- screen then opens. No backticks in this comment: it sits inside a
+    -- tagged template.
+    select c.resource_id
+      from access_contexts c
+     where c.workspace_id = ${input.workspaceId}
+       and c.resource_type = ${input.resourceType}
+       and c.deleted_at is null
+       and c.resource_id = any(${sql.param([...input.ids])}::uuid[])
+       and exists (
+         select 1
+           from role_permissions rp
+           join workspace_members m
+             on m.role_id = rp.role_id
+            and m.id = ${input.memberId}
+            and m.workspace_id = ${input.workspaceId}
+            and m.kind = 'human'
+            and m.status = 'active'
+            and m.deleted_at is null
+          where rp.workspace_id = ${input.workspaceId}
+            and rp.deleted_at is null
+            and rp.domain = c.resource_type
+            and rp.level >= ${requires}
+       )
   `);
   return new Set(result.rows.map((row) => row.resource_id));
 }

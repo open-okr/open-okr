@@ -414,6 +414,15 @@ describe("decomposing a key result", () => {
       "update access_bindings set level = 40 where workspace_id = $1",
       [workspaceId],
     );
+    // **And no role** (P8-G13a). A level is the maximum over the bindings
+    // reaching somebody and the level their workspace role grants, so lowering
+    // only the bindings no longer makes a member who may not create work: the
+    // founder holds Owner, which grants `manage` on every domain. Taking the
+    // role away is the other half of what this test means by "may not".
+    await wb.admin.query(
+      "update workspace_members set role_id = null where workspace_id = $1",
+      [workspaceId],
+    );
     await expect(
       decompose(
         decomposer([{ title: "Anything", description: "", tasks: [] }]),

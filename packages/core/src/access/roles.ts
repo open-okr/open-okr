@@ -20,6 +20,7 @@ import {
   type RoleDomain,
   rolePermissions,
   type WorkspaceTx,
+  workspaceMembers,
   workspaceRoles,
 } from "@openokr/db";
 import { and, eq } from "drizzle-orm";
@@ -208,4 +209,67 @@ export async function defaultRoleId<
     )
     .limit(1);
   return (row as { id: string } | undefined)?.id ?? null;
+}
+
+export interface MoveAdministratorRoleInput {
+  readonly workspaceId: string;
+  readonly memberId: string;
+  readonly administrator: boolean;
+}
+
+/**
+ * Puts a member on the Admin role, or back on the workspace default
+ * (P8-G13a).
+ *
+ * Called by `people.setAdministrator`, which until this existed changed only
+ * the binding. A level is the maximum over bindings and the role, so a founder
+ * stepping down kept Owner and kept full access, and the action silently did
+ * nothing.
+ *
+ * **It never takes Owner away from somebody who is not stepping down**, and it
+ * never promotes past Admin: Owner is held by whoever provisioned the
+ * workspace or by whoever an operator moved it to, and promoting through this
+ * action would make a second owner by a side door.
+ *
+ * A workspace with no roles yet, which is one provisioned before this and not
+ * yet backfilled, is left alone. Nothing to move, and the binding still says
+ * what it said.
+ */
+export async function moveAdministratorRole<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: MoveAdministratorRoleInput): Promise<void> {
+  const [role] = await tx
+    .select({ id: workspaceRoles.id })
+    .from(workspaceRoles)
+    .where(
+      activeOnly(
+        workspaceRoles,
+        and(
+          eq(workspaceRoles.workspaceId, input.workspaceId),
+          input.administrator
+            ? eq(workspaceRoles.builtinKey, "admin")
+            : eq(workspaceRoles.isDefault, true),
+        ),
+      ),
+    )
+    .limit(1);
+  const roleId = (role as { id: string } | undefined)?.id;
+  if (!roleId) {
+    return;
+  }
+
+  // openokr:allow-mutation: called only from inside an Operation's execute,
+  // on the transaction that Operation opened.
+  await tx
+    .update(workspaceMembers)
+    .set({ roleId, updatedAt: new Date() })
+    .where(
+      activeOnly(
+        workspaceMembers,
+        and(
+          eq(workspaceMembers.workspaceId, input.workspaceId),
+          eq(workspaceMembers.id, input.memberId),
+        ),
+      ),
+    );
 }

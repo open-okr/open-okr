@@ -479,6 +479,18 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason: "Message templates this workspace wrote.",
   },
   {
+    table: "workspace_roles",
+    decision: "export",
+    reason:
+      "The roles a workspace defined, including any an administrator added. Without them an imported archive resolves every member to their bindings alone.",
+  },
+  {
+    table: "role_permissions",
+    decision: "export",
+    reason:
+      "What each role may do in each domain. The matrix is a decision somebody made, not a derived value, so it cannot be recomputed from anything else in the archive.",
+  },
+  {
     table: "workspace_members",
     decision: "export",
     reason:
