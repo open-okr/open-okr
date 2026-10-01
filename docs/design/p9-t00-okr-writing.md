@@ -64,7 +64,7 @@ One screen replaces S-13, the goals explorer, and absorbs S-16, the alignment st
 | Part | Behaviour |
 |---|---|
 | Cycle switcher | The current cycle by default; any cycle the reader can see; "No cycle" for goals with their own timeframe |
-| Scope tabs | Mine (I am champion, owner or contributor), My team (spaces I belong to), Company (company level), All. The tab is kept in the address |
+| Scope tabs | Mine (I am the champion or a key result owner, or I follow it; goals have no contributor list), My team (spaces I belong to), Company (company level), All. The tab is kept in the address |
 | View toggle | List or Diagram. Kept in the address (`?view=diagram`), so a link opens the same view; the last choice is remembered per member |
 | + New objective | Always shown when the reader can write. It opens an inline row at the top of the list, or a new node in the diagram. If the workspace has restricted writing (§12 of the method), the button opens a panel naming the reason and the link that resolves it, never a dead button |
 | Summary line | Counts, average progress, at risk and outdated |
@@ -96,7 +96,7 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 | Champion, key result owner | Member picker | `goals.patch {championId}`, `goals.patchKeyResult {ownerId}` | Access to the space is checked server-side |
 | Key result title | Text, live KR-2 and KR-5 chips | `goals.patchKeyResult {title}` | As above |
 | Current value | Number | `goals.recordValue` | A KPI-linked key result shows its value read-only with a link to the KPI |
-| Target | Number | `goals.changeTarget` | Raising saves. Lowering opens a one-line reason field under the cell, when the workspace requires one |
+| Target | Number | `goals.changeTarget` | Making it harder saves. Easing it, toward the baseline (lowering an increase, raising a reduce), opens a one-line reason field under the cell, when the workspace requires one |
 | Baseline, unit, due date | Number, text, date picker | `goals.patchKeyResult` | |
 | Milestone done | Checkbox | `goals.patchKeyResult {doneAt}` | |
 | Confidence | 0 to 10 stepper, shown as "x in 10" | Recorded with the next check-in, or as a quick confidence update | |
@@ -106,7 +106,8 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 - **No placeholder records.** "+ Add key result" inserts a client-side draft row with the cursor in its title.
   - Nothing is written until the first commit with a non-empty title.
   - Escape on an empty draft removes the row.
-  - The new key result defaults to a metric owned by the objective's champion and due at the cycle's end, so the only required input is a title. Other fields can be filled in the same row with Tab.
+  - The new key result defaults to a metric owned by the objective's champion and due at the cycle's end, so the first commit needs only a title. Other fields can be filled in the same row with Tab.
+  - A metric key result also needs a target before it goes live. Before the cycle's plan is published every row is a draft anyway. After the team publication window, a row saved without its target is a draft its space can see, marked with what is missing, until the target is filled (METHOD v2 §2.9).
 - **"+ Add objective"** does the same at the objective level, in the scope and cycle on screen, with the reader as champion and the kind defaulting per the workspace (decision D2). It opens with one empty key result draft row under it.
 - **Policy is asked on commit.** If the workspace has restricted writing, the server refuses with the reason. The draft row stays, showing the reason and the link that resolves it, so nothing typed is lost (UIUX-PLAN §1.7, "Never lose work").
 
@@ -158,6 +159,8 @@ The two are new runtime dependencies, so this needs Akmal's approval (decision D
 ```
 
 - **Top-down.** The cycle at the root, then company objectives, then the objectives aligned beneath them by `parentGoalId` or `parentKeyResultId`. An objective aligned to a key result hangs from that key result's row, which today's studio cannot draw.
+- **Parents in another cycle.** A quarter's objectives usually align to annual ones. Every parent from another cycle is drawn above the cycle's objectives as a context band. The band is read-only on the canvas, opens in the drawer, and is a valid drop target for re-parenting. `goals.tree` returns these parents with the tree (§6).
+- **Alignment across levels.** A goal may align to a goal at its own level or above, in any space (METHOD v2 §5.1), so an edge may run sideways between two departments as well as upwards.
 - **Placement.** Dagre places the cycle and objective levels. Key results stack under their objective as part of its card, not as separate nodes, which keeps large trees compact.
 - **Order.** After layout, siblings are re-sorted to the saved order, so the list and the diagram agree.
 - **Edges.** Alignment edges are solid. Dependencies are dashed and can be switched off.
@@ -196,7 +199,7 @@ The flaw FlowyLMS has, two views drifting apart, is avoided by having one source
 
 | Piece | Design |
 |---|---|
-| Read | `goals.tree(cycleId, scope)` returns objectives, key results, alignment and dependencies in one call, shaped for both views |
+| Read | `goals.tree(cycleId, scope)` returns objectives, key results, alignment and dependencies in one call, shaped for both views, with every parent from another cycle as read-only context |
 | Cache | TanStack Query, already in the locked stack and installed. The key is `["okr-tree", cycleId, scope]`; both views read the same entry |
 | Write | Every mutation goes through one `useOkrMutation` hook: patch the cache at once, call the server action, on refusal roll back and show the server's sentence, on success merge the server's recomputed progress, health and verdicts |
 | Undo | Deletes, stops, re-parents and reorders push an undo entry for six seconds (UIUX-PLAN §4) |

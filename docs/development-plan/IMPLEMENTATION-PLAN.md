@@ -15,7 +15,7 @@ Authority: this is the execution authority. It implements TECHNICAL-PLAN.md, AI-
 | 7 | Hardening | P7-T01 to P7-T09 |
 | 8 | Cloud, enterprise and launch | P8-T01 to P8-T14 |
 
-**224 tasks**, some split into lettered parts. The figure was 105 when this plan was written and grew as tasks were cut into the size the rule below describes, and Phase 9 added 24 on 1 October 2026; [STATUS.md](STATUS.md) records every split and why. **Sizing: one task is one working session and one commit.** S is a short session, M is a full one. There is no L: a task that will not fit one session is split into lettered parts before anybody starts it, and the letters are the tasks. A bare id in a `Depends on:` line means every lettered part of it, so `P4-T02` reads as `P4-T02a` through `P4-T02c`. Phase 4 is cut this way; the earlier phases carry their original sizes because they are done. Guidance, not promises. With the PLAN.md §11 throughput assumption of three to five merged tasks a week where large tasks count double, Phases 1 to 7 are a realistic seven to ten months. If actuals diverge by more than half over a month, re-baseline rather than slipping quietly.
+**225 tasks**, some split into lettered parts. The figure was 105 when this plan was written and grew as tasks were cut into the size the rule below describes, Phase 9 added 24 on 1 October 2026, and P9-T19 was cut in two the next day; [STATUS.md](STATUS.md) records every split and why. **Sizing: one task is one working session and one commit.** S is a short session, M is a full one. There is no L: a task that will not fit one session is split into lettered parts before anybody starts it, and the letters are the tasks. A bare id in a `Depends on:` line means every lettered part of it, so `P4-T02` reads as `P4-T02a` through `P4-T02c`. Phase 4 is cut this way; the earlier phases carry their original sizes because they are done. Guidance, not promises. With the PLAN.md §11 throughput assumption of three to five merged tasks a week where large tasks count double, Phases 1 to 7 are a realistic seven to ten months. If actuals diverge by more than half over a month, re-baseline rather than slipping quietly.
 
 ## How to read a task
 
@@ -3008,6 +3008,8 @@ Acceptance: Given any screen, when its text is read, then the only dotted words 
 
 Planned on 1 October 2026, after the demo refused to let anybody add an objective and a review of METHOD.md against public OKR practice ([METHOD-REVIEW.md](../METHOD-REVIEW.md)) found the core sound and most of its locks unsourced. Akmal decided the same day: anybody can write OKRs at any time by default and an admin can restrict it; only structural defects block publishing by default; committed and aspirational OKRs are adopted; locks become practice settings with best-practice defaults. The revised METHOD.md text is held in [p9-t00-method-v2.md](../design/p9-t00-method-v2.md), and each task below moves its sections into METHOD.md with its code, so `pnpm method:check` stays green after every task. [p9-t00-adaptable-practice.md](../design/p9-t00-adaptable-practice.md) §6 maps every section and every one of the 67 conformance differences to its task.
 
+**The reference scenario.** [A year of OKRs at Northwind](../scenarios/northwind-year/README.md) runs this phase's practice through a whole year, one numbered step at a time. Each card below names the steps it must make true, and [the scenario index](../scenarios/northwind-year/05-scenario-index.md) names the task each step waits for, so the two check each other. A step a card names is that task's acceptance test as well as its own. Aligning the two on 2 October 2026 added items to eleven cards and cut P9-T19 in two.
+
 **Waves:**
 
 | Wave | Tasks | What it does |
@@ -3017,7 +3019,7 @@ Planned on 1 October 2026, after the demo refused to let anybody add an objectiv
 | Writing | P9-T06 to P9-T10 | The OKRs list edited in place, the drawer, the diagram |
 | The model | P9-T11 to P9-T15 | Committed and aspirational, key result kinds, mid-cycle changes, adjustable scores, a pace-aware signal |
 | Alignment and KPIs | P9-T16 to P9-T18 | Alignment on ratios, KPI target types, the unhealthy-KPI response |
-| Rhythm | P9-T19, P9-T20 | Calmer escalation and cadence; the quarterly review, re-timed |
+| Rhythm | P9-T19a, P9-T19b, P9-T20 | Calmer escalation and cadence; holidays; the quarterly and annual reviews, re-timed |
 | Close | P9-T21, P9-T22 | METHOD.md fully landed; the release |
 
 ### P9-T00: Design gate: adaptable practice and OKR writing [M]
@@ -3045,6 +3047,7 @@ Deliverables:
 No behaviour changes yet: nothing reads the settings.
 Test plan: unit tests for resolution, unknown keys and invalid values; an action test for the audit row; the conformance suite against §12.
 Acceptance: Given a fresh workspace, when `practice.read` runs, then it returns the recommended profile with every default and no stored overrides.
+Scenario steps: none of its own, because nothing reads the settings yet. Every step that changes a setting depends on it.
 
 ### P9-T02: One policy decides every practice refusal; anybody can write [M]
 Depends on: P9-T01
@@ -3053,12 +3056,14 @@ Deliverables:
 - **The policy.** `decide` in `packages/method/src/policy.ts`, and `requirePolicy` in core.
 - **The lock removed.** `goals.create` and `goals.addKeyResult` consult the policy, and the `guided` flag is accepted and ignored for one release.
 - **Phase enforcement.** The guided, binding and hidden settings apply in `workflow.ts`, and the phase strip shows what is missing without refusing.
+- **The first cycle is inferred.** A workspace with no earlier cycle meets Phase 2's prior-cycle condition without anybody declaring a first cycle (METHOD v2 §2.3, CY-2). The declaration still reads for a workspace that made one.
 - **The build gate.** A source test fails any OKR write action that neither calls `requirePolicy` nor carries an exemption.
 - **Documents.** METHOD.md §2.2, §2.3, §2.4, §2.6, §2.9 (who may write, and when) and principle 11 move in. "Team publication window" and "Strategic issue minimum" join the registry, and "Strategic issue bounds" leaves it.
 Test plan: the policy matrix across the five profiles; end-to-end REQUIREMENTS §3.1 acceptance in both directions; an API and a CLI create under the governed profile refused like the screen.
 Acceptance: Given the demo workspace with an unscored prior cycle, when Priya adds an objective from the cycle screen or the API, then it is created and the phase strip shows what is missing.
+Scenario steps: NW-P-07.
 
-### P9-T03: Enforcement levels for checks and gates [M]
+### P9-T03: Enforcement levels for checks and gates; publishing in two steps [M]
 Depends on: P9-T02
 Goal: only structural defects block by default, and every check and gate can be block, warn or off.
 Deliverables:
@@ -3066,9 +3071,11 @@ Deliverables:
 - **Gates.** Gate 2 blocks only structural key result defects by default, and gate 6 is off.
 - **Condition tables.** OBJ-1, OBJ-2 and KR-5 move to their METHOD v2 tables.
 - **Word lists.** "to" leaves the why markers and "bring" joins the movement verbs.
-- **Documents.** METHOD.md §4 intro, §4.1, §4.4, §4.5 and §4.6 move in. "Objective length limit" and "Strength score warn weight" join the registry, and "Objective length bounds" leaves it. The `docs/handbook/numbers.md` quotes are updated.
-Test plan: the quality corpus re-run against the published examples in METHOD-REVIEW §3.4, with the expected verdicts recorded; end-to-end REQUIREMENTS §3.2 acceptance in both directions.
+- **Publishing in two steps.** `workflow.publish` gains `step: "company" | "teams"`, and `cycles.teams_published_at` records the second. OKRs written inside the team publication window face the gates at the team step. One added after it faces only the checks set to block, never the set-level gates (METHOD v2 §4.5).
+- **Documents.** METHOD.md §2.7 (all but its first sentence, which waits for the levels setting), the §4 intro, §4.1, §4.2's KR-1, KR-4 and KR-5, §4.4, §4.5 and §4.6 move in. "Objective length limit" and "Strength score warn weight" join the registry, and "Objective length bounds" leaves it. The `docs/handbook/numbers.md` quotes are updated. PLAN.md §13 decision 4 is marked superseded by Akmal's decision of 1 October 2026: only structural defects block by default, and every check and gate has a level. DATABASE.md and the §7.2 mapping gain `teams_published_at`.
+Test plan: the quality corpus re-run against the published examples in METHOD-REVIEW §3.4, with the expected verdicts recorded; end-to-end REQUIREMENTS §3.2 acceptance in both directions; the two publish steps, with a set refused at the team step and published with an admin override.
 Acceptance: Given "Launch the new mobile app" with one complete key result, when the set is published on the recommended profile, then it publishes with an OBJ-1 warning.
+Scenario steps: NW-P-10, NW-P-14, NW-Q1-05, NW-Q1-08, NW-Q1-09, NW-Q1-14, NW-Q2-03, NW-Q2-04, NW-Q2-06, NW-Q4-01, NW-Q4-08.
 
 ### P9-T04: The reviewer becomes optional [M]
 Depends on: P9-T01
@@ -3081,6 +3088,7 @@ Deliverables:
 - **Documents.** METHOD.md §2.5 and OBJ-4 move in. DATABASE.md is updated.
 Test plan: the migration test; action tests for each reviewer setting; end-to-end REQUIREMENTS §3.3 acceptance.
 Acceptance: Given reviewers off, when a champion publishes a check-in, then nobody owes an acknowledgement and no ladder names a reviewer.
+Scenario steps: NW-P-09, NW-Q1-15.
 
 ### P9-T05: The practice settings screen [M]
 Depends on: P9-T01
@@ -3091,19 +3099,21 @@ Deliverables:
 - **Documents.** The UIUX-PLAN S-36 text.
 Test plan: card tests; an end-to-end spec that applies each profile; the accessibility scan picks the screen up automatically.
 Acceptance: Given an admin on the practice screen, when they switch "Who may write" to "Planning window" and save, then a member outside the window is refused with the reason, and the audit log shows the change.
+Scenario steps: NW-P-09, NW-Q2-02, NW-Q2-03, NW-Q2-13, NW-Q2-18, NW-Q3-01, NW-Q4-13.
 
 ### P9-T06: One tree, one cache [M]
 Depends on: P9-T02
 Goal: one read and one write layer serve the list, the drawer and the diagram ([p9-t00-okr-writing.md](../design/p9-t00-okr-writing.md) §6).
 Deliverables:
-- **The read.** `goals.tree`.
+- **The read.** `goals.tree`, with every parent in another cycle, such as an annual objective, returned as read-only context.
 - **One-field writes.** `goals.patch` and `goals.patchKeyResult` with a concurrency token.
-- **Targets.** `goals.changeTarget` with the `key_result_target_changes` table, its row-level security and the reason rule.
+- **Targets.** `goals.changeTarget` with the `key_result_target_changes` table, its row-level security and the reason rule. Easing is judged by direction: lowering an increase target or raising a reduce one needs the reason, and making a target harder never does (METHOD v2 §2.9).
 - **Deleting a key result.** `goals.deleteKeyResult`, soft, and restorable from deleted items.
 - **The client.** The TanStack Query cache and `useOkrMutation`, with optimistic patching, rollback and undo, and realtime invalidation.
 - **Documents.** The contract regenerated. DATABASE.md and the §7.2 mapping updated.
-Test plan: action tests including the stale-write refusal; hook tests for rollback and undo; the performance budget for `goals.tree` measured on the large dataset.
+Test plan: action tests including the stale-write refusal, and the reason rule on increase and reduce key results in both directions; hook tests for rollback and undo; the performance budget for `goals.tree` measured on the large dataset.
 Acceptance: Given two members, when both edit one title, then the second is refused with the current value and nothing is overwritten.
+Scenario steps: NW-Q1-12, NW-Q1-24, NW-Q2-11.
 
 ### P9-T07a: The OKRs list, edited in place [M]
 Depends on: P9-T06, P9-T03
@@ -3113,11 +3123,12 @@ Cut from one task before any code: the list with in-place editing, and adding wi
 
 Deliverables:
 - **The screen.** The OKRs screen's header, scope tabs, cycle switcher and list view ([p9-t00-okr-writing.md](../design/p9-t00-okr-writing.md) §3, §4.1, §4.2 and §4.5).
-- **Editing.** Every in-place cell, with keyboard and live coaching chips, and every state.
+- **Editing.** Every in-place cell, with keyboard and live coaching chips, and every state. Easing a target opens its reason field under the cell ([p9-t00-okr-writing.md](../design/p9-t00-okr-writing.md) §4.2).
 - **Navigation.** The sidebar is regrouped and "Goals" renamed "OKRs".
 - **Documents.** UIUX-PLAN §3 and the S-13 rewrite.
 Test plan: component tests per cell; end-to-end U3, U6 and U7; the keyboard spec; the accessibility scan.
 Acceptance: Given a key result in the list, when its owner changes the title, value and due date with the keyboard alone, then each saves on Enter and shows after a reload.
+Scenario steps: NW-Q1-12, NW-Q1-24, NW-Q2-11.
 
 ### P9-T07b: Adding and reordering in the list [M]
 Depends on: P9-T07a
@@ -3129,6 +3140,7 @@ Deliverables:
 - **Documents.** Mockups 12 and 12b redrawn.
 Test plan: end-to-end U1, U2 and U8; a reorder spec that hides rows by filter and checks the saved order.
 Acceptance: Given the demo workspace, when Priya adds an objective with two key results from the list using only the keyboard, then both are saved and visible after a reload, and nothing was written before her first Enter.
+Scenario steps: NW-Q1-06, NW-Q3-09.
 
 ### P9-T08: The OKR drawer and the goal page [M]
 Depends on: P9-T06
@@ -3139,16 +3151,19 @@ Deliverables:
 - **Documents.** The S-14 text.
 Test plan: end-to-end U4 across the drawer and the list; drawer deep-link spec.
 Acceptance: Given a key result edited in the drawer, when it saves, then its list row shows the new value without a reload.
+Scenario steps: none of its own. The drawer is where NW-Q1-07, NW-Q2-16 and NW-Q3-11 happen, and P9-T12 proves them.
 
 ### P9-T09: The diagram view [M]
 Depends on: P9-T06, decision D1
 Goal: the same OKRs, drawn as a tree with key results, from the same cache.
 Deliverables:
 - **The diagram.** React Flow and dagre ([p9-t00-okr-writing.md](../design/p9-t00-okr-writing.md) §5.1 and §5.2): nodes with key result stacks, objectives aligned to key results drawn, dependencies on a toggle, collapse, fit, minimap, keyboard, and the list/diagram toggle.
+- **Parents in another cycle.** An annual objective that a quarter's objectives align to is drawn as a read-only context band above them.
 - **The studio.** Its health and findings panel moves here, and `/goals/studio` redirects.
 - **Documents.** UIUX-PLAN S-16; mockup 05 redrawn.
 Test plan: layout unit tests (order matches the list); end-to-end U10 with the measurement recorded; the accessibility scan and keyboard spec.
 Acceptance: Given 300 objectives in one cycle, when the diagram opens, then it is interactive within the budget and collapsed below company level.
+Scenario steps: none of its own. The diagram steps NW-Q1-10, NW-Q2-10 and NW-Q3-09 edit it, and P9-T10 proves them.
 
 ### P9-T10: Editing on the diagram [M]
 Depends on: P9-T09, P9-T08
@@ -3156,22 +3171,25 @@ Goal: a member edits, adds and re-parents on the diagram itself.
 Deliverables:
 - **In place.** Title and value edits on the node.
 - **Adding.** "+ KR" and "+ aligned" drafts on the node.
-- **Moving.** Re-parenting by dragging a node's handle, through the policy, with undo, and a keyboard "Move under…".
+- **Moving.** Re-parenting by dragging a node's handle, through the policy, with undo, and a keyboard "Move under…". A node can be dropped onto an objective in the annual context band.
 - **Order.** Siblings reorder by dragging sideways.
 Test plan: end-to-end U5 and U9.
 Acceptance: Given a team objective, when it is dragged onto another company objective, then the alignment changes at once, saves, and can be undone for six seconds.
+Scenario steps: NW-Q1-10, NW-Q2-10, NW-Q3-09.
 
 ### P9-T11: Committed and aspirational OKRs [M]
 Depends on: P9-T01
 Goal: every rule that judges ambition knows which kind of promise it is judging.
 Deliverables:
 - **The data.** `goals.kind`, with the kind picker and chip.
-- **The rules.** Confidence, draft verdicts, score notes, the portfolio verdict and the root-cause threshold split by kind; the committed confidence floor and its escalation.
+- **The rules.** Confidence, draft verdicts, score notes, the portfolio verdict and the root-cause threshold split by kind; the committed confidence floor, at drafting and at every check-in, and its escalation. KR-6 judges aspirational key results only. Gate 5 and CY-6 warn on a committed OKR left at "exceeds", and let an aspirational one exceed (METHOD v2 §5.5).
+- **A change of kind.** `goals.setKind`, recorded in the activity with its reason, so the close shows what the objective was promised as and when that changed.
 - **The registry.** Six thresholds join it and four leave (the sandbagging and annotation parameters).
 - **Triggers.** The trigger catalogue is updated.
-- **Documents.** METHOD.md §1 principle 4, §2.8, §3.2 and §3.4 move in.
-Test plan: scoring unit tests per kind; end-to-end acceptance A6.
+- **Documents.** METHOD.md §1 principle 4, §2.8, §3.2, §3.4 and §4.2's KR-6 move in.
+Test plan: scoring unit tests per kind; gate 5 with a committed and an aspirational key result at "exceeds"; end-to-end acceptance A6.
 Acceptance: Given a committed key result scored 1.0, when the cycle closes, then no "too safe" note appears.
+Scenario steps: NW-P-10, NW-Q1-04, NW-Q1-14, NW-Q1-25, NW-Q2-10, NW-Q2-14, NW-Q4-04.
 
 ### P9-T12: Kinds of key result [M]
 Depends on: P9-T06
@@ -3181,32 +3199,38 @@ Deliverables:
 - **The rules.** Progress and scoring by kind, and KR-2, KR-3 and KR-7 by kind.
 - **The screens.** The list and drawer controls.
 - **Importers.** The CSV and FlowyTeam mappings: FlowyTeam's `boolean` and `milestone` metric types become milestone.
-- **Documents.** METHOD.md §2.10, §3.1 and §4.2 move in. DATABASE.md and the §7.2 mapping are updated.
+- **Documents.** METHOD.md §2.10, §3.1, and §4.2's opening with KR-2, KR-3 and KR-7 move in. DATABASE.md and the §7.2 mapping are updated.
 Test plan: unit tests per kind; importer reconciliation tests; the published examples from METHOD-REVIEW §3.4 re-run.
 Acceptance: Given "No one on the team experienced a major injury" written as a milestone, when it is checked, then KR-2 passes.
+Scenario steps: NW-P-11, NW-Q1-07, NW-Q1-20, NW-Q1-22, NW-Q2-16, NW-Q3-09, NW-Q3-11, NW-Q3-12, NW-Q3-13, NW-Q4-04, NW-Q4-07.
 
 ### P9-T13: Changing OKRs mid-cycle [M]
 Depends on: P9-T06, P9-T02
 Goal: continue, update, start and stop at any point, visibly.
 Deliverables:
-- **Marking.** The added-mid-cycle mark.
-- **Creation.** Live, owner-draft or reviewer-approval creation, with `goals.publishDraft` and `goals.approveDraft`.
+- **Marking.** The added-mid-cycle mark, set only on what is created after the team publication window closes.
+- **Creation.** Live, owner-draft or reviewer-approval creation, with `goals.publishDraft` and `goals.approveDraft`. Under "Live", an addition is live once it passes the checks set to block, and a draft its space can see until it does.
+- **Reasons.** "Reason when adding mid-cycle" and "Reason when easing a target" are enforced through the policy, so the screen, the API and the CLI refuse alike.
+- **Annual revisions.** An annual objective, key result or not-doing item revised at a quarterly revalidation, with a written reason, under the same target rules as any other (METHOD v2 §2.1).
 - **Stopping.** Stop as close-abandoned with a reason.
 - **Calibration retired.** No more writes to `cycle_calibrations`, and its index is dropped. The table goes one release later.
-- **Documents.** METHOD.md §2.9 (changes) and §7.6 move in.
-Test plan: action tests for each creation setting; end-to-end acceptance A5.
+- **Documents.** METHOD.md §2.1, §2.9 (the four moves, live or draft, changing a target) and §7.6 move in.
+Test plan: action tests for each creation setting and for each reason setting from the API; the window boundary; an annual revision; end-to-end acceptance A5.
 Acceptance: Given an objective added in week 5, when the cycle closes, then the review shows it as added mid-cycle with its date.
+Scenario steps: NW-Q1-14, NW-Q1-17, NW-Q1-18, NW-Q2-10, NW-Q2-13, NW-Q2-16, NW-Q2-22, NW-Q3-09, NW-Q3-11.
 
 ### P9-T14: Adjustable scores, and cycles that keep their rules [M]
 Depends on: P9-T11
 Goal: a person can adjust a computed score with a reason, and a closed cycle never changes its verdicts.
 Deliverables:
 - **Scores.** `score_computed` and `score_reason`, with the adjust control in the scoring reveal.
-- **Snapshots.** `cycles.practice_snapshot` is written at close and read by every closed-cycle view.
+- **Snapshots.** `cycles.practice_snapshot` holds the practice settings and every threshold in force, is written at close, and is read by every closed-cycle view.
+- **The scorecard.** Each closed cycle's column reads its own snapshot, and shows the computed score beside an adjusted one, each eased target's original, the count added mid-cycle, and every change of kind.
 - **Colours.** The score colour setting, and score bands 1.0, 0.6 and 0.3.
 - **Documents.** METHOD.md §3.3 and the snapshot paragraph of §12 move in.
 Test plan: end-to-end acceptance A7; snapshot unit tests.
 Acceptance: Given a closed cycle, when an admin changes the score bands, then its verdicts are unchanged.
+Scenario steps: NW-Q1-26, NW-Q1-29, NW-Q2-19, NW-Q3-14, NW-Q4-09, NW-Q4-12.
 
 ### P9-T15: A progress signal that knows the date [S]
 Depends on: P9-T01
@@ -3218,6 +3242,7 @@ Deliverables:
 - **Documents.** METHOD.md §3.5, §3.6 and §3.7 move in, with three thresholds.
 Test plan: unit tests on the signal across a cycle's weeks.
 Acceptance: Given week 2 of 13 at 15% progress, when the signal is computed, then it is green.
+Scenario steps: NW-Q1-21, NW-Q1-22, NW-Q1-23, NW-Q3-10.
 
 ### P9-T16: Alignment on ratios [M]
 Depends on: P9-T03
@@ -3230,65 +3255,91 @@ Deliverables:
 - **Documents.** METHOD.md §4.3 and §5 move in.
 Test plan: alignment unit tests on small and large trees; studio panel test.
 Acceptance: Given 100 goals of which 92 are aligned or stand alone with a reason, when the score is read, then it is healthy.
+Scenario steps: NW-Q1-10, NW-Q1-11, NW-Q1-13, NW-Q2-07.
 
 ### P9-T17: KPI target types and their own thresholds [M]
 Depends on: P9-T01
 Goal: a KPI's health is judged in its own units, by its own kind of target.
 Deliverables:
-- **Target types.** `kpis.target_type`, with green and red values and bands.
+- **Target types.** `kpis.target_type`, with green and red values and bands. A range KPI is healthy inside its band and judged against its red boundary outside it.
 - **Health.** Health by type, with the ratio fallback and its warning.
 - **Recovering.** Shown as an overlay beside the real band, never instead of it.
 - **Aggregates.** Last value and first value.
 - **Documents.** METHOD.md §6.1 to §6.4 and §6.7 move in.
-Test plan: the KPI cases from METHOD-REVIEW §3.6 (uptime, a 1 to 5 rating, NPS, defects) as unit tests.
+Test plan: the KPI cases from METHOD-REVIEW §3.6 (uptime, a 1 to 5 rating, NPS, defects) as unit tests, including uptime as a range of 99.9 to 100 read at 99.95, 99.7 and 99.4.
 Acceptance: Given uptime at 95 against a 99.9 target with a red boundary at 99.5, when health is read, then it is unhealthy.
+Scenario steps: NW-P-12, NW-Q1-17, NW-Q3-03, NW-Q3-05, NW-Q4-04.
 
 ### P9-T18: Responding to an unhealthy KPI [M]
 Depends on: P9-T17, P9-T11
 Goal: an unhealthy KPI asks for a decision, and a recovery OKR passes the product's own checks.
 Deliverables:
-- **The decision.** The three responses.
+- **The decision.** The three responses. "Fix it now" creates a task with an owner and a date and drafts no recovery OKR.
 - **The recovery draft.** Committed; a qualitative objective; the KPI as its first key result; drivers below target with owners; targets sized to the gap; the new placeholder.
 - **Timing.** Proposals after two periods, or at once on a fall of two bands.
 - **The board.** The recovery board updated.
 - **Documents.** METHOD.md §6.5 and §6.6 move in.
 Test plan: the METHOD-REVIEW §3.6 recovery cases as unit tests, including the key result that used to go the wrong way.
 Acceptance: Given a driver already past its target, when a recovery is drafted, then it is skipped.
+Scenario steps: NW-Q1-17, NW-Q3-04, NW-Q4-04, NW-Q4-11.
 
-### P9-T19: Calmer escalation and cadence [M]
+### P9-T19a: Calmer escalation and cadence [M]
 Depends on: P9-T04
 Goal: the rhythm nudges without alarm, at whatever frequency a team runs.
+
+Cut from one task on 2 October 2026, before any code, when the Northwind year showed that holidays need a table, an action and a screen of their own. Escalation and cadence change rules that already exist; holidays add data that every rhythm rule then has to read. They fail differently: a ladder that reaches the wrong person, against a week that should not have counted.
+
 Deliverables:
 - **Blockers.** The clock runs to the next check-in.
-- **Ladders.** They stop at the coordinator, with the sponsor as a setting.
+- **Ladders.** They stop at the coordinator, with the sponsor as a setting. A confidence drop on a company objective tells the company space's coordinator.
 - **Confidence.** Critical escalation is opt-in, and a drop triggers rather than a level.
-- **Nudges and cadence.** A ceiling of 5, with overflow to the digest. Every-two-weeks and monthly frequencies, a streak that follows the cadence and skips holidays, and commitments of 3 to 4 per team with weekly wins.
+- **Nudges and cadence.** A ceiling of 5 per member per week, with overflow to the digest. Every-two-weeks and monthly frequencies, a streak that follows the cadence, and commitments of 3 to 4 per team with the week's wins named in the digest.
+- **Planning.** A quarter's planning opens four weeks ahead, not three.
 - **The taxonomy.** Blocker types gain "approach not working" and "other", as an enum addition.
-- **Documents.** METHOD.md §7.1 to §7.5 and the §11 cadence group move in.
-Test plan: escalation unit tests per setting; the weekly session end-to-end spec updated.
+- **Documents.** METHOD.md §7.1, §7.2, §7.3, §7.5 and the §11 cadence group move in. AI-NATIVE-PLAN §12 A7 records the ceiling of 5, as Akmal decided on 2 October 2026.
+Test plan: escalation unit tests per setting; the streak at every frequency; the weekly session end-to-end spec updated.
 Acceptance: Given a blocker opened on Tuesday with weekly check-ins, when Thursday passes, then nobody has been escalated.
+Scenario steps: NW-Q1-01, NW-Q1-19, NW-Q2-02, NW-Q2-09, NW-Q2-14, NW-Q3-02, NW-Q4-01, NW-Q4-04, NW-Q4-16.
 
-### P9-T20: The quarterly review, re-timed [M]
-Depends on: P9-T11, P9-T14
+### P9-T19b: Holidays, and a rhythm that follows them [M]
+Depends on: P9-T19a
+Goal: a holiday week asks nothing of anybody and costs nobody their streak.
+Deliverables:
+- **The data.** `space_holidays`, with its row-level security, and `spaces.setHolidays`, audited.
+- **The screen.** Holiday periods on the space settings.
+- **The rules.** No check-in is due in a holiday week, the Champion sends no nudge for it, the streak skips it, and the measured on-time rate leaves it out.
+- **Documents.** METHOD.md §7.4 moves in. DATABASE.md, the §7.2 mapping (no legacy source) and the contract are updated.
+Test plan: streak and nudge unit tests across a holiday; an action test for the audit row; an end-to-end spec that marks a week and finds nothing due.
+Acceptance: Given a space with the week of 9 August marked as a holiday, when no check-in is published that week, then the streak continues and no nudge is sent.
+Scenario steps: NW-Q3-06, NW-Q3-16.
+
+### P9-T20: The quarterly review, re-timed, and the annual review [M]
+Depends on: P9-T11, P9-T14, P9-T19b
 Goal: a review that fits its time, and a close that can say "achieved" and "defer".
 Deliverables:
-- **The session.** Ninety minutes in four acts with the new stage minutes, and the format setting: one session or split.
+- **The session.** Ninety minutes in four acts with the new stage minutes, and the format setting: one session, or split with stages 1 to 4 in the review and 5 to 11 in the retrospective.
+- **Scoring closes on explanations.** The scoring stage does not close until every committed miss has its explanation.
+- **The annual review.** An annual cycle closes with the same review, before the next year's drafting.
 - **Root causes.** A threshold by kind, "other" and a secondary cause.
 - **Process health.** It becomes an improvement action.
-- **The diagnostic.** It reads the measured on-time rate.
-- **Close decisions.** "Achieved" and "defer" are added. Keep pre-fills the next draft, and unfinished aspirational objectives are proposed for carry-forward.
+- **The diagnostic.** It reads the measured on-time rate, without holiday weeks.
+- **Close decisions.** "Achieved" and "defer" are added. Keep pre-fills the next draft, with each key result's last recorded value as its baseline, and unfinished aspirational objectives are proposed for carry-forward.
+- **The minutes.** Committed and aspirational results reported apart.
 - **Documents.** METHOD.md §8 moves in. The diagnostic thresholds change.
 Test plan: session unit tests; the quarterly review end-to-end spec updated.
 Acceptance: Given an aspirational key result at 0.65, when the review reaches root causes, then it is not asked for one.
+Scenario steps: NW-P-13, NW-Q1-27, NW-Q1-28, NW-Q1-29, NW-Q1-30, NW-Q1-31, NW-Q1-32, NW-Q2-01, NW-Q2-18, NW-Q2-20, NW-Q2-21, NW-Q3-01, NW-Q3-15, NW-Q3-16, NW-Q4-01, NW-Q4-06, NW-Q4-10, NW-Q4-11, NW-Q4-14.
 
 ### P9-T21: The coach's voice, and METHOD.md fully landed [S]
 Depends on: P9-T02 to P9-T20
 Goal: METHOD.md is the revised text in full, and the coach says what it says.
 Deliverables:
-- **The text.** METHOD.md §1, §9, §10, the §11 framing and §13 move in. The trigger catalogue in AI-NATIVE-PLAN §6.4 and the P4-T00 coach watch list are updated. "At risk" becomes the default label.
+- **The text.** METHOD.md's preamble and terms, §1, §9, §10, the §11 framing and §13 move in. The preamble waits until here because it describes committed OKRs and key result kinds. The trigger catalogue in AI-NATIVE-PLAN §6.4 and the P4-T00 coach watch list are updated.
+- **Terminology.** "At risk" becomes the default status label, and the terminology card offers "Owner" as the suggested alternative to "Champion" (decision D6).
 - **Cleanup.** `p9-t00-method-v2.md` and METHOD.md's banner are deleted.
 Test plan: `pnpm method:check` passes against the full revised METHOD.md.
 Acceptance: Given the repository, when the conformance suite runs, then it passes and the target file no longer exists.
+Scenario steps: none of its own. Every step's rule reference resolves to METHOD.md itself from here on.
 
 ### P9-T22: Release 0.2.0 and the demo story [S]
 Depends on: P9-T21
@@ -3299,10 +3350,11 @@ Deliverables:
 - **The guides.** The handbook and user guide updated.
 Test plan: the upgrade workflow from 0.1.2; the demo seed run against today's date.
 Acceptance: Given an instance on 0.1.2, when it upgrades to 0.2.0, then every workspace is on the recommended profile and its data is intact.
+Scenario steps: NW-P-07.
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (21: P7-T01 cut into a and b; P7-T02 plus T02a, which took the audit chain off the write path; P7-T03 cut into a and b; P7-T06 cut into a, b and c; P7-T07 plus T07a and T07b, one for each finding its own audit raised and Agung ruled on; P7-T08 cut into a, b, c and d; P7-T09 cut into a, b and c. The line read 9 until 14 September 2026, when P7-T07b was added and nobody had updated it through the previous eleven cuts). Phase 8: P8-T01 to T15 plus P8-G01 to G11 (47: P8-T01 cut into a and b on 14 September 2026, because two of its five design documents block P8-T02 and the other three block nothing until P8-T03; P8-T04 cut into a and b, because the session is a security boundary and its screen stands on it; P8-T03 cut into a, b and c the same day as well, because a new principal reaching past the tenant floor is a security boundary that the two screens stand on; P8-T02 cut into a, b and c the same day, because a migration with its policy, a public route touching Better Auth, and a path that erases stored user data fail in three different ways and none is reviewable inside the others; P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day; P8-G01 added on 15 September 2026, when Agung reported the component preview page waiting with nothing on screen and the cause turned out to be a rule rather than an omission; P8-T06 cut into a, b, c and d the same day, before any code, because its five deliverables are four kinds of work and the design gate covers only one of them; P8-T07a, P8-T07b and P8-T08a added on 17 September 2026; P8-T13 cut into a, b and c on 18 September 2026, before any code, because a cast that can sign in, a finished quarter the demo has never held, and a public deployment that rebuilds itself fail in three ways and are tested with two databases and a container; P8-T11 cut into a and b on 18 September 2026, before any writing, because an administrator installing an instance and a practitioner running the practice are two audiences written from two sets of facts and only the first is what the acceptance criterion tests, when a review of the two tasks as shipped found the tenant floor answering three pre-tenant reads with nothing, so neither feature could ever have worked, and the P8-T08 acceptance criterion had no code path at all; P8-G02 and P8-G03 added on 22 September 2026, after Agung asked whether a key result value could pass 100% and reach a hundred million, which turned out to be two questions with two different answers; P8-G04 added the same day, out of P8-G03, for every bar that draws a number it may now be too small to hold, including three KPI bars that had been drawing a 0-to-200 achievement on a 0-to-100 track since Phase 5; P8-G05 and P8-G06 added the same day, both found by signing in to a Docker instance as somebody other than the founder for the first time, which is a thing no suite in this repository does; P8-G05a, P8-G07 and P8-G08 the same day again, the first for a redirect loop P8-G05 itself created, the second for a dropped port in the proxy, the third for two admin cards nobody had ever opened; P8-G11 the same day again, after Agung reported the save button at the bottom of the rhythm screen, which a product-wide measurement showed was the only screen with that shape; P8-G11a on 23 September 2026, after Agung reported that the refusal P8-G11 left in the card was off the top of the window, and a second defect turned up while verifying it: React resets a form with an action, so the refused value was gone before its refusal could be read; P8-G11b the same day, from Agung's own audit of the screen, which asked whether the §4 word lists could be edited and turned up a boundary rather than a yes or a no; P8-G11c the same morning, when the clause references the chips had been hiding turned out to be in the prose of nine screens as well; P8-G11d the same morning, after Agung asked whether a raw assist key was a missing translation and it turned out to be deliberate, which made it a decision to take rather than a bug to fix). Phase 9: P9-T00 to T22 (24: planned on 1 October 2026 after the METHOD.md review; P9-T07 cut into a and b before any code, because editing in place and adding with reordering fail differently). **205 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (21: P7-T01 cut into a and b; P7-T02 plus T02a, which took the audit chain off the write path; P7-T03 cut into a and b; P7-T06 cut into a, b and c; P7-T07 plus T07a and T07b, one for each finding its own audit raised and Agung ruled on; P7-T08 cut into a, b, c and d; P7-T09 cut into a, b and c. The line read 9 until 14 September 2026, when P7-T07b was added and nobody had updated it through the previous eleven cuts). Phase 8: P8-T01 to T15 plus P8-G01 to G11 (47: P8-T01 cut into a and b on 14 September 2026, because two of its five design documents block P8-T02 and the other three block nothing until P8-T03; P8-T04 cut into a and b, because the session is a security boundary and its screen stands on it; P8-T03 cut into a, b and c the same day as well, because a new principal reaching past the tenant floor is a security boundary that the two screens stand on; P8-T02 cut into a, b and c the same day, because a migration with its policy, a public route touching Better Auth, and a path that erases stored user data fail in three different ways and none is reviewable inside the others; P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day; P8-G01 added on 15 September 2026, when Agung reported the component preview page waiting with nothing on screen and the cause turned out to be a rule rather than an omission; P8-T06 cut into a, b, c and d the same day, before any code, because its five deliverables are four kinds of work and the design gate covers only one of them; P8-T07a, P8-T07b and P8-T08a added on 17 September 2026; P8-T13 cut into a, b and c on 18 September 2026, before any code, because a cast that can sign in, a finished quarter the demo has never held, and a public deployment that rebuilds itself fail in three ways and are tested with two databases and a container; P8-T11 cut into a and b on 18 September 2026, before any writing, because an administrator installing an instance and a practitioner running the practice are two audiences written from two sets of facts and only the first is what the acceptance criterion tests, when a review of the two tasks as shipped found the tenant floor answering three pre-tenant reads with nothing, so neither feature could ever have worked, and the P8-T08 acceptance criterion had no code path at all; P8-G02 and P8-G03 added on 22 September 2026, after Agung asked whether a key result value could pass 100% and reach a hundred million, which turned out to be two questions with two different answers; P8-G04 added the same day, out of P8-G03, for every bar that draws a number it may now be too small to hold, including three KPI bars that had been drawing a 0-to-200 achievement on a 0-to-100 track since Phase 5; P8-G05 and P8-G06 added the same day, both found by signing in to a Docker instance as somebody other than the founder for the first time, which is a thing no suite in this repository does; P8-G05a, P8-G07 and P8-G08 the same day again, the first for a redirect loop P8-G05 itself created, the second for a dropped port in the proxy, the third for two admin cards nobody had ever opened; P8-G11 the same day again, after Agung reported the save button at the bottom of the rhythm screen, which a product-wide measurement showed was the only screen with that shape; P8-G11a on 23 September 2026, after Agung reported that the refusal P8-G11 left in the card was off the top of the window, and a second defect turned up while verifying it: React resets a form with an action, so the refused value was gone before its refusal could be read; P8-G11b the same day, from Agung's own audit of the screen, which asked whether the §4 word lists could be edited and turned up a boundary rather than a yes or a no; P8-G11c the same morning, when the clause references the chips had been hiding turned out to be in the prose of nine screens as well; P8-G11d the same morning, after Agung asked whether a raw assist key was a missing translation and it turned out to be deliberate, which made it a decision to take rather than a bug to fix). Phase 9: P9-T00 to T22 (25: planned on 1 October 2026 after the METHOD.md review; P9-T07 cut into a and b before any code, because editing in place and adding with reordering fail differently; P9-T19 cut into a and b on 2 October 2026, before any code, when the Northwind year showed holidays need data and a screen of their own). **206 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01a, P8-T01b, P9-T00. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

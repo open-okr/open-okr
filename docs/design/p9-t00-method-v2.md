@@ -75,7 +75,7 @@ Every rule below serves one of these. They are the practice's centre, and the pa
 
 | Horizon | Runs | Sets | Revisited |
 |---|---|---|---|
-| Annual | Once a year, about 6 weeks before the year starts | The annual frame (mission, vision, mid-term strategy), 2 to 5 annual strategies, up to 5 annual OKRs, the year's not-doing list | Mission and vision stay stable. Annual OKRs and the not-doing list may be revised at a quarterly revalidation, with a written reason |
+| Annual | Once a year, about 6 weeks before the year starts | The annual frame (mission, vision, mid-term strategy), 2 to 5 annual strategies, up to 5 annual OKRs, the year's not-doing list | Mission and vision stay stable. Annual OKRs and the not-doing list may be revised at a quarterly revalidation, with a written reason. An annual target changes under the same rules as any target (§2.9): easing it needs a reason, and the original stays on record |
 | Quarterly | Four times a year, planning opens about 4 weeks before the quarter | Quarterly OKRs inside the annual frame | Scored and closed at the end of the quarter |
 
 The annual frame is reference material during a quarterly cycle. Phase 3 of a quarterly cycle revalidates it: it holds, or it changes with a documented reason. *Source:* Castro: company OKRs "are not set in stone"; whatmatters: "it's rare to adjust company-level OKRs … it may be necessary".
@@ -95,7 +95,7 @@ Every cycle offers the same phases. Phase 0 runs only in an annual cycle, so a q
 | 6 | Run the cadence | Check-ins, reviews and a decision log |
 | 7 | Review and learn | Scores, learnings and the next cycle's inputs |
 
-The phases are the recommended path. They guide, and by default they never stop anybody writing (§2.9). Company OKRs are best set before the cycle starts. Team and individual OKRs are commonly drafted and shared in its first one to two weeks. Phase 6 runs through the cycle. Phase 7 closes it and feeds the next one. *Source:* whatmatters' typical cycle: "Start of quarter: Communicate Team Q1 OKRs", "1 week after start of quarter: Share Employee Q1 OKRs".
+The phases are the recommended path. They guide, and by default they never stop anybody writing (§2.9). Company OKRs are best set before the cycle starts. Team and individual OKRs are commonly drafted and shared in its first one to two weeks. Publishing follows the same two steps: the company set publishes before the cycle starts, and the department and team sets publish by the time the team publication window closes, each through the gates (§4.5). Phase 6 runs through the cycle. Phase 7 closes it and feeds the next one. *Source:* whatmatters' typical cycle: "Start of quarter: Communicate Team Q1 OKRs", "1 week after start of quarter: Share Employee Q1 OKRs".
 
 ### 2.3 Phase completion rules
 
@@ -108,7 +108,7 @@ A phase is complete when all of its conditions hold. The product computes this. 
 | 2 | Prior cycle scored (or this is the first cycle, which is inferred when no earlier cycle exists and may be declared), baseline health recorded, at least 3 strategic issues ranked |
 | 3 | Annual: 3 to 5 priorities each with a 12-month success statement, not-doing list written, leadership agreement on the frame recorded. Quarterly: frame revalidated (holds or documented change) and focus areas chosen |
 | 4 | No objective or key result fails a check set to block. Warnings do not count |
-| 5 | Every publish gate set to block is green and the set is published |
+| 5 | Every publish gate set to block is green and the planned sets are published (§4.5) |
 | 6 | Cadence booked for the whole cycle |
 | 7 | Every key result scored and the retrospective written |
 
@@ -145,7 +145,7 @@ Guidance for people, not machine thresholds (§11).
 | 2 weeks before | The ending quarter is graded and reviewed (§8). Phase 2: diagnosis with those scores |
 | 2 to 1 weeks before | Phase 3: revalidation. Phase 4: company OKRs drafted |
 | 1 week before | Phase 5: company OKRs aligned and published |
-| Weeks 1 to 2 of the quarter | Team and individual OKRs drafted and shared |
+| Weeks 1 to 2 of the quarter | Department and team OKRs drafted and published, the second publish step (§4.5) |
 
 *Source:* Wodtke: "Two weeks before the end of the quarter, it's time to grade your OKRs, and plan for the next cycle"; whatmatters' typical cycle.
 
@@ -226,11 +226,11 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 | Start | Add a new objective or key result mid-cycle | Created and marked **added mid-cycle**, visible in lists and at the close. OKRs created before the team publication window closes (§11) are the cycle's plan, not additions, and carry no mark |
 | Stop | It no longer matters | Closed as abandoned with a one-line reason |
 
-**Live or draft.** An objective added mid-cycle is live at once by default. A workspace may make new objectives start as drafts that their owner publishes, or that their reviewer approves (§12).
+**Live or draft.** An objective or key result added mid-cycle is live at once by default, as soon as it passes the checks set to block (§4): a key result needs its target where its kind has one, its due date and its owner. Until it does, it is a draft its space can see, and the list shows what is missing. A workspace may instead make new objectives start as drafts that their owner publishes, or that their reviewer approves (§12).
 
 **Changing a target.**
-- Raising a target needs no reason.
-- Lowering one needs a written reason, and the original target stays on record so the close can see both.
+- Making a target harder needs no reason: raising it on an increase, lowering it on a reduce. Neither does setting a first target where there was none.
+- Easing a target, moving it toward its baseline, needs a written reason, and the original target stays on record so the close can see both.
 - "It got hard" is not a reason. *Source:* whatmatters: "Never change your OKRs because you're afraid you'll fall short."
 - There is no limit on how many times by default.
 
@@ -534,7 +534,7 @@ Info by default, shown as the phase checklist. Under binding phase enforcement t
 
 ### 4.5 Publish gates
 
-Publishing makes a cycle's planned set live. Each gate has an enforcement level (§12). A gate at block refuses publishing until it is green, and an admin may override it with a recorded reason. OKRs added after publication go live as §2.9 says, not through the gates.
+Publishing makes a cycle's planned OKRs live, in up to two steps: the company set before the cycle starts, then the department and team sets by the time the team publication window closes (§11). Each publish runs the gates over what it publishes. Each gate has an enforcement level (§12). A gate at block refuses publishing until it is green, and an admin may override it with a recorded reason. OKRs added after the team publication window go live as §2.9 says: they must pass the checks set to block, not the set-level gates.
 
 1. Every objective has a title and a named champion, and a reviewer where reviewers are required. Block.
 2. Every objective has at least one key result, and every key result passes the checks set to block (by default a target where it needs one, a due date and an owner). Block.
@@ -565,7 +565,7 @@ The coach shows these beside the check that fired.
 
 | Direction | Meaning | Recorded as |
 |---|---|---|
-| Vertical | This goal supports a goal or key result at any level above it | A single parent pointer |
+| Vertical | This goal supports a goal or key result at its own level or any level above it, in any space and in an earlier or longer cycle, such as an annual objective | A single parent pointer |
 | Horizontal | This goal and another goal in a different team depend on each other | A two-way dependency link |
 
 Vertical alignment is contribution, not copying (principle 9). Roughly half of a healthy organisation's OKRs are proposed by the teams themselves and laddered up. *Source:* Doerr: "roughly half"; Castro: "60% of the OKRs are created bottom-up".
@@ -659,6 +659,8 @@ A KPI's health comes from its own thresholds, in its own units, by its target ty
 | Unhealthy | Past the red boundary, or below 70% on the fallback. Decide a response (§6.5) |
 | No data | Enter a current value and a target |
 
+For a KPI that should stay within a range, the range is its green band. Its red boundaries sit outside the range: one below, and one above where too high matters too. Between the range and a red boundary is watch.
+
 State precedence, first match wins: no data, then the band. A KPI with an active recovery OKR is shown as **recovering** beside its real band, never instead of it. The fallback thresholds are workspace settings, and each KPI may carry its own (§11). *Source:* Castro: "as long as the dials on the dashboard are within certain thresholds, you don't care about them".
 
 ### 6.5 Responding to an unhealthy KPI
@@ -745,9 +747,11 @@ A key result that falls into the low band is raised with the coordinator.
 
 Every blocker carries an opened time, an owner and a next action. The next action is due by the next check-in. A blocker whose action passes that point is escalated to the coordinator, not re-discussed. *Source:* OpenOKR default. No OKR source defines a blocker taxonomy.
 
-### 7.4 The rhythm streak
+### 7.4 The rhythm streak and holidays
 
-Consecutive check-in periods in which a space held its check-in, at whatever frequency the space runs. A skipped period breaks it; a period marked as a holiday does not. Shown on the space home. A light touch that keeps the heartbeat visible. *Source:* Tability (vendor) shows check-in streaks.
+Consecutive check-in periods in which a space held its check-in, at whatever frequency the space runs. A skipped period breaks it; a period marked as a holiday does not.
+
+A space marks its holiday periods. No check-in is due in them, nobody is nudged for them, the streak does not break, and the measured rhythm (§8.6) does not count them. Shown on the space home. A light touch that keeps the heartbeat visible. *Source:* Tability (vendor) shows check-in streaks.
 
 ### 7.5 Monthly review
 
@@ -763,13 +767,13 @@ The decision log is the artifact that survives the meeting. Every decision names
 
 ### 7.6 Mid-cycle calibration
 
-A target may be changed at any time in the cycle, as §2.9 says. Raising a target needs no reason. Lowering one needs a written reason, and the original target stays on record. It got hard is not a reason, and changing a target only because it got hard empties the score of meaning.
+A target may be changed at any time in the cycle, as §2.9 says. Making a target harder needs no reason. Easing one, toward its baseline, needs a written reason, and the original target stays on record. It got hard is not a reason, and changing a target only because it got hard empties the score of meaning.
 
 ---
 
 ## 8. The quarterly review
 
-Ninety minutes by default, four acts, eleven timed stages, held about two weeks before the cycle ends. A workspace may split it into a review session and a separate retrospective (§12). Each act asks one question.
+Ninety minutes by default, four acts, eleven timed stages, held about two weeks before the cycle ends. A workspace may split it into a review session and a separate retrospective (§12). When split, the review session holds the Open and Review acts (stages 1 to 4) and the retrospective holds the Retro and Reset acts (stages 5 to 11). An annual cycle closes with the same review over its annual OKRs, held before any of the next year's drafting. Each act asks one question.
 
 | Act | Question |
 |---|---|
@@ -812,7 +816,7 @@ The reads are coaching for the facilitator. *Source:* OpenOKR default; a one-wor
 
 ### 8.3 Scoring reveal
 
-Score each key result 0.0 to 1.0 against the key result as written, with baseline, target, actual and any mid-cycle changes on screen as evidence, plus a one-line reason. The objective score is hidden until the team reveals it together. Facts, not feelings. A row of 1.0s on aspirational key results usually means the ambition was too safe, and that gets said out loud now, not next quarter. A committed key result below 1.0 gets its short explanation.
+Score each key result 0.0 to 1.0 against the key result as written, with baseline, target, actual and any mid-cycle changes on screen as evidence, plus a one-line reason. The objective score is hidden until the team reveals it together. Facts, not feelings. A row of 1.0s on aspirational key results usually means the ambition was too safe, and that gets said out loud now, not next quarter. A committed key result below 1.0 gets its short explanation, and the scoring stage does not close until every one has it.
 
 An objective's score is the weighted average of its key results' scores, using the same weights §3.1 uses for progress. A team that said one key result matters three times as much should see that in the score, exactly as it sees it in the progress. An unscored key result is left out rather than counted as zero, so a half-graded objective does not read as a failing one.
 
@@ -848,7 +852,7 @@ The lowest-scoring statement becomes an improvement action for the next cycle, w
 
 ### 8.6 The rhythm diagnostic
 
-Combine the cycle score (the §3.4 average over every scored aspirational key result in the cycle) with the rhythm score: the share of due check-ins published within tolerance, measured by the product. Process-health statements 2 and 5 are shown beside it as a cross-check. The diagnosis is a hypothesis for the room to test, not a verdict.
+Combine the cycle score (the §3.4 average over every scored aspirational key result in the cycle) with the rhythm score: the share of due check-ins published within tolerance, measured by the product. Holiday periods (§7.4) are not due, so they are not counted. Process-health statements 2 and 5 are shown beside it as a cross-check. The diagnosis is a hypothesis for the room to test, not a verdict.
 
 | Condition | Diagnosis | Prescription |
 |---|---|---|
@@ -892,7 +896,7 @@ At close, the product feeds the next cycle automatically:
 | From this cycle | Into the next cycle |
 |---|---|
 | Every key result and its score | Phase 2, the prior-cycle scoring list |
-| Every kept or modified objective | Phase 4, a pre-filled draft |
+| Every kept or modified objective | Phase 4, a pre-filled draft whose key results start from their last recorded values as baselines |
 | Every deferred item and carry-forward learning | Phase 2, the strategic issue list at impact 4 |
 | Learnings and the retrospective | Phase 1, the input pack |
 | The lowest process-health statement | Phase 3, an improvement action |
@@ -1093,7 +1097,7 @@ Every parameter has a default, so a workspace practises the full method correctl
 
 The non-numeric choices a workspace makes about its practice. Each has the recommended default first. Changing one is an audited admin action, and no setting can make the product refuse a read or lose data.
 
-**A cycle keeps the rules it was graded under.** When a cycle closes, the scoring settings and thresholds in force are recorded with it. Changing a band later does not rewrite a closed cycle's verdicts.
+**A cycle keeps the rules it was graded under.** When a cycle closes, the practice settings and every threshold in force are recorded with it. Changing a band or a cap later does not rewrite a closed cycle's verdicts.
 
 ### 12.1 The settings
 
@@ -1103,7 +1107,7 @@ The non-numeric choices a workspace makes about its practice. Each has the recom
 | Phase enforcement | Guided · Binding · Hidden | Guided | No source requires phases before drafting |
 | New objectives mid-cycle start as | Live · Draft published by its owner · Draft approved by the reviewer | Live, marked added mid-cycle | whatmatters |
 | Reason when adding mid-cycle | Off · Optional · Required | Optional | OpenOKR default |
-| Reason when lowering a target | Required · Optional | Required | whatmatters |
+| Reason when easing a target | Required · Optional | Required | whatmatters |
 | OKR kinds | Committed and aspirational · Aspirational only · Committed only | Both, new objectives aspirational | Google's OKR playbook |
 | Key result kinds | Metric, maintain, milestone, baseline: each on or off | All on | Lamorte; re:Work |
 | Reviewer per goal | Off · Optional · Required | Optional | OpenOKR default |
