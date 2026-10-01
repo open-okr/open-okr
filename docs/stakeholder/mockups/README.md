@@ -33,6 +33,23 @@ Never cite a mockup as the reason for a behaviour. Cite the specification.
 | [09-channels](png/09-channels.png) | AI-NATIVE-PLAN §5 | P5-T02 to P5-T05 | The same nudge in four channels, a conversational check-in capturing a typed blocker, and nudge provenance on every message |
 | [10-review-inbox](png/10-review-inbox.png) | S-02 | P3-T08, P4-T04 | Overdue-first grouping, agent proposals in the queue, the five-step escalation ladder, the provenance panel with snooze and change-channel |
 
+## Two that are a proposal, not a specification
+
+These two draw a screen UIUX-PLAN does not describe yet. They belong to
+[docs/design/okr-entry-points.md](../../design/okr-entry-points.md), written
+after a usability complaint on 30 September 2026, and they exist so the human
+can look at the proposal before deciding whether it becomes specification.
+
+**Nothing may cite them as a target until UIUX-PLAN §6 S-13 is rewritten.**
+If the proposal is rejected, both files are deleted rather than left to be
+mistaken for the plan.
+
+| Mockup | What it proposes |
+|---|---|
+| [12-okr-home](png/12-okr-home.png) | One OKR screen: level tabs, key results inline under the objective they belong to, a create action on the screen that lists them, and an add row under the key results. The Coach's verdicts stay, which is what separates it from the tracker it borrows the shape from |
+| [12b-okr-create](png/12b-okr-create.png) | The same create action in both states. Open: the rule verdicts answer as the member types. Closed: the button is still offered, and the panel names the phase, what it still needs, and the way to finish it |
+
+
 ## Everything in them is a real value
 
 The mockups quote the canon rather than inventing numbers, because a developer will copy what they see. Where a mockup shows a rule key, a band, a corridor, a penalty or a threshold, it comes from a document:
