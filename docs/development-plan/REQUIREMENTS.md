@@ -11,8 +11,8 @@ Feature scope is priced **P0** (must ship in v1), **P1** (fast follow inside v1)
 - **Name:** OpenOKR.
 - **One line:** Your OKR coach, built in. Open source, AI-native, self-hosted or in our cloud.
 - **The problem.** Most organisations treat OKRs as a form to fill in. A tool stores the objectives, nobody updates them, and by week six the quarter is running on memory. The practice that makes OKRs work (a real planning cycle, honest quality review of every draft, alignment that means contribution, a weekly rhythm with teeth, an evidence-based quarterly close) lives in a consultant's slide deck, not in the software. Meanwhile the software is passive. It waits to be visited.
-- **The answer.** OpenOKR encodes the practice and makes the software active. The full OKR method is built in as guided cycles, live quality checks, alignment diagnostics, KPI health corridors and timed sessions. Two AI agents work the practice alongside the organisation: an **OKR Coach** that guards quality, and an **OKR Champion** that guards the rhythm. They initiate. They nudge the champion whose check-in is due, escalate the blocker that aged past its 24-hour clock, tell leadership their not-doing list is empty, and propose a recovery OKR when a KPI drops out of its corridor. They do it in the browser, in Slack, Teams, WhatsApp or Telegram, by email, and through any AI agent the user already runs.
-- **The stance.** Active, not passive. Opinionated, not configurable. Agent-native to the core: everything a human can do, an agent can do, through one permission-checked contract.
+- **The answer.** OpenOKR encodes the practice and makes the software active. The full OKR method is built in as guided cycles, live quality checks, alignment diagnostics, KPI health corridors and timed sessions. Two AI agents work the practice alongside the organisation: an **OKR Coach** that guards quality, and an **OKR Champion** that guards the rhythm. They initiate. They nudge the champion whose check-in is due, escalate the blocker nobody has moved, tell leadership their not-doing list is empty, and propose a recovery OKR when a KPI drops out of its corridor. They do it in the browser, in Slack, Teams, WhatsApp or Telegram, by email, and through any AI agent the user already runs.
+- **The stance.** Active, not passive. Opinionated defaults, adaptable practice: the recommended method ships switched on, and an organisation tunes it to its own flavour of OKRs in its practice settings rather than starting from a blank configuration (METHOD.md §12). Decided by Akmal on 1 October 2026, replacing "opinionated, not configurable". The METHOD.md sections this document cites for that decision (§2.8 to §2.10 and §12) arrive in METHOD.md during Phase 9; until then their approved text is in `docs/design/p9-t00-method-v2.md`. Agent-native to the core: everything a human can do, an agent can do, through one permission-checked contract.
 - **Ownership.** Self-host it on your own servers or use our cloud. Same release, same behaviour. Export the whole workspace whenever you like.
 
 ## 2. Who uses it
@@ -36,21 +36,23 @@ Not modules a user assembles. Defaults the product imposes. Each is tunable. Non
 
 ### 3.1 The guided cycle
 
-Every OKR cycle runs the eight phases in METHOD.md §2 with computed completion, not self-reported ticks. Annual cycles set the frame and the annual OKRs. Quarterly cycles revalidate the frame in 30 to 60 minutes and set the quarter's OKRs inside it. The product knows which phase a cycle is in, what is missing, who owes what, and how many weeks remain before the publication deadline.
+Every OKR cycle can run the eight guided phases in METHOD.md §2 with computed completion, not self-reported ticks. Annual cycles set the frame and the annual OKRs. Quarterly cycles revalidate the frame in 30 to 60 minutes and set the quarter's OKRs inside it. The product knows which phase a cycle is in, what is missing, who owes what, and how many weeks remain before the publication deadline.
 
-*Acceptance:* Given a quarterly cycle three weeks from its start with the input pack incomplete, when the facilitator opens the cycle, then Phase 1 is shown as blocked with the exact missing items, and drafting in Phase 4 is refused with the reason.
+The phases guide. By default they never stop anybody writing an objective or a key result: any member who can edit a space may add or change its OKRs at any time in the cycle (METHOD.md §2.9). A workspace that wants a governed process makes the phases binding in its practice settings (METHOD.md §12).
+
+*Acceptance:* Given a quarterly cycle three weeks from its start with the input pack incomplete, when the facilitator opens the cycle, then Phase 1 is shown as incomplete with the exact missing items, and a member can still draft an objective, with the missing items shown beside the form. Given a workspace that has made the phases binding, then drafting in Phase 4 is refused with the reason.
 
 ### 3.2 Quality at the point of writing
 
-Every objective and key result is checked live against the quality checks in METHOD.md §4 as it is typed. Each check returns pass, warn or fail with a specific coaching prompt, a reason, and a weak-versus-strong example. The set carries a strength score. The six publish gates in METHOD.md §4.5 are hard: an OKR set that fails one cannot be published.
+Every objective and key result is checked live against the quality checks in METHOD.md §4 as it is typed. Each check returns pass, warn or fail with a specific coaching prompt, a reason, and a weak-versus-strong example. The set carries a strength score. Every check and each of the six publish gates in METHOD.md §4.5 has an enforcement level the workspace sets: block, warn or off (METHOD.md §12). By default only structural defects block publishing: an objective with no key result, a key result with no target or date, and a goal with no owner. Every other check warns and coaches.
 
-*Acceptance:* Given an objective beginning "Launch the new mobile app", when the champion types it, then the outcome-not-output check fails inline with the coaching prompt, the strength score drops, and publishing the set is blocked until it passes or the workspace overrides with a recorded reason.
+*Acceptance:* Given an objective beginning "Launch the new mobile app", when the champion types it, then the outcome-not-output check warns inline with the coaching prompt, the strength score drops, and the set can still be published. Given a workspace that has set that check to block, then publishing is refused until it passes or the workspace overrides with a recorded reason.
 
 ### 3.3 Cadence, staleness and accountability
 
-Every goal has a check-in frequency (weekly by default, anchored to a company-chosen day), exactly one champion and exactly one reviewer. The system computes the next due date, honours the workspace timezone and a small tolerance, and drives every reminder from it. A missed check-in past the grace window makes the goal **outdated**, which overrides the last reported health everywhere it appears. A published check-in enters `awaiting acknowledgement` until the reviewer closes the loop.
+Every goal has a check-in frequency (weekly by default, anchored to a company-chosen day), exactly one champion, and a reviewer where the workspace asks for one (off by default, METHOD.md §2.5). The system computes the next due date, honours the workspace timezone and a small tolerance, and drives every reminder from it. A missed check-in past the grace window makes the goal **outdated**, which overrides the last reported health everywhere it appears. Where a goal has a reviewer, a published check-in enters `awaiting acknowledgement` until the reviewer closes the loop.
 
-*Acceptance:* Given a weekly goal last checked in ten days ago, when any list, map or dashboard renders it, then it shows `outdated` regardless of the last check-in, its champion has been nudged on their chosen channel on the due day and daily after, and the reviewer has been brought in at the grace boundary.
+*Acceptance:* Given a weekly goal last checked in ten days ago, when any list, map or dashboard renders it, then it shows `outdated` regardless of the last check-in, its champion has been nudged on their chosen channel on the due day and daily after, and its reviewer, where it has one, has been brought in at the grace boundary.
 
 ### 3.4 Check-ins as narrative snapshots
 
@@ -62,11 +64,11 @@ One server-computed page per person: check-ins due as champion, acknowledgements
 
 ### 3.6 The weekly session
 
-A four-step ritual the product runs, not a meeting people remember to hold: confidence round (with optional private team voting revealed together), diagnose every low score into a typed blocker with an owner and a 24-hour action, close last week's commitments and set this week's, then publish the digest. It ends with a rhythm streak that a skipped week breaks. Full specification in METHOD.md §7.
+A four-step ritual the product runs, not a meeting people remember to hold: confidence round (with optional private team voting revealed together), discuss every key result whose confidence fell, give every low score a next action due by the next check-in and a typed blocker with an owner where something is actually blocked, close last week's commitments and set this week's, then publish the digest. It ends with a rhythm streak that a skipped week breaks. Full specification in METHOD.md §7.
 
 ### 3.7 The quarterly review
 
-A timed sixty-minute session in three acts across eleven stages, ending in exported minutes and an automatic feed-forward into the next cycle. It produces the rhythm diagnostic (METHOD.md §8.6), which tells leadership whether a missed quarter was a cadence problem or a strategy problem. Full specification in METHOD.md §8.
+A timed session, ninety minutes by default, held about two weeks before the cycle ends, in four acts across eleven stages, which a workspace may split into a review and a separate retrospective, ending in exported minutes and an automatic feed-forward into the next cycle. It produces the rhythm diagnostic (METHOD.md §8.6), which tells leadership whether a missed quarter was a cadence problem or a strategy problem. Full specification in METHOD.md §8.
 
 ### 3.8 The active coach
 
@@ -79,7 +81,7 @@ Two agent members ship with every workspace, on by default where an AI provider 
 
 They act under their own least-privilege principal, are metered and hard-capped, and are audited. Their default write policy is to propose; a human approves. Full design in AI-NATIVE-PLAN.md §6.
 
-*Acceptance:* Given a champion who has not checked in by the anchor day, when the Champion agent runs, then it messages them on their chosen channel with a one-tap check-in, and as the miss ages it escalates up the ladder: the reviewer at the grace boundary, the coordinator at seven days, the sponsor at fourteen, every step recorded and visible to the champion.
+*Acceptance:* Given a champion who has not checked in by the anchor day, when the Champion agent runs, then it messages them on their chosen channel with a one-tap check-in, and as the miss ages it escalates up the ladder: the reviewer at the grace boundary where the goal has one, then the coordinator at seven days, every step recorded and visible to the champion. The sponsor sees stale goals in the weekly digest by default, and a workspace may add the sponsor as a ladder step.
 
 ### 3.9 The Work Map
 
@@ -89,9 +91,10 @@ One company-wide tree: goals, sub-goals, key results, initiatives and the KPIs t
 
 ### Pillar A: The OKR core (P0, Phase 3)
 
-- **Cycles and the planning workflow (P0).** Annual and quarterly cycles, the eight guided phases, sponsor and facilitator, session dates, publication deadline, the seven-item input pack with distribution tracking, prior-cycle scoring, baseline health, ranked strategic issues, priorities with 12-month success statements, the not-doing list, the six publish gates, and the automatic feed-forward at close.
-- **Goals and key results (P0).** Objectives owned by the workspace, a space or a person, in a cycle or with their own timeframe. Key results as direction-aware numeric ranges (baseline to target, increase / reduce / maintain / move) with unit, weight, type (leading / lagging), owner, due date, confidence, full value history and a trend forecast. Alignment under a parent goal or parent key result with cycle detection. Explicit close with an outcome and a retrospective, reopenable.
-- **Alignment (P0).** The vertical cascade across company, department, team and individual levels, plus horizontal dependency links between goals in different teams. The alignment health score (METHOD.md §5.2) with linked gaps. The dependency register with confirmation and named risk owners. The capacity check with a mandatory record of what was cut.
+- **Cycles and the planning workflow (P0).** Annual and quarterly cycles, the eight guided phases, sponsor and facilitator, session dates, publication deadline, the seven-item input pack with distribution tracking, prior-cycle scoring, baseline health, ranked strategic issues, priorities with 12-month success statements, the not-doing list, the six publish gates each at a workspace-set enforcement level, and the automatic feed-forward at close.
+- **Practice settings and profiles (P0).** One admin screen where a workspace chooses a starting profile (METHOD.md §12: recommended, Google-style, Radical Focus, lightweight, governed) and tunes any rule: whether phases bind, which checks and gates block, warn or are off, whether goals need a reviewer, OKR and key result types, scoring and confidence scales, cadence and escalation. Every setting has a sourced default, every change is audited, and a cycle keeps the scoring rules it was graded under.
+- **Goals and key results (P0).** Objectives owned by the workspace, a space or a person, in a cycle or with their own timeframe, each either **committed** (expected to be delivered in full) or **aspirational** (a stretch, expected to land around 0.7), following Google's OKR playbook (METHOD.md §2.8). Key results of four kinds: a metric moving from a baseline to a target (increase, reduce or move), a value held within a band (maintain), a milestone that is done or not done, and a baseline still to be established. Each has a unit where it is numeric, a weight, an optional leading or lagging tag, an owner, a due date, a confidence, full value history and, for metrics, a trend forecast. Created, changed, started or stopped at any point in the cycle (METHOD.md §2.9). Every mid-cycle change is visible, and lowering a target needs a written reason and keeps the original on record. Alignment under a parent goal or parent key result with cycle detection. Explicit close with an outcome and a retrospective, reopenable.
+- **Alignment (P0).** Vertical alignment across the levels a workspace uses (company, department, team and individual by default), where a goal may align to a goal or key result at any level above it, or stand alone with a stated reason. Horizontal dependency links between goals in different teams. The alignment health score (METHOD.md §5.2) with linked gaps. The dependency register with confirmation, and escalation for a dependency nobody can commit to. The capacity check, with what was cut recorded.
 - **KPIs and KPI trees (P0).** Categories, per-KPI frequency, unit, direction, type, tier, targets and health corridors. A keyboard-first grid of periods by KPIs. Parent and child driver trees. Calculated KPIs from a typed formula over other KPIs with cross-frequency aggregation and cascade recompute. KPI-backed key results. **Recovery OKRs** drafted from an unhealthy KPI's leading drivers, and the cross-tree recovery board (METHOD.md §6).
 - **Check-ins (P0).** §3.4, plus optional private team confidence voting revealed together.
 - **Scorecard (P1).** Per owner and per cycle rollup on archive, score bands and portfolio verdicts, trends across cycles, export.
@@ -99,11 +102,11 @@ One company-wide tree: goals, sub-goals, key results, initiatives and the KPIs t
 ### Pillar B: The rhythm (P0, Phase 4)
 
 - **Weekly check-in session (P0).** METHOD.md §7.2, run in the product: the confidence round with the dial and bands, team voting, blocker diagnosis, commitments, the generated digest, the rhythm streak, the twelve-week confidence trend, and the open-blocker board with ages.
-- **Blockers (P0).** The five-type taxonomy, an owner, a next action, a 24-hour clock, escalation at 0.3 and below, and an aging board.
-- **Commitments (P0).** Weekly, owned, linked to a key result, closed as delivered or not with no negotiation.
+- **Blockers (P0).** The blocker taxonomy, an owner, a next action due by the next check-in, escalation when it ages past that or when confidence drops into the low band, and an aging board.
+- **Commitments (P0).** Weekly, owned, linked to a key result, closed as delivered or not, plus the week's wins.
 - **Monthly review (P0).** Trend per objective, dependency and risk log, resource shifts, and the decision log where every decision names the key result it affects.
-- **Quarterly review session (P0).** METHOD.md §8 in full: eleven timed stages, room pulse, hidden-then-revealed scoring, round-robin narratives, kudos, dot-voted retro, the four management-retro questions, the eight-cause root-cause picker, the five-statement anonymous process health, the rhythm diagnostic, keep / modify / abandon, learnings and next-cycle drafts, decisions and actions, and exported minutes.
-- **Mid-cycle calibration (P0).** Once per cycle, only for a verifiable external change, with a written reason.
+- **Quarterly review session (P0).** METHOD.md §8 in full: eleven timed stages, room pulse, hidden-then-revealed scoring, round-robin narratives, kudos, dot-voted retro, the four management-retro questions, the eight-cause root-cause picker, the five-statement anonymous process health, the rhythm diagnostic, keep / modify / abandon / defer, learnings, decisions and actions, and exported minutes.
+- **Mid-cycle changes (P0).** Continue, update, start or stop any OKR at any point in the cycle, following Doerr (METHOD.md §2.9). Every change is visible in the activity and at the close. Lowering a target needs a written reason and keeps the original on record; "it got hard" is not a reason.
 - **Review inbox and digests (P0).** §3.5, plus daily and weekly digests in the member's own timezone and channel.
 
 ### Pillar C: The work (P0, Phase 5)
@@ -148,7 +151,7 @@ One channel port with one driver per provider. Every inbound message resolves to
 - **Comments, reactions, mentions, subscriptions, notifications (P0).** Everywhere, with per-reason routing, per-channel delivery, digest windows and a daily summary in the member's own timezone.
 - **Activity feed (P0).** Typed, human-readable, permission-filtered, live, at workspace, space, goal and profile scope. Separate from the compliance audit log.
 - **Search and command palette (P0).** ⌘K for entity jump, actions and full-text search across everything the member may see. Semantic search arrives with the AI layer.
-- **Admin (P0).** Workspace settings, members and access, cycle and rhythm defaults, thresholds, terminology labels, notification and channel defaults, security, branding, the audit log with chain verification, a read-only freeze switch, backups, import and export.
+- **Admin (P0).** Workspace settings, members and access, practice settings and profiles, cycle and rhythm defaults, thresholds, terminology labels, notification and channel defaults, security, branding, the audit log with chain verification, a read-only freeze switch, backups, import and export.
 - **Portability (P0).** Signed, encrypted, checksummed workspace export and dry-run import between any two OpenOKR instances, self-host and cloud in both directions.
 
 ## 5. Deployment (P0, both in v1)
@@ -167,7 +170,7 @@ Self-host is never seat-limited and never feature-gated.
 ## 6. Cross-cutting requirements
 
 - **Importers (P0).** (1) A generic CSV/XLSX importer for goals, key results, KPIs and records, initiatives and tasks, with template downloads, an AI-assisted column mapper, a dry-run preview and a per-row error report. (2) A **FlowyTeam importer**: read-only MySQL, per-company, covering org units to spaces, cycles, objectives, key results, check-ins, KPIs with records and formula translation, and tasks. Both idempotent on re-run, both producing a reconciliation report, with all derived values recomputed rather than trusted.
-- **Zero setup (P0).** Registering is the whole of setup. Every setting in the product carries a working default (TECHNICAL-PLAN.md §4.14), so a new workspace practises the full method correctly from its first minute: the rhythm runs, the coach checks drafts, the gates hold and the agents work in their deterministic form, with nothing configured. Onboarding proposes, it never demands: every step is skippable and every choice it offers is already answered. Configuration is how an organisation adapts the product later, never how it starts.
+- **Zero setup (P0).** Registering is the whole of setup. Every setting in the product carries a working default (TECHNICAL-PLAN.md §4.14), so a new workspace practises the full method correctly from its first minute: the rhythm runs, the coach checks drafts, the structural gates hold and the agents work in their deterministic form, with nothing configured. Onboarding proposes, it never demands: every step is skippable and every choice it offers is already answered. Configuration is how an organisation adapts the product later, never how it starts.
 - **UX bar (P0).** Modern-tool feel: inline editing, optimistic updates with undo, ⌘K, dark mode, keyboard-first, responsive, live updates. Binding specification in UIUX-PLAN.md; budgets in TECHNICAL-PLAN.md §13.
 - **Languages.** English (P0) and Bahasa Melayu (P1). Internationalisation-ready from day one.
 - **Accessibility.** WCAG 2.1 AA target, automated checks in CI on every screen, keyboard paths for every action including drag alternatives.
