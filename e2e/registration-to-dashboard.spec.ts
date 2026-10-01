@@ -216,7 +216,12 @@ test("both seeded agents are in admin, with their schedules and an empty log", a
     page.getByRole("heading", { name: "Agents and runs" }),
   ).toBeVisible();
 
-  const champion = page
+  // **Inside the agents list, not the page.** The scheduler runs the
+  // Champion at :00, :15, :30 and :45, and a run row names its agent, so a
+  // page-wide filter matched twice whenever this test crossed one of those
+  // minutes (found on 2 October 2026, when it ran at 22:15).
+  const agents = page.getByRole("list", { name: "The agents" });
+  const champion = agents
     .getByRole("listitem")
     .filter({ hasText: "OKR Champion" });
   await expect(champion).toHaveCount(1);
@@ -227,14 +232,15 @@ test("both seeded agents are in admin, with their schedules and an empty log", a
   // chip is lower case and the button is not, which `exact` distinguishes.
   await expect(champion.getByText("propose", { exact: true })).toBeVisible();
 
-  const coach = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  const coach = agents.getByRole("listitem").filter({ hasText: "OKR Coach" });
   await expect(coach).toHaveCount(1);
   await expect(coach.getByText("On every write")).toBeVisible();
   await expect(coach.getByText("propose", { exact: true })).toBeVisible();
 
-  // Nothing schedules a run on this instance, and the page says so rather
-  // than showing an empty list that reads like a bug.
-  await expect(page.getByText(/No run yet/)).toBeVisible();
+  // The run log is on the page whether or not the scheduler has already
+  // run something. It used to assert "No run yet", which held only when no
+  // scheduled minute had passed since the workspace was created.
+  await expect(page.getByRole("heading", { name: "Recent runs" })).toBeVisible();
 });
 
 test("an administrator can run an agent, and the page says whether it can draft", async () => {
