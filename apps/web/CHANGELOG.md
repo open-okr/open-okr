@@ -1,5 +1,45 @@
 # @openokr/web
 
+## 0.1.1
+
+### Patch Changes
+
+- This is the first release of OpenOKR you can install. 0.1.0 was tagged but
+  never published.
+  
+  The release run checks every test against the tagged commit before it builds
+  anything. For 0.1.0, one test planned a cycle in November 2026. On 1 October
+  2026 that quarter became the current one, which every workspace already holds,
+  so the test failed and nothing after it ran. No image, Helm chart or release
+  page exists for 0.1.0, so there is nothing to upgrade from. The test now plans
+  its cycle two quarters ahead of the day it runs.
+  
+  Everything 0.1.0 was meant to ship is in this release. Those changes are listed
+  under 0.1.0 in
+  [the changelog](https://github.com/open-okr/open-okr/blob/main/apps/web/CHANGELOG.md#010).
+
+- [#100](https://github.com/open-okr/open-okr/pull/100) [`0970ab1`](https://github.com/open-okr/open-okr/commit/0970ab10d3d7dabfcb892ceddf4d887bc52e9a1d) Thanks [@agungksidik](https://github.com/agungksidik)! - One scrollbar on a long screen, not two.
+  
+  Tailwind's `sr-only` is `position: absolute`, and an absolutely positioned box
+  with no positioned ancestor resolves against the initial containing block. Its
+  scrollable overflow then lands on the document rather than on the pane it sits
+  in.
+  
+  The cycle drafting phase carries one `sr-only` label per form field, a few
+  hundred rows down, so the browser drew a document scrollbar beside the one the
+  content pane already had. The outer one moved nothing. Measured at 1440x900 on
+  `/cycle?phase=4`: `html.scrollHeight` 6151px against a `body` of 900px.
+  
+  The content pane is now the containing block, so that overflow stays inside the
+  pane that owns it. Every screen keeps its own single scrollbar.
+- Updated dependencies []:
+  - @openokr/adapters@0.1.1
+  - @openokr/agents@0.1.1
+  - @openokr/config@0.1.1
+  - @openokr/core@0.1.1
+  - @openokr/method@0.1.1
+  - @openokr/ui@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
