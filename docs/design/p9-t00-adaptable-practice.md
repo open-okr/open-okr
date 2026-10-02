@@ -135,7 +135,7 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 
 | Table | Change | Backfill (data-change runner) |
 |---|---|---|
-| `rhythm_settings` | `profile text not null default 'recommended'`, checked against the five profiles; `practice jsonb not null default '{}'`, checked to be an object (migration 0108, P9-T01) | None |
+| `rhythm_settings` | `profile text not null default 'recommended'`, checked against the five profiles; `practice jsonb not null default '{}'`, checked to be an object (migration 0109, P9-T01) | None |
 | `goals` | `kind goal_kind not null default 'aspirational'` (`committed`, `aspirational`) | None; existing goals read aspirational |
 | `goals` | `added_mid_cycle_at timestamptz`, `standalone_reason text`, `draft_state goal_draft_state` (`draft`, `awaiting_approval`; null means it follows its cycle) | None |
 | `goals` | `reviewer_id` drops `not null` | None |
@@ -143,7 +143,7 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 | `key_results` | `score_computed numeric`, `score_reason text` | `score_computed = score` where scored |
 | New `key_result_target_changes` | `workspace_id`, `key_result_id`, `from_value`, `to_value`, `reason`, `actor`, `changed_at`, `mid_cycle` | None |
 | `cycles` | `practice_snapshot jsonb` | Closed cycles get today's canon |
-| `cycles` | `company_published_at timestamptz`, the first publish step (METHOD v2 §4.5, migration 0109). **Changed at P9-T03b** from a `teams_published_at` for the second step: `published_at` keeps meaning "the whole set is out" for every reader that relies on it, so a cycle published before the release needs no backfill | None |
+| `cycles` | `company_published_at timestamptz`, the first publish step (METHOD v2 §4.5, migration 0110). **Changed at P9-T03b** from a `teams_published_at` for the second step: `published_at` keeps meaning "the whole set is out" for every reader that relies on it, so a cycle published before the release needs no backfill | None |
 | New `space_holidays` | `workspace_id`, `space_id`, `starts_on`, `ends_on`, `note` | None |
 | New `member_leave` (G-2) | `workspace_id`, `member_id`, `starts_on`, `ends_on`, `delegate_member_id` | None |
 | Root-cause enum | add `other`; sessions gain `secondary_root_cause` | None |

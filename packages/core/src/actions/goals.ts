@@ -2176,6 +2176,100 @@ export const recordKeyResultValue = defineWriteAction({
   }),
 });
 
+export const removeKeyResult = defineWriteAction({
+  name: "goals.removeKeyResult",
+  // openokr:policy-exempt: removing a key result is a change to an objective that exists, which stays open under every setting (METHOD.md §2.9); access decides who may, at full.
+  summary:
+    "Removes one key result from its goal, which is not the same as closing the goal.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  // `full`, like `goals.delete` and unlike the edits above. Removing a measure
+  // takes its whole value history out of the set, and a reader who may edit a
+  // goal is not thereby somebody who may decide a measure never counted.
+  access: ACCESS_LEVELS.full,
+  safety: "destructive",
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [owner] = await tx
+        .select({ goalId: keyResults.goalId, title: keyResults.title })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        owner.goalId,
+        ACCESS_LEVELS.full,
+      );
+
+      // openokr:allow-mutation: the operation's own execute.
+      await tx
+        .update(keyResults)
+        .set({ deletedAt: new Date() })
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        );
+
+      await recompute(tx, workspaceId, owner.goalId);
+      // The KR checks judge the set, so removing one rescores the rest.
+      await recomputeGoalQualityInTx(tx, { workspaceId, goalId: owner.goalId });
+
+      // KR-1 fires at none and at nothing else, which is the same crossing
+      // `goals.addKeyResult` watches for, in the other direction.
+      const [{ count } = { count: 0 }] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.goalId, owner.goalId),
+          ),
+        );
+      if (count === 0) {
+        await realign(tx, workspaceId, owner.goalId);
+      }
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "key_result.removed",
+          subjectType: "goal",
+          subjectId: owner.goalId,
+          // The title travels, because the feed entry has to read as a sentence
+          // after the row it names is gone.
+          payload: { title: owner.title },
+        },
+        audit: {
+          action: "goals.removeKeyResult",
+          targetType: "key_result",
+          targetId: input.id,
+          payload: { goalId: owner.goalId, title: owner.title },
+        },
+      };
+    },
+  }),
+});
+
 /**
  * Links a KPI to a key result drafted without one (completeness review M-07).
  *

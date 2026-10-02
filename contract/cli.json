@@ -4005,6 +4005,117 @@
       "pages": false
     },
     {
+      "name": "roles list",
+      "action": "roles.list",
+      "method": "GET",
+      "path": "/roles/list",
+      "scope": "read",
+      "summary": "Every workspace role with its permission matrix.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "roles setPermission",
+      "action": "roles.setPermission",
+      "method": "POST",
+      "path": "/roles/setPermission",
+      "scope": "write",
+      "summary": "Sets what one role may do in one domain.",
+      "flags": [
+        {
+          "name": "role-id",
+          "field": "roleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "domain",
+          "field": "domain",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "goal",
+            "kpi",
+            "initiative",
+            "task",
+            "comment",
+            "space",
+            "workspace"
+          ]
+        },
+        {
+          "name": "level",
+          "field": "level",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "roles create",
+      "action": "roles.create",
+      "method": "POST",
+      "path": "/roles/create",
+      "scope": "write",
+      "summary": "Adds a role, starting from the levels given.",
+      "flags": [
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "permissions",
+          "field": "permissions",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "roles delete",
+      "action": "roles.delete",
+      "method": "POST",
+      "path": "/roles/delete",
+      "scope": "destructive",
+      "summary": "Removes a role that nobody holds.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "roles assign",
+      "action": "roles.assign",
+      "method": "POST",
+      "path": "/roles/assign",
+      "scope": "write",
+      "summary": "Gives a member a role, or takes their role away.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "role-id",
+          "field": "roleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "rhythm read",
       "action": "rhythm.read",
       "method": "GET",
@@ -6654,6 +6765,23 @@
           "field": "note",
           "type": "string",
           "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals removeKeyResult",
+      "action": "goals.removeKeyResult",
+      "method": "POST",
+      "path": "/goals/removeKeyResult",
+      "scope": "destructive",
+      "summary": "Removes one key result from its goal, which is not the same as closing the goal.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false

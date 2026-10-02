@@ -425,13 +425,16 @@ describe("access, which is the space's and the owner's", () => {
       call("initiatives.delete", { id: theirs.id }, OTHER),
     ).rejects.toThrow(/higher access level/);
 
-    // And the workspace's own owner cannot delete it either, because the second
-    // gate is `full` on the initiative's own context and only its owner holds
-    // that. Identical to a goal whose champion is somebody else, which
-    // `goals/service.ts` records as an open question rather than a defect.
-    await expect(call("initiatives.delete", { id: theirs.id })).rejects.toThrow(
-      /No such initiative/,
-    );
+    // **The workspace owner can delete it, and that is new** (P8-G13a). The
+    // second gate is `full` on the initiative's own context, and the Owner
+    // role grants manage on the initiative domain, so the maximum meets it.
+    // Before roles only the initiative's own owner held that, which is the
+    // open question `goals/service.ts` recorded rather than a defect; the
+    // matrix is what answers it. An ordinary member is still refused above,
+    // because the Member role grants edit and the gate asks for manage.
+    await expect(
+      call("initiatives.delete", { id: theirs.id }),
+    ).resolves.toBeTruthy();
 
     const mine = await createInitiative();
     await expect(

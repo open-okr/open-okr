@@ -236,6 +236,7 @@ import {
   readKeyResultHistory,
   reassignGoalRole,
   recordKeyResultValue,
+  removeKeyResult,
   reopenGoal,
   restoreGoal,
   rewriteKeyResult,
@@ -343,6 +344,13 @@ import {
   proposeFromLearnings,
 } from "./review-assists.ts";
 import { narrateDigest, narrateTrend, readDigest } from "./rhythm-assists.ts";
+import {
+  assignRole,
+  createRole,
+  deleteRole,
+  listRoles,
+  setRolePermission,
+} from "./roles.ts";
 import { findEntities, readPaletteJump, runSearch } from "./search.ts";
 import {
   addRetroNote,
@@ -642,6 +650,11 @@ export const ACTION_MAP = {
   "cycles.feedForward": feedForwardCycle,
   "cycles.close": closeCycle,
   "cycles.scorecard": readScorecard,
+  "roles.list": listRoles,
+  "roles.setPermission": setRolePermission,
+  "roles.create": createRole,
+  "roles.delete": deleteRole,
+  "roles.assign": assignRole,
   "rhythm.read": readRhythmSettings,
   "rhythm.update": updateRhythmSettings,
   "practice.read": readPractice,
@@ -721,6 +734,7 @@ export const ACTION_MAP = {
   "goals.addKeyResult": createKeyResult,
   "goals.updateKeyResult": updateKeyResult,
   "goals.recordValue": recordKeyResultValue,
+  "goals.removeKeyResult": removeKeyResult,
   "goals.linkKpi": linkKeyResultKpi,
   "goals.unlinkKpi": unlinkKeyResultKpi,
   "goals.keyResultHistory": readKeyResultHistory,

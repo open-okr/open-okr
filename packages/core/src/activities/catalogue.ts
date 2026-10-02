@@ -86,6 +86,17 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "member.updated": z.object({ name: z.string() }),
   "member.suspended": z.object({ name: z.string() }),
   "member.restored": z.object({ name: z.string() }),
+  // Workspace roles (P8-G13a). The role name travels on the first three
+  // because the feed entry has to read as a sentence after a role is renamed
+  // or removed.
+  "role.created": z.object({ name: z.string() }),
+  "role.deleted": z.object({ name: z.string() }),
+  "role.permission_set": z.object({
+    role: z.string(),
+    domain: z.string(),
+    level: z.number(),
+  }),
+  "role.assigned": z.object({}),
   // Full access granted or returned to standard (completeness review H-14).
   "member.administrator_set": z.object({
     name: z.string(),
@@ -389,6 +400,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "key_result.created": z.object({ title: z.string() }),
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
+  "key_result.removed": z.object({ title: z.string() }),
   "key_result.kpi_linked": z.object({ kpiId: z.uuid() }),
   "key_result.kpi_unlinked": z.object({}),
   // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing

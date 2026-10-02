@@ -16,8 +16,8 @@ import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_g
 import { bindAgentsToSpacelessItems } from "../src/data-changes/0009_bind_agents_to_spaceless_items.ts";
 import { scrubErasedMemberNames } from "../src/data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../src/data-changes/0011_seal_account_tokens.ts";
-import { carryStrategicIssueMinimum } from "../src/data-changes/0012_carry_strategic_issue_minimum.ts";
-import { carryObjectiveLengthLimit } from "../src/data-changes/0013_carry_objective_length_limit.ts";
+import { carryStrategicIssueMinimum } from "../src/data-changes/0013_carry_strategic_issue_minimum.ts";
+import { carryObjectiveLengthLimit } from "../src/data-changes/0014_carry_objective_length_limit.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -806,7 +806,7 @@ describe("0011: sealing the identity-provider tokens stored in plain text", () =
   });
 });
 
-describe("0012: carrying the strategic issue floor onto its new threshold", () => {
+describe("0013: carrying the strategic issue floor onto its new threshold", () => {
   it("moves a raised floor, drops the canon one and anything unreadable, and keeps a value already set", async () => {
     await runMigrations(client, {
       dirs: [join(import.meta.dirname, "../migrations")],
@@ -871,7 +871,7 @@ describe("0012: carrying the strategic issue floor onto its new threshold", () =
   });
 });
 
-describe("0013: carrying the objective length limit onto its new threshold", () => {
+describe("0014: carrying the objective length limit onto its new threshold", () => {
   it("moves a changed upper bound, drops the canon one, and keeps a value already set", async () => {
     await runMigrations(client, {
       dirs: [join(import.meta.dirname, "../migrations")],

@@ -51,6 +51,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
   "member.restored": (p) => `${asString(p.name, "A member")} was restored`,
+  "role.created": (p) => `Role "${asString(p.name, "a role")}" was added`,
+  "role.deleted": (p) => `Role "${asString(p.name, "a role")}" was removed`,
+  "role.permission_set": (p) =>
+    `What ${asString(p.role, "a role")} may do with ${asString(p.domain, "a domain")} was changed`,
+  "role.assigned": () => "A member was given a different role",
   "member.administrator_set": (p) =>
     p.administrator === true
       ? `${asString(p.name, "A member")} became an administrator`
@@ -334,6 +339,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "key_result.updated": () => "A key result was edited",
   "key_result.value_recorded": (p) =>
     `A key result moved to ${Number(p.value ?? 0)}`,
+  "key_result.removed": (p) =>
+    `Key result "${asString(p.title, "a key result")}" was removed`,
   "key_result.kpi_linked": () =>
     "A key result was linked to a KPI and now reads its value from it",
   "key_result.kpi_unlinked": () =>

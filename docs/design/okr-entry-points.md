@@ -176,3 +176,33 @@ or the avatar menu, as reachability.test.ts asserts
 4. **Does this belong in v1 or after the first release?** It is interface work
    with no schema change, so it can land late. The counter-argument is that
    first impressions of an OKR product are formed on exactly this screen.
+
+## 7. What was built, 1 October 2026 (P8-G12)
+
+Section 3.2 of this document is now the screen, and sections 3.1 and 3.3 are
+not. The sidebar regroup, the rename and the goal detail's add row are still
+proposals, and the four questions in section 6 are still open.
+
+| Asked for | Built as |
+|---|---|
+| Inline edit of objectives and key results | Titles and the current value are fields on the row. Enter saves, Escape puts the stored value back |
+| Add buttons under each set | `Add key result` under each objective's measures, `Add objective` under the set. Neither writes until a title is typed |
+| Open and delete on hover | Shown on hover, revealed by focus too, and the delete asks once in place rather than in a dialog |
+| List and Diagram tabs | A `display` parameter with three values: the editable list, the diagram, and the previous table under `tree` |
+| Add cycle | A searchable picker beside the title, with a create dialog. The cycle chips are gone from the filter bar |
+
+**What the status chip does, and why it is not what the prototype showed.**
+The prototype let somebody click the chip and choose a status. OpenOKR's
+equivalent column is health, and METHOD.md §3 derives it from the check-ins and
+the confidence. A chip that set it would be a second opinion on the same
+column, and the escalation ladder would follow the one nobody typed. The chip
+shows health and nothing on this screen writes it.
+
+**What a typed value does.** It goes through `goals.recordValue`, which writes
+a `key_result_values` row with source `manual` and recomputes the goal. The
+table is a faster door onto the same room, not a second room.
+
+**What a new objective is.** A draft, at the level the filter names or `team`
+when it names none, championed and reviewed by whoever added it. The publish
+gates on S-10 are untouched, and the quality checks judge the row the moment it
+is saved rather than refusing it on the way in.

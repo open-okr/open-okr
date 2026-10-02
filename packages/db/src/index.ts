@@ -573,6 +573,16 @@ export {
   workspaceImports,
 } from "./schema/workspace-imports.ts";
 export {
+  BUILTIN_ROLE_KEYS,
+  type BuiltinRoleKey,
+  ROLE_DOMAINS,
+  type RoleDomain,
+  type RolePermission,
+  rolePermissions,
+  type WorkspaceRole,
+  workspaceRoles,
+} from "./schema/workspace-roles.ts";
+export {
   type QuietHours,
   type Workspace,
   type WorkspaceMember,
