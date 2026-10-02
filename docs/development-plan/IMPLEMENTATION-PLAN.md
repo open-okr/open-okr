@@ -3035,6 +3035,14 @@ Deliverables: an admin screen listing the roles, their matrix as a grid of four 
 Test plan: changing a cell writes one audit row and the member it affects resolves the new level on their next read; the Owner row offers no control; removing a role somebody holds is refused with the sentence the action gives.
 Acceptance: Given an administrator on the roles screen, when they lower Member to view on objectives, then a member holding that role opens an objective read-only.
 
+**Built on 2 October 2026.** Two cards rather than one: the matrix, and who
+holds which role. `people.directory` gained `roleId` so the second card needs
+no read per person, which meant three producers of the member summary had to
+select it; two are `returning` clauses that only a run-time schema would have
+caught. The screen is registered at `/admin/roles` and takes `full`, the same
+level as invitations and support access, because deciding what a role may do
+is deciding who can change what.
+
 ### P8-G13c: An objective's edit stops coming from its space [M]
 Depends on: P8-G13a, P8-G13b
 Goal: one answer to "who may edit this", not two.
