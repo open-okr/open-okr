@@ -355,6 +355,7 @@ export {
   PHASE_TITLES,
   type PhaseResult,
   type PredicateState,
+  type PublishScope,
   phaseCompletion,
   phaseWorkAllowed,
   publishGates,

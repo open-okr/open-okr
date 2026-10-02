@@ -61,8 +61,9 @@ import {
   lte,
   or,
 } from "drizzle-orm";
+import { practiceFromRow } from "../practice/settings.ts";
 import { loadCycleCadence } from "../sessions/booking.ts";
-import { workspaceTimeZone } from "./service.ts";
+import { readRhythmRow, workspaceTimeZone } from "./service.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -97,6 +98,7 @@ export async function loadWorkflowInput<
     | "endsOn"
     | "publicationDeadline"
     | "publishedAt"
+    | "companyPublishedAt"
     | "sponsorId"
     | "facilitatorId"
     | "packDistributedAt"
@@ -252,6 +254,11 @@ export async function loadWorkflowInput<
     startsOn: cycle.startsOn,
     publicationDeadline: cycle.publicationDeadline,
     publishedAt: cycle.publishedAt,
+    companyPublishedAt: cycle.companyPublishedAt,
+    // How hard each check and gate is here (METHOD.md §12). Read with the
+    // rest of the input, so phase 4, the gates and publication all judge by
+    // the workspace's practice rather than the recommended one (P9-T03b).
+    practice: practiceFromRow(await readRhythmRow(tx, workspaceId)).practice,
     sponsorId: cycle.sponsorId,
     facilitatorId: cycle.facilitatorId,
     packDistributedAt: cycle.packDistributedAt,
@@ -659,6 +666,7 @@ export async function loadCycleForWorkflow<
       endsOn: cycles.endsOn,
       publicationDeadline: cycles.publicationDeadline,
       publishedAt: cycles.publishedAt,
+      companyPublishedAt: cycles.companyPublishedAt,
       sponsorId: cycles.sponsorId,
       facilitatorId: cycles.facilitatorId,
       packDistributedAt: cycles.packDistributedAt,

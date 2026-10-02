@@ -30,15 +30,28 @@ The input pack closes three working days before the planning session.
 
 ## The six publish gates
 
-An OKR set is not published until all six pass. They are hard: the product
-refuses, rather than warning and letting it through.
+Publishing runs six gates over what it publishes. Each has a level: a gate
+that blocks holds publication until it is green, one that warns is shown and
+coached, and one that is off is not judged. By default only the two
+structural gates block.
 
-1. Every objective has a title, a champion and a reviewer
-2. Every key result passes the quality checks, and every objective names an outcome rather than an output
-3. Alignment is mapped: each objective states what it contributes to
-4. Every dependency is confirmed, or logged with a named risk owner
-5. Capacity is checked, and nothing is left exceeding it
-6. A publication date is set before day one of the cycle
+| Gate | Default |
+|---|---|
+| 1. Every objective has a title and a champion | Blocks |
+| 2. Every objective has key results, and nothing fails a check set to block | Blocks |
+| 3. Alignment is mapped: each objective states what it contributes to | Warns |
+| 4. Every dependency is confirmed, or logged with a named risk owner | Warns |
+| 5. Capacity is checked, and nothing committed is left exceeding it | Warns |
+| 6. A publication date is set | Off |
+
+A workspace that runs a formal planning process can make any of them block,
+which is what the governed profile does for gates 3 to 5. An administrator
+can publish past a gate that blocks with a written reason, unless the
+workspace has turned that off.
+
+**Two steps.** The company set publishes before the cycle starts and the
+department and team sets in its first two weeks, each through the gates over
+what it publishes. A set can still be published in one go.
 
 Gate 5 is the one teams argue with, and it is the one that saves the quarter.
 A set nobody has capacity for is a set that quietly becomes optional in week

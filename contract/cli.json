@@ -4528,13 +4528,23 @@
       "method": "POST",
       "path": "/workflow/publish",
       "scope": "write",
-      "summary": "Publishes the set, refusing while any of the six gates is red or cannot be evaluated.",
+      "summary": "Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated.",
       "flags": [
         {
           "name": "cycle-id",
           "field": "cycleId",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "step",
+          "field": "step",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "company",
+            "teams"
+          ]
         },
         {
           "name": "override",

@@ -580,6 +580,7 @@ export default async function CyclePage({
             gates={workflow.gates}
             publishable={workflow.publishable}
             publishedAt={workflow.publishedAt}
+            companyPublishedAt={workflow.companyPublishedAt}
             canPublish={canPublish}
             pinnedCycleId={pinnedCycleId}
           />

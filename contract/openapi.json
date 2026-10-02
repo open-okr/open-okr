@@ -21735,6 +21735,12 @@
                             "null"
                           ]
                         },
+                        "companyPublishedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "packDistributedAt": {
                           "type": [
                             "string",
@@ -21955,6 +21961,14 @@
                               "title": {
                                 "type": "string"
                               },
+                              "level": {
+                                "type": "string",
+                                "enum": [
+                                  "block",
+                                  "warn",
+                                  "off"
+                                ]
+                              },
                               "passed": {
                                 "type": "boolean"
                               },
@@ -21977,6 +21991,7 @@
                             "required": [
                               "gateKey",
                               "title",
+                              "level",
                               "passed",
                               "evaluable",
                               "missing",
@@ -22375,6 +22390,7 @@
                         "publicationDeadline",
                         "daysToDeadline",
                         "publishedAt",
+                        "companyPublishedAt",
                         "packDistributedAt",
                         "firstCycle",
                         "sponsor",
@@ -23456,7 +23472,7 @@
     "/workflow/publish": {
       "post": {
         "operationId": "workflow.publish",
-        "summary": "Publishes the set, refusing while any of the six gates is red or cannot be evaluated.",
+        "summary": "Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated.",
         "tags": [
           "workflow"
         ],
@@ -23481,7 +23497,22 @@
                         "publishedAt": {
                           "type": "string"
                         },
+                        "published": {
+                          "type": "string",
+                          "enum": [
+                            "company",
+                            "set"
+                          ]
+                        },
                         "overrodeGates": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "warnedGates": {
                           "type": "array",
                           "items": {
                             "type": "integer",
@@ -23493,7 +23524,9 @@
                       "required": [
                         "cycleId",
                         "publishedAt",
-                        "overrodeGates"
+                        "published",
+                        "overrodeGates",
+                        "warnedGates"
                       ],
                       "additionalProperties": false
                     }
@@ -23541,6 +23574,13 @@
                     "type": "string",
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "step": {
+                    "type": "string",
+                    "enum": [
+                      "company",
+                      "teams"
+                    ]
                   },
                   "override": {
                     "type": "object",

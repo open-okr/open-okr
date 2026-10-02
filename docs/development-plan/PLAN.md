@@ -236,7 +236,7 @@ Throughput is planned, not assumed: one human reviewer plus the agent, sustainin
 | 1 | Cloud pricing model | Per seat, per workspace, usage-based, free tier shape | Per seat with a free tier; no feature gating | Before the cloud opens |
 | 2 | Whether any feature is ever gated | Nothing gated / an enterprise layer | Nothing gated | Before Phase 8 exit |
 | 3 | Default agent autonomy | Propose and approve / scoped direct writes | Propose and approve; direct writes are opt-in per agent | Before Phase 4 |
-| 4 | Coach strictness default | Advisory / warn / strict | Warn, with the six publish gates hard | Before Phase 4 |
+| 4 | Coach strictness default | Advisory / warn / strict | ~~Warn, with the six publish gates hard~~ **Superseded on 1 October 2026** by Akmal's decision 2: only structural defects block publishing by default, and every quality check and publish gate has its own level, block, warn or off (METHOD.md §4, §4.5, §12). Recorded at P9-T03b | Before Phase 4 |
 | 5 | Which channel ships first after email | Slack / Teams | Slack, because setup is self-serve | Before Phase 5 |
 | 6 | Embedding model and vector dimension | Provider-hosted / local | Decide with the retrieval task; keep the column swappable | Before the retrieval task |
 | 7 | Formal external accessibility audit | Yes / internal only | Internal automated plus a manual pass; external audit if a customer requires it | Before Phase 7 exit |

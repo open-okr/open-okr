@@ -143,7 +143,7 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 | `key_results` | `score_computed numeric`, `score_reason text` | `score_computed = score` where scored |
 | New `key_result_target_changes` | `workspace_id`, `key_result_id`, `from_value`, `to_value`, `reason`, `actor`, `changed_at`, `mid_cycle` | None |
 | `cycles` | `practice_snapshot jsonb` | Closed cycles get today's canon |
-| `cycles` | `teams_published_at timestamptz`, beside the existing `published_at`, for the second publish step (METHOD v2 §4.5) | None |
+| `cycles` | `company_published_at timestamptz`, the first publish step (METHOD v2 §4.5, migration 0109). **Changed at P9-T03b** from a `teams_published_at` for the second step: `published_at` keeps meaning "the whole set is out" for every reader that relies on it, so a cycle published before the release needs no backfill | None |
 | New `space_holidays` | `workspace_id`, `space_id`, `starts_on`, `ends_on`, `note` | None |
 | New `member_leave` (G-2) | `workspace_id`, `member_id`, `starts_on`, `ends_on`, `delegate_member_id` | None |
 | Root-cause enum | add `other`; sessions gain `secondary_root_cause` | None |
@@ -167,7 +167,7 @@ New actions in the registry, which regenerates REST, OpenAPI, the CLI and the ag
 | `goals.deleteKeyResult` | edit | Soft delete; there is no way to remove a key result today |
 | `goals.setKind` | edit | Committed or aspirational, recorded in the activity |
 | `goals.publishDraft`, `goals.approveDraft` | edit, reviewer | For workspaces whose mid-cycle objectives start as drafts, and for a mid-cycle addition that is a draft until it passes the checks set to block |
-| `workflow.publish` gains `step: "company" \| "teams"` | full | The two publish steps (METHOD v2 §4.5) |
+| `workflow.publish` gains `step: "company" \| "teams"`, absent for whatever is left | full | The two publish steps (METHOD v2 §4.5). Each step judges only what it publishes, and only a gate at block holds it |
 | `spaces.setHolidays` | edit on the space | Holiday periods (METHOD v2 §7.4) |
 | `goals.moveToSpace` (G-1) | edit on both spaces | Moves an objective with its key results, check-ins, dependencies and alignment, recorded as one dated change (METHOD v2 §2.9) |
 | `people.setLeave` (G-2) | the member, or `full` | Leave with a delegate (METHOD v2 §7.4) |

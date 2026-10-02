@@ -293,6 +293,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     // Which gates were unmet when somebody published anyway (P4-T03).
     // Empty on a normal publication, which is most of them.
     overrodeGates: z.array(z.number().int()).optional(),
+    // Which step this was (METHOD.md §4.5, P9-T03b): the company set, or the
+    // whole set. Absent on rows written before the two steps existed.
+    published: z.enum(["company", "set"]).optional(),
   }),
   // The nudge run (P4-T04a). One activity per run rather than per nudge:
   // the nudges are rows of their own, and a feed with one entry per message

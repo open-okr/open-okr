@@ -218,7 +218,9 @@ The two legacy columns and their unique partial index arrived at P6-T03a, sevent
 `frame_id` to annual_frames, `text`, `note?`, `position`.
 
 ### cycles *(short_id, importable)*
-`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `levels jsonb`, `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `company_published_at?`, `levels jsonb`, `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+
+`company_published_at` (0109, P9-T03b) is the first of the two publish steps, METHOD.md §4.5: the company set, published before the cycle starts. `published_at` still means the whole set is out, so a set published in one go sets both and a cycle published before the column existed reads as it always did. No legacy source.
 
 The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An imported cycle keeps the name the source used, because that is the name the people being migrated recognise; the period still decides the dates and the mode.
 

@@ -409,29 +409,31 @@ The lower bound of four words was removed on 1 October 2026: whatmatters' own "A
 
 ### 4.4 Cycle checks
 
+Info by default, shown as the phase checklist. Under binding phase enforcement they decide phase completion.
+
 | ID | Check |
 |---|---|
-| CY-1 | Input pack complete and distributed at least 3 working days before session one |
-| CY-2 | Prior cycle scored, or first cycle explicitly declared |
+| CY-1 | Input pack gathered and distributed before session one |
+| CY-2 | Prior cycle scored, or this is the first cycle |
 | CY-3 | At least 3 strategic issues listed and ranked by impact |
-| CY-4 | 3 to 5 priorities, each with a stated 12-month success |
-| CY-5 | The not-doing list is written |
-| CY-6 | Capacity checked, nothing left at "exceeds", and the cuts are recorded |
-| CY-7 | Every dependency confirmed or risk-owned |
+| CY-4 | Annual cycles: 3 to 5 priorities, each with a stated 12-month success |
+| CY-5 | Annual cycles: the not-doing list is written |
+| CY-6 | Capacity checked, no committed OKR left at "exceeds" |
+| CY-7 | Every dependency confirmed, escalated or risk-owned |
 | CY-8 | Every check-in and review booked for the whole cycle |
 
 ### 4.5 Publish gates
 
-The set cannot be published until all six are green.
+Publishing makes a cycle's planned OKRs live, in up to two steps: the company set before the cycle starts, then the department and team sets by the time the team publication window closes (§11). Each publish runs the gates over what it publishes. Each gate has an enforcement level (§12). A gate at block refuses publishing until it is green, and an admin may override it with a recorded reason. OKRs added after the team publication window go live as §2.9 says: they must pass the checks set to block, not the set-level gates.
 
-1. Every objective has a title, a named champion and a named reviewer.
-2. Every key result passes the §4.2 checks, and no objective fails OBJ-1.
-3. Alignment is mapped. Each objective states what it contributes to.
-4. Every dependency is confirmed, or logged with a named risk owner.
-5. Capacity is checked. Nothing is left marked as exceeding capacity.
-6. A publication date is set before day one of the cycle.
+1. Every objective has a title and a named champion, and a reviewer where reviewers are required. Block.
+2. Every objective has at least one key result, and every key result passes the checks set to block (by default a target where it needs one, a due date and an owner). Block.
+3. Alignment is mapped. Each objective states what it contributes to, or why it stands alone. Warn.
+4. Every dependency is confirmed, escalated or logged with a named risk owner. Warn.
+5. Capacity is checked. No committed OKR is left marked as exceeding capacity. Warn.
+6. A publication date is set. Off by default; the countdown reminders run either way.
 
-OBJ-1 joined gate 2 on 28 September 2026. REQUIREMENTS §3.2 says an objective that names an output, such as "Launch the new mobile app", blocks publishing until it passes or the workspace overrides with a recorded reason, and until then gate 2 judged key results only. A warn still does not block. The override is unchanged.
+OBJ-1 joined gate 2 on 28 September 2026, under REQUIREMENTS §3.2 as it then read. Since 1 October 2026 OBJ-1 warns by default, so it reaches gate 2 only where a workspace raises it to block.
 
 ### 4.6 Weak and strong examples
 

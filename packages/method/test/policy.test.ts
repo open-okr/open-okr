@@ -250,3 +250,38 @@ describe("every profile against every intent", () => {
     });
   }
 });
+
+describe("publishing", () => {
+  const publish = (cycle: CycleFacts): PolicyIntent => ({
+    kind: "set.publish",
+    cycle,
+  });
+
+  it("never waits on the recommended practice, and never needs the phases", () => {
+    const practice = resolvePractice("recommended");
+    expect(policyNeedsPhases(publish(unready), practice)).toBe(false);
+    expect(decide(publish(unready), practice, thresholds).outcome).toBe(
+      "allow",
+    );
+  });
+
+  it("waits for phase 4 under binding phases, naming what drafting still misses", () => {
+    const practice = resolvePractice("recommended", {
+      "phases.enforcement": "binding",
+    });
+    expect(policyNeedsPhases(publish(unready), practice)).toBe(true);
+    const decision = decide(publish(unready), practice, thresholds);
+    expect(decision.outcome).toBe("block");
+    expect(decision.rules).toEqual(["phases.enforcement"]);
+    expect(decision.reasons[0]).toContain("Nothing drafted yet");
+    const drafted: CycleFacts = {
+      ...ready,
+      phases: (ready.phases ?? []).map((result) =>
+        result.phase === 4 ? phase(4) : result,
+      ),
+    };
+    expect(decide(publish(drafted), practice, thresholds).outcome).toBe(
+      "allow",
+    );
+  });
+});

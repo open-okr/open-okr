@@ -161,9 +161,13 @@ export async function publishCycle(
   // means a plain publish, and the action refuses a red gate on its own; this
   // never decides whether the gates are met.
   const reason = String(formData.get("override.reason") ?? "").trim();
+  // The first of the two steps when the company button sent it; absent
+  // publishes whatever is not yet out (METHOD.md §4.5, P9-T03b).
+  const step = formData.get("step") === "company" ? "company" : undefined;
   return run((context) =>
     callAction(context, "workflow.publish", {
       cycleId,
+      ...(step ? { step } : {}),
       ...(reason === "" ? {} : { override: { reason } }),
     }),
   );

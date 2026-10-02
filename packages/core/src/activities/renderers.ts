@@ -250,7 +250,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Chose ${Number(p.count ?? 0)} of the year's key results to focus on`,
   "cycle.calibrated": () => "The cycle was calibrated mid-flight",
   "cycle.published": (p) =>
-    `Cycle "${asString(p.name, "a cycle")}" was published`,
+    p.published === "company"
+      ? `The company set of cycle "${asString(p.name, "a cycle")}" was published`
+      : `Cycle "${asString(p.name, "a cycle")}" was published`,
   // One line per run, not per nudge. A feed with an entry for every message
   // the product sent would bury everything a person actually did.
   "nudges.run": (p) =>

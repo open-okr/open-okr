@@ -3083,9 +3083,9 @@ Scenario steps: NW-P-10, NW-Q1-08, NW-Q1-09, NW-Q2-03, NW-Q2-04.
 Depends on: P9-T03a
 Goal: only structural defects block publishing by default, and a cycle publishes its company set and its team sets as two steps.
 Deliverables:
-- **Gates.** Per-gate levels in `publishGates` from the practice: gates 1 and 2 block, 3 to 5 warn, 6 off. Gate 2 reads the checks set to block. The override follows the "Gate override" setting. Under binding phases, publishing also waits for phase 4 (§2.3). `workflow.publish` asks `requirePolicy`, and its exemption goes.
-- **Publishing in two steps.** `workflow.publish` gains `step: "company" | "teams"`, and `cycles.teams_published_at` records the second. OKRs written inside the team publication window face the gates at the team step. One added after it faces only the checks set to block, never the set-level gates (METHOD v2 §4.5).
-- **Documents.** METHOD.md §4.4 and §4.5 move in. PLAN.md §13 decision 4 is marked superseded by Akmal's decision of 1 October 2026. DATABASE.md and the §7.2 mapping gain `teams_published_at`. The handbook's "six gates, hard" is rewritten.
+- **Gates.** Per-gate levels in `publishGates` from the practice: gates 1 and 2 block, 3 to 5 warn, 6 off. Only a gate at block holds publication. Gate 2 asks that every objective has key results and nothing fails a check set to block, and is red on an empty set, because nothing drafted is nothing to publish. The override follows the "Gate override" setting. Under binding phases, publishing also waits for phase 4 (§2.3). `workflow.publish` asks `requirePolicy`, and its exemption goes. The server's workflow now reads the workspace's practice, so phase 4 and the gates judge by its levels.
+- **Publishing in two steps.** `workflow.publish` gains `step: "company" | "teams"`; absent publishes whatever is left. Each step judges only what it publishes. **`cycles.company_published_at` records the first step** rather than a `teams_published_at` recording the second, because `published_at` keeps meaning "the whole set is out" for every reader that already relies on it, and a cycle published before this release needs no backfill. OKRs added after the team publication window leave the set-level gates at P9-T13, with the added-mid-cycle mark.
+- **Documents.** METHOD.md §4.4 and §4.5 move in. PLAN.md §13 decision 4 is marked superseded by Akmal's decision of 1 October 2026. DATABASE.md, TECHNICAL-PLAN §4.3 and the §7.2 mapping gain `company_published_at`. The handbook's "six gates, hard" and the UAT cases are rewritten.
 Test plan: gate unit tests per level; the two publish steps, with a set refused at the team step and published with an admin override; REQUIREMENTS §3.2's publishing half end to end in both directions.
 Acceptance: Given "Launch the new mobile app" with one complete key result, when the set is published on the recommended profile, then it publishes with an OBJ-1 warning.
 Scenario steps: NW-P-14, NW-Q1-05, NW-Q1-14, NW-Q2-03, NW-Q2-06, NW-Q4-01, NW-Q4-08.
@@ -3223,7 +3223,7 @@ Scenario steps: NW-P-11, NW-Q1-07, NW-Q1-20, NW-Q1-22, NW-Q2-16, NW-Q3-09, NW-Q3
 Depends on: P9-T06, P9-T02
 Goal: continue, update, start and stop at any point, visibly.
 Deliverables:
-- **Marking.** The added-mid-cycle mark, set only on what is created after the team publication window closes.
+- **Marking.** The added-mid-cycle mark, set only on what is created after the team publication window closes. A marked OKR faces only the checks set to block, never the set-level publish gates (METHOD.md §4.5).
 - **Creation.** Live, owner-draft or reviewer-approval creation, with `goals.publishDraft` and `goals.approveDraft`. Under "Live", an addition is live once it passes the checks set to block, and a draft its space can see until it does.
 - **Reasons.** "Reason when adding mid-cycle" and "Reason when easing a target" are enforced through the policy, so the screen, the API and the CLI refuse alike.
 - **Annual revisions.** An annual objective, key result or not-doing item revised at a quarterly revalidation, with a written reason, under the same target rules as any other (METHOD v2 §2.1).

@@ -590,22 +590,49 @@ describe("the six publish gates", () => {
     expect(gate?.detail.missing).toContain("What was cut is not recorded");
   });
 
-  it("gate 6 needs a deadline before day one", () => {
+  it("gate 6 is off by default, and judges the deadline where a workspace turns it on", () => {
+    // Off by default since P9-T03b (METHOD.md §4.5): the countdown reminders
+    // run either way, and a missing date is not a defect in the set.
     expect(
-      publishGates(base({ publicationDeadline: null }))
+      publishGates(base({ publicationDeadline: null })).find(
+        (g) => g.gateKey === 6,
+      ),
+    ).toMatchObject({ level: "off", passed: true });
+    const on = resolvePractice("recommended", { "gates.6": "block" });
+    expect(
+      publishGates(base({ publicationDeadline: null, practice: on }))
         .find((g) => g.gateKey === 6)
         ?.detail.missing.join(" "),
     ).toMatch(/No publication deadline/);
     expect(
-      publishGates(base({ publicationDeadline: "2026-07-05" }))
+      publishGates(base({ publicationDeadline: "2026-07-05", practice: on }))
         .find((g) => g.gateKey === 6)
         ?.detail.missing.join(" "),
     ).toMatch(/not before day one/);
     expect(
-      publishGates(base({ publicationDeadline: "2026-06-24" })).find(
-        (g) => g.gateKey === 6,
-      )?.passed,
+      publishGates(
+        base({ publicationDeadline: "2026-06-24", practice: on }),
+      ).find((g) => g.gateKey === 6)?.passed,
     ).toBe(true);
+  });
+
+  it("holds publication only on a gate set to block", () => {
+    // Gate 5 at its default, warn: the set is not green and still publishes.
+    const warned = base({
+      goals: [goal()],
+      qualityChecksPass: true,
+      initiatives: [],
+      hasCapacityNotes: false,
+    });
+    const gates = publishGates(warned);
+    const five = gates.find((gate) => gate.gateKey === 5);
+    expect(five).toMatchObject({ level: "warn", passed: false });
+    expect(canPublish(gates)).toBe(true);
+    const governed = publishGates({
+      ...warned,
+      practice: resolvePractice("governed"),
+    });
+    expect(canPublish(governed)).toBe(false);
   });
 
   it("goes green on all six, and only then allows publication", () => {
@@ -723,11 +750,12 @@ describe("the conditions tally the rail draws its bar from", () => {
     expect(phase(base(), 4)?.conditions).toEqual({ met: 0, total: 0 });
   });
 
-  it("counts only the gates that can be judged, plus publication", () => {
-    // No goals table, so gates 1 to 5 are unevaluable and only gate 6 counts.
+  it("counts only the blocking gates that can be judged, plus publication", () => {
+    // No goals table, so gates 1 to 5 are unevaluable, and gate 6 is off by
+    // default, so publication is the only condition that counts.
     const result = phase(base(), 5);
-    expect(result?.conditions.total).toBe(2);
-    expect(result?.conditions.met).toBe(1);
+    expect(result?.conditions.total).toBe(1);
+    expect(result?.conditions.met).toBe(0);
   });
 
   it("drops prior scoring from phase 2 when this is a first cycle", () => {
@@ -917,6 +945,27 @@ describe("phase 4 and gate 2 over the drafted set", () => {
     const five = phase(base({ goals: [judged(goal().title)] }), 5);
     expect(five?.blocked).toEqual([]);
     expect(five?.missing).toEqual(["The set is not published"]);
+  });
+
+  it("judges only what each step publishes", () => {
+    const company = { ...judged(goal().title), level: "company" };
+    const team = {
+      ...judged("A team objective"),
+      id: "g2",
+      level: "team",
+      keyResults: [],
+    };
+    const input = base({ goals: [company, team] });
+    // The team objective has no key results, so gate 2 is red for the rest
+    // of the set and green for the company step alone.
+    expect(
+      publishGates(input, thresholds, "company").find((g) => g.gateKey === 2)
+        ?.passed,
+    ).toBe(true);
+    expect(
+      publishGates(input, thresholds, "teams").find((g) => g.gateKey === 2)
+        ?.detail.missing,
+    ).toEqual(['"A team objective" has no key results']);
   });
 });
 

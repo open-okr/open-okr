@@ -622,7 +622,7 @@ the machine-readable document.
 | `workflow.addPriority`<br/>Adds a phase 3 priority, optionally promoting the issue it came from. | `POST /api/v1/workflow/addPriority` | writes |
 | `workflow.calibrate`<br/>Records the one mid-cycle calibration a cycle is allowed (METHOD.md §7.6). | `POST /api/v1/workflow/calibrate` | writes |
 | `workflow.distributePack`<br/>Records that the input pack reached people, which the §2.6 lead time is measured from. | `POST /api/v1/workflow/distributePack` | writes |
-| `workflow.publish`<br/>Publishes the set, refusing while any of the six gates is red or cannot be evaluated. | `POST /api/v1/workflow/publish` | writes |
+| `workflow.publish`<br/>Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated. | `POST /api/v1/workflow/publish` | writes |
 | `workflow.read`<br/>A cycle's phase completion, its six publish gates and the rows they are computed from. | `GET /api/v1/workflow/read` | reads |
 | `workflow.setBaselineHealth`<br/>Records phase 2's KPI reading in the three §8.5 columns: stable, declining, business as usual. | `POST /api/v1/workflow/setBaselineHealth` | writes |
 | `workflow.setCapacityNotes`<br/>Records what was cut, which publish gate 5 reads (§5.5: if nothing was cut, capacity was not checked). | `POST /api/v1/workflow/setCapacityNotes` | writes |

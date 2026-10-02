@@ -80,14 +80,16 @@ test("a set with red gates is published past them, and the trail says why", asyn
 
   const published = page.getByText(/^Published .+\.$/);
   if ((await published.count()) === 0) {
-    // An empty set cannot clear every gate, so the plain button is offered and
-    // refused, with the rule beside it rather than a silent grey.
-    await expect(page.getByText(/^[0-5] of 6 green$/)).toBeVisible();
+    // An empty set cannot clear gate 2, which blocks (nothing drafted is
+    // nothing to publish), so the plain button is offered and refused, with
+    // the rule beside it rather than a silent grey. The count is over the
+    // gates this workspace judges; gate 6 is off by default (P9-T03b).
+    await expect(page.getByText(/^[0-4] of 5 green$/)).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Publish the set" }),
     ).toBeDisabled();
     await expect(
-      page.getByText(/^All six gates have to be green\./),
+      page.getByText(/^Every gate that blocks has to be green\./),
     ).toBeVisible();
 
     await page.getByText("Publish anyway, past the red gates").click();

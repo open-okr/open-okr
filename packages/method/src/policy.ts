@@ -44,7 +44,12 @@ export type PolicyIntent =
   /** A new objective. `cycle` is null for one with its own timeframe. */
   | { readonly kind: "objective.create"; readonly cycle: CycleFacts | null }
   /** A new key result on an objective that already exists. */
-  | { readonly kind: "keyResult.create"; readonly cycle: CycleFacts | null };
+  | { readonly kind: "keyResult.create"; readonly cycle: CycleFacts | null }
+  /**
+   * Publishing a set, or the company half of one (P9-T03b). The gates judge
+   * what is published; this decides only whether publishing may happen yet.
+   */
+  | { readonly kind: "set.publish"; readonly cycle: CycleFacts };
 
 export interface PolicyDecision {
   readonly outcome: "allow" | "block";
@@ -79,6 +84,9 @@ export function policyNeedsPhases(
   intent: PolicyIntent,
   practice: ResolvedPractice,
 ): boolean {
+  if (intent.kind === "set.publish") {
+    return practice["phases.enforcement"] === "binding";
+  }
   return intent.cycle !== null && draftingWaitsForPhases(practice);
 }
 
@@ -109,6 +117,21 @@ export function planningWindow(
     // 14th, not the 15th.
     closesOn: addDays(cycle.startsOn, 7 * window - 1),
   };
+}
+
+/**
+ * The cycle's phases, which a caller must have read when the practice makes a
+ * decision depend on them. One that did not cannot be told yes on a question
+ * about them: a programming error in the caller, refused loudly rather than
+ * allowed quietly.
+ */
+function requirePhases(cycle: CycleFacts): readonly PhaseResult[] {
+  if (cycle.phases === undefined) {
+    throw new Error(
+      "decide() needs the cycle's phases under this practice; read them first (policyNeedsPhases).",
+    );
+  }
+  return cycle.phases;
 }
 
 /** Which of the setting keys is waiting for the phases, for the citation. */
@@ -142,17 +165,27 @@ export function decide(
     return ALLOW;
   }
 
-  if (draftingWaitsForPhases(practice)) {
-    const phases = cycle.phases;
-    if (phases === undefined) {
-      // A caller that did not read the phases cannot be told yes on a
-      // question that depends on them. This is a programming error in the
-      // caller, so it is refused loudly rather than allowed quietly.
-      throw new Error(
-        "decide() needs the cycle's phases under this practice; read them first (policyNeedsPhases).",
-      );
+  // §2.3: under binding phases, publishing waits for phase 4, so a set is
+  // never published while something in it fails a check set to block.
+  if (intent.kind === "set.publish") {
+    if (practice["phases.enforcement"] !== "binding") {
+      return ALLOW;
     }
-    const missing = phases
+    const four = requirePhases(cycle).find((result) => result.phase === 4);
+    if (four?.state === "todo") {
+      return {
+        outcome: "block",
+        rules: ["phases.enforcement"],
+        reasons: [
+          `This workspace publishes after drafting is complete, and phase 4 is not. ${four.missing.join(". ")}.`,
+        ],
+      };
+    }
+    return ALLOW;
+  }
+
+  if (draftingWaitsForPhases(practice)) {
+    const missing = requirePhases(cycle)
       .filter(
         (result) =>
           (PHASES_BEFORE_DRAFTING as readonly number[]).includes(

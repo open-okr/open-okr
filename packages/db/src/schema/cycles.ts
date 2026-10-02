@@ -135,6 +135,12 @@ export const cycles = pgTable("cycles", {
   publicationDeadline: date("publication_deadline"),
   packDistributedAt: timestamp("pack_distributed_at", { withTimezone: true }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
+  /**
+   * When the company set was published, the first of the two steps (METHOD.md
+   * §4.5, P9-T03b). `publishedAt` still means the whole set; a set published
+   * in one go sets both.
+   */
+  companyPublishedAt: timestamp("company_published_at", { withTimezone: true }),
   levels: jsonb("levels")
     .$type<GoalLevel[]>()
     .notNull()

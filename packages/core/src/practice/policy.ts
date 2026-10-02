@@ -32,7 +32,9 @@ import { practiceFromRow } from "./settings.ts";
 /** A write the practice governs, named by what it touches. */
 export type PolicyRequest =
   | { readonly kind: "objective.create"; readonly cycleId: string | null }
-  | { readonly kind: "keyResult.create"; readonly cycleId: string | null };
+  | { readonly kind: "keyResult.create"; readonly cycleId: string | null }
+  /** Publishing a set, or its company half (P9-T03b). */
+  | { readonly kind: "set.publish"; readonly cycleId: string };
 
 /**
  * What the policy decides for this request, without refusing.
@@ -65,7 +67,12 @@ export async function policyDecisionInTx<
         startsOn: loaded.startsOn,
         today,
       };
-      cycle = policyNeedsPhases({ kind: request.kind, cycle: facts }, practice)
+      cycle = policyNeedsPhases(
+        request.kind === "set.publish"
+          ? { kind: "set.publish", cycle: facts }
+          : { kind: request.kind, cycle: facts },
+        practice,
+      )
         ? {
             ...facts,
             phases: (
@@ -76,6 +83,13 @@ export async function policyDecisionInTx<
     }
   }
 
+  if (request.kind === "set.publish") {
+    // A publish names a cycle that exists, or the action has already refused
+    // it as not found; with no cycle there is nothing for the policy to hold.
+    return cycle === null
+      ? { outcome: "allow", rules: [], reasons: [] }
+      : decide({ kind: "set.publish", cycle }, practice, thresholds);
+  }
   return decide({ kind: request.kind, cycle }, practice, thresholds);
 }
 
