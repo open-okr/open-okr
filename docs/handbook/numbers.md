@@ -71,7 +71,9 @@ needs discussion; below 0.3 it needs a decision.
 | `quality.carryForwardIssueImpact` | 4 | §8.9 |
 
 **Five company objectives, three per unit.** More than that is a list of work
-rather than a set of priorities, and the cap is the whole point.
+rather than a set of priorities, and the cap is the whole point. Above either
+the Coach warns rather than refuses: focus is a decision a team makes, and a
+workspace that wants the cap to block sets that check to block.
 
 **Two to five key results per objective**, which is `quality.keyResultsPerObjective`.
 One is a measure pretending to be an objective; more than five is a plan.

@@ -30,11 +30,11 @@ Each Phase 9 task card in IMPLEMENTATION-PLAN.md lists the steps it must make tr
 | NW-P-07 | The upgrade to 0.2.0: the recommended profile, nothing lost, the first cycle inferred | P9-T22, P9-T02 |
 | NW-P-08 | The annual frame, priorities with 12-month success statements, the not-doing list | Today |
 | NW-P-09 | Practice settings at their defaults; reviewers where Northwind wants them | P9-T05, P9-T04 |
-| NW-P-10 | Annual objectives drafted, committed and aspirational | P9-T03, P9-T11 |
+| NW-P-10 | Annual objectives drafted, committed and aspirational | P9-T03a, P9-T11 |
 | NW-P-11 | 2026 spreadsheets imported, kinds mapped | Today, P9-T12 |
 | NW-P-12 | KPI target types and their own thresholds, including a range | P9-T17 |
 | NW-P-13 | The pilot's review feeds Q1 | P9-T20 |
-| NW-P-14 | The annual set publishes | P9-T03 |
+| NW-P-14 | The annual set publishes | P9-T03b |
 | NW-P-15 | Q1's whole rhythm booked in advance | Today |
 
 ### Q1: the rollout
@@ -45,16 +45,16 @@ Each Phase 9 task card in IMPLEMENTATION-PLAN.md lists the steps it must make tr
 | NW-Q1-02 | Phase 2 after the pilot's review | Today |
 | NW-Q1-03 | Quarterly revalidation, no annual-only checks | Today |
 | NW-Q1-04 | Company objectives drafted by kind | P9-T11 |
-| NW-Q1-05 | The company step publishes | P9-T03 |
+| NW-Q1-05 | The company step publishes | P9-T03b |
 | NW-Q1-06 | Adding inline; Escape discards an empty draft | P9-T07b |
 | NW-Q1-07 | A baseline key result passes | P9-T12 |
-| NW-Q1-08 | Task-shaped key results warn, never refused | P9-T03 |
-| NW-Q1-09 | Too many objectives warns | P9-T03 |
+| NW-Q1-08 | Task-shaped key results warn, never refused | P9-T03a |
+| NW-Q1-09 | Too many objectives warns | P9-T03a |
 | NW-Q1-10 | Aligning across departments by drag; no level-skip message | P9-T10, P9-T16 |
 | NW-Q1-11 | Standing alone with a reason | P9-T16 |
 | NW-Q1-12 | Peer review: rewrites, two edits at once, a duplicate deleted | Today, P9-T06, P9-T07a |
 | NW-Q1-13 | Dependencies confirmed; alignment health | Today, P9-T16 |
-| NW-Q1-14 | The team step publishes; an aspirational key result may exceed capacity, a committed one would warn | P9-T03, P9-T11, P9-T13 |
+| NW-Q1-14 | The team step publishes; an aspirational key result may exceed capacity, a committed one would warn | P9-T03b, P9-T11, P9-T13 |
 | NW-Q1-15 | First check-ins; acknowledgements only where a reviewer exists | Today, P9-T04 |
 | NW-Q1-16 | A late check-in and its three nudges | Today |
 | NW-Q1-17 | A KPI turns unhealthy; a key result added mid-cycle | P9-T17, P9-T18, P9-T13 |
@@ -80,10 +80,10 @@ Each Phase 9 task card in IMPLEMENTATION-PLAN.md lists the steps it must make tr
 |---|---|---|
 | NW-Q2-01 | Kept objectives pre-filled; the copilot drafts one | Today (copilot), P9-T20 |
 | NW-Q2-02 | Critical escalation turned on | P9-T05, P9-T19a |
-| NW-Q2-03 | OBJ-1 raised to block | P9-T05, P9-T03 |
-| NW-Q2-04 | The cap of two warns at a third | P9-T03 |
+| NW-Q2-03 | OBJ-1 raised to block | P9-T05, P9-T03a, P9-T03b |
+| NW-Q2-04 | The cap of two warns at a third | P9-T03a |
 | NW-Q2-05 | A new hire provisioned; she follows a goal | Today |
-| NW-Q2-06 | The team step refused by OBJ-1; one rewrite, one override | P9-T03 |
+| NW-Q2-06 | The team step refused by OBJ-1; one rewrite, one override | P9-T03b |
 | NW-Q2-07 | An unconfirmed dependency escalated | P9-T16 |
 | NW-Q2-08 | Monthly review | Today |
 | NW-Q2-09 | A check-in at 3 in 10 reaches the sponsor the same day | P9-T19a |
@@ -127,14 +127,14 @@ Each Phase 9 task card in IMPLEMENTATION-PLAN.md lists the steps it must make tr
 
 | ID | Step | Status |
 |---|---|---|
-| NW-Q4-01 | Planning at the company cap; objectives moved between levels by close decision | P9-T19a, P9-T20, P9-T03 |
+| NW-Q4-01 | Planning at the company cap; objectives moved between levels by close decision | P9-T19a, P9-T20, P9-T03b |
 | NW-Q4-02 | A leader returns; roles handed back | Today |
 | NW-Q4-03 | Annual planning for 2028 opens | Today |
 | NW-Q4-04 | An outage: a range KPI, a maintain key result, "fix it now", a committed check-in at 3 | P9-T12, P9-T17, P9-T18, P9-T11, P9-T19a |
 | NW-Q4-05 | A recovery's KPI turns healthy; closing proposed once and dismissed | Today |
 | NW-Q4-06 | The annual review, before any 2028 drafting | P9-T20 |
 | NW-Q4-07 | The scorecard as CSV and the minutes for the board; a milestone done | Today, P9-T12 |
-| NW-Q4-08 | 2028 annual objectives drafted and published | Today, P9-T03 |
+| NW-Q4-08 | 2028 annual objectives drafted and published | Today, P9-T03b |
 | NW-Q4-09 | Q4 graded; two committed misses explained | P9-T14 |
 | NW-Q4-10 | The review session; no "too safe" note | P9-T20 |
 | NW-Q4-11 | The retrospective; the recovery closed; carry-forward proposed | P9-T20, P9-T18 |

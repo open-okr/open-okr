@@ -22,6 +22,7 @@ import { bindAgentsToSpacelessItems } from "../data-changes/0009_bind_agents_to_
 import { scrubErasedMemberNames } from "../data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../data-changes/0011_seal_account_tokens.ts";
 import { carryStrategicIssueMinimum } from "../data-changes/0012_carry_strategic_issue_minimum.ts";
+import { carryObjectiveLengthLimit } from "../data-changes/0013_carry_objective_length_limit.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -42,6 +43,7 @@ try {
       bindAgentsToSpacelessItems,
       scrubErasedMemberNames,
       carryStrategicIssueMinimum,
+      carryObjectiveLengthLimit,
       // Read straight from the environment, as `keys:rotate` reads it: the
       // schema `loadEnv` checks has no root key, because the web process
       // resolves its own ring. Absent is fine until there is a token to seal.

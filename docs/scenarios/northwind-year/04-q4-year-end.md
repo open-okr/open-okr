@@ -38,7 +38,7 @@ Published 14 October.
 
 ## The quarter, in date order
 
-**NW-Q4-01 · 3 to 27 Sep · Leadership · S-04 to S-10 · METHOD v2 §2.4, §8.9 · P9-T19a, P9-T20, P9-T03**
+**NW-Q4-01 · 3 to 27 Sep · Leadership · S-04 to S-10 · METHOD v2 §2.4, §8.9 · P9-T19a, P9-T20, P9-T03b**
 Q4 planning opens four weeks ahead, on 3 September. Phase 2 follows Q3's retrospective on 16 September:
 - **C8.** CS2's deferred expansion work becomes C8, now first on the issue list.
 - **CS3.** C2 becomes the merged team's committed objective in Customer Success.
@@ -93,7 +93,7 @@ The aspirational annual key results average 0.77. Committed: 2 of 6 annual key r
 
 *Test:* Given four cycles scored, when the scorecard is exported, then the CSV has a row per cycle with its averages.
 
-**NW-Q4-08 · 9 to 17 Dec · Leadership · S-09 drafting, S-10 publish · METHOD v2 §2.4 · Today, P9-T03**
+**NW-Q4-08 · 9 to 17 Dec · Leadership · S-09 drafting, S-10 publish · METHOD v2 §2.4 · Today, P9-T03b**
 The 2028 annual objectives are drafted from the annual review's decisions and the new strategy, and published on 17 December. Phase 2 of the 2028 cycle lists 2027's scored annual key results as its prior-cycle scoring.
 *Test:* Given the 2027 annual review completed on 8 December, when the 2028 annual cycle's Phase 2 is evaluated, then the prior cycle reads as scored.
 

@@ -44,6 +44,7 @@ export interface RuleVerdictView {
 
 const TONE: Record<QualityStatus, string> = {
   pass: "border-ok/40 bg-ok-bg text-ok",
+  info: "border-line bg-raised text-ink-2",
   warn: "border-warn/40 bg-warn-bg text-warn",
   fail: "border-bad/40 bg-bad-bg text-bad",
   todo: "border-line bg-raised text-ink-3",
@@ -53,6 +54,7 @@ const TONE: Record<QualityStatus, string> = {
  * class undoing one. */
 const CHIP: Record<QualityStatus, string> = {
   pass: "bg-ok-bg text-ok",
+  info: "bg-raised text-ink-2",
   warn: "bg-warn-bg text-warn",
   fail: "bg-bad-bg text-bad",
   todo: "bg-raised text-ink-3",
@@ -60,6 +62,7 @@ const CHIP: Record<QualityStatus, string> = {
 
 const BAND: Record<QualityStatus, string> = {
   pass: "bg-ok-bg",
+  info: "bg-raised",
   warn: "bg-warn-bg",
   fail: "bg-bad-bg",
   todo: "bg-raised",
@@ -67,6 +70,7 @@ const BAND: Record<QualityStatus, string> = {
 
 const DOT: Record<QualityStatus, string> = {
   pass: "bg-ok",
+  info: "bg-ink-4",
   warn: "bg-warn",
   fail: "bg-bad",
   todo: "bg-ink-4",
@@ -74,6 +78,7 @@ const DOT: Record<QualityStatus, string> = {
 
 const LABEL: Record<QualityStatus, string> = {
   pass: "PASS",
+  info: "NOTE",
   warn: "WARN",
   fail: "FAIL",
   todo: "TO DO",

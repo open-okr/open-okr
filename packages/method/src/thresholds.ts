@@ -397,6 +397,14 @@ export const THRESHOLDS = {
     default: { red: 45, green: 75 },
     schema: z.object({ red: percent, green: percent }),
   }),
+  "quality.strengthScoreWarnWeight": param({
+    group: "quality",
+    label: "Strength score warn weight",
+    section: "§4",
+    why: "Half. A warning is worth another look, not a defect, so it counts for half a pass. A product heuristic rather than a published measure.",
+    default: 0.5,
+    schema: unit,
+  }),
   "quality.keyResultsPerObjective": param({
     group: "quality",
     label: "Key results per objective",
@@ -405,13 +413,13 @@ export const THRESHOLDS = {
     default: { low: 2, high: 5 },
     schema: bounds(0, 20),
   }),
-  "quality.objectiveLengthWords": param({
+  "quality.objectiveLengthLimit": param({
     group: "quality",
-    label: "Objective length bounds",
+    label: "Objective length limit",
     section: "§4.1",
-    why: "Four to eighteen words. Shorter and nobody outside the team understands it; longer and the team cannot recite it.",
-    default: { low: 4, high: 18 },
-    schema: bounds(1, 100),
+    why: "Eighteen words, warn above: longer and the team cannot recite it. There is no lower bound since P9-T02's review: whatmatters' own \"Achieve fiscal sustainability\" is three words.",
+    default: 18,
+    schema: z.number().int().min(1).max(100),
   }),
   "quality.companyObjectiveCap": param({
     group: "quality",

@@ -21,8 +21,9 @@
  *
  * Pure: no database, no clock beyond what the caller passes, no framework.
  */
+import { applyEnforcement } from "./enforcement.ts";
+import { defaultPractice, type ResolvedPractice } from "./practice.ts";
 import {
-  applyStrictness,
   evaluateKeyResults,
   evaluateObjective,
   type KeyResultVerdict,
@@ -215,6 +216,15 @@ export interface CycleWorkflowInput {
   readonly allKeyResultsScored?: boolean;
   /** The quarterly review's retro holds a note. Undefined when not read. */
   readonly retrospectiveWritten?: boolean;
+  /**
+   * The workspace's practice (METHOD.md §12), which sets how hard each check
+   * is when phase 4 and gate 2 judge the set (P9-T03a). Absent reads as the
+   * recommended practice, which is what a caller that has not read the
+   * settings would otherwise have to assume anyway.
+   */
+  readonly practice?: ResolvedPractice;
+  /** True when this space or workspace has "Coach strictness" at strict. */
+  readonly strict?: boolean;
 }
 
 /** The seven §2.6 input-pack items, in the order the specification lists them. */
@@ -557,8 +567,8 @@ const OBJECTIVE_LEVELS = [
 ] as const;
 
 /**
- * One objective's §4.1 and §4.2 verdicts, with the workspace's strictness
- * applied, exactly as the Draft Coach beside it judges them.
+ * One objective's §4.1 and §4.2 verdicts, with the workspace's check levels
+ * applied (P9-T03a), exactly as the Draft Coach beside it judges them.
  *
  * The objective is in a cycle by construction, so OBJ-3 passes, and the count
  * OBJ-5 reads is the number of objectives at its level in this cycle, which is
@@ -568,16 +578,22 @@ function goalVerdicts(
   goal: GoalSnapshot,
   goals: readonly GoalSnapshot[],
   thresholds: ResolvedThresholds,
+  input: Pick<CycleWorkflowInput, "practice" | "strict">,
 ): {
   readonly objective: readonly QualityVerdict[];
   readonly keyResults: readonly KeyResultVerdict[];
 } {
-  const strictness = thresholds["quality.coachStrictness"];
+  const practice = input.practice ?? defaultPractice();
+  const options = {
+    strict:
+      input.strict === true ||
+      thresholds["quality.coachStrictness"] === "strict",
+  };
   const level = (OBJECTIVE_LEVELS as readonly string[]).includes(goal.level)
     ? (goal.level as (typeof OBJECTIVE_LEVELS)[number])
     : "team";
   return {
-    objective: applyStrictness(
+    objective: applyEnforcement(
       evaluateObjective(
         {
           title: goal.title,
@@ -591,9 +607,10 @@ function goalVerdicts(
         },
         thresholds,
       ),
-      strictness,
+      practice,
+      options,
     ),
-    keyResults: applyStrictness(
+    keyResults: applyEnforcement(
       evaluateKeyResults(
         {
           keyResults: goal.keyResults.map((keyResult) => ({
@@ -603,7 +620,8 @@ function goalVerdicts(
         },
         thresholds,
       ),
-      strictness,
+      practice,
+      options,
     ),
   };
 }
@@ -665,7 +683,7 @@ function phaseFour(
 
   const missing: string[] = [];
   for (const goal of goals) {
-    const verdicts = goalVerdicts(goal, goals, thresholds);
+    const verdicts = goalVerdicts(goal, goals, thresholds, input);
     const failing = [...verdicts.objective, ...verdicts.keyResults]
       .filter((verdict) => verdict.status === "fail")
       .map((verdict) => verdict.id);
@@ -885,7 +903,7 @@ export function publishGates(
     } else {
       const failures: string[] = [];
       for (const goal of goals) {
-        const judged = goalVerdicts(goal, goals, thresholds);
+        const judged = goalVerdicts(goal, goals, thresholds, input);
         const outcome = judged.objective.find((entry) => entry.id === "OBJ-1");
         if (outcome?.status === "fail") {
           failures.push(`OBJ-1 on "${goal.title}": ${outcome.prompt}`);

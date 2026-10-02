@@ -1,10 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import {
   canonThresholds,
+  defaultPractice,
   KEY_RESULT_CHECKS,
   OBJECTIVE_CHECKS,
   PHASE_TITLES,
   phaseWorkAllowed,
+  type ResolvedPractice,
   type ResolvedThresholds,
 } from "@openokr/method";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
@@ -323,6 +325,11 @@ export default async function CyclePage({
           // by construction: the same `resolveThresholds` builds both.
           thresholds: (await callAction(context, "rhythm.read", {}))
             .thresholds as unknown as ResolvedThresholds,
+          // The same for the check levels (METHOD.md §12, P9-T03a). Typed as
+          // records of words at the contract boundary; `ResolvedPractice` by
+          // construction, since `resolvePractice` builds both.
+          practice: (await callAction(context, "practice.read", {}))
+            .practice as unknown as ResolvedPractice,
           checkTitles: [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].map(
             (check) => ({ id: check.id, title: check.title }),
           ),
@@ -332,6 +339,7 @@ export default async function CyclePage({
           goals: [],
           members: [],
           thresholds: canonThresholds(),
+          practice: defaultPractice(),
           checkTitles: [],
           kpis: [],
         };
@@ -588,6 +596,7 @@ export default async function CyclePage({
             kpis={draft.kpis}
             canEdit={canEdit}
             thresholds={draft.thresholds}
+            practice={draft.practice}
             checkTitles={draft.checkTitles}
             memberId={workspace.memberId}
             assistsAvailable={await assistsAvailableAction()}
@@ -698,6 +707,7 @@ export default async function CyclePage({
               })),
             }))}
             thresholds={draft.thresholds}
+            practice={draft.practice}
             checkTitles={draft.checkTitles}
           />
         ) : null}

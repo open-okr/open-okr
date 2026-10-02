@@ -431,7 +431,7 @@ key results, and the expected check verdict for every applicable check.
 
 | Check | Verdict | Reason |
 |---|---|---|
-| OBJ-1 | fail | Starts with output verb "Launch" |
+| OBJ-1 | warn | Starts with output verb "Launch". A fail until P9-T03a (2 October 2026), when METHOD.md §4.1 made every OBJ-1 row a warning |
 | OBJ-2 | pass | 9 words, no digits (Q3 is not a digit) |
 | OBJ-3 | pass | Cycle is set (Q3) |
 | OBJ-4 | pass | Champion and reviewer named |
@@ -443,7 +443,7 @@ key results, and the expected check verdict for every applicable check.
 
 | Check | Verdict | Reason |
 |---|---|---|
-| OBJ-1 | fail | Bare metric movement with no why (starts with movement verb, contains a number, no why marker) |
+| OBJ-1 | warn | Bare metric movement with no why (starts with movement verb, contains a number, no why marker). A fail until P9-T03a |
 | OBJ-2 | warn | Contains digits ("30") |
 | OBJ-3 | pass | Cycle set |
 | OBJ-4 | pass | Owned |
@@ -493,7 +493,7 @@ key results, and the expected check verdict for every applicable check.
 | KR-2 | warn (KR3) | KR3 has only 1 number |
 | KR-3 | pass | All have baseline and target |
 | KR-4 | warn | All leading, no lagging |
-| KR-5 | fail (KR1), warn (KR2), warn (KR3) | KR1: "interviews" is activity noun, no impact. KR2: "outreach emails" is activity noun. KR3: "Complete" is output verb with < 2 numbers |
+| KR-5 | pass | Every key result here is tagged leading, and since P9-T03a a leading key result is exempt from KR-5 (METHOD.md §4.2). Untagged, the same texts warn on all three: KR1 and KR2 are activity nouns with no impact, KR3 is an output verb with fewer than two numbers. Until P9-T03a this row read fail (KR1), warn (KR2), warn (KR3) |
 | KR-6 | depends on confidence | |
 | KR-7 | pass | All carry direction |
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { applyEnforcement } from "../src/enforcement.ts";
+import { defaultPractice } from "../src/practice.ts";
 import {
   ALIGNMENT_CHECKS,
-  applyStrictness,
   CYCLE_CHECKS,
   evaluateAlignment,
   evaluateCycle,
@@ -63,8 +64,11 @@ describe("corpus entry 1: an output-shaped objective", () => {
     thresholds,
   );
 
-  it("fails OBJ-1 because it starts with an output verb", () => {
-    expect(verdict("OBJ-1", result)).toBe("fail");
+  // A warning since P9-T03a (METHOD.md §4.1): Doerr's own example objective
+  // is "Build a planning model for their company", so an objective that opens
+  // with an action is a style question, not a defect.
+  it("warns OBJ-1 because it starts with an output verb", () => {
+    expect(verdict("OBJ-1", result)).toBe("warn");
   });
 
   it("passes the rest", () => {
@@ -89,8 +93,8 @@ describe("corpus entry 2: a metric as the objective", () => {
     thresholds,
   );
 
-  it("fails OBJ-1: movement with no why is a key result in disguise", () => {
-    expect(verdict("OBJ-1", result)).toBe("fail");
+  it("warns OBJ-1: movement with no why is usually a key result in disguise", () => {
+    expect(verdict("OBJ-1", result)).toBe("warn");
   });
 
   it("warns OBJ-2 on the digits", () => {
@@ -117,7 +121,7 @@ describe("corpus entry 3: a strong outcome objective", () => {
   });
 
   it("scores 100", () => {
-    expect(strengthScore(result)).toBe(100);
+    expect(strengthScore(result, thresholds)).toBe(100);
   });
 });
 
@@ -144,7 +148,7 @@ describe("the refusals that are not about wording", () => {
     expect(verdict("OBJ-4", result)).toBe("fail");
   });
 
-  it("warns OBJ-5 above three in a unit, and fails above five at company", () => {
+  it("warns OBJ-5 above three in a unit, and above five at company", () => {
     const warned = evaluateObjective(
       { ...base, hasCycle: true, objectivesInUnit: 4 },
       thresholds,
@@ -154,7 +158,7 @@ describe("the refusals that are not about wording", () => {
       { ...base, hasCycle: true, objectivesInUnit: 6, level: "company" },
       thresholds,
     );
-    expect(verdict("OBJ-5", failed)).toBe("fail");
+    expect(verdict("OBJ-5", failed)).toBe("warn");
   });
 });
 
@@ -172,8 +176,8 @@ describe("the strength score", () => {
       },
       thresholds,
     );
-    // OBJ-1 fail, OBJ-2 warn, OBJ-3/4/5 pass: (3 + 0.5) / 5 = 70.
-    expect(strengthScore(result)).toBe(70);
+    // OBJ-1 warn, OBJ-2 warn, OBJ-3/4/5 pass: (3 + 0.5 + 0.5) / 5 = 80.
+    expect(strengthScore(result, thresholds)).toBe(80);
   });
 });
 
@@ -262,9 +266,11 @@ describe("corpus entry 4: activity-shaped key results", () => {
    * question for a human, because a corpus entry is an approved expectation
    * and changing what it means is not a developer's call.
    */
-  it("fails KR-2, because the third carries no numbers in its text", () => {
+  it("warns KR-2, naming all three, because the third carries no numbers in its text", () => {
+    // A warning since P9-T03a: METHOD.md §4 puts KR-2 at warn, and a
+    // done-or-not-done result becomes a milestone key result at P9-T12.
     const kr2 = krVerdict("KR-2", result);
-    expect(kr2?.status).toBe("fail");
+    expect(kr2?.status).toBe("warn");
     expect(kr2?.keyResults).toEqual([0, 1, 2]);
   });
 
@@ -276,9 +282,28 @@ describe("corpus entry 4: activity-shaped key results", () => {
     expect(krVerdict("KR-4", result)?.status).toBe("warn");
   });
 
-  it("fails KR-5, and names all three offenders", () => {
+  // Every key result in this set is tagged leading, and since P9-T03a a
+  // leading key result is exempt from KR-5: an activity can be a fair leading
+  // signal, which is what the tag says (METHOD.md §4.2). KR-4 is what still
+  // says the set has no lagging measure of the outcome.
+  it("passes KR-5, because each one is tagged leading", () => {
     const kr5 = krVerdict("KR-5", result);
-    expect(kr5?.status).toBe("fail");
+    expect(kr5?.status).toBe("pass");
+    expect(kr5?.keyResults).toEqual([]);
+  });
+
+  it("warns KR-5 on the same texts once the leading tags come off", () => {
+    const untagged = evaluateKeyResults(
+      {
+        keyResults: activityShaped.map((keyResult) => ({
+          ...keyResult,
+          indicatorType: null,
+        })),
+      },
+      thresholds,
+    );
+    const kr5 = krVerdict("KR-5", untagged);
+    expect(kr5?.status).toBe("warn");
     expect(kr5?.keyResults).toEqual([0, 1, 2]);
   });
 
@@ -300,7 +325,7 @@ describe("the checks METHOD.md words but corpus entry 4 does not exercise", () =
     ...over,
   });
 
-  it("fails KR-1 with none, warns with one, fails above five", () => {
+  it("fails KR-1 with none, warns with one and above five", () => {
     expect(
       krVerdict("KR-1", evaluateKeyResults({ keyResults: [] }, thresholds))
         ?.status,
@@ -315,33 +340,63 @@ describe("the checks METHOD.md words but corpus entry 4 does not exercise", () =
     expect(
       krVerdict("KR-1", evaluateKeyResults({ keyResults: six }, thresholds))
         ?.status,
-    ).toBe("fail");
+    ).toBe("warn");
   });
 
-  it("fails KR-2 on a key result with no numbers at all", () => {
+  it("warns KR-2 on a key result with no numbers at all", () => {
     const result = evaluateKeyResults(
       { keyResults: [one({ text: "Improve customer satisfaction" })] },
       thresholds,
     );
-    expect(krVerdict("KR-2", result)?.status).toBe("fail");
+    expect(krVerdict("KR-2", result)?.status).toBe("warn");
   });
 
-  it("fails KR-3 when a baseline is missing, and names which one", () => {
+  it("warns KR-3 when only a baseline is missing, and names which one", () => {
     const result = evaluateKeyResults(
       { keyResults: [one({}), one({ baseline: null })] },
       thresholds,
     );
     const kr3 = krVerdict("KR-3", result);
-    expect(kr3?.status).toBe("fail");
+    expect(kr3?.status).toBe("warn");
     expect(kr3?.keyResults).toEqual([1]);
   });
 
-  it("fails KR-4 on an untagged key result, before it looks at the mix", () => {
+  it("fails KR-3 when a target, a date or an owner is missing", () => {
+    for (const missing of [
+      { target: null },
+      { dueOn: null },
+      { ownerId: null },
+    ]) {
+      const result = evaluateKeyResults(
+        { keyResults: [one({}), one(missing)] },
+        thresholds,
+      );
+      expect(krVerdict("KR-3", result)?.status, JSON.stringify(missing)).toBe(
+        "fail",
+      );
+    }
+  });
+
+  it("passes KR-4 when nobody tagged anything, because tagging is optional", () => {
+    const result = evaluateKeyResults(
+      {
+        keyResults: [
+          one({ indicatorType: null }),
+          one({ indicatorType: null }),
+        ],
+      },
+      thresholds,
+    );
+    expect(krVerdict("KR-4", result)?.condition).toBe("None tagged");
+    expect(krVerdict("KR-4", result)?.status).toBe("pass");
+  });
+
+  it("judges KR-4 on the key results that are tagged", () => {
     const result = evaluateKeyResults(
       { keyResults: [one({}), one({ indicatorType: null })] },
       thresholds,
     );
-    expect(krVerdict("KR-4", result)?.status).toBe("fail");
+    expect(krVerdict("KR-4", result)?.condition).toBe("All lagging");
   });
 
   it("passes KR-4 on a set holding one of each", () => {
@@ -414,12 +469,14 @@ describe("corpus entry 8: strictness promotes every warn to a fail", () => {
     thresholds,
   );
 
-  it("leaves the verdicts alone in warn mode", () => {
-    expect(applyStrictness(borderline, "warn")).toEqual(borderline);
+  it("leaves the verdicts alone on the recommended practice", () => {
+    expect(applyEnforcement(borderline, defaultPractice())).toEqual(borderline);
   });
 
   it("turns OBJ-1's warn into a fail in strict mode, keeping the prompt", () => {
-    const strict = applyStrictness(borderline, "strict");
+    const strict = applyEnforcement(borderline, defaultPractice(), {
+      strict: true,
+    });
     const obj1 = strict.find((entry) => entry.id === "OBJ-1");
     expect(verdict("OBJ-1", borderline)).toBe("warn");
     expect(obj1?.status).toBe("fail");
@@ -429,22 +486,23 @@ describe("corpus entry 8: strictness promotes every warn to a fail", () => {
   });
 
   it("moves the strength score, because a fail scores nothing", () => {
-    const warned = strengthScore(borderline);
-    const strict = strengthScore(applyStrictness(borderline, "strict"));
+    const warned = strengthScore(borderline, thresholds);
+    const strict = strengthScore(
+      applyEnforcement(borderline, defaultPractice(), { strict: true }),
+      thresholds,
+    );
     expect(warned).not.toBeNull();
     expect(strict as number).toBeLessThan(warned as number);
   });
 });
 
-describe("the objective length bounds come from the §11 registry", () => {
-  it("reads quality.objectiveLengthWords rather than carrying its own 4 and 18", () => {
-    const bounds = canonThresholds()["quality.objectiveLengthWords"];
-    const short = Array.from({ length: bounds.low - 1 }, () => "word").join(
-      " ",
-    );
-    const long = Array.from({ length: bounds.high + 1 }, () => "word").join(
-      " ",
-    );
+describe("the objective length limit comes from the §11 registry", () => {
+  it("reads quality.objectiveLengthLimit rather than carrying its own 18, and has no lower bound", () => {
+    const limit = canonThresholds()["quality.objectiveLengthLimit"];
+    // Three words passes since P9-T03a: whatmatters' own "Achieve fiscal
+    // sustainability" is three.
+    const short = "Achieve fiscal sustainability";
+    const long = Array.from({ length: limit + 1 }, () => "word").join(" ");
     const base = {
       hasCycle: true,
       hasTimeframe: false,
@@ -458,7 +516,7 @@ describe("the objective length bounds come from the §11 registry", () => {
         "OBJ-2",
         evaluateObjective({ ...base, title: short }, thresholds),
       ),
-    ).toBe("warn");
+    ).toBe("pass");
     expect(
       verdict("OBJ-2", evaluateObjective({ ...base, title: long }, thresholds)),
     ).toBe("warn");
@@ -585,7 +643,7 @@ describe("corpus entry 6: cycle readiness", () => {
   it("counts none of them towards the strength score", () => {
     expect(result).toHaveLength(8);
     expect(result.every((entry) => !entry.feedsStrengthScore)).toBe(true);
-    expect(strengthScore(result)).toBeNull();
+    expect(strengthScore(result, thresholds)).toBeNull();
   });
 
   it("carries a prompt on every condition of every cycle check", () => {
@@ -702,15 +760,18 @@ describe("corpus entry 7: a perfect set at strict mode", () => {
   );
 
   it("scores 100 with every check passing", () => {
-    expect(strengthScore(strong)).toBe(100);
+    expect(strengthScore(strong, thresholds)).toBe(100);
   });
 
   it("scores the same at strict, because there are no warns to promote", () => {
     // The corpus says so in as many words: "No change from warn mode because
     // there are no warns to promote." Strictness only moves a set that had
     // something to say.
-    expect(strengthScore(applyStrictness(strong, "strict"))).toBe(100);
-    expect(applyStrictness(strong, "strict")).toEqual(strong);
+    const strict = applyEnforcement(strong, defaultPractice(), {
+      strict: true,
+    });
+    expect(strengthScore(strict, thresholds)).toBe(100);
+    expect(strict).toEqual(strong);
   });
 });
 
@@ -738,7 +799,7 @@ describe("a workspace that adds its own vocabulary", () => {
       },
       tuned,
     );
-    expect(verdict("OBJ-1", result)).toBe("fail");
+    expect(verdict("OBJ-1", result)).toBe("warn");
   });
 });
 
@@ -791,12 +852,11 @@ describe("OBJ-1 recognises an end state it has no word for", () => {
     expect(verdict?.condition).toBe("Matches an end-state shape");
   });
 
-  it("still refuses a deliverable, which is the point of the check", () => {
+  it("still flags a deliverable and a bare metric, as warnings", () => {
     expect(objective("Launch the new mobile app by end of Q3")?.status).toBe(
-      "fail",
+      "warn",
     );
-    expect(objective("Modernise the data platform")?.status).not.toBe("pass");
-    expect(objective("Grow revenue 40% this quarter")?.status).toBe("fail");
+    expect(objective("Grow revenue 40% this quarter")?.status).toBe("warn");
   });
 
   it("needs a word after the shape, so a bare form is not an end state", () => {
@@ -806,11 +866,19 @@ describe("OBJ-1 recognises an end state it has no word for", () => {
     expect(verdict?.condition).not.toBe("Matches an end-state shape");
   });
 
-  it("leaves the fallback in place for an objective that names nothing", () => {
-    // The fallback is not being removed. An objective that genuinely says
-    // nothing about an end state still gets asked the question.
-    const verdict = objective("Win back the customers we lost last year");
-    expect(verdict?.status).toBe("warn");
+  it("passes the fallback with a tip, so a sound objective is not warned", () => {
+    // "Cannot tell" warned until P9-T03a and fired on most well-formed
+    // objectives, which made it a banner rather than coaching. It still asks
+    // the question, as a tip (METHOD.md §4.1).
+    for (const title of [
+      "Win back the customers we lost last year",
+      "Modernise the data platform",
+    ]) {
+      const verdict = objective(title);
+      expect(verdict?.status, title).toBe("pass");
+      expect(verdict?.condition, title).toBe("Cannot tell");
+      expect(verdict?.prompt, title).toMatch(/^Tip: /);
+    }
   });
 });
 

@@ -135,7 +135,8 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
       low: 2,
       high: 5,
     });
-    expect(canon["quality.objectiveLengthWords"]).toEqual({ low: 4, high: 18 });
+    expect(canon["quality.objectiveLengthLimit"]).toBe(18);
+    expect(canon["quality.strengthScoreWarnWeight"]).toBe(0.5);
     expect(canon["quality.companyObjectiveCap"]).toBe(5);
     expect(canon["quality.objectivesPerUnitCap"]).toBe(3);
     expect(canon["quality.strategicIssueMinimum"]).toBe(3);

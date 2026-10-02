@@ -556,7 +556,7 @@ test("drafting a goal with key results persists at zero percent and pending", as
  * suite because the thing worth proving is that the browser evaluates at all:
  * the same package, the workspace's own thresholds, and no round trip.
  */
-test("the coach fails a rule as you type, and the score moves with it", async () => {
+test("the coach flags a rule as you type, and the score moves with it", async () => {
   await page.goto("/cycle?phase=4");
 
   const title = page
@@ -579,7 +579,7 @@ test("the coach fails a rule as you type, and the score moves with it", async ()
   // The card carries the prompt, what was seen, and §4.6's pair.
   await chip.click();
   await expect(
-    page.getByText(/Your objective starts with a deliverable, not a destination/),
+    page.getByText(/Your objective starts with a deliverable\. If we do it/),
   ).toBeVisible();
   await expect(page.getByText(/What was seen\./)).toBeVisible();
   // The weak half of §4.6's pair, not the strong half: the strong half is the
@@ -598,7 +598,7 @@ test("the coach fails a rule as you type, and the score moves with it", async ()
   // hunts for.
   await page.getByRole("button", { name: "Dismiss" }).first().click();
   await expect(
-    page.getByText(/Your objective starts with a deliverable, not a destination/),
+    page.getByText(/Your objective starts with a deliverable\. If we do it/),
   ).toBeHidden();
   await chip.click();
 

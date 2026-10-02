@@ -266,8 +266,35 @@ describe("the seeded Coach", () => {
   });
 });
 
+/**
+ * KR-4 is information by default since P9-T03a (METHOD.md §4), and a note
+ * sends nothing. A workspace that wants the all-lagging nudge sets KR-4 to
+ * warn, which is what these tests do before they expect it.
+ */
+async function warnOnKr4(): Promise<void> {
+  const wb = await workerDb();
+  await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+    overrides: { "checks.KR-4": "warn" },
+  });
+}
+
 describe("the quality pass, with no provider configured", () => {
-  it("cites quality.all_lagging when every key result is lagging", async () => {
+  it("sends no all-lagging nudge by default, because KR-4 is a note", async () => {
+    const goal = await createGoal("Become the preferred platform for teams");
+    await addKeyResult(goal.id, "Monthly active teams", "lagging");
+    await addKeyResult(goal.id, "Weekly retained teams", "lagging");
+
+    await runCoach();
+    expect(
+      (await sentNudges()).filter(
+        (row) => row.rule_key === "quality.all_lagging",
+      ),
+    ).toEqual([]);
+    expect(await flagsOf(goal.id)).not.toContain("KR-4");
+  });
+
+  it("cites quality.all_lagging when every key result is lagging and KR-4 warns", async () => {
+    await warnOnKr4();
     const goal = await createGoal("Become the preferred platform for teams");
     await addKeyResult(goal.id, "Monthly active teams", "lagging");
     await addKeyResult(goal.id, "Weekly retained teams", "lagging");
@@ -309,6 +336,7 @@ describe("the quality pass, with no provider configured", () => {
     // trigger chosen from the stored flag id alone would send the wrong
     // message here, which is the whole reason the reader re-evaluates and
     // matches on the condition.
+    await warnOnKr4();
     const goal = await createGoal("Become the preferred platform for teams");
     await addKeyResult(goal.id, "Trial starts per week", "leading");
     await addKeyResult(goal.id, "Demo requests per week", "leading");

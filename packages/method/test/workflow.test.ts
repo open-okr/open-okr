@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolvePractice } from "../src/practice.ts";
 import { canonThresholds } from "../src/thresholds.ts";
 import {
   type CycleWorkflowInput,
@@ -837,9 +838,22 @@ describe("phase 4 and gate 2 over the drafted set", () => {
     expect(four?.conditions).toEqual({ met: 1, total: 1 });
   });
 
-  it("holds phase 4 on an objective that names an output, and says which", () => {
+  it("passes phase 4 on an objective that names an output, which only warns by default", () => {
+    // METHOD.md §4, P9-T03a: OBJ-1 warns, and phase 4 waits only for what
+    // fails a check set to block.
     const four = phase(
       base({ goals: [judged("Launch the new mobile app by end of Q3")] }),
+      4,
+    );
+    expect(four?.state).toBe("pass");
+  });
+
+  it("holds phase 4 on that objective where the workspace sets OBJ-1 to block, and says which", () => {
+    const four = phase(
+      base({
+        goals: [judged("Launch the new mobile app by end of Q3")],
+        practice: resolvePractice("recommended", { "checks.OBJ-1": "block" }),
+      }),
       4,
     );
     expect(four?.state).toBe("todo");
@@ -883,9 +897,12 @@ describe("phase 4 and gate 2 over the drafted set", () => {
     ]);
   });
 
-  it("refuses publication on a failing OBJ-1", () => {
+  it("refuses publication on OBJ-1 where the workspace sets it to block", () => {
     const gates = publishGates(
-      base({ goals: [judged("Launch the new mobile app by end of Q3")] }),
+      base({
+        goals: [judged("Launch the new mobile app by end of Q3")],
+        practice: resolvePractice("recommended", { "checks.OBJ-1": "block" }),
+      }),
       thresholds,
     );
     const two = gates.find((entry) => entry.gateKey === 2);

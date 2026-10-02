@@ -17,6 +17,7 @@ import { bindAgentsToSpacelessItems } from "../src/data-changes/0009_bind_agents
 import { scrubErasedMemberNames } from "../src/data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../src/data-changes/0011_seal_account_tokens.ts";
 import { carryStrategicIssueMinimum } from "../src/data-changes/0012_carry_strategic_issue_minimum.ts";
+import { carryObjectiveLengthLimit } from "../src/data-changes/0013_carry_objective_length_limit.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -865,6 +866,63 @@ describe("0012: carrying the strategic issue floor onto its new threshold", () =
     await client.query("delete from _data_changes");
     const [again] = await runDataChanges(client, {
       scripts: [carryStrategicIssueMinimum],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0013: carrying the objective length limit onto its new threshold", () => {
+  it("moves a changed upper bound, drops the canon one, and keeps a value already set", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, overrides: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, $2::jsonb from w
+         returning workspace_id as id`,
+        [slug, JSON.stringify(overrides)],
+      );
+      return rows[0]?.id as string;
+    };
+    const longer = await seed("longer", {
+      "quality.objectiveLengthWords": { low: 3, high: 24 },
+    });
+    const canon = await seed("canon", {
+      "quality.objectiveLengthWords": { low: 2, high: 18 },
+    });
+    const both = await seed("both", {
+      "quality.objectiveLengthWords": { low: 4, high: 30 },
+      "quality.objectiveLengthLimit": 20,
+    });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [carryObjectiveLengthLimit],
+    });
+    expect(result?.rowsChanged).toBe(3);
+
+    const overridesOf = async (id: string) =>
+      (
+        await client.query<{ overrides: object }>(
+          "select overrides from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0]?.overrides;
+    expect(await overridesOf(longer)).toEqual({
+      "quality.objectiveLengthLimit": 24,
+    });
+    expect(await overridesOf(canon)).toEqual({});
+    expect(await overridesOf(both)).toEqual({
+      "quality.objectiveLengthLimit": 20,
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [carryObjectiveLengthLimit],
     });
     expect(again?.rowsChanged).toBe(0);
   });

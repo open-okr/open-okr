@@ -54,6 +54,12 @@ export {
   divergences,
 } from "./divergence.ts";
 export {
+  applyEnforcement,
+  CHECK_DEFAULT_LEVELS,
+  type EnforcementLevel,
+  enforcementLevel,
+} from "./enforcement.ts";
+export {
   acknowledgementEscalation,
   blockerEscalation,
   type Escalation,
@@ -178,7 +184,6 @@ export {
 export {
   ALIGNMENT_CHECKS,
   type AlignmentCheckInput,
-  applyStrictness,
   type ConditionRow,
   CYCLE_CHECKS,
   type CycleCheckInput,

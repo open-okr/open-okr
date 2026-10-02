@@ -150,14 +150,16 @@ Distribute it a few working days before the first session (3 by default, §11). 
 
 ### 2.7 Levels and quantities
 
+Many organisations use only two, company and team. *Source:* Castro: "Use as few OKR levels as possible"; Cagan: focus on team objectives.
+
 | Level | Objectives | Rule |
 |---|---|---|
-| Company | 1 to 5 | Hard cap at 5. If the annual set already contains everything, no quarter can choose |
-| Department | 1 to 3 per department | |
-| Team | 1 to 3 per team | |
-| Individual | 0 to 3 | Optional. Many organisations stop at team level |
+| Company | 1 to 5 | Warn above 5. If the annual set already contains everything, no quarter can choose |
+| Department | 1 to 3 per department | Warn above 3. Optional level |
+| Team | 1 to 3 per team | Warn above 3 |
+| Individual | 0 to 3 | Optional, and off by default. Never required. *Source:* Castro: "Individual OKRs are not for everyone and should never be required" |
 
-Every objective carries 2 to 5 key results. A unit may contribute to another unit's OKRs instead of setting its own. Record which units do this.
+Every objective carries 2 to 5 key results: block at none, warn at one or above five. A unit may contribute to another unit's OKRs instead of setting its own. Record which units do this. *Source:* Doerr: "A limit of three to five OKRs per cycle" and "five or fewer" key results; re:Work: "around three key results per objective"; Castro: "2 to 5 Key Results".
 
 ### 2.9 Writing and changing OKRs at any time
 
@@ -277,34 +279,63 @@ Beside health, every goal and key result carries a red, amber or green signal co
 
 Twenty-six checks across four groups: five objective checks, seven key result checks, six alignment checks and eight cycle checks. This is the Draft Coach engine's specification. Each check has a status, a coaching prompt, and a reason. In every condition table in this section, rows are evaluated top to bottom and the first matching row wins.
 
-Statuses: **pass**, **warn** (worth another look), **fail** (fix before publishing), **todo** (waiting on input). In strict mode every warn becomes a fail.
+Statuses: **pass**, **warn** (worth another look), **fail** (a structural defect), **todo** (waiting on input).
 
-**Strength score** = (passes + 0.5 × warns) / evaluated checks, as a percentage, computed over the objective, key result and alignment checks of the set being drafted. A todo check counts in the denominator and adds nothing. The cycle checks feed phase completion and the publish gates, not the strength score. Below 45% is red, 45% to below 75% is amber, 75% and above is green.
+**Enforcement.** Each check has a default level, below, and a workspace may change it (§12):
+- A check at **block** refuses publishing while it reports fail. A workspace that raises a check from warn to block turns that check's warns into fails.
+- A check at **warn** shows and coaches.
+- A check at **off** is not evaluated.
+- **Strict mode** raises every check to block at once. It is off by default.
+
+| Check | Default level |
+|---|---|
+| OBJ-1 Outcome, OBJ-2 Qualitative, OBJ-5 Counted | Warn |
+| OBJ-3 Timebound, OBJ-4 Owned (champion) | Block |
+| KR-1 Count | Block at none; warn at one or above five |
+| KR-2 Verifiable | Warn |
+| KR-3 Complete | Block on a missing target (metric and maintain), due date or owner. Warn on a missing baseline |
+| KR-4 Leading and lagging, KR-6 Ambitious but honest | Info |
+| KR-5 Impact, not effort | Warn |
+| KR-7 Direction set | Block only where a metric key result has none and none can be derived |
+| AL-1, AL-4, AL-5 | Warn |
+| AL-2 | Block (a data rule) |
+| AL-3, AL-6 | Off |
+| CY-1 to CY-8 | Info. Block only under binding phase enforcement |
+
+*Source:* No OKR tool found that blocks publishing on automated quality checks. Perdoo (vendor): "To activate a Draft OKR, you must manually activate it." Microsoft Viva Goals' approval is optional and done by a person.
+
+**Strength score** = (passes + 0.5 × warns) / evaluated checks, as a percentage, computed over the objective, key result and alignment checks of the set being drafted. A todo check counts in the denominator and adds nothing. Checks that are off are not evaluated. The cycle checks feed phase completion and the publish gates, not the strength score. Below 45% is red, 45% to below 75% is amber, 75% and above is green. *Source:* OpenOKR default. A product heuristic, not a published measure.
+
+**What word lists can and cannot do.** OBJ-1, KR-5 and parts of KR-2 match words. A word list will always be behind English, and the checks are measured against published OKRs (METHOD-REVIEW.md §3.4). So no word-list check blocks by default. A person decides what blocks, not a word.
 
 ### 4.1 Objective checks
 
-**OBJ-1 Outcome, not output.**
+**OBJ-1 Outcome, not output.** Warn.
 
 | Condition | Status | Coaching prompt |
 |---|---|---|
-| Starts with an output verb | fail | "Your objective starts with a deliverable, not a destination. If we do it and nothing changes, did we succeed? Rewrite around the change you want." |
+| Starts with an output verb | warn | "Your objective starts with a deliverable. If we do it and nothing changes, did we succeed? Consider naming the change you want, and keep the deliverable in a key result or an initiative." |
 | Matches an end-state shape | pass | "This names the state you want to be in. Keep the deliverables in your key results." |
 | Contains an output verb anywhere | warn | "There is output language here. What would be true after this is done? Lead with that." |
-| Bare metric movement, no why | fail | "Naming a metric to move is a key result in disguise. The outcome is the why behind the movement. Add the why, or lead with the end state." |
+| Bare metric movement, no why | warn | "Naming a metric to move is usually a key result in disguise. The outcome is the why behind the movement. Add the why, or lead with the end state." |
 | Metric movement with a why | pass | "You have paired movement with a why. Stronger still: lead with the end state and let the key results carry the movement." |
 | Names a change in state | pass | "This reads as a change in state, not a to-do. Keep the deliverables in your key results." |
-| Cannot tell | warn | "Could you complete this without anything actually improving? If yes, rewrite around the improvement." |
+| Cannot tell | pass | "Tip: could you complete this without anything actually improving? If yes, rewrite around the improvement." |
 
-The shape row sits second, above the output-verb sweep, since 28 September 2026. It was sixth, under "Contains an output verb anywhere", and first match wins, so the shape example below ("…something new customers finish by themselves", where *finish* is an output verb) would have warned while this section said it passes. The rows after it keep their order, so an objective that pairs movement or a state word with an output verb anywhere now warns, as the table always said it should. Decided by Akmal at completeness review M-27.
+The shape row sits second, above the output-verb sweep, since 28 September 2026 (completeness review M-27). "Cannot tell" passes with a tip since 1 October 2026: as a warning it fired on most well-formed objectives, which made it a banner rather than coaching.
+
+Every row that used to fail now warns. Doerr's own example objective is "Build a planning model for their company", and Wodtke's good example is "Launch an Awesome MVP", so an objective that opens with an action is a style question, not a defect. *Source:* Doerr: objectives are "significant, concrete, action oriented, and (ideally) inspirational".
 
 Word lists:
 
 | List | Words |
 |---|---|
 | Output verbs | launch, build, ship, implement, create, deliver, release, complete, develop, deploy, write, publish, migrate, install, conduct, hold, organise, organize, set up, roll out, rollout, hire, redesign, finish, produce, run |
-| Movement verbs | increase, grow, improve, reduce, boost, raise, cut, double, triple, maximise, maximize, minimise, minimize, decrease, accelerate, expand, drive |
+| Movement verbs | increase, grow, improve, reduce, boost, raise, cut, double, triple, maximise, maximize, minimise, minimize, decrease, accelerate, expand, drive, bring |
 | State words | become, be the, delight, delighted, loved, trusted, leading, best, strongest, profitable, sustainable, engaged, thriving, world-class, prefer, preferred, go-to, healthiest, excellence, dominant, known for, famous for, proud |
-| Why markers | to, so that, in order to, because |
+| Why markers | so that, in order to, because |
+
+"To" left the why markers on 1 October 2026. Every "from X to Y" contains it, so "Increase revenue from $2M to $3M" passed as movement with a why. "Bring" joined the movement verbs at the same time, so a recovery objective is judged as movement.
 
 **End-state shapes.** A word list can only recognise an end state that happens to use one of its words. These are sentence shapes that name an end state without needing any of them, and an objective matching one passes OBJ-1. `…` stands for any words.
 
@@ -314,46 +345,49 @@ Word lists:
 | reach the point where … | Reach the point where the product sells itself |
 | get to where … | Get to where a failed payment never reaches a person |
 
-Added 11 September 2026 after the P7-T07 audit measured OBJ-1 against twenty real drafts. Sixteen of twenty warned, and the warning was the "Cannot tell" fallback rather than a real objection: the objectives were well-formed outcomes that happened to use none of the twenty-two state words. A check that fires on nineteen objectives out of twenty is a banner, not coaching. Lengthening the word list was the alternative and was rejected, because a word list will always be behind English.
+Added 11 September 2026 after the P7-T07 audit measured OBJ-1 against twenty real drafts.
 
-**OBJ-2 Inspiring and directional.**
+**OBJ-2 Qualitative and memorable.** Warn.
 
 | Condition | Status | Prompt |
 |---|---|---|
-| Contains digits | warn | "Metrics belong in the key results. Keep the objective qualitative and memorable." |
-| Fewer than 4 words | warn | "Very short. Would someone outside your team understand where you are headed and why it matters?" |
+| Contains digits other than a four-digit year | warn | "Metrics usually belong in the key results. Keep the objective qualitative and memorable." |
 | More than 18 words | warn | "Trim it. If your team cannot recite it from memory, it will not steer their daily decisions." |
-| 4 to 18 words, no digits | pass | "Good length and qualitative. Read it aloud. Would it make your team lean in?" |
+| Otherwise | pass | "Good length and qualitative. Read it aloud. Would it make your team lean in?" |
 
-**OBJ-3 Timebound.** Fail without a cycle or an explicit timeframe. An OKR without a deadline is a wish.
+The lower bound of four words was removed on 1 October 2026: whatmatters' own "Achieve fiscal sustainability" is three. The 18-word limit is an OpenOKR default.
+
+**OBJ-3 Timebound.** Block. Fail without a cycle or an explicit timeframe. An OKR without a deadline is a wish. *Source:* Wodtke: "Time Bound"; Doerr: key results are "time-bound".
 
 **OBJ-4 Owned.** Fail without a named champion. Fail without a named reviewer.
 
-**OBJ-5 Counted.** Warn when a unit exceeds 3 objectives. Fail when the company level exceeds 5.
+**OBJ-5 Counted.** Warn when a unit exceeds 3 objectives, or the company level exceeds 5.
 
 ### 4.2 Key result checks
 
-**KR-1 Count.** Pass at 2 to 5. Warn at 1 ("can a single measure prove this from every angle?"). Fail at 0, or above 5 ("which two would you drop if you had to? Drop them").
+**KR-1 Count.** Pass at 2 to 5. Fail at none, which blocks. Warn at 1 ("can a single measure prove this from every angle?"). Warn above 5 ("which would you drop if you had to?").
 
-**KR-2 Measurable.** Pass when the text reads "from X to Y" or carries two numbers. Warn on a single number ("a target but no baseline. Without the from, you cannot prove movement"). Fail with no numbers ("what is the baseline today, and where must it land?").
+**KR-2 Measurable.** Warn. Pass when the text reads "from X to Y" or carries two numbers. Warn on a single number ("a target but no baseline. Without the from, you cannot prove movement"). Warn with no numbers ("what is the baseline today, and where must it land?").
 
-**KR-3 Complete.** Fail if baseline, target, date or owner is missing. If a baseline is unknown, establishing it can be the first key result.
+**KR-3 Complete.** Block when the target, the due date or the owner is missing. Warn when the baseline is missing. If a baseline is unknown, establishing it can be its own key result. *Source:* Doerr's own key results ("99% uptime") often carry no baseline.
 
-**KR-4 Leading and lagging mix.** Fail if any key result is untagged. Pass when the set holds at least one of each. Warn when all are lagging ("you will only find out at the end of the cycle whether it worked"). Warn when all are leading ("which key result proves the actual outcome landed?").
+**KR-4 Leading and lagging.** Info. Tagging is optional. Where the set's key results are tagged: pass when the set holds at least one of each. Note when all are lagging ("you will only find out at the end whether it worked"). Note when all are leading ("which key result proves the outcome landed?"). *Source:* whatmatters: "The most effective way to go is often a mix."
 
-**KR-5 Impact, not effort.**
+**KR-5 Impact, not effort.** Warn. A key result tagged leading is exempt: an activity can be a fair leading signal.
 
 | Condition | Status | Prompt |
 |---|---|---|
-| Activity noun, no impact word, no purpose | fail | "This measures pure activity volume. That is an output however measurable it is. Ask why: more calls, to what end? Name that impact and make it the key result." |
-| Output verb with fewer than two numbers | warn | "Reads like a milestone. What measurably changes because of it? Measure that instead." |
-| Activity plus a why, but the target sits on the activity | warn | "Good instinct, but flip it. Measure the impact itself and keep the activity as a clearly tagged leading indicator at most." |
+| Activity noun, no impact word, no purpose | warn | "This measures activity volume. Ask why: more calls, to what end? If you can measure that impact, make it the key result and keep the activity as a leading indicator." |
+| Output verb with fewer than two numbers | warn | "Reads like a milestone. If it is one, mark it a milestone key result. Otherwise measure what changes because of it." |
+| Activity plus a why, but the target sits on the activity | warn | "Good instinct, but consider flipping it. Measure the impact itself and keep the activity as a tagged leading indicator." |
 | Otherwise | pass | "These measure impact, not activity." |
 
 | List | Words |
 |---|---|
 | Activity nouns | call, meeting, interview, demo, email, workshop, session, training, webinar, post, visit, proposal, campaign, feature, report, presentation, event, ticket, article, sprint, task, activity, outreach, touchpoint (and plurals) |
 | Impact words | revenue, pipeline, conversion, retention, churn, nps, csat, satisfaction, margin, profit, growth, adoption, activation, engagement, win rate, quality, insight, market share, loyalty, renewal, upsell, arr, mrr, ltv, cac, accuracy, uptime, productivity, time-to-value, referrals, deal size |
+
+*Source:* Google's OKR playbook: key results "must describe outcomes, not activities"; Cagan on outcomes over output. Google's own sample "Launch xx feature to all users" and Intel's Operation Crush key results show outputs are sometimes the honest measure, which is why this warns.
 
 **KR-6 Ambitious but honest.** Judged on the set's average confidence, per §3.2.
 
@@ -405,9 +439,9 @@ The coach shows these beside the check that fired.
 
 | Weak | Strong | Why |
 |---|---|---|
-| Objective: Launch the new mobile app by end of Q3 | Objective: Make mobile the way our customers prefer to reach us | Launch is an output. You can launch and still fail. The strong version names the change in customer behaviour, and the launch becomes a means |
+| Objective: Launch the new mobile app by end of Q3 | Objective: Make mobile the way our customers prefer to reach us | You can launch and still fail. The strong version names the change in customer behaviour. For a committed delivery, "Launch the app" can be an honest milestone key result under it |
 | KR: Improve customer satisfaction | KR: Increase NPS from 32 to 50 (lagging). KR: Cut first-response time from 9h to 2h (leading) | No baseline, no target, no way to score it. The strong pair sets from and to, and combines lagging proof with a leading signal you can steer weekly |
-| KR: Hold 12 customer interviews | KR: Raise activation rate of new sign-ups from 41% to 60% | Interviews are activity. Ask what the interviews are for, and measure that outcome |
+| KR: Hold 12 customer interviews | KR: Raise activation rate of new sign-ups from 41% to 60% (lagging). KR: Interview 12 churned customers by week 6 (leading) | Interviews alone are activity. Ask what they are for and measure that outcome; the interviews can stay as a tagged leading signal |
 | KR: Increase sales calls from 40 to 120 per week | KR: Grow qualified pipeline from $1.2M to $3.0M (lagging). KR: Lift call-to-meeting conversion from 8% to 15% (leading) | Measurable, but still an output. If 120 calls create no pipeline, the key result was achieved and the quarter was wasted |
 
 ---
@@ -809,10 +843,11 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 
 | Parameter | Canon default |
 |---|---|
-| Coach strictness | Warn. The six publish gates are always hard |
+| Coach strictness | Per check, as §4 sets out. Strict mode raises every check to block |
 | Strength score boundaries | Red below 45%, green at 75% and above |
+| Strength score warn weight | 0.5 |
 | Key results per objective | 2 to 5 |
-| Objective length bounds | 4 to 18 words |
+| Objective length limit | 18 words, warn above |
 | Company objective cap | 5 |
 | Objectives per unit cap | 3 |
 | Strategic issue minimum | 3, ranked |

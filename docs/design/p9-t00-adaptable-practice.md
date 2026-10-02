@@ -62,7 +62,7 @@ export function resolvePractice(profile: string, overrides: unknown): ResolvedPr
 - **`asMethod`** is a check's default: the level §4 gives it, which for KR-1, KR-3, KR-7 and the cycle checks is more than one level. Overrides are block, warn or off.
 - **Storage.** `rhythm_settings.profile` names the profile and `rhythm_settings.practice` holds only the workspace's own changes. Resolution is defaults, then the profile, then the changes. Switching profile keeps the changes, and `differencesFromProfile` names the ones that now override the new profile, which `practice.applyProfile` returns and audits.
 - **Profile thresholds are applied from P9-T05.** `cadence.checkInFrequency`, which Lightweight sets, has its own non-null column, so applying a profile's thresholds is a write the settings screen has to decide, not a layer at read time.
-- **Strict mode is declared and not yet read.** The §11 threshold `quality.coachStrictness` (advisory, warn, strict) already does part of its job. P9-T03 makes strict mode the one home and retires the threshold's `strict`, so the value never has two.
+- **Strict mode, as built at P9-T03a.** It raises every check to block except one turned off. The §11 threshold `quality.coachStrictness` at `strict`, for the workspace or one space, still means the same, so the two cannot disagree and no workspace that chose strict before Phase 9 loses it. Retiring the threshold's `strict` needs a data change and one control on the settings screen, which is P9-T05's to decide.
 - **One row was added to §12.1**: "Root causes at the review", as §8.4 or optional. The approved Lightweight profile makes root causes optional, and no setting existed to say so.
 
 Every entry carries a Zod schema, a label, the METHOD.md section and a source line, exactly as a threshold does. The conformance suite gains one comparison: METHOD.md §12.1 against `PRACTICE`, in both directions, so a setting cannot exist in one and not the other.
@@ -95,7 +95,7 @@ In `packages/core`, one helper wraps it:
 - Warnings are returned with the action result, so the interface shows them beside the work.
 
 **As built at P9-T02** ([`policy.ts`](../../packages/method/src/policy.ts), [`practice/policy.ts`](../../packages/core/src/practice/policy.ts)):
-- **Two intents so far**, `objective.create` and `keyResult.create`. Each later task adds the intents it governs: a target change at P9-T06, publishing at P9-T03, drafts at P9-T13.
+- **Two intents so far**, `objective.create` and `keyResult.create`. Each later task adds the intents it governs: a target change at P9-T06, publishing at P9-T03b, drafts at P9-T13.
 - **The phases are read only when the practice needs them** (`policyNeedsPhases`), because evaluating a cycle's workflow is a dozen queries. A caller that skips them under binding is refused loudly, never allowed quietly.
 - **Drafting waits for phases 1 to 3, never phase 0**, because an annual OKR is what completes phase 0.
 - **An import is not refused** (`bulk`): it records objectives somebody already wrote, and refusing history would lose data, which no setting may do (§2.5).
@@ -197,7 +197,8 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 |---|---|---|---|
 | P9-T01 | Practice settings: registry, storage and actions | §12 | New: §12.1 against `PRACTICE` |
 | P9-T02 | One policy decides; anybody can write; the first cycle is inferred | §1 principle 11, §2.2, §2.3, §2.4, §2.6, §2.9 (who may write, and when) | "Team publication window", "Strategic issue minimum"; retire "Strategic issue bounds" |
-| P9-T03 | Enforcement levels for checks and gates; publishing in two steps | §2.7 (all but its first sentence, which needs the levels setting), §4 intro, §4.1, §4.2's KR-1, KR-4 and KR-5, §4.4, §4.5, §4.6 | Word lists ("to", "bring"); OBJ-1, OBJ-2 and KR-5 condition tables; "Objective length limit", "Strength score warn weight"; retire "Objective length bounds" |
+| P9-T03a | Enforcement levels for the checks | §2.7 (all but its levels-in-use sentences), §4 intro, §4.1 (bar OBJ-4), §4.2's KR-1, KR-4 and KR-5, §4.6's first four pairs | Word lists ("to", "bring"); OBJ-1, OBJ-2 and KR-5 condition tables; "Objective length limit", "Strength score warn weight"; retire "Objective length bounds" |
+| P9-T03b | Gate levels, and publishing in two steps | §4.4, §4.5 | None (behaviour) |
 | P9-T04 | The reviewer becomes optional | §2.5, OBJ-4 | None (behaviour) |
 | P9-T05 | The practice settings screen | none | None |
 | P9-T06 to P9-T10 | OKR writing, list and diagram | none ([p9-t00-okr-writing.md](p9-t00-okr-writing.md)), except P9-T07a, which carries §2.7's first sentence with the level picker that reads the levels in use (G-3) | None |

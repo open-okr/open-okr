@@ -1,4 +1,4 @@
-import type { ResolvedThresholds } from "@openokr/method";
+import type { ResolvedPractice, ResolvedThresholds } from "@openokr/method";
 import {
   Bar,
   Button,
@@ -85,6 +85,7 @@ export async function Drafting({
   kpis,
   canEdit,
   thresholds,
+  practice,
   checkTitles,
   memberId,
   assistsAvailable,
@@ -115,6 +116,8 @@ export async function Drafting({
   readonly canEdit: boolean;
   /** Resolved per workspace, so the browser judges by the same numbers. */
   readonly thresholds: ResolvedThresholds;
+  /** How hard each check is here (METHOD.md §12), for the same reason. */
+  readonly practice: ResolvedPractice;
   readonly checkTitles: readonly {
     readonly id: string;
     readonly title: string;
@@ -232,6 +235,7 @@ export async function Drafting({
                 confidence: keyResult.confidence,
               }))}
               thresholds={thresholds}
+              practice={practice}
               checkTitles={checkTitles}
             />
 

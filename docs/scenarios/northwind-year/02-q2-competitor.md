@@ -59,11 +59,11 @@ Two per unit at most, the cap Elena lowered after Q1 (NW-Q1-29). Published 15 Ap
 Elena learned of C1.3's drop to 3 in 10 only at the monthly review, three weeks late (NW-Q1-23). She wants to hear the same day when any key result falls to 3 in 10 or below, so she turns "Critical confidence escalation" on. The change is audited.
 *Test:* Given critical confidence escalation on, when a key result's confidence falls to 0.3, then the sponsor is told the same day, and the audit log shows who turned the setting on and when.
 
-**NW-Q2-03 · 2 Apr · Elena · S-36 practice settings · METHOD v2 §4, §12 · P9-T05, P9-T03**
+**NW-Q2-03 · 2 Apr · Elena · S-36 practice settings · METHOD v2 §4, §12 · P9-T05, P9-T03a, P9-T03b**
 Q1's first drafts were full of objectives that started with a deliverable. For Q2, Elena raises OBJ-1 from warn to block, to see whether it helps. The change is audited.
 *Test:* Given OBJ-1 raised to block, when an objective starting "Run" is drafted, then OBJ-1 reports fail. The draft still saves, and publishing it would be refused.
 
-**NW-Q2-04 · 5 to 14 Apr · Teams · OKRs list · METHOD v2 §2.7, OBJ-5 · P9-T03**
+**NW-Q2-04 · 5 to 14 Apr · Teams · OKRs list · METHOD v2 §2.7, OBJ-5 · P9-T03a**
 Engineering drafts a third objective. OBJ-5 now warns at three, because the cap is two. Mei moves the third, "Halve the build time", into an initiative under E1, where the work is tracked without being an objective.
 *Test:* Given the objectives-per-unit cap at 2, when a third Engineering objective is saved, then OBJ-5 warns and the save succeeds.
 
@@ -71,7 +71,7 @@ Engineering drafts a third objective. OBJ-5 now warns at three, because the cap 
 Yuki Tanaka joins as Product Manager, Growth. Directory sync creates her as a member on her first morning, and Priya adds her to the Product space. She reads the Company tab of OKRs, opens C1 in the drawer, and follows P1, so it appears under Mine. Individual OKRs are off, so she writes none.
 *Test:* Given a person added to the identity provider's group, when directory sync runs, then they are a member with standard access, can read every company OKR on first sign-in, and can follow a goal.
 
-**NW-Q2-06 · 15 Apr · Elena, Nadia, Hugo · S-10 publish, second step · METHOD v2 §4.5, OBJ-1 · P9-T03**
+**NW-Q2-06 · 15 Apr · Elena, Nadia, Hugo · S-10 publish, second step · METHOD v2 §4.5, OBJ-1 · P9-T03b**
 The department and team step is refused twice, because OBJ-1 is at block.
 - **Marketing.** Nadia's first draft, "Run the target-profile webinar series", fails. She rewrites it as "Leads that turn into deals" and it passes.
 - **Finance.** F2, "Publish weekly spend views to budget owners", also fails. Elena overrides with the reason "A reporting deliverable the board asked for; its outcome is in F2.1", and the override is recorded.
