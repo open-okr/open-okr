@@ -294,17 +294,19 @@ describe("goals.restore", () => {
       /higher access level/,
     );
 
-    // An administrator who is not the champion clears the first gate and
-    // not the second, and is told what they would have been told had they
-    // tried to delete it: that there is no such goal.
+    // **An administrator who is not the champion now clears both gates**
+    // (P8-G13a). The Admin role grants manage on the goal domain, and a level
+    // is the maximum over the bindings reaching somebody and the level their
+    // role grants, so the second gate is met by the role rather than by a
+    // binding on this goal. That is what the matrix says Admin may do, and it
+    // answers the open question goals/service.ts recorded: before roles, a
+    // workspace administrator could not touch a goal somebody else champions.
     await call("people.setAdministrator", {
       memberId: otherMemberId,
       administrator: true,
     });
-    await expect(call("goals.restore", { id: goalId }, OTHER)).rejects.toThrow(
-      /No such goal/,
-    );
-    expect(await isDeleted("goals", goalId)).toBe(true);
+    await call("goals.restore", { id: goalId }, OTHER);
+    expect(await isDeleted("goals", goalId)).toBe(false);
   });
 
   it("is not held back by a deleted parent goal, which a delete leaves children under", async () => {
@@ -393,14 +395,14 @@ describe("initiatives.restore", () => {
       call("initiatives.restore", { id: created.id }, OTHER),
     ).rejects.toThrow(/No such initiative/);
 
+    // An administrator clears both gates now, for the reason the goal case
+    // above spells out: the Admin role grants manage on the initiative domain.
     await call("people.setAdministrator", {
       memberId: otherMemberId,
       administrator: true,
     });
-    await expect(
-      call("initiatives.restore", { id: created.id }, OTHER),
-    ).rejects.toThrow(/No such initiative/);
-    expect(await isDeleted("initiatives", created.id)).toBe(true);
+    await call("initiatives.restore", { id: created.id }, OTHER);
+    expect(await isDeleted("initiatives", created.id)).toBe(false);
   });
 });
 
@@ -602,9 +604,13 @@ describe("workspace.deletedItems", () => {
       memberId: otherMemberId,
       administrator: true,
     });
-    // An administrator, and not the goal's champion: they could not have
-    // deleted it and cannot restore it, so it is not on their list.
-    expect(await list(OTHER)).toEqual([]);
+    // An administrator, and not the goal's champion. Before roles they could
+    // not have deleted it and so never saw it here; the Admin role grants
+    // manage on the goal domain, so now they can restore it and it is on
+    // their list. The list still shows only what the reader could restore,
+    // which is the rule this test holds (P8-G13a).
+    const shown = await list(OTHER);
+    expect(shown.map((row) => row.id)).toEqual([goalId]);
   });
 
   it("is refused below full, as every read on an admin screen is", async () => {

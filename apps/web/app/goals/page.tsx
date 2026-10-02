@@ -1,4 +1,4 @@
-import { callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { ALIGNMENT_LEVEL_ORDER } from "@openokr/method";
 import {
   Card,
@@ -10,6 +10,7 @@ import {
 import type { ReactNode } from "react";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { progressCeiling } from "../../lib/ceilings.ts";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -18,8 +19,12 @@ import { exportListAction } from "../search/actions.ts";
 import { ExportButton } from "../search/export-button.tsx";
 import { MyExports } from "../search/my-exports.tsx";
 import { GoalTable } from "../work-map.tsx";
+import { CYCLE_PLACEHOLDER, CyclePicker } from "./cycle-picker.tsx";
 import { filterAssistAvailableAction } from "./filter-actions.ts";
 import { FilterAssist } from "./filter-assist.tsx";
+import { NewObjectiveButton } from "./new-objective.tsx";
+import { OkrDiagram } from "./okr-diagram.tsx";
+import { OkrTable } from "./okr-table.tsx";
 
 /**
  * The goals explorer (UIUX-PLAN.md §4 S-13, P3-T10).
@@ -57,13 +62,27 @@ export default async function GoalsPage({
      */
     health?: string;
     mine?: string;
+    /**
+     * Which of the three renderings is on screen (P8-G12).
+     *
+     * Separate from `view`, which has meant the tree-or-flat ordering since
+     * P3-T10 and still does. `editor` is the editable set, `diagram` draws the
+     * same cycle as a tree of cards, and `tree` is the Work Map's own table,
+     * which is the only one of the three that indents by the parent pointer.
+     */
+    display?: string;
   }>;
 }) {
   const { t } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
-  // A guest holds nothing here, and is moved to their spaces (L-23).
-  await workspaceReaderLevel(workspace.workspaceId, workspace.memberId);
+  // A guest holds nothing here, and is moved to their spaces (L-23). The level
+  // it resolves is also what decides which controls the editable set offers,
+  // so it is kept rather than asked for a second time further down.
+  const accessLevel = await workspaceReaderLevel(
+    workspace.workspaceId,
+    workspace.memberId,
+  );
   const context = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
@@ -87,6 +106,12 @@ export default async function GoalsPage({
   const mine = query.mine === "1";
   const includeClosed = query.closed === "1";
   const tree = query.view !== "list";
+  const display =
+    query.display === "diagram"
+      ? "diagram"
+      : query.display === "tree"
+        ? "tree"
+        : "editor";
   // Whether anything is narrowing the set. Derived rather than counted a second
   // time: the difference between "this cycle has no goals" and "your filters
   // left nothing" is knowable from the query alone, and getting it wrong is
@@ -103,6 +128,10 @@ export default async function GoalsPage({
         ...(mine ? { mine } : {}),
       })
     : { goals: [] };
+
+  const canEdit = accessLevel >= ACCESS_LEVELS.edit;
+  const canAdminister = accessLevel >= ACCESS_LEVELS.full;
+  const progressMax = await progressCeiling();
 
   const alignment = cycleId
     ? await callAction(context, "alignment.read", {
@@ -124,6 +153,7 @@ export default async function GoalsPage({
       mine: mine ? "1" : null,
       view: tree ? null : "list",
       closed: includeClosed ? "1" : null,
+      display: display === "editor" ? null : display,
       ...patch,
     };
     for (const [key, value] of Object.entries(merged)) {
@@ -139,66 +169,77 @@ export default async function GoalsPage({
     <div className="flex flex-col gap-4.5">
       <SectionTabs items={GOAL_TABS} active="/goals" />
       <Card>
-        <CardHeader className="justify-between gap-4">
-          {/* Identity and state as one unit on the left, rather than a title
-           * with a sentence under it that repeated what the table below
-           * already says. The chip reports what is on screen; the table owns
-           * the empty state and its suggestion. */}
-          <div className="flex min-w-0 items-center gap-2.5">
-            <h1 className="flex-none text-lg font-bold text-ink">
-              {t("goals.goals")}
-            </h1>
-            <Chip tone={filtered ? "brand" : "neutral"}>
-              {/* Never "nothing in this cycle" from a filtered count. The
-               * cycle had two goals and the filters excluded both, and this
-               * line claimed the cycle was empty while the table forty
-               * pixels below correctly said no goals matched. One screen,
-               * two answers, and the wrong one was the louder. */}
-              {goals.length === 0
-                ? filtered
-                  ? t("goals.noMatchForTheseFilters")
-                  : t("goals.noGoalsInThisCycleYet")
-                : countChip(t, goals.length, filtered, tree)}
-            </Chip>
+        {/* **Two rows of two, not four things on one line.** Four groups on
+         * one line put the title, the set it belongs to, a score and an export
+         * at the same rank, and each pushed the next towards the middle. The
+         * split is by what each row answers: the first says what you are
+         * looking at and how it is doing, the second is what you can do to it.
+         * Agung asked for this shape after the filter bar was fixed. */}
+        <CardHeader className="flex-col items-stretch gap-2.5">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            {/* Identity and state as one unit on the left, rather than a title
+             * with a sentence under it that repeated what the table below
+             * already says. The chip reports what is on screen; the table owns
+             * the empty state and its suggestion. */}
+            <div className="flex min-w-0 items-center gap-2.5">
+              <h1 className="flex-none text-lg font-bold text-ink">
+                {t("goals.goals")}
+              </h1>
+              <Chip tone={filtered ? "brand" : "neutral"}>
+                {/* Never "nothing in this cycle" from a filtered count. The
+                 * cycle had two goals and the filters excluded both, and this
+                 * line claimed the cycle was empty while the table forty
+                 * pixels below correctly said no goals matched. One screen,
+                 * two answers, and the wrong one was the louder. */}
+                {goals.length === 0
+                  ? filtered
+                    ? t("goals.noMatchForTheseFilters")
+                    : t("goals.noGoalsInThisCycleYet")
+                  : countChip(
+                      t,
+                      goals.length,
+                      filtered,
+                      tree && display === "tree",
+                    )}
+              </Chip>
+            </div>
+            {alignment?.score !== null && alignment !== null ? (
+              <AlignmentScore
+                score={alignment.score}
+                healthy={alignment.healthy === true}
+                label={t("goals.alignment")}
+              />
+            ) : null}
           </div>
-          {alignment?.score !== null && alignment !== null ? (
-            <a
-              href={`/cycle?phase=5`}
-              className="flex flex-none items-baseline gap-2 rounded-control px-2 py-1 hover:bg-raised"
-            >
-              <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
-                {t("goals.alignment")}
-              </span>
-              {/* With its denominator. "ALIGNMENT 100" on its own could be a
-               * percentage, a score out of a hundred, or a points total;
-               * `05-alignment-studio` writes "73 / 100". Only the value is
-               * coloured, because the total carries no verdict. */}
-              <span className="flex items-baseline gap-0.5">
-                <span
-                  className={
-                    alignment.healthy
-                      ? "text-lg font-bold tabular-nums text-ok"
-                      : "text-lg font-bold tabular-nums text-warn"
-                  }
-                >
-                  {alignment.score}
-                </span>
-                {/* `--ink-3`, not `--ink-4`. The denominator is content, and
-                 * `--ink-4` measures 2.56:1 on this surface, which is the
-                 * violation the group labels above were just fixed for. */}
-                <span className="text-xs font-semibold tabular-nums text-ink-3">
-                  / 100
-                </span>
-              </span>
-            </a>
-          ) : null}
-          {/*
-           * Taking the list away, beside the thing it is a list of (P5-T13).
-           * The file matches the rows and columns on screen, and every export
-           * writes an audit row: it is the one action that takes data out of
-           * the product.
-           */}
-          <ExportButton onExport={exportListAction.bind(null, "goals")} />
+
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            {/* Which cycle is on screen, and the way another one is made.
+             * Beside the title rather than in the filter bar below: it is the
+             * first question this screen answers and it is not a filter, it is
+             * the set. */}
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <CyclePicker
+                cycles={cycles}
+                cycleId={cycleId}
+                hrefTemplate={href({ cycle: CYCLE_PLACEHOLDER })}
+                canCreate={canAdminister}
+              />
+              {/* Beside the cycle, because the two answer one after the other:
+               * which set am I looking at, and what do I want to put in it.
+               * The set also carries an add row under it, for the moment
+               * somebody is already reading. */}
+              {canEdit && cycleId ? (
+                <NewObjectiveButton cycleId={cycleId} level={level ?? "team"} />
+              ) : null}
+            </div>
+            {/*
+             * Taking the list away, beside the thing it is a list of (P5-T13).
+             * The file matches the rows and columns on screen, and every export
+             * writes an audit row: it is the one action that takes data out of
+             * the product.
+             */}
+            <ExportButton onExport={exportListAction.bind(null, "goals")} />
+          </div>
         </CardHeader>
         {/*
          * Where a queued export is collected (P5-T15). Renders nothing until
@@ -208,18 +249,80 @@ export default async function GoalsPage({
         <MyExports />
         <CardBody className="flex flex-col gap-2.5">
           <Filters
-            cycles={cycles}
-            cycleId={cycleId}
             level={level ?? null}
             health={health ?? null}
             mine={mine}
             filterAssist={filterAssistAvailable ? <FilterAssist /> : undefined}
             tree={tree}
+            display={display}
             includeClosed={includeClosed}
             href={href}
           />
         </CardBody>
       </Card>
+
+      {display === "editor" ? (
+        <OkrTable
+          goals={goals.map((goal) => ({
+            id: goal.id,
+            title: goal.title,
+            health: goal.health,
+            progressPct: goal.progressPct,
+            champion: goal.champion.name,
+            reviewer: goal.reviewer.name,
+            keyResults: goal.keyResults.map((keyResult) => ({
+              id: keyResult.id,
+              title: keyResult.title,
+              unit: keyResult.unit,
+              currentValue: keyResult.currentValue,
+              targetValue: keyResult.targetValue,
+              progressPct: keyResult.progressPct,
+            })),
+          }))}
+          cycleId={cycleId}
+          // The level a row added here is written at. The filter when one is
+          // chosen, so a filtered set adds to itself rather than adding a row
+          // the filter immediately hides; team otherwise, which is the level
+          // §4.3 puts most objectives at.
+          level={level ?? "team"}
+          canEdit={canEdit}
+          canAdminister={canAdminister}
+          progressMax={progressMax}
+          empty={
+            <div className="flex flex-col gap-1.5 p-3">
+              <p className="text-sm text-ink-2">
+                {t("goals.noGoalsMatchThis")}
+              </p>
+            </div>
+          }
+        />
+      ) : null}
+
+      {display === "diagram" ? (
+        <OkrDiagram
+          goals={goals.map((goal) => ({
+            id: goal.id,
+            title: goal.title,
+            health: goal.health,
+            progressPct: goal.progressPct,
+            champion: goal.champion.name,
+            reviewer: goal.reviewer.name,
+            keyResults: goal.keyResults.map((keyResult) => ({
+              id: keyResult.id,
+              title: keyResult.title,
+              unit: keyResult.unit,
+              currentValue: keyResult.currentValue,
+              targetValue: keyResult.targetValue,
+              progressPct: keyResult.progressPct,
+            })),
+          }))}
+          cycleName={
+            cycles.find((cycle) => cycle.id === cycleId)?.name ??
+            t("goals.editor.noCycle")
+          }
+          progressMax={progressMax}
+        />
+      ) : null}
 
       {/* The same table the Work Map draws (`01-work-map`), not a card per
        * goal. S-13 has no mockup, and §10 treats a detail only the mockups
@@ -227,37 +330,41 @@ export default async function GoalsPage({
        * repository has is the one both screens use. The explorer's own tree
        * ordering stays here: it walks what survived the filters and has to
        * mark a goal whose parent did not. */}
-      <GoalTable
-        nodes={(tree
-          ? inTreeOrder(goals)
-          : goals.map((goal) => ({
+      {display === "tree" ? (
+        <GoalTable
+          nodes={(tree
+            ? inTreeOrder(goals)
+            : goals.map((goal) => ({
+                goal,
+                depth: 0,
+                detached: false,
+              }))
+          ).flatMap(({ goal, depth, detached }) =>
+            mapNodesFor(
+              t,
               goal,
-              depth: 0,
-              detached: false,
-            }))
-        ).flatMap(({ goal, depth, detached }) =>
-          mapNodesFor(
-            t,
-            goal,
-            depth,
-            detached ? t("goals.parentIsOutsideThisFilter") : undefined,
-          ),
-        )}
-        selected={null}
-        rowHref={(node) => `/goals/${node.goalId}`}
-        empty={
-          <div className="flex flex-col gap-1.5 p-3">
-            <p className="text-sm text-ink-2">{t("goals.noGoalsMatchThis")}</p>
-            <p className="text-xs text-ink-3">
-              {t("goals.objectivesAreDraftedIn")}{" "}
-              <a className="underline" href="/cycle?phase=4">
-                {t("goals.openDrafting")}
-              </a>
-              .
-            </p>
-          </div>
-        }
-      />
+              depth,
+              detached ? t("goals.parentIsOutsideThisFilter") : undefined,
+            ),
+          )}
+          selected={null}
+          rowHref={(node) => `/goals/${node.goalId}`}
+          empty={
+            <div className="flex flex-col gap-1.5 p-3">
+              <p className="text-sm text-ink-2">
+                {t("goals.noGoalsMatchThis")}
+              </p>
+              <p className="text-xs text-ink-3">
+                {t("goals.objectivesAreDraftedIn")}{" "}
+                <a className="underline" href="/cycle?phase=4">
+                  {t("goals.openDrafting")}
+                </a>
+                .
+              </p>
+            </div>
+          }
+        />
+      ) : null}
     </div>
   );
 }
@@ -267,6 +374,60 @@ export default async function GoalsPage({
  * whether a filter or the tree is shaping them. One whole message per case, so
  * a translator never assembles the phrase from pieces.
  */
+/**
+ * The count beside the title.
+ *
+ * `tree` here means "and it is drawn as a tree", which is true only under the
+ * tree rendering. It used to read the ordering parameter alone, so the chip
+ * said "9 goals, as a tree" while the editable list was on screen: the same
+ * confusion between the rendering and the ordering that the toolbar had.
+ */
+/**
+ * The alignment score, as a figure with its denominator.
+ *
+ * "ALIGNMENT 100" on its own could be a percentage, a score out of a hundred
+ * or a points total; `05-alignment-studio` writes "73 / 100". Only the value
+ * is coloured, because the total carries no verdict. Lifted out of the header
+ * when that header became two rows, so the row is a line of two things rather
+ * than a line with a paragraph of markup in the middle of it.
+ */
+function AlignmentScore({
+  score,
+  healthy,
+  label,
+}: {
+  readonly score: number;
+  readonly healthy: boolean;
+  readonly label: string;
+}) {
+  return (
+    <a
+      href="/cycle?phase=5"
+      className="flex flex-none items-baseline gap-2 rounded-control px-2 py-1 hover:bg-raised"
+    >
+      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+        {label}
+      </span>
+      <span className="flex items-baseline gap-0.5">
+        <span
+          className={
+            healthy
+              ? "text-lg font-bold tabular-nums text-ok"
+              : "text-lg font-bold tabular-nums text-warn"
+          }
+        >
+          {score}
+        </span>
+        {/* `--ink-3`, not `--ink-4`. The denominator is content, and
+         * `--ink-4` measures 2.56:1 on this surface. */}
+        <span className="text-xs font-semibold tabular-nums text-ink-3">
+          / 100
+        </span>
+      </span>
+    </a>
+  );
+}
+
 function countChip(
   t: (key: string, values?: MessageValues) => string,
   count: number,
@@ -301,22 +462,20 @@ const GOAL_HEALTH_BANDS = [
 ] as const;
 
 async function Filters({
-  cycles,
-  cycleId,
   level,
   health,
   mine,
   tree,
+  display,
   includeClosed,
   href,
   filterAssist,
 }: {
-  readonly cycles: readonly { id: string; name: string }[];
-  readonly cycleId: string | null;
   readonly level: string | null;
   readonly health: string | null;
   readonly mine: boolean;
   readonly tree: boolean;
+  readonly display: "editor" | "diagram" | "tree";
   readonly includeClosed: boolean;
   readonly href: (patch: Record<string, string | null>) => string;
   /** The sentence-to-filter box, when a provider can answer. */
@@ -336,92 +495,97 @@ async function Filters({
     // Filling it with the control that was sitting in a row of its own uses the
     // space and removes a row, where stretching the tracks would only have made
     // long grey slabs with the chips packed at one end.
-    <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between 2xl:gap-8">
-      <div className="flex min-w-0 flex-col gap-4">
-        {/* Two rows, composed rather than wrapped, because six groups running
-         * along one line is what made this read as a paragraph of links. The
-         * split is by the question each group answers: the first row says what
-         * you are looking at, the second narrows it down. Each group's label
-         * sits above its own track, so the boundary between groups needs no gap
-         * to carry it.
-         *
-         * The rows scroll, the page never does. Three attempts to make the
-         * groups shrink inside the viewport failed measurement at 375: the level
-         * track came out 328px and health 523px against 319px of bar. This is
-         * the repository's own rule for wide content, and it is the one that
-         * holds without depending on flex shrink behaviour. */}
-        <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
-          <Group label={t("scorecard.cycle")}>
-            {cycles.map((cycle) => (
-              <Tab
-                key={cycle.id}
-                href={href({ cycle: cycle.id })}
-                active={cycle.id === cycleId}
-              >
-                {cycle.name}
-              </Tab>
-            ))}
-          </Group>
+    <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between 2xl:gap-8">
+      {/* **One row, and one control per question.**
+       *
+       * This was six labelled groups over two ragged rows, and two of them
+       * said the same two words. `Display` offered List, Diagram and Tree;
+       * `View` offered Tree and List and meant the ordering *inside* the tree
+       * table, which does nothing at all under the other two displays. Agung
+       * asked what the difference was, which is the question a reader should
+       * never have to ask of a toolbar.
+       *
+       * So the rendering is one segmented control, the ordering appears only
+       * under the rendering it belongs to, and the two yes-or-no filters are
+       * one chip each instead of a labelled pair. Six groups become four
+       * controls, and the label sits in the track rather than above it. */}
+      <div className="-mx-0.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 overflow-x-auto px-0.5">
+        <Group label={t("goals.editor.displayGroup")}>
+          <Tab href={href({ display: null })} active={display === "editor"}>
+            {t("goals.editor.displayList")}
+          </Tab>
+          <Tab
+            href={href({ display: "diagram" })}
+            active={display === "diagram"}
+          >
+            {t("goals.editor.displayDiagram")}
+          </Tab>
+          <Tab href={href({ display: "tree" })} active={display === "tree"}>
+            {t("goals.editor.displayTree")}
+          </Tab>
+        </Group>
 
-          <Group label={t("common.level")}>
-            <Tab href={href({ level: null })} active={level === null}>
-              {t("goals.all")}
-            </Tab>
-            {ALIGNMENT_LEVEL_ORDER.map((entry) => (
-              <Tab
-                key={entry}
-                href={href({ level: entry })}
-                active={level === entry}
-              >
-                {entry}
-              </Tab>
-            ))}
-          </Group>
-
-          <Group label={t("goals.view")}>
+        {/* Only under the tree, because the ordering is a property of that
+         * table and of nothing else. Hidden rather than disabled: a control
+         * that can never apply here is not a control a reader has to reason
+         * about. */}
+        {display === "tree" ? (
+          <Group label={t("goals.editor.orderGroup")}>
             <Tab href={href({ view: null })} active={tree}>
-              {t("goals.tree")}
+              {t("goals.editor.orderNested")}
             </Tab>
             <Tab href={href({ view: "list" })} active={!tree}>
-              {t("goals.list")}
+              {t("goals.editor.orderFlat")}
             </Tab>
           </Group>
-        </div>
+        ) : null}
 
-        <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
-          <Group label={t("workMap.health")}>
-            <Tab href={href({ health: null })} active={health === null}>
-              {t("common.any")}
-            </Tab>
-            {GOAL_HEALTH_BANDS.map((band) => (
-              <Tab
-                key={band}
-                href={href({ health: band })}
-                active={health === band}
-              >
-                {band.replace("_", " ")}
-              </Tab>
-            ))}
-          </Group>
+        <span aria-hidden="true" className="h-5 w-px flex-none bg-line" />
 
-          <Group label={t("goals.whose")}>
-            <Tab href={href({ mine: null })} active={!mine}>
-              {t("goals.everyoneS")}
+        <Group label={t("common.level")}>
+          <Tab href={href({ level: null })} active={level === null}>
+            {t("goals.all")}
+          </Tab>
+          {ALIGNMENT_LEVEL_ORDER.map((entry) => (
+            <Tab
+              key={entry}
+              href={href({ level: entry })}
+              active={level === entry}
+            >
+              {entry}
             </Tab>
-            <Tab href={href({ mine: "1" })} active={mine}>
-              {t("goals.mine")}
-            </Tab>
-          </Group>
+          ))}
+        </Group>
 
-          <Group label={t("operator.workspace.factClosed")}>
-            <Tab href={href({ closed: null })} active={!includeClosed}>
-              {t("goals.hidden")}
+        <Group label={t("workMap.health")}>
+          <Tab href={href({ health: null })} active={health === null}>
+            {t("common.any")}
+          </Tab>
+          {GOAL_HEALTH_BANDS.map((band) => (
+            <Tab
+              key={band}
+              href={href({ health: band })}
+              active={health === band}
+            >
+              {band.replace("_", " ")}
             </Tab>
-            <Tab href={href({ closed: "1" })} active={includeClosed}>
-              {t("goals.shown")}
-            </Tab>
-          </Group>
-        </div>
+          ))}
+        </Group>
+
+        {/* Two filters that are a yes or a no, drawn as a yes or a no. A pair
+         * of options each needed a label to say which pair it was; a single
+         * chip says it in the word on the chip. `aria-pressed` is what tells
+         * somebody who cannot see the fill which way it is set. */}
+        <Toggle
+          href={href({ mine: mine ? null : "1" })}
+          on={mine}
+          label={t("goals.mine")}
+        />
+        <Toggle
+          href={href({ closed: includeClosed ? null : "1" })}
+          on={includeClosed}
+          label={t("goals.editor.filterClosed")}
+        />
       </div>
 
       {filterAssist ? (
@@ -443,35 +607,62 @@ function Group({
     // and a test that clicks the wrong one passes for the wrong reason. Naming
     // the region is also what a screen reader wants: the chips mean nothing
     // without knowing which filter they belong to.
-    // A `fieldset`, not a `div role="group"`: the a11y lint asks for the element
-    // that already has the role, and `getByRole("group")` finds either. The
-    // label is on the element rather than in a `legend`, because the visible
-    // text below is the label and a legend would say it twice.
+    // A `fieldset`, not a `div role="group"`: the a11y lint asks for the
+    // element that already has the role, and `getByRole("group")` finds
+    // either.
     <fieldset
       aria-label={label}
-      // A column: the label above its own track. Six groups running along one
-      // line with the label beside each track is what made this read as a
-      // paragraph, and no gap between groups can fix that on its own.
-      className="flex min-w-0 flex-col gap-1.5 border-0 p-0"
+      // One line, with the caption inside the track rather than above it. The
+      // stacked caption cost a whole row of height per group and made six
+      // groups read as six paragraphs; inside the track it reads as the track
+      // own name and the row halves.
+      className="flex min-w-0 items-center gap-1 rounded-control bg-raised p-0.5 pl-2"
     >
-      {/* 10px against the options' 12px, and `--ink-3` rather than `--ink-4`.
-       * The label used to be the same 12px as the words it labels, so the only
-       * thing separating "HEALTH" from "pending" was colour, and that colour
-       * measured 2.56:1 against §7's 4.5:1 floor. Rank now comes from size,
-       * where it costs no contrast. */}
-      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+      {/* 10px against the options 12px, and `--ink-3` rather than
+       * `--ink-4`. Rank comes from size, where it costs no contrast: at the
+       * same size the only thing separating "HEALTH" from "pending" was
+       * colour, and that colour measured 2.56:1 against §7 4.5:1 floor. */}
+      <span className="flex-none text-[10px] font-bold uppercase tracking-wider text-ink-3">
         {label}
       </span>
-      {/* A segmented track, which is one move for three of the audit's
-       * findings. It gives twenty options that looked like plain text a
-       * visible boundary, it makes each group a unit the eye can find without
-       * relying on a 16px gap, and it separates the groups from each other
-       * without a divider. The active segment lifts out of the track rather
-       * than only changing colour. */}
-      <div className="flex min-w-0 flex-wrap items-center gap-0.5 rounded-control bg-raised p-0.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-0.5">
         {children}
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * A filter that is a yes or a no.
+ *
+ * A pair of options needs a caption to say which pair it is; one chip says it
+ * in its own word. It stays a link, so the state is still a URL somebody can
+ * send, and `aria-current` carries what the fill carries for anybody who
+ * cannot see it. Not `aria-pressed`: that belongs to a button, and this is a
+ * link to another state of the same page, which is what every other chip in
+ * this toolbar is.
+ */
+function Toggle({
+  href,
+  on,
+  label,
+}: {
+  readonly href: string;
+  readonly on: boolean;
+  readonly label: string;
+}) {
+  return (
+    <a
+      href={href}
+      aria-current={on ? "true" : undefined}
+      className={
+        on
+          ? "inline-flex h-7 flex-none items-center whitespace-nowrap rounded-control border border-brand-line bg-brand-weak px-2.5 text-xs font-semibold text-brand-text"
+          : "inline-flex h-7 flex-none items-center whitespace-nowrap rounded-control border border-line bg-surface px-2.5 text-xs font-medium text-ink-3 hover:border-line-2 hover:text-ink-2"
+      }
+    >
+      {label}
+    </a>
   );
 }
 

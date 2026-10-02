@@ -21,6 +21,7 @@ import { backfillBlockerGoal } from "../data-changes/0008_backfill_blocker_goal.
 import { bindAgentsToSpacelessItems } from "../data-changes/0009_bind_agents_to_spaceless_items.ts";
 import { scrubErasedMemberNames } from "../data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../data-changes/0011_seal_account_tokens.ts";
+import { backfillWorkspaceRoles } from "../data-changes/0012_backfill_workspace_roles.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -44,6 +45,7 @@ try {
       // schema `loadEnv` checks has no root key, because the web process
       // resolves its own ring. Absent is fine until there is a token to seal.
       sealAccountTokens(process.env.OPENOKR_ENCRYPTION_KEY),
+      backfillWorkspaceRoles,
     ],
   });
   process.stdout.write(

@@ -31,6 +31,7 @@ import {
   resolveMemberAccessLevel,
   resolveSubjectContext,
 } from "../access/reads.ts";
+import { moveAdministratorRole } from "../access/roles.ts";
 import { findLegacyRowInTx, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { eraseAccountIfAlone, sweepPersonalData } from "../people/erasure.ts";
@@ -535,6 +536,22 @@ export const setAdministrator = defineWriteAction({
           level: wanted,
         });
       }
+
+      // **The role moves with the binding** (P8-G13a). A level is the maximum
+      // over the bindings reaching somebody and the level their role grants,
+      // so lowering the binding alone would leave a founder holding Owner at
+      // full access after stepping down, and this action would have done
+      // nothing. Administration is now said in two places and both have to
+      // agree.
+      //
+      // Stepping down returns them to the workspace default rather than to no
+      // role at all: "the standard level every member holds" is what the
+      // default role is for, and a member with no role is a guest.
+      await moveAdministratorRole(tx, {
+        workspaceId,
+        memberId: member.id,
+        administrator: input.administrator,
+      });
 
       return {
         result: { id: member.id, administrator: input.administrator },

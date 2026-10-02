@@ -55,8 +55,12 @@ test("the two new filters are there, and they are chips", async () => {
   // Both exist for their own sake, with or without a provider: the assist needed
   // them before it could set them.
   await expect(page.getByRole("group", { name: "Health" })).toBeVisible();
-  await expect(page.getByRole("group", { name: "Whose" })).toBeVisible();
   await expect(page.getByRole("link", { name: "off track" })).toBeVisible();
+  // **"Whose" is one chip now, not a labelled pair.** The toolbar revamp made
+  // the two yes-or-no filters a single chip each, because a pair of options
+  // needs a caption to say which pair it is and one chip says it in its own
+  // word. What the criterion asks for is unchanged: the filter is visible and
+  // it is something a person can press.
   await expect(page.getByRole("link", { name: "Mine" })).toBeVisible();
 });
 

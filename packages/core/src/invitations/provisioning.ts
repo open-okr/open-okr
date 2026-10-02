@@ -19,6 +19,7 @@ import { eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
+import { defaultRoleId } from "../access/roles.ts";
 import { resolveMemberSettings } from "../settings/registry.ts";
 import { requireSeatInTx } from "../tenancy/plans.ts";
 
@@ -112,6 +113,13 @@ export async function provisionMemberForInvite<
   }
 
   const memberSettings = resolveMemberSettings({});
+  // The workspace's default role, for a human only (P8-G13a). A guest holds
+  // no role on purpose: they were asked into one space, and a workspace-wide
+  // role would hand them the whole workspace instead.
+  const roleId =
+    (input.kind ?? "human") === "human"
+      ? await defaultRoleId(tx, input.workspaceId)
+      : null;
   // openokr:allow-mutation: this helper is called only from inside an
   // Operation's execute (invitations.acceptLink, invitations
   // .joinByTrustedDomain), on the transaction that Operation opened.
@@ -123,6 +131,7 @@ export async function provisionMemberForInvite<
       name: input.user.name,
       kind: input.kind ?? "human",
       status: "active",
+      ...(roleId ? { roleId } : {}),
       primaryChannel:
         memberSettings.primaryChannel as typeof workspaceMembers.$inferInsert.primaryChannel,
       quietHours: memberSettings.quietHours,

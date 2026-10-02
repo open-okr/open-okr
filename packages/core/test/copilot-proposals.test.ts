@@ -302,6 +302,13 @@ describe("applying one", () => {
       "update access_bindings set level = 40 where workspace_id = $1",
       [workspaceId],
     );
+    // **And the role** (P8-G13a): a level is the maximum over the bindings
+    // reaching somebody and the level their workspace role grants, so lowering
+    // the bindings alone leaves the founder on Owner and refuses nothing.
+    await wb.admin.query(
+      "update workspace_members set role_id = null where workspace_id = $1",
+      [workspaceId],
+    );
 
     await expect(apply(proposed?.id as string)).rejects.toThrow();
 
@@ -337,6 +344,13 @@ describe("undoing one", () => {
     // inventing a right.
     await wb.admin.query(
       "update access_bindings set level = 70 where workspace_id = $1",
+      [workspaceId],
+    );
+    // **And the role** (P8-G13a): a level is the maximum over the bindings
+    // reaching somebody and the level their workspace role grants, so lowering
+    // the bindings alone leaves the founder on Owner and refuses nothing.
+    await wb.admin.query(
+      "update workspace_members set role_id = null where workspace_id = $1",
       [workspaceId],
     );
 
@@ -475,6 +489,14 @@ describe("the rest of the catalogue", () => {
           )`,
       [workspaceId, resourceType, level, resourceId],
     );
+    // **And the role** (P8-G13a). Narrowing one resource's bindings no longer
+    // narrows anybody while they hold a role granting that whole domain, and
+    // the founder holds Owner. Clearing it leaves every binding in place, so
+    // the member keeps exactly the access these tests were written against.
+    await wb.admin.query(
+      "update workspace_members set role_id = null where workspace_id = $1",
+      [workspaceId],
+    );
   };
 
   beforeEach(async () => {
@@ -588,6 +610,13 @@ describe("the rest of the catalogue", () => {
     const wb = await workerDb();
     await wb.admin.query(
       "update access_bindings set level = 40 where workspace_id = $1",
+      [workspaceId],
+    );
+    // **And the role** (P8-G13a): a level is the maximum over the bindings
+    // reaching somebody and the level their workspace role grants, so lowering
+    // the bindings alone leaves the founder on Owner and refuses nothing.
+    await wb.admin.query(
+      "update workspace_members set role_id = null where workspace_id = $1",
       [workspaceId],
     );
     const drafter = new ProposingDrafter(task());

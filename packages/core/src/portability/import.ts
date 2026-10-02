@@ -210,6 +210,41 @@ async function buildKeyMap(ctx: KeyMapContext): Promise<{
     }
   }
 
+  // **A built-in role maps onto the target's own** (P8-G13a). The target
+  // workspace was provisioned with its four roles, and the archive carries
+  // four with the same `builtin_key`, which the unique index refuses. Left
+  // alone, the role insert is skipped and every member row pointing at it
+  // then fails its foreign key and is skipped too: a move that silently
+  // carried nobody across, which is how this was found.
+  //
+  // Matched by `builtin_key` rather than by name, because a workspace may
+  // rename Admin and still mean Admin. A role an administrator added carries
+  // no key, collides with nothing and imports as itself.
+  const archivedRoles = ctx.archive.records.filter(
+    (r) => r.r === "row" && r.t === "workspace_roles" && r.d.builtin_key,
+  );
+  if (archivedRoles.length > 0) {
+    const existingRoles = await ctx.tx.execute<{
+      id: string;
+      builtin_key: string | null;
+    }>(sql`
+      select id, builtin_key from workspace_roles
+       where workspace_id = ${ctx.workspaceId}
+         and deleted_at is null
+         and builtin_key is not null
+    `);
+    const byKey = new Map(
+      existingRoles.rows.map((row) => [row.builtin_key as string, row.id]),
+    );
+    for (const record of archivedRoles) {
+      if (record.r !== "row") continue;
+      const existingId = byKey.get(String(record.d.builtin_key));
+      if (existingId) {
+        keyMap.set(String(record.d.id), existingId);
+      }
+    }
+  }
+
   // Collect every other uuid in the archive and assign fresh ids
   for (const record of ctx.archive.records) {
     if (record.r !== "row") continue;
