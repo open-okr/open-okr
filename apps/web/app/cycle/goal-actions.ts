@@ -63,7 +63,8 @@ export async function createGoal(
       level: level as "company" | "department" | "team" | "individual",
       ownerKind: "workspace",
       championId,
-      reviewerId,
+      // "" is the "No reviewer" option (P9-T04).
+      reviewerId: reviewerId === "" ? null : reviewerId,
       weight: 1,
       ...(contributionStatement === "" ? {} : { contributionStatement }),
     }),

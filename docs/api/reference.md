@@ -302,7 +302,7 @@ the machine-readable document.
 | `goals.publishDraftedCheckIn`<br/>Opens the author's draft check-in on a goal and publishes it in one action, for a proposal a human applies. | `POST /api/v1/goals/publishDraftedCheckIn` | writes |
 | `goals.read`<br/>One goal with its key results and its retrospective, if it has one. | `GET /api/v1/goals/read` | reads |
 | `goals.readVotes`<br/>The votes on one key result: only your own until the reveal, all of them and the average after it. | `GET /api/v1/goals/readVotes` | reads |
-| `goals.reassignRole`<br/>Moves the champion or the reviewer to another member, rebinding access with it. | `POST /api/v1/goals/reassignRole` | writes |
+| `goals.reassignRole`<br/>Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off. | `POST /api/v1/goals/reassignRole` | writes |
 | `goals.recordValue`<br/>Moves a key result's value and records the movement as history. | `POST /api/v1/goals/recordValue` | writes |
 | `goals.relations`<br/>The parent, children, horizontal dependencies and register entries of one goal. | `GET /api/v1/goals/relations` | reads |
 | `goals.removeDependency`<br/>Removes a horizontal link between two goals. | `POST /api/v1/goals/removeDependency` | writes |

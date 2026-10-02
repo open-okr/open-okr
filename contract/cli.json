@@ -6116,7 +6116,7 @@
           "name": "reviewer-id",
           "field": "reviewerId",
           "type": "string",
-          "required": true
+          "required": false
         },
         {
           "name": "parent-goal-id",
@@ -6370,7 +6370,7 @@
       "method": "POST",
       "path": "/goals/reassignRole",
       "scope": "write",
-      "summary": "Moves the champion or the reviewer to another member, rebinding access with it.",
+      "summary": "Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off.",
       "flags": [
         {
           "name": "id",

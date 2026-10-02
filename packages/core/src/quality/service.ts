@@ -253,6 +253,7 @@ export async function evaluateGoalInTx(
         hasTimeframe: goal.timeframe !== null,
         championId: goal.championId,
         reviewerId: goal.reviewerId,
+        reviewerRequired: practice.reviewer === "required",
         objectivesInUnit: Math.max(unit.length, 1),
         level: goal.level,
       },

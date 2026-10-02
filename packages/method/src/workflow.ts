@@ -270,7 +270,7 @@ export const PHASE_TITLES = [
 ] as const;
 
 export const GATE_TITLES = [
-  "Every objective has a title, a champion and a reviewer",
+  "Every objective has a title and a champion, and a reviewer where required",
   "Every objective has key results, and nothing fails a check set to block",
   "Alignment is mapped: each objective states what it contributes to",
   "Every dependency is confirmed, or logged with a named risk owner",
@@ -621,6 +621,7 @@ function goalVerdicts(
           hasTimeframe: false,
           championId: goal.championId,
           reviewerId: goal.reviewerId,
+          reviewerRequired: practice.reviewer === "required",
           objectivesInUnit: goals.filter((other) => other.level === goal.level)
             .length,
           level,
@@ -904,7 +905,8 @@ export function publishGates(
       if (!goal.championId) {
         problems.push(`"${goal.title}" has no champion`);
       }
-      if (!goal.reviewerId) {
+      // Only where the workspace requires reviewers (§2.5, P9-T04).
+      if (!goal.reviewerId && practice.reviewer === "required") {
         problems.push(`"${goal.title}" has no reviewer`);
       }
       return problems;

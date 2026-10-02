@@ -182,15 +182,21 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
           "Nobody owns this. Name the champion who reports on it, or it belongs to everyone and therefore to no one.",
       },
       {
-        condition: "No named reviewer",
+        condition: "No named reviewer where reviewers are required",
         status: "fail",
         prompt:
-          "No reviewer means no one acknowledges the check-ins. Name the person who reads them.",
+          "This workspace asks for a reviewer, who acknowledges the check-ins. Name the person who reads them.",
       },
       {
         condition: "Champion and reviewer named",
         status: "pass",
         prompt: "Owned and reviewed, so the loop closes on somebody.",
+      },
+      {
+        condition: "Champion named",
+        status: "pass",
+        prompt:
+          "Owned. Nobody is asked to acknowledge its check-ins, which this workspace's practice allows.",
       },
     ],
   },
@@ -449,6 +455,12 @@ export interface ObjectiveInput {
   readonly hasTimeframe: boolean;
   readonly championId: string | null;
   readonly reviewerId: string | null;
+  /**
+   * True where the workspace requires a reviewer on every objective
+   * (METHOD.md §2.5, P9-T04). Absent reads as not required, which is the
+   * recommended practice.
+   */
+  readonly reviewerRequired?: boolean;
   /** How many objectives this unit already has, including this one. */
   readonly objectivesInUnit: number;
   readonly level: "company" | "department" | "team" | "individual";
@@ -581,9 +593,11 @@ export function evaluateObjective(
   const obj4 = check("OBJ-4");
   const obj4Verdict = !input.championId
     ? verdictOf(obj4, "No named champion")
-    : !input.reviewerId
-      ? verdictOf(obj4, "No named reviewer")
-      : verdictOf(obj4, "Champion and reviewer named");
+    : input.reviewerId
+      ? verdictOf(obj4, "Champion and reviewer named")
+      : input.reviewerRequired
+        ? verdictOf(obj4, "No named reviewer where reviewers are required")
+        : verdictOf(obj4, "Champion named");
 
   // OBJ-5
   const obj5 = check("OBJ-5");

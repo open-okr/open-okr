@@ -285,3 +285,25 @@ describe("publishing", () => {
     );
   });
 });
+
+describe("the reviewer setting", () => {
+  it("refuses an objective with no reviewer, or removing one, only where reviewers are required", () => {
+    const optional = resolvePractice("recommended");
+    const required = resolvePractice("recommended", { reviewer: "required" });
+    const create: PolicyIntent = {
+      kind: "objective.create",
+      cycle: null,
+      hasReviewer: false,
+    };
+    expect(decide(create, optional, thresholds).outcome).toBe("allow");
+    const refused = decide(create, required, thresholds);
+    expect(refused.outcome).toBe("block");
+    expect(refused.rules).toEqual(["reviewer"]);
+    expect(
+      decide({ kind: "reviewer.remove" }, required, thresholds).outcome,
+    ).toBe("block");
+    expect(
+      decide({ kind: "reviewer.remove" }, optional, thresholds).outcome,
+    ).toBe("allow");
+  });
+});

@@ -689,7 +689,7 @@ export default async function CyclePage({
                 hasCycle: true,
                 hasTimeframe: false,
                 championId: goal.champion.id,
-                reviewerId: goal.reviewer.id,
+                reviewerId: goal.reviewer?.id ?? null,
                 objectivesInUnit: draft.goals.filter(
                   (other) => other.level === goal.level,
                 ).length,

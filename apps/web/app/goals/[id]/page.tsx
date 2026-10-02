@@ -273,12 +273,18 @@ export default async function GoalPage({
             <div className="flex min-w-0 flex-col">
               <h1 className="text-lg font-bold text-ink">{goal.title}</h1>
               <p className="text-xs text-ink-3">
-                {t("common.championsItReviewsItWeight", {
-                  level: goal.level,
-                  name: goal.champion.name,
-                  name2: goal.reviewer.name,
-                  weight: goal.weight,
-                })}
+                {goal.reviewer
+                  ? t("common.championsItReviewsItWeight", {
+                      level: goal.level,
+                      name: goal.champion.name,
+                      name2: goal.reviewer.name,
+                      weight: goal.weight,
+                    })
+                  : t("common.championsItNoReviewerWeight", {
+                      level: goal.level,
+                      name: goal.champion.name,
+                      weight: goal.weight,
+                    })}
               </p>
             </div>
             <Chip tone={closed ? "neutral" : "brand"}>
@@ -589,7 +595,6 @@ export default async function GoalPage({
                 <select
                   id="reassign-member"
                   name="memberId"
-                  required
                   className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
                 >
                   {members.map((member) => (
@@ -597,6 +602,12 @@ export default async function GoalPage({
                       {member.name}
                     </option>
                   ))}
+                  {/* Takes the reviewer off (P9-T04). Refused for the
+                   * champion, who is always somebody, and where the
+                   * workspace requires reviewers, each with the reason. */}
+                  <option value="">
+                    {t("goals.detail.nobodyReviewerOnly")}
+                  </option>
                 </select>
                 <Button type="submit" variant="ghost">
                   {t("common.reassign")}

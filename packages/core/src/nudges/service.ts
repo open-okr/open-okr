@@ -62,7 +62,9 @@ import {
   agentSeesGoal,
 } from "../agents/scope.ts";
 import { daysPastDue } from "../cadence/service.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError } from "../operations/errors.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 
 /**
@@ -249,9 +251,13 @@ export async function dueCheckInNudges(
         input.scope ? agentSeesGoal(input.scope) : undefined,
       ),
     );
+  // Where reviewers are off (METHOD.md §2.5, P9-T04), no ladder names one: a
+  // goal's existing reviewer stays on it and is simply not brought in.
+  const reviewersOff = await reviewersAreOff(tx, input.workspaceId);
 
   const due: DueNudge[] = [];
-  for (const goal of rows) {
+  for (const row of rows) {
+    const goal = reviewersOff ? { ...row, reviewerId: null } : row;
     if (!goal.nextCheckInAt) {
       continue;
     }
@@ -959,12 +965,27 @@ export async function goalRolesFor(
       ),
     )
     .limit(1);
-  return (
-    goal ?? {
+  if (!goal) {
+    return {
       championId: null,
       reviewerId: null,
       spaceId: null,
       cycleId: null,
-    }
+    };
+  }
+  // The same rule as the check-in ladder above (P9-T04).
+  return (await reviewersAreOff(tx, workspaceId))
+    ? { ...goal, reviewerId: null }
+    : goal;
+}
+
+/** Whether this workspace has turned per-goal reviewers off (METHOD.md §2.5). */
+async function reviewersAreOff(
+  tx: WorkspaceTx,
+  workspaceId: string,
+): Promise<boolean> {
+  return (
+    practiceFromRow(await readRhythmRow(tx, workspaceId)).practice.reviewer ===
+    "off"
   );
 }

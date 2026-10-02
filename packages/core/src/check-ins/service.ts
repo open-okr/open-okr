@@ -34,8 +34,9 @@ import type { ResolvedThresholds } from "@openokr/method";
 import { desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { cadence, dueInstant, firstDue } from "../cadence/engine.ts";
 import { localDateIn } from "../cycles/generation.ts";
-import { workspaceTimeZone } from "../cycles/service.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { OperationError } from "../operations/operation.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -279,7 +280,8 @@ export interface PublishResult {
   readonly goalId: string;
   readonly snapshotId: string;
   readonly valuesWritten: number;
-  readonly reviewerMemberId: string;
+  /** Null where nobody owes an acknowledgement (P9-T04). */
+  readonly reviewerMemberId: string | null;
 }
 
 /** Publication, in §6.2's order. */
@@ -341,6 +343,15 @@ export async function publishCheckInInTx<
     throw new OperationError("not_found", "No such goal.");
   }
 
+  // Who owes the acknowledgement (METHOD.md §2.5, P9-T04): the goal's
+  // reviewer, unless it has none or the workspace has turned reviewers off,
+  // in which case nobody does. An existing reviewer stays on the goal either
+  // way; the practice decides only whether they are asked.
+  const reviewersOff =
+    practiceFromRow(await readRhythmRow(tx, input.workspaceId)).practice
+      .reviewer === "off";
+  const reviewerOfRecord = reviewersOff ? null : goal.reviewerId;
+
   const previous = await readPrevious(tx, input.workspaceId, goal.id);
   const valuesWritten = await applyValues(tx, input, previous);
 
@@ -371,7 +382,7 @@ export async function publishCheckInInTx<
       // goal later, because publication is the moment the obligation is created
       // and the goal's reviewer can change afterwards. An edit inside the window
       // re-publishes through this same path, so it never orphans the obligation.
-      reviewerMemberId: goal.reviewerId,
+      reviewerMemberId: reviewerOfRecord,
       updatedAt: input.now,
     })
     .where(activeOnly(checkIns, eq(checkIns.id, input.checkInId)));
@@ -407,11 +418,11 @@ export async function publishCheckInInTx<
 
   // Step 6: the reviewer's obligation. Derived state, not a table of its own
   // (§6.5), so the notification is what tells them rather than what records it.
-  if (goal.reviewerId !== checkIn.authorMemberId) {
+  if (reviewerOfRecord && reviewerOfRecord !== checkIn.authorMemberId) {
     // openokr:allow-mutation: same transaction.
     await tx.insert(notifications).values({
       workspaceId: input.workspaceId,
-      recipientMemberId: goal.reviewerId,
+      recipientMemberId: reviewerOfRecord,
       // The goal, not the check-in: the obligation is to review a goal's
       // progress, and the goal is what the row links to and groups under
       // (migration 0074, P6-G07a). This producer had no activity id either.
@@ -426,7 +437,7 @@ export async function publishCheckInInTx<
     goalId: goal.id,
     snapshotId,
     valuesWritten,
-    reviewerMemberId: goal.reviewerId,
+    reviewerMemberId: reviewerOfRecord,
   };
 }
 

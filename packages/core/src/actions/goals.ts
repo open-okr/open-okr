@@ -160,7 +160,8 @@ const goalOutput = z.object({
   spaceId: z.uuid().nullable(),
   memberId: z.uuid().nullable(),
   champion: z.object({ id: z.uuid(), name: z.string() }),
-  reviewer: z.object({ id: z.uuid(), name: z.string() }),
+  /** Null where the goal has none, which the practice allows (P9-T04). */
+  reviewer: z.object({ id: z.uuid(), name: z.string() }).nullable(),
   parentGoalId: z.uuid().nullable(),
   parentKeyResultId: z.uuid().nullable(),
   weight: z.number(),
@@ -588,7 +589,11 @@ export const listGoals = defineReadAction({
         const names = await memberNames(
           tx,
           context.workspaceId,
-          visible.flatMap((row) => [row.championId, row.reviewerId]),
+          visible.flatMap((row) =>
+            row.reviewerId
+              ? [row.championId, row.reviewerId]
+              : [row.championId],
+          ),
         );
         // The due date is a date in the workspace calendar, so it is read in the
         // workspace timezone rather than the reader's.
@@ -609,10 +614,12 @@ export const listGoals = defineReadAction({
               id: row.championId,
               name: names.get(row.championId) ?? "Unknown",
             },
-            reviewer: {
-              id: row.reviewerId,
-              name: names.get(row.reviewerId) ?? "Unknown",
-            },
+            reviewer: row.reviewerId
+              ? {
+                  id: row.reviewerId,
+                  name: names.get(row.reviewerId) ?? "Unknown",
+                }
+              : null,
             keyResults: children
               .filter((child) => child.goalId === row.id)
               .map(keyResultRow),
@@ -700,10 +707,11 @@ export const readGoal = defineReadAction({
           )
           .limit(1);
 
-        const names = await memberNames(tx, context.workspaceId, [
-          row.championId,
-          row.reviewerId,
-        ]);
+        const names = await memberNames(
+          tx,
+          context.workspaceId,
+          row.reviewerId ? [row.championId, row.reviewerId] : [row.championId],
+        );
         const timeZone = await workspaceTimeZone(tx, context.workspaceId);
         const now = new Date();
 
@@ -718,10 +726,12 @@ export const readGoal = defineReadAction({
             id: row.championId,
             name: names.get(row.championId) ?? "Unknown",
           },
-          reviewer: {
-            id: row.reviewerId,
-            name: names.get(row.reviewerId) ?? "Unknown",
-          },
+          reviewer: row.reviewerId
+            ? {
+                id: row.reviewerId,
+                name: names.get(row.reviewerId) ?? "Unknown",
+              }
+            : null,
           keyResults: children.map(keyResultRow),
           // Read, never recomputed here: the score on the row is what the
           // write path committed to and what the quality panel already shows,
@@ -985,7 +995,12 @@ export const createGoal = defineWriteAction({
       spaceId: z.uuid().optional(),
       memberId: z.uuid().optional(),
       championId: z.uuid(),
-      reviewerId: z.uuid(),
+      /**
+       * Optional since P9-T04 (METHOD.md §2.5): a goal without one owes no
+       * acknowledgement. A workspace that requires reviewers refuses its
+       * absence through the policy, from every caller alike.
+       */
+      reviewerId: z.uuid().nullable().optional(),
       parentGoalId: z.uuid().optional(),
       parentKeyResultId: z.uuid().optional(),
       /**
@@ -1049,7 +1064,11 @@ export const createGoal = defineWriteAction({
       await requirePolicy(
         tx,
         { workspaceId, bulk: context.bulk },
-        { kind: "objective.create", cycleId: input.cycleId ?? null },
+        {
+          kind: "objective.create",
+          cycleId: input.cycleId ?? null,
+          hasReviewer: Boolean(input.reviewerId),
+        },
       );
 
       // A parent has to be one this writer can actually see, resolved through
@@ -1121,7 +1140,7 @@ export const createGoal = defineWriteAction({
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
         championId: input.championId,
-        reviewerId: input.reviewerId,
+        reviewerId: input.reviewerId ?? null,
         parentGoalId: input.parentGoalId ?? null,
         parentKeyResultId: input.parentKeyResultId ?? null,
         strategyId: input.strategyId ?? null,
@@ -1631,14 +1650,21 @@ export const reopenGoal = defineWriteAction({
 
 export const reassignGoalRole = defineWriteAction({
   name: "goals.reassignRole",
-  // openokr:policy-exempt: who champions or reviews an objective is a role on one that exists, not a practice choice about writing (METHOD.md §2.5).
   summary:
-    "Moves the champion or the reviewer to another member, rebinding access with it.",
-  input: z.object({
-    id: z.uuid(),
-    role: z.enum(["champion", "reviewer"]),
-    memberId: z.uuid(),
-  }),
+    "Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off.",
+  input: z
+    .object({
+      id: z.uuid(),
+      role: z.enum(["champion", "reviewer"]),
+      /**
+       * Null takes the reviewer off (P9-T04), which the practice refuses where
+       * reviewers are required. A champion is moved, never removed.
+       */
+      memberId: z.uuid().nullable(),
+    })
+    .refine((value) => value.memberId !== null || value.role === "reviewer", {
+      message: "A goal always has a champion. Move it to somebody else.",
+    }),
   output: z.object({ id: z.uuid(), role: z.string() }),
   // Full, not edit: naming who owns and who reviews a goal is administering it,
   // and the champion is the one who holds full on their own goal.
@@ -1675,6 +1701,14 @@ export const reassignGoalRole = defineWriteAction({
       const role = input.role as GoalRole;
       const fromMemberId =
         role === "champion" ? goal.championId : goal.reviewerId;
+      if (input.memberId === null) {
+        // §2.5: where reviewers are required, every objective keeps one.
+        await requirePolicy(
+          tx,
+          { workspaceId, bulk: context.bulk },
+          { kind: "reviewer.remove" },
+        );
+      }
 
       await reassignRoleInTx(tx, {
         workspaceId,

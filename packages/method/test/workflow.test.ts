@@ -442,19 +442,27 @@ describe("the six publish gates", () => {
     expect(gates.find((entry) => entry.gateKey === 1)?.passed).toBe(true);
   });
 
-  it("names the goal missing a champion or a reviewer", () => {
-    const gates = publishGates(
-      base({
-        goals: [
-          goal({ championId: null }),
-          goal({ id: "g2", title: "Second", reviewerId: null }),
-        ],
-      }),
+  it("names the goal missing a champion, and a reviewer only where one is required", () => {
+    const goals = [
+      goal({ championId: null }),
+      goal({ id: "g2", title: "Second", reviewerId: null }),
+    ];
+    const optional = publishGates(base({ goals })).find(
+      (entry) => entry.gateKey === 1,
     );
-    const gate = gates.find((entry) => entry.gateKey === 1);
-    expect(gate?.passed).toBe(false);
-    expect(gate?.detail.missing.join(" ")).toMatch(/has no champion/);
-    expect(gate?.detail.missing.join(" ")).toMatch(/"Second" has no reviewer/);
+    expect(optional?.passed).toBe(false);
+    expect(optional?.detail.missing.join(" ")).toMatch(/has no champion/);
+    // Optional by default (METHOD.md §2.5, P9-T04): no reviewer is no defect.
+    expect(optional?.detail.missing.join(" ")).not.toMatch(/has no reviewer/);
+    const required = publishGates(
+      base({
+        goals,
+        practice: resolvePractice("recommended", { reviewer: "required" }),
+      }),
+    ).find((entry) => entry.gateKey === 1);
+    expect(required?.detail.missing.join(" ")).toMatch(
+      /"Second" has no reviewer/,
+    );
   });
 
   it("gate 3 accepts a stated contribution in place of a parent", () => {

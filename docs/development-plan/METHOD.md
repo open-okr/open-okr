@@ -127,12 +127,13 @@ Guidance for people, not machine thresholds (§11).
 
 | Role | Owns | Rule |
 |---|---|---|
-| Sponsor | The cycle. Accountable senior leader | One per cycle. Escalations land here |
-| Facilitator | The sessions and the quality bar | One per cycle. Can refuse to run Phase 4 without a complete input pack |
-| Champion | One goal. Posts its check-ins | Exactly one per goal. Never a team, never a committee |
-| Reviewer | Acknowledging that goal's check-ins | Exactly one per goal. Different person from the champion where possible |
+| Sponsor | The cycle. Accountable senior leader | One per cycle. Sees escalations in the weekly digest |
+| Facilitator | The sessions and the quality bar | One per cycle. May decline to run a drafting session without its inputs. That is their judgement; the product never refuses on their behalf unless phases are binding |
+| Champion | One goal. Posts its check-ins | Exactly one per goal. Never a team, never a committee. Block. *Source:* whatmatters: "only one owner per OKR, even if Key Results are distributed across a team" |
+| Key result owner | One key result | Exactly one per key result, defaulting to the champion |
+| Reviewer | Acknowledging that goal's check-ins | Practice setting: off, optional (default) or required. Where used, a different person from the champion where possible. *Source:* OpenOKR default; no OKR source defines a per-goal reviewer |
 | Contributor | Work that moves a key result | Any number |
-| Coordinator | The weekly session for a space | One per space. Runs the check-in, chases blockers |
+| Coordinator | The weekly session for a space | One per space. Runs the check-in, chases blockers. *Source:* OpenOKR default |
 
 ### 2.6 The input pack
 
@@ -359,7 +360,7 @@ The lower bound of four words was removed on 1 October 2026: whatmatters' own "A
 
 **OBJ-3 Timebound.** Block. Fail without a cycle or an explicit timeframe. An OKR without a deadline is a wish. *Source:* Wodtke: "Time Bound"; Doerr: key results are "time-bound".
 
-**OBJ-4 Owned.** Fail without a named champion. Fail without a named reviewer.
+**OBJ-4 Owned.** Block. Fail without a named champion. A named reviewer is required only where the workspace requires reviewers (§2.5).
 
 **OBJ-5 Counted.** Warn when a unit exceeds 3 objectives, or the company level exceeds 5.
 

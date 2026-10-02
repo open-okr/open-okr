@@ -50,7 +50,7 @@ Every objective and key result is checked live against the quality checks in MET
 
 ### 3.3 Cadence, staleness and accountability
 
-Every goal has a check-in frequency (weekly by default, anchored to a company-chosen day), exactly one champion, and a reviewer where the workspace asks for one (off by default, METHOD.md §2.5). The system computes the next due date, honours the workspace timezone and a small tolerance, and drives every reminder from it. A missed check-in past the grace window makes the goal **outdated**, which overrides the last reported health everywhere it appears. Where a goal has a reviewer, a published check-in enters `awaiting acknowledgement` until the reviewer closes the loop.
+Every goal has a check-in frequency (weekly by default, anchored to a company-chosen day), exactly one champion, and a reviewer where the workspace asks for one (optional by default: a goal may name one or not, METHOD.md §2.5 and §12). The system computes the next due date, honours the workspace timezone and a small tolerance, and drives every reminder from it. A missed check-in past the grace window makes the goal **outdated**, which overrides the last reported health everywhere it appears. Where a goal has a reviewer, a published check-in enters `awaiting acknowledgement` until the reviewer closes the loop.
 
 *Acceptance:* Given a weekly goal last checked in ten days ago, when any list, map or dashboard renders it, then it shows `outdated` regardless of the last check-in, its champion has been nudged on their chosen channel on the due day and daily after, and its reviewer, where it has one, has been brought in at the grace boundary.
 

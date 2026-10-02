@@ -41,8 +41,18 @@ export interface CycleFacts {
 }
 
 export type PolicyIntent =
-  /** A new objective. `cycle` is null for one with its own timeframe. */
-  | { readonly kind: "objective.create"; readonly cycle: CycleFacts | null }
+  /**
+   * A new objective. `cycle` is null for one with its own timeframe.
+   * `hasReviewer` says whether it names one, which a workspace that requires
+   * reviewers asks of every objective (§2.5, P9-T04).
+   */
+  | {
+      readonly kind: "objective.create";
+      readonly cycle: CycleFacts | null;
+      readonly hasReviewer?: boolean;
+    }
+  /** Taking the reviewer off an objective that has one (P9-T04). */
+  | { readonly kind: "reviewer.remove" }
   /** A new key result on an objective that already exists. */
   | { readonly kind: "keyResult.create"; readonly cycle: CycleFacts | null }
   /**
@@ -60,6 +70,14 @@ export interface PolicyDecision {
 }
 
 const ALLOW: PolicyDecision = { outcome: "allow", rules: [], reasons: [] };
+
+const REVIEWER_REQUIRED: PolicyDecision = {
+  outcome: "block",
+  rules: ["reviewer"],
+  reasons: [
+    "This workspace asks every objective to name a reviewer, who acknowledges its check-ins. Name one.",
+  ],
+};
 
 /**
  * The phases drafting waits for, when it waits at all (§2.3: "Drafting waits
@@ -84,6 +102,9 @@ export function policyNeedsPhases(
   intent: PolicyIntent,
   practice: ResolvedPractice,
 ): boolean {
+  if (intent.kind === "reviewer.remove") {
+    return false;
+  }
   if (intent.kind === "set.publish") {
     return practice["phases.enforcement"] === "binding";
   }
@@ -158,6 +179,20 @@ export function decide(
   practice: ResolvedPractice,
   thresholds: ResolvedThresholds,
 ): PolicyDecision {
+  // §2.5: where a workspace requires reviewers, every objective names one,
+  // whoever writes it and through whichever surface.
+  const reviewerRequired = practice.reviewer === "required";
+  if (intent.kind === "reviewer.remove") {
+    return reviewerRequired ? REVIEWER_REQUIRED : ALLOW;
+  }
+  if (
+    intent.kind === "objective.create" &&
+    intent.hasReviewer === false &&
+    reviewerRequired
+  ) {
+    return REVIEWER_REQUIRED;
+  }
+
   const cycle = intent.cycle;
   // An objective with its own timeframe is in no cycle, so no phase and no
   // window applies to it.

@@ -8379,9 +8379,16 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "reviewerId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "parentGoalId": {
             "type": "string",
@@ -8437,8 +8444,7 @@
         "required": [
           "title",
           "level",
-          "championId",
-          "reviewerId"
+          "championId"
         ]
       },
       "scope": "write",
@@ -8450,8 +8456,7 @@
       "example": {
         "title": "…",
         "level": "company",
-        "championId": "00000000-0000-4000-8000-000000000000",
-        "reviewerId": "00000000-0000-4000-8000-000000000000"
+        "championId": "00000000-0000-4000-8000-000000000000"
       }
     },
     {
@@ -8719,7 +8724,7 @@
     },
     {
       "name": "goals.reassignRole",
-      "description": "Moves the champion or the reviewer to another member, rebinding access with it.",
+      "description": "Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8736,9 +8741,16 @@
             ]
           },
           "memberId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -8756,7 +8768,7 @@
       "example": {
         "id": "00000000-0000-4000-8000-000000000000",
         "role": "champion",
-        "memberId": "00000000-0000-4000-8000-000000000000"
+        "memberId": {}
       }
     },
     {

@@ -31,7 +31,14 @@ import { practiceFromRow } from "./settings.ts";
 
 /** A write the practice governs, named by what it touches. */
 export type PolicyRequest =
-  | { readonly kind: "objective.create"; readonly cycleId: string | null }
+  | {
+      readonly kind: "objective.create";
+      readonly cycleId: string | null;
+      /** Whether it names a reviewer (P9-T04). */
+      readonly hasReviewer?: boolean;
+    }
+  /** Taking the reviewer off an objective (P9-T04). */
+  | { readonly kind: "reviewer.remove" }
   | { readonly kind: "keyResult.create"; readonly cycleId: string | null }
   /** Publishing a set, or its company half (P9-T03b). */
   | { readonly kind: "set.publish"; readonly cycleId: string };
@@ -52,6 +59,9 @@ export async function policyDecisionInTx<
   const row = await readRhythmRow(tx, workspaceId);
   const { practice } = practiceFromRow(row);
   const { thresholds } = resolveRhythm(row);
+  if (request.kind === "reviewer.remove") {
+    return decide({ kind: "reviewer.remove" }, practice, thresholds);
+  }
 
   let cycle: CycleFacts | null = null;
   if (request.cycleId !== null) {
@@ -89,6 +99,19 @@ export async function policyDecisionInTx<
     return cycle === null
       ? { outcome: "allow", rules: [], reasons: [] }
       : decide({ kind: "set.publish", cycle }, practice, thresholds);
+  }
+  if (request.kind === "objective.create") {
+    return decide(
+      {
+        kind: "objective.create",
+        cycle,
+        ...(request.hasReviewer === undefined
+          ? {}
+          : { hasReviewer: request.hasReviewer }),
+      },
+      practice,
+      thresholds,
+    );
   }
   return decide({ kind: request.kind, cycle }, practice, thresholds);
 }

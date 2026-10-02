@@ -93,7 +93,8 @@ export interface CreateGoalInput {
   readonly spaceId?: string | null;
   readonly memberId?: string | null;
   readonly championId: string;
-  readonly reviewerId: string;
+  /** Optional since P9-T04 (METHOD.md §2.5). */
+  readonly reviewerId: string | null;
   readonly parentGoalId?: string | null;
   readonly parentKeyResultId?: string | null;
   /** The §2.1 annual strategy this objective serves, or null (P6-G14b). */
@@ -234,12 +235,14 @@ export async function createGoalInTx<
     input.championId,
     "champion",
   );
-  await requireActiveMember(
-    tx,
-    input.workspaceId,
-    input.reviewerId,
-    "reviewer",
-  );
+  if (input.reviewerId) {
+    await requireActiveMember(
+      tx,
+      input.workspaceId,
+      input.reviewerId,
+      "reviewer",
+    );
+  }
 
   // No loop check on create: a goal that does not exist yet cannot be its own
   // ancestor. `update` is where the walk matters, and it is where it runs.
@@ -325,12 +328,14 @@ export async function createGoalInTx<
     memberId: input.championId,
     role: "champion",
   });
-  await bindRole(tx, {
-    workspaceId: input.workspaceId,
-    contextId,
-    memberId: input.reviewerId,
-    role: "reviewer",
-  });
+  if (input.reviewerId) {
+    await bindRole(tx, {
+      workspaceId: input.workspaceId,
+      contextId,
+      memberId: input.reviewerId,
+      role: "reviewer",
+    });
+  }
 
   // A goal that belongs to no space, a company or an individual goal, has no
   // space binding the built-in agents can see it through, so they are bound
@@ -388,8 +393,10 @@ export interface ReassignRoleInput {
   readonly goalId: string;
   readonly contextId: string;
   readonly role: GoalRole;
-  readonly fromMemberId: string;
-  readonly toMemberId: string;
+  /** Null when the goal had no reviewer (P9-T04). */
+  readonly fromMemberId: string | null;
+  /** Null takes the reviewer off; a champion is never null. */
+  readonly toMemberId: string | null;
 }
 
 /**
@@ -413,36 +420,46 @@ export async function reassignRoleInTx<
   if (input.fromMemberId === input.toMemberId) {
     return;
   }
-  await requireActiveMember(
-    tx,
-    input.workspaceId,
-    input.toMemberId,
-    input.role,
-  );
+  if (input.toMemberId === null && input.role === "champion") {
+    // A goal is never without a champion (§2.5), whatever the practice.
+    throw new Error("A champion cannot be removed, only moved.");
+  }
+  if (input.toMemberId) {
+    await requireActiveMember(
+      tx,
+      input.workspaceId,
+      input.toMemberId,
+      input.role,
+    );
+  }
 
-  const outgoingGroupId = await ensureMemberGroup(tx, {
-    workspaceId: input.workspaceId,
-    memberId: input.fromMemberId,
-  });
-  await unbindGroup(tx, {
-    workspaceId: input.workspaceId,
-    groupId: outgoingGroupId,
-    contextId: input.contextId,
-    tag: input.role,
-  });
-  await bindRole(tx, {
-    workspaceId: input.workspaceId,
-    contextId: input.contextId,
-    memberId: input.toMemberId,
-    role: input.role,
-  });
+  if (input.fromMemberId) {
+    const outgoingGroupId = await ensureMemberGroup(tx, {
+      workspaceId: input.workspaceId,
+      memberId: input.fromMemberId,
+    });
+    await unbindGroup(tx, {
+      workspaceId: input.workspaceId,
+      groupId: outgoingGroupId,
+      contextId: input.contextId,
+      tag: input.role,
+    });
+  }
+  if (input.toMemberId) {
+    await bindRole(tx, {
+      workspaceId: input.workspaceId,
+      contextId: input.contextId,
+      memberId: input.toMemberId,
+      role: input.role,
+    });
+  }
 
   // openokr:allow-mutation: the calling Operation's own transaction.
   await tx
     .update(goals)
     .set(
       input.role === "champion"
-        ? { championId: input.toMemberId, updatedAt: new Date() }
+        ? { championId: input.toMemberId as string, updatedAt: new Date() }
         : { reviewerId: input.toMemberId, updatedAt: new Date() },
     )
     .where(activeOnly(goals, eq(goals.id, input.goalId)));
@@ -450,7 +467,8 @@ export async function reassignRoleInTx<
   if (input.role === "reviewer") {
     // Step 4. A published check-in nobody has acknowledged is the only pending
     // obligation this role has today; blockers and commitments arrive at P3-T09
-    // and P4-T07 and will need their own line here.
+    // and P4-T07 and will need their own line here. Taking the reviewer off
+    // (P9-T04) takes the obligation with them: nobody owes it any more.
     // openokr:allow-mutation: the calling Operation's own transaction.
     await tx
       .update(checkIns)

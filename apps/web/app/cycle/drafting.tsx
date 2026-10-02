@@ -45,7 +45,8 @@ export interface DraftGoal {
   readonly health: string;
   readonly contributionStatement: string | null;
   readonly champion: { readonly id: string; readonly name: string };
-  readonly reviewer: { readonly id: string; readonly name: string };
+  /** Null where the goal has none, which the practice allows (P9-T04). */
+  readonly reviewer: { readonly id: string; readonly name: string } | null;
   readonly keyResults: readonly {
     readonly id: string;
     readonly title: string;
@@ -176,11 +177,16 @@ export async function Drafting({
             <div className="flex min-w-0 flex-col">
               <h2 className="text-sm font-bold text-ink">{goal.title}</h2>
               <p className="text-xs text-ink-3">
-                {t("common.championsItReviewsIt", {
-                  level: goal.level,
-                  name: goal.champion.name,
-                  name2: goal.reviewer.name,
-                })}
+                {goal.reviewer
+                  ? t("common.championsItReviewsIt", {
+                      level: goal.level,
+                      name: goal.champion.name,
+                      name2: goal.reviewer.name,
+                    })
+                  : t("common.championsItNoReviewer", {
+                      level: goal.level,
+                      name: goal.champion.name,
+                    })}
               </p>
             </div>
             <span className="flex flex-none items-center gap-2">
@@ -206,7 +212,7 @@ export async function Drafting({
                 hasCycle: true,
                 hasTimeframe: false,
                 championId: goal.champion.id,
-                reviewerId: goal.reviewer.id,
+                reviewerId: goal.reviewer?.id ?? null,
                 // Every objective on this screen belongs to the cycle being
                 // drafted, and they share a level per row, so the count the
                 // per-unit cap reads is the number on screen at this level.
@@ -630,21 +636,34 @@ export async function Drafting({
                     </option>
                   ))}
                 </select>
-                <label className="sr-only" htmlFor="goal-reviewer">
-                  {t("common.reviewer")}
-                </label>
-                <select
-                  id="goal-reviewer"
-                  name="reviewerId"
-                  required
-                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                >
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {t("cycle.drafting.reviewer", { name: member.name })}
-                    </option>
-                  ))}
-                </select>
+                {/* The reviewer follows the practice (METHOD.md §2.5, P9-T04):
+                 * off asks for none, so there is no picker; optional offers
+                 * "No reviewer" after the members; required offers members
+                 * only, and the server refuses a goal without one either way. */}
+                {practice.reviewer === "off" ? null : (
+                  <>
+                    <label className="sr-only" htmlFor="goal-reviewer">
+                      {t("common.reviewer")}
+                    </label>
+                    <select
+                      id="goal-reviewer"
+                      name="reviewerId"
+                      required={practice.reviewer === "required"}
+                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    >
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {t("cycle.drafting.reviewer", { name: member.name })}
+                        </option>
+                      ))}
+                      {practice.reviewer === "optional" ? (
+                        <option value="">
+                          {t("cycle.drafting.noReviewer")}
+                        </option>
+                      ) : null}
+                    </select>
+                  </>
+                )}
                 <Button type="submit" variant="primary">
                   {t("cycle.drafting.addObjective")}
                 </Button>

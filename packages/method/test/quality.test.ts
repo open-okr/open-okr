@@ -140,12 +140,17 @@ describe("the refusals that are not about wording", () => {
     expect(verdict("OBJ-3", evaluateObjective(base, thresholds))).toBe("fail");
   });
 
-  it("fails OBJ-4 with no reviewer", () => {
-    const result = evaluateObjective(
+  it("passes OBJ-4 with no reviewer, and fails it only where reviewers are required", () => {
+    const optional = evaluateObjective(
       { ...base, hasCycle: true, reviewerId: null },
       thresholds,
     );
-    expect(verdict("OBJ-4", result)).toBe("fail");
+    expect(verdict("OBJ-4", optional)).toBe("pass");
+    const required = evaluateObjective(
+      { ...base, hasCycle: true, reviewerId: null, reviewerRequired: true },
+      thresholds,
+    );
+    expect(verdict("OBJ-4", required)).toBe("fail");
   });
 
   it("warns OBJ-5 above three in a unit, and above five at company", () => {

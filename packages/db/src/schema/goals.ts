@@ -115,9 +115,11 @@ export const goals = pgTable("goals", {
   championId: uuid("champion_id")
     .notNull()
     .references(() => workspaceMembers.id),
-  reviewerId: uuid("reviewer_id")
-    .notNull()
-    .references(() => workspaceMembers.id),
+  /**
+   * Optional since P9-T04 (METHOD.md §2.5): the practice decides whether a
+   * goal needs one, and a goal without one owes no acknowledgement.
+   */
+  reviewerId: uuid("reviewer_id").references(() => workspaceMembers.id),
   /**
    * The §2.1 annual strategy this objective serves (P6-G14b).
    *
