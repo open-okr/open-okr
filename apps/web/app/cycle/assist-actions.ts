@@ -104,9 +104,6 @@ export async function applyDraftedObjectiveAction(input: {
     // The provenance. Set because the reader kept the draft; a reader who
     // rewrote it uses the ordinary form, which does not set this.
     aiGenerated: true,
-    // Drafting on the cycle screen, which phase 4 refuses while an earlier
-    // phase is incomplete (H-09).
-    guided: true,
   });
   // KR-3 asks for an owner and a date. The champion owns what the draft
   // proposed, due on the cycle's last day, until somebody changes either.
@@ -128,7 +125,6 @@ export async function applyDraftedObjectiveAction(input: {
         weight: 1,
         ownerId: input.championId,
         ...(endsOn ? { dueOn: endsOn } : {}),
-        guided: true,
       });
     } catch (error) {
       // Named rather than swallowed. A measure the rules refuse is worth

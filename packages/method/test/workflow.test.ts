@@ -254,7 +254,7 @@ describe("phase 2, diagnose", () => {
     // The floor is read from the registry, not written here: hardcoding it
     // made this test fail when the canon moved from 5 to 3 on 2026-08-17, which
     // is the test asserting the number rather than the behaviour.
-    const floor = canonThresholds()["quality.strategicIssueBounds"].low;
+    const floor = canonThresholds()["quality.strategicIssueMinimum"];
     expect(result?.missing.join(" ")).toMatch(
       new RegExp(`2 strategic issue\\(s\\).*at least ${floor}`),
     );

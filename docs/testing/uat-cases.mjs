@@ -336,7 +336,7 @@ export const CASES = [
   c("M08", "A later phase warns about missing earlier work", "Admin",
     "Use the next cycle from M08-02 where phase 1 is not done",
     ["Switch the cycle picker to the next cycle", "Open phase 4"],
-    "Warning \"This phase is blocked by earlier work\" with \"Go and gather what is missing\". The forms can still be used",
+    "Notice \"Earlier phases still have gaps\" with \"Go and gather what is missing\". The forms can still be used",
     "Medium"),
 
   // M09 Drafting OKRs and quality checks

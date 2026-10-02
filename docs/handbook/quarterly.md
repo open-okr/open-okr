@@ -18,10 +18,13 @@ how many weeks remain. It does not ask you to tick a box saying you are done.
 | **6. Run the cadence** | Check-ins, reviews and a decision log |
 | **7. Review and learn** | Scores, learnings, and the next cycle's inputs |
 
-**Drafting is refused until the input pack is complete**, and the screen names
-exactly what is missing. This is the rule people push against hardest and the
-one worth keeping: a planning session with no inputs produces objectives
-written from opinion, and opinion is what the diagnose phase exists to replace.
+**The phases guide; they do not lock.** Anybody who can edit a space can
+draft an objective at any time, and the screen names exactly what the earlier
+phases still miss beside the form. A planning session with no inputs still
+produces objectives written from opinion, so the gaps are worth closing, but a
+missing input pack never stops somebody writing. A workspace that runs a formal
+planning process can make the phases binding in its practice settings, and
+then drafting waits for phases 1 to 3, from every screen and the API alike.
 
 The input pack closes three working days before the planning session.
 

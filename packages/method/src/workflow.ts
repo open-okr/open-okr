@@ -450,10 +450,10 @@ function phaseTwo(
     missing.push("Baseline health is not recorded");
   }
 
-  const bounds = thresholds["quality.strategicIssueBounds"];
-  if (input.issues.length < bounds.low) {
+  const minimum = thresholds["quality.strategicIssueMinimum"];
+  if (input.issues.length < minimum) {
     missing.push(
-      `${input.issues.length} strategic issue(s) ranked, and §2.3 asks for at least ${bounds.low}`,
+      `${input.issues.length} strategic issue(s) ranked, and §2.3 asks for at least ${minimum}`,
     );
   }
 

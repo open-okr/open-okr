@@ -79,6 +79,7 @@ export async function Drafting({
   cycleId,
   endsOn,
   draftingAllowed,
+  draftingReasons,
   goals,
   members,
   kpis,
@@ -92,12 +93,16 @@ export async function Drafting({
   /** The cycle's last day, which a new key result is due on unless changed. */
   readonly endsOn: string;
   /**
-   * False while an earlier phase is incomplete. The add forms give way to the
-   * reason, which the banner above names, and the server refuses a guided
-   * draft regardless (REQUIREMENTS §3.1, H-09). What is already drafted stays
+   * Whether the workspace's practice lets a new objective be drafted here now
+   * (METHOD.md §2.3, §2.9, P9-T02). True by default. False only when the
+   * workspace has made the phases bind or chosen a planning window, and then
+   * the add forms give way to the policy's own reasons, which are the
+   * sentences the server would refuse with. What is already drafted stays
    * editable: finishing a draft is not starting one.
    */
   readonly draftingAllowed: boolean;
+  /** Why drafting waits, in the policy's words. Empty when it does not. */
+  readonly draftingReasons: readonly string[];
   readonly goals: readonly DraftGoal[];
   readonly members: readonly { readonly id: string; readonly name: string }[];
   /**
@@ -137,6 +142,13 @@ export async function Drafting({
             <p className="text-sm text-ink-2">
               {t("cycle.drafting.waitsForEarlierPhases")}
             </p>
+            {draftingReasons.length === 0 ? null : (
+              <ul className="mt-1.5 flex list-disc flex-col gap-0.5 pl-4 text-xs text-ink-3">
+                {draftingReasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            )}
           </CardBody>
         </Card>
       ) : null}

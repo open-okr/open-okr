@@ -46,6 +46,8 @@ import {
   recomputeGateState,
 } from "../cycles/workflow.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { policyDecisionInTx } from "../practice/policy.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { plainTextLines } from "../rich-text/excerpt.ts";
 import {
   RICH_TEXT_SCHEMA_VERSION,
@@ -238,6 +240,24 @@ export const readWorkflow = defineReadAction({
       }),
     }),
     phases: z.array(phaseResult),
+    /**
+     * How this workspace practises the phases (METHOD.md §2.3, §2.9, P9-T02):
+     * whether they guide, bind or are hidden, and when new objectives may be
+     * written. The screen shows the strip and its gaps by these.
+     */
+    practice: z.object({
+      phaseEnforcement: z.enum(["guided", "binding", "hidden"]),
+      writingWhen: z.enum(["anytime", "planningWindow", "afterPhases"]),
+    }),
+    /**
+     * Whether a new objective may be drafted in this cycle now, decided by the
+     * same policy `goals.create` asks, so the screen never offers a form the
+     * write would refuse, or hides one it would accept.
+     */
+    drafting: z.object({
+      allowed: z.boolean(),
+      reasons: z.array(z.string()),
+    }),
     gates: z.array(gateResult),
     packItems: z.array(
       z.object({
@@ -356,9 +376,13 @@ export const readWorkflow = defineReadAction({
         if (!cycle) {
           throw new OperationError("not_found", "No such cycle.");
         }
-        const rhythm = resolveRhythm(
-          await readRhythmRow(tx, context.workspaceId),
-        );
+        const rhythmRow = await readRhythmRow(tx, context.workspaceId);
+        const rhythm = resolveRhythm(rhythmRow);
+        const { practice } = practiceFromRow(rhythmRow);
+        const drafting = await policyDecisionInTx(tx, context.workspaceId, {
+          kind: "objective.create",
+          cycleId: input.cycleId,
+        });
         const snapshot = await evaluateWorkflow(
           tx,
           context.workspaceId,
@@ -519,8 +543,7 @@ export const readWorkflow = defineReadAction({
           ),
           publishable: snapshot.publishable,
           asks: {
-            strategicIssues:
-              rhythm.thresholds["quality.strategicIssueBounds"].low,
+            strategicIssues: rhythm.thresholds["quality.strategicIssueMinimum"],
             priorities: rhythm.thresholds["quality.priorityBounds"],
           },
           phases: snapshot.phases.map((result) => ({
@@ -528,6 +551,14 @@ export const readWorkflow = defineReadAction({
             missing: [...result.missing],
             blocked: [...result.blocked],
           })),
+          practice: {
+            phaseEnforcement: practice["phases.enforcement"],
+            writingWhen: practice["writing.when"],
+          },
+          drafting: {
+            allowed: drafting.outcome === "allow",
+            reasons: [...drafting.reasons],
+          },
           gates: snapshot.gates.map((gate) => ({
             gateKey: gate.gateKey,
             title: gate.title,
@@ -1253,6 +1284,7 @@ export const calibrateCycle = defineWriteAction({
 
 export const publishCycle = defineWriteAction({
   name: "workflow.publish",
+  // openokr:policy-exempt: publishing is decided by the six publish gates (METHOD.md §4.5), which P9-T03 puts under the practice with an enforcement level each.
   summary:
     "Publishes the set, refusing while any of the six gates is red or cannot be evaluated.",
   input: z.object({

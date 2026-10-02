@@ -220,6 +220,14 @@ export const THRESHOLDS = {
       quarterly: z.number().int().min(0).max(52),
     }),
   }),
+  "cadence.teamPublicationWindowWeeks": param({
+    group: "cadence",
+    label: "Team publication window",
+    section: "§2.9",
+    why: "Two weeks after the cycle starts. Company OKRs publish before day one and team OKRs in the first fortnight, which is when most published cycles share them; an OKR created after it is marked as added mid-cycle.",
+    default: 2,
+    schema: z.number().int().min(0).max(13),
+  }),
   "cadence.publicationCountdownDays": param({
     group: "cadence",
     label: "Publication deadline countdown",
@@ -421,13 +429,13 @@ export const THRESHOLDS = {
     default: 3,
     schema: z.number().int().min(1).max(50),
   }),
-  "quality.strategicIssueBounds": param({
+  "quality.strategicIssueMinimum": param({
     group: "quality",
-    label: "Strategic issue bounds",
+    label: "Strategic issue minimum",
     section: "§2.3",
-    why: "Three to ten, ranked by impact. Fewer than three is not a diagnosis; more than ten is not ranked. The floor was five until 2026-08-17: it held for a mid-sized company and blocked a team of eight on day one, which taught them to invent two issues rather than to diagnose, and inventing is the exact failure the check exists to prevent. A workspace that wants five back raises this.",
-    default: { low: 3, high: 10 },
-    schema: bounds(0, 100),
+    why: "Three, ranked by impact. Fewer than three is not a diagnosis. The floor was five until 2026-08-17: it held for a mid-sized company and blocked a team of eight on day one, which taught them to invent two issues rather than to diagnose, and inventing is the exact failure the check exists to prevent. There is no ceiling since P9-T02: the old upper bound of ten was never checked by anything, and a long ranked list is a facilitator's problem rather than a defect.",
+    default: 3,
+    schema: z.number().int().min(0).max(100),
   }),
   "quality.priorityBounds": param({
     group: "quality",

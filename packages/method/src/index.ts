@@ -131,6 +131,15 @@ export {
   linkedWorkShare,
 } from "./linked-work.ts";
 export {
+  type CycleFacts,
+  decide,
+  draftingWaitsForPhases,
+  type PolicyDecision,
+  type PolicyIntent,
+  planningWindow,
+  policyNeedsPhases,
+} from "./policy.ts";
+export {
   CHECK_ENFORCEMENT,
   type CheckEnforcement,
   defaultPractice,

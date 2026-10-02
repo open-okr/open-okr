@@ -21897,6 +21897,51 @@
                             "additionalProperties": false
                           }
                         },
+                        "practice": {
+                          "type": "object",
+                          "properties": {
+                            "phaseEnforcement": {
+                              "type": "string",
+                              "enum": [
+                                "guided",
+                                "binding",
+                                "hidden"
+                              ]
+                            },
+                            "writingWhen": {
+                              "type": "string",
+                              "enum": [
+                                "anytime",
+                                "planningWindow",
+                                "afterPhases"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "phaseEnforcement",
+                            "writingWhen"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "drafting": {
+                          "type": "object",
+                          "properties": {
+                            "allowed": {
+                              "type": "boolean"
+                            },
+                            "reasons": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "allowed",
+                            "reasons"
+                          ],
+                          "additionalProperties": false
+                        },
                         "gates": {
                           "type": "array",
                           "items": {
@@ -22337,6 +22382,8 @@
                         "publishable",
                         "asks",
                         "phases",
+                        "practice",
+                        "drafting",
                         "gates",
                         "packItems",
                         "issues",

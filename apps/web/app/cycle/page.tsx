@@ -287,7 +287,14 @@ export default async function CyclePage({
       : null;
 
   const phase = workflow.phases[viewing];
+  // What earlier phases still miss. Under guided phases, the default, this is
+  // guidance and nothing waits on it (METHOD.md §2.3). Whether drafting waits
+  // is the server's decision, read from `workflow.drafting`, so this screen
+  // never offers a form the write would refuse, or hides one it would accept.
   const work = phaseWorkAllowed(viewing, workflow.phases);
+  const draftingBlocked = viewing === 4 && !workflow.drafting.allowed;
+  const showGaps =
+    !work.allowed && workflow.practice.phaseEnforcement !== "hidden";
 
   // Only phase 4 needs the set and the member list, and only phase 4 pays for
   // reading them.
@@ -417,11 +424,18 @@ export default async function CyclePage({
               currentId={cycle.id}
             />
           </CardHeader>
-          {work.allowed ? null : (
+          {draftingBlocked || showGaps ? (
             <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">
               <p className="text-sm font-bold text-warn">
-                {t("cycle.thisPhaseIsBlocked")}
+                {draftingBlocked
+                  ? t("cycle.thisPhaseIsBlocked")
+                  : t("cycle.earlierPhasesHaveGaps")}
               </p>
+              {draftingBlocked ? null : (
+                <p className="text-xs text-warn">
+                  {t("cycle.thePhasesGuideNothingWaits")}
+                </p>
+              )}
               <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-warn">
                 {work.because.map((reason) => (
                   <li key={reason}>{reason}</li>
@@ -433,7 +447,7 @@ export default async function CyclePage({
                 </a>
               </p>
             </CardBody>
-          )}
+          ) : null}
           {phase && phase.blocked.length > 0 ? (
             <CardBody className="border-line border-t">
               <ul className="flex flex-col gap-0.5 text-xs text-ink-3">
@@ -567,7 +581,8 @@ export default async function CyclePage({
           <Drafting
             cycleId={workflow.cycleId}
             endsOn={workflow.endsOn}
-            draftingAllowed={work.allowed}
+            draftingAllowed={workflow.drafting.allowed}
+            draftingReasons={workflow.drafting.reasons}
             goals={draft.goals}
             members={draft.members}
             kpis={draft.kpis}

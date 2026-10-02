@@ -1139,10 +1139,10 @@ export const CYCLE_CHECKS: readonly QualityCheck[] = [
     feedsStrengthScore: false,
     conditions: [
       {
-        condition: "Outside the bounds",
+        condition: "Fewer than the minimum",
         status: "fail",
         prompt:
-          "Too few issues is not a diagnosis, and too many is not a ranking. List them inside the bounds and rank them by impact.",
+          "Too few issues is not a diagnosis. List at least the minimum and rank them by impact.",
       },
       {
         condition: "Listed but not ranked",
@@ -1295,7 +1295,7 @@ export function evaluateCycle(
   thresholds: ResolvedThresholds,
 ): readonly QualityVerdict[] {
   const lead = thresholds["quality.inputPackLeadWorkingDays"];
-  const issues = thresholds["quality.strategicIssueBounds"];
+  const issueMinimum = thresholds["quality.strategicIssueMinimum"];
   const priorities = thresholds["quality.priorityBounds"];
   const gate = (key: number) =>
     input.gates.find((entry) => entry.gateKey === key);
@@ -1313,8 +1313,8 @@ export function evaluateCycle(
       : "Neither scored nor declared a first cycle";
 
   const cy3 =
-    input.issueCount < issues.low || input.issueCount > issues.high
-      ? "Outside the bounds"
+    input.issueCount < issueMinimum
+      ? "Fewer than the minimum"
       : input.issuesRanked
         ? "Listed and ranked"
         : "Listed but not ranked";

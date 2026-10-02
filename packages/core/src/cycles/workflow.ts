@@ -46,7 +46,6 @@ import {
   type InitiativeSnapshot,
   type PhaseResult,
   phaseCompletion,
-  phaseWorkAllowed,
   publishGates,
   type ResolvedThresholds,
 } from "@openokr/method";
@@ -58,6 +57,7 @@ import {
   gte,
   inArray,
   isNull,
+  lt,
   lte,
   or,
 } from "drizzle-orm";
@@ -227,9 +227,28 @@ export async function loadWorkflowInput<
       .filter((on): on is string => typeof on === "string" && on !== "")
       .sort()[0] ?? null;
 
+  // METHOD.md §2.3, P9-T02: a cycle with no earlier cycle of its own mode
+  // is a first cycle whether or not anybody declared it, so a new workspace
+  // never meets "the prior cycle is not scored" for a prior cycle that does
+  // not exist. The declaration still counts for a workspace that made one.
+  const [earlier] = cycle.firstCycle
+    ? [undefined]
+    : await tx
+        .select({ id: cycles.id })
+        .from(cycles)
+        .where(
+          activeOnly(
+            cycles,
+            eq(cycles.workspaceId, workspaceId),
+            eq(cycles.mode, cycle.mode),
+            lt(cycles.startsOn, cycle.startsOn),
+          ),
+        )
+        .limit(1);
+
   return {
     mode: cycle.mode,
-    firstCycle: cycle.firstCycle,
+    firstCycle: cycle.firstCycle || earlier === undefined,
     startsOn: cycle.startsOn,
     publicationDeadline: cycle.publicationDeadline,
     publishedAt: cycle.publishedAt,
@@ -675,34 +694,6 @@ export async function evaluateWorkflow<
     gates,
     publishable: canPublish(gates),
   };
-}
-
-/**
- * Why drafting in a cycle's phase 4 is refused, or null when it is not
- * (REQUIREMENTS §3.1: "drafting in Phase 4 is refused with the reason";
- * METHOD.md §2.6; completeness review H-09).
- *
- * Phase 4 waits for every earlier phase that applies, and the reason is each
- * condition still missing, in the words the rail shows. A closed or unknown
- * cycle is not this function's to refuse: the write that names it does.
- */
-export async function draftingRefusal<
-  TSchema extends Record<string, unknown> = Record<string, never>,
->(
-  tx: AnyTx<TSchema>,
-  workspaceId: string,
-  cycleId: string,
-  thresholds: ResolvedThresholds,
-): Promise<string | null> {
-  const cycle = await loadCycleForWorkflow(tx, workspaceId, cycleId);
-  if (!cycle) {
-    return null;
-  }
-  const { phases } = await evaluateWorkflow(tx, workspaceId, cycle, thresholds);
-  const work = phaseWorkAllowed(4, phases);
-  return work.allowed
-    ? null
-    : `Drafting waits until the earlier phases are complete. ${work.because.join(". ")}.`;
 }
 
 /**

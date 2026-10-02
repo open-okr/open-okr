@@ -622,7 +622,7 @@ describe("the cycle checks read the §11 registry, not their own numbers", () =>
   });
 
   it("fails CY-3 one below the registry's own floor", () => {
-    const floor = thresholds["quality.strategicIssueBounds"].low;
+    const floor = thresholds["quality.strategicIssueMinimum"];
     const result = evaluateCycle(
       { ...ready, issueCount: floor - 1 },
       thresholds,

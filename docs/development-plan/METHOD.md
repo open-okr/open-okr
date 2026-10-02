@@ -39,6 +39,7 @@ These are not preferences. Every rule below serves one of them.
 8. **Neglect must be visible.** A goal nobody has updated cannot quietly stay green.
 9. **Alignment is contribution, not copying.** A team's OKR states its own distinct contribution to the level above. It does not restate the parent.
 10. **Diagnose before you prescribe.** A missed cycle with a strong rhythm is a strategy problem. A missed cycle with a weak rhythm is a cadence problem. They need opposite fixes.
+11. **Anybody can write.** A member who can edit a space can add or change its OKRs at any time. Coaching happens while they type. It never refuses them, unless the workspace has chosen to (§2.9). *Source:* Doerr: "Start: Launch a new OKR mid-cycle, whenever the need arises"; decided by Akmal on 1 October 2026.
 
 ---
 
@@ -55,7 +56,7 @@ The annual frame is read-only reference material during a quarterly cycle. Phase
 
 ### 2.2 The eight phases
 
-Every cycle runs the same eight phases. Phase 0 runs only in an annual cycle.
+Every cycle offers the same phases. Phase 0 runs only in an annual cycle, so a quarterly cycle runs seven.
 
 | # | Phase | Output |
 |---|---|---|
@@ -63,12 +64,12 @@ Every cycle runs the same eight phases. Phase 0 runs only in an annual cycle.
 | 1 | Prepare | Planning brief and a complete input pack |
 | 2 | Diagnose | Scored prior OKRs and a ranked issue list |
 | 3 | Set direction | A priority list for the horizon |
-| 4 | Draft OKRs | A draft OKR set with owners, passing every quality check |
+| 4 | Draft OKRs | A draft OKR set with owners |
 | 5 | Align and commit | A published, aligned OKR set |
 | 6 | Run the cadence | Check-ins, reviews and a decision log |
 | 7 | Review and learn | Scores, learnings and the next cycle's inputs |
 
-Phases 0 to 5 happen before the cycle starts. Phase 6 runs through it. Phase 7 closes it and feeds the next one.
+The phases are the recommended path. They guide, and by default they never stop anybody writing (§2.9). Company OKRs are best set before the cycle starts. Team and individual OKRs are commonly drafted and shared in its first one to two weeks. Publishing follows the same two steps: the company set publishes before the cycle starts, and the department and team sets publish by the time the team publication window closes, each through the gates (§4.5). Phase 6 runs through the cycle. Phase 7 closes it and feeds the next one. *Source:* whatmatters' typical cycle: "Start of quarter: Communicate Team Q1 OKRs", "1 week after start of quarter: Share Employee Q1 OKRs".
 
 ### 2.3 Phase completion rules
 
@@ -77,15 +78,27 @@ A phase is complete when all of its conditions hold. The product computes this. 
 | Phase | Complete when |
 |---|---|
 | 0 | Mission and mid-term strategy written, 2 to 5 annual strategies set, at least one annual OKR with key results |
-| 1 | Sponsor and facilitator named, all 7 input-pack items gathered, pack distributed at least 3 working days before session one |
-| 2 | Prior cycle scored (or first cycle declared), baseline health recorded, at least 3 strategic issues ranked |
+| 1 | Sponsor and facilitator named, the input pack gathered and distributed |
+| 2 | Prior cycle scored (or this is the first cycle, which is inferred when no earlier cycle exists and may be declared), baseline health recorded, at least 3 strategic issues ranked |
 | 3 | Annual: 3 to 5 priorities each with a 12-month success statement, not-doing list written, leadership agreement on the frame recorded. Quarterly: frame revalidated (holds or documented change) and focus areas chosen |
-| 4 | Every objective and key result passes the §4 quality checks |
-| 5 | All six publish gates green and the set published |
-| 6 | Cadence booked for the whole cycle and at least one decision recorded |
+| 4 | No objective or key result fails a check set to block. Warnings do not count |
+| 5 | Every publish gate set to block is green and the planned sets are published (§4.5) |
+| 6 | Cadence booked for the whole cycle |
 | 7 | Every key result scored and the retrospective written |
 
+**Phase enforcement** is a practice setting (§12):
+
+| Setting | Effect |
+|---|---|
+| **Guided** (default) | Completion is shown as progress, with what is missing and a link to fix it. Nothing is refused |
+| **Binding** | Drafting waits for phases 1 to 3 and publishing waits for phase 4. The governed choice for organisations that run a formal planning process |
+| **Hidden** | The phase strip and its checklist are not shown. OKRs are written and tracked without the planning workflow |
+
+*Source:* No source found that requires earlier phases before drafting. Perdoo (vendor): "You can draft an unlimited number of OKRs". Doerr: "Start: Launch a new OKR mid-cycle, whenever the need arises."
+
 ### 2.4 Timeline
+
+Guidance for people, not machine thresholds (§11).
 
 **Annual cycle**, weeks before the year starts:
 
@@ -94,17 +107,21 @@ A phase is complete when all of its conditions hold. The product computes this. 
 | 6 to 5 | Phase 1: scope, roles, input pack |
 | 4 | Phase 2: diagnosis session |
 | 4 to 3 | Phase 3: direction-setting session with leadership |
-| 3 to 2 | Phase 4: drafting sessions per unit, then peer review between teams |
-| 2 to 1 | Phase 5: alignment session, capacity check |
-| 1 to 0 | Sign-off, publication, Phase 6 calendar booked |
+| 3 to 2 | Phase 4: annual OKRs drafted, then peer review between teams |
+| 2 to 1 | Phase 5: annual OKRs aligned and published |
+| 1 to 0 | Company OKRs for the first quarter drafted inside the published frame. Phase 6 calendar booked |
 
-**Quarterly cycle**, weeks before the quarter starts:
+**Quarterly cycle**, weeks before and after the quarter starts:
 
-| Weeks before | Activity |
+| When | Activity |
 |---|---|
-| 3 | Phase 1 (light refresh) and Phase 2: input refresh, scoring |
-| 2 | Phase 3 (revalidation) and Phase 4: drafting |
-| 1 | Phase 5: alignment, sign-off, publication |
+| 4 weeks before | Phase 1: light refresh of the input pack |
+| 2 weeks before | The ending quarter is graded and reviewed (§8). Phase 2: diagnosis with those scores |
+| 2 to 1 weeks before | Phase 3: revalidation. Phase 4: company OKRs drafted |
+| 1 week before | Phase 5: company OKRs aligned and published |
+| Weeks 1 to 2 of the quarter | Department and team OKRs drafted and published, the second publish step (§4.5) |
+
+*Source:* Wodtke: "Two weeks before the end of the quarter, it's time to grade your OKRs, and plan for the next cycle"; whatmatters' typical cycle.
 
 ### 2.5 Roles
 
@@ -119,7 +136,7 @@ A phase is complete when all of its conditions hold. The product computes this. 
 
 ### 2.6 The input pack
 
-Phase 4 must not run without these seven items. This is the single most common failure point in an OKR programme.
+A checklist for Phase 1, shown in Phase 1 and beside the drafting form. It never blocks unless phases are binding.
 
 1. Mission, vision and current strategy documents
 2. Prior cycle OKRs with scores and retrospective notes
@@ -129,7 +146,7 @@ Phase 4 must not run without these seven items. This is the single most common f
 6. Committed projects and obligations that consume capacity
 7. Open risks and dependencies carried over from the last cycle
 
-Distribute at least three working days before the first session. An incomplete pack delivered on time beats a complete pack delivered late.
+Distribute it a few working days before the first session (3 by default, §11). An incomplete pack delivered on time beats a complete pack delivered late. *Source:* Atlassian (vendor) lists the same kind of pre-reads, previous OKRs "If available".
 
 ### 2.7 Levels and quantities
 
@@ -141,6 +158,18 @@ Distribute at least three working days before the first session. An incomplete p
 | Individual | 0 to 3 | Optional. Many organisations stop at team level |
 
 Every objective carries 2 to 5 key results. A unit may contribute to another unit's OKRs instead of setting its own. Record which units do this.
+
+### 2.9 Writing and changing OKRs at any time
+
+**Who may write, and when.** By default, any member who can edit a space may create, change, start or stop its objectives and key results at any time in the cycle. *Source:* Doerr; decided by Akmal on 1 October 2026. A workspace may restrict this in its practice settings (§12):
+
+| Setting | Effect |
+|---|---|
+| **Any time** (default) | Writing is never refused for planning reasons |
+| **Planning window** | New objectives may be created from planning-open (§11) until the team publication window closes. Changes to existing ones stay open |
+| **After the phases** | Drafting waits for phases 1 to 3, as under binding phase enforcement (§2.3) |
+
+Access still applies everywhere: a member writes only where they may edit. Quality checks run as they type.
 
 ---
 
@@ -350,7 +379,7 @@ Added 11 September 2026 after the P7-T07 audit measured OBJ-1 against twenty rea
 |---|---|
 | CY-1 | Input pack complete and distributed at least 3 working days before session one |
 | CY-2 | Prior cycle scored, or first cycle explicitly declared |
-| CY-3 | 3 to 10 strategic issues listed and ranked by impact |
+| CY-3 | At least 3 strategic issues listed and ranked by impact |
 | CY-4 | 3 to 5 priorities, each with a stated 12-month success |
 | CY-5 | The not-doing list is written |
 | CY-6 | Capacity checked, nothing left at "exceeds", and the cuts are recorded |
@@ -753,6 +782,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Nudge volume ceiling | 10 per member per week |
 | Due-soon lead | 1 day before the anchor day |
 | Planning-open lead | 6 weeks before an annual cycle starts, 3 weeks before a quarterly |
+| Team publication window | 2 weeks after the cycle starts |
 | Publication deadline countdown | 14, 7 and 1 days before the deadline |
 | Review preparation lead | 2 weeks before the cycle ends |
 
@@ -785,7 +815,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Objective length bounds | 4 to 18 words |
 | Company objective cap | 5 |
 | Objectives per unit cap | 3 |
-| Strategic issue bounds | 3 to 10, ranked |
+| Strategic issue minimum | 3, ranked |
 | Priority bounds | 3 to 5, each with a 12-month success statement |
 | Annual strategy bounds | 2 to 5 |
 | Carry-forward issue impact | 4 |

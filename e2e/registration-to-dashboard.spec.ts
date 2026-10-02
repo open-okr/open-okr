@@ -393,28 +393,27 @@ test("ticking a pack item moves the count", async () => {
   await expect(page.getByText("1 of 7", { exact: true })).toBeVisible();
 });
 
-test("opening phase 4 names what is blocking drafting", async () => {
-  // The acceptance criterion: "Given a quarterly cycle whose input pack has two
-  // items missing, when the facilitator opens Phase 4, then drafting is blocked
-  // with the two missing items named and a link to gather them."
+test("opening phase 4 names what earlier phases miss, and drafting stays open", async () => {
+  // REQUIREMENTS §3.1 as revised for Phase 9: "Given a quarterly cycle three
+  // weeks from its start with the input pack incomplete, when the facilitator
+  // opens the cycle, then Phase 1 is shown as incomplete with the exact
+  // missing items, and a member can still draft an objective, with the missing
+  // items shown beside the form." Until P9-T02 this phase refused drafting
+  // here (completeness review H-09); the phases now guide, and the binding
+  // half of §3.1 is `s04c-binding-phases.spec.ts`.
   await page.goto("/cycle?phase=4");
 
-  await expect(page.getByText("This phase is blocked by earlier work")).toBeVisible();
+  await expect(page.getByText("Earlier phases still have gaps")).toBeVisible();
   await expect(
     page.getByText(/Input pack item 4 is missing: Customer feedback/),
   ).toBeVisible();
   await expect(
     page.getByText(/Input pack item 7 is missing: Open risks/),
   ).toBeVisible();
-  // REQUIREMENTS §3.1: "drafting in Phase 4 is refused with the reason"
-  // (completeness review H-09). The form gives way to the reason, and the
-  // server refuses a guided draft regardless.
   await expect(
-    page.getByText("Drafting opens once the earlier phases are complete"),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add objective" })).toHaveCount(
-    0,
-  );
+    page.getByText("This phase is blocked by earlier work"),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add objective" })).toBeVisible();
   await page.getByRole("link", { name: "Go and gather what is missing" }).click();
   await expect(page).toHaveURL("/cycle?phase=1");
 });
@@ -424,10 +423,10 @@ test("opening phase 4 names what is blocking drafting", async () => {
  *
  * The sponsor, the facilitator, the planning dates, baseline health and the
  * quarterly revalidation had no control on any screen, so none of these phases
- * could turn green and drafting was never allowed. Every step below is a
- * control a facilitator uses.
+ * could turn green. Every step below is a control a facilitator uses, and once
+ * they are done the gaps the phase 4 view listed are gone.
  */
-test("the planning phases complete from the browser, and drafting opens", async () => {
+test("the planning phases complete from the browser, and the gaps clear", async () => {
   await page.goto("/cycle?phase=1");
 
   // The rest of the input pack.
@@ -484,6 +483,7 @@ test("the planning phases complete from the browser, and drafting opens", async 
   ).toHaveValue("Mobile activation");
 
   await page.goto("/cycle?phase=4");
+  await expect(page.getByText("Earlier phases still have gaps")).toHaveCount(0);
   await expect(
     page.getByText("This phase is blocked by earlier work"),
   ).toHaveCount(0);

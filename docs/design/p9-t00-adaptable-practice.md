@@ -94,6 +94,14 @@ In `packages/core`, one helper wraps it:
 - `requirePolicy(tx, workspaceId, intent)` loads the resolved practice inside the transaction, calls `decide`, and throws `OperationError("forbidden", reasons)` on block.
 - Warnings are returned with the action result, so the interface shows them beside the work.
 
+**As built at P9-T02** ([`policy.ts`](../../packages/method/src/policy.ts), [`practice/policy.ts`](../../packages/core/src/practice/policy.ts)):
+- **Two intents so far**, `objective.create` and `keyResult.create`. Each later task adds the intents it governs: a target change at P9-T06, publishing at P9-T03, drafts at P9-T13.
+- **The phases are read only when the practice needs them** (`policyNeedsPhases`), because evaluating a cycle's workflow is a dozen queries. A caller that skips them under binding is refused loudly, never allowed quietly.
+- **Drafting waits for phases 1 to 3, never phase 0**, because an annual OKR is what completes phase 0.
+- **An import is not refused** (`bulk`): it records objectives somebody already wrote, and refusing history would lose data, which no setting may do (§2.5).
+- **`workflow.read` returns the decision**, so the screen never offers a form the write would refuse.
+- **The first cycle is inferred** when no earlier cycle of the same mode exists, in the workflow loader every surface reads.
+
 **The rule that keeps it robust.** A source test lists every write action that creates, changes, publishes or closes an OKR and asserts that it calls `requirePolicy` or carries a written exemption. This is the same pattern as the trigger-emitter gate from H-11. The `guided` flag is deleted. A refusal for a practice reason anywhere else fails the build.
 
 ### 2.3 Enforcement levels, not new code paths

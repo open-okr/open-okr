@@ -3056,7 +3056,7 @@ Goal: the drafting lock is gone by default, and no caller can bypass a refusal t
 Deliverables:
 - **The policy.** `decide` in `packages/method/src/policy.ts`, and `requirePolicy` in core.
 - **The lock removed.** `goals.create` and `goals.addKeyResult` consult the policy, and the `guided` flag is accepted and ignored for one release.
-- **Phase enforcement.** The guided, binding and hidden settings apply in `workflow.ts`, and the phase strip shows what is missing without refusing.
+- **Phase enforcement.** The guided, binding and hidden settings apply: `workflow.read` reports the practice and the policy's drafting decision, the cycle screen shows the earlier phases' gaps without refusing under guided and gives the add form way to the reasons under binding, and the strip is not shown under hidden.
 - **The first cycle is inferred.** A workspace with no earlier cycle meets Phase 2's prior-cycle condition without anybody declaring a first cycle (METHOD v2 §2.3, CY-2). The declaration still reads for a workspace that made one.
 - **The build gate.** A source test fails any OKR write action that neither calls `requirePolicy` nor carries an exemption.
 - **Documents.** METHOD.md §2.2, §2.3, §2.4, §2.6, §2.9 (who may write, and when) and principle 11 move in. "Team publication window" and "Strategic issue minimum" join the registry, and "Strategic issue bounds" leaves it.
@@ -3069,7 +3069,7 @@ Depends on: P9-T02
 Goal: only structural defects block by default, and every check and gate can be block, warn or off.
 Deliverables:
 - **Enforcement.** `applyEnforcement`, strict mode as "every check at block", and per-gate levels in `publishGates`. Strict mode becomes the one home for strictness: the §11 threshold `quality.coachStrictness` and the per-space override stop deciding it, so the value never has two.
-- **Gates.** Gate 2 blocks only structural key result defects by default, and gate 6 is off.
+- **Gates.** Gate 2 blocks only structural key result defects by default, and gate 6 is off. Under binding phases, publishing also waits for phase 4 (METHOD.md §2.3); P9-T02 left `workflow.publish` exempt from the policy for this task to take in.
 - **Condition tables.** OBJ-1, OBJ-2 and KR-5 move to their METHOD v2 tables.
 - **Word lists.** "to" leaves the why markers and "bring" joins the movement verbs.
 - **Publishing in two steps.** `workflow.publish` gains `step: "company" | "teams"`, and `cycles.teams_published_at` records the second. OKRs written inside the team publication window face the gates at the team step. One added after it faces only the checks set to block, never the set-level gates (METHOD v2 §4.5).

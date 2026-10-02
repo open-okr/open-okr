@@ -77,8 +77,8 @@ rather than a set of priorities, and the cap is the whole point.
 One is a measure pretending to be an objective; more than five is a plan.
 
 **The input pack closes three working days before the planning session.**
-Drafting is refused until it is complete, because a planning session with no
-inputs produces objectives written from opinion.
+It guides rather than locks: drafting is open while it is incomplete, unless a
+workspace has made its phases binding.
 
 ## Alignment
 

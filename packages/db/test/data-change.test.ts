@@ -16,6 +16,7 @@ import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_g
 import { bindAgentsToSpacelessItems } from "../src/data-changes/0009_bind_agents_to_spaceless_items.ts";
 import { scrubErasedMemberNames } from "../src/data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../src/data-changes/0011_seal_account_tokens.ts";
+import { carryStrategicIssueMinimum } from "../src/data-changes/0012_carry_strategic_issue_minimum.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -801,5 +802,70 @@ describe("0011: sealing the identity-provider tokens stored in plain text", () =
     expect(`${(error as Error).message} ${cause.message}`).not.toContain(
       "not-a-key",
     );
+  });
+});
+
+describe("0012: carrying the strategic issue floor onto its new threshold", () => {
+  it("moves a raised floor, drops the canon one and anything unreadable, and keeps a value already set", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, overrides: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, $2::jsonb from w
+         returning workspace_id as id`,
+        [slug, JSON.stringify(overrides)],
+      );
+      return rows[0]?.id as string;
+    };
+    const raised = await seed("raised", {
+      "quality.strategicIssueBounds": { low: 5, high: 10 },
+      "cadence.graceDays": 4,
+    });
+    const canon = await seed("canon", {
+      "quality.strategicIssueBounds": { low: 3, high: 8 },
+    });
+    const garbled = await seed("garbled", {
+      "quality.strategicIssueBounds": { low: "five" },
+    });
+    const both = await seed("both", {
+      "quality.strategicIssueBounds": { low: 6, high: 10 },
+      "quality.strategicIssueMinimum": 4,
+    });
+    const untouched = await seed("untouched", { "cadence.graceDays": 2 });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [carryStrategicIssueMinimum],
+    });
+    expect(result?.rowsChanged).toBe(4);
+
+    const overridesOf = async (id: string) =>
+      (
+        await client.query<{ overrides: object }>(
+          "select overrides from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0]?.overrides;
+    expect(await overridesOf(raised)).toEqual({
+      "quality.strategicIssueMinimum": 5,
+      "cadence.graceDays": 4,
+    });
+    expect(await overridesOf(canon)).toEqual({});
+    expect(await overridesOf(garbled)).toEqual({});
+    expect(await overridesOf(both)).toEqual({
+      "quality.strategicIssueMinimum": 4,
+    });
+    expect(await overridesOf(untouched)).toEqual({ "cadence.graceDays": 2 });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [carryStrategicIssueMinimum],
+    });
+    expect(again?.rowsChanged).toBe(0);
   });
 });
