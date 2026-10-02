@@ -22,6 +22,7 @@ import { GoalTable } from "../work-map.tsx";
 import { CYCLE_PLACEHOLDER, CyclePicker } from "./cycle-picker.tsx";
 import { filterAssistAvailableAction } from "./filter-actions.ts";
 import { FilterAssist } from "./filter-assist.tsx";
+import { NewObjectiveButton } from "./new-objective.tsx";
 import { OkrDiagram } from "./okr-diagram.tsx";
 import { OkrTable } from "./okr-table.tsx";
 
@@ -216,12 +217,21 @@ export default async function GoalsPage({
              * Beside the title rather than in the filter bar below: it is the
              * first question this screen answers and it is not a filter, it is
              * the set. */}
-            <CyclePicker
-              cycles={cycles}
-              cycleId={cycleId}
-              hrefTemplate={href({ cycle: CYCLE_PLACEHOLDER })}
-              canCreate={canAdminister}
-            />
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <CyclePicker
+                cycles={cycles}
+                cycleId={cycleId}
+                hrefTemplate={href({ cycle: CYCLE_PLACEHOLDER })}
+                canCreate={canAdminister}
+              />
+              {/* Beside the cycle, because the two answer one after the other:
+               * which set am I looking at, and what do I want to put in it.
+               * The set also carries an add row under it, for the moment
+               * somebody is already reading. */}
+              {canEdit && cycleId ? (
+                <NewObjectiveButton cycleId={cycleId} level={level ?? "team"} />
+              ) : null}
+            </div>
             {/*
              * Taking the list away, beside the thing it is a list of (P5-T13).
              * The file matches the rows and columns on screen, and every export

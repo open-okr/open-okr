@@ -1877,6 +1877,7 @@
   "goals.editor.legendCaution": "Caution",
   "goals.editor.legendOffTrack": "Off track",
   "goals.editor.legendOnTrack": "On track",
+  "goals.editor.newObjective": "New objective",
   "goals.editor.noCycle": "No cycle",
   "goals.editor.noCycleMatch": "No cycle matches that",
   "goals.editor.objectivePlaceholder": "What outcome does this buy?",
