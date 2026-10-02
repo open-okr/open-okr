@@ -155,6 +155,10 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "sessions.schedule.space",
   "spaces.spaces",
   "tour.checkIn.title",
+  // Both are a line made only of holes and a slash: the workspace's own
+  // words for the two things the column holds. Nothing to translate.
+  "goals.editor.columnName",
+  "workMap.goalKeyResult",
   "workMap.keyResult",
   "workMap.objective",
 ]);
