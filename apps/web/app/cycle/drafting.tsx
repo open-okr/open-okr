@@ -144,7 +144,7 @@ export async function Drafting({
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
-              {t("cycle.drafting.waitsForEarlierPhases")}
+              {t("cycle.drafting.practiceHoldsNewObjectives")}
             </p>
             {draftingReasons.length === 0 ? null : (
               <ul className="mt-1.5 flex list-disc flex-col gap-0.5 pl-4 text-xs text-ink-3">

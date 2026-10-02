@@ -3155,7 +3155,8 @@ Depends on: P9-T01
 Goal: an admin chooses a profile and changes any setting, from the browser.
 Deliverables:
 - **The screen.** A practice card group in S-36, using the existing `SettingsCard` pattern: a profile picker with a preview of what it changes, one card per §12.1 group, the difference from the profile shown, and reset to the profile.
-- **Profile thresholds.** Choosing a profile also applies the §11 thresholds it sets (`PROFILES[profile].thresholds`), including Lightweight's check-in frequency, which has its own column on `rhythm_settings`. P9-T01 declared them and applied none.
+- **Profile thresholds.** Choosing a profile also applies the §11 thresholds it sets (`PROFILES[profile].thresholds`), including Lightweight's check-in frequency, which has its own column on `rhythm_settings`. P9-T01 declared them and applied none. A threshold the workspace set itself is kept, as its own practice changes are.
+- **Strict mode's one home.** The rhythm card's "Coach strictness" control gives way to the practice's strict mode, and data change 0015 carries a workspace that had chosen strict across. A space's own strictness stays.
 - **Navigation.** The registry entry and reachability test.
 - **Documents.** The UIUX-PLAN S-36 text.
 Test plan: card tests; an end-to-end spec that applies each profile; the accessibility scan picks the screen up automatically.

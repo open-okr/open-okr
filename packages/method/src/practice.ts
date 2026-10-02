@@ -29,7 +29,12 @@
  * Pure. No database, no clock, no network, no framework.
  */
 import { z } from "zod";
-import type { ThresholdOverrides } from "./thresholds.ts";
+import {
+  canonThresholds,
+  isThresholdKey,
+  type ThresholdKey,
+  type ThresholdOverrides,
+} from "./thresholds.ts";
 
 /** Which part of the practice a setting belongs to. Drives the admin cards. */
 export type PracticeGroup =
@@ -57,6 +62,12 @@ export interface PracticeSetting<T extends string = string> {
   /** Who the default comes from, as §12.1's source column says. */
   readonly source: string;
   readonly options: readonly T[];
+  /**
+   * Each option as §12.1's options column words it, for a screen or a command
+   * that shows the choice to a person. The stored value is the key; this is
+   * what it reads as. The conformance suite compares the two.
+   */
+  readonly optionLabels: Readonly<Record<T, string>>;
   readonly default: T;
 }
 
@@ -68,6 +79,12 @@ const setting = <const T extends string>(
 /** The two words most settings are, in the order §12.1 lists the default. */
 const ON_OFF = ["on", "off"] as const;
 const OFF_ON = ["off", "on"] as const;
+const ON_OFF_LABELS = { on: "On", off: "Off" } as const;
+const OFF_OPTIONAL_REQUIRED = {
+  off: "Off",
+  optional: "Optional",
+  required: "Required",
+} as const;
 
 /**
  * Each check's options. `asMethod` is the level METHOD.md §4 gives the check,
@@ -128,6 +145,12 @@ const checkSettings = Object.fromEntries(
       section: "§4",
       source: "§4",
       options: CHECK_ENFORCEMENT,
+      optionLabels: {
+        asMethod: "As §4",
+        block: "Block",
+        warn: "Warn",
+        off: "Off",
+      },
       default: "asMethod",
     }),
   ]),
@@ -156,6 +179,7 @@ const gateSettings = Object.fromEntries(
       section: "§4.5",
       source: "§4.5",
       options: GATE_ENFORCEMENT,
+      optionLabels: { block: "Block", warn: "Warn", off: "Off" },
       default: GATE_DEFAULTS[gate],
     }),
   ]),
@@ -181,6 +205,7 @@ const levelSettings = Object.fromEntries(
       // Individual OKRs are off by default: "not for everyone and should never
       // be required" (§2.7).
       options: level === "individual" ? OFF_ON : ON_OFF,
+      optionLabels: ON_OFF_LABELS,
       default: level === "individual" ? "off" : "on",
     }),
   ]),
@@ -204,6 +229,7 @@ const keyResultKindSettings = Object.fromEntries(
       section: "§2.10",
       source: "Lamorte; re:Work",
       options: ON_OFF,
+      optionLabels: ON_OFF_LABELS,
       default: "on",
     }),
   ]),
@@ -223,6 +249,11 @@ export const PRACTICE = {
     section: "§2.9",
     source: "Doerr; Akmal, 1 October 2026",
     options: ["anytime", "planningWindow", "afterPhases"],
+    optionLabels: {
+      anytime: "Any time",
+      planningWindow: "Planning window",
+      afterPhases: "After the phases",
+    },
     default: "anytime",
   }),
   "phases.enforcement": setting({
@@ -231,6 +262,7 @@ export const PRACTICE = {
     section: "§2.3",
     source: "No source requires phases before drafting",
     options: ["guided", "binding", "hidden"],
+    optionLabels: { guided: "Guided", binding: "Binding", hidden: "Hidden" },
     default: "guided",
   }),
   "writing.midCycleAs": setting({
@@ -239,6 +271,11 @@ export const PRACTICE = {
     section: "§2.9",
     source: "whatmatters",
     options: ["live", "ownerDraft", "reviewerApproval"],
+    optionLabels: {
+      live: "Live",
+      ownerDraft: "Draft published by its owner",
+      reviewerApproval: "Draft approved by the reviewer",
+    },
     default: "live",
   }),
   "reasons.midCycleAddition": setting({
@@ -247,6 +284,7 @@ export const PRACTICE = {
     section: "§2.9",
     source: "OpenOKR default",
     options: ["off", "optional", "required"],
+    optionLabels: OFF_OPTIONAL_REQUIRED,
     default: "optional",
   }),
   "reasons.easingTarget": setting({
@@ -255,6 +293,7 @@ export const PRACTICE = {
     section: "§2.9",
     source: "whatmatters",
     options: ["required", "optional"],
+    optionLabels: { required: "Required", optional: "Optional" },
     default: "required",
   }),
 
@@ -265,6 +304,11 @@ export const PRACTICE = {
     section: "§2.8",
     source: "Google's OKR playbook",
     options: ["both", "aspirationalOnly", "committedOnly"],
+    optionLabels: {
+      both: "Committed and aspirational",
+      aspirationalOnly: "Aspirational only",
+      committedOnly: "Committed only",
+    },
     default: "both",
   }),
   ...keyResultKindSettings,
@@ -274,6 +318,7 @@ export const PRACTICE = {
     section: "§2.5",
     source: "OpenOKR default",
     options: ["off", "optional", "required"],
+    optionLabels: OFF_OPTIONAL_REQUIRED,
     default: "optional",
   }),
 
@@ -285,6 +330,7 @@ export const PRACTICE = {
     section: "§4",
     source: "OpenOKR default",
     options: OFF_ON,
+    optionLabels: ON_OFF_LABELS,
     default: "off",
   }),
   ...gateSettings,
@@ -294,6 +340,7 @@ export const PRACTICE = {
     section: "§4.5",
     source: "REQUIREMENTS §3.2",
     options: ON_OFF,
+    optionLabels: ON_OFF_LABELS,
     default: "on",
   }),
 
@@ -307,6 +354,7 @@ export const PRACTICE = {
     section: "§3.1",
     source: "Perdoo (vendor)",
     options: OFF_ON,
+    optionLabels: ON_OFF_LABELS,
     default: "off",
   }),
   "confidence.display": setting({
@@ -315,6 +363,11 @@ export const PRACTICE = {
     section: "§3.2",
     source: "Wodtke",
     options: ["xIn10", "decimal", "percent"],
+    optionLabels: {
+      xIn10: "x in 10",
+      decimal: "0.0 to 1.0",
+      percent: "Percent",
+    },
     default: "xIn10",
   }),
   "scoring.enabled": setting({
@@ -323,6 +376,7 @@ export const PRACTICE = {
     section: "§3.3",
     source: "Lamorte; Castro",
     options: ON_OFF,
+    optionLabels: ON_OFF_LABELS,
     default: "on",
   }),
   "scoring.adjustment": setting({
@@ -331,6 +385,10 @@ export const PRACTICE = {
     section: "§3.3",
     source: "Doerr",
     options: ["withReason", "notAllowed"],
+    optionLabels: {
+      withReason: "Allowed with a reason",
+      notAllowed: "Not allowed",
+    },
     default: "withReason",
   }),
   "scoring.colours": setting({
@@ -339,6 +397,7 @@ export const PRACTICE = {
     section: "§3.3",
     source: "re:Work; whatmatters",
     options: ["google", "doerr"],
+    optionLabels: { google: "Google (0.6, 0.3)", doerr: "Doerr (0.7, 0.4)" },
     default: "google",
   }),
   "progress.signal": setting({
@@ -347,6 +406,7 @@ export const PRACTICE = {
     section: "§3.7",
     source: "Microsoft Viva Goals (vendor)",
     options: ["paceAware", "absolute"],
+    optionLabels: { paceAware: "Pace-aware", absolute: "Absolute" },
     default: "paceAware",
   }),
 
@@ -357,6 +417,7 @@ export const PRACTICE = {
     section: "§3.2",
     source: "OpenOKR default",
     options: OFF_ON,
+    optionLabels: ON_OFF_LABELS,
     default: "off",
   }),
   "escalation.sponsorInLadders": setting({
@@ -365,6 +426,7 @@ export const PRACTICE = {
     section: "§7.3",
     source: "OpenOKR default",
     options: OFF_ON,
+    optionLabels: ON_OFF_LABELS,
     default: "off",
   }),
 
@@ -375,6 +437,10 @@ export const PRACTICE = {
     section: "§8",
     source: "Workpath (vendor)",
     options: ["oneSession", "split"],
+    optionLabels: {
+      oneSession: "One session",
+      split: "Review and retrospective separately",
+    },
     default: "oneSession",
   }),
   "review.rootCauses": setting({
@@ -383,6 +449,7 @@ export const PRACTICE = {
     section: "§8.4",
     source: "OpenOKR default",
     options: ["asMethod", "optional"],
+    optionLabels: { asMethod: "As §8.4", optional: "Optional" },
     default: "asMethod",
   }),
   "close.carryForward": setting({
@@ -391,6 +458,10 @@ export const PRACTICE = {
     section: "§8.8",
     source: "Google's OKR playbook",
     options: ["proposed", "notProposed"],
+    optionLabels: {
+      proposed: "Proposed as Keep",
+      notProposed: "Not proposed",
+    },
     default: "proposed",
   }),
 
@@ -401,6 +472,10 @@ export const PRACTICE = {
     section: "§6.5",
     source: "Wodtke",
     options: ["offer", "draftRecovery"],
+    optionLabels: {
+      offer: "Offer the three responses",
+      draftRecovery: "Draft a recovery OKR at once",
+    },
     default: "offer",
   }),
 } as const;
@@ -640,4 +715,131 @@ export function differencesFromProfile(
   const base = resolvePractice(profile);
   const actual = resolvePractice(profile, overrides);
   return PRACTICE_KEYS.filter((key) => base[key] !== actual[key]);
+}
+
+// --- Switching profile -------------------------------------------------------
+
+/** One practice setting whose value a profile switch changes. */
+export interface PracticeChange {
+  readonly key: PracticeKey;
+  readonly from: string;
+  readonly to: string;
+}
+
+/** One §11 threshold a profile switch writes. */
+export interface ThresholdChange {
+  readonly key: ThresholdKey;
+  readonly from: unknown;
+  readonly to: unknown;
+  /**
+   * True when the new value is the canon's. The writer then stores nothing,
+   * rather than a copy of today's canon that would outlive a change to it.
+   */
+  readonly toCanon: boolean;
+}
+
+/** What choosing a profile changes, worked out before anything is written. */
+export interface ProfileSwitch {
+  readonly from: ProfileKey;
+  readonly to: ProfileKey;
+  readonly practice: readonly PracticeChange[];
+  readonly thresholds: readonly ThresholdChange[];
+  /** This workspace's own practice changes, kept, that differ from `to`. */
+  readonly keptPractice: readonly PracticeKey[];
+  /**
+   * Thresholds a profile sets that this workspace had set itself. Kept, the
+   * same way its own practice changes are.
+   */
+  readonly keptThresholds: readonly ThresholdKey[];
+}
+
+/** Equal by value, whatever order an object's keys were stored in. */
+function sameValue(left: unknown, right: unknown): boolean {
+  const stable = (value: unknown): string => {
+    if (Array.isArray(value)) {
+      return `[${value.map(stable).join(",")}]`;
+    }
+    if (value !== null && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      return `{${Object.keys(record)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${stable(record[key])}`)
+        .join(",")}}`;
+    }
+    return JSON.stringify(value);
+  };
+  return stable(left) === stable(right);
+}
+
+/**
+ * What choosing `to` does to a workspace, practice and thresholds together
+ * (METHOD.md §12.2, P9-T05).
+ *
+ * **The practice is layered, so it needs no writing.** The profile is one
+ * column, and the workspace's own changes stay on top of whichever profile is
+ * chosen. This reports which resolved values move.
+ *
+ * **The thresholds a profile sets are written**, because §11's values are
+ * stored as the workspace's own and one of them has its own column. So the
+ * same rule is applied by hand: a threshold the old profile set, still at the
+ * old profile's value, follows the switch; one the workspace changed itself is
+ * the workspace's and is kept. Only the thresholds one of the two profiles
+ * names are looked at, so a switch never touches a number neither profile has
+ * an opinion on.
+ */
+export function switchProfile(
+  current: {
+    readonly profile: string | null | undefined;
+    readonly overrides?: unknown;
+    /** The workspace's thresholds as they resolve now. */
+    readonly thresholds: Readonly<Record<string, unknown>>;
+  },
+  to: ProfileKey,
+): ProfileSwitch {
+  const from: ProfileKey =
+    current.profile && isProfileKey(current.profile)
+      ? current.profile
+      : "recommended";
+  const before = resolvePractice(from, current.overrides);
+  const after = resolvePractice(to, current.overrides);
+  const practice = PRACTICE_KEYS.filter(
+    (key) => before[key] !== after[key],
+  ).map((key) => ({ key, from: before[key], to: after[key] }));
+
+  const canon = canonThresholds() as Record<string, unknown>;
+  const fromSets = PROFILES[from].thresholds as Record<string, unknown>;
+  const toSets = PROFILES[to].thresholds as Record<string, unknown>;
+  const thresholds: ThresholdChange[] = [];
+  const keptThresholds: ThresholdKey[] = [];
+  const named = [
+    ...new Set([...Object.keys(fromSets), ...Object.keys(toSets)]),
+  ].filter(isThresholdKey);
+  for (const key of named) {
+    const now = current.thresholds[key] ?? canon[key];
+    const expected = key in fromSets ? fromSets[key] : canon[key];
+    if (!sameValue(now, expected)) {
+      // The workspace moved it away from what its profile gave it.
+      keptThresholds.push(key);
+      continue;
+    }
+    const target = key in toSets ? toSets[key] : canon[key];
+    if (sameValue(now, target)) {
+      continue;
+    }
+    thresholds.push({
+      key,
+      from: now,
+      to: target,
+      toCanon: sameValue(target, canon[key]),
+    });
+  }
+
+  return {
+    from,
+    to,
+    practice,
+    thresholds,
+    keptPractice: differencesFromProfile(to, current.overrides),
+    keptThresholds,
+  };
 }

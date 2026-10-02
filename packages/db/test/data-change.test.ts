@@ -18,6 +18,7 @@ import { scrubErasedMemberNames } from "../src/data-changes/0010_scrub_erased_me
 import { sealAccountTokens } from "../src/data-changes/0011_seal_account_tokens.ts";
 import { carryStrategicIssueMinimum } from "../src/data-changes/0013_carry_strategic_issue_minimum.ts";
 import { carryObjectiveLengthLimit } from "../src/data-changes/0014_carry_objective_length_limit.ts";
+import { carryCoachStrictness } from "../src/data-changes/0015_carry_coach_strictness.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -923,6 +924,61 @@ describe("0014: carrying the objective length limit onto its new threshold", () 
     await client.query("delete from _data_changes");
     const [again] = await runDataChanges(client, {
       scripts: [carryObjectiveLengthLimit],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0015: carrying a strict Coach onto strict mode", () => {
+  it("turns strict mode on where the Coach was strict, clears the column, and leaves the rest", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, strictness: string, practice: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, coach_strictness, practice)
+         select w.id, $2, $3::jsonb from w
+         returning workspace_id as id`,
+        [slug, strictness, JSON.stringify(practice)],
+      );
+      return rows[0]?.id as string;
+    };
+    const strict = await seed("strict", "strict", { reviewer: "required" });
+    const advisory = await seed("advisory", "advisory", {});
+    const warn = await seed("warn", "warn", {});
+
+    const [result] = await runDataChanges(client, {
+      scripts: [carryCoachStrictness],
+    });
+    expect(result?.rowsChanged).toBe(1);
+
+    const rowOf = async (id: string) =>
+      (
+        await client.query<{ coach_strictness: string; practice: object }>(
+          "select coach_strictness, practice from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0];
+    expect(await rowOf(strict)).toEqual({
+      coach_strictness: "warn",
+      practice: { reviewer: "required", strictMode: "on" },
+    });
+    expect(await rowOf(advisory)).toEqual({
+      coach_strictness: "advisory",
+      practice: {},
+    });
+    expect(await rowOf(warn)).toEqual({
+      coach_strictness: "warn",
+      practice: {},
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [carryCoachStrictness],
     });
     expect(again?.rowsChanged).toBe(0);
   });

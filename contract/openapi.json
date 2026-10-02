@@ -21380,6 +21380,15 @@
                                   "type": "string"
                                 }
                               },
+                              "optionLabels": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
                               "default": {
                                 "type": "string"
                               }
@@ -21392,6 +21401,7 @@
                               "section",
                               "source",
                               "options",
+                              "optionLabels",
                               "default"
                             ],
                             "additionalProperties": false
@@ -21619,7 +21629,7 @@
     "/practice/applyProfile": {
       "post": {
         "operationId": "practice.applyProfile",
-        "summary": "Chooses one of the five METHOD.md §12.2 profiles. This workspace's own changes are kept.",
+        "summary": "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
         "tags": [
           "practice"
         ],
@@ -21669,13 +21679,27 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "thresholdsChanged": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "thresholdsKept": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
                         "profile",
                         "overrides",
                         "practice",
-                        "differsFromProfile"
+                        "differsFromProfile",
+                        "thresholdsChanged",
+                        "thresholdsKept"
                       ],
                       "additionalProperties": false
                     }

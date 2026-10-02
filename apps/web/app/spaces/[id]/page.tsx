@@ -155,13 +155,14 @@ export default async function SpacePage({
   // uses, and `spaces.read` above has already answered not-found for a space
   // the reader may not see, so there is nothing extra to refuse here.
   const TREND_WEEKS = 12;
-  const [trend, streak, rhythm] = await Promise.all([
+  const [trend, streak, rhythm, practice] = await Promise.all([
     callAction(actor, "sessions.confidenceTrend", {
       spaceId: id,
       weeks: TREND_WEEKS,
     }),
     callAction(actor, "sessions.readStreak", { spaceId: id }),
     callAction(actor, "rhythm.read", {}).catch(refusedAsNull),
+    callAction(actor, "practice.read", {}).catch(refusedAsNull),
   ]);
 
   // Last week is the last session this space closed, and its digest is what
@@ -303,7 +304,14 @@ export default async function SpacePage({
         <SpaceSettingsCard
           spaceId={space.id}
           settings={space.settings}
-          workspaceStrictness={rhythm.coachStrictness}
+          // The workspace is strict through its practice's strict mode since
+          // P9-T05, and the old column only for a workspace an older
+          // release wrote to; either means what a space inherits is strict.
+          workspaceStrictness={
+            practice?.practice.strictMode === "on"
+              ? "strict"
+              : rhythm.coachStrictness
+          }
           workspaceFrequency={rhythm.defaultCheckInFrequency}
           canManage={canManage}
           connectedProviders={connectedProviders}

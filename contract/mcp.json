@@ -5951,7 +5951,7 @@
     },
     {
       "name": "practice.applyProfile",
-      "description": "Chooses one of the five METHOD.md §12.2 profiles. This workspace's own changes are kept.",
+      "description": "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
       "inputSchema": {
         "type": "object",
         "properties": {

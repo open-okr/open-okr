@@ -427,7 +427,7 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `practice.applyProfile`<br/>Chooses one of the five METHOD.md §12.2 profiles. This workspace's own changes are kept. | `POST /api/v1/practice/applyProfile` | writes |
+| `practice.applyProfile`<br/>Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept. | `POST /api/v1/practice/applyProfile` | writes |
 | `practice.read`<br/>The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved. | `GET /api/v1/practice/read` | reads |
 | `practice.update`<br/>Changes some of this workspace's practice settings. A setting set to null goes back to its profile's value. | `POST /api/v1/practice/update` | writes |
 

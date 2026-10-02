@@ -10,9 +10,9 @@
  *   kept, and the result names the ones that now differ from the new profile,
  *   so a screen can offer to reset them.
  *
- * Nothing reads the resolved practice yet. P9-T02 is the first task whose
- * policy decides by it, so in this release these actions record a choice and
- * change no behaviour.
+ * Choosing a profile also writes the §11 thresholds the profile sets (P9-T05),
+ * by the rule `switchProfile` states: a threshold the workspace set itself is
+ * kept, the same way its own practice changes are.
  */
 import {
   activeOnly,
@@ -26,6 +26,7 @@ import {
   PROFILE_KEYS,
   PROFILES,
   resolvePractice,
+  switchProfile,
   validatePracticeOverrides,
 } from "@openokr/method";
 import { eq } from "drizzle-orm";
@@ -33,6 +34,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { mergeOverrides, resolveRhythm } from "../cycles/rhythm.ts";
 import { ensureRhythmSettingsInTx, readRhythmRow } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
@@ -58,6 +60,8 @@ const settingDescriptor = z.object({
   section: z.string(),
   source: z.string(),
   options: z.array(z.string()),
+  /** Each option as METHOD.md §12.1 words it. */
+  optionLabels: z.record(z.string(), z.string()),
   default: z.string(),
 });
 
@@ -149,6 +153,7 @@ export const readPractice = defineReadAction({
               section: entry.section,
               source: entry.source,
               options: [...entry.options],
+              optionLabels: { ...entry.optionLabels } as Record<string, string>,
               default: entry.default,
             };
           }),
@@ -284,20 +289,64 @@ export const updatePractice = defineWriteAction({
 export const applyPracticeProfile = defineWriteAction({
   name: "practice.applyProfile",
   summary:
-    "Chooses one of the five METHOD.md §12.2 profiles. This workspace's own changes are kept.",
+    "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
   input: z.object({ profile: profileKey }),
-  output: practiceState,
+  output: practiceState.extend({
+    /** The §11 thresholds the switch wrote. */
+    thresholdsChanged: z.array(z.string()),
+    /** Thresholds the new profile sets that this workspace had set itself. */
+    thresholdsKept: z.array(z.string()),
+  }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       await ensureRhythmSettingsInTx(tx, workspaceId);
-      const before = practiceFromRow(await readRhythmRow(tx, workspaceId));
+      const row = await readRhythmRow(tx, workspaceId);
+      const before = practiceFromRow(row);
+      const change = switchProfile(
+        {
+          profile: before.profile,
+          overrides: before.overrides,
+          thresholds: resolveRhythm(row).thresholds as Record<string, unknown>,
+        },
+        input.profile,
+      );
+
+      // Three thresholds have their own column, and the rest live in the
+      // sparse override map (cycles/rhythm.ts). A value back at the canon is
+      // stored as nothing in the map, and as the canon's value in a column,
+      // which cannot be empty.
+      const columns: Partial<
+        Pick<
+          typeof rhythmSettings.$inferInsert,
+          "defaultCheckInFrequency" | "checkInAnchorDay" | "coachStrictness"
+        >
+      > = {};
+      const patch: Record<string, unknown> = {};
+      for (const threshold of change.thresholds) {
+        if (threshold.key === "cadence.checkInFrequency") {
+          columns.defaultCheckInFrequency =
+            threshold.to as typeof columns.defaultCheckInFrequency;
+        } else if (threshold.key === "cadence.anchorDay") {
+          columns.checkInAnchorDay = threshold.to as number;
+        } else if (threshold.key === "quality.coachStrictness") {
+          columns.coachStrictness =
+            threshold.to as typeof columns.coachStrictness;
+        } else {
+          patch[threshold.key] = threshold.toCanon ? null : threshold.to;
+        }
+      }
 
       // openokr:allow-mutation: same transaction, same reason as
       // practice.update above.
       const [updated] = await tx
         .update(rhythmSettings)
-        .set({ profile: input.profile, updatedAt: new Date() })
+        .set({
+          profile: input.profile,
+          overrides: mergeOverrides(row?.overrides ?? {}, patch),
+          ...columns,
+          updatedAt: new Date(),
+        })
         .where(eq(rhythmSettings.workspaceId, workspaceId))
         .returning({
           profile: rhythmSettings.profile,
@@ -308,12 +357,17 @@ export const applyPracticeProfile = defineWriteAction({
       }
 
       const state = practiceFromRow(updated);
+      const thresholdsChanged = change.thresholds.map(
+        (threshold) => threshold.key as string,
+      );
       return {
         result: {
           ...state,
           overrides: state.overrides as Record<string, string>,
           practice: state.practice as Record<string, string>,
           differsFromProfile: [...state.differsFromProfile],
+          thresholdsChanged,
+          thresholdsKept: [...change.keptThresholds],
         },
         activity: {
           kind: "practice.profile_applied",
@@ -331,6 +385,12 @@ export const applyPracticeProfile = defineWriteAction({
             // The workspace's own changes survive the switch, so the audit
             // says which of them now override the profile just chosen.
             keptChanges: [...state.differsFromProfile],
+            thresholds: change.thresholds.map((threshold) => ({
+              key: threshold.key,
+              from: threshold.from,
+              to: threshold.to,
+            })),
+            keptThresholds: [...change.keptThresholds],
           },
         },
       };

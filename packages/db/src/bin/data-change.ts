@@ -24,6 +24,7 @@ import { sealAccountTokens } from "../data-changes/0011_seal_account_tokens.ts";
 import { backfillWorkspaceRoles } from "../data-changes/0012_backfill_workspace_roles.ts";
 import { carryStrategicIssueMinimum } from "../data-changes/0013_carry_strategic_issue_minimum.ts";
 import { carryObjectiveLengthLimit } from "../data-changes/0014_carry_objective_length_limit.ts";
+import { carryCoachStrictness } from "../data-changes/0015_carry_coach_strictness.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -50,6 +51,7 @@ try {
       backfillWorkspaceRoles,
       carryStrategicIssueMinimum,
       carryObjectiveLengthLimit,
+      carryCoachStrictness,
     ],
   });
   process.stdout.write(

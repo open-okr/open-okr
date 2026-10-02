@@ -10,6 +10,7 @@ import {
   PROFILES,
   practiceInGroup,
   resolvePractice,
+  switchProfile,
   validatePracticeOverrides,
 } from "../src/practice.ts";
 import {
@@ -18,7 +19,7 @@ import {
   KEY_RESULT_CHECKS,
   OBJECTIVE_CHECKS,
 } from "../src/quality.ts";
-import { validateOverrides } from "../src/thresholds.ts";
+import { canonThresholds, validateOverrides } from "../src/thresholds.ts";
 
 /**
  * The METHOD.md §12 practice settings (P9-T01).
@@ -200,5 +201,129 @@ describe("validation", () => {
   it("refuses anything that is not an object", () => {
     expect(validatePracticeOverrides(["reviewer"]).problems).toHaveLength(1);
     expect(validatePracticeOverrides(null).problems).toHaveLength(1);
+  });
+});
+
+describe("option labels", () => {
+  it("words every option of every setting, and nothing else", () => {
+    // The settings screen shows these words, so an option without one would
+    // render as its stored key. `pnpm method:check` holds the words to §12.1.
+    for (const key of PRACTICE_KEYS) {
+      const entry = PRACTICE[key];
+      expect(Object.keys(entry.optionLabels).sort(), key).toEqual(
+        [...entry.options].sort(),
+      );
+      for (const words of Object.values(entry.optionLabels)) {
+        expect((words as string).length, key).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe("switching profile (P9-T05)", () => {
+  const canon = canonThresholds() as Record<string, unknown>;
+
+  it("reports the practice values that move, and changes nothing else", () => {
+    const change = switchProfile(
+      { profile: "recommended", overrides: {}, thresholds: canon },
+      "lightweight",
+    );
+    expect(change.from).toBe("recommended");
+    expect(change.to).toBe("lightweight");
+    expect(
+      Object.fromEntries(change.practice.map((c) => [c.key, c.to])),
+    ).toEqual(PROFILES.lightweight.practice);
+    expect(change.keptPractice).toEqual([]);
+  });
+
+  it("applies the thresholds the new profile sets", () => {
+    const change = switchProfile(
+      { profile: "recommended", overrides: {}, thresholds: canon },
+      "lightweight",
+    );
+    expect(change.thresholds).toEqual([
+      {
+        key: "cadence.checkInFrequency",
+        from: "weekly",
+        to: "biweekly",
+        toCanon: false,
+      },
+    ]);
+  });
+
+  it("returns the old profile's thresholds to the canon when the new one says nothing", () => {
+    const onRadicalFocus = {
+      ...canon,
+      ...(PROFILES.radicalFocus.thresholds as Record<string, unknown>),
+    };
+    const change = switchProfile(
+      { profile: "radicalFocus", overrides: {}, thresholds: onRadicalFocus },
+      "recommended",
+    );
+    expect(change.thresholds.map((c) => [c.key, c.toCanon])).toEqual([
+      ["quality.objectivesPerUnitCap", true],
+      ["quality.keyResultsPerObjective", true],
+    ]);
+    expect(change.thresholds[1]?.to).toEqual(
+      canon["quality.keyResultsPerObjective"],
+    );
+  });
+
+  it("keeps a threshold the workspace set itself, and says so", () => {
+    // Lightweight would make check-ins fortnightly; this workspace chose
+    // monthly before switching, and that is its own choice to keep.
+    const change = switchProfile(
+      {
+        profile: "recommended",
+        overrides: {},
+        thresholds: { ...canon, "cadence.checkInFrequency": "monthly" },
+      },
+      "lightweight",
+    );
+    expect(change.thresholds).toEqual([]);
+    expect(change.keptThresholds).toEqual(["cadence.checkInFrequency"]);
+  });
+
+  it("compares a composite threshold by value, whatever order its parts were stored in", () => {
+    const stored = { high: 3, low: 2 };
+    const change = switchProfile(
+      {
+        profile: "radicalFocus",
+        overrides: {},
+        thresholds: {
+          ...canon,
+          "quality.objectivesPerUnitCap": 1,
+          "quality.keyResultsPerObjective": stored,
+        },
+      },
+      "radicalFocus",
+    );
+    expect(change.thresholds).toEqual([]);
+    expect(change.keptThresholds).toEqual([]);
+  });
+
+  it("keeps the workspace's own practice changes and names those that differ from the new profile", () => {
+    const change = switchProfile(
+      {
+        profile: "recommended",
+        overrides: { reviewer: "required", strictMode: "on" },
+        thresholds: canon,
+      },
+      "googleStyle",
+    );
+    // Google-style turns reviewers off; this workspace requires them, and
+    // still does after the switch.
+    expect(change.practice.map((c) => c.key)).not.toContain("reviewer");
+    expect(change.keptPractice).toEqual(["reviewer", "strictMode"]);
+  });
+
+  it("reads an unknown stored profile as Recommended", () => {
+    const change = switchProfile(
+      { profile: "retired", overrides: {}, thresholds: canon },
+      "recommended",
+    );
+    expect(change.from).toBe("recommended");
+    expect(change.practice).toEqual([]);
+    expect(change.thresholds).toEqual([]);
   });
 });

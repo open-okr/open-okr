@@ -282,3 +282,86 @@ describe("practice.applyProfile", () => {
     expect((await storedRow()).profile).toBe("recommended");
   });
 });
+
+describe("practice.applyProfile writes the thresholds a profile sets (P9-T05)", () => {
+  async function thresholdsRow(): Promise<{
+    frequency: string;
+    overrides: Record<string, unknown>;
+  }> {
+    const wb = await workerDb();
+    const rows = await wb.admin.query<{
+      frequency: string;
+      overrides: Record<string, unknown>;
+    }>(
+      `select default_check_in_frequency as frequency, overrides
+         from rhythm_settings where workspace_id = $1`,
+      [workspaceId],
+    );
+    return rows.rows[0] as {
+      frequency: string;
+      overrides: Record<string, unknown>;
+    };
+  }
+
+  it("sets Lightweight's check-in frequency in its own column, and puts it back on leaving", async () => {
+    const applied = await call<{ thresholdsChanged: string[] }>(
+      OWNER,
+      "practice.applyProfile",
+      { profile: "lightweight" },
+    );
+    expect(applied.thresholdsChanged).toEqual(["cadence.checkInFrequency"]);
+    expect((await thresholdsRow()).frequency).toBe("biweekly");
+
+    await call(OWNER, "practice.applyProfile", { profile: "recommended" });
+    expect((await thresholdsRow()).frequency).toBe("weekly");
+  });
+
+  it("stores Radical Focus's caps as overrides, and removes them rather than storing the canon on leaving", async () => {
+    await call(OWNER, "practice.applyProfile", { profile: "radicalFocus" });
+    expect((await thresholdsRow()).overrides).toMatchObject({
+      "quality.objectivesPerUnitCap": 1,
+      "quality.keyResultsPerObjective": { low: 2, high: 3 },
+    });
+    const rhythm = await call<{ thresholds: Record<string, unknown> }>(
+      OWNER,
+      "rhythm.read",
+      {},
+    );
+    expect(rhythm.thresholds["quality.objectivesPerUnitCap"]).toBe(1);
+
+    await call(OWNER, "practice.applyProfile", { profile: "recommended" });
+    const after = (await thresholdsRow()).overrides;
+    expect(after).not.toHaveProperty("quality.objectivesPerUnitCap");
+    expect(after).not.toHaveProperty("quality.keyResultsPerObjective");
+  });
+
+  it("keeps a threshold the workspace set itself, and audits what it wrote and kept", async () => {
+    await call(OWNER, "rhythm.update", { defaultCheckInFrequency: "monthly" });
+    const applied = await call<{
+      thresholdsChanged: string[];
+      thresholdsKept: string[];
+    }>(OWNER, "practice.applyProfile", { profile: "lightweight" });
+    expect(applied.thresholdsChanged).toEqual([]);
+    expect(applied.thresholdsKept).toEqual(["cadence.checkInFrequency"]);
+    expect((await thresholdsRow()).frequency).toBe("monthly");
+
+    const audit = await auditActions();
+    expect(audit.at(-1)?.payload).toMatchObject({
+      to: "lightweight",
+      thresholds: [],
+      keptThresholds: ["cadence.checkInFrequency"],
+    });
+  });
+
+  it("names each option in METHOD.md §12.1's words", async () => {
+    const read = await call<{
+      registry: { key: string; optionLabels: Record<string, string> }[];
+    }>(OWNER, "practice.read", {});
+    const writing = read.registry.find((entry) => entry.key === "writing.when");
+    expect(writing?.optionLabels).toEqual({
+      anytime: "Any time",
+      planningWindow: "Planning window",
+      afterPhases: "After the phases",
+    });
+  });
+});

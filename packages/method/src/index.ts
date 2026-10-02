@@ -166,6 +166,7 @@ export {
   PRACTICE_KEYS,
   PROFILE_KEYS,
   PROFILES,
+  type PracticeChange,
   type PracticeCheckId,
   type PracticeGroup,
   type PracticeKey,
@@ -176,9 +177,12 @@ export {
   type PracticeValue,
   type ProfileDefinition,
   type ProfileKey,
+  type ProfileSwitch,
   practiceInGroup,
   type ResolvedPractice,
   resolvePractice,
+  switchProfile,
+  type ThresholdChange,
   validatePracticeOverrides,
 } from "./practice.ts";
 export {

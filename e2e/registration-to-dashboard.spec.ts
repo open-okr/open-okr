@@ -428,6 +428,11 @@ test("opening phase 4 names what earlier phases miss, and drafting stays open", 
  */
 test("the planning phases complete from the browser, and the gaps clear", async () => {
   await page.goto("/cycle?phase=1");
+  // `count()` below does not wait, so counting before the phase has rendered
+  // reads nothing to gather and skips the loop; the gaps then never clear.
+  await expect(
+    page.getByRole("button", { name: "Confirm distribution" }),
+  ).toBeVisible({ timeout: 15_000 });
 
   // The rest of the input pack.
   const ungathered = page.getByRole("button", { name: /^Mark ".*" as gathered$/ });

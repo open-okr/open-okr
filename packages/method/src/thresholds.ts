@@ -369,7 +369,7 @@ export const THRESHOLDS = {
     group: "quality",
     label: "Coach strictness",
     section: "§4",
-    why: "Warn: a warning is worth another look, not a refusal. The six publish gates are always hard, whatever this says.",
+    why: "Warn: each check keeps its own level from §4. Strict, for a space, raises every check on its goals to block, which is what the practice's strict mode does for the whole workspace.",
     default: "warn" as CoachStrictness,
     schema: z.enum(COACH_STRICTNESS),
   }),

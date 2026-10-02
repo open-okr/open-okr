@@ -232,6 +232,71 @@ for (const label of practiceLabels) {
   }
 }
 
+// Each option's words against §12.1's options column (P9-T05), because the
+// settings screen shows the registry's words and a reader holds them against
+// the document's. A row whose options are a list separated by "·" is compared
+// both ways; a row that describes its options in a sentence instead ("each on
+// or off") has nothing to split, and is skipped. The one option a column may
+// leave out is the default, which §12.1 names in the next column instead: "As
+// §4" is every check's default and is not repeated among Block, Warn and Off.
+let optionRows = 0;
+for (const line of section(
+  method,
+  "### 12.1 The settings",
+  "### 12.2",
+).split("\n")) {
+  const cells = line
+    .split("|")
+    .slice(1, -1)
+    .map((cell) => cell.trim());
+  const [label, optionsCell, defaultCell] = cells;
+  if (
+    label === undefined ||
+    optionsCell === undefined ||
+    defaultCell === undefined ||
+    !optionsCell.includes(" · ")
+  ) {
+    continue;
+  }
+  const entry = Object.values(PRACTICE).find(
+    (candidate) => candidate.label === label,
+  );
+  if (!entry) {
+    continue;
+  }
+  optionRows += 1;
+  // "Each check: Block · Warn · Off" lists the options after the colon.
+  const listed = optionsCell
+    .replace(/^[^·]*?:\s+/, "")
+    .split(" · ")
+    .map((option) => option.trim());
+  const worded = Object.values(
+    entry.optionLabels as Record<string, string>,
+  );
+  for (const option of listed) {
+    if (!worded.includes(option)) {
+      fail(
+        "practice",
+        `METHOD.md §12.1 offers "${option}" for "${label}", and the registry words none of that setting's options that way`,
+      );
+    }
+  }
+  for (const option of worded) {
+    if (!listed.includes(option) && option !== defaultCell) {
+      fail(
+        "practice",
+        `the registry words an option of "${label}" as "${option}", which METHOD.md §12.1 does not offer`,
+      );
+    }
+  }
+}
+if (optionRows < 15) {
+  fail(
+    "practice",
+    `only ${optionRows} option lists compared in METHOD.md §12.1; the parse is wrong, not the document`,
+  );
+}
+
 const documentedProfiles = section(method, "### 12.2 Profiles", "\n---")
   .split(NEWLINE)
   .map((line) => /^\|\s*\*\*([^*]+)\*\*\s*\|/.exec(line)?.[1])
