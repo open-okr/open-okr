@@ -171,6 +171,14 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
   // The METHOD.md §12 practice settings (P9-T01). The cycle screen reads
   // them since P9-T03a; the admin screen that changes them is P9-T05, which
   // removes these two entries when it calls them.
+  "goals.patch": {
+    apiOnly: true,
+    why: "the OKR list and drawer write through it from P9-T06c, when the client cache that carries the values read arrives; until then the editor writes through goals.update",
+  },
+  "goals.patchKeyResult": {
+    apiOnly: true,
+    why: "the OKR list and drawer write through it from P9-T06c, when the client cache that carries the values read arrives; until then the editor writes through goals.updateKeyResult",
+  },
   "workspace.overview": {
     apiOnly: true,
     why: "the Work Map composes its own reads for the map, the strip and the badges, and this answers a different shape for an API client",

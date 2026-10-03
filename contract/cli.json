@@ -6741,6 +6741,103 @@
       "pages": false
     },
     {
+      "name": "goals tree",
+      "action": "goals.tree",
+      "method": "GET",
+      "path": "/goals/tree",
+      "scope": "read",
+      "summary": "One cycle's objectives with their key results, alignment and dependencies, shaped for the OKR list and diagram, with parents outside the set as read-only context.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "scope",
+          "field": "scope",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "all",
+            "mine"
+          ]
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "include-closed",
+          "field": "includeClosed",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals patch",
+      "action": "goals.patch",
+      "method": "POST",
+      "path": "/goals/patch",
+      "scope": "write",
+      "summary": "Changes some of an objective's fields, refused with the current values if any of them changed since the caller read them.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "set",
+          "field": "set",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals patchKeyResult",
+      "action": "goals.patchKeyResult",
+      "method": "POST",
+      "path": "/goals/patchKeyResult",
+      "scope": "write",
+      "summary": "Changes some of a key result's fields, refused with the current values if any of them changed since the caller read them. The target and the current value have their own actions.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "set",
+          "field": "set",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals recordValue",
       "action": "goals.recordValue",
       "method": "POST",

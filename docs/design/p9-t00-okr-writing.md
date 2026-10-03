@@ -116,7 +116,7 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 | Action | How |
 |---|---|
 | Reorder | Drag by the grip, within the same parent. The keyboard alternative is Alt+↑ and Alt+↓. The whole order is saved, never just the visible rows |
-| Delete a key result | More menu, then delete, with the six-second undo toast. A soft delete through `goals.deleteKeyResult`, restorable from deleted items |
+| Delete a key result | More menu, then delete, with the six-second undo toast. A soft delete through `goals.removeKeyResult`, which P8-G12 built, restorable from deleted items (P9-T06b). One removal rather than a second action beside it |
 | Stop an objective | More menu, then stop, with a one-line reason. It closes as abandoned (§2.9 of the method) |
 | Check in | The row's check-in action opens the drawer on its check-in tab |
 
@@ -199,11 +199,11 @@ The flaw FlowyLMS has, two views drifting apart, is avoided by having one source
 
 | Piece | Design |
 |---|---|
-| Read | `goals.tree(cycleId, scope)` returns objectives, key results, alignment and dependencies in one call, shaped for both views, with every parent from another cycle as read-only context |
+| Read | `goals.tree(cycleId, scope)` returns objectives, key results, alignment and dependencies in one call, shaped for both views, with every parent from another cycle as read-only context. **As built at P9-T06a:** a parent the scope left out of this cycle is context too, marked `otherCycle: false`; a parent the reader cannot see is left out, and the child still names it. "Mine" is what the reader champions, reviews or owns a key result under; following an objective has no data yet, so it is not part of the scope |
 | Cache | TanStack Query, already in the locked stack and installed. The key is `["okr-tree", cycleId, scope]`; both views read the same entry |
 | Write | Every mutation goes through one `useOkrMutation` hook: patch the cache at once, call the server action, on refusal roll back and show the server's sentence, on success merge the server's recomputed progress, health and verdicts |
 | Undo | Deletes, stops, re-parents and reorders push an undo entry for six seconds (UIUX-PLAN §4) |
-| Concurrency | Every `goals.patch*` carries the token from the read; a stale write is refused with the current value (§4.5) |
+| Concurrency | Every `goals.patch*` carries the token from the read; a stale write is refused with the current value (§4.5). **As built at P9-T06a, the token is the values read**: each patch sends `read` beside `set`, field by field, and is refused as a `conflict` (409) with `details.current`, `changedBy` and `changedAt` when a field it changes has moved. A revision column would need every write path to bump it, and `updated_at` moves with every roll-up, so a title edit would fail over a value somebody recorded. Comparing values conflicts only on the fields that moved |
 | Live updates | The existing realtime port invalidates the tree key when another member changes the same cycle |
 | Drawer | Reads and writes through the same cache, so a change in the drawer shows in the row and the node the moment it saves |
 
@@ -250,7 +250,9 @@ Full text in IMPLEMENTATION-PLAN.md, Phase 9.
 
 | Task | Title | Delivers |
 |---|---|---|
-| P9-T06 | One tree, one cache | `goals.tree`, `goals.patch`, `goals.patchKeyResult`, `goals.changeTarget` (with history), `goals.deleteKeyResult`, the concurrency token, the TanStack Query cache and `useOkrMutation` with rollback and undo |
+| P9-T06a | One tree, and one-field writes that refuse a stale read | `goals.tree`, `goals.patch`, `goals.patchKeyResult`, the read values as the concurrency token, the `conflict` refusal |
+| P9-T06b | Target changes with their reason, and a key result removed and restored | `goals.changeTarget` (with history), the reason rule on every target write, a removed key result restorable from deleted items |
+| P9-T06c | The client cache and `useOkrMutation` | The TanStack Query cache, `useOkrMutation` with rollback, conflict and undo, live invalidation |
 | P9-T07a | The OKRs list, edited in place | §3, §4.1, §4.2, §4.5; sidebar regroup and rename; S-13 rewrite |
 | P9-T07b | Adding and reordering in the list | §4.3, §4.4; "+ New objective"; mockups 12 and 12b |
 | P9-T08 | The OKR drawer and the goal page | The shared drawer with edit, check-in, history and target changes; S-14's add-key-result row; the confidence control wired |

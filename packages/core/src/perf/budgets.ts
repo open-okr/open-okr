@@ -1,7 +1,7 @@
 /**
  * TECHNICAL-PLAN §13.1's budgets, and what measures each one (P7-T01b).
  *
- * §13.1 lists fourteen rows and they are not all the same kind of thing. Some
+ * §13.1 lists fifteen rows and they are not all the same kind of thing. Some
  * are a server read this process can time directly. Some are a browser paint,
  * a frame rate or a Core Web Vital, which needs a real page and belongs to
  * P7-T05. One is a delivery through a chat provider, which needs a channel and
@@ -45,6 +45,17 @@ export const BUDGETS: readonly Budget[] = [
     // The server half of the row. The 2.0s interactive half is a browser
     // measurement and P7-T05 owns it.
     action: "goals.list",
+    input: {},
+  },
+  {
+    surface: "OKR tree, one cycle, for the list and the diagram",
+    ms: 1000,
+    statistic: "median",
+    measuredBy: "here",
+    // The one read both OKR views draw from (P9-T06a). The same ceiling as
+    // the Work Map's server render, because it is the same kind of first
+    // paint. The cycle is filled in by the runner.
+    action: "goals.tree",
     input: {},
   },
   {

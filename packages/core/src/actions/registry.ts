@@ -222,6 +222,7 @@ import {
   suggestParent,
 } from "./goal-assists.ts";
 import { readGoalRelations } from "./goal-relations.ts";
+import { patchGoal, patchKeyResult, readGoalTree } from "./goal-tree.ts";
 import {
   closeGoal,
   createGoal,
@@ -733,6 +734,9 @@ export const ACTION_MAP = {
   "goals.moveToCycle": moveGoalToCycle,
   "goals.addKeyResult": createKeyResult,
   "goals.updateKeyResult": updateKeyResult,
+  "goals.tree": readGoalTree,
+  "goals.patch": patchGoal,
+  "goals.patchKeyResult": patchKeyResult,
   "goals.recordValue": recordKeyResultValue,
   "goals.removeKeyResult": removeKeyResult,
   "goals.linkKpi": linkKeyResultKpi,

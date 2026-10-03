@@ -632,6 +632,7 @@ Measured on the large seeded dataset: 100,000 goals and key results plus 1,000,0
 | Surface | Budget |
 |---|---|
 | Work Map first paint, 100 nodes visible | Under 1.0 s server render, under 2.0 s interactive |
+| OKR tree, one cycle, for the list and the diagram (P9-T06a) | Under 1.0 s server render |
 | Work Map and list scroll | 60 frames per second virtualised, no cliff at 10,000 loaded rows |
 | Goal page opened from a list | Under 300 ms perceived |
 | Board render, 4 columns by 50 cards | Under 1.5 s |
