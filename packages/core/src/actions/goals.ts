@@ -91,6 +91,7 @@ import { recomputeForGoal } from "../scoring/recompute.ts";
 import { recomputeAlignmentFor } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { changeTargetInTx, targetReason } from "./goal-targets.ts";
 
 /**
  * Goals per page when the caller names no limit.
@@ -1976,9 +1977,9 @@ export const createKeyResult = defineWriteAction({
 
 export const updateKeyResult = defineWriteAction({
   name: "goals.updateKeyResult",
-  // openokr:policy-exempt: changing a key result that exists stays open under every setting (METHOD.md §2.9); easing a target joins the policy at P9-T06.
+  // openokr:policy-exempt: changing a key result that exists stays open under every setting (METHOD.md §2.9); a target it is given goes through changeTargetInTx, which asks the policy.
   summary:
-    "Edits a key result's definition. The current value has its own action, because it is history.",
+    "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
   input: z.object({
     id: z.uuid(),
     title: z.string().trim().min(1).max(500).optional(),
@@ -1987,6 +1988,11 @@ export const updateKeyResult = defineWriteAction({
     indicatorType: z.enum(INDICATOR_TYPES).optional(),
     baselineValue: z.number().optional(),
     targetValue: z.number().optional(),
+    /**
+     * Why an eased target was eased (P9-T06b). Needed only when the new
+     * target is closer to the baseline and the workspace asks for a reason.
+     */
+    targetReason: targetReason.optional(),
     dueOn: localDate.nullable().optional(),
     ownerId: z.uuid().nullable().optional(),
     weight: z.number().optional(),
@@ -2048,9 +2054,6 @@ export const updateKeyResult = defineWriteAction({
       if (input.baselineValue !== undefined) {
         patch.baselineValue = String(input.baselineValue);
       }
-      if (input.targetValue !== undefined) {
-        patch.targetValue = String(input.targetValue);
-      }
       if (input.dueOn !== undefined) {
         patch.dueOn = input.dueOn;
       }
@@ -2077,6 +2080,19 @@ export const updateKeyResult = defineWriteAction({
             eq(keyResults.id, input.id),
           ),
         );
+      // After the rest, so an easing is judged against the baseline this
+      // same call may have just set.
+      if (input.targetValue !== undefined) {
+        await changeTargetInTx(tx, {
+          workspaceId,
+          keyResultId: input.id,
+          to: input.targetValue,
+          reason: input.targetReason ?? null,
+          actorMemberId: memberId,
+          ...(context.bulk === undefined ? {} : { bulk: context.bulk }),
+        });
+        patch.targetValue = String(input.targetValue);
+      }
 
       await recompute(tx, workspaceId, owner.goalId);
       // Editing a key result changes its own verdicts and the set's.
@@ -2256,8 +2272,9 @@ export const removeKeyResult = defineWriteAction({
           subjectType: "goal",
           subjectId: owner.goalId,
           // The title travels, because the feed entry has to read as a sentence
-          // after the row it names is gone.
-          payload: { title: owner.title },
+          // after the row it names is gone. The id travels so deleted items
+          // can say who removed it (P9-T06b).
+          payload: { title: owner.title, keyResultId: input.id },
         },
         audit: {
           action: "goals.removeKeyResult",

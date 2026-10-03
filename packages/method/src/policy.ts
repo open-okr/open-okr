@@ -59,7 +59,18 @@ export type PolicyIntent =
    * Publishing a set, or the company half of one (P9-T03b). The gates judge
    * what is published; this decides only whether publishing may happen yet.
    */
-  | { readonly kind: "set.publish"; readonly cycle: CycleFacts };
+  | { readonly kind: "set.publish"; readonly cycle: CycleFacts }
+  /**
+   * Changing a key result's target (P9-T06b, METHOD v2 §2.9). Only easing
+   * one, toward its baseline, can be refused, and only for want of a reason.
+   */
+  | {
+      readonly kind: "target.change";
+      readonly from: number;
+      readonly to: number;
+      readonly baseline: number;
+      readonly hasReason: boolean;
+    };
 
 export interface PolicyDecision {
   readonly outcome: "allow" | "block";
@@ -102,7 +113,7 @@ export function policyNeedsPhases(
   intent: PolicyIntent,
   practice: ResolvedPractice,
 ): boolean {
-  if (intent.kind === "reviewer.remove") {
+  if (intent.kind === "reviewer.remove" || intent.kind === "target.change") {
     return false;
   }
   if (intent.kind === "set.publish") {
@@ -168,6 +179,27 @@ function phaseRules(practice: ResolvedPractice): PracticeKey[] {
 }
 
 /**
+ * Whether a target change eases the key result, by moving its target closer
+ * to the baseline (METHOD v2 §2.9).
+ *
+ * Judged by distance rather than by direction, which says the same thing for
+ * an increase and a reduce and still answers for a maintain or a move: on an
+ * increase from 40, 100 to 80 eases and 100 to 110 does not; on a reduce
+ * from 100, 50 to 70 eases. Equal distance is not easing, so a target moved
+ * to the mirror side of its baseline asks for nothing.
+ */
+export function isEasing(change: {
+  readonly from: number;
+  readonly to: number;
+  readonly baseline: number;
+}): boolean {
+  return (
+    Math.abs(change.to - change.baseline) <
+    Math.abs(change.from - change.baseline)
+  );
+}
+
+/**
  * Decides whether a write the practice governs may go ahead.
  *
  * Nothing about the quality of what is written is decided here: checks coach
@@ -184,6 +216,24 @@ export function decide(
   const reviewerRequired = practice.reviewer === "required";
   if (intent.kind === "reviewer.remove") {
     return reviewerRequired ? REVIEWER_REQUIRED : ALLOW;
+  }
+  // §2.9: making a target harder never needs a reason; easing one does where
+  // the workspace asks for it, and "it got hard" is not one.
+  if (intent.kind === "target.change") {
+    if (
+      intent.hasReason ||
+      practice["reasons.easingTarget"] !== "required" ||
+      !isEasing(intent)
+    ) {
+      return ALLOW;
+    }
+    return {
+      outcome: "block",
+      rules: ["reasons.easingTarget"],
+      reasons: [
+        `Easing a target needs a written reason: ${intent.from} to ${intent.to} moves it toward its baseline of ${intent.baseline}. The original target stays on record, and "it got hard" is not a reason.`,
+      ],
+    };
   }
   if (
     intent.kind === "objective.create" &&

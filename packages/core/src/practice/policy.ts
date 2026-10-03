@@ -41,7 +41,15 @@ export type PolicyRequest =
   | { readonly kind: "reviewer.remove" }
   | { readonly kind: "keyResult.create"; readonly cycleId: string | null }
   /** Publishing a set, or its company half (P9-T03b). */
-  | { readonly kind: "set.publish"; readonly cycleId: string };
+  | { readonly kind: "set.publish"; readonly cycleId: string }
+  /** Changing a key result's target (P9-T06b). Needs no cycle. */
+  | {
+      readonly kind: "target.change";
+      readonly from: number;
+      readonly to: number;
+      readonly baseline: number;
+      readonly hasReason: boolean;
+    };
 
 /**
  * What the policy decides for this request, without refusing.
@@ -61,6 +69,9 @@ export async function policyDecisionInTx<
   const { thresholds } = resolveRhythm(row);
   if (request.kind === "reviewer.remove") {
     return decide({ kind: "reviewer.remove" }, practice, thresholds);
+  }
+  if (request.kind === "target.change") {
+    return decide(request, practice, thresholds);
   }
 
   let cycle: CycleFacts | null = null;

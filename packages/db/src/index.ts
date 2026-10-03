@@ -335,6 +335,7 @@ export {
   type KeyResultDirection,
   type KeyResultValue,
   keyResults,
+  keyResultTargetChanges,
   keyResultValues,
   VALUE_SOURCES,
   type ValueSource,

@@ -401,6 +401,15 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
   "key_result.removed": z.object({ title: z.string() }),
+  // A target moved, and whether it eased (P9-T06b). The reason is in the
+  // target history, not the feed, where it would be read out of context.
+  "key_result.target_changed": z.object({
+    keyResultId: z.uuid(),
+    from: z.number(),
+    to: z.number(),
+    eased: z.boolean(),
+  }),
+  "key_result.restored": z.object({ title: z.string() }),
   "key_result.kpi_linked": z.object({ kpiId: z.uuid() }),
   "key_result.kpi_unlinked": z.object({}),
   // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing

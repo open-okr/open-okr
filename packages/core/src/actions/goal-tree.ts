@@ -80,7 +80,7 @@ const treeKeyResult = z.object({
   position: z.number().int(),
 });
 
-const treeGoal = z.object({
+export const treeGoal = z.object({
   id: z.uuid(),
   title: z.string(),
   cycleId: z.uuid().nullable(),
@@ -310,7 +310,7 @@ async function treeNodes(
 }
 
 /** One goal's node, read after a write so the caller can merge it. */
-async function treeNode(
+export async function treeNode(
   tx: OperationTx,
   workspaceId: string,
   goalId: string,

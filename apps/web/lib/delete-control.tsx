@@ -27,6 +27,11 @@ const WORDS: Record<
     deleted: "deleteControl.deletedGoal",
     restored: "deleteControl.restoredGoal",
   },
+  key_result: {
+    button: "deleteControl.deleteKeyResult",
+    deleted: "deleteControl.deletedKeyResult",
+    restored: "deleteControl.restoredKeyResult",
+  },
   initiative: {
     button: "deleteControl.deleteInitiative",
     deleted: "deleteControl.deletedInitiative",

@@ -224,6 +224,42 @@ export const keyResultValues = pgTable("key_result_values", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
+/**
+ * Every change to a key result's target (P9-T06b, METHOD v2 §2.9). The
+ * original stays on record, and easing one carries its reason.
+ */
+export const keyResultTargetChanges = pgTable("key_result_target_changes", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  keyResultId: uuid("key_result_id")
+    .notNull()
+    .references(() => keyResults.id, { onDelete: "cascade" }),
+  fromValue: numeric("from_value").notNull(),
+  toValue: numeric("to_value").notNull(),
+  /** The baseline the change was judged against, which can move later. */
+  baselineValue: numeric("baseline_value").notNull(),
+  /** Whether this change moved the target toward its baseline when made. */
+  eased: boolean("eased").notNull(),
+  reason: text("reason"),
+  /** Whether the cycle's plan was already published (P9-T13 reads it). */
+  midCycle: boolean("mid_cycle").notNull().default(false),
+  actorMemberId: uuid("actor_member_id").references(() => workspaceMembers.id, {
+    onDelete: "set null",
+  }),
+  changedAt: timestamp("changed_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
 export const goalRetrospectives = pgTable("goal_retrospectives", {
   id: uuid("id").primaryKey().$defaultFn(newId),
   workspaceId: uuid("workspace_id")

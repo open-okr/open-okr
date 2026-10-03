@@ -787,6 +787,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason: "The measured history of every key result.",
   },
   {
+    table: "key_result_target_changes",
+    decision: "export",
+    reason:
+      "Every change to a key result's target, and the reason given for easing one.",
+  },
+  {
     table: "kudos",
     decision: "export",
     reason: "Recognition somebody gave somebody else.",

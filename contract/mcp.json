@@ -9147,7 +9147,7 @@
     },
     {
       "name": "goals.updateKeyResult",
-      "description": "Edits a key result's definition. The current value has its own action, because it is history.",
+      "description": "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9193,6 +9193,11 @@
           },
           "targetValue": {
             "type": "number"
+          },
+          "targetReason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
           },
           "dueOn": {
             "anyOf": [
@@ -9457,6 +9462,94 @@
         "id": "00000000-0000-4000-8000-000000000000",
         "set": {},
         "read": {}
+      }
+    },
+    {
+      "name": "goals.changeTarget",
+      "description": "Changes a key result's target and records the change. Easing it toward its baseline needs a reason where the workspace asks for one.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "targetValue": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "id",
+          "targetValue"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "targetValue": 0
+      }
+    },
+    {
+      "name": "goals.targetHistory",
+      "description": "Every change to a key result's target, oldest first, with who made it and the reason given for easing it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "goals.restoreKeyResult",
+      "description": "Brings back a key result that was removed on its own, with its value history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
       }
     },
     {

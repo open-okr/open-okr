@@ -179,6 +179,14 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     apiOnly: true,
     why: "the OKR list and drawer write through it from P9-T06c, when the client cache that carries the values read arrives; until then the editor writes through goals.updateKeyResult",
   },
+  "goals.changeTarget": {
+    apiOnly: true,
+    why: "the OKR list and drawer change a target through it from P9-T07a and P9-T08, where the reason field opens under the cell; no screen changes a target before then, and goals.updateKeyResult meets the same rule for the callers that send one",
+  },
+  "goals.targetHistory": {
+    apiOnly: true,
+    why: "the OKR drawer's target history tab reads it from P9-T08",
+  },
   "workspace.overview": {
     apiOnly: true,
     why: "the Work Map composes its own reads for the map, the strip and the badges, and this answers a different shape for an API client",

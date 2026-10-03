@@ -3,6 +3,7 @@ import {
   type CycleFacts,
   decide,
   draftingWaitsForPhases,
+  isEasing,
   type PolicyIntent,
   planningWindow,
   policyNeedsPhases,
@@ -305,5 +306,66 @@ describe("the reviewer setting", () => {
     expect(
       decide({ kind: "reviewer.remove" }, optional, thresholds).outcome,
     ).toBe("allow");
+  });
+});
+
+describe("changing a target (P9-T06b, METHOD v2 §2.9)", () => {
+  const required = resolvePractice("recommended");
+  const optional = resolvePractice("recommended", {
+    "reasons.easingTarget": "optional",
+  });
+  const change = (
+    from: number,
+    to: number,
+    baseline: number,
+    hasReason = false,
+  ): PolicyIntent => ({
+    kind: "target.change",
+    from,
+    to,
+    baseline,
+    hasReason,
+  });
+
+  it("judges easing by distance from the baseline, for an increase and a reduce alike", () => {
+    // Increase from 40: 100 to 80 eases, 100 to 110 is harder.
+    expect(isEasing({ from: 100, to: 80, baseline: 40 })).toBe(true);
+    expect(isEasing({ from: 100, to: 110, baseline: 40 })).toBe(false);
+    // Reduce from 100: 50 to 70 eases, 50 to 30 is harder.
+    expect(isEasing({ from: 50, to: 70, baseline: 100 })).toBe(true);
+    expect(isEasing({ from: 50, to: 30, baseline: 100 })).toBe(false);
+    // The same target is no change at all.
+    expect(isEasing({ from: 100, to: 100, baseline: 40 })).toBe(false);
+  });
+
+  it("refuses easing without a reason by default, citing the setting", () => {
+    const refused = decide(change(100, 80, 40), required, thresholds);
+    expect(refused.outcome).toBe("block");
+    expect(refused.rules).toEqual(["reasons.easingTarget"]);
+    expect(refused.reasons[0]).toMatch(
+      /^Easing a target needs a written reason/,
+    );
+    expect(
+      decide(change(100, 80, 40, true), required, thresholds).outcome,
+    ).toBe("allow");
+  });
+
+  it("never asks a reason for a harder target", () => {
+    expect(decide(change(100, 110, 40), required, thresholds).outcome).toBe(
+      "allow",
+    );
+    expect(decide(change(50, 30, 100), required, thresholds).outcome).toBe(
+      "allow",
+    );
+  });
+
+  it("lets easing through without a reason where the workspace made it optional", () => {
+    expect(decide(change(100, 80, 40), optional, thresholds).outcome).toBe(
+      "allow",
+    );
+  });
+
+  it("needs no phases to decide", () => {
+    expect(policyNeedsPhases(change(100, 80, 40), required)).toBe(false);
   });
 });

@@ -341,6 +341,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A key result moved to ${Number(p.value ?? 0)}`,
   "key_result.removed": (p) =>
     `Key result "${asString(p.title, "a key result")}" was removed`,
+  "key_result.target_changed": (p) =>
+    p.eased
+      ? `A key result's target was eased from ${String(p.from)} to ${String(p.to)}`
+      : `A key result's target moved from ${String(p.from)} to ${String(p.to)}`,
+  "key_result.restored": (p) =>
+    `Key result "${asString(p.title, "a key result")}" was brought back`,
   "key_result.kpi_linked": () =>
     "A key result was linked to a KPI and now reads its value from it",
   "key_result.kpi_unlinked": () =>

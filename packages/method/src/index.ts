@@ -140,6 +140,7 @@ export {
   type CycleFacts,
   decide,
   draftingWaitsForPhases,
+  isEasing,
   type PolicyDecision,
   type PolicyIntent,
   planningWindow,

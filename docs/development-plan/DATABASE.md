@@ -81,6 +81,7 @@ workspaces
   │     └── goals
   │           ├── key_results
   │           │     ├── key_result_values
+  │           │     ├── key_result_target_changes
   │           │     ├── key_result_dependencies
   │           │     ├── blockers
   │           │     └── kpi_id ──► kpis  (measured by)
@@ -279,6 +280,11 @@ At most one of `parent_goal_id` and `parent_key_result_id` is set. Cycles in the
 
 ### key_result_values
 `key_result_id` to key_results, `value numeric`, `at`, `author_member_id` to workspace_members, `check_in_id?` to check_ins, `source` (`manual` / `check_in` / `kpi` / `import` / `agent`).
+
+### key_result_target_changes
+`key_result_id` to key_results, `from_value numeric`, `to_value numeric`, `baseline_value numeric`, `eased bool`, `reason?`, `mid_cycle bool`, `actor_member_id?` to workspace_members, `changed_at`. Migration 0112 (P9-T06b).
+
+Every change to a key result's target, written by `goals.changeTarget` and by a target sent through `goals.updateKeyResult`, so the original stays on record (METHOD v2 §2.9). `eased` and `baseline_value` are what the change was judged on when it was made, because the baseline can move afterwards. A reason is required for an eased target unless the workspace made it optional, and is never an empty string. `mid_cycle` is whether the cycle's plan was already published.
 
 ### check_ins
 `subject_type` (`goal`), `subject_id`, `author_member_id` to workspace_members, `state` (`draft` / `published`), `published_at?`, `status` (`on_track` / `caution` / `off_track`), `confidence numeric?`, `narrative` (rich), `snapshot_id?` to check_in_snapshots, `session_id?` to sessions, `reviewer_member_id?` to workspace_members, `acknowledged_by_id?` to workspace_members, `acknowledged_at?`, `ai_drafted bool`.

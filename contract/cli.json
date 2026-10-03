@@ -6653,7 +6653,7 @@
       "method": "POST",
       "path": "/goals/updateKeyResult",
       "scope": "write",
-      "summary": "Edits a key result's definition. The current value has its own action, because it is history.",
+      "summary": "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
       "flags": [
         {
           "name": "id",
@@ -6705,6 +6705,12 @@
           "name": "target-value",
           "field": "targetValue",
           "type": "number",
+          "required": false
+        },
+        {
+          "name": "target-reason",
+          "field": "targetReason",
+          "type": "string",
           "required": false
         },
         {
@@ -6832,6 +6838,69 @@
           "name": "read",
           "field": "read",
           "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals changeTarget",
+      "action": "goals.changeTarget",
+      "method": "POST",
+      "path": "/goals/changeTarget",
+      "scope": "write",
+      "summary": "Changes a key result's target and records the change. Easing it toward its baseline needs a reason where the workspace asks for one.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "target-value",
+          "field": "targetValue",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals targetHistory",
+      "action": "goals.targetHistory",
+      "method": "GET",
+      "path": "/goals/targetHistory",
+      "scope": "read",
+      "summary": "Every change to a key result's target, oldest first, with who made it and the reason given for easing it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals restoreKeyResult",
+      "action": "goals.restoreKeyResult",
+      "method": "POST",
+      "path": "/goals/restoreKeyResult",
+      "scope": "write",
+      "summary": "Brings back a key result that was removed on its own, with its value history.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
           "required": true
         }
       ],
