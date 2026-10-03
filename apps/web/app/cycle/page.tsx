@@ -1,10 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import {
   canonThresholds,
+  defaultPractice,
   KEY_RESULT_CHECKS,
   OBJECTIVE_CHECKS,
   PHASE_TITLES,
   phaseWorkAllowed,
+  type ResolvedPractice,
   type ResolvedThresholds,
 } from "@openokr/method";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
@@ -287,7 +289,14 @@ export default async function CyclePage({
       : null;
 
   const phase = workflow.phases[viewing];
+  // What earlier phases still miss. Under guided phases, the default, this is
+  // guidance and nothing waits on it (METHOD.md §2.3). Whether drafting waits
+  // is the server's decision, read from `workflow.drafting`, so this screen
+  // never offers a form the write would refuse, or hides one it would accept.
   const work = phaseWorkAllowed(viewing, workflow.phases);
+  const draftingBlocked = viewing === 4 && !workflow.drafting.allowed;
+  const showGaps =
+    !work.allowed && workflow.practice.phaseEnforcement !== "hidden";
 
   // Only phase 4 needs the set and the member list, and only phase 4 pays for
   // reading them.
@@ -316,6 +325,11 @@ export default async function CyclePage({
           // by construction: the same `resolveThresholds` builds both.
           thresholds: (await callAction(context, "rhythm.read", {}))
             .thresholds as unknown as ResolvedThresholds,
+          // The same for the check levels (METHOD.md §12, P9-T03a). Typed as
+          // records of words at the contract boundary; `ResolvedPractice` by
+          // construction, since `resolvePractice` builds both.
+          practice: (await callAction(context, "practice.read", {}))
+            .practice as unknown as ResolvedPractice,
           checkTitles: [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].map(
             (check) => ({ id: check.id, title: check.title }),
           ),
@@ -325,6 +339,7 @@ export default async function CyclePage({
           goals: [],
           members: [],
           thresholds: canonThresholds(),
+          practice: defaultPractice(),
           checkTitles: [],
           kpis: [],
         };
@@ -417,11 +432,18 @@ export default async function CyclePage({
               currentId={cycle.id}
             />
           </CardHeader>
-          {work.allowed ? null : (
+          {draftingBlocked || showGaps ? (
             <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">
               <p className="text-sm font-bold text-warn">
-                {t("cycle.thisPhaseIsBlocked")}
+                {draftingBlocked
+                  ? t("cycle.thisPhaseIsBlocked")
+                  : t("cycle.earlierPhasesHaveGaps")}
               </p>
+              {draftingBlocked ? null : (
+                <p className="text-xs text-warn">
+                  {t("cycle.thePhasesGuideNothingWaits")}
+                </p>
+              )}
               <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-warn">
                 {work.because.map((reason) => (
                   <li key={reason}>{reason}</li>
@@ -433,7 +455,7 @@ export default async function CyclePage({
                 </a>
               </p>
             </CardBody>
-          )}
+          ) : null}
           {phase && phase.blocked.length > 0 ? (
             <CardBody className="border-line border-t">
               <ul className="flex flex-col gap-0.5 text-xs text-ink-3">
@@ -558,6 +580,7 @@ export default async function CyclePage({
             gates={workflow.gates}
             publishable={workflow.publishable}
             publishedAt={workflow.publishedAt}
+            companyPublishedAt={workflow.companyPublishedAt}
             canPublish={canPublish}
             pinnedCycleId={pinnedCycleId}
           />
@@ -567,12 +590,14 @@ export default async function CyclePage({
           <Drafting
             cycleId={workflow.cycleId}
             endsOn={workflow.endsOn}
-            draftingAllowed={work.allowed}
+            draftingAllowed={workflow.drafting.allowed}
+            draftingReasons={workflow.drafting.reasons}
             goals={draft.goals}
             members={draft.members}
             kpis={draft.kpis}
             canEdit={canEdit}
             thresholds={draft.thresholds}
+            practice={draft.practice}
             checkTitles={draft.checkTitles}
             memberId={workspace.memberId}
             assistsAvailable={await assistsAvailableAction()}
@@ -664,7 +689,7 @@ export default async function CyclePage({
                 hasCycle: true,
                 hasTimeframe: false,
                 championId: goal.champion.id,
-                reviewerId: goal.reviewer.id,
+                reviewerId: goal.reviewer?.id ?? null,
                 objectivesInUnit: draft.goals.filter(
                   (other) => other.level === goal.level,
                 ).length,
@@ -683,6 +708,7 @@ export default async function CyclePage({
               })),
             }))}
             thresholds={draft.thresholds}
+            practice={draft.practice}
             checkTitles={draft.checkTitles}
           />
         ) : null}

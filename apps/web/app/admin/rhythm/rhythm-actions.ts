@@ -90,8 +90,8 @@ function composites(
  * the same property used for the save.
  *
  * So the payload is built from what arrived rather than read at fixed names.
- * Reading `form.get("coachStrictness")` unconditionally, as this did while one
- * form wrapped the whole screen, would send `null` for the three cadence
+ * Reading `form.get("checkInAnchorDay")` unconditionally, as this did while
+ * one form wrapped the whole screen, would send `null` for the cadence
  * settings on every save from any other card.
  */
 export async function saveRhythm(
@@ -203,12 +203,6 @@ export async function saveRhythm(
   }
   if (form.has("checkInAnchorDay")) {
     patch.checkInAnchorDay = Number(form.get("checkInAnchorDay"));
-  }
-  if (form.has("coachStrictness")) {
-    patch.coachStrictness = String(form.get("coachStrictness")) as
-      | "advisory"
-      | "warn"
-      | "strict";
   }
   if (sawThreshold) {
     patch.overrides = overrides;

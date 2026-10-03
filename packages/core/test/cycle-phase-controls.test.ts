@@ -264,51 +264,162 @@ describe("a key result's owner and due date", () => {
 });
 
 /**
- * REQUIREMENTS §3.1: "drafting in Phase 4 is refused with the reason"
- * (completeness review H-09). The cycle screen's drafting is guided; a goal
- * added anywhere else does not wait on the planning phases.
+ * REQUIREMENTS §3.1, both directions (P9-T02).
+ *
+ * Until P9-T02 the cycle screen's drafting refused while an earlier phase was
+ * incomplete, and only when the screen set `guided` (completeness review
+ * H-09). The phases now guide by default and nothing waits on them, from any
+ * caller. A workspace that makes them binding gets the refusal back, from
+ * every caller alike, with the reasons and the setting that caused it.
  */
-describe("drafting in a blocked phase 4", () => {
+describe("drafting while the earlier phases are incomplete", () => {
   const objective = {
     title: "Make onboarding the reason new customers stay",
     level: "company",
     ownerKind: "workspace",
     weight: 1,
-  };
+  } as const;
+  const keyResultOf = (goalId: string) => ({
+    goalId,
+    title: "Raise activation from 41% to 60%",
+    direction: "increase",
+    indicatorType: "leading",
+    baselineValue: 41,
+    targetValue: 60,
+    weight: 1,
+  });
 
-  it("refuses a guided draft and names what the earlier phases still need", async () => {
-    await expect(
-      call("goals.create", {
+  it("drafts an objective and a key result on the recommended profile, with or without the old flag", async () => {
+    for (const guided of [true, false]) {
+      const goal = (await call("goals.create", {
         ...objective,
         cycleId: quarterId,
         championId: ownerMemberId,
         reviewerId: ownerMemberId,
-        guided: true,
-      }),
-    ).rejects.toThrow(
-      /^Drafting waits until the earlier phases are complete\. .*Phase 1: No sponsor named/,
-    );
+        guided,
+      })) as { id: string };
+      await expect(
+        call("goals.addKeyResult", { ...keyResultOf(goal.id), guided }),
+      ).resolves.toBeTruthy();
+    }
   });
 
-  it("refuses a guided key result on a goal in that cycle, and lets an unguided one through", async () => {
+  it("says on the workflow that drafting is open, and what the phases still miss", async () => {
+    const workflow = (await call("workflow.read", { cycleId: quarterId })) as {
+      practice: { phaseEnforcement: string };
+      drafting: { allowed: boolean; reasons: string[] };
+      phases: { phase: number; state: string; missing: string[] }[];
+    };
+    expect(workflow.practice.phaseEnforcement).toBe("guided");
+    expect(workflow.drafting).toEqual({ allowed: true, reasons: [] });
+    expect(workflow.phases[1]?.missing.join(" ")).toMatch(/No sponsor named/);
+  });
+
+  it("refuses both under binding phases, naming what the earlier phases still need", async () => {
     const goal = (await call("goals.create", {
       ...objective,
       cycleId: quarterId,
       championId: ownerMemberId,
       reviewerId: ownerMemberId,
     })) as { id: string };
-    const keyResult = {
-      goalId: goal.id,
-      title: "Raise activation from 41% to 60%",
-      direction: "increase",
-      indicatorType: "leading",
-      baselineValue: 41,
-      targetValue: 60,
-      weight: 1,
-    };
+    await call("practice.update", {
+      overrides: { "phases.enforcement": "binding" },
+    });
+
     await expect(
-      call("goals.addKeyResult", { ...keyResult, guided: true }),
-    ).rejects.toThrow(/Drafting waits/);
-    await expect(call("goals.addKeyResult", keyResult)).resolves.toBeTruthy();
+      call("goals.create", {
+        ...objective,
+        cycleId: quarterId,
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+      }),
+    ).rejects.toThrow(
+      /drafts after the planning phases are complete.*Phase 1: No sponsor named/,
+    );
+    await expect(
+      call("goals.addKeyResult", keyResultOf(goal.id)),
+    ).rejects.toThrow(/drafts after the planning phases are complete/);
+
+    const workflow = (await call("workflow.read", { cycleId: quarterId })) as {
+      drafting: { allowed: boolean; reasons: string[] };
+    };
+    expect(workflow.drafting.allowed).toBe(false);
+    expect(workflow.drafting.reasons[0]).toMatch(/Phase 1: No sponsor named/);
+  });
+
+  it("leaves an objective with its own timeframe alone under binding phases", async () => {
+    await call("practice.update", {
+      overrides: { "phases.enforcement": "binding" },
+    });
+    await expect(
+      call("goals.create", {
+        ...objective,
+        timeframe: { startsOn: "2030-01-01", endsOn: "2030-06-30" },
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+      }),
+    ).resolves.toBeTruthy();
+  });
+
+  it("lets an import record objectives under binding phases, because it records history", async () => {
+    await call("practice.update", {
+      overrides: { "phases.enforcement": "binding" },
+    });
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        {
+          pool: wb.appPool,
+          workspaceId,
+          actor: { kind: "human", userId: OWNER },
+          bulk: true,
+        },
+        "goals.create",
+        {
+          ...objective,
+          cycleId: quarterId,
+          championId: ownerMemberId,
+          reviewerId: ownerMemberId,
+        },
+      ),
+    ).resolves.toBeTruthy();
+  });
+});
+
+/**
+ * METHOD.md §2.3 (P9-T02): "or this is the first cycle, which is inferred
+ * when no earlier cycle exists and may be declared". A workspace's first
+ * quarter never asks for a prior quarter's scores that cannot exist.
+ */
+describe("the first cycle is inferred", () => {
+  const priorMissing = (phases: { missing: string[] }[]) =>
+    (phases[2]?.missing ?? []).some((reason) => /prior cycle/i.test(reason));
+
+  it("asks nothing of a prior cycle when there is none of its mode", async () => {
+    // Provisioning made the quarter containing today, which is the earliest
+    // quarterly cycle here. Nobody declared it a first cycle.
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string; first_cycle: boolean }>(
+      `select id, first_cycle from cycles
+        where workspace_id = $1 and mode = 'quarterly' and deleted_at is null
+        order by starts_on asc limit 1`,
+      [workspaceId],
+    );
+    const earliest = rows[0];
+    expect(earliest?.first_cycle).toBe(false);
+    const first = (await call("workflow.read", { cycleId: earliest?.id })) as {
+      phases: { missing: string[] }[];
+    };
+    expect(priorMissing(first.phases)).toBe(false);
+  });
+
+  it("asks for the prior cycle's scores once an earlier one exists", async () => {
+    const next = (await call("cycles.create", { on: "2030-05-15" })) as {
+      id: string;
+    };
+    const second = (await call("workflow.read", { cycleId: next.id })) as {
+      phases: { missing: string[] }[];
+    };
+    expect(priorMissing(second.phases)).toBe(true);
   });
 });

@@ -220,6 +220,14 @@ export const THRESHOLDS = {
       quarterly: z.number().int().min(0).max(52),
     }),
   }),
+  "cadence.teamPublicationWindowWeeks": param({
+    group: "cadence",
+    label: "Team publication window",
+    section: "§2.9",
+    why: "Two weeks after the cycle starts. Company OKRs publish before day one and team OKRs in the first fortnight, which is when most published cycles share them; an OKR created after it is marked as added mid-cycle.",
+    default: 2,
+    schema: z.number().int().min(0).max(13),
+  }),
   "cadence.publicationCountdownDays": param({
     group: "cadence",
     label: "Publication deadline countdown",
@@ -361,7 +369,7 @@ export const THRESHOLDS = {
     group: "quality",
     label: "Coach strictness",
     section: "§4",
-    why: "Warn: a warning is worth another look, not a refusal. The six publish gates are always hard, whatever this says.",
+    why: "Warn: each check keeps its own level from §4. Strict, for a space, raises every check on its goals to block, which is what the practice's strict mode does for the whole workspace.",
     default: "warn" as CoachStrictness,
     schema: z.enum(COACH_STRICTNESS),
   }),
@@ -389,6 +397,14 @@ export const THRESHOLDS = {
     default: { red: 45, green: 75 },
     schema: z.object({ red: percent, green: percent }),
   }),
+  "quality.strengthScoreWarnWeight": param({
+    group: "quality",
+    label: "Strength score warn weight",
+    section: "§4",
+    why: "Half. A warning is worth another look, not a defect, so it counts for half a pass. A product heuristic rather than a published measure.",
+    default: 0.5,
+    schema: unit,
+  }),
   "quality.keyResultsPerObjective": param({
     group: "quality",
     label: "Key results per objective",
@@ -397,13 +413,13 @@ export const THRESHOLDS = {
     default: { low: 2, high: 5 },
     schema: bounds(0, 20),
   }),
-  "quality.objectiveLengthWords": param({
+  "quality.objectiveLengthLimit": param({
     group: "quality",
-    label: "Objective length bounds",
+    label: "Objective length limit",
     section: "§4.1",
-    why: "Four to eighteen words. Shorter and nobody outside the team understands it; longer and the team cannot recite it.",
-    default: { low: 4, high: 18 },
-    schema: bounds(1, 100),
+    why: "Eighteen words, warn above: longer and the team cannot recite it. There is no lower bound since P9-T02's review: whatmatters' own \"Achieve fiscal sustainability\" is three words.",
+    default: 18,
+    schema: z.number().int().min(1).max(100),
   }),
   "quality.companyObjectiveCap": param({
     group: "quality",
@@ -421,13 +437,13 @@ export const THRESHOLDS = {
     default: 3,
     schema: z.number().int().min(1).max(50),
   }),
-  "quality.strategicIssueBounds": param({
+  "quality.strategicIssueMinimum": param({
     group: "quality",
-    label: "Strategic issue bounds",
+    label: "Strategic issue minimum",
     section: "§2.3",
-    why: "Three to ten, ranked by impact. Fewer than three is not a diagnosis; more than ten is not ranked. The floor was five until 2026-08-17: it held for a mid-sized company and blocked a team of eight on day one, which taught them to invent two issues rather than to diagnose, and inventing is the exact failure the check exists to prevent. A workspace that wants five back raises this.",
-    default: { low: 3, high: 10 },
-    schema: bounds(0, 100),
+    why: "Three, ranked by impact. Fewer than three is not a diagnosis. The floor was five until 2026-08-17: it held for a mid-sized company and blocked a team of eight on day one, which taught them to invent two issues rather than to diagnose, and inventing is the exact failure the check exists to prevent. There is no ceiling since P9-T02: the old upper bound of ten was never checked by anything, and a long ranked list is a facilitator's problem rather than a defect.",
+    default: 3,
+    schema: z.number().int().min(0).max(100),
   }),
   "quality.priorityBounds": param({
     group: "quality",

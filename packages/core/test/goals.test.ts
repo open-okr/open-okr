@@ -178,7 +178,7 @@ describe("creating a goal", () => {
     expect(read.progressPct).toBe(0);
     expect(read.health).toBe("pending");
     expect(read.champion.name).toBe("Goal Owner");
-    expect(read.reviewer.name).toBe("Second Member");
+    expect(read.reviewer?.name).toBe("Second Member");
     expect(read.keyResults).toHaveLength(2);
     // The current value defaults to the baseline, so progress starts at 0 rather
     // than undefined (§5.1).
@@ -601,7 +601,7 @@ describe("reassigning a role", () => {
       "goals.read",
       { id: created.id },
     );
-    expect(read.reviewer.id).toBe(ownerMemberId);
+    expect(read.reviewer?.id).toBe(ownerMemberId);
 
     // The binding moved with the column. A reassignment that updated one and not
     // the other would leave the outgoing reviewer holding access they no longer

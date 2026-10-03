@@ -135,6 +135,12 @@ export const cycles = pgTable("cycles", {
   publicationDeadline: date("publication_deadline"),
   packDistributedAt: timestamp("pack_distributed_at", { withTimezone: true }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
+  /**
+   * When the company set was published, the first of the two steps (METHOD.md
+   * §4.5, P9-T03b). `publishedAt` still means the whole set; a set published
+   * in one go sets both.
+   */
+  companyPublishedAt: timestamp("company_published_at", { withTimezone: true }),
   levels: jsonb("levels")
     .$type<GoalLevel[]>()
     .notNull()
@@ -196,6 +202,29 @@ export const rhythmSettings = pgTable("rhythm_settings", {
    * thresholds.
    */
   quietMode: boolean("quiet_mode").notNull().default(false),
+  /**
+   * The METHOD.md §12 profile the workspace chose (P9-T01). The starting
+   * point `practice` is laid over.
+   */
+  profile: text("profile", {
+    enum: [
+      "recommended",
+      "googleStyle",
+      "radicalFocus",
+      "lightweight",
+      "governed",
+    ],
+  })
+    .notNull()
+    .default("recommended"),
+  /**
+   * The practice settings this workspace changed on top of its profile,
+   * sparse, validated against `PRACTICE` in packages/method (P9-T01).
+   */
+  practice: jsonb("practice")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

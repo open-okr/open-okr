@@ -81,6 +81,7 @@ workspaces
   │     └── goals
   │           ├── key_results
   │           │     ├── key_result_values
+  │           │     ├── key_result_target_changes
   │           │     ├── key_result_dependencies
   │           │     ├── blockers
   │           │     └── kpi_id ──► kpis  (measured by)
@@ -226,7 +227,9 @@ The two legacy columns and their unique partial index arrived at P6-T03a, sevent
 `frame_id` to annual_frames, `text`, `note?`, `position`.
 
 ### cycles *(short_id, importable)*
-`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `levels jsonb`, `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `company_published_at?`, `levels jsonb`, `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+
+`company_published_at` (0110, P9-T03b) is the first of the two publish steps, METHOD.md §4.5: the company set, published before the cycle starts. `published_at` still means the whole set is out, so a set published in one go sets both and a cycle published before the column existed reads as it always did. No legacy source.
 
 The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An imported cycle keeps the name the source used, because that is the name the people being migrated recognise; the period still decides the dates and the mode.
 
@@ -261,12 +264,12 @@ The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An i
 `cycle_id` to cycles, `used bool`, `reason`, `at`, `author_member_id` to workspace_members.
 
 ### rhythm_settings *(one row per workspace)*
-`default_check_in_frequency`, `check_in_anchor_day`, `coach_strictness` (`advisory` / `warn` / `strict`), `overrides jsonb`, `labels jsonb`. `overrides` holds sparse deviations from the METHOD.md §11 registry, validated against the method package's schema; an unset key reads the canon default.
+`default_check_in_frequency`, `check_in_anchor_day`, `coach_strictness` (`advisory` / `warn` / `strict`), `overrides jsonb`, `labels jsonb`, `quiet_mode bool`, `profile` (`recommended` / `googleStyle` / `radicalFocus` / `lightweight` / `governed`, default `recommended`), `practice jsonb` (default `{}`, an object). `overrides` holds sparse deviations from the METHOD.md §11 registry, validated against the method package's schema; an unset key reads the canon default. `profile` and `practice` (0109, P9-T01) are the METHOD.md §12 practice settings: the chosen profile, and only what the workspace changed on top of it, validated against `PRACTICE`. No legacy source.
 
 ## 7. Goals, key results and check-ins (domain D)
 
 ### goals *(short_id, importable)*
-`title`, `description` (rich), `cycle_id?` to cycles, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `champion_id` to workspace_members, `reviewer_id` to workspace_members, `parent_goal_id?` to goals, `parent_key_result_id?` to key_results, `strategy_id?` to annual_strategies, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?` to check_ins, `contribution_statement?`, `closed_at?`, `closed_by_id?`, `success_status?` (`achieved` / `missed`), `close_decision?` (`keep` / `modify` / `abandon`), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `ai_generated bool` (written for the first time by P4-T15a: an objective a reader kept from an assist's draft says so, and one they typed says so too), `position`.
+`title`, `description` (rich), `cycle_id?` to cycles, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `champion_id` to workspace_members, `reviewer_id?` to workspace_members (optional since 0111, P9-T04: the practice decides whether a goal needs one), `parent_goal_id?` to goals, `parent_key_result_id?` to key_results, `strategy_id?` to annual_strategies, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?` to check_ins, `contribution_statement?`, `closed_at?`, `closed_by_id?`, `success_status?` (`achieved` / `missed`), `close_decision?` (`keep` / `modify` / `abandon`), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `ai_generated bool` (written for the first time by P4-T15a: an objective a reader kept from an assist's draft says so, and one they typed says so too), `position`.
 
 At most one of `parent_goal_id` and `parent_key_result_id` is set. Cycles in the alignment graph are rejected.
 
@@ -277,6 +280,11 @@ At most one of `parent_goal_id` and `parent_key_result_id` is set. Cycles in the
 
 ### key_result_values
 `key_result_id` to key_results, `value numeric`, `at`, `author_member_id` to workspace_members, `check_in_id?` to check_ins, `source` (`manual` / `check_in` / `kpi` / `import` / `agent`).
+
+### key_result_target_changes
+`key_result_id` to key_results, `from_value numeric`, `to_value numeric`, `baseline_value numeric`, `eased bool`, `reason?`, `mid_cycle bool`, `actor_member_id?` to workspace_members, `changed_at`. Migration 0112 (P9-T06b).
+
+Every change to a key result's target, written by `goals.changeTarget` and by a target sent through `goals.updateKeyResult`, so the original stays on record (METHOD v2 §2.9). `eased` and `baseline_value` are what the change was judged on when it was made, because the baseline can move afterwards. A reason is required for an eased target unless the workspace made it optional, and is never an empty string. `mid_cycle` is whether the cycle's plan was already published.
 
 ### check_ins
 `subject_type` (`goal`), `subject_id`, `author_member_id` to workspace_members, `state` (`draft` / `published`), `published_at?`, `status` (`on_track` / `caution` / `off_track`), `confidence numeric?`, `narrative` (rich), `snapshot_id?` to check_in_snapshots, `session_id?` to sessions, `reviewer_member_id?` to workspace_members, `acknowledged_by_id?` to workspace_members, `acknowledged_at?`, `ai_drafted bool`.

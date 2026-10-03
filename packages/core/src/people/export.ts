@@ -197,6 +197,12 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     label: "Values you recorded",
   },
   {
+    table: "key_result_target_changes",
+    column: "actor_member_id",
+    // A change somebody made, with the reason they gave, is theirs (P9-T06b).
+    label: "Key result targets you changed",
+  },
+  {
     table: "kpi_records",
     column: "author_member_id",
     label: "KPI values you recorded",

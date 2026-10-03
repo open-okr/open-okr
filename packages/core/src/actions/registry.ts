@@ -223,6 +223,12 @@ import {
 } from "./goal-assists.ts";
 import { readGoalRelations } from "./goal-relations.ts";
 import {
+  changeKeyResultTarget,
+  readTargetHistory,
+  restoreKeyResult,
+} from "./goal-targets.ts";
+import { patchGoal, patchKeyResult, readGoalTree } from "./goal-tree.ts";
+import {
   closeGoal,
   createGoal,
   createKeyResult,
@@ -326,6 +332,11 @@ import {
   updateOwnProfile,
 } from "./people.ts";
 import { exportArchive, importArchive } from "./portability.ts";
+import {
+  applyPracticeProfile,
+  readPractice,
+  updatePractice,
+} from "./practice.ts";
 import {
   applyAgentProposal,
   dismissAgentProposal,
@@ -652,6 +663,9 @@ export const ACTION_MAP = {
   "roles.assign": assignRole,
   "rhythm.read": readRhythmSettings,
   "rhythm.update": updateRhythmSettings,
+  "practice.read": readPractice,
+  "practice.update": updatePractice,
+  "practice.applyProfile": applyPracticeProfile,
   "frame.annualObjectives": readAnnualObjectives,
   "frame.read": readAnnualFrame,
   "frame.set": setAnnualFrame,
@@ -725,6 +739,12 @@ export const ACTION_MAP = {
   "goals.moveToCycle": moveGoalToCycle,
   "goals.addKeyResult": createKeyResult,
   "goals.updateKeyResult": updateKeyResult,
+  "goals.tree": readGoalTree,
+  "goals.patch": patchGoal,
+  "goals.patchKeyResult": patchKeyResult,
+  "goals.changeTarget": changeKeyResultTarget,
+  "goals.targetHistory": readTargetHistory,
+  "goals.restoreKeyResult": restoreKeyResult,
   "goals.recordValue": recordKeyResultValue,
   "goals.removeKeyResult": removeKeyResult,
   "goals.linkKpi": linkKeyResultKpi,

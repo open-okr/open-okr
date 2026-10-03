@@ -1,4 +1,4 @@
-import type { ResolvedThresholds } from "@openokr/method";
+import type { ResolvedPractice, ResolvedThresholds } from "@openokr/method";
 import {
   Bar,
   Button,
@@ -45,7 +45,8 @@ export interface DraftGoal {
   readonly health: string;
   readonly contributionStatement: string | null;
   readonly champion: { readonly id: string; readonly name: string };
-  readonly reviewer: { readonly id: string; readonly name: string };
+  /** Null where the goal has none, which the practice allows (P9-T04). */
+  readonly reviewer: { readonly id: string; readonly name: string } | null;
   readonly keyResults: readonly {
     readonly id: string;
     readonly title: string;
@@ -79,11 +80,13 @@ export async function Drafting({
   cycleId,
   endsOn,
   draftingAllowed,
+  draftingReasons,
   goals,
   members,
   kpis,
   canEdit,
   thresholds,
+  practice,
   checkTitles,
   memberId,
   assistsAvailable,
@@ -92,12 +95,16 @@ export async function Drafting({
   /** The cycle's last day, which a new key result is due on unless changed. */
   readonly endsOn: string;
   /**
-   * False while an earlier phase is incomplete. The add forms give way to the
-   * reason, which the banner above names, and the server refuses a guided
-   * draft regardless (REQUIREMENTS §3.1, H-09). What is already drafted stays
+   * Whether the workspace's practice lets a new objective be drafted here now
+   * (METHOD.md §2.3, §2.9, P9-T02). True by default. False only when the
+   * workspace has made the phases bind or chosen a planning window, and then
+   * the add forms give way to the policy's own reasons, which are the
+   * sentences the server would refuse with. What is already drafted stays
    * editable: finishing a draft is not starting one.
    */
   readonly draftingAllowed: boolean;
+  /** Why drafting waits, in the policy's words. Empty when it does not. */
+  readonly draftingReasons: readonly string[];
   readonly goals: readonly DraftGoal[];
   readonly members: readonly { readonly id: string; readonly name: string }[];
   /**
@@ -110,6 +117,8 @@ export async function Drafting({
   readonly canEdit: boolean;
   /** Resolved per workspace, so the browser judges by the same numbers. */
   readonly thresholds: ResolvedThresholds;
+  /** How hard each check is here (METHOD.md §12), for the same reason. */
+  readonly practice: ResolvedPractice;
   readonly checkTitles: readonly {
     readonly id: string;
     readonly title: string;
@@ -135,8 +144,15 @@ export async function Drafting({
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
-              {t("cycle.drafting.waitsForEarlierPhases")}
+              {t("cycle.drafting.practiceHoldsNewObjectives")}
             </p>
+            {draftingReasons.length === 0 ? null : (
+              <ul className="mt-1.5 flex list-disc flex-col gap-0.5 pl-4 text-xs text-ink-3">
+                {draftingReasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            )}
           </CardBody>
         </Card>
       ) : null}
@@ -161,11 +177,16 @@ export async function Drafting({
             <div className="flex min-w-0 flex-col">
               <h2 className="text-sm font-bold text-ink">{goal.title}</h2>
               <p className="text-xs text-ink-3">
-                {t("common.championsItReviewsIt", {
-                  level: goal.level,
-                  name: goal.champion.name,
-                  name2: goal.reviewer.name,
-                })}
+                {goal.reviewer
+                  ? t("common.championsItReviewsIt", {
+                      level: goal.level,
+                      name: goal.champion.name,
+                      name2: goal.reviewer.name,
+                    })
+                  : t("common.championsItNoReviewer", {
+                      level: goal.level,
+                      name: goal.champion.name,
+                    })}
               </p>
             </div>
             <span className="flex flex-none items-center gap-2">
@@ -191,7 +212,7 @@ export async function Drafting({
                 hasCycle: true,
                 hasTimeframe: false,
                 championId: goal.champion.id,
-                reviewerId: goal.reviewer.id,
+                reviewerId: goal.reviewer?.id ?? null,
                 // Every objective on this screen belongs to the cycle being
                 // drafted, and they share a level per row, so the count the
                 // per-unit cap reads is the number on screen at this level.
@@ -220,6 +241,7 @@ export async function Drafting({
                 confidence: keyResult.confidence,
               }))}
               thresholds={thresholds}
+              practice={practice}
               checkTitles={checkTitles}
             />
 
@@ -614,21 +636,34 @@ export async function Drafting({
                     </option>
                   ))}
                 </select>
-                <label className="sr-only" htmlFor="goal-reviewer">
-                  {t("common.reviewer")}
-                </label>
-                <select
-                  id="goal-reviewer"
-                  name="reviewerId"
-                  required
-                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                >
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {t("cycle.drafting.reviewer", { name: member.name })}
-                    </option>
-                  ))}
-                </select>
+                {/* The reviewer follows the practice (METHOD.md §2.5, P9-T04):
+                 * off asks for none, so there is no picker; optional offers
+                 * "No reviewer" after the members; required offers members
+                 * only, and the server refuses a goal without one either way. */}
+                {practice.reviewer === "off" ? null : (
+                  <>
+                    <label className="sr-only" htmlFor="goal-reviewer">
+                      {t("common.reviewer")}
+                    </label>
+                    <select
+                      id="goal-reviewer"
+                      name="reviewerId"
+                      required={practice.reviewer === "required"}
+                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    >
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {t("cycle.drafting.reviewer", { name: member.name })}
+                        </option>
+                      ))}
+                      {practice.reviewer === "optional" ? (
+                        <option value="">
+                          {t("cycle.drafting.noReviewer")}
+                        </option>
+                      ) : null}
+                    </select>
+                  </>
+                )}
                 <Button type="submit" variant="primary">
                   {t("cycle.drafting.addObjective")}
                 </Button>

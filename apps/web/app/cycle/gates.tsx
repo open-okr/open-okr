@@ -15,9 +15,15 @@ import { keepCycle } from "./cycle-href.ts";
  * The six publish gates (METHOD.md §4.5, UIUX-PLAN.md §4 S-10).
  *
  * A gate whose input does not exist yet is drawn as "cannot be judged", not as
- * red and not as green. That is the honest third state: it blocks publication the
- * same way a red gate does, and telling a facilitator to go fix something that
- * has not been built would waste their time.
+ * red and not as green. That is the honest third state: at block it holds
+ * publication the same way a red gate does, and telling a facilitator to go fix
+ * something that has not been built would waste their time.
+ *
+ * **Each gate has a level** (METHOD.md §4.5, §12, P9-T03b). By default gates 1
+ * and 2 block, 3 to 5 warn and 6 is off. A gate at warn is drawn amber and
+ * coached, and never holds publication; a gate at off is shown as off so a
+ * reader can see the rule exists and that this workspace chose not to use it.
+ * Publishing comes in up to two steps: the company set first, then the rest.
  *
  * The publish button re-evaluates on the server before it commits. What the
  * screen shows is a snapshot, and the refusal it may come back with is the
@@ -62,6 +68,7 @@ export const FIX: Record<
 export interface Gate {
   readonly gateKey: number;
   readonly title: string;
+  readonly level: "block" | "warn" | "off";
   readonly passed: boolean;
   readonly evaluable: boolean;
   readonly missing: readonly string[];
@@ -73,6 +80,7 @@ export async function Gates({
   gates,
   publishable,
   publishedAt,
+  companyPublishedAt,
   canPublish,
   pinnedCycleId,
 }: {
@@ -80,6 +88,8 @@ export async function Gates({
   readonly gates: readonly Gate[];
   readonly publishable: boolean;
   readonly publishedAt: string | null;
+  /** When the company set went out, the first of the two steps. */
+  readonly companyPublishedAt: string | null;
   readonly canPublish: boolean;
   /**
    * The cycle the reader opened by name. A remedy on this screen stays on it,
@@ -90,8 +100,12 @@ export async function Gates({
 }) {
   const { t } = await getTranslations();
 
-  const green = gates.filter((gate) => gate.evaluable && gate.passed).length;
-  const unmet = gates.filter((gate) => !gate.evaluable || !gate.passed).length;
+  const judged = gates.filter((gate) => gate.level !== "off");
+  const green = judged.filter((gate) => gate.evaluable && gate.passed).length;
+  // What an override goes past: the gates that hold publication.
+  const unmet = gates.filter(
+    (gate) => gate.level === "block" && (!gate.evaluable || !gate.passed),
+  ).length;
 
   return (
     <Card>
@@ -100,7 +114,7 @@ export async function Gates({
           {t("cycle.gates.publishGates")}
         </h2>
         <Chip tone={publishable ? "ok" : "warn"}>
-          {t("cycle.gates.of6Green", { green })}
+          {t("cycle.gates.greenOfJudged", { green, count: judged.length })}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
@@ -112,7 +126,15 @@ export async function Gates({
             >
               <VerdictDot
                 className="mt-1.5"
-                state={!gate.evaluable ? "todo" : gate.passed ? "pass" : "fail"}
+                state={
+                  gate.level === "off" || !gate.evaluable
+                    ? "todo"
+                    : gate.passed
+                      ? "pass"
+                      : gate.level === "warn"
+                        ? "warn"
+                        : "fail"
+                }
                 label={
                   !gate.evaluable
                     ? t("cycle.gates.gateCannotBeJudged", {
@@ -124,12 +146,23 @@ export async function Gates({
                 }
               />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-sm text-ink">
-                  {gate.gateKey}. {gate.title}
+                <span className="flex flex-wrap items-center gap-2 text-sm text-ink">
+                  <span>
+                    {gate.gateKey}. {gate.title}
+                  </span>
+                  <Chip tone="neutral">
+                    {gate.level === "block"
+                      ? t("cycle.gates.levelBlock")
+                      : gate.level === "warn"
+                        ? t("cycle.gates.levelWarn")
+                        : t("cycle.gates.levelOff")}
+                  </Chip>
                 </span>
-                {gate.evaluable ? (
+                {gate.level === "off" ? null : gate.evaluable ? (
                   gate.missing.length > 0 ? (
-                    <ul className="flex flex-col gap-0.5 text-xs text-bad">
+                    <ul
+                      className={`flex flex-col gap-0.5 text-xs ${gate.level === "block" ? "text-bad" : "text-warn"}`}
+                    >
                       {gate.missing.map((reason) => (
                         <li key={reason}>{reason}</li>
                       ))}
@@ -142,7 +175,8 @@ export async function Gates({
                     })}
                   </span>
                 )}
-                {gate.evaluable && gate.passed ? null : (
+                {gate.level === "off" ||
+                (gate.evaluable && gate.passed) ? null : (
                   <a
                     href={keepCycle(
                       FIX[gate.gateKey]?.href ?? "/cycle?phase=4",
@@ -168,17 +202,43 @@ export async function Gates({
             })}
           </p>
         ) : canPublish ? (
-          <ActionForm action={publishCycle} className="flex flex-col gap-1.5">
-            <input type="hidden" name="cycleId" value={cycleId} />
-            <Button type="submit" variant="primary" disabled={!publishable}>
-              {t("cycle.gates.publishTheSet")}
-            </Button>
-            {publishable ? null : (
-              <p className="text-xs text-ink-3">
-                {t("cycle.gates.allSixGatesHave")}
+          <div className="flex flex-col gap-2">
+            {companyPublishedAt ? (
+              <p className="text-sm text-ok">
+                {t("cycle.gates.companySetPublished", {
+                  publishedAt: new Date(companyPublishedAt).toLocaleString(),
+                })}
               </p>
+            ) : null}
+            <ActionForm action={publishCycle} className="flex flex-col gap-1.5">
+              <input type="hidden" name="cycleId" value={cycleId} />
+              <Button type="submit" variant="primary" disabled={!publishable}>
+                {companyPublishedAt
+                  ? t("cycle.gates.publishTheTeamSets")
+                  : t("cycle.gates.publishTheSet")}
+              </Button>
+              {publishable ? null : (
+                <p className="text-xs text-ink-3">
+                  {t("cycle.gates.everyBlockingGateHas")}
+                </p>
+              )}
+            </ActionForm>
+            {companyPublishedAt ? null : (
+              // The first of the two steps (METHOD.md §4.5): the company set
+              // before the cycle starts, the department and team sets in its
+              // first fortnight. The server judges the company set alone.
+              <ActionForm action={publishCycle} className="flex flex-col gap-1">
+                <input type="hidden" name="cycleId" value={cycleId} />
+                <input type="hidden" name="step" value="company" />
+                <Button type="submit">
+                  {t("cycle.gates.publishTheCompanySet")}
+                </Button>
+                <p className="text-xs text-ink-4">
+                  {t("cycle.gates.theCompanySetFirst")}
+                </p>
+              </ActionForm>
             )}
-          </ActionForm>
+          </div>
         ) : null}
 
         {publishedAt || !canPublish || publishable ? null : (

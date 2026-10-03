@@ -128,7 +128,8 @@ export async function reassignRole(
       role: String(formData.get("role") ?? "champion") as
         | "champion"
         | "reviewer",
-      memberId: String(formData.get("memberId") ?? ""),
+      // "" is "Nobody", which takes a reviewer off (P9-T04).
+      memberId: String(formData.get("memberId") ?? "") || null,
     }),
   );
 }

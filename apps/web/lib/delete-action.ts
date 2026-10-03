@@ -27,10 +27,17 @@ import { getPool } from "./auth";
 import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace";
 
-export type DeletableSubject = "goal" | "initiative" | "task" | "document";
+export type DeletableSubject =
+  | "goal"
+  | "key_result"
+  | "initiative"
+  | "task"
+  | "document";
 
 const ACTION = {
   goal: "goals.delete",
+  // Removed on its own and listed in deleted items since P9-T06b.
+  key_result: "goals.removeKeyResult",
   initiative: "initiatives.delete",
   task: "tasks.delete",
   document: "documents.delete",
@@ -38,6 +45,7 @@ const ACTION = {
 
 const RESTORE = {
   goal: "goals.restore",
+  key_result: "goals.restoreKeyResult",
   initiative: "initiatives.restore",
   task: "tasks.restore",
   document: "documents.restore",

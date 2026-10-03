@@ -4185,6 +4185,57 @@
       "pages": false
     },
     {
+      "name": "practice read",
+      "action": "practice.read",
+      "method": "GET",
+      "path": "/practice/read",
+      "scope": "read",
+      "summary": "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "practice update",
+      "action": "practice.update",
+      "method": "POST",
+      "path": "/practice/update",
+      "scope": "write",
+      "summary": "Changes some of this workspace's practice settings. A setting set to null goes back to its profile's value.",
+      "flags": [
+        {
+          "name": "overrides",
+          "field": "overrides",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "practice applyProfile",
+      "action": "practice.applyProfile",
+      "method": "POST",
+      "path": "/practice/applyProfile",
+      "scope": "write",
+      "summary": "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
+      "flags": [
+        {
+          "name": "profile",
+          "field": "profile",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "recommended",
+            "googleStyle",
+            "radicalFocus",
+            "lightweight",
+            "governed"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "frame annualObjectives",
       "action": "frame.annualObjectives",
       "method": "GET",
@@ -4588,13 +4639,23 @@
       "method": "POST",
       "path": "/workflow/publish",
       "scope": "write",
-      "summary": "Publishes the set, refusing while any of the six gates is red or cannot be evaluated.",
+      "summary": "Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated.",
       "flags": [
         {
           "name": "cycle-id",
           "field": "cycleId",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "step",
+          "field": "step",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "company",
+            "teams"
+          ]
         },
         {
           "name": "override",
@@ -6166,7 +6227,7 @@
           "name": "reviewer-id",
           "field": "reviewerId",
           "type": "string",
-          "required": true
+          "required": false
         },
         {
           "name": "parent-goal-id",
@@ -6420,7 +6481,7 @@
       "method": "POST",
       "path": "/goals/reassignRole",
       "scope": "write",
-      "summary": "Moves the champion or the reviewer to another member, rebinding access with it.",
+      "summary": "Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off.",
       "flags": [
         {
           "name": "id",
@@ -6592,7 +6653,7 @@
       "method": "POST",
       "path": "/goals/updateKeyResult",
       "scope": "write",
-      "summary": "Edits a key result's definition. The current value has its own action, because it is history.",
+      "summary": "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
       "flags": [
         {
           "name": "id",
@@ -6647,6 +6708,12 @@
           "required": false
         },
         {
+          "name": "target-reason",
+          "field": "targetReason",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "due-on",
           "field": "dueOn",
           "type": "string",
@@ -6675,6 +6742,166 @@
           "field": "carryForward",
           "type": "boolean",
           "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals tree",
+      "action": "goals.tree",
+      "method": "GET",
+      "path": "/goals/tree",
+      "scope": "read",
+      "summary": "One cycle's objectives with their key results, alignment and dependencies, shaped for the OKR list and diagram, with parents outside the set as read-only context.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "scope",
+          "field": "scope",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "all",
+            "mine"
+          ]
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "include-closed",
+          "field": "includeClosed",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals patch",
+      "action": "goals.patch",
+      "method": "POST",
+      "path": "/goals/patch",
+      "scope": "write",
+      "summary": "Changes some of an objective's fields, refused with the current values if any of them changed since the caller read them.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "set",
+          "field": "set",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals patchKeyResult",
+      "action": "goals.patchKeyResult",
+      "method": "POST",
+      "path": "/goals/patchKeyResult",
+      "scope": "write",
+      "summary": "Changes some of a key result's fields, refused with the current values if any of them changed since the caller read them. The target and the current value have their own actions.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "set",
+          "field": "set",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals changeTarget",
+      "action": "goals.changeTarget",
+      "method": "POST",
+      "path": "/goals/changeTarget",
+      "scope": "write",
+      "summary": "Changes a key result's target and records the change. Easing it toward its baseline needs a reason where the workspace asks for one.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "target-value",
+          "field": "targetValue",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals targetHistory",
+      "action": "goals.targetHistory",
+      "method": "GET",
+      "path": "/goals/targetHistory",
+      "scope": "read",
+      "summary": "Every change to a key result's target, oldest first, with who made it and the reason given for easing it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals restoreKeyResult",
+      "action": "goals.restoreKeyResult",
+      "method": "POST",
+      "path": "/goals/restoreKeyResult",
+      "scope": "write",
+      "summary": "Brings back a key result that was removed on its own, with its value history.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false

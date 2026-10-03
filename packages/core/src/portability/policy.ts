@@ -454,7 +454,8 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
   {
     table: "rhythm_settings",
     decision: "export",
-    reason: "Check-in day, frequency, grace and the escalation ladders.",
+    reason:
+      "Check-in day, frequency, grace and the escalation ladders, and the practice profile and settings (METHOD.md §12).",
   },
   {
     table: "scorecard_settings",
@@ -784,6 +785,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "key_result_values",
     decision: "export",
     reason: "The measured history of every key result.",
+  },
+  {
+    table: "key_result_target_changes",
+    decision: "export",
+    reason:
+      "Every change to a key result's target, and the reason given for easing one.",
   },
   {
     table: "kudos",

@@ -21,8 +21,13 @@
  *
  * Pure: no database, no clock beyond what the caller passes, no framework.
  */
+import { applyEnforcement } from "./enforcement.ts";
 import {
-  applyStrictness,
+  defaultPractice,
+  type GateEnforcement,
+  type ResolvedPractice,
+} from "./practice.ts";
+import {
   evaluateKeyResults,
   evaluateObjective,
   type KeyResultVerdict,
@@ -61,8 +66,17 @@ export interface GateResult {
   /** 1 to 6, as METHOD.md §4.5 lists them. */
   readonly gateKey: number;
   readonly title: string;
+  /**
+   * The gate's enforcement level from the practice (METHOD.md §4.5, §12,
+   * P9-T03b). Only a gate at block holds publication; one at warn is shown and
+   * coached; one at off is not judged and always reads passed.
+   */
+  readonly level: GateEnforcement;
   readonly passed: boolean;
-  /** False when an input does not exist yet. Publication is blocked either way. */
+  /**
+   * False when an input does not exist yet. A gate at block that cannot be
+   * judged holds publication the same way a red one does.
+   */
   readonly evaluable: boolean;
   readonly detail: {
     readonly missing: readonly string[];
@@ -153,7 +167,14 @@ export interface CycleWorkflowInput {
   readonly firstCycle: boolean;
   readonly startsOn: string;
   readonly publicationDeadline: string | null;
+  /** When the whole set was published, the last of the two steps. */
   readonly publishedAt: Date | string | null;
+  /**
+   * When the company set was published, the first step (METHOD.md §4.5,
+   * P9-T03b). Null when it has not been, or when the set was published in one
+   * go; `publishedAt` then carries both.
+   */
+  readonly companyPublishedAt?: Date | string | null;
   readonly sponsorId: string | null;
   readonly facilitatorId: string | null;
   readonly packDistributedAt: Date | string | null;
@@ -215,6 +236,15 @@ export interface CycleWorkflowInput {
   readonly allKeyResultsScored?: boolean;
   /** The quarterly review's retro holds a note. Undefined when not read. */
   readonly retrospectiveWritten?: boolean;
+  /**
+   * The workspace's practice (METHOD.md §12), which sets how hard each check
+   * is when phase 4 and gate 2 judge the set (P9-T03a). Absent reads as the
+   * recommended practice, which is what a caller that has not read the
+   * settings would otherwise have to assume anyway.
+   */
+  readonly practice?: ResolvedPractice;
+  /** True when this space or workspace has "Coach strictness" at strict. */
+  readonly strict?: boolean;
 }
 
 /** The seven §2.6 input-pack items, in the order the specification lists them. */
@@ -240,8 +270,8 @@ export const PHASE_TITLES = [
 ] as const;
 
 export const GATE_TITLES = [
-  "Every objective has a title, a champion and a reviewer",
-  "Every key result passes the quality checks, and every objective names an outcome",
+  "Every objective has a title and a champion, and a reviewer where required",
+  "Every objective has key results, and nothing fails a check set to block",
   "Alignment is mapped: each objective states what it contributes to",
   "Every dependency is confirmed, or logged with a named risk owner",
   "Capacity is checked, and nothing is left exceeding it",
@@ -450,10 +480,10 @@ function phaseTwo(
     missing.push("Baseline health is not recorded");
   }
 
-  const bounds = thresholds["quality.strategicIssueBounds"];
-  if (input.issues.length < bounds.low) {
+  const minimum = thresholds["quality.strategicIssueMinimum"];
+  if (input.issues.length < minimum) {
     missing.push(
-      `${input.issues.length} strategic issue(s) ranked, and §2.3 asks for at least ${bounds.low}`,
+      `${input.issues.length} strategic issue(s) ranked, and §2.3 asks for at least ${minimum}`,
     );
   }
 
@@ -557,8 +587,8 @@ const OBJECTIVE_LEVELS = [
 ] as const;
 
 /**
- * One objective's §4.1 and §4.2 verdicts, with the workspace's strictness
- * applied, exactly as the Draft Coach beside it judges them.
+ * One objective's §4.1 and §4.2 verdicts, with the workspace's check levels
+ * applied (P9-T03a), exactly as the Draft Coach beside it judges them.
  *
  * The objective is in a cycle by construction, so OBJ-3 passes, and the count
  * OBJ-5 reads is the number of objectives at its level in this cycle, which is
@@ -568,16 +598,22 @@ function goalVerdicts(
   goal: GoalSnapshot,
   goals: readonly GoalSnapshot[],
   thresholds: ResolvedThresholds,
+  input: Pick<CycleWorkflowInput, "practice" | "strict">,
 ): {
   readonly objective: readonly QualityVerdict[];
   readonly keyResults: readonly KeyResultVerdict[];
 } {
-  const strictness = thresholds["quality.coachStrictness"];
+  const practice = input.practice ?? defaultPractice();
+  const options = {
+    strict:
+      input.strict === true ||
+      thresholds["quality.coachStrictness"] === "strict",
+  };
   const level = (OBJECTIVE_LEVELS as readonly string[]).includes(goal.level)
     ? (goal.level as (typeof OBJECTIVE_LEVELS)[number])
     : "team";
   return {
-    objective: applyStrictness(
+    objective: applyEnforcement(
       evaluateObjective(
         {
           title: goal.title,
@@ -585,15 +621,17 @@ function goalVerdicts(
           hasTimeframe: false,
           championId: goal.championId,
           reviewerId: goal.reviewerId,
+          reviewerRequired: practice.reviewer === "required",
           objectivesInUnit: goals.filter((other) => other.level === goal.level)
             .length,
           level,
         },
         thresholds,
       ),
-      strictness,
+      practice,
+      options,
     ),
-    keyResults: applyStrictness(
+    keyResults: applyEnforcement(
       evaluateKeyResults(
         {
           keyResults: goal.keyResults.map((keyResult) => ({
@@ -603,7 +641,8 @@ function goalVerdicts(
         },
         thresholds,
       ),
-      strictness,
+      practice,
+      options,
     ),
   };
 }
@@ -665,7 +704,7 @@ function phaseFour(
 
   const missing: string[] = [];
   for (const goal of goals) {
-    const verdicts = goalVerdicts(goal, goals, thresholds);
+    const verdicts = goalVerdicts(goal, goals, thresholds, input);
     const failing = [...verdicts.objective, ...verdicts.keyResults]
       .filter((verdict) => verdict.status === "fail")
       .map((verdict) => verdict.id);
@@ -689,7 +728,9 @@ function phaseFive(
   const missing: string[] = [];
   const blocked: string[] = [];
 
-  for (const gate of gates) {
+  // Phase 5 waits for the gates set to block, as publishing does (§2.3). A
+  // gate at warn is coached on the publish screen and does not hold it.
+  for (const gate of gates.filter((entry) => entry.level === "block")) {
     if (!gate.evaluable) {
       blocked.push(
         `Gate ${gate.gateKey} cannot be evaluated: ${gate.detail.blocked}`,
@@ -702,7 +743,11 @@ function phaseFive(
   }
 
   if (!asDate(input.publishedAt)) {
-    missing.push("The set is not published");
+    missing.push(
+      asDate(input.companyPublishedAt ?? null)
+        ? "The department and team sets are not published"
+        : "The set is not published",
+    );
   }
 
   return {
@@ -715,7 +760,8 @@ function phaseFive(
     // can evaluate is not in the denominator, so the bar cannot fill by having
     // fewer things checkable.
     conditions: conditionsOf(
-      gates.filter((gate) => gate.evaluable).length + 1,
+      gates.filter((gate) => gate.level === "block" && gate.evaluable).length +
+        1,
       missing,
     ),
   };
@@ -796,12 +842,32 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
  * red gate does. That is the correct direction to be wrong in: a gate that
  * cannot check anything must not pass.
  */
+/**
+ * Which part of the set a publish judges (METHOD.md §4.5, P9-T03b).
+ *
+ * The company set publishes first, then the department and team sets. "rest"
+ * is everything not yet published: the whole set, or only the department and
+ * team sets once the company set is out.
+ */
+export type PublishScope = "company" | "teams" | "rest";
+
 export function publishGates(
   input: CycleWorkflowInput,
   thresholds?: ResolvedThresholds,
+  scope: PublishScope = "rest",
 ): readonly GateResult[] {
-  const goals = input.goals;
+  const practice = input.practice ?? defaultPractice();
+  const companyOut = Boolean(asDate(input.companyPublishedAt ?? null));
+  const inScope = (goal: GoalSnapshot): boolean =>
+    scope === "company"
+      ? goal.level === "company"
+      : scope === "teams" || companyOut
+        ? goal.level !== "company"
+        : true;
+  const goals = input.goals?.filter(inScope);
   const goalsBlocked = "the goals and key results could not be read";
+  const levelOf = (gateKey: number): GateEnforcement =>
+    practice[`gates.${gateKey}` as `gates.${1 | 2 | 3 | 4 | 5 | 6}`];
 
   const gate = (
     gateKey: number,
@@ -810,6 +876,7 @@ export function publishGates(
   ): GateResult => ({
     gateKey,
     title: GATE_TITLES[gateKey - 1] as string,
+    level: levelOf(gateKey),
     passed,
     evaluable: true,
     detail: { missing },
@@ -818,6 +885,7 @@ export function publishGates(
   const unevaluable = (gateKey: number, blocked: string): GateResult => ({
     gateKey,
     title: GATE_TITLES[gateKey - 1] as string,
+    level: levelOf(gateKey),
     passed: false,
     evaluable: false,
     detail: { missing: [], blocked },
@@ -837,7 +905,8 @@ export function publishGates(
       if (!goal.championId) {
         problems.push(`"${goal.title}" has no champion`);
       }
-      if (!goal.reviewerId) {
+      // Only where the workspace requires reviewers (§2.5, P9-T04).
+      if (!goal.reviewerId && practice.reviewer === "required") {
         problems.push(`"${goal.title}" has no reviewer`);
       }
       return problems;
@@ -884,14 +953,34 @@ export function publishGates(
       );
     } else {
       const failures: string[] = [];
+      // Nothing to publish is not a set (P9-T03b). With every other gate
+      // passing vacuously on an empty set, this is what keeps a cycle with no
+      // objectives from publishing. The team step after the company set is
+      // the exception: a cycle whose OKRs are all company OKRs finishes there.
+      if (goals.length === 0 && !(companyOut && scope !== "company")) {
+        failures.push("Nothing is drafted to publish yet");
+      }
       for (const goal of goals) {
-        const judged = goalVerdicts(goal, goals, thresholds);
-        const outcome = judged.objective.find((entry) => entry.id === "OBJ-1");
-        if (outcome?.status === "fail") {
-          failures.push(`OBJ-1 on "${goal.title}": ${outcome.prompt}`);
+        // METHOD.md §4.5 since P9-T03b: every objective has a key result, and
+        // nothing fails a check set to block. OBJ-3 and OBJ-4 are left to the
+        // structure and to gate 1, which already name them.
+        if (goal.keyResults.length === 0) {
+          failures.push(`"${goal.title}" has no key results`);
+        }
+        const judged = goalVerdicts(goal, goals, thresholds, input);
+        for (const outcome of judged.objective.filter(
+          (entry) =>
+            entry.status === "fail" &&
+            entry.id !== "OBJ-3" &&
+            entry.id !== "OBJ-4",
+        )) {
+          failures.push(`${outcome.id} on "${goal.title}": ${outcome.prompt}`);
         }
         for (const verdict of judged.keyResults.filter(
-          (entry) => entry.status === "fail",
+          (entry) =>
+            entry.status === "fail" &&
+            // Already named above as "has no key results".
+            !(entry.id === "KR-1" && goal.keyResults.length === 0),
         )) {
           const offenders = verdict.keyResults
             .map((index) => goal.keyResults[index]?.title)
@@ -989,13 +1078,25 @@ export function publishGates(
   }
   results.push(gate(6, missingSix.length === 0, missingSix));
 
-  return results;
+  // A gate at off is not judged (METHOD.md §12): it reads passed, with
+  // nothing missing, whatever its rule would have said.
+  return results.map((result) =>
+    result.level === "off"
+      ? { ...result, passed: true, evaluable: true, detail: { missing: [] } }
+      : result,
+  );
 }
 
-/** True only when all six gates are green and evaluable. */
+/**
+ * True when every gate at block is green and evaluable (P9-T03b). A gate at
+ * warn shows what it found and never holds publication.
+ */
 export function canPublish(gates: readonly GateResult[]): boolean {
   return (
-    gates.length === 6 && gates.every((gate) => gate.evaluable && gate.passed)
+    gates.length === 6 &&
+    gates.every(
+      (gate) => gate.level !== "block" || (gate.evaluable && gate.passed),
+    )
   );
 }
 

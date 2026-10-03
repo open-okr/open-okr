@@ -16,6 +16,12 @@
  * **Who deleted it comes from the feed's own row.** Every delete writes a
  * `<kind>.deleted` activity with its actor in the same transaction, so that
  * row is the record of who did it rather than something this read infers.
+ *
+ * **A key result removed on its own is here too** (P9-T06b). One deleted with
+ * its objective is not: it comes back with the objective. Its removal's
+ * activity names the objective as its subject, so who removed it is matched
+ * on the key result id the activity carries since P9-T06b, and an older
+ * removal reads as unknown.
  */
 import {
   activeOnly,
@@ -28,7 +34,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -36,6 +42,7 @@ import { visibleResourceIds } from "../access/reads.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction } from "./define.ts";
 import { requireRestorableDocument } from "./documents.ts";
+import { removedKeyResults } from "./goal-targets.ts";
 
 /**
  * The most recent deletions of each kind this read looks at.
@@ -49,6 +56,7 @@ const PER_KIND = 100;
 
 const DELETED_SUBJECT_TYPES = [
   "goal",
+  "key_result",
   "initiative",
   "task",
   "document",
@@ -157,6 +165,31 @@ export const listDeletedItems = defineReadAction({
           }
         }
 
+        // A key result is restored at the level its removal asked, `full` on
+        // its objective, so the check is on the objective.
+        const keyResultRows = await removedKeyResults(
+          tx,
+          workspaceId,
+          PER_KIND,
+        );
+        const keyResultsAllowed = await visibleResourceIds(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: [...new Set(keyResultRows.map((row) => row.goalId))],
+          requires: ACCESS_LEVELS.full,
+        });
+        for (const row of keyResultRows) {
+          if (keyResultsAllowed.has(row.goalId)) {
+            items.push({
+              subjectType: "key_result",
+              id: row.id,
+              title: `${row.title} (${row.goalTitle})`,
+              deletedAt: row.deletedAt.toISOString(),
+            });
+          }
+        }
+
         // A document owns no context, so the set-shaped check above cannot
         // answer for it. Its restore's own loader can, one row at a time, and
         // using it means the list and the restore cannot disagree.
@@ -253,6 +286,34 @@ async function whoDeleted(
   for (const row of rows) {
     if (!found.has(row.subjectId)) {
       found.set(row.subjectId, row.name);
+    }
+  }
+
+  // A key result's removal is an activity on its objective, carrying the key
+  // result's id in its payload.
+  const removals = await tx
+    .select({
+      keyResultId: sql<string>`${activities.payload}->>'keyResultId'`,
+      name: workspaceMembers.name,
+    })
+    .from(activities)
+    .innerJoin(
+      workspaceMembers,
+      eq(workspaceMembers.id, activities.actorMemberId),
+    )
+    .where(
+      and(
+        eq(activities.workspaceId, workspaceId),
+        eq(activities.kind, "key_result.removed"),
+        inArray(sql<string>`${activities.payload}->>'keyResultId'`, [
+          ...subjectIds,
+        ]),
+      ),
+    )
+    .orderBy(desc(activities.at));
+  for (const row of removals) {
+    if (!found.has(row.keyResultId)) {
+      found.set(row.keyResultId, row.name);
     }
   }
   return found;

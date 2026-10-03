@@ -1,13 +1,14 @@
 "use client";
 
 import {
-  applyStrictness,
+  applyEnforcement,
   evaluateKeyResults,
   evaluateObjective,
   examplesFor,
   type KeyResultInput,
   type QualityStatus,
   type QualityVerdict,
+  type ResolvedPractice,
   type ResolvedThresholds,
   strengthScore,
 } from "@openokr/method";
@@ -64,6 +65,7 @@ export interface CoachObjective {
 /** The field's dot, at the worst verdict on screen. `.vd` in the mockup. */
 const WORST_DOT: Record<QualityStatus, string> = {
   pass: "bg-ok",
+  info: "bg-ok",
   warn: "bg-warn",
   fail: "bg-bad",
   todo: "bg-ink-4",
@@ -87,11 +89,14 @@ export function DraftCoach({
   objective,
   keyResults,
   thresholds,
+  practice,
   checkTitles,
 }: {
   readonly objective: CoachObjective;
   readonly keyResults: readonly CoachKeyResult[];
   readonly thresholds: ResolvedThresholds;
+  /** How hard each check is here (METHOD.md §12), so the coach and the server agree. */
+  readonly practice: ResolvedPractice;
   readonly checkTitles: readonly {
     readonly id: string;
     readonly title: string;
@@ -106,7 +111,9 @@ export function DraftCoach({
   );
 
   const { verdicts, views } = useMemo(() => {
-    const strictness = thresholds["quality.coachStrictness"];
+    const options = {
+      strict: thresholds["quality.coachStrictness"] === "strict",
+    };
     const set: KeyResultInput[] = keyResults.map((row) => ({
       text: row.title,
       baseline: row.baseline,
@@ -118,13 +125,15 @@ export function DraftCoach({
       confidence: row.confidence,
     }));
 
-    const objectiveVerdicts = applyStrictness(
+    const objectiveVerdicts = applyEnforcement(
       evaluateObjective({ ...objective, title }, thresholds),
-      strictness,
+      practice,
+      options,
     );
-    const keyResultVerdicts = applyStrictness(
+    const keyResultVerdicts = applyEnforcement(
       evaluateKeyResults({ keyResults: set }, thresholds),
-      strictness,
+      practice,
+      options,
     );
 
     return {
@@ -144,7 +153,7 @@ export function DraftCoach({
         ),
       ],
     };
-  }, [objective, keyResults, thresholds, title, titles, t]);
+  }, [objective, keyResults, thresholds, practice, title, titles, t]);
 
   // Counted with a mutable local rather than a spread into the accumulator:
   // the spread rebuilt the whole record once per verdict, which is O(n²) on a
@@ -152,6 +161,7 @@ export function DraftCoach({
   // error in the repository.
   const counts: Record<QualityStatus, number> = {
     pass: 0,
+    info: 0,
     warn: 0,
     fail: 0,
     todo: 0,
@@ -209,7 +219,7 @@ export function DraftCoach({
       </div>
 
       <StrengthMeter
-        score={strengthScore(verdicts)}
+        score={strengthScore(verdicts, thresholds)}
         counts={counts}
         bands={thresholds["quality.strengthScoreBands"]}
       />

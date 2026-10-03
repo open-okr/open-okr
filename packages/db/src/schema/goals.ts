@@ -115,9 +115,11 @@ export const goals = pgTable("goals", {
   championId: uuid("champion_id")
     .notNull()
     .references(() => workspaceMembers.id),
-  reviewerId: uuid("reviewer_id")
-    .notNull()
-    .references(() => workspaceMembers.id),
+  /**
+   * Optional since P9-T04 (METHOD.md §2.5): the practice decides whether a
+   * goal needs one, and a goal without one owes no acknowledgement.
+   */
+  reviewerId: uuid("reviewer_id").references(() => workspaceMembers.id),
   /**
    * The §2.1 annual strategy this objective serves (P6-G14b).
    *
@@ -213,6 +215,42 @@ export const keyResultValues = pgTable("key_result_values", {
   checkInId: uuid("check_in_id"),
   source: text("source", { enum: VALUE_SOURCES }).notNull(),
   note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+/**
+ * Every change to a key result's target (P9-T06b, METHOD v2 §2.9). The
+ * original stays on record, and easing one carries its reason.
+ */
+export const keyResultTargetChanges = pgTable("key_result_target_changes", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  keyResultId: uuid("key_result_id")
+    .notNull()
+    .references(() => keyResults.id, { onDelete: "cascade" }),
+  fromValue: numeric("from_value").notNull(),
+  toValue: numeric("to_value").notNull(),
+  /** The baseline the change was judged against, which can move later. */
+  baselineValue: numeric("baseline_value").notNull(),
+  /** Whether this change moved the target toward its baseline when made. */
+  eased: boolean("eased").notNull(),
+  reason: text("reason"),
+  /** Whether the cycle's plan was already published (P9-T13 reads it). */
+  midCycle: boolean("mid_cycle").notNull().default(false),
+  actorMemberId: uuid("actor_member_id").references(() => workspaceMembers.id, {
+    onDelete: "set null",
+  }),
+  changedAt: timestamp("changed_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -177,7 +177,7 @@ Distribute it a few working days before the first session (3 by default, §11). 
 
 ### 2.7 Levels and quantities
 
-A workspace chooses the levels it uses (§12). Many organisations use only two, company and team. *Source:* Castro: "Use as few OKR levels as possible"; Cagan: focus on team objectives.
+A workspace chooses the levels it uses (§12). A change applies to cycles that start after it: a running or closed cycle keeps the levels it began with, so no objective is ever left at a level that no longer exists. Many organisations use only two, company and team. *Source:* Castro: "Use as few OKR levels as possible"; Cagan: focus on team objectives.
 
 | Level | Objectives | Rule |
 |---|---|---|
@@ -233,6 +233,8 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 - Easing a target, moving it toward its baseline, needs a written reason, and the original target stays on record so the close can see both.
 - "It got hard" is not a reason. *Source:* whatmatters: "Never change your OKRs because you're afraid you'll fall short."
 - There is no limit on how many times by default.
+
+**When the organisation changes.** A team that merges, splits or is renamed takes its OKRs with it. An objective can move to another space at any time: its key results, check-ins, dependencies and alignment move with it, and the move is recorded as a dated change. A merged team writes its own objectives at the next cycle rather than carrying both teams' sets; until then, both sets run in the merged space. *Source:* whatmatters: "A new team doesn't automatically inherit old OKRs"; resetting after a reorganisation is "very similar to the end of a cycle".
 
 **Mid-cycle changes are evidence, not failure.** The close reads them. A cycle full of starts and stops says the planning inputs were weak, which Phase 2 of the next cycle should hear.
 
@@ -747,11 +749,13 @@ A key result that falls into the low band is raised with the coordinator.
 
 Every blocker carries an opened time, an owner and a next action. The next action is due by the next check-in. A blocker whose action passes that point is escalated to the coordinator, not re-discussed. *Source:* OpenOKR default. No OKR source defines a blocker taxonomy.
 
-### 7.4 The rhythm streak and holidays
+### 7.4 The rhythm streak, holidays and leave
 
 Consecutive check-in periods in which a space held its check-in, at whatever frequency the space runs. A skipped period breaks it; a period marked as a holiday does not.
 
 A space marks its holiday periods. No check-in is due in them, nobody is nudged for them, the streak does not break, and the measured rhythm (§8.6) does not count them. Shown on the space home. A light touch that keeps the heartbeat visible. *Source:* Tability (vendor) shows check-in streaks.
+
+A member marks their own leave, with a delegate. While they are away nobody nudges them, their reviews and acknowledgements go to the delegate, and a check-in on a goal they champion is the delegate's to post, so their absence never breaks the space's streak. Leave never moves a role for good: that is a reassignment, recorded as one.
 
 ### 7.5 Monthly review
 
@@ -1125,6 +1129,7 @@ The non-numeric choices a workspace makes about its practice. Each has the recom
 | Critical confidence escalation | Off · On | Off | OpenOKR default |
 | Sponsor in escalation ladders | Off · On | Off | OpenOKR default |
 | Quarterly review format | One session · Review and retrospective separately | One session | Workpath (vendor) |
+| Root causes at the review | As §8.4 · Optional | As §8.4 | OpenOKR default |
 | Carry forward unfinished aspirational objectives | Proposed as Keep · Not proposed | Proposed | Google's OKR playbook |
 | Unhealthy KPI response | Offer the three responses · Draft a recovery OKR at once | Offer the three responses | Wodtke |
 

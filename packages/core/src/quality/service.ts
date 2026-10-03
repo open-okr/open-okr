@@ -30,7 +30,7 @@ import {
   type WorkspaceTx,
 } from "@openokr/db";
 import {
-  applyStrictness,
+  applyEnforcement,
   type CoachStrictness,
   evaluateKeyResults,
   evaluateObjective,
@@ -43,6 +43,7 @@ import {
 import { and, eq, isNull, ne } from "drizzle-orm";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 
 /**
@@ -109,9 +110,14 @@ export interface GoalQuality {
   readonly keyResultFlags: ReadonlyMap<string, readonly string[]>;
 }
 
-/** A verdict that is not a pass is a flag. `todo` counts: it has not passed. */
+/**
+ * A verdict that is not a pass is a flag. `todo` counts: it has not passed.
+ * `info` does not: a note asks nothing of anybody (P9-T03a).
+ */
 const flagsOf = (verdicts: readonly QualityVerdict[]): string[] =>
-  verdicts.filter((entry) => entry.status !== "pass").map((entry) => entry.id);
+  verdicts
+    .filter((entry) => entry.status !== "pass" && entry.status !== "info")
+    .map((entry) => entry.id);
 
 export interface GoalVerdicts {
   /** §4.1's five objective checks, after strictness. */
@@ -232,8 +238,14 @@ export async function evaluateGoalInTx(
     override === null
       ? thresholds
       : { ...thresholds, "quality.coachStrictness": override };
-  const strictness = inForce["quality.coachStrictness"];
-  const objective = applyStrictness(
+  // Each check's level from the practice (METHOD.md §4, §12, P9-T03a).
+  // "Coach strictness" at strict, for the workspace or this space, still
+  // means every check at block, which is what strict mode is.
+  const practice = practiceFromRow(
+    await readRhythmRow(tx, input.workspaceId),
+  ).practice;
+  const options = { strict: inForce["quality.coachStrictness"] === "strict" };
+  const objective = applyEnforcement(
     evaluateObjective(
       {
         title: goal.title,
@@ -241,26 +253,29 @@ export async function evaluateGoalInTx(
         hasTimeframe: goal.timeframe !== null,
         championId: goal.championId,
         reviewerId: goal.reviewerId,
+        reviewerRequired: practice.reviewer === "required",
         objectivesInUnit: Math.max(unit.length, 1),
         level: goal.level,
       },
       inForce,
     ),
-    strictness,
+    practice,
+    options,
   );
-  const keyResultVerdicts = applyStrictness(
+  const keyResultVerdicts = applyEnforcement(
     evaluateKeyResults({ keyResults: set }, inForce),
-    strictness,
+    practice,
+    options,
   );
 
-  const score = strengthScore([...objective, ...keyResultVerdicts]);
+  const score = strengthScore([...objective, ...keyResultVerdicts], inForce);
   const flags = [...flagsOf(objective), ...flagsOf(keyResultVerdicts)];
 
   // Which key result tripped which check, so a surface can put the flag beside
   // the row rather than beside the objective.
   const perKeyResult = new Map<string, string[]>();
   for (const verdict of keyResultVerdicts) {
-    if (verdict.status === "pass") {
+    if (verdict.status === "pass" || verdict.status === "info") {
       continue;
     }
     for (const index of verdict.keyResults) {

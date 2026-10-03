@@ -230,6 +230,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Cycle "${asString(p.name, "a cycle")}" was archived`,
   "rhythm.updated": (p) =>
     `Rhythm settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "thresholds"})`,
+  "practice.updated": (p) =>
+    `Practice settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "settings"})`,
+  "practice.profile_applied": (p) =>
+    `The practice profile changed from ${String(p.from ?? "")} to ${String(p.to ?? "")}`,
   "cycle.pack_item_set": (p) =>
     `Input pack item ${Number(p.itemKey ?? 0)} was marked ${p.gathered ? "gathered" : "missing"}`,
   "cycle.pack_distributed": () => "The input pack was distributed",
@@ -251,7 +255,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Chose ${Number(p.count ?? 0)} of the year's key results to focus on`,
   "cycle.calibrated": () => "The cycle was calibrated mid-flight",
   "cycle.published": (p) =>
-    `Cycle "${asString(p.name, "a cycle")}" was published`,
+    p.published === "company"
+      ? `The company set of cycle "${asString(p.name, "a cycle")}" was published`
+      : `Cycle "${asString(p.name, "a cycle")}" was published`,
   // One line per run, not per nudge. A feed with an entry for every message
   // the product sent would bury everything a person actually did.
   "nudges.run": (p) =>
@@ -335,6 +341,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A key result moved to ${Number(p.value ?? 0)}`,
   "key_result.removed": (p) =>
     `Key result "${asString(p.title, "a key result")}" was removed`,
+  "key_result.target_changed": (p) =>
+    p.eased
+      ? `A key result's target was eased from ${String(p.from)} to ${String(p.to)}`
+      : `A key result's target moved from ${String(p.from)} to ${String(p.to)}`,
+  "key_result.restored": (p) =>
+    `Key result "${asString(p.title, "a key result")}" was brought back`,
   "key_result.kpi_linked": () =>
     "A key result was linked to a KPI and now reads its value from it",
   "key_result.kpi_unlinked": () =>

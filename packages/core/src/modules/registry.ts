@@ -402,6 +402,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-practice",
+        label: "Practice",
+        href: "/admin/practice",
+        section: "admin",
+        // The METHOD.md §12 choices: who may write, how hard each check and
+        // gate is. `practice.update` asks `full`, the same as the rhythm card
+        // beside it (P9-T05).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-rhythm",
         label: "Rhythm and thresholds",
         href: "/admin/rhythm",

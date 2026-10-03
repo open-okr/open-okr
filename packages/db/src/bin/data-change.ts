@@ -22,6 +22,9 @@ import { bindAgentsToSpacelessItems } from "../data-changes/0009_bind_agents_to_
 import { scrubErasedMemberNames } from "../data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../data-changes/0011_seal_account_tokens.ts";
 import { backfillWorkspaceRoles } from "../data-changes/0012_backfill_workspace_roles.ts";
+import { carryStrategicIssueMinimum } from "../data-changes/0013_carry_strategic_issue_minimum.ts";
+import { carryObjectiveLengthLimit } from "../data-changes/0014_carry_objective_length_limit.ts";
+import { carryCoachStrictness } from "../data-changes/0015_carry_coach_strictness.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -46,6 +49,9 @@ try {
       // resolves its own ring. Absent is fine until there is a token to seal.
       sealAccountTokens(process.env.OPENOKR_ENCRYPTION_KEY),
       backfillWorkspaceRoles,
+      carryStrategicIssueMinimum,
+      carryObjectiveLengthLimit,
+      carryCoachStrictness,
     ],
   });
   process.stdout.write(

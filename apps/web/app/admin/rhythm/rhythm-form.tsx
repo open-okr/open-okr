@@ -15,6 +15,7 @@ import {
   useTranslations,
   useUnsavedGuard,
 } from "@openokr/ui";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   createContext,
@@ -771,7 +772,7 @@ export function RhythmForm({
       <SettingsCard
         id="check-in"
         title={t("admin.rhythm.rhythmForm.theCheckInRhythm")}
-        description={t("admin.rhythm.rhythmForm.theseThreeHaveTheir")}
+        description={t("admin.rhythm.rhythmForm.theseTwoHaveTheir")}
         canManage={canManage}
       >
         <div className="flex flex-col gap-3 text-sm">
@@ -811,25 +812,18 @@ export function RhythmForm({
               ))}
             </select>
           </label>
-          <label className="flex items-center justify-between gap-3">
-            <span className="text-ink-2">
-              {t("admin.rhythm.rhythmForm.coachStrictness")}
-            </span>
-            <select
-              name="coachStrictness"
-              disabled={!canManage}
-              defaultValue={rhythm.coachStrictness}
-              className="rounded-md border border-line bg-bg px-2 py-1"
-            >
-              {["advisory", "warn", "strict"].map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/*
+           * **Coach strictness left this card at P9-T05.** Every check now has
+           * its own level (METHOD.md §4), and strict mode, which raises them
+           * all to block, is one setting among the practice's. Two switches
+           * for one behaviour is two places for an admin to look, and data
+           * change 0015 carried every workspace that had chosen strict across.
+           */}
           <p className="text-sm text-ink-3">
-            {t("admin.rhythm.rhythmForm.theSixPublishGates")}
+            {t("admin.rhythm.rhythmForm.strictModeIsOnThe")}{" "}
+            <Link href="/admin/practice" className="text-brand-text underline">
+              {t("admin.practice.title")}
+            </Link>
           </p>
         </div>
       </SettingsCard>

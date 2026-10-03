@@ -63,12 +63,10 @@ export async function createGoal(
       level: level as "company" | "department" | "team" | "individual",
       ownerKind: "workspace",
       championId,
-      reviewerId,
+      // "" is the "No reviewer" option (P9-T04).
+      reviewerId: reviewerId === "" ? null : reviewerId,
       weight: 1,
       ...(contributionStatement === "" ? {} : { contributionStatement }),
-      // Phase 4 of the guided cycle: refused, with the reason, while an
-      // earlier phase is incomplete (REQUIREMENTS §3.1, H-09).
-      guided: true,
     }),
   );
 }
@@ -108,7 +106,6 @@ export async function addKeyResult(
       ...(ownerId === "" ? {} : { ownerId }),
       ...(dueOn === "" ? {} : { dueOn }),
       ...(kpiId === "" ? {} : { kpiId }),
-      guided: true,
       direction: String(formData.get("direction") ?? "increase") as
         | "increase"
         | "reduce"

@@ -278,6 +278,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.updated": z.object({ name: z.string() }),
   "cycle.archived": z.object({ name: z.string() }),
   "rhythm.updated": z.object({ keys: z.array(z.string()) }),
+  // The METHOD.md §12 practice settings (P9-T01).
+  "practice.updated": z.object({ keys: z.array(z.string()) }),
+  "practice.profile_applied": z.object({ from: z.string(), to: z.string() }),
   "frame.set": z.object({ yearLabel: z.string() }),
   // The guided cycle workflow (P3-T03).
   "cycle.pack_item_set": z.object({
@@ -301,6 +304,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     // Which gates were unmet when somebody published anyway (P4-T03).
     // Empty on a normal publication, which is most of them.
     overrodeGates: z.array(z.number().int()).optional(),
+    // Which step this was (METHOD.md §4.5, P9-T03b): the company set, or the
+    // whole set. Absent on rows written before the two steps existed.
+    published: z.enum(["company", "set"]).optional(),
   }),
   // The nudge run (P4-T04a). One activity per run rather than per nudge:
   // the nudges are rows of their own, and a feed with one entry per message
@@ -395,6 +401,15 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
   "key_result.removed": z.object({ title: z.string() }),
+  // A target moved, and whether it eased (P9-T06b). The reason is in the
+  // target history, not the feed, where it would be read out of context.
+  "key_result.target_changed": z.object({
+    keyResultId: z.uuid(),
+    from: z.number(),
+    to: z.number(),
+    eased: z.boolean(),
+  }),
+  "key_result.restored": z.object({ title: z.string() }),
   "key_result.kpi_linked": z.object({ kpiId: z.uuid() }),
   "key_result.kpi_unlinked": z.object({}),
   // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing

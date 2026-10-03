@@ -269,7 +269,7 @@ export default async function GoalsPage({
             health: goal.health,
             progressPct: goal.progressPct,
             champion: goal.champion.name,
-            reviewer: goal.reviewer.name,
+            reviewer: goal.reviewer?.name ?? null,
             keyResults: goal.keyResults.map((keyResult) => ({
               id: keyResult.id,
               title: keyResult.title,
@@ -306,7 +306,7 @@ export default async function GoalsPage({
             health: goal.health,
             progressPct: goal.progressPct,
             champion: goal.champion.name,
-            reviewer: goal.reviewer.name,
+            reviewer: goal.reviewer?.name ?? null,
             keyResults: goal.keyResults.map((keyResult) => ({
               id: keyResult.id,
               title: keyResult.title,

@@ -27,7 +27,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { INPUT_PACK_ITEMS } from "@openokr/method";
+import { INPUT_PACK_ITEMS, publishGates } from "@openokr/method";
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -46,6 +46,8 @@ import {
   recomputeGateState,
 } from "../cycles/workflow.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { policyDecisionInTx, requirePolicy } from "../practice/policy.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { plainTextLines } from "../rich-text/excerpt.ts";
 import {
   RICH_TEXT_SCHEMA_VERSION,
@@ -79,6 +81,8 @@ const phaseResult = z.object({
 const gateResult = z.object({
   gateKey: z.number().int(),
   title: z.string(),
+  /** The gate's enforcement level here (METHOD.md §4.5, §12, P9-T03b). */
+  level: z.enum(["block", "warn", "off"]),
   passed: z.boolean(),
   evaluable: z.boolean(),
   missing: z.array(z.string()),
@@ -220,6 +224,11 @@ export const readWorkflow = defineReadAction({
      */
     daysToDeadline: z.number().int().nullable(),
     publishedAt: z.string().nullable(),
+    /**
+     * When the company set went out, the first publish step (METHOD.md §4.5,
+     * P9-T03b). Null until then; a set published in one go sets it too.
+     */
+    companyPublishedAt: z.string().nullable(),
     packDistributedAt: z.string().nullable(),
     firstCycle: z.boolean(),
     sponsor: z.object({ id: z.uuid(), name: z.string() }).nullable(),
@@ -238,6 +247,24 @@ export const readWorkflow = defineReadAction({
       }),
     }),
     phases: z.array(phaseResult),
+    /**
+     * How this workspace practises the phases (METHOD.md §2.3, §2.9, P9-T02):
+     * whether they guide, bind or are hidden, and when new objectives may be
+     * written. The screen shows the strip and its gaps by these.
+     */
+    practice: z.object({
+      phaseEnforcement: z.enum(["guided", "binding", "hidden"]),
+      writingWhen: z.enum(["anytime", "planningWindow", "afterPhases"]),
+    }),
+    /**
+     * Whether a new objective may be drafted in this cycle now, decided by the
+     * same policy `goals.create` asks, so the screen never offers a form the
+     * write would refuse, or hides one it would accept.
+     */
+    drafting: z.object({
+      allowed: z.boolean(),
+      reasons: z.array(z.string()),
+    }),
     gates: z.array(gateResult),
     packItems: z.array(
       z.object({
@@ -356,9 +383,13 @@ export const readWorkflow = defineReadAction({
         if (!cycle) {
           throw new OperationError("not_found", "No such cycle.");
         }
-        const rhythm = resolveRhythm(
-          await readRhythmRow(tx, context.workspaceId),
-        );
+        const rhythmRow = await readRhythmRow(tx, context.workspaceId);
+        const rhythm = resolveRhythm(rhythmRow);
+        const { practice } = practiceFromRow(rhythmRow);
+        const drafting = await policyDecisionInTx(tx, context.workspaceId, {
+          kind: "objective.create",
+          cycleId: input.cycleId,
+        });
         const snapshot = await evaluateWorkflow(
           tx,
           context.workspaceId,
@@ -503,6 +534,9 @@ export const readWorkflow = defineReadAction({
           publishedAt: cycle.publishedAt
             ? new Date(cycle.publishedAt).toISOString()
             : null,
+          companyPublishedAt: cycle.companyPublishedAt
+            ? new Date(cycle.companyPublishedAt).toISOString()
+            : null,
           packDistributedAt: cycle.packDistributedAt
             ? new Date(cycle.packDistributedAt).toISOString()
             : null,
@@ -519,8 +553,7 @@ export const readWorkflow = defineReadAction({
           ),
           publishable: snapshot.publishable,
           asks: {
-            strategicIssues:
-              rhythm.thresholds["quality.strategicIssueBounds"].low,
+            strategicIssues: rhythm.thresholds["quality.strategicIssueMinimum"],
             priorities: rhythm.thresholds["quality.priorityBounds"],
           },
           phases: snapshot.phases.map((result) => ({
@@ -528,9 +561,18 @@ export const readWorkflow = defineReadAction({
             missing: [...result.missing],
             blocked: [...result.blocked],
           })),
+          practice: {
+            phaseEnforcement: practice["phases.enforcement"],
+            writingWhen: practice["writing.when"],
+          },
+          drafting: {
+            allowed: drafting.outcome === "allow",
+            reasons: [...drafting.reasons],
+          },
           gates: snapshot.gates.map((gate) => ({
             gateKey: gate.gateKey,
             title: gate.title,
+            level: gate.level,
             passed: gate.passed,
             evaluable: gate.evaluable,
             missing: [...gate.detail.missing],
@@ -1254,18 +1296,27 @@ export const calibrateCycle = defineWriteAction({
 export const publishCycle = defineWriteAction({
   name: "workflow.publish",
   summary:
-    "Publishes the set, refusing while any of the six gates is red or cannot be evaluated.",
+    "Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated.",
   input: z.object({
     cycleId: z.uuid(),
     /**
+     * Which step (METHOD.md §4.5, P9-T03b). `company` publishes the company
+     * set before the cycle starts; `teams` publishes the department and team
+     * sets once it is out. Absent publishes whatever is not yet published,
+     * which is the whole set in one go, or the team sets after the company
+     * step.
+     */
+    step: z.enum(["company", "teams"]).optional(),
+    /**
      * The override, and the reason for it (METHOD.md §4.5, P4-T03).
      *
-     * §4.5 makes the six gates hard, and a product with no way past a hard
-     * refusal is a product people leave. So the override exists, and everything
-     * about it is designed to be uncomfortable: it needs the same `full` access
-     * publishing needs, it needs a reason written in the sentence somebody will
-     * read six months later, and it writes an audit row naming who did it and
-     * which gates were red at the time.
+     * A gate at block is a refusal, and a product with no way past a refusal
+     * is a product people leave. So the override exists, where the practice
+     * allows it ("Gate override", §12), and everything about it is designed to
+     * be uncomfortable: it needs the same `full` access publishing needs, it
+     * needs a reason written in the sentence somebody will read six months
+     * later, and it writes an audit row naming who did it and which gates were
+     * red at the time.
      *
      * The reason is not optional and not defaulted. An override with no reason
      * is indistinguishable from a bug.
@@ -1276,11 +1327,16 @@ export const publishCycle = defineWriteAction({
   }),
   output: z.object({
     cycleId: z.uuid(),
+    /** When this step was published. */
     publishedAt: z.string(),
+    /** `company` for the first step; `set` once the whole set is out. */
+    published: z.enum(["company", "set"]),
     overrodeGates: z.array(z.number().int()),
+    /** Gates at warn that were not green, shown and not held to. */
+    warnedGates: z.array(z.number().int()),
   }),
   access: ACCESS_LEVELS.full,
-  operation: (_context, input) => ({
+  operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       // Re-evaluated, never read from `cycle_gate_state`. A stored gate row is a
       // cache, and trusting a cache is how a set gets published through a gate
@@ -1297,10 +1353,44 @@ export const publishCycle = defineWriteAction({
           "This cycle is already published.",
         );
       }
+      const companyOut = Boolean(cycle.companyPublishedAt);
+      if (input.step === "company" && companyOut) {
+        throw new OperationError(
+          "forbidden",
+          "The company set is already published. Publish the department and team sets next.",
+        );
+      }
+      if (input.step === "teams" && !companyOut) {
+        throw new OperationError(
+          "forbidden",
+          "Publish the company set first, or publish the whole set at once.",
+        );
+      }
 
-      const red = snapshot.gates.filter(
-        (gate) => !gate.passed || !gate.evaluable,
+      // §2.3: under binding phases, publishing waits for phase 4.
+      await requirePolicy(
+        tx,
+        { workspaceId, bulk: context.bulk },
+        { kind: "set.publish", cycleId: input.cycleId },
       );
+
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      const companyStep = input.step === "company";
+      // Each step judges what it publishes (§4.5). The snapshot already
+      // judged the rest of the set, which is the whole set or, once the
+      // company set is out, the department and team sets.
+      const gates = companyStep
+        ? publishGates(snapshot.input, thresholds, "company")
+        : snapshot.gates;
+      const unmet = (gate: (typeof gates)[number]) =>
+        !gate.passed || !gate.evaluable;
+      const red = gates.filter((gate) => gate.level === "block" && unmet(gate));
+      const warnedGates = gates
+        .filter((gate) => gate.level === "warn" && unmet(gate))
+        .map((gate) => gate.gateKey);
+
       if (red.length > 0 && !input.override) {
         const reasons = red.map((gate) => {
           const detail = gate.evaluable
@@ -1310,7 +1400,7 @@ export const publishCycle = defineWriteAction({
         });
         throw new OperationError(
           "forbidden",
-          `The set cannot be published until all six gates are green. ${reasons.join(" ")}`,
+          `The set cannot be published until every gate set to block is green. ${reasons.join(" ")}`,
         );
       }
       if (input.override && red.length === 0) {
@@ -1318,7 +1408,16 @@ export const publishCycle = defineWriteAction({
         // teaches the reader of the audit log that overrides are routine.
         throw new OperationError(
           "forbidden",
-          "Every gate is green, so there is nothing to override.",
+          "Every gate set to block is green, so there is nothing to override.",
+        );
+      }
+      if (
+        input.override &&
+        snapshot.input.practice?.["gates.override"] === "off"
+      ) {
+        throw new OperationError(
+          "forbidden",
+          'This workspace does not publish past a red gate ("Gate override" is off in its practice settings), so the gates have to be green.',
         );
       }
       const overrodeGates = red.map((gate) => gate.gateKey);
@@ -1327,26 +1426,37 @@ export const publishCycle = defineWriteAction({
       // Publication is the moment the set becomes the thing everybody reads, so
       // every derived column in it is settled here rather than on the next write
       // to each goal (P3-T05).
-      const { thresholds } = resolveRhythm(
-        await readRhythmRow(tx, workspaceId),
-      );
       await recomputeForCycle(tx, workspaceId, input.cycleId, thresholds, at);
       await tx
         .update(cycles)
-        .set({ publishedAt: at, status: "active", phase: 6, updatedAt: at })
+        .set(
+          companyStep
+            ? { companyPublishedAt: at, updatedAt: at }
+            : {
+                publishedAt: at,
+                // A set published in one go published its company half too.
+                companyPublishedAt: cycle.companyPublishedAt ?? at,
+                status: "active",
+                phase: 6,
+                updatedAt: at,
+              },
+        )
         .where(activeOnly(cycles, eq(cycles.id, input.cycleId)));
 
+      const published = companyStep ? "company" : "set";
       return {
         result: {
           cycleId: input.cycleId,
           publishedAt: at.toISOString(),
+          published,
           overrodeGates,
+          warnedGates,
         },
         activity: {
           kind: "cycle.published",
           subjectType: "cycle",
           subjectId: input.cycleId,
-          payload: { name: cycle.name, overrodeGates },
+          payload: { name: cycle.name, overrodeGates, published },
         },
         audit: {
           // A different action name when a gate was overridden, so the audit
@@ -1361,6 +1471,7 @@ export const publishCycle = defineWriteAction({
             overrodeGates.length > 0
               ? {
                   name: cycle.name,
+                  published,
                   overrodeGates,
                   reason: input.override?.reason,
                   gates: red.map((gate) => ({
@@ -1370,7 +1481,7 @@ export const publishCycle = defineWriteAction({
                     blocked: gate.detail.blocked ?? null,
                   })),
                 }
-              : { name: cycle.name },
+              : { name: cycle.name, published, warnedGates },
         },
       };
     },

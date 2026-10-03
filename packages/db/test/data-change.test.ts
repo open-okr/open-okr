@@ -16,6 +16,9 @@ import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_g
 import { bindAgentsToSpacelessItems } from "../src/data-changes/0009_bind_agents_to_spaceless_items.ts";
 import { scrubErasedMemberNames } from "../src/data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../src/data-changes/0011_seal_account_tokens.ts";
+import { carryStrategicIssueMinimum } from "../src/data-changes/0013_carry_strategic_issue_minimum.ts";
+import { carryObjectiveLengthLimit } from "../src/data-changes/0014_carry_objective_length_limit.ts";
+import { carryCoachStrictness } from "../src/data-changes/0015_carry_coach_strictness.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -801,5 +804,182 @@ describe("0011: sealing the identity-provider tokens stored in plain text", () =
     expect(`${(error as Error).message} ${cause.message}`).not.toContain(
       "not-a-key",
     );
+  });
+});
+
+describe("0013: carrying the strategic issue floor onto its new threshold", () => {
+  it("moves a raised floor, drops the canon one and anything unreadable, and keeps a value already set", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, overrides: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, $2::jsonb from w
+         returning workspace_id as id`,
+        [slug, JSON.stringify(overrides)],
+      );
+      return rows[0]?.id as string;
+    };
+    const raised = await seed("raised", {
+      "quality.strategicIssueBounds": { low: 5, high: 10 },
+      "cadence.graceDays": 4,
+    });
+    const canon = await seed("canon", {
+      "quality.strategicIssueBounds": { low: 3, high: 8 },
+    });
+    const garbled = await seed("garbled", {
+      "quality.strategicIssueBounds": { low: "five" },
+    });
+    const both = await seed("both", {
+      "quality.strategicIssueBounds": { low: 6, high: 10 },
+      "quality.strategicIssueMinimum": 4,
+    });
+    const untouched = await seed("untouched", { "cadence.graceDays": 2 });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [carryStrategicIssueMinimum],
+    });
+    expect(result?.rowsChanged).toBe(4);
+
+    const overridesOf = async (id: string) =>
+      (
+        await client.query<{ overrides: object }>(
+          "select overrides from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0]?.overrides;
+    expect(await overridesOf(raised)).toEqual({
+      "quality.strategicIssueMinimum": 5,
+      "cadence.graceDays": 4,
+    });
+    expect(await overridesOf(canon)).toEqual({});
+    expect(await overridesOf(garbled)).toEqual({});
+    expect(await overridesOf(both)).toEqual({
+      "quality.strategicIssueMinimum": 4,
+    });
+    expect(await overridesOf(untouched)).toEqual({ "cadence.graceDays": 2 });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [carryStrategicIssueMinimum],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0014: carrying the objective length limit onto its new threshold", () => {
+  it("moves a changed upper bound, drops the canon one, and keeps a value already set", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, overrides: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, $2::jsonb from w
+         returning workspace_id as id`,
+        [slug, JSON.stringify(overrides)],
+      );
+      return rows[0]?.id as string;
+    };
+    const longer = await seed("longer", {
+      "quality.objectiveLengthWords": { low: 3, high: 24 },
+    });
+    const canon = await seed("canon", {
+      "quality.objectiveLengthWords": { low: 2, high: 18 },
+    });
+    const both = await seed("both", {
+      "quality.objectiveLengthWords": { low: 4, high: 30 },
+      "quality.objectiveLengthLimit": 20,
+    });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [carryObjectiveLengthLimit],
+    });
+    expect(result?.rowsChanged).toBe(3);
+
+    const overridesOf = async (id: string) =>
+      (
+        await client.query<{ overrides: object }>(
+          "select overrides from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0]?.overrides;
+    expect(await overridesOf(longer)).toEqual({
+      "quality.objectiveLengthLimit": 24,
+    });
+    expect(await overridesOf(canon)).toEqual({});
+    expect(await overridesOf(both)).toEqual({
+      "quality.objectiveLengthLimit": 20,
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [carryObjectiveLengthLimit],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0015: carrying a strict Coach onto strict mode", () => {
+  it("turns strict mode on where the Coach was strict, clears the column, and leaves the rest", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, strictness: string, practice: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, coach_strictness, practice)
+         select w.id, $2, $3::jsonb from w
+         returning workspace_id as id`,
+        [slug, strictness, JSON.stringify(practice)],
+      );
+      return rows[0]?.id as string;
+    };
+    const strict = await seed("strict", "strict", { reviewer: "required" });
+    const advisory = await seed("advisory", "advisory", {});
+    const warn = await seed("warn", "warn", {});
+
+    const [result] = await runDataChanges(client, {
+      scripts: [carryCoachStrictness],
+    });
+    expect(result?.rowsChanged).toBe(1);
+
+    const rowOf = async (id: string) =>
+      (
+        await client.query<{ coach_strictness: string; practice: object }>(
+          "select coach_strictness, practice from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0];
+    expect(await rowOf(strict)).toEqual({
+      coach_strictness: "warn",
+      practice: { reviewer: "required", strictMode: "on" },
+    });
+    expect(await rowOf(advisory)).toEqual({
+      coach_strictness: "advisory",
+      practice: {},
+    });
+    expect(await rowOf(warn)).toEqual({
+      coach_strictness: "warn",
+      practice: {},
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [carryCoachStrictness],
+    });
+    expect(again?.rowsChanged).toBe(0);
   });
 });

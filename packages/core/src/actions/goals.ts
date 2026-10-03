@@ -61,7 +61,6 @@ import {
 } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
-import { draftingRefusal } from "../cycles/workflow.ts";
 import {
   asNumber,
   clampWeight,
@@ -81,6 +80,7 @@ import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { readLinkableKpi } from "../kpis/linked.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { requirePolicy } from "../practice/policy.ts";
 import {
   recomputeGoalQualityInTx,
   recomputeUnitQualityInTx,
@@ -91,6 +91,7 @@ import { recomputeForGoal } from "../scoring/recompute.ts";
 import { recomputeAlignmentFor } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { changeTargetInTx, targetReason } from "./goal-targets.ts";
 
 /**
  * Goals per page when the caller names no limit.
@@ -105,23 +106,6 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
  * end of the list: the cursor still advances, and the caller asks again.
  */
 const GOAL_PAGE = 200;
-
-/** Refuses guided drafting while an earlier phase is incomplete (H-09). */
-async function refuseUnreadyDrafting(
-  tx: OperationTx,
-  workspaceId: string,
-  cycleId: string,
-): Promise<void> {
-  const refusal = await draftingRefusal(
-    tx,
-    workspaceId,
-    cycleId,
-    resolveRhythm(await readRhythmRow(tx, workspaceId)).thresholds,
-  );
-  if (refusal) {
-    throw new OperationError("forbidden", refusal);
-  }
-}
 
 /** A key result's due date: a local calendar date, never a free string. */
 const localDate = z
@@ -177,7 +161,8 @@ const goalOutput = z.object({
   spaceId: z.uuid().nullable(),
   memberId: z.uuid().nullable(),
   champion: z.object({ id: z.uuid(), name: z.string() }),
-  reviewer: z.object({ id: z.uuid(), name: z.string() }),
+  /** Null where the goal has none, which the practice allows (P9-T04). */
+  reviewer: z.object({ id: z.uuid(), name: z.string() }).nullable(),
   parentGoalId: z.uuid().nullable(),
   parentKeyResultId: z.uuid().nullable(),
   weight: z.number(),
@@ -605,7 +590,11 @@ export const listGoals = defineReadAction({
         const names = await memberNames(
           tx,
           context.workspaceId,
-          visible.flatMap((row) => [row.championId, row.reviewerId]),
+          visible.flatMap((row) =>
+            row.reviewerId
+              ? [row.championId, row.reviewerId]
+              : [row.championId],
+          ),
         );
         // The due date is a date in the workspace calendar, so it is read in the
         // workspace timezone rather than the reader's.
@@ -626,10 +615,12 @@ export const listGoals = defineReadAction({
               id: row.championId,
               name: names.get(row.championId) ?? "Unknown",
             },
-            reviewer: {
-              id: row.reviewerId,
-              name: names.get(row.reviewerId) ?? "Unknown",
-            },
+            reviewer: row.reviewerId
+              ? {
+                  id: row.reviewerId,
+                  name: names.get(row.reviewerId) ?? "Unknown",
+                }
+              : null,
             keyResults: children
               .filter((child) => child.goalId === row.id)
               .map(keyResultRow),
@@ -717,10 +708,11 @@ export const readGoal = defineReadAction({
           )
           .limit(1);
 
-        const names = await memberNames(tx, context.workspaceId, [
-          row.championId,
-          row.reviewerId,
-        ]);
+        const names = await memberNames(
+          tx,
+          context.workspaceId,
+          row.reviewerId ? [row.championId, row.reviewerId] : [row.championId],
+        );
         const timeZone = await workspaceTimeZone(tx, context.workspaceId);
         const now = new Date();
 
@@ -735,10 +727,12 @@ export const readGoal = defineReadAction({
             id: row.championId,
             name: names.get(row.championId) ?? "Unknown",
           },
-          reviewer: {
-            id: row.reviewerId,
-            name: names.get(row.reviewerId) ?? "Unknown",
-          },
+          reviewer: row.reviewerId
+            ? {
+                id: row.reviewerId,
+                name: names.get(row.reviewerId) ?? "Unknown",
+              }
+            : null,
           keyResults: children.map(keyResultRow),
           // Read, never recomputed here: the score on the row is what the
           // write path committed to and what the quality panel already shows,
@@ -1002,7 +996,12 @@ export const createGoal = defineWriteAction({
       spaceId: z.uuid().optional(),
       memberId: z.uuid().optional(),
       championId: z.uuid(),
-      reviewerId: z.uuid(),
+      /**
+       * Optional since P9-T04 (METHOD.md §2.5): a goal without one owes no
+       * acknowledgement. A workspace that requires reviewers refuses its
+       * absence through the policy, from every caller alike.
+       */
+      reviewerId: z.uuid().nullable().optional(),
       parentGoalId: z.uuid().optional(),
       parentKeyResultId: z.uuid().optional(),
       /**
@@ -1034,10 +1033,12 @@ export const createGoal = defineWriteAction({
        */
       legacy: legacyKey.optional(),
       /**
-       * Drafted in the guided cycle's phase 4 (REQUIREMENTS §3.1). Refused,
-       * with the reason, while an earlier phase is incomplete. The cycle
-       * screen sets it; a goal added anywhere else does not wait on the
-       * planning phases (completeness review H-09).
+       * Accepted and ignored since P9-T02, for one release (PLAN.md §5.1).
+       *
+       * It used to make this action wait for the planning phases, and only
+       * the cycle screen set it, so the API, the command line and the copilot
+       * never waited (completeness review H-09). Whether drafting waits is now
+       * the workspace's practice, decided by `requirePolicy` for every caller.
        */
       guided: z.boolean().optional(),
     })
@@ -1061,9 +1062,15 @@ export const createGoal = defineWriteAction({
       );
 
       await assertLegacyKeyFree(tx, workspaceId, goals, input.legacy, "goal");
-      if (input.guided && input.cycleId) {
-        await refuseUnreadyDrafting(tx, workspaceId, input.cycleId);
-      }
+      await requirePolicy(
+        tx,
+        { workspaceId, bulk: context.bulk },
+        {
+          kind: "objective.create",
+          cycleId: input.cycleId ?? null,
+          hasReviewer: Boolean(input.reviewerId),
+        },
+      );
 
       // A parent has to be one this writer can actually see, resolved through
       // the getter so an invisible parent reads as not found (§4.2).
@@ -1134,7 +1141,7 @@ export const createGoal = defineWriteAction({
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
         championId: input.championId,
-        reviewerId: input.reviewerId,
+        reviewerId: input.reviewerId ?? null,
         parentGoalId: input.parentGoalId ?? null,
         parentKeyResultId: input.parentKeyResultId ?? null,
         strategyId: input.strategyId ?? null,
@@ -1193,6 +1200,7 @@ export const createGoal = defineWriteAction({
 
 export const updateGoal = defineWriteAction({
   name: "goals.update",
+  // openokr:policy-exempt: changing an objective that exists stays open under every setting (METHOD.md §2.9); its target changes join the policy at P9-T06.
   summary: "Edits a goal's own fields, including its alignment pointer.",
   input: z.object({
     id: z.uuid(),
@@ -1499,6 +1507,7 @@ export const goalReviewDecision = defineReadAction({
 
 export const closeGoal = defineWriteAction({
   name: "goals.close",
+  // openokr:policy-exempt: closing is the close decision the review records (METHOD.md §8.8), not writing; stopping mid-cycle with a reason joins the policy at P9-T13.
   summary:
     "Closes a goal with an outcome, a keep/modify/abandon decision and a retrospective.",
   input: z.object({
@@ -1585,6 +1594,7 @@ export const closeGoal = defineWriteAction({
 
 export const reopenGoal = defineWriteAction({
   name: "goals.reopen",
+  // openokr:policy-exempt: reopening undoes a close on an objective that exists, which stays open under every setting (METHOD.md §2.9).
   summary:
     "Reopens a closed goal, clearing its outcome and keeping its retrospective.",
   input: z.object({ id: z.uuid() }),
@@ -1642,12 +1652,20 @@ export const reopenGoal = defineWriteAction({
 export const reassignGoalRole = defineWriteAction({
   name: "goals.reassignRole",
   summary:
-    "Moves the champion or the reviewer to another member, rebinding access with it.",
-  input: z.object({
-    id: z.uuid(),
-    role: z.enum(["champion", "reviewer"]),
-    memberId: z.uuid(),
-  }),
+    "Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off.",
+  input: z
+    .object({
+      id: z.uuid(),
+      role: z.enum(["champion", "reviewer"]),
+      /**
+       * Null takes the reviewer off (P9-T04), which the practice refuses where
+       * reviewers are required. A champion is moved, never removed.
+       */
+      memberId: z.uuid().nullable(),
+    })
+    .refine((value) => value.memberId !== null || value.role === "reviewer", {
+      message: "A goal always has a champion. Move it to somebody else.",
+    }),
   output: z.object({ id: z.uuid(), role: z.string() }),
   // Full, not edit: naming who owns and who reviews a goal is administering it,
   // and the champion is the one who holds full on their own goal.
@@ -1684,6 +1702,14 @@ export const reassignGoalRole = defineWriteAction({
       const role = input.role as GoalRole;
       const fromMemberId =
         role === "champion" ? goal.championId : goal.reviewerId;
+      if (input.memberId === null) {
+        // §2.5: where reviewers are required, every objective keeps one.
+        await requirePolicy(
+          tx,
+          { workspaceId, bulk: context.bulk },
+          { kind: "reviewer.remove" },
+        );
+      }
 
       await reassignRoleInTx(tx, {
         workspaceId,
@@ -1718,6 +1744,7 @@ export const reassignGoalRole = defineWriteAction({
 
 export const moveGoalToCycle = defineWriteAction({
   name: "goals.moveToCycle",
+  // openokr:policy-exempt: moving an objective that exists is a change to it, and changes stay open under every setting (METHOD.md §2.9).
   summary:
     "Moves a goal into another cycle, taking its check-in history with it.",
   input: z.object({ id: z.uuid(), cycleId: z.uuid() }),
@@ -1841,7 +1868,7 @@ export const createKeyResult = defineWriteAction({
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
     /** The source-system identity, when an import is creating this (P6-T01a). */
     legacy: legacyKey.optional(),
-    /** Drafted in the guided cycle's phase 4, as on `goals.create`. */
+    /** Accepted and ignored since P9-T02, as on `goals.create`. */
     guided: z.boolean().optional(),
   }),
   output: z.object({ id: z.uuid() }),
@@ -1860,16 +1887,16 @@ export const createKeyResult = defineWriteAction({
         input.goalId,
         ACCESS_LEVELS.edit,
       );
-      if (input.guided) {
-        const [goal] = await tx
-          .select({ cycleId: goals.cycleId })
-          .from(goals)
-          .where(activeOnly(goals, eq(goals.id, input.goalId)))
-          .limit(1);
-        if (goal?.cycleId) {
-          await refuseUnreadyDrafting(tx, workspaceId, goal.cycleId);
-        }
-      }
+      const [goal] = await tx
+        .select({ cycleId: goals.cycleId })
+        .from(goals)
+        .where(activeOnly(goals, eq(goals.id, input.goalId)))
+        .limit(1);
+      await requirePolicy(
+        tx,
+        { workspaceId, bulk: context.bulk },
+        { kind: "keyResult.create", cycleId: goal?.cycleId ?? null },
+      );
 
       await assertLegacyKeyFree(
         tx,
@@ -1950,8 +1977,9 @@ export const createKeyResult = defineWriteAction({
 
 export const updateKeyResult = defineWriteAction({
   name: "goals.updateKeyResult",
+  // openokr:policy-exempt: changing a key result that exists stays open under every setting (METHOD.md §2.9); a target it is given goes through changeTargetInTx, which asks the policy.
   summary:
-    "Edits a key result's definition. The current value has its own action, because it is history.",
+    "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
   input: z.object({
     id: z.uuid(),
     title: z.string().trim().min(1).max(500).optional(),
@@ -1960,6 +1988,11 @@ export const updateKeyResult = defineWriteAction({
     indicatorType: z.enum(INDICATOR_TYPES).optional(),
     baselineValue: z.number().optional(),
     targetValue: z.number().optional(),
+    /**
+     * Why an eased target was eased (P9-T06b). Needed only when the new
+     * target is closer to the baseline and the workspace asks for a reason.
+     */
+    targetReason: targetReason.optional(),
     dueOn: localDate.nullable().optional(),
     ownerId: z.uuid().nullable().optional(),
     weight: z.number().optional(),
@@ -2021,9 +2054,6 @@ export const updateKeyResult = defineWriteAction({
       if (input.baselineValue !== undefined) {
         patch.baselineValue = String(input.baselineValue);
       }
-      if (input.targetValue !== undefined) {
-        patch.targetValue = String(input.targetValue);
-      }
       if (input.dueOn !== undefined) {
         patch.dueOn = input.dueOn;
       }
@@ -2050,6 +2080,19 @@ export const updateKeyResult = defineWriteAction({
             eq(keyResults.id, input.id),
           ),
         );
+      // After the rest, so an easing is judged against the baseline this
+      // same call may have just set.
+      if (input.targetValue !== undefined) {
+        await changeTargetInTx(tx, {
+          workspaceId,
+          keyResultId: input.id,
+          to: input.targetValue,
+          reason: input.targetReason ?? null,
+          actorMemberId: memberId,
+          ...(context.bulk === undefined ? {} : { bulk: context.bulk }),
+        });
+        patch.targetValue = String(input.targetValue);
+      }
 
       await recompute(tx, workspaceId, owner.goalId);
       // Editing a key result changes its own verdicts and the set's.
@@ -2081,6 +2124,7 @@ export const updateKeyResult = defineWriteAction({
 
 export const recordKeyResultValue = defineWriteAction({
   name: "goals.recordValue",
+  // openokr:policy-exempt: a value is a fact about the world recorded against a key result, which no practice setting may refuse.
   summary: "Moves a key result's value and records the movement as history.",
   input: z.object({
     id: z.uuid(),
@@ -2150,6 +2194,7 @@ export const recordKeyResultValue = defineWriteAction({
 
 export const removeKeyResult = defineWriteAction({
   name: "goals.removeKeyResult",
+  // openokr:policy-exempt: removing a key result is a change to an objective that exists, which stays open under every setting (METHOD.md §2.9); access decides who may, at full.
   summary:
     "Removes one key result from its goal, which is not the same as closing the goal.",
   input: z.object({ id: z.uuid() }),
@@ -2227,8 +2272,9 @@ export const removeKeyResult = defineWriteAction({
           subjectType: "goal",
           subjectId: owner.goalId,
           // The title travels, because the feed entry has to read as a sentence
-          // after the row it names is gone.
-          payload: { title: owner.title },
+          // after the row it names is gone. The id travels so deleted items
+          // can say who removed it (P9-T06b).
+          payload: { title: owner.title, keyResultId: input.id },
         },
         audit: {
           action: "goals.removeKeyResult",
@@ -2251,6 +2297,7 @@ export const removeKeyResult = defineWriteAction({
  */
 export const linkKeyResultKpi = defineWriteAction({
   name: "goals.linkKpi",
+  // openokr:policy-exempt: linking a KPI changes where a key result reads its value from, which stays open under every setting (METHOD.md §2.9).
   summary:
     "Links a KPI to a key result, which from then on reads its value and progress from it.",
   input: z.object({ id: z.uuid(), kpiId: z.uuid() }),
@@ -2340,6 +2387,7 @@ export const linkKeyResultKpi = defineWriteAction({
 
 export const unlinkKeyResultKpi = defineWriteAction({
   name: "goals.unlinkKpi",
+  // openokr:policy-exempt: unlinking a KPI changes where a key result reads its value from, which stays open under every setting (METHOD.md §2.9).
   summary: "Unlinks a KPI, keeping the value it last reported as a manual one.",
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
@@ -2427,6 +2475,7 @@ export const unlinkKeyResultKpi = defineWriteAction({
  */
 export const deleteGoal = defineWriteAction({
   name: "goals.delete",
+  // openokr:policy-exempt: deleting is governed by access and is undone from deleted items; no practice setting decides it (design §2.5).
   summary:
     "Removes a goal and its key results, which is not the same as closing one.",
   input: z.object({ id: z.uuid() }),
@@ -2536,6 +2585,7 @@ export const deleteGoal = defineWriteAction({
  */
 export const restoreGoal = defineWriteAction({
   name: "goals.restore",
+  // openokr:policy-exempt: restoring undoes a delete, and no setting may stop data coming back (design §2.5).
   summary:
     "Brings back a deleted goal and the key results that were deleted with it.",
   input: z.object({ id: z.uuid() }),

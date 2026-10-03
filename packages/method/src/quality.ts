@@ -1,5 +1,5 @@
 import { type DraftVerdict, draftVerdict } from "./scoring.ts";
-import type { CoachStrictness, ResolvedThresholds } from "./thresholds.ts";
+import type { ResolvedThresholds } from "./thresholds.ts";
 
 /**
  * METHOD.md §4's quality catalogue, as data and pure functions (P4-T01).
@@ -17,7 +17,12 @@ import type { CoachStrictness, ResolvedThresholds } from "./thresholds.ts";
  * Condition tables are **first match wins**, in the order METHOD.md lists them.
  */
 
-export type QualityStatus = "pass" | "warn" | "fail" | "todo";
+/**
+ * `info` is a note rather than a warning (METHOD.md §4, P9-T03a): a check
+ * whose level is information shows what it saw and asks nothing of anybody.
+ * Only `applyEnforcement` produces it; no condition row carries it.
+ */
+export type QualityStatus = "pass" | "info" | "warn" | "fail" | "todo";
 
 export interface ConditionRow {
   /** What the reader would call the case, for the rule card. */
@@ -76,9 +81,9 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
     conditions: [
       {
         condition: "Starts with an output verb",
-        status: "fail",
+        status: "warn",
         prompt:
-          "Your objective starts with a deliverable, not a destination. If we do it and nothing changes, did we succeed? Rewrite around the change you want.",
+          "Your objective starts with a deliverable. If we do it and nothing changes, did we succeed? Consider naming the change you want, and keep the deliverable in a key result or an initiative.",
       },
       {
         condition: "Matches an end-state shape",
@@ -94,9 +99,9 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
       },
       {
         condition: "Bare metric movement, no why",
-        status: "fail",
+        status: "warn",
         prompt:
-          "Naming a metric to move is a key result in disguise. The outcome is the why behind the movement. Add the why, or lead with the end state.",
+          "Naming a metric to move is usually a key result in disguise. The outcome is the why behind the movement. Add the why, or lead with the end state.",
       },
       {
         condition: "Metric movement with a why",
@@ -112,29 +117,23 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
       },
       {
         condition: "Cannot tell",
-        status: "warn",
+        status: "pass",
         prompt:
-          "Could you complete this without anything actually improving? If yes, rewrite around the improvement.",
+          "Tip: could you complete this without anything actually improving? If yes, rewrite around the improvement.",
       },
     ],
   },
   {
     id: "OBJ-2",
     group: "objective",
-    title: "Inspiring and directional",
+    title: "Qualitative and memorable",
     feedsStrengthScore: true,
     conditions: [
       {
-        condition: "Contains digits",
+        condition: "Contains digits other than a four-digit year",
         status: "warn",
         prompt:
-          "Metrics belong in the key results. Keep the objective qualitative and memorable.",
-      },
-      {
-        condition: "Fewer than 4 words",
-        status: "warn",
-        prompt:
-          "Very short. Would someone outside your team understand where you are headed and why it matters?",
+          "Metrics usually belong in the key results. Keep the objective qualitative and memorable.",
       },
       {
         condition: "More than 18 words",
@@ -143,7 +142,7 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
           "Trim it. If your team cannot recite it from memory, it will not steer their daily decisions.",
       },
       {
-        condition: "4 to 18 words, no digits",
+        condition: "Otherwise",
         status: "pass",
         prompt:
           "Good length and qualitative. Read it aloud. Would it make your team lean in?",
@@ -183,15 +182,21 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
           "Nobody owns this. Name the champion who reports on it, or it belongs to everyone and therefore to no one.",
       },
       {
-        condition: "No named reviewer",
+        condition: "No named reviewer where reviewers are required",
         status: "fail",
         prompt:
-          "No reviewer means no one acknowledges the check-ins. Name the person who reads them.",
+          "This workspace asks for a reviewer, who acknowledges the check-ins. Name the person who reads them.",
       },
       {
         condition: "Champion and reviewer named",
         status: "pass",
         prompt: "Owned and reviewed, so the loop closes on somebody.",
+      },
+      {
+        condition: "Champion named",
+        status: "pass",
+        prompt:
+          "Owned. Nobody is asked to acknowledge its check-ins, which this workspace's practice allows.",
       },
     ],
   },
@@ -203,7 +208,7 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
     conditions: [
       {
         condition: "Company level above the company cap",
-        status: "fail",
+        status: "warn",
         prompt:
           "Too many objectives at company level. Which of these would you drop if you had to choose? Drop them.",
       },
@@ -247,8 +252,8 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
       },
       {
         condition: "Above the upper bound",
-        status: "fail",
-        prompt: "Which two would you drop if you had to? Drop them.",
+        status: "warn",
+        prompt: "Which would you drop if you had to?",
       },
       {
         condition: "Exactly one",
@@ -271,7 +276,7 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
     conditions: [
       {
         condition: "No numbers",
-        status: "fail",
+        status: "warn",
         prompt: "What is the baseline today, and where must it land?",
       },
       {
@@ -295,10 +300,16 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
     feedsStrengthScore: true,
     conditions: [
       {
-        condition: "Baseline, target, date or owner missing",
+        condition: "Target, date or owner missing",
         status: "fail",
         prompt:
-          "Something is missing: a baseline, a target, a date or an owner. If the baseline is unknown, establishing it can be the first key result.",
+          "Something is missing: a target, a date or an owner. Without them this cannot be checked in on.",
+      },
+      {
+        condition: "Baseline missing",
+        status: "warn",
+        prompt:
+          "No baseline. If the number today is unknown, establishing it can be its own key result.",
       },
       {
         condition: "All four present",
@@ -311,25 +322,26 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
   {
     id: "KR-4",
     group: "key_result",
-    title: "Leading and lagging mix",
+    title: "Leading and lagging",
     feedsStrengthScore: true,
+    // Tagging is optional since P9-T03a (METHOD.md §4.2): the set is judged
+    // on the key results somebody tagged, and a set nobody tagged passes.
     conditions: [
       {
-        condition: "Untagged",
-        status: "fail",
+        condition: "None tagged",
+        status: "pass",
         prompt:
-          "This one is neither leading nor lagging. Tag it, or the set cannot say whether it will find out in time.",
+          "Tagging is optional. Mark a key result leading or lagging when it helps the set say whether it will find out in time.",
       },
       {
         condition: "All lagging",
         status: "warn",
-        prompt:
-          "You will only find out at the end of the cycle whether it worked.",
+        prompt: "You will only find out at the end whether it worked.",
       },
       {
         condition: "All leading",
         status: "warn",
-        prompt: "Which key result proves the actual outcome landed?",
+        prompt: "Which key result proves the outcome landed?",
       },
       {
         condition: "At least one of each",
@@ -347,21 +359,21 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
     conditions: [
       {
         condition: "Activity noun, no impact word, no purpose",
-        status: "fail",
+        status: "warn",
         prompt:
-          "This measures pure activity volume. That is an output however measurable it is. Ask why: more calls, to what end? Name that impact and make it the key result.",
+          "This measures activity volume. Ask why: more calls, to what end? If you can measure that impact, make it the key result and keep the activity as a leading indicator.",
       },
       {
         condition: "Output verb with fewer than two numbers",
         status: "warn",
         prompt:
-          "Reads like a milestone. What measurably changes because of it? Measure that instead.",
+          "Reads like a milestone. If it is one, mark it a milestone key result. Otherwise measure what changes because of it.",
       },
       {
         condition: "Activity plus a why, but the target sits on the activity",
         status: "warn",
         prompt:
-          "Good instinct, but flip it. Measure the impact itself and keep the activity as a clearly tagged leading indicator at most.",
+          "Good instinct, but consider flipping it. Measure the impact itself and keep the activity as a tagged leading indicator.",
       },
       {
         condition: "Otherwise",
@@ -443,6 +455,12 @@ export interface ObjectiveInput {
   readonly hasTimeframe: boolean;
   readonly championId: string | null;
   readonly reviewerId: string | null;
+  /**
+   * True where the workspace requires a reviewer on every objective
+   * (METHOD.md §2.5, P9-T04). Absent reads as not required, which is the
+   * recommended practice.
+   */
+  readonly reviewerRequired?: boolean;
   /** How many objectives this unit already has, including this one. */
   readonly objectivesInUnit: number;
   readonly level: "company" | "department" | "team" | "individual";
@@ -517,6 +535,11 @@ export function evaluateObjective(
   // Without this, every objective that names its own quarter would be warned
   // for the one thing OBJ-3 asks it to do.
   const hasDigits = /\d/.test(title.replace(/\bQ[1-4]\b/gi, ""));
+  // OBJ-2 also lets a four-digit year through since P9-T03a: "Be the
+  // mid-market's first choice by 2027" names a time, not a metric.
+  const hasMetricDigits = /\d/.test(
+    title.replace(/\bQ[1-4]\b/gi, "").replace(/\b(19|20)\d{2}\b/g, ""),
+  );
   // From the registry rather than the module, so a workspace's added terms
   // reach the check that uses them. §11 carries these as a parameter.
   const lists = wordListsFrom(thresholds["quality.wordLists"]);
@@ -548,19 +571,16 @@ export function evaluateObjective(
               ? verdictOf(obj1, "Names a change in state")
               : verdictOf(obj1, "Cannot tell");
 
-  // OBJ-2. The bounds are the §11 registry's, not this function's: METHOD.md
-  // §4.1 words them as four and eighteen and the registry carries those as
-  // `quality.objectiveLengthWords`, so a workspace that tunes them tunes the
-  // check rather than being ignored by it.
+  // OBJ-2. The limit is the §11 registry's, not this function's, so a
+  // workspace that tunes it tunes the check rather than being ignored by it.
+  // There is no lower bound since P9-T03a (METHOD.md §4.1).
   const obj2 = check("OBJ-2");
-  const length = thresholds["quality.objectiveLengthWords"];
-  const obj2Verdict = hasDigits
-    ? verdictOf(obj2, "Contains digits")
-    : wordCount < length.low
-      ? verdictOf(obj2, "Fewer than 4 words")
-      : wordCount > length.high
-        ? verdictOf(obj2, "More than 18 words")
-        : verdictOf(obj2, "4 to 18 words, no digits");
+  const limit = thresholds["quality.objectiveLengthLimit"];
+  const obj2Verdict = hasMetricDigits
+    ? verdictOf(obj2, "Contains digits other than a four-digit year")
+    : wordCount > limit
+      ? verdictOf(obj2, "More than 18 words")
+      : verdictOf(obj2, "Otherwise");
 
   // OBJ-3
   const obj3 = check("OBJ-3");
@@ -573,9 +593,11 @@ export function evaluateObjective(
   const obj4 = check("OBJ-4");
   const obj4Verdict = !input.championId
     ? verdictOf(obj4, "No named champion")
-    : !input.reviewerId
-      ? verdictOf(obj4, "No named reviewer")
-      : verdictOf(obj4, "Champion and reviewer named");
+    : input.reviewerId
+      ? verdictOf(obj4, "Champion and reviewer named")
+      : input.reviewerRequired
+        ? verdictOf(obj4, "No named reviewer where reviewers are required")
+        : verdictOf(obj4, "Champion named");
 
   // OBJ-5
   const obj5 = check("OBJ-5");
@@ -623,6 +645,7 @@ const numbersIn = (text: string): number =>
 
 const WORST: Record<QualityStatus, number> = {
   pass: 0,
+  info: 0.5,
   todo: 1,
   warn: 2,
   fail: 3,
@@ -732,29 +755,28 @@ export function evaluateKeyResults(
     "KR-3",
     indexes.map((index) => {
       const entry = set[index] as KeyResultInput;
-      const complete =
-        entry.baseline !== null &&
-        entry.target !== null &&
-        entry.dueOn !== null &&
-        entry.ownerId !== null;
       return {
         index,
-        condition: complete
-          ? "All four present"
-          : "Baseline, target, date or owner missing",
+        condition:
+          entry.target === null ||
+          entry.dueOn === null ||
+          entry.ownerId === null
+            ? "Target, date or owner missing"
+            : entry.baseline === null
+              ? "Baseline missing"
+              : "All four present",
       };
     }),
   );
 
-  // KR-4. The untagged case is per key result and the mix is not, so this one
-  // is built by hand rather than through `rollUp`.
+  // KR-4 judges the set, and only the key results somebody tagged: tagging
+  // is optional since P9-T03a (METHOD.md §4.2).
   const kr4Check = check("KR-4");
-  const untagged = indexes.filter((index) => !set[index]?.indicatorType);
   const leading = set.filter((entry) => entry.indicatorType === "leading");
   const lagging = set.filter((entry) => entry.indicatorType === "lagging");
   const kr4Row =
-    set.length === 0 || untagged.length > 0
-      ? "Untagged"
+    leading.length === 0 && lagging.length === 0
+      ? "None tagged"
       : leading.length > 0 && lagging.length > 0
         ? "At least one of each"
         : lagging.length > 0
@@ -762,7 +784,7 @@ export function evaluateKeyResults(
           : "All leading";
   const kr4: KeyResultVerdict = {
     ...verdictOf(kr4Check, kr4Row),
-    keyResults: kr4Row === "Untagged" ? untagged : [],
+    keyResults: [],
   };
 
   // KR-5
@@ -770,6 +792,11 @@ export function evaluateKeyResults(
     "KR-5",
     indexes.map((index) => {
       const text = set[index]?.text ?? "";
+      // A key result tagged leading is exempt (METHOD.md §4.2, P9-T03a): an
+      // activity can be a fair leading signal, which is what the tag says.
+      if (set[index]?.indicatorType === "leading") {
+        return { index, condition: "Otherwise" };
+      }
       const activity = contains(text, lists.activityNouns);
       const impact = contains(text, lists.impactWords);
       const why = contains(text, lists.whyMarkers);
@@ -829,30 +856,6 @@ const DRAFT_VERDICT_CONDITIONS: Record<DraftVerdict, string> = {
 };
 
 /**
- * METHOD.md §4: "In strict mode every warn becomes a fail."
- *
- * That one sentence is the whole rule, and the prompt is unchanged by it: the
- * problem the writer has is the same problem whether it blocks or not, so the
- * coaching stays and only the consequence moves.
- *
- * `advisory` is in the §11 enum and METHOD.md never says what it does. It is
- * the identity here rather than a guessed demotion, and that gap is recorded
- * on the P4-T01 row as a question for a human. Inventing a rule would put
- * practice in the code instead of in the document.
- */
-export function applyStrictness<T extends QualityVerdict>(
-  verdicts: readonly T[],
-  strictness: CoachStrictness,
-): readonly T[] {
-  if (strictness !== "strict") {
-    return verdicts;
-  }
-  return verdicts.map((entry) =>
-    entry.status === "warn" ? { ...entry, status: "fail" as const } : entry,
-  );
-}
-
-/**
  * METHOD.md §4: `(passes + 0.5 × warns) / evaluated checks`, as a percentage.
  *
  * A `todo` counts in the denominator and adds nothing, because a check nobody
@@ -861,14 +864,19 @@ export function applyStrictness<T extends QualityVerdict>(
  */
 export function strengthScore(
   verdicts: readonly QualityVerdict[],
+  thresholds: ResolvedThresholds,
 ): number | null {
   const counted = verdicts.filter((entry) => entry.feedsStrengthScore);
   if (counted.length === 0) {
     return null;
   }
-  const passes = counted.filter((entry) => entry.status === "pass").length;
+  // A note asks nothing of anybody, so it counts as a pass (P9-T03a).
+  const passes = counted.filter(
+    (entry) => entry.status === "pass" || entry.status === "info",
+  ).length;
   const warns = counted.filter((entry) => entry.status === "warn").length;
-  return Math.round(((passes + 0.5 * warns) / counted.length) * 100);
+  const weight = thresholds["quality.strengthScoreWarnWeight"];
+  return Math.round(((passes + weight * warns) / counted.length) * 100);
 }
 
 /**
@@ -1139,10 +1147,10 @@ export const CYCLE_CHECKS: readonly QualityCheck[] = [
     feedsStrengthScore: false,
     conditions: [
       {
-        condition: "Outside the bounds",
+        condition: "Fewer than the minimum",
         status: "fail",
         prompt:
-          "Too few issues is not a diagnosis, and too many is not a ranking. List them inside the bounds and rank them by impact.",
+          "Too few issues is not a diagnosis. List at least the minimum and rank them by impact.",
       },
       {
         condition: "Listed but not ranked",
@@ -1295,7 +1303,7 @@ export function evaluateCycle(
   thresholds: ResolvedThresholds,
 ): readonly QualityVerdict[] {
   const lead = thresholds["quality.inputPackLeadWorkingDays"];
-  const issues = thresholds["quality.strategicIssueBounds"];
+  const issueMinimum = thresholds["quality.strategicIssueMinimum"];
   const priorities = thresholds["quality.priorityBounds"];
   const gate = (key: number) =>
     input.gates.find((entry) => entry.gateKey === key);
@@ -1313,8 +1321,8 @@ export function evaluateCycle(
       : "Neither scored nor declared a first cycle";
 
   const cy3 =
-    input.issueCount < issues.low || input.issueCount > issues.high
-      ? "Outside the bounds"
+    input.issueCount < issueMinimum
+      ? "Fewer than the minimum"
       : input.issuesRanked
         ? "Listed and ranked"
         : "Listed but not ranked";
@@ -1392,7 +1400,7 @@ export const QUALITY_EXAMPLES: readonly QualityExample[] = [
   {
     weak: "Objective: Launch the new mobile app by end of Q3",
     strong: "Objective: Make mobile the way our customers prefer to reach us",
-    why: "Launch is an output. You can launch and still fail. The strong version names the change in customer behaviour, and the launch becomes a means",
+    why: 'You can launch and still fail. The strong version names the change in customer behaviour. For a committed delivery, "Launch the app" can be an honest milestone key result under it',
     firesChecks: ["OBJ-1"],
   },
   {
@@ -1404,8 +1412,9 @@ export const QUALITY_EXAMPLES: readonly QualityExample[] = [
   },
   {
     weak: "KR: Hold 12 customer interviews",
-    strong: "KR: Raise activation rate of new sign-ups from 41% to 60%",
-    why: "Interviews are activity. Ask what the interviews are for, and measure that outcome",
+    strong:
+      "KR: Raise activation rate of new sign-ups from 41% to 60% (lagging). KR: Interview 12 churned customers by week 6 (leading)",
+    why: "Interviews alone are activity. Ask what they are for and measure that outcome; the interviews can stay as a tagged leading signal",
     firesChecks: ["KR-5"],
   },
   {

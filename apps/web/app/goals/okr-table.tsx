@@ -53,7 +53,8 @@ export interface EditableGoal {
   readonly health: string;
   readonly progressPct: number;
   readonly champion: string;
-  readonly reviewer: string;
+  /** Null where the goal has no reviewer, which the practice allows (P9-T04). */
+  readonly reviewer: string | null;
   readonly keyResults: readonly EditableKeyResult[];
 }
 
@@ -148,10 +149,14 @@ export function OkrTable({
                     }
                   />
                   <span className="truncate px-1.5 text-[11px] text-ink-3">
-                    {t("goals.editor.roles", {
-                      champion: goal.champion,
-                      reviewer: goal.reviewer,
-                    })}
+                    {goal.reviewer
+                      ? t("goals.editor.roles", {
+                          champion: goal.champion,
+                          reviewer: goal.reviewer,
+                        })
+                      : t("goals.editor.rolesNoReviewer", {
+                          champion: goal.champion,
+                        })}
                   </span>
                 </div>
 

@@ -25,6 +25,7 @@ import { RestoreButton } from "./restore-button";
 
 const KIND_LABEL = {
   goal: "admin.deleted.kindGoal",
+  key_result: "admin.deleted.kindKeyResult",
   initiative: "admin.deleted.kindInitiative",
   task: "admin.deleted.kindTask",
   document: "admin.deleted.kindDocument",

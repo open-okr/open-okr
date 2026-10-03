@@ -111,3 +111,41 @@ test("a member can take the key result back off the set", async () => {
     page.locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
   ).toHaveCount(0, { timeout: 15_000 });
 });
+
+/**
+ * A key result removed on its own comes back from Deleted items (P9-T06b).
+ * Until then only a deleted objective could, and a key result taken off a
+ * set was gone for good, whatever the delete control's sentence promised.
+ */
+test("and Deleted items lists it with who removed it, and brings it back", async () => {
+  await goTo(page, "/admin/deleted");
+  const row = page
+    .getByTestId("deleted-item")
+    .filter({ hasText: `${KEY_RESULT} (${OBJECTIVE})` });
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await expect(row).toContainText("Key result");
+  await expect(row).toContainText("Deleted by");
+
+  await row
+    .getByRole("button", { name: `Restore "${KEY_RESULT} (${OBJECTIVE})"` })
+    .click();
+  await expect(
+    page.getByTestId("toast").filter({ hasText: "Key result restored." }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(row).toHaveCount(0, { timeout: 15_000 });
+
+  await goTo(page, "/goals");
+  await expect(
+    page.locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // And off again, so every later spec meets the set it met before.
+  await page
+    .getByRole("button", { name: "Delete this key result" })
+    .last()
+    .click();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(
+    page.locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
+  ).toHaveCount(0, { timeout: 15_000 });
+});

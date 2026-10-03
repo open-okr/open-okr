@@ -71,7 +71,7 @@ export async function gather(
           goal.health,
           goal.progressPct,
           goal.champion.name,
-          goal.reviewer.name,
+          goal.reviewer?.name ?? "",
           goal.keyResults.length,
         ]),
       };

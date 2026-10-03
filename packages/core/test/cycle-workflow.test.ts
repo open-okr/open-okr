@@ -242,12 +242,12 @@ describe("the gate rows", () => {
     const four = rows.rows.find((entry) => entry.gate_key === 4);
     expect(four?.evaluable).toBe(true);
     // Gate 2 answered "cannot be judged" until P4-T03 taught it to evaluate the
-    // §4.2 checks over the set itself. On an empty cycle it passes, because a
-    // set with no key results has none that fail.
+    // §4.2 checks over the set itself. On an empty cycle it is red since
+    // P9-T03b: nothing drafted is nothing to publish.
     expect(rows.rows.find((entry) => entry.gate_key === 2)?.evaluable).toBe(
       true,
     );
-    expect(rows.rows.find((entry) => entry.gate_key === 2)?.passed).toBe(true);
+    expect(rows.rows.find((entry) => entry.gate_key === 2)?.passed).toBe(false);
     expect(rows.rows.find((entry) => entry.gate_key === 6)?.evaluable).toBe(
       true,
     );
@@ -277,11 +277,15 @@ describe("the gate rows", () => {
     expect(publishable).toBe(false);
   });
 
-  it("pass gate 6 once a deadline before day one is set", async () => {
+  it("pass gate 6 once a deadline before day one is set, where the workspace judges it", async () => {
+    // Gate 6 is off by default since P9-T03b (METHOD.md §4.5).
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "gates.6": "block" },
+    });
     const before = await snapshot();
     expect(before.gates.find((gate) => gate.gateKey === 6)?.passed).toBe(false);
 
-    const wb = await workerDb();
     const cycle = await withTx((tx) =>
       loadCycleForWorkflow(tx, workspaceId, cycleId),
     );
@@ -461,7 +465,7 @@ describe("the workflow actions", () => {
       callAction({ pool: wb.appPool, ...context() }, "workflow.publish", {
         cycleId,
       }),
-    ).rejects.toThrow(/all six gates are green/i);
+    ).rejects.toThrow(/every gate set to block is green/i);
   });
 
   it("names the blocked gates in the refusal rather than failing silently", async () => {
@@ -914,5 +918,148 @@ describe("the pack items table itself", () => {
       ),
     ).rejects.toThrow();
     void cyclePackItems;
+  });
+});
+
+/**
+ * Publishing in two steps, gate levels and the override switch (P9-T03b,
+ * METHOD.md §4.5 and §12).
+ */
+describe("publishing in two steps", () => {
+  const call = async <T>(action: string, input: unknown): Promise<T> => {
+    const wb = await workerDb();
+    return (await callAction(
+      { pool: wb.appPool, ...context() },
+      action as never,
+      input as never,
+    )) as T;
+  };
+
+  /** An objective at a level, with one complete, measurable key result. */
+  async function objective(level: "company" | "team", title: string) {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    const memberId = rows[0]?.id as string;
+    const goal = await call<{ id: string }>("goals.create", {
+      title,
+      cycleId,
+      level,
+      ownerKind: "workspace",
+      championId: memberId,
+      reviewerId: memberId,
+      contributionStatement: "Carries the year's first priority",
+    });
+    await call("goals.addKeyResult", {
+      goalId: goal.id,
+      title: "Raise activation from 41% to 60%",
+      direction: "increase",
+      indicatorType: "lagging",
+      baselineValue: 41,
+      targetValue: 60,
+      dueOn: "2099-12-31",
+      ownerId: memberId,
+    });
+    return goal.id;
+  }
+
+  async function cycleRow() {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      published_at: Date | null;
+      company_published_at: Date | null;
+      phase: number;
+    }>(
+      "select published_at, company_published_at, phase from cycles where id = $1",
+      [cycleId],
+    );
+    return rows[0];
+  }
+
+  it("publishes the company set first, judging only it, then the rest", async () => {
+    await objective("company", "Make onboarding the reason customers stay");
+    // A team objective with no key result: red on gate 2 for the rest of the
+    // set, and invisible to the company step.
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    await call("goals.create", {
+      title: "Answer once, in the product",
+      cycleId,
+      level: "team",
+      ownerKind: "workspace",
+      championId: rows[0]?.id,
+      reviewerId: rows[0]?.id,
+    });
+
+    const company = await call<{ published: string }>("workflow.publish", {
+      cycleId,
+      step: "company",
+    });
+    expect(company.published).toBe("company");
+    const afterCompany = await cycleRow();
+    expect(afterCompany?.company_published_at).not.toBeNull();
+    expect(afterCompany?.published_at).toBeNull();
+
+    await expect(
+      call("workflow.publish", { cycleId, step: "company" }),
+    ).rejects.toThrow(/company set is already published/);
+    await expect(call("workflow.publish", { cycleId })).rejects.toThrow(
+      /has no key results/,
+    );
+
+    const read = await call<{
+      companyPublishedAt: string | null;
+      phases: { phase: number; missing: string[] }[];
+    }>("workflow.read", { cycleId });
+    expect(read.companyPublishedAt).not.toBeNull();
+    expect(read.phases[5]?.missing).toContain(
+      "The department and team sets are not published",
+    );
+  });
+
+  it("publishes a whole set in one go, setting both steps", async () => {
+    await objective("company", "Make onboarding the reason customers stay");
+    const result = await call<{ published: string; warnedGates: number[] }>(
+      "workflow.publish",
+      { cycleId },
+    );
+    expect(result.published).toBe("set");
+    // Gate 5 warns (no cuts recorded) and does not hold publication.
+    expect(result.warnedGates).toContain(5);
+    const row = await cycleRow();
+    expect(row?.published_at).not.toBeNull();
+    expect(row?.company_published_at).toEqual(row?.published_at);
+    expect(row?.phase).toBe(6);
+  });
+
+  it("refuses the team step before the company step", async () => {
+    await expect(
+      call("workflow.publish", { cycleId, step: "teams" }),
+    ).rejects.toThrow(/Publish the company set first/);
+  });
+
+  it("refuses an override where the practice turns overrides off", async () => {
+    await call("practice.update", { overrides: { "gates.override": "off" } });
+    await expect(
+      call("workflow.publish", {
+        cycleId,
+        override: { reason: "The board approved this set on Tuesday." },
+      }),
+    ).rejects.toThrow(/does not publish past a red gate/);
+  });
+
+  it("holds publication for gates a governed workspace makes block", async () => {
+    await objective("company", "Make onboarding the reason customers stay");
+    await call("practice.applyProfile", { profile: "governed" });
+    // Governed blocks on gates 3 to 5 and binds the phases, so publishing
+    // waits for phase 4 and for the cuts gate 5 asks about.
+    await expect(call("workflow.publish", { cycleId })).rejects.toThrow(
+      /publishes after drafting is complete|every gate set to block/,
+    );
   });
 });

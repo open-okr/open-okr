@@ -10,6 +10,7 @@ import {
 
 const RESTORED: Record<DeletableSubject, string> = {
   goal: "deleteControl.restoredGoal",
+  key_result: "deleteControl.restoredKeyResult",
   initiative: "deleteControl.restoredInitiative",
   task: "deleteControl.restoredTask",
   document: "deleteControl.restoredDocument",

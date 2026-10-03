@@ -39,7 +39,10 @@ import {
   MID_CYCLE_CALIBRATION,
   OBJECTIVE_CHECKS,
   PHASE_TITLES,
+  PRACTICE,
   PROCESS_HEALTH_STATEMENTS,
+  PROFILE_KEYS,
+  PROFILES,
   QUALITY_WORD_LISTS,
   REVIEW_STAGES,
   RITUALS,
@@ -187,6 +190,123 @@ for (const [label, key] of registered) {
       `the registry carries \`${key}\` labelled "${label}", which METHOD.md §11 does not list. A value not in the registry is not a setting`,
     );
   }
+}
+
+// --- 2b. Practice settings (P9-T01) -----------------------------------------
+//
+// The §12.1 rows against the `PRACTICE` registry, both directions, the same
+// rule §11 holds the thresholds to: a setting that is in one and not the other
+// either does nothing or cannot be found. Several registry entries share one
+// row (each check, each gate, each level, each key result kind), so the
+// comparison is between the document's rows and the registry's distinct
+// labels. §12.2's profile names are compared the same way.
+
+const practiceRows = new Set(
+  firstColumnLabels(
+    section(method, "### 12.1 The settings", "### 12.2"),
+  ).filter((label) => label !== "Setting"),
+);
+if (practiceRows.size < 20) {
+  fail(
+    "practice",
+    `only ${practiceRows.size} settings found in METHOD.md §12.1; the parse is wrong, not the document`,
+  );
+}
+const practiceLabels = new Set(
+  Object.values(PRACTICE).map((entry) => entry.label as string),
+);
+for (const label of practiceRows) {
+  if (!practiceLabels.has(label)) {
+    fail(
+      "practice",
+      `METHOD.md §12.1 lists "${label}" and the practice registry has no setting with that label`,
+    );
+  }
+}
+for (const label of practiceLabels) {
+  if (!practiceRows.has(label)) {
+    fail(
+      "practice",
+      `the practice registry carries "${label}", which METHOD.md §12.1 does not list. A setting not in §12 does not exist`,
+    );
+  }
+}
+
+// Each option's words against §12.1's options column (P9-T05), because the
+// settings screen shows the registry's words and a reader holds them against
+// the document's. A row whose options are a list separated by "·" is compared
+// both ways; a row that describes its options in a sentence instead ("each on
+// or off") has nothing to split, and is skipped. The one option a column may
+// leave out is the default, which §12.1 names in the next column instead: "As
+// §4" is every check's default and is not repeated among Block, Warn and Off.
+let optionRows = 0;
+for (const line of section(
+  method,
+  "### 12.1 The settings",
+  "### 12.2",
+).split("\n")) {
+  const cells = line
+    .split("|")
+    .slice(1, -1)
+    .map((cell) => cell.trim());
+  const [label, optionsCell, defaultCell] = cells;
+  if (
+    label === undefined ||
+    optionsCell === undefined ||
+    defaultCell === undefined ||
+    !optionsCell.includes(" · ")
+  ) {
+    continue;
+  }
+  const entry = Object.values(PRACTICE).find(
+    (candidate) => candidate.label === label,
+  );
+  if (!entry) {
+    continue;
+  }
+  optionRows += 1;
+  // "Each check: Block · Warn · Off" lists the options after the colon.
+  const listed = optionsCell
+    .replace(/^[^·]*?:\s+/, "")
+    .split(" · ")
+    .map((option) => option.trim());
+  const worded = Object.values(
+    entry.optionLabels as Record<string, string>,
+  );
+  for (const option of listed) {
+    if (!worded.includes(option)) {
+      fail(
+        "practice",
+        `METHOD.md §12.1 offers "${option}" for "${label}", and the registry words none of that setting's options that way`,
+      );
+    }
+  }
+  for (const option of worded) {
+    if (!listed.includes(option) && option !== defaultCell) {
+      fail(
+        "practice",
+        `the registry words an option of "${label}" as "${option}", which METHOD.md §12.1 does not offer`,
+      );
+    }
+  }
+}
+if (optionRows < 15) {
+  fail(
+    "practice",
+    `only ${optionRows} option lists compared in METHOD.md §12.1; the parse is wrong, not the document`,
+  );
+}
+
+const documentedProfiles = section(method, "### 12.2 Profiles", "\n---")
+  .split(NEWLINE)
+  .map((line) => /^\|\s*\*\*([^*]+)\*\*\s*\|/.exec(line)?.[1])
+  .filter((label): label is string => label !== undefined);
+const registeredProfiles = PROFILE_KEYS.map((key) => PROFILES[key].label);
+if (documentedProfiles.join("|") !== registeredProfiles.join("|")) {
+  fail(
+    "practice",
+    `METHOD.md §12.2 names the profiles ${documentedProfiles.join(", ") || "(none found)"}; the package defines ${registeredProfiles.join(", ")}`,
+  );
 }
 
 // --- 3. Word lists ----------------------------------------------------------
@@ -663,7 +783,8 @@ const terms = Object.values(QUALITY_WORD_LISTS).reduce(
 );
 console.log(
   `Conformance passed. ${triggerKeys.length} trigger keys, ${CHECK_IDS.size} checks, ` +
-    `${documented.size} thresholds, ${terms} word-list terms, ` +
+    `${documented.size} thresholds, ${practiceRows.size} practice settings, ` +
+    `${documentedProfiles.length} profiles, ${terms} word-list terms, ` +
     `${corpusEntries.length} corpus entries and ${ENUMERATIONS_CHECKED} enumerations ` +
     `agree with the documents.`,
 );

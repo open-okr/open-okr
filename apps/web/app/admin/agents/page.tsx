@@ -153,7 +153,7 @@ export default async function AgentsPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
+          <h2 id="agents-list-heading" className="text-sm font-bold text-ink">
             {t("admin.agents.theAgents")}
           </h2>
         </CardHeader>
@@ -163,7 +163,10 @@ export default async function AgentsPage() {
               {t("admin.agents.thisWorkspaceHasNo")}
             </p>
           ) : (
-            <ul className="flex flex-col">
+            // Named by its heading, so "the agents" and "the runs" are two
+            // lists a reader can tell apart: a run row carries the agent's
+            // name too.
+            <ul aria-labelledby="agents-list-heading" className="flex flex-col">
               {agents.map((agent) => (
                 <li
                   key={agent.id}
