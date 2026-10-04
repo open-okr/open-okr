@@ -31225,9 +31225,7 @@
                 },
                 "required": [
                   "title",
-                  "level",
-                  "championId",
-                  "reviewerId"
+                  "level"
                 ]
               }
             }

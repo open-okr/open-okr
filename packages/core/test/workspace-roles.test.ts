@@ -430,3 +430,65 @@ describe("a goal in a space, after P8-G13c", () => {
     expect(await levelOn(goalId, otherMemberId)).toBe(ACCESS_LEVELS.view);
   });
 });
+
+describe("the number of answers a form demands (P8-G13d)", () => {
+  it("creates a cycle from a date alone, with every field resolved", async () => {
+    const wb = await workerDb();
+    const half = new Date();
+    half.setUTCMonth(half.getUTCMonth() + 6);
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.create",
+      { on: half.toISOString().slice(0, 10), firstCycle: false } as never,
+    );
+
+    const row = created as {
+      id: string;
+      sponsorId: string | null;
+      facilitatorId: string | null;
+      publicationDeadline: string | null;
+      startsOn: string;
+    };
+    // Named rather than left for somebody to answer: METHOD.md §2 phase 1
+    // asks that both be named, and whoever made the cycle is both until they
+    // say otherwise.
+    expect(row.sponsorId).toBe(ownerMemberId);
+    expect(row.facilitatorId).toBe(ownerMemberId);
+    // Publish gate 6 asks for a date strictly before day one and says nothing
+    // about how far before, so the latest allowed date is the only one the
+    // product can choose without inventing a judgement.
+    expect(row.publicationDeadline).not.toBeNull();
+    expect((row.publicationDeadline as string) < row.startsOn).toBe(true);
+  });
+
+  it("creates an objective from a title alone, championed by whoever typed it", async () => {
+    const wb = await workerDb();
+    const cycle = await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.create",
+      {
+        title: "Make onboarding something customers finish by themselves",
+        level: "team",
+        ownerKind: "workspace",
+        cycleId: cycle?.id as string,
+        weight: 1,
+      } as never,
+    );
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.read",
+      { id: created.id },
+    );
+    expect(read.champion.id).toBe(ownerMemberId);
+    expect(read.reviewer.id).toBe(ownerMemberId);
+    // And the quality canon says what is still missing rather than the create
+    // refusing: a reviewer who is also the champion is a finding, not a wall.
+    expect(read.quality).toBeTruthy();
+  });
+});

@@ -268,6 +268,16 @@ Every setting in the product, by scope. The settings service implements this map
 
 **Every setting has a working default, and no setting must be answered before the product is usable.** Registering provisions a complete, correct workspace: the member signs in to a working instance practising the full method, and every card in admin is a later refinement. This is a hard rule, tested as such. A setting introduced without a default fails review, and a screen that blocks progress until a setting is chosen is a defect.
 
+**Three values a cycle used to demand and now resolves on its own** (P8-G13d). They are rules rather than stored settings, because none of them is a number somebody would ever go and change: the answer is always derived from who is asking or from the period itself, and a card holding them would be a card nobody opens.
+
+| Value | Default | Why it is not a question |
+|---|---|---|
+| `cycles.sponsor_id` | Whoever creates the cycle | METHOD.md §2 phase 1 asks that a sponsor be *named*. Somebody making a cycle on their own is the sponsor until they say otherwise, and phase 1 reads green instead of listing a thing only they could answer with their own name |
+| `cycles.facilitator_id` | Whoever creates the cycle | The same, and the cycle screen reassigns either |
+| `cycles.publication_deadline` | The day before the cycle starts | Publish gate 6 asks for a date strictly before day one and says nothing about how far before, so the latest allowed date is the only one the product can choose without inventing a judgement. A facilitator pulls it earlier |
+
+`cycles.levels` already defaulted to company, department and team in the schema, and `goals.champion_id` and `goals.reviewer_id` now default to whoever creates the objective, in `goals.create` rather than in each of the four surfaces that call it.
+
 The only exceptions are the instance connections that describe the deployment itself: mail, the deployment AI key and channel credentials. Each is optional, offered by the first-run wizard, and degraded cleanly when absent — with no mail, delivery stays in the in-app inbox; with no AI key, AI is off; with no channel, email and the inbox carry everything. None of them blocks registration or use.
 
 | Scope | Lives in | Managed from | Permission | Contents |

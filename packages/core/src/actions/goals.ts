@@ -1001,8 +1001,21 @@ export const createGoal = defineWriteAction({
       ownerKind: z.enum(GOAL_OWNER_KINDS).default("workspace"),
       spaceId: z.uuid().optional(),
       memberId: z.uuid().optional(),
-      championId: z.uuid(),
-      reviewerId: z.uuid(),
+      /**
+       * Who champions and who reviews it (P8-G13d).
+       *
+       * Both default to whoever creates the objective when they are not
+       * given. They are `not null` on the row and METHOD.md §2.5 wants both
+       * named, so this names them rather than loosening anything: somebody
+       * drafting on their own is both until they say otherwise, and every
+       * surface that creates an objective can accept a title alone. The goal
+       * detail reassigns either, which rebinds access with it.
+       *
+       * A reviewer who is also the champion is a quality finding rather than
+       * a refusal: §4 reports it, and reporting it is what makes it fixable.
+       */
+      championId: z.uuid().optional(),
+      reviewerId: z.uuid().optional(),
       parentGoalId: z.uuid().optional(),
       parentKeyResultId: z.uuid().optional(),
       /**
@@ -1133,8 +1146,8 @@ export const createGoal = defineWriteAction({
         ownerKind: input.ownerKind,
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
-        championId: input.championId,
-        reviewerId: input.reviewerId,
+        championId: input.championId ?? memberId,
+        reviewerId: input.reviewerId ?? memberId,
         parentGoalId: input.parentGoalId ?? null,
         parentKeyResultId: input.parentKeyResultId ?? null,
         strategyId: input.strategyId ?? null,
