@@ -123,6 +123,19 @@ beforeEach(async () => {
      values (gen_random_uuid(), $1, $2, 'Member', 'active') returning id`,
     [workspaceId, MEMBER],
   );
+  // **And the workspace default role** (P8-G13c). A member who joins through
+  // an invitation is given it; this row is written straight into the table, so
+  // it is given the same role the product would have given it. Without that it
+  // holds no role at all, which is a guest rather than a member, and §8.3 is
+  // the team scoring: the room grades together, and the floor is the `edit`
+  // every active member holds.
+  await wb.admin.query(
+    `update workspace_members set role_id = (
+       select id from workspace_roles
+        where workspace_id = $1 and is_default and deleted_at is null
+      ) where id = $2`,
+    [workspaceId, member.rows[0]?.id],
+  );
   memberMemberId = member.rows[0]?.id as string;
   await call("spaces.addMember", {
     spaceId,

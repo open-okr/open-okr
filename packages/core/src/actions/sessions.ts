@@ -4514,7 +4514,16 @@ export const scoreKeyResult = defineWriteAction({
         memberId,
         resourceType: "goal",
         resourceId: owner.goalId,
-        requires: ACCESS_LEVELS.edit as never,
+        // **`view`, not `edit`** (P8-G13c). This writes a review row and
+        // never the goal, so the goal access it needs is the right to see
+        // what is being graded. Being in the room is what says somebody may
+        // grade, and `requireQuarterly` above has already asked for that.
+        // It read `edit` until roles existed, which worked only because a
+        // space granted every member `edit` on every objective in it: once
+        // that binding went, a Viewer in the room could no longer take part
+        // in a review, and METHOD.md §8.3 is the team scoring rather than
+        // the facilitator scoring at them.
+        requires: ACCESS_LEVELS.view as never,
       });
 
       const [existing] = await tx
@@ -4849,7 +4858,16 @@ export const setNarrative = defineWriteAction({
         memberId,
         resourceType: "goal",
         resourceId: input.goalId,
-        requires: ACCESS_LEVELS.edit as never,
+        // **`view`, not `edit`** (P8-G13c). This writes a review row and
+        // never the goal, so the goal access it needs is the right to see
+        // what is being graded. Being in the room is what says somebody may
+        // grade, and `requireQuarterly` above has already asked for that.
+        // It read `edit` until roles existed, which worked only because a
+        // space granted every member `edit` on every objective in it: once
+        // that binding went, a Viewer in the room could no longer take part
+        // in a review, and METHOD.md §8.3 is the team scoring rather than
+        // the facilitator scoring at them.
+        requires: ACCESS_LEVELS.view as never,
       });
 
       const now = new Date();
@@ -6810,7 +6828,16 @@ export const decideObjective = defineWriteAction({
         memberId,
         resourceType: "goal",
         resourceId: input.goalId,
-        requires: ACCESS_LEVELS.edit as never,
+        // **`view`, not `edit`** (P8-G13c). This writes a review row and
+        // never the goal, so the goal access it needs is the right to see
+        // what is being graded. Being in the room is what says somebody may
+        // grade, and `requireQuarterly` above has already asked for that.
+        // It read `edit` until roles existed, which worked only because a
+        // space granted every member `edit` on every objective in it: once
+        // that binding went, a Viewer in the room could no longer take part
+        // in a review, and METHOD.md §8.3 is the team scoring rather than
+        // the facilitator scoring at them.
+        requires: ACCESS_LEVELS.view as never,
       });
 
       const now = new Date();
@@ -8067,7 +8094,16 @@ export const revealObjectiveScore = defineWriteAction({
         memberId,
         resourceType: "goal",
         resourceId: input.goalId,
-        requires: ACCESS_LEVELS.edit as never,
+        // **`view`, not `edit`** (P8-G13c). This writes a review row and
+        // never the goal, so the goal access it needs is the right to see
+        // what is being graded. Being in the room is what says somebody may
+        // grade, and `requireQuarterly` above has already asked for that.
+        // It read `edit` until roles existed, which worked only because a
+        // space granted every member `edit` on every objective in it: once
+        // that binding went, a Viewer in the room could no longer take part
+        // in a review, and METHOD.md §8.3 is the team scoring rather than
+        // the facilitator scoring at them.
+        requires: ACCESS_LEVELS.view as never,
       });
 
       const now = new Date();

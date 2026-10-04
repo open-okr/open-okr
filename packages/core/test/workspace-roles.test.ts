@@ -341,3 +341,92 @@ describe("the member row", () => {
     expect(rows[0]?.roleId).not.toBeNull();
   });
 });
+
+describe("a goal in a space, after P8-G13c", () => {
+  /**
+   * The binding that used to answer "who may edit this objective" is gone, so
+   * the role is the only thing that answers it. These two tests are the pair
+   * that would have caught putting it back: one says the space grants nothing
+   * beyond the workspace-wide view, the other says the role still does.
+   */
+  const goalInASpace = async () => {
+    const wb = await workerDb();
+    const space = await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.create",
+      { name: "Revenue" },
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "spaces.addMember", {
+      spaceId: space.id,
+      memberId: otherMemberId,
+      role: "member",
+    });
+    const cycle = await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.create",
+      {
+        title: "Make renewal a decision customers do not have to think about",
+        level: "team",
+        ownerKind: "space",
+        spaceId: space.id,
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        cycleId: cycle?.id as string,
+        weight: 1,
+      },
+    );
+    return created.id;
+  };
+
+  const levelOn = async (goalId: string, memberId: string) =>
+    withTx(async (tx) => {
+      const resolved = await resolveSubjectContext(
+        tx,
+        "goal",
+        goalId,
+        workspaceId,
+      );
+      return resolveMemberAccessLevel(tx, {
+        workspaceId,
+        memberId,
+        contextId: resolved?.contextId as string,
+      });
+    });
+
+  it("grants a member of that space nothing beyond the workspace-wide view", async () => {
+    const goalId = await goalInASpace();
+    // No role, so the only thing reaching them is `workspace_standard` at
+    // view. Before P8-G13c the space binding made this `edit`.
+    expect(await levelOn(goalId, otherMemberId)).toBe(ACCESS_LEVELS.view);
+  });
+
+  it("still grants the edit through the role, which is the point", async () => {
+    const wb = await workerDb();
+    const goalId = await goalInASpace();
+    const { roles } = await callAction(
+      { pool: wb.appPool, ...context() },
+      "roles.list",
+      {},
+    );
+    const member = roles.find((role) => role.builtinKey === "member");
+    await callAction({ pool: wb.appPool, ...context() }, "roles.assign", {
+      memberId: otherMemberId,
+      roleId: member?.id as string,
+    });
+    expect(await levelOn(goalId, otherMemberId)).toBe(ACCESS_LEVELS.edit);
+
+    // And lowering that role is what takes it away, which is what the screen
+    // promises and what could not be true while the space binding stood.
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "roles.setPermission",
+      { roleId: member?.id as string, domain: "goal", level: 10 },
+    );
+    expect(await levelOn(goalId, otherMemberId)).toBe(ACCESS_LEVELS.view);
+  });
+});

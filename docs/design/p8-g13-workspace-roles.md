@@ -193,3 +193,58 @@ the same rule.
 callers all ask for `view`, which the workspace-wide binding already grants.
 A list that asks for `edit` needs the role in that filter, and this note is
 here so it is not discovered by somebody debugging an empty page.
+
+## 9. What P8-G13c removed, and the one place it did not
+
+Built 4 October 2026.
+
+`createGoalInTx` no longer writes the `space_standard` binding at `edit`, and
+data change 0013 removes the ones written before. The workspace role is now the
+only thing that answers "who may edit this objective", which is what makes the
+roles screen mean anything: before this, lowering Member on objectives changed
+no level anywhere, because the space binding still granted the edit.
+
+| What a space decides | Before | After |
+|---|---|---|
+| Who may see an objective in it | Everybody, through `workspace_standard` | Unchanged |
+| Who may edit an objective in it | Every member of the space | The workspace role |
+| Membership, the session cadence, the rails that read it | The space | Unchanged |
+
+**Nobody loses the edit on the day this runs**, because 0012 runs first and
+gives every active human the Member role, which grants `edit` on the `goal`
+domain. The level is the same number from a different source. What changes is
+that an administrator can now change it.
+
+**The initiative followed, on Agung's answer.** The first version of this
+section said an initiative in a space still granted its members `edit` through
+the identical shape, that the two now disagreed, and that resolving it was a
+decision rather than a tidy-up. Agung read that and asked for them to agree, so
+`createInitiativeInTx` no longer writes the binding either and data change
+0013 removes both. The owner keeps `full` through their own group, which is
+what `initiatives.delete` asks for, and `workspace_standard` keeps `view`
+on both, so alignment still reads across spaces.
+
+## 10. What a review asks for, and why it changed
+
+**Removing the binding took a Viewer out of the room, and that was wrong.**
+Four review writes authorised through `edit` on the objective:
+`sessions.scoreKeyResult`, `sessions.setNarrative`,
+`sessions.decideObjective` and `sessions.revealObjectiveScore`. Every one of
+them writes a review table and none of them writes the goal row. They read
+`edit` only because a space used to grant every member `edit` on every
+objective in it, so the check happened to pass for everybody in the room.
+
+Once the binding went, somebody holding Viewer could no longer take part in a
+quarterly review. METHOD.md §8.3 is the team scoring rather than the
+facilitator scoring at them, so that is the practice breaking rather than the
+matrix working.
+
+| The check | Before | After |
+|---|---|---|
+| On the session | `edit`, which membership of the room grants | Unchanged |
+| On the objective | `edit` | `view` |
+
+Being in the room is what says somebody may grade. The objective check is the
+right to see what is being graded, which is what it was always for. Nobody
+outside the room gains anything: `requireQuarterly` still asks for the
+session first.

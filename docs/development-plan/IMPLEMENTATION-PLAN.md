@@ -3050,6 +3050,12 @@ Deliverables: `createGoalInTx` stops writing the `space_standard` binding at `ed
 Test plan: a goal created in a space grants its members nothing beyond their role; a member whose role grants `view` cannot edit a goal in their own space; the alignment and session paths that read space membership are unaffected.
 Acceptance: Given a workspace that has lowered Member to view, when a member of the owning space opens an objective, then it is read-only.
 
+**Built on 4 October 2026.** The binding goes from `createGoalInTx` and data change 0013
+removes the ones already written, ordered after 0012 so nobody loses the edit on the day it
+runs. The initiative's identical binding is deliberately untouched: this row names the
+objective, and the two now disagree, which the design note §9 records rather than resolving
+quietly.
+
 ### P8-G13d: Fewer required fields on the way in [S]
 Depends on: P8-G13a
 Goal: the second half of Agung's complaint, which is the number of answers a form demands before it will accept anything.
