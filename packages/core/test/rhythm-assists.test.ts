@@ -246,10 +246,14 @@ describe("the deterministic digest", () => {
 
   it("puts a blocker's age on the 24-hour clock", async () => {
     const wb = await workerDb();
+    // Thirty and a half hours by the database's clock, so the whole hours the
+    // digest counts against the application's clock are 30 even when the two
+    // clocks disagree by a moment. Exactly 30 read as 29 on 5 October 2026,
+    // with the database in a container and the suite on the host.
     await wb.admin.query(
       `insert into blockers (id, workspace_id, type, owner_id, next_action, opened_at, due_at, session_id)
        values (gen_random_uuid(), $1, 'dependency', $2, 'Chase the billing team',
-               now() - interval '30 hours', now() - interval '6 hours', $3)`,
+               now() - interval '30 hours 30 minutes', now() - interval '6 hours', $3)`,
       [workspaceId, ownerMemberId, sessionId],
     );
     await writeDigest({

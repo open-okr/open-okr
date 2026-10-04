@@ -18,6 +18,11 @@
  *   Given the list open in two tabs, when a title is changed in one, then
  *   the other shows it without a reload (P9-T06c).
  *
+ *   Given a key result in the list, when its owner changes the title, value
+ *   and due date with the keyboard alone, then each saves on Enter and shows
+ *   after a reload (P9-T07a-a). Easing its target asks why (U3), and a title
+ *   changed since it was read is not overwritten (U6).
+ *
  * **A browser proves what the action tests cannot**: that a value typed into
  * a cell reaches `goals.recordValue` and comes back as a different number on
  * the row, and that the add controls exist on the screen somebody is reading
@@ -40,6 +45,22 @@ let page: Page;
 const OBJECTIVE = "Make onboarding something customers finish by themselves";
 const KEY_RESULT = "Accounts reaching first value within seven days";
 
+/**
+ * Waits until a reload shows what was saved, which is when the server has it.
+ *
+ * The list changes the moment somebody types (P9-T06c), so a row on screen is
+ * not evidence that the write landed. A case that navigates straight after an
+ * edit can leave while the write is still on its way, and the next case then
+ * meets the old value; that is how a removal and the Deleted items case after
+ * it failed in continuous integration once the list became optimistic.
+ */
+async function persisted(check: () => Promise<void>): Promise<void> {
+  await expect(async () => {
+    await page.reload();
+    await check();
+  }).toPass({ timeout: 20_000 });
+}
+
 test.beforeAll(async ({ browser }) => {
   context = await browser.newContext();
   page = await context.newPage();
@@ -58,27 +79,35 @@ test("sign in and open the OKR screen", async () => {
 });
 
 test("an objective is added without leaving the screen", async () => {
-  await page.getByRole("button", { name: "Add objective" }).click();
-  const field = page.getByRole("textbox", { name: "Add objective" });
-  await field.fill(OBJECTIVE);
-  await field.press("Enter");
+  const added = page.locator(
+    `input[aria-label="Objective title"][value="${OBJECTIVE}"]`,
+  );
+  // Retry-safe: a retry runs this serial file from the top, and a second
+  // objective with the same title would make every later locator ambiguous.
+  if ((await added.count()) === 0) {
+    await page.getByRole("button", { name: "Add objective" }).click();
+    const field = page.getByRole("textbox", { name: "Add objective" });
+    await field.fill(OBJECTIVE);
+    await field.press("Enter");
+  }
 
   // The row is an input carrying the title, so the assertion is on its value.
-  await expect(
-    page.locator(`input[aria-label="Objective title"][value="${OBJECTIVE}"]`),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(added).toBeVisible({ timeout: 15_000 });
 });
 
 test("a key result is added under that objective", async () => {
-  const addRows = page.getByRole("button", { name: "Add key result" });
-  await addRows.last().click();
-  const field = page.getByRole("textbox", { name: "Add key result" });
-  await field.fill(KEY_RESULT);
-  await field.press("Enter");
+  const added = page.locator(
+    `input[aria-label="Key result title"][value="${KEY_RESULT}"]`,
+  );
+  if ((await added.count()) === 0) {
+    const addRows = page.getByRole("button", { name: "Add key result" });
+    await addRows.last().click();
+    const field = page.getByRole("textbox", { name: "Add key result" });
+    await field.fill(KEY_RESULT);
+    await field.press("Enter");
+  }
 
-  await expect(
-    page.locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(added).toBeVisible({ timeout: 15_000 });
 });
 
 /**
@@ -124,6 +153,160 @@ test("a value typed into the table is recorded and moves the progress", async ()
   await expect(page.getByText("40%").first()).toBeVisible();
 });
 
+/**
+ * Every cell of a key result, with the keyboard alone (P9-T07a-a acceptance).
+ * Each field is reached, typed into and committed with Enter, and all three
+ * are still there after a reload, which is the claim that matters: a cell that
+ * looks saved and is not is the defect this list exists to avoid.
+ */
+test("a key result's title, value and due date change with the keyboard alone, and stay after a reload", async () => {
+  await goTo(page, "/goals");
+  const retitled = `${KEY_RESULT}, measured weekly`;
+
+  const title = page.locator(
+    `input[aria-label="Key result title"][value="${KEY_RESULT}"]`,
+  );
+  await title.focus();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type(retitled);
+  await page.keyboard.press("Enter");
+
+  const value = page.getByRole("spinbutton", {
+    name: `Current value for ${retitled}`,
+  });
+  await expect(value).toBeVisible({ timeout: 15_000 });
+  await value.focus();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("55");
+  await page.keyboard.press("Enter");
+
+  const due = page.getByLabel(`Due date for ${retitled}`);
+  await due.focus();
+  await due.fill("2030-03-31");
+  await page.keyboard.press("Enter");
+
+  await expect(async () => {
+    await page.reload();
+    await expect(
+      page.locator(`input[aria-label="Key result title"][value="${retitled}"]`),
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page.getByRole("spinbutton", { name: `Current value for ${retitled}` }),
+    ).toHaveValue("55");
+    await expect(page.getByLabel(`Due date for ${retitled}`)).toHaveValue(
+      "2030-03-31",
+    );
+  }).toPass({ timeout: 20_000 });
+
+  // Back to the title every later case in this file names.
+  const back = page.locator(
+    `input[aria-label="Key result title"][value="${retitled}"]`,
+  );
+  await back.fill(KEY_RESULT);
+  await page.keyboard.press("Enter");
+  await persisted(() =>
+    expect(
+      page.locator(
+        `input[aria-label="Key result title"][value="${KEY_RESULT}"]`,
+      ),
+    ).toBeVisible({ timeout: 5_000 }),
+  );
+});
+
+/**
+ * U3: easing a target asks why, under the cell, before anything is sent; with
+ * a reason it saves. That the server refuses an easing without one, from every
+ * surface, is proved in `packages/core/test/goal-targets.test.ts`.
+ */
+test("easing a target asks why, and saves with the reason", async () => {
+  await goTo(page, "/goals");
+  const target = page.getByRole("spinbutton", {
+    name: `Target for ${KEY_RESULT}`,
+  });
+  await expect(target).toHaveValue("100", { timeout: 15_000 });
+  await target.fill("80");
+  await page.keyboard.press("Enter");
+
+  const reason = page.getByTestId("target-reason");
+  await expect(reason).toContainText("Easing the target from 100 to 80");
+  await reason
+    .getByRole("textbox")
+    .fill("The partner channel we counted on closed in week three");
+  await page.keyboard.press("Enter");
+  await expect(reason).toHaveCount(0);
+
+  await expect(async () => {
+    await page.reload();
+    await expect(
+      page.getByRole("spinbutton", { name: `Target for ${KEY_RESULT}` }),
+    ).toHaveValue("80", { timeout: 5_000 });
+  }).toPass({ timeout: 20_000 });
+});
+
+/**
+ * U6: two people, one title. The other write goes through the REST surface as
+ * this same member, which the live stream deliberately does not announce to
+ * them and no other tab hears, so the list is holding exactly the stale read
+ * the conflict refusal exists for. Nothing is overwritten, the screen says
+ * what the title now reads, and taking theirs shows it.
+ */
+test("a title changed since it was read is not overwritten", async ({
+  playwright,
+  baseURL,
+}) => {
+  await goTo(page, "/account/api-tokens");
+  await page.getByLabel("Name").fill("OKR list conflict e2e");
+  await page.getByRole("checkbox", { name: "Write" }).check();
+  await page.getByRole("button", { name: "Create token" }).click();
+  const shown = page.getByTestId("minted-token");
+  await expect(shown).toBeVisible({ timeout: 10_000 });
+  const token = ((await shown.textContent()) ?? "").trim();
+  const api = await playwright.request.newContext({ baseURL });
+  const headers = { authorization: `Bearer ${token}` };
+
+  try {
+    await goTo(page, "/goals");
+    const field = (value: string) =>
+      page.locator(`input[aria-label="Objective title"][value="${value}"]`);
+    await expect(field(OBJECTIVE)).toBeVisible({ timeout: 15_000 });
+
+    const listed = await api.get("/api/v1/goals/list", { headers });
+    const goal = (
+      (await listed.json()).data.goals as { id: string; title: string }[]
+    ).find((row) => row.title === OBJECTIVE);
+    expect(goal).toBeTruthy();
+    const theirs = `${OBJECTIVE}, as somebody else put it`;
+    const patched = await api.post("/api/v1/goals/patch", {
+      headers,
+      data: {
+        id: goal?.id,
+        set: { title: theirs },
+        read: { title: OBJECTIVE },
+      },
+    });
+    expect(patched.status()).toBe(200);
+
+    // The list still shows the title it read, and this edit is made from it.
+    await field(OBJECTIVE).fill(`${OBJECTIVE}, as I put it`);
+    await page.keyboard.press("Enter");
+    const conflict = page.getByTestId("okr-conflict");
+    await expect(conflict).toContainText(theirs, { timeout: 15_000 });
+
+    await conflict.getByRole("button", { name: "Take theirs" }).click();
+    await expect(field(theirs)).toBeVisible({ timeout: 15_000 });
+    await expect(conflict).toHaveCount(0);
+
+    // Back to the title the rest of this file names.
+    await field(theirs).fill(OBJECTIVE);
+    await page.keyboard.press("Enter");
+    await persisted(() =>
+      expect(field(OBJECTIVE)).toBeVisible({ timeout: 5_000 }),
+    );
+  } finally {
+    await api.dispose();
+  }
+});
+
 test("the diagram draws the same cycle", async () => {
   await page.getByRole("link", { name: "Diagram", exact: true }).click();
   await expect(
@@ -143,6 +326,11 @@ test("a member can take the key result back off the set", async () => {
   await expect(
     page.locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
   ).toHaveCount(0, { timeout: 15_000 });
+  // The row goes at once; the toast is the server's answer, and what the next
+  // case reads is only there once it has given it.
+  await expect(
+    page.getByTestId("toast").filter({ hasText: "Key result removed" }),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 /**
@@ -179,6 +367,6 @@ test("and Deleted items lists it with who removed it, and brings it back", async
     .click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(
-    page.locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
-  ).toHaveCount(0, { timeout: 15_000 });
+    page.getByTestId("toast").filter({ hasText: "Key result removed" }),
+  ).toBeVisible({ timeout: 15_000 });
 });

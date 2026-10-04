@@ -84,6 +84,7 @@ const node = (title: string): OkrGoal => ({
       title: "Trials from 0 to 100",
       unit: null,
       direction: "increase",
+      indicatorType: "lagging",
       baselineValue: 0,
       targetValue: 100,
       currentValue: 20,
@@ -123,6 +124,7 @@ function Harness() {
   return (
     <p data-testid="state">
       {okr.problem ?? ""}
+      {okr.failed?.error ?? ""}
       {okr.conflict ? "conflict" : ""}
     </p>
   );
@@ -190,6 +192,18 @@ describe("useOkrMutation", () => {
     await settle();
     expect(cached()?.goals[0]?.title).toBe("Grow the trial base");
     expect(container.textContent).toContain("This workspace refuses that.");
+    // What was typed is kept, so Retry sends it again as it was.
+    expect(okr.failed?.mutation).toMatchObject({
+      set: { title: "Make trials turn into teams" },
+    });
+    runOkrMutation.mockResolvedValueOnce({
+      ok: true,
+      goal: node("Make trials turn into teams"),
+    });
+    act(() => okr.retry());
+    await settle();
+    expect(cached()?.goals[0]?.title).toBe("Make trials turn into teams");
+    expect(okr.failed).toBeNull();
   });
 
   test("puts the row back on a conflict and offers keep-mine, which sends it again from what is stored", async () => {

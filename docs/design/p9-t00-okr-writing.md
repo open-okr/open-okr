@@ -82,6 +82,8 @@ One screen replaces S-13, the goals explorer, and absorbs S-16, the alignment st
 
 Aligned child objectives show indented under their parent when the scope holds both, with a toggle to flatten.
 
+**As built at P9-T07a-a**, as far as the data reaches today: the objective row has its title with the OBJ-1 and OBJ-2 chips while it is typed (the stored flags otherwise), the champion picker, the reviewer, the next check-in, progress and health; the key result row has its title with KR-2 and KR-5 chips, the owner picker and due date under it, the value cluster (current, target and unit, with the baseline under them), progress and confidence as x in 10. The kind chip and icon come with P9-T11 and P9-T12, the added-mid-cycle mark with P9-T13, the pace with P9-T15, the grip with P9-T07b.
+
 ### 4.2 Editing in place
 
 Every cell follows UIUX-PLAN §4, "Inline edit".
@@ -127,8 +129,8 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 | Loading | Skeleton rows at the final layout |
 | Empty cycle | One sentence and the "+ Add objective" row. The phase checklist link only where phases are guided or binding |
 | Empty filter | "Nothing matches" with a clear-filters action |
-| Error | The row keeps the typed value, shows the server's sentence beneath it, and offers retry |
-| Read-only reader | No pencils, no ghost rows, no grips. Values are plain text |
+| Error | The row keeps the typed value, shows the server's sentence beneath it, and offers retry. **As built at P9-T07a-a:** the cell goes back to the stored value, and a line under the row reads "Not saved:" with the server's sentence, Retry (which sends the typed value again, as it was) and Discard. The typed value lives in that retry rather than in the cell, because a cell holding a value the server refused would read as saved |
+| Read-only reader | No pencils, no ghost rows, no grips. Values are plain text. **As built at P9-T07a-a:** every cell renders as text rather than a disabled control, and the champion picker is text for anybody below `full`, which naming a champion asks |
 | Stale write | The server refuses with the current value; the cell shows "Changed by Mei a moment ago" with the two values and keep-mine or take-theirs |
 
 ## 5. The diagram view

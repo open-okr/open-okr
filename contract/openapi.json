@@ -34000,6 +34000,13 @@
                                         "move"
                                       ]
                                     },
+                                    "indicatorType": {
+                                      "type": "string",
+                                      "enum": [
+                                        "leading",
+                                        "lagging"
+                                      ]
+                                    },
                                     "baselineValue": {
                                       "type": "number"
                                     },
@@ -34082,6 +34089,7 @@
                                     "title",
                                     "unit",
                                     "direction",
+                                    "indicatorType",
                                     "baselineValue",
                                     "targetValue",
                                     "currentValue",
@@ -34560,6 +34568,13 @@
                                       "move"
                                     ]
                                   },
+                                  "indicatorType": {
+                                    "type": "string",
+                                    "enum": [
+                                      "leading",
+                                      "lagging"
+                                    ]
+                                  },
                                   "baselineValue": {
                                     "type": "number"
                                   },
@@ -34642,6 +34657,7 @@
                                   "title",
                                   "unit",
                                   "direction",
+                                  "indicatorType",
                                   "baselineValue",
                                   "targetValue",
                                   "currentValue",
@@ -35028,6 +35044,13 @@
                                       "move"
                                     ]
                                   },
+                                  "indicatorType": {
+                                    "type": "string",
+                                    "enum": [
+                                      "leading",
+                                      "lagging"
+                                    ]
+                                  },
                                   "baselineValue": {
                                     "type": "number"
                                   },
@@ -35110,6 +35133,7 @@
                                   "title",
                                   "unit",
                                   "direction",
+                                  "indicatorType",
                                   "baselineValue",
                                   "targetValue",
                                   "currentValue",
@@ -35517,6 +35541,13 @@
                                       "move"
                                     ]
                                   },
+                                  "indicatorType": {
+                                    "type": "string",
+                                    "enum": [
+                                      "leading",
+                                      "lagging"
+                                    ]
+                                  },
                                   "baselineValue": {
                                     "type": "number"
                                   },
@@ -35599,6 +35630,7 @@
                                   "title",
                                   "unit",
                                   "direction",
+                                  "indicatorType",
                                   "baselineValue",
                                   "targetValue",
                                   "currentValue",
@@ -36096,6 +36128,13 @@
                                       "move"
                                     ]
                                   },
+                                  "indicatorType": {
+                                    "type": "string",
+                                    "enum": [
+                                      "leading",
+                                      "lagging"
+                                    ]
+                                  },
                                   "baselineValue": {
                                     "type": "number"
                                   },
@@ -36178,6 +36217,7 @@
                                   "title",
                                   "unit",
                                   "direction",
+                                  "indicatorType",
                                   "baselineValue",
                                   "targetValue",
                                   "currentValue",

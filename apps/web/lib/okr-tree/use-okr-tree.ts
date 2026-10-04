@@ -114,6 +114,15 @@ export interface PendingConflict {
   readonly conflict: OkrConflict;
 }
 
+/**
+ * A change the server refused, kept so the row can show what was typed with
+ * the server's sentence and offer to send it again (design §4.5).
+ */
+export interface FailedChange {
+  readonly mutation: OkrMutation;
+  readonly error: string;
+}
+
 export function useOkrMutation(input: {
   readonly cycleId: string;
   readonly scope: OkrScope;
@@ -123,6 +132,7 @@ export function useOkrMutation(input: {
   const queryClient = useQueryClient();
   const key = okrTreeKey(input.cycleId, input.scope);
   const [conflict, setConflict] = useState<PendingConflict | null>(null);
+  const [failed, setFailed] = useState<FailedChange | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const announce = useCallback(() => {
@@ -143,6 +153,7 @@ export function useOkrMutation(input: {
     mutationFn: (change) => runOkrMutation(change),
     onMutate: async (change) => {
       setProblem(null);
+      setFailed(null);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<OkrTree>(key);
       if (previous) {
@@ -165,8 +176,7 @@ export function useOkrMutation(input: {
           setConflict({ mutation: change, conflict: outcome.conflict });
           return;
         }
-        setProblem(outcome.error);
-        toast.show({ tone: "bad", message: outcome.error, source: change.id });
+        setFailed({ mutation: change, error: outcome.error });
         return;
       }
       if (outcome.goal) {
@@ -218,10 +228,22 @@ export function useOkrMutation(input: {
     void queryClient.invalidateQueries({ queryKey: key });
   }, [key, queryClient]);
 
+  /** Send a refused change again, as it was typed. */
+  const retry = useCallback(() => {
+    if (failed) {
+      mutation.mutate(failed.mutation);
+    }
+  }, [failed, mutation]);
+
+  const discard = useCallback(() => setFailed(null), []);
+
   return {
     mutate: mutation.mutate,
     pending: mutation.isPending,
     problem,
+    failed,
+    retry,
+    discard,
     conflict,
     keepMine,
     takeTheirs,

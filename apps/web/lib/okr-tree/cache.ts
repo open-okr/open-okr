@@ -30,6 +30,11 @@ export interface GoalFields {
   readonly title?: string;
   readonly contributionStatement?: string | null;
   readonly weight?: number;
+  /**
+   * Sent to the server; the cache shows the new champion's name only once the
+   * server's node arrives, because it holds ids and not the directory.
+   */
+  readonly championId?: string;
 }
 
 export interface KeyResultFields {
@@ -37,6 +42,8 @@ export interface KeyResultFields {
   readonly unit?: string | null;
   readonly baselineValue?: number;
   readonly dueOn?: string | null;
+  /** As `championId` above: the name follows with the server's node. */
+  readonly ownerId?: string | null;
   readonly weight?: number;
   readonly currentValue?: number;
   readonly targetValue?: number;

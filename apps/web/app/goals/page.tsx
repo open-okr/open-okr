@@ -1,5 +1,11 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { ALIGNMENT_LEVEL_ORDER } from "@openokr/method";
+import {
+  ALIGNMENT_LEVEL_ORDER,
+  defaultPractice,
+  resolveThresholds as defaultThresholds,
+  type ResolvedPractice,
+  type ResolvedThresholds,
+} from "@openokr/method";
 import {
   Card,
   CardBody,
@@ -149,6 +155,23 @@ export default async function GoalsPage({
       : { goals: [] };
   const shownCount = display === "tree" ? goals.length : treeGoals.length;
 
+  // What the editable list needs beyond the tree: who can champion or own,
+  // and the numbers and practice its coaching chips judge by, which the
+  // browser cannot read for itself (P9-T07a-a). Only read for the list.
+  const editing = display === "editor" && okrTree !== null;
+  const [directory, practiceRead, rhythmRead] = editing
+    ? await Promise.all([
+        callAction(context, "people.directory", {}),
+        callAction(context, "practice.read", {}),
+        callAction(context, "rhythm.read", {}),
+      ])
+    : [[], null, null];
+  // People only: an agent or an unclaimed placeholder cannot champion an
+  // objective or own a key result (H-09).
+  const members = directory
+    .filter((member) => member.kind === "human" || member.kind === "guest")
+    .map((member) => ({ id: member.id, name: member.name }));
+
   const canEdit = accessLevel >= ACCESS_LEVELS.edit;
   const canAdminister = accessLevel >= ACCESS_LEVELS.full;
   const progressMax = await progressCeiling();
@@ -285,6 +308,13 @@ export default async function GoalsPage({
         <OkrTable
           initialTree={okrTree}
           initialAt={treeReadAt}
+          members={members}
+          coach={{
+            thresholds: (rhythmRead?.thresholds ??
+              defaultThresholds()) as ResolvedThresholds,
+            practice: (practiceRead?.practice ??
+              defaultPractice()) as ResolvedPractice,
+          }}
           scope={scope}
           filters={filters}
           cycleId={cycleId}
