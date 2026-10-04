@@ -15,6 +15,9 @@
  *   Given the Diagram tab, when it is opened, then the same cycle is drawn
  *   with its objectives and their key results.
  *
+ *   Given the list open in two tabs, when a title is changed in one, then
+ *   the other shows it without a reload (P9-T06c).
+ *
  * **A browser proves what the action tests cannot**: that a value typed into
  * a cell reaches `goals.recordValue` and comes back as a different number on
  * the row, and that the add controls exist on the screen somebody is reading
@@ -76,6 +79,36 @@ test("a key result is added under that objective", async () => {
   await expect(
     page.locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
   ).toBeVisible({ timeout: 15_000 });
+});
+
+/**
+ * One cache for the list, and every tab on it (P9-T06c). The title is
+ * changed in one tab and the other shows it without being reloaded, which is
+ * the cache telling the other tab over the browser's own channel; another
+ * member's change arrives on the workspace's live stream instead.
+ */
+test("a title changed in one tab shows in another without a reload", async () => {
+  const other = await context.newPage();
+  await goTo(other, "/goals");
+  const titled = (where: typeof page, value: string) =>
+    where.locator(`input[aria-label="Objective title"][value="${value}"]`);
+  await expect(titled(other, OBJECTIVE)).toBeVisible({ timeout: 15_000 });
+
+  const renamed = `${OBJECTIVE}, from the first tab`;
+  // Enter on the keyboard rather than on the locator: the locator finds the
+  // field by its value, which is no longer the old title once it is filled.
+  await titled(page, OBJECTIVE).fill(renamed);
+  await page.keyboard.press("Enter");
+  // At once in this tab, and in the other without a navigation.
+  await expect(titled(page, renamed)).toBeVisible({ timeout: 5_000 });
+  await expect(titled(other, renamed)).toBeVisible({ timeout: 15_000 });
+
+  // Back, so the rest of this file and every later spec meet the title they
+  // expect.
+  await titled(page, renamed).fill(OBJECTIVE);
+  await page.keyboard.press("Enter");
+  await expect(titled(other, OBJECTIVE)).toBeVisible({ timeout: 15_000 });
+  await other.close();
 });
 
 test("a value typed into the table is recorded and moves the progress", async () => {

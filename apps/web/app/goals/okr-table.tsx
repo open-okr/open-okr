@@ -1,18 +1,26 @@
 "use client";
 
 import type { GoalLevel } from "@openokr/db";
-import { Bar, Button, useTranslations } from "@openokr/ui";
+import { Bar, Button, useQueryClient, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  filterGoals,
+  type OkrFilters,
+  type OkrScope,
+  type OkrTree,
+  okrCycleKey,
+} from "../../lib/okr-tree/cache.ts";
+import {
+  useOkrLive,
+  useOkrMutation,
+  useOkrTree,
+} from "../../lib/okr-tree/use-okr-tree.ts";
 import {
   addKeyResult,
   addObjective,
   type EditorResult,
-  recordKeyResultValue,
   removeGoal,
-  removeKeyResult,
-  renameGoal,
-  renameKeyResult,
 } from "./editor-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 
@@ -59,7 +67,10 @@ export interface EditableGoal {
 }
 
 export function OkrTable({
-  goals,
+  initialTree,
+  initialAt,
+  scope,
+  filters,
   cycleId,
   level,
   canEdit,
@@ -67,7 +78,13 @@ export function OkrTable({
   progressMax,
   empty,
 }: {
-  readonly goals: readonly EditableGoal[];
+  /** The server's render of the cycle's tree, or null with no cycle. */
+  readonly initialTree: OkrTree | null;
+  /** When the server read it, so the cache knows how fresh it is. */
+  readonly initialAt: number;
+  readonly scope: OkrScope;
+  /** Applied to the cache the way the server applied them to its render. */
+  readonly filters: OkrFilters;
   /** Null when no cycle is selected, which is the one state that cannot add. */
   readonly cycleId: string | null;
   readonly level: GoalLevel;
@@ -76,20 +93,89 @@ export function OkrTable({
   readonly progressMax: number;
   readonly empty: React.ReactNode;
 }) {
+  if (cycleId === null || initialTree === null) {
+    return (
+      <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        {empty}
+      </div>
+    );
+  }
+  return (
+    <LiveOkrTable
+      initialTree={initialTree}
+      initialAt={initialAt}
+      scope={scope}
+      filters={filters}
+      cycleId={cycleId}
+      level={level}
+      canEdit={canEdit}
+      canAdminister={canAdminister}
+      progressMax={progressMax}
+      empty={empty}
+    />
+  );
+}
+
+/**
+ * The table on the cache (P9-T06c).
+ *
+ * A rename, a value and a removal change the cache at once and go through
+ * `useOkrMutation`, so the row moves before the server answers and moves back
+ * with the server's sentence if it refuses. Adding a row or deleting an
+ * objective still re-renders the page, because the header's count and the
+ * alignment score above the table are the server's to recompute.
+ */
+function LiveOkrTable({
+  initialTree,
+  initialAt,
+  scope,
+  filters,
+  cycleId,
+  level,
+  canEdit,
+  canAdminister,
+  progressMax,
+  empty,
+}: {
+  readonly initialTree: OkrTree;
+  readonly initialAt: number;
+  readonly scope: OkrScope;
+  readonly filters: OkrFilters;
+  readonly cycleId: string;
+  readonly level: GoalLevel;
+  readonly canEdit: boolean;
+  readonly canAdminister: boolean;
+  readonly progressMax: number;
+  readonly empty: React.ReactNode;
+}) {
   const { t } = useTranslations();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [pending, start] = useTransition();
-  const [problem, setProblem] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<readonly string[]>([]);
+  const tree = useOkrTree({
+    cycleId,
+    scope,
+    initial: initialTree,
+    initialAt,
+  });
+  useOkrLive(cycleId);
+  const okr = useOkrMutation({ cycleId, scope });
+  const goals = filterGoals(tree.goals, filters);
+  const problem = failure ?? okr.problem;
 
+  // A structural change: the page's own count and score move with it, so the
+  // server renders again, and the cache is told to re-read either way.
   const run = (work: () => Promise<EditorResult>) => {
-    setProblem(null);
+    setFailure(null);
     start(async () => {
       const result = await work();
       if (result.error) {
-        setProblem(result.error);
+        setFailure(result.error);
         return;
       }
+      await queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
       router.refresh();
     });
   };
@@ -107,6 +193,29 @@ export function OkrTable({
         <p role="alert" className="text-xs text-bad">
           {problem}
         </p>
+      ) : null}
+
+      {okr.conflict ? (
+        <div
+          role="alert"
+          data-testid="okr-conflict"
+          className="flex flex-wrap items-center gap-2 rounded-control border border-warn-dot bg-warn-bg px-3 py-2 text-xs text-ink-2"
+        >
+          <span className="min-w-0 flex-1">
+            {t("okrTree.changedSinceYouRead", {
+              name: okr.conflict.conflict.changedBy ?? t("okrTree.somebody"),
+              value: Object.values(okr.conflict.conflict.current)
+                .map((value) => String(value ?? ""))
+                .join(", "),
+            })}
+          </span>
+          <Button type="button" size="sm" onClick={okr.keepMine}>
+            {t("okrTree.keepMine")}
+          </Button>
+          <Button type="button" size="sm" onClick={okr.takeTheirs}>
+            {t("okrTree.takeTheirs")}
+          </Button>
+        </div>
       ) : null}
 
       <div className="overflow-hidden rounded-lg border border-line bg-surface">
@@ -145,17 +254,22 @@ export function OkrTable({
                     disabled={!canEdit || pending}
                     bold
                     onSave={(title) =>
-                      run(() => renameGoal({ id: goal.id, title }))
+                      okr.mutate({
+                        kind: "patchGoal",
+                        id: goal.id,
+                        set: { title },
+                        read: { title: goal.title },
+                      })
                     }
                   />
                   <span className="truncate px-1.5 text-[11px] text-ink-3">
                     {goal.reviewer
                       ? t("goals.editor.roles", {
-                          champion: goal.champion,
-                          reviewer: goal.reviewer,
+                          champion: goal.champion.name,
+                          reviewer: goal.reviewer.name,
                         })
                       : t("goals.editor.rolesNoReviewer", {
-                          champion: goal.champion,
+                          champion: goal.champion.name,
                         })}
                   </span>
                 </div>
@@ -201,9 +315,12 @@ export function OkrTable({
                           label={t("goals.editor.keyResultTitle")}
                           disabled={!canEdit || pending}
                           onSave={(title) =>
-                            run(() =>
-                              renameKeyResult({ id: keyResult.id, title }),
-                            )
+                            okr.mutate({
+                              kind: "patchKeyResult",
+                              id: keyResult.id,
+                              set: { title },
+                              read: { title: keyResult.title },
+                            })
                           }
                         />
                       </div>
@@ -216,9 +333,11 @@ export function OkrTable({
                           })}
                           disabled={!canEdit || pending}
                           onSave={(value) =>
-                            run(() =>
-                              recordKeyResultValue({ id: keyResult.id, value }),
-                            )
+                            okr.mutate({
+                              kind: "recordValue",
+                              id: keyResult.id,
+                              value,
+                            })
                           }
                         />
                         <span className="text-ink-4">
@@ -247,7 +366,10 @@ export function OkrTable({
                         deleteLabel={t("goals.editor.deleteKeyResult")}
                         canDelete={canAdminister && !pending}
                         onDelete={() =>
-                          run(() => removeKeyResult({ id: keyResult.id }))
+                          okr.mutate({
+                            kind: "removeKeyResult",
+                            id: keyResult.id,
+                          })
                         }
                       />
                     </div>
@@ -330,6 +452,15 @@ function InlineText({
   readonly onSave: (next: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
+  const field = useRef<HTMLInputElement>(null);
+  // The cache moves under a field: another tab's write, a refusal rolled
+  // back, a conflict taken from somebody else. Followed unless the reader is
+  // typing in it, when their draft is the one that matters.
+  useEffect(() => {
+    if (document.activeElement !== field.current) {
+      setDraft(value);
+    }
+  }, [value]);
 
   const commit = () => {
     const next = draft.trim();
@@ -342,6 +473,7 @@ function InlineText({
 
   return (
     <input
+      ref={field}
       value={draft}
       aria-label={label}
       disabled={disabled}
@@ -376,6 +508,12 @@ function InlineNumber({
   readonly onSave: (next: number) => void;
 }) {
   const [draft, setDraft] = useState(String(value));
+  const field = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (document.activeElement !== field.current) {
+      setDraft(String(value));
+    }
+  }, [value]);
 
   const commit = () => {
     const next = Number(draft);
@@ -388,6 +526,7 @@ function InlineNumber({
 
   return (
     <input
+      ref={field}
       type="number"
       value={draft}
       aria-label={label}

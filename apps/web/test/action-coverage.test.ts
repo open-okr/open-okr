@@ -171,18 +171,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
   // The METHOD.md §12 practice settings (P9-T01). The cycle screen reads
   // them since P9-T03a; the admin screen that changes them is P9-T05, which
   // removes these two entries when it calls them.
-  "goals.patch": {
-    apiOnly: true,
-    why: "the OKR list and drawer write through it from P9-T06c, when the client cache that carries the values read arrives; until then the editor writes through goals.update",
-  },
-  "goals.patchKeyResult": {
-    apiOnly: true,
-    why: "the OKR list and drawer write through it from P9-T06c, when the client cache that carries the values read arrives; until then the editor writes through goals.updateKeyResult",
-  },
-  "goals.changeTarget": {
-    apiOnly: true,
-    why: "the OKR list and drawer change a target through it from P9-T07a and P9-T08, where the reason field opens under the cell; no screen changes a target before then, and goals.updateKeyResult meets the same rule for the callers that send one",
-  },
   "goals.targetHistory": {
     apiOnly: true,
     why: "the OKR drawer's target history tab reads it from P9-T08",

@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
+import { filterGoals, type OkrScope } from "../../lib/okr-tree/cache.ts";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -119,15 +120,34 @@ export default async function GoalsPage({
   const filtered =
     level !== undefined || health !== undefined || mine || includeClosed;
 
-  const { goals } = cycleId
-    ? await callAction(context, "goals.list", {
-        cycleId,
-        includeClosed,
-        ...(level ? { level } : {}),
-        ...(health ? { health } : {}),
-        ...(mine ? { mine } : {}),
-      })
-    : { goals: [] };
+  // The list and the diagram draw from one tree, which the table's cache then
+  // owns (P9-T06c); the indented tree view still reads `goals.list`. Only the
+  // one the display needs is read. "Mine" on the tree is what the reader
+  // champions, reviews or owns a key result under.
+  const scope: OkrScope = mine ? "mine" : "all";
+  const okrTree =
+    cycleId && display !== "tree"
+      ? await callAction(context, "goals.tree", {
+          cycleId,
+          scope,
+          includeClosed: true,
+        })
+      : null;
+  const treeReadAt = Date.now();
+  const filters = { level, health, includeClosed };
+  const treeGoals = okrTree ? filterGoals(okrTree.goals, filters) : [];
+
+  const { goals } =
+    cycleId && display === "tree"
+      ? await callAction(context, "goals.list", {
+          cycleId,
+          includeClosed,
+          ...(level ? { level } : {}),
+          ...(health ? { health } : {}),
+          ...(mine ? { mine } : {}),
+        })
+      : { goals: [] };
+  const shownCount = display === "tree" ? goals.length : treeGoals.length;
 
   const canEdit = accessLevel >= ACCESS_LEVELS.edit;
   const canAdminister = accessLevel >= ACCESS_LEVELS.full;
@@ -191,13 +211,13 @@ export default async function GoalsPage({
                  * line claimed the cycle was empty while the table forty
                  * pixels below correctly said no goals matched. One screen,
                  * two answers, and the wrong one was the louder. */}
-                {goals.length === 0
+                {shownCount === 0
                   ? filtered
                     ? t("goals.noMatchForTheseFilters")
                     : t("goals.noGoalsInThisCycleYet")
                   : countChip(
                       t,
-                      goals.length,
+                      shownCount,
                       filtered,
                       tree && display === "tree",
                     )}
@@ -263,22 +283,10 @@ export default async function GoalsPage({
 
       {display === "editor" ? (
         <OkrTable
-          goals={goals.map((goal) => ({
-            id: goal.id,
-            title: goal.title,
-            health: goal.health,
-            progressPct: goal.progressPct,
-            champion: goal.champion.name,
-            reviewer: goal.reviewer?.name ?? null,
-            keyResults: goal.keyResults.map((keyResult) => ({
-              id: keyResult.id,
-              title: keyResult.title,
-              unit: keyResult.unit,
-              currentValue: keyResult.currentValue,
-              targetValue: keyResult.targetValue,
-              progressPct: keyResult.progressPct,
-            })),
-          }))}
+          initialTree={okrTree}
+          initialAt={treeReadAt}
+          scope={scope}
+          filters={filters}
           cycleId={cycleId}
           // The level a row added here is written at. The filter when one is
           // chosen, so a filtered set adds to itself rather than adding a row
@@ -300,7 +308,7 @@ export default async function GoalsPage({
 
       {display === "diagram" ? (
         <OkrDiagram
-          goals={goals.map((goal) => ({
+          goals={treeGoals.map((goal) => ({
             id: goal.id,
             title: goal.title,
             health: goal.health,

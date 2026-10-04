@@ -9,12 +9,10 @@
  * thin call onto an action that already exists. Nothing here decides anything:
  * the refusal a member sees is the one the Operation pipeline produced.
  *
- * **A value typed into the table is recorded as history, not as a column
- * write.** `goals.recordValue` writes a `key_result_values` row with source
- * `manual` and recomputes the goal, which is the same path a check-in takes.
- * Without that the table would be a second door onto progress, and the
- * check-in history would have holes exactly where somebody used the quicker
- * one.
+ * **Renames, values and removals moved to the OKR tree's cache at P9-T06c**
+ * (`lib/okr-tree/actions.ts`), where they change the row at once and carry
+ * the values they read. What stays here adds a row or deletes an objective,
+ * which re-renders the page because its count and score move with them.
  */
 
 import { callAction, OperationError } from "@openokr/core";
@@ -59,54 +57,6 @@ const refused = (error: unknown): EditorResult => {
  */
 function refresh(): void {
   revalidatePath("/", "layout");
-}
-
-export async function renameGoal(input: {
-  id: string;
-  title: string;
-}): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.update", {
-      id: input.id,
-      title: input.title,
-    });
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
-}
-
-export async function renameKeyResult(input: {
-  id: string;
-  title: string;
-}): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.updateKeyResult", {
-      id: input.id,
-      title: input.title,
-    });
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
-}
-
-export async function recordKeyResultValue(input: {
-  id: string;
-  value: number;
-}): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.recordValue", {
-      id: input.id,
-      value: input.value,
-    });
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
 }
 
 /**
@@ -172,18 +122,6 @@ export async function addKeyResult(input: {
   } catch (error) {
     return { ...refused(error), id: null };
   }
-}
-
-export async function removeKeyResult(input: {
-  id: string;
-}): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.removeKeyResult", input);
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
 }
 
 export async function removeGoal(input: { id: string }): Promise<EditorResult> {
