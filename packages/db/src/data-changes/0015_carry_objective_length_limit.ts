@@ -22,7 +22,7 @@ import type {
 } from "../data-change.ts";
 
 export const carryObjectiveLengthLimit: DataChangeScript = {
-  name: "0014_carry_objective_length_limit",
+  name: "0015_carry_objective_length_limit",
   summary:
     "Moves a workspace's objective length upper bound from the retired bounds threshold onto the objective length limit.",
   expects: [

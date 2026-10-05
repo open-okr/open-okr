@@ -48,7 +48,6 @@ import {
   bindGroup,
   ensureContext,
   ensureMemberGroup,
-  ensureSpaceStandardGroup,
   ensureWorkspaceStandardGroup,
   unbindGroup,
 } from "../access/contexts.ts";
@@ -198,16 +197,18 @@ export async function createInitiativeInTx<
     level: ACCESS_LEVELS.view,
   });
 
-  const spaceStandardGroupId = await ensureSpaceStandardGroup(tx, {
-    workspaceId: input.workspaceId,
-    spaceId: input.spaceId,
-  });
-  await bindGroup(tx, {
-    workspaceId: input.workspaceId,
-    groupId: spaceStandardGroupId,
-    contextId,
-    level: ACCESS_LEVELS.edit,
-  });
+  // **An initiative in a space no longer grants its members `edit`**
+  // (P8-G13c). It did, through the same binding a goal used to carry, and
+  // Agung asked for the two to agree rather than to differ because one task
+  // happened to name only the objective. The workspace role answers it now,
+  // on the roles screen, where the `initiative` domain has its own column.
+  //
+  // Visibility is untouched: the `workspace_standard` binding at `view`
+  // above stays, so alignment still reads across spaces. The owner keeps
+  // `full` through their own group, which is what `initiatives.delete`
+  // still asks for.
+  //
+  // Data change 0013 removes the bindings written before this.
 
   await bindOwner(tx, {
     workspaceId: input.workspaceId,

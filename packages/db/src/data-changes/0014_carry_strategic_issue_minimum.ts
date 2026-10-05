@@ -24,7 +24,7 @@ import type {
 } from "../data-change.ts";
 
 export const carryStrategicIssueMinimum: DataChangeScript = {
-  name: "0013_carry_strategic_issue_minimum",
+  name: "0014_carry_strategic_issue_minimum",
   summary:
     "Moves a workspace's raised strategic issue floor from the retired bounds threshold onto the strategic issue minimum.",
   expects: [

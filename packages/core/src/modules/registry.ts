@@ -375,6 +375,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-roles",
+        label: "Roles and permissions",
+        href: "/admin/roles",
+        section: "admin",
+        // Deciding what a role may do is deciding who can change what in the
+        // workspace, which is the same question invitations and support
+        // access answer and takes the same level (P8-G13b).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-support",
         label: "Support access",
         href: "/admin/support",

@@ -312,7 +312,11 @@ describe("drafting while the earlier phases are incomplete", () => {
     };
     expect(workflow.practice.phaseEnforcement).toBe("guided");
     expect(workflow.drafting).toEqual({ allowed: true, reasons: [] });
-    expect(workflow.phases[1]?.missing.join(" ")).toMatch(/No sponsor named/);
+    // Not "No sponsor named" since P8-G13d: the sponsor defaults to whoever
+    // creates the cycle. The input pack is what nothing fills in by default.
+    expect(workflow.phases[1]?.missing.join(" ")).toMatch(
+      /Input pack item 1 is missing/,
+    );
   });
 
   it("refuses both under binding phases, naming what the earlier phases still need", async () => {
@@ -334,7 +338,7 @@ describe("drafting while the earlier phases are incomplete", () => {
         reviewerId: ownerMemberId,
       }),
     ).rejects.toThrow(
-      /drafts after the planning phases are complete.*Phase 1: No sponsor named/,
+      /drafts after the planning phases are complete.*Phase 1: Input pack item 1 is missing/,
     );
     await expect(
       call("goals.addKeyResult", keyResultOf(goal.id)),
@@ -344,7 +348,9 @@ describe("drafting while the earlier phases are incomplete", () => {
       drafting: { allowed: boolean; reasons: string[] };
     };
     expect(workflow.drafting.allowed).toBe(false);
-    expect(workflow.drafting.reasons[0]).toMatch(/Phase 1: No sponsor named/);
+    expect(workflow.drafting.reasons[0]).toMatch(
+      /Phase 1: Input pack item 1 is missing/,
+    );
   });
 
   it("leaves an objective with its own timeframe alone under binding phases", async () => {

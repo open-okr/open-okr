@@ -16,9 +16,9 @@ import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_g
 import { bindAgentsToSpacelessItems } from "../src/data-changes/0009_bind_agents_to_spaceless_items.ts";
 import { scrubErasedMemberNames } from "../src/data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../src/data-changes/0011_seal_account_tokens.ts";
-import { carryStrategicIssueMinimum } from "../src/data-changes/0013_carry_strategic_issue_minimum.ts";
-import { carryObjectiveLengthLimit } from "../src/data-changes/0014_carry_objective_length_limit.ts";
-import { carryCoachStrictness } from "../src/data-changes/0015_carry_coach_strictness.ts";
+import { carryStrategicIssueMinimum } from "../src/data-changes/0014_carry_strategic_issue_minimum.ts";
+import { carryObjectiveLengthLimit } from "../src/data-changes/0015_carry_objective_length_limit.ts";
+import { carryCoachStrictness } from "../src/data-changes/0016_carry_coach_strictness.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**

@@ -8690,8 +8690,7 @@
         },
         "required": [
           "title",
-          "level",
-          "championId"
+          "level"
         ]
       },
       "scope": "write",
@@ -8702,8 +8701,7 @@
       },
       "example": {
         "title": "…",
-        "level": "company",
-        "championId": "00000000-0000-4000-8000-000000000000"
+        "level": "company"
       }
     },
     {

@@ -59,7 +59,8 @@ async function createGoal(reviewerId: string | null): Promise<string> {
     level: "team",
     ownerKind: "workspace",
     championId: ownerMemberId,
-    ...(reviewerId === null ? {} : { reviewerId }),
+    // `null` is nobody; left out, the practice decides (the last case below).
+    reviewerId,
   });
   return goal.id;
 }
@@ -196,6 +197,27 @@ describe("required", () => {
     );
     const reviewer = await addReviewer();
     await expect(createGoal(reviewer)).resolves.toBeTruthy();
+  });
+
+  it("names the creator for a reviewer left out, where reviewers are required and only there", async () => {
+    const leftOut = async () => {
+      const goal = await call<{ id: string }>("goals.create", {
+        title: "Make onboarding the reason customers stay",
+        cycleId,
+        level: "team",
+        ownerKind: "workspace",
+      });
+      return (
+        await call<{ reviewer: { id: string } | null }>("goals.read", {
+          id: goal.id,
+        })
+      ).reviewer;
+    };
+    // Optional, the default: a title alone owes nobody an acknowledgement.
+    expect(await leftOut()).toBeNull();
+    // Required: P8-G13d's default, so a title alone is still accepted.
+    await call("practice.update", { overrides: { reviewer: "required" } });
+    expect((await leftOut())?.id).toBe(ownerMemberId);
   });
 
   it("refuses taking a reviewer off", async () => {

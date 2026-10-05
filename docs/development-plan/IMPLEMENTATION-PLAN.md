@@ -3035,12 +3035,26 @@ Deliverables: an admin screen listing the roles, their matrix as a grid of four 
 Test plan: changing a cell writes one audit row and the member it affects resolves the new level on their next read; the Owner row offers no control; removing a role somebody holds is refused with the sentence the action gives.
 Acceptance: Given an administrator on the roles screen, when they lower Member to view on objectives, then a member holding that role opens an objective read-only.
 
+**Built on 2 October 2026.** Two cards rather than one: the matrix, and who
+holds which role. `people.directory` gained `roleId` so the second card needs
+no read per person, which meant three producers of the member summary had to
+select it; two are `returning` clauses that only a run-time schema would have
+caught. The screen is registered at `/admin/roles` and takes `full`, the same
+level as invitations and support access, because deciding what a role may do
+is deciding who can change what.
+
 ### P8-G13c: An objective's edit stops coming from its space [M]
 Depends on: P8-G13a, P8-G13b
 Goal: one answer to "who may edit this", not two.
 Deliverables: `createGoalInTx` stops writing the `space_standard` binding at `edit`; a data change removing it from existing goals; the space screens saying what a space now decides, which is membership and the session cadence rather than edit rights.
 Test plan: a goal created in a space grants its members nothing beyond their role; a member whose role grants `view` cannot edit a goal in their own space; the alignment and session paths that read space membership are unaffected.
 Acceptance: Given a workspace that has lowered Member to view, when a member of the owning space opens an objective, then it is read-only.
+
+**Built on 4 October 2026.** The binding goes from `createGoalInTx` and data change 0013
+removes the ones already written, ordered after 0012 so nobody loses the edit on the day it
+runs. The initiative's identical binding is deliberately untouched: this row names the
+objective, and the two now disagree, which the design note §9 records rather than resolving
+quietly.
 
 ### P8-G13d: Fewer required fields on the way in [S]
 Depends on: P8-G13a
@@ -3121,7 +3135,7 @@ Deliverables:
 - **Enforcement.** `applyEnforcement(verdicts, practice)`: block keeps fails and turns warns into fails, warn turns fails into warns, off drops the check. Each check's `asMethod` level is §4's own table. Strict mode is every check at block, bar one turned off. `quality.coachStrictness` at strict, for the workspace or a space, still means the same, so no workspace loses a choice it made; retiring it is P9-T05's, with the one control on the settings screen.
 - **Condition tables.** OBJ-1's rows warn and "cannot tell" passes with a tip; OBJ-2 ignores a four-digit year and loses its lower bound; OBJ-5 warns at company level too; KR-1 warns above five; KR-2 warns with no numbers; KR-3 blocks on a missing target, date or owner and warns on a missing baseline; KR-4 is information and tagging is optional; KR-5 warns, and a key result tagged leading is exempt. A new `info` status carries a note that asks nothing of anybody.
 - **Word lists.** "to" leaves the why markers and "bring" joins the movement verbs.
-- **Documents.** METHOD.md §2.7 (all but its levels-in-use sentences, which are P9-T07a's), the §4 intro, §4.1 (OBJ-1, OBJ-2, OBJ-3, OBJ-5), §4.2's KR-1, KR-4 and KR-5, and §4.6's first four pairs move in; KR-2 and KR-3 read their interim levels until P9-T12, and §4.6's committed pair waits for P9-T11. "Objective length limit" and "Strength score warn weight" join the registry, and "Objective length bounds" leaves it, with data change 0014 carrying a changed limit across. The handbook, the P4-T00 corpus and METHOD-REVIEW §3.4 are updated.
+- **Documents.** METHOD.md §2.7 (all but its levels-in-use sentences, which are P9-T07a's), the §4 intro, §4.1 (OBJ-1, OBJ-2, OBJ-3, OBJ-5), §4.2's KR-1, KR-4 and KR-5, and §4.6's first four pairs move in; KR-2 and KR-3 read their interim levels until P9-T12, and §4.6's committed pair waits for P9-T11. "Objective length limit" and "Strength score warn weight" join the registry, and "Objective length bounds" leaves it, with data change 0015 carrying a changed limit across. The handbook, the P4-T00 corpus and METHOD-REVIEW §3.4 are updated.
 Test plan: the quality corpus re-run against the published examples in METHOD-REVIEW §3.4, with the expected verdicts recorded; `applyEnforcement` unit tests per level; REQUIREMENTS §3.2's coaching half end to end.
 Acceptance: Given "Launch the new mobile app", when it is checked on the recommended profile, then OBJ-1 warns with its prompt and nothing fails.
 Scenario steps: NW-P-10, NW-Q1-08, NW-Q1-09, NW-Q2-03, NW-Q2-04.
@@ -3156,7 +3170,7 @@ Goal: an admin chooses a profile and changes any setting, from the browser.
 Deliverables:
 - **The screen.** A practice card group in S-36, using the existing `SettingsCard` pattern: a profile picker with a preview of what it changes, one card per §12.1 group, the difference from the profile shown, and reset to the profile.
 - **Profile thresholds.** Choosing a profile also applies the §11 thresholds it sets (`PROFILES[profile].thresholds`), including Lightweight's check-in frequency, which has its own column on `rhythm_settings`. P9-T01 declared them and applied none. A threshold the workspace set itself is kept, as its own practice changes are.
-- **Strict mode's one home.** The rhythm card's "Coach strictness" control gives way to the practice's strict mode, and data change 0015 carries a workspace that had chosen strict across. A space's own strictness stays.
+- **Strict mode's one home.** The rhythm card's "Coach strictness" control gives way to the practice's strict mode, and data change 0016 carries a workspace that had chosen strict across. A space's own strictness stays.
 - **Navigation.** The registry entry and reachability test.
 - **Documents.** The UIUX-PLAN S-36 text.
 Test plan: card tests; an end-to-end spec that applies each profile; the accessibility scan picks the screen up automatically.
@@ -3515,6 +3529,8 @@ Deliverables:
 Test plan: the upgrade workflow from 0.1.2; the demo seed run against today's date and at each of the five scenario dates.
 Acceptance: Given an instance on 0.1.2, when it upgrades to 0.2.0, then every workspace is on the recommended profile and its data is intact.
 Scenario steps: NW-P-07.
+
+**P8-G13d was built on 5 October 2026.** None of the three cycle defaults is a stored setting: the answer is always derived from who is asking or from the period itself, so §4.14 records them as rules rather than as a card nobody would open. Champion and reviewer default in `goals.create` rather than in each of the four surfaces that call it, so the command line and the REST surface get the same behaviour as the screens.
 
 ## Appendix A: index
 

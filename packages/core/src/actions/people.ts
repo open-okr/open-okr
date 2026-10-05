@@ -84,6 +84,15 @@ const memberSummary = z.object({
   status: z.enum(["active", "invited", "suspended"]),
   managerId: z.uuid().nullable(),
   timezone: z.string().nullable(),
+  /**
+   * The workspace role this member holds, or null (P8-G13b).
+   *
+   * Null is a real answer and the common one for a guest, an agent and a
+   * placeholder: a role is workspace-wide, and somebody invited into one
+   * space must not be handed the workspace by it. The roles screen reads this
+   * to say who holds what without a second query per person.
+   */
+  roleId: z.uuid().nullable(),
 });
 
 export const updateOwnProfile = defineWriteAction({
@@ -256,6 +265,7 @@ export const updateOwnProfile = defineWriteAction({
           status: workspaceMembers.status,
           managerId: workspaceMembers.managerId,
           timezone: workspaceMembers.timezone,
+          roleId: workspaceMembers.roleId,
         });
       if (!updated) {
         throw new OperationError("not_found", "No such member.");
@@ -340,6 +350,7 @@ export const updateMember = defineWriteAction({
           status: workspaceMembers.status,
           managerId: workspaceMembers.managerId,
           timezone: workspaceMembers.timezone,
+          roleId: workspaceMembers.roleId,
         });
       if (!updated) {
         throw new OperationError("not_found", "No such member.");
@@ -994,6 +1005,7 @@ export const directory = defineReadAction({
           status: workspaceMembers.status,
           managerId: workspaceMembers.managerId,
           timezone: workspaceMembers.timezone,
+          roleId: workspaceMembers.roleId,
         })
         .from(workspaceMembers)
         .where(activeOnly(workspaceMembers, ...filters));

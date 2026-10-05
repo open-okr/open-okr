@@ -62,8 +62,12 @@ export async function createGoal(
       title,
       level: level as "company" | "department" | "team" | "individual",
       ownerKind: "workspace",
-      championId,
-      // "" is the "No reviewer" option (P9-T04).
+      // Omitted rather than sent empty when nobody was chosen (P8-G13d):
+      // `goals.create` then names whoever is drafting, and an empty string
+      // would fail the uuid schema instead.
+      ...(championId ? { championId } : {}),
+      // "" is the "No reviewer" option, or no picker at all where the
+      // practice turns reviewers off (P9-T04), and either means none.
       reviewerId: reviewerId === "" ? null : reviewerId,
       weight: 1,
       ...(contributionStatement === "" ? {} : { contributionStatement }),

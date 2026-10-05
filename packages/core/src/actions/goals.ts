@@ -81,6 +81,7 @@ import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { readLinkableKpi } from "../kpis/linked.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { requirePolicy } from "../practice/policy.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import {
   recomputeGoalQualityInTx,
   recomputeUnitQualityInTx,
@@ -995,12 +996,26 @@ export const createGoal = defineWriteAction({
       ownerKind: z.enum(GOAL_OWNER_KINDS).default("workspace"),
       spaceId: z.uuid().optional(),
       memberId: z.uuid().optional(),
-      championId: z.uuid(),
       /**
-       * Optional since P9-T04 (METHOD.md §2.5): a goal without one owes no
-       * acknowledgement. A workspace that requires reviewers refuses its
-       * absence through the policy, from every caller alike.
+       * Who champions and who reviews it (P8-G13d, P9-T04).
+       *
+       * Both default to whoever creates the objective when they are not
+       * given, so every surface that creates an objective can accept a title
+       * alone: somebody drafting on their own is both until they say
+       * otherwise. The goal detail reassigns either, which rebinds access
+       * with it.
+       *
+       * **The reviewer follows the practice** (METHOD.md §2.5, P9-T04). Left
+       * out, it is the creator only where the workspace requires reviewers,
+       * and nobody where they are optional or off: defaulting everybody to
+       * the creator would give every new objective an acknowledgement nobody
+       * asked for. `null` is nobody, and a workspace that requires reviewers
+       * refuses that through the policy, from every caller alike.
+       *
+       * A reviewer who is also the champion is a quality finding rather than
+       * a refusal: §4 reports it, and reporting it is what makes it fixable.
        */
+      championId: z.uuid().optional(),
       reviewerId: z.uuid().nullable().optional(),
       parentGoalId: z.uuid().optional(),
       parentKeyResultId: z.uuid().optional(),
@@ -1062,13 +1077,21 @@ export const createGoal = defineWriteAction({
       );
 
       await assertLegacyKeyFree(tx, workspaceId, goals, input.legacy, "goal");
+      // Where P8-G13d's default meets P9-T04's setting (STATUS, P9-T04).
+      const reviewerId =
+        input.reviewerId !== undefined
+          ? input.reviewerId
+          : practiceFromRow(await readRhythmRow(tx, workspaceId)).practice
+                .reviewer === "required"
+            ? memberId
+            : null;
       await requirePolicy(
         tx,
         { workspaceId, bulk: context.bulk },
         {
           kind: "objective.create",
           cycleId: input.cycleId ?? null,
-          hasReviewer: Boolean(input.reviewerId),
+          hasReviewer: reviewerId !== null,
           // §2.7: only a level the cycle uses (P9-T07a-c).
           level: input.level,
         },
@@ -1142,8 +1165,8 @@ export const createGoal = defineWriteAction({
         ownerKind: input.ownerKind,
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
-        championId: input.championId,
-        reviewerId: input.reviewerId ?? null,
+        championId: input.championId ?? memberId,
+        reviewerId,
         parentGoalId: input.parentGoalId ?? null,
         parentKeyResultId: input.parentKeyResultId ?? null,
         strategyId: input.strategyId ?? null,

@@ -61,8 +61,12 @@ function refresh(): void {
 }
 
 /**
- * A new objective in the current cycle, championed and reviewed by whoever
- * added it.
+ * A new objective in the current cycle, championed by whoever added it.
+ *
+ * **The reviewer is left to the practice** (P9-T04, with P8-G13d's default):
+ * `goals.create` names the creator where the workspace requires reviewers
+ * and nobody where they are optional or off, so a row added here owes no
+ * acknowledgement the workspace did not ask for.
  *
  * **`guided` is not set, so the phase gate does not refuse this.** METHOD.md
  * §2 blocks drafting inside the guided cycle until the earlier phases pass,
@@ -84,7 +88,6 @@ export async function addObjective(input: {
       ownerKind: "member",
       memberId,
       championId: memberId,
-      reviewerId: memberId,
       weight: 1,
     });
     refresh();

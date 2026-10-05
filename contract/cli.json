@@ -6238,7 +6238,7 @@
           "name": "champion-id",
           "field": "championId",
           "type": "string",
-          "required": true
+          "required": false
         },
         {
           "name": "reviewer-id",

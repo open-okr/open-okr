@@ -49,7 +49,6 @@ import {
   bindGroup,
   ensureContext,
   ensureMemberGroup,
-  ensureSpaceStandardGroup,
   ensureWorkspaceStandardGroup,
   unbindGroup,
 } from "../access/contexts.ts";
@@ -309,18 +308,19 @@ export async function createGoalInTx<
     level: ACCESS_LEVELS.view,
   });
 
-  if (spaceId) {
-    const spaceStandardGroupId = await ensureSpaceStandardGroup(tx, {
-      workspaceId: input.workspaceId,
-      spaceId,
-    });
-    await bindGroup(tx, {
-      workspaceId: input.workspaceId,
-      groupId: spaceStandardGroupId,
-      contextId,
-      level: ACCESS_LEVELS.edit,
-    });
-  }
+  // **A goal in a space used to grant every member of that space `edit`, and
+  // no longer does** (P8-G13c, docs/design/p8-g13-workspace-roles.md). That
+  // binding was the only answer to "who may edit this objective", it could be
+  // stated only by reading the binding table, it could be changed only by
+  // moving people between spaces, and it had no screen. The workspace role
+  // answers it now, on a screen an administrator can edit.
+  //
+  // Nothing about who can *see* it changes: the `workspace_standard` binding
+  // above grants `view` to every member, as it has since P3-T04. What a space
+  // decides is still membership, the session cadence and the rails that read
+  // it; what it no longer decides is editing somebody else's objective.
+  //
+  // Data change 0013 removes the bindings written before this.
 
   await bindRole(tx, {
     workspaceId: input.workspaceId,

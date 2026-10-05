@@ -22,9 +22,10 @@ import { bindAgentsToSpacelessItems } from "../data-changes/0009_bind_agents_to_
 import { scrubErasedMemberNames } from "../data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../data-changes/0011_seal_account_tokens.ts";
 import { backfillWorkspaceRoles } from "../data-changes/0012_backfill_workspace_roles.ts";
-import { carryStrategicIssueMinimum } from "../data-changes/0013_carry_strategic_issue_minimum.ts";
-import { carryObjectiveLengthLimit } from "../data-changes/0014_carry_objective_length_limit.ts";
-import { carryCoachStrictness } from "../data-changes/0015_carry_coach_strictness.ts";
+import { dropSpaceEditOnGoals } from "../data-changes/0013_drop_space_edit_on_goals.ts";
+import { carryStrategicIssueMinimum } from "../data-changes/0014_carry_strategic_issue_minimum.ts";
+import { carryObjectiveLengthLimit } from "../data-changes/0015_carry_objective_length_limit.ts";
+import { carryCoachStrictness } from "../data-changes/0016_carry_coach_strictness.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -49,6 +50,12 @@ try {
       // resolves its own ring. Absent is fine until there is a token to seal.
       sealAccountTokens(process.env.OPENOKR_ENCRYPTION_KEY),
       backfillWorkspaceRoles,
+      // After 0012, never before it: 0012 is what gives everybody the role
+      // that replaces the binding this removes.
+      dropSpaceEditOnGoals,
+      // Phase 9's three, numbered after main's 0013 when main was merged in
+      // on 5 October 2026: the ledger keys a script by its whole name, and
+      // 0013 had already run on instances built from main.
       carryStrategicIssueMinimum,
       carryObjectiveLengthLimit,
       carryCoachStrictness,

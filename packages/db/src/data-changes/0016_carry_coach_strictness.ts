@@ -26,7 +26,7 @@ import type {
 } from "../data-change.ts";
 
 export const carryCoachStrictness: DataChangeScript = {
-  name: "0015_carry_coach_strictness",
+  name: "0016_carry_coach_strictness",
   summary:
     "Moves a workspace's strict Coach strictness onto the strict mode practice setting.",
   expects: [

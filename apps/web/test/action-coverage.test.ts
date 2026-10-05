@@ -62,26 +62,6 @@ type Reason =
   | { readonly plannedAs: string; readonly why: string };
 
 const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
-  "roles.list": {
-    plannedAs: "P8-G13b",
-    why: "the matrix is read by the roles screen, which is the task after the one that added these; until then it is read through the command line and the API",
-  },
-  "roles.setPermission": {
-    plannedAs: "P8-G13b",
-    why: "moving one cell of the matrix is what the roles screen is for, and it lands with it",
-  },
-  "roles.create": {
-    plannedAs: "P8-G13b",
-    why: "adding a role belongs beside the matrix it starts from, on the same screen",
-  },
-  "roles.delete": {
-    plannedAs: "P8-G13b",
-    why: "removing a role has to say who holds it first, which is a count the roles screen draws",
-  },
-  "roles.assign": {
-    plannedAs: "P8-G13b",
-    why: "giving somebody a role belongs on the people screen, which the same task wires up",
-  },
   "workspace.provision": {
     caller: "packages/core/src/workspaces/provisioning.ts",
     why: "the pipeline calls it, from registration and the setup wizard",

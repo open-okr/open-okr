@@ -40,6 +40,7 @@ import {
   feedFromClosedPredecessorInTx,
 } from "../cycles/archive.ts";
 import {
+  addDays,
   cyclePeriodFor,
   formatLocalDate,
   localDateIn,
@@ -484,15 +485,39 @@ export const createCycle = defineWriteAction({
         (await resolveWorkspaceCadence(tx, workspaceId, input.mode));
       const period = cyclePeriodFor(cadence, parseLocalDate(input.on));
       const timeZone = await workspaceTimeZone(tx, workspaceId);
+      // **Three defaults, so a cycle can be made from a date alone**
+      // (P8-G13d, TECHNICAL-PLAN §4.14). Agung's complaint had two halves:
+      // the gates, which stay, and the number of answers a form demands
+      // before it will accept anything. These are the second half.
+      //
+      // The sponsor and the facilitator default to whoever creates the
+      // cycle. METHOD.md §2 phase 1 asks that both be *named*, and this names
+      // them: somebody who makes a cycle on their own is both until they say
+      // otherwise, and phase 1 reads green instead of listing two things the
+      // person making it could only have answered with their own name. It is
+      // a starting value, not a claim: the cycle screen reassigns either.
+      //
+      // The publication deadline defaults to the day before the cycle starts.
+      // Publish gate 6 asks for a date strictly before day one and says
+      // nothing about how far before, so the latest allowed date is the only
+      // one the product can choose without inventing a judgement. A
+      // facilitator pulls it earlier.
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        _context.actor.userId,
+      );
       const created = await createCycleInTx(tx, {
         workspaceId,
         cadence,
         period,
         today: formatLocalDate(localDateIn(new Date(), timeZone)),
         firstCycle: input.firstCycle,
-        sponsorId: input.sponsorId ?? null,
-        facilitatorId: input.facilitatorId ?? null,
-        publicationDeadline: input.publicationDeadline ?? null,
+        sponsorId: input.sponsorId ?? memberId,
+        facilitatorId: input.facilitatorId ?? memberId,
+        publicationDeadline:
+          input.publicationDeadline ??
+          formatLocalDate(addDays(parseLocalDate(period.startsOn), -1)),
         ...(input.name ? { name: input.name } : {}),
         ...(input.legacy ? { legacy: input.legacy } : {}),
       });
