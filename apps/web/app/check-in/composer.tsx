@@ -39,6 +39,9 @@ export interface ComposerKeyResult {
   readonly progressPct: number;
   readonly confidence: number | null;
   readonly kpiId: string | null;
+  /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12c-a). */
+  readonly kind: "metric" | "maintain" | "milestone" | "baseline";
+  readonly doneAt: string | null;
 }
 
 export async function Composer({
@@ -133,13 +136,25 @@ export async function Composer({
                         {keyResult.title}
                       </span>
                       <span className="text-xs text-ink-3">
-                        {t("common.toNow", {
-                          direction: keyResult.direction,
-                          baselineValue: formatMeasure(keyResult.baselineValue),
-                          targetValue: formatMeasure(keyResult.targetValue),
-                          unit: keyResult.unit ? ` ${keyResult.unit}` : "",
-                          progressPct: Math.round(keyResult.progressPct),
-                        })}
+                        {/* A milestone and a baseline have no numbers to
+                            move between, so their kind is the summary. */}
+                        {keyResult.kind === "milestone"
+                          ? t("keyResultKind.milestone")
+                          : keyResult.kind === "baseline"
+                            ? t("keyResultKind.baseline")
+                            : t("common.toNow", {
+                                direction: keyResult.direction,
+                                baselineValue: formatMeasure(
+                                  keyResult.baselineValue,
+                                ),
+                                targetValue: formatMeasure(
+                                  keyResult.targetValue,
+                                ),
+                                unit: keyResult.unit
+                                  ? ` ${keyResult.unit}`
+                                  : "",
+                                progressPct: Math.round(keyResult.progressPct),
+                              })}
                       </span>
                     </span>
                     <span className="flex flex-none items-center gap-1.5">
@@ -148,7 +163,28 @@ export async function Composer({
                           currentValue: formatMeasure(keyResult.currentValue),
                         })}
                       </span>
-                      {keyResult.kpiId ? (
+                      {keyResult.kind === "milestone" ? (
+                        // §2.10: done or not done. The hidden field says the
+                        // question was on the form, because an unticked box
+                        // posts nothing at all.
+                        <label className="flex items-center gap-1.5 text-xs text-ink-2">
+                          <input
+                            type="hidden"
+                            name={`asked:${keyResult.id}`}
+                            value="done"
+                          />
+                          <input
+                            type="checkbox"
+                            name={`done:${keyResult.id}`}
+                            defaultChecked={keyResult.doneAt !== null}
+                            aria-label={t("keyResultKind.doneOf", {
+                              title: keyResult.title,
+                            })}
+                            className="size-3.5 accent-brand"
+                          />
+                          {t("keyResultKind.done")}
+                        </label>
+                      ) : keyResult.kpiId ? (
                         <Chip tone="info">{t("common.fromAKpi")}</Chip>
                       ) : (
                         <>
@@ -165,7 +201,14 @@ export async function Composer({
                             name={`value:${keyResult.id}`}
                             type="number"
                             step="any"
-                            defaultValue={keyResult.currentValue}
+                            // A baseline nobody has recorded starts empty,
+                            // so the first value typed is the one it found.
+                            defaultValue={
+                              keyResult.kind === "baseline" &&
+                              keyResult.doneAt === null
+                                ? ""
+                                : keyResult.currentValue
+                            }
                             // Nine digits fit. A measure in rupiah or
                             // impressions reaches them and `w-24` hid half.
                             className="w-32 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"

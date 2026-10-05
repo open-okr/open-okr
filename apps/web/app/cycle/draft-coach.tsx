@@ -51,6 +51,8 @@ export interface CoachKeyResult {
   readonly indicatorType: "leading" | "lagging";
   readonly direction: "increase" | "reduce" | "maintain" | "move";
   readonly confidence: number | null;
+  /** Metric, maintain, milestone or baseline (METHOD.md §2.10). */
+  readonly keyResultKind: "metric" | "maintain" | "milestone" | "baseline";
 }
 
 export interface CoachObjective {
@@ -131,6 +133,7 @@ export function DraftCoach({
       direction: row.direction,
       confidence: row.confidence,
       kind: objective.kind,
+      keyResultKind: row.keyResultKind,
     }));
 
     const objectiveVerdicts = applyEnforcement(

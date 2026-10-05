@@ -537,6 +537,18 @@ export function okrKindsInUse(practice: ResolvedPractice): OkrKind[] {
 }
 
 /**
+ * The kinds of key result a practice uses (§2.10, P9-T12c-a), in §2.10's
+ * order. All four by default.
+ */
+export function keyResultKindsInUse(
+  practice: ResolvedPractice,
+): KeyResultKind[] {
+  return KEY_RESULT_KINDS.filter(
+    (kind) => practice[`keyResultKinds.${kind}`] === "on",
+  );
+}
+
+/**
  * The kind a new objective starts as when nobody says (§2.8, decision D2):
  * aspirational, because a commitment is a promise somebody makes on purpose,
  * unless the workspace uses committed OKRs only.

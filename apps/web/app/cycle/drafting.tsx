@@ -68,6 +68,7 @@ export interface DraftGoal {
     readonly dueOn: string | null;
     readonly ownerId: string | null;
     readonly confidence: number | null;
+    readonly kind: "metric" | "maintain" | "milestone" | "baseline";
   }[];
 }
 
@@ -254,6 +255,7 @@ export async function Drafting({
                   | "maintain"
                   | "move",
                 confidence: keyResult.confidence,
+                keyResultKind: keyResult.kind,
               }))}
               thresholds={thresholds}
               practice={practice}

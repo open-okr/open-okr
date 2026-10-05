@@ -161,6 +161,7 @@ export {
   isProfileKey,
   KEY_RESULT_KINDS,
   type KeyResultKind,
+  keyResultKindsInUse,
   levelsInUse,
   OKR_LEVELS,
   type OkrLevel,

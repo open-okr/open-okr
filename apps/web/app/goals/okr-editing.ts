@@ -88,6 +88,8 @@ function keyResultVerdicts(
             indicatorType: keyResult.indicatorType,
             direction: keyResult.direction,
             confidence: keyResult.confidence,
+            // KR-2, KR-3 and KR-7 judge by kind, as the server does.
+            keyResultKind: keyResult.kind,
           },
         ],
       },
@@ -177,13 +179,19 @@ export function useKeyResultCells(
 
   const patch = (
     set: PatchableKeyResult,
-    read: Record<string, string | number | null>,
+    read: Record<string, string | number | boolean | null>,
   ) => okr.mutate({ kind: "patchKeyResult", id: keyResult.id, set, read });
 
   return {
     verdicts,
     onDraft: setDraft,
     patch,
+    /** Metric, maintain, milestone or baseline (METHOD.md §2.10). */
+    saveKind: (kind: NonNullable<PatchableKeyResult["kind"]>) =>
+      patch({ kind }, { kind: keyResult.kind }),
+    /** A milestone ticked done, or unticked. */
+    saveDone: (done: boolean) =>
+      patch({ done }, { done: keyResult.doneAt !== null }),
     /** A value is history, recorded the way a check-in records it. */
     saveValue: (value: number) =>
       okr.mutate({ kind: "recordValue", id: keyResult.id, value }),

@@ -58,7 +58,9 @@ const { OkrTable } = await import("../app/goals/okr-table.tsx");
 const MEI = { id: "00000000-0000-7000-8000-000000000002", name: "Mei" };
 const PRIYA = { id: "00000000-0000-7000-8000-000000000001", name: "Priya" };
 
-const tree = (): OkrTree => ({
+type FixtureKeyResult = OkrTree["goals"][number]["keyResults"][number];
+
+const tree = (over: Partial<FixtureKeyResult> = {}): OkrTree => ({
   cycle: {
     id: "c",
     name: "Q1",
@@ -108,6 +110,7 @@ const tree = (): OkrTree => ({
           confidence: 0.6,
           qualityFlags: [],
           position: 0,
+          ...over,
         },
       ],
     },
@@ -122,6 +125,7 @@ let container: HTMLDivElement;
 async function render(options: {
   canEdit?: boolean;
   practice?: ReturnType<typeof defaultPractice>;
+  keyResult?: Partial<FixtureKeyResult>;
 }) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -132,7 +136,7 @@ async function render(options: {
         <TranslationsProvider locale="en">
           <ToastProvider>
             <OkrTable
-              initialTree={tree()}
+              initialTree={tree(options.keyResult)}
               initialAt={Date.now()}
               scope="all"
               filters={{ includeClosed: false }}
@@ -303,6 +307,92 @@ describe("the kind (METHOD.md §2.8, P9-T11b-a)", () => {
     });
     expect(field(LABEL)).toBeNull();
     expect(container.querySelector("[data-kind]")).toBeNull();
+  });
+});
+
+describe("the key result's kind (METHOD.md §2.10, P9-T12c-a)", () => {
+  async function choose(label: string, value: string) {
+    const select = field(label) as HTMLSelectElement;
+    await act(async () => {
+      select.value = value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  test("is chosen in the row, compared with the kind it was read as", async () => {
+    await render({});
+    // A metric's value field, by the label the milestone test expects gone.
+    expect(
+      field("Current value for Activation from 30% to 45%"),
+    ).not.toBeNull();
+    await choose("Kind of key result Activation from 30% to 45%", "milestone");
+    expect(runOkrMutation).toHaveBeenCalledWith({
+      kind: "patchKeyResult",
+      id: "k",
+      set: { kind: "milestone" },
+      read: { kind: "metric" },
+    });
+  });
+
+  test("offers only the kinds the workspace uses", async () => {
+    await render({
+      practice: resolvePractice("recommended", {
+        "keyResultKinds.baseline": "off",
+      }),
+    });
+    const options = [
+      ...((
+        field(
+          "Kind of key result Activation from 30% to 45%",
+        ) as HTMLSelectElement
+      )?.options ?? []),
+    ].map((option) => option.value);
+    expect(options).toEqual(["metric", "maintain", "milestone"]);
+  });
+
+  test("asks a milestone only whether it is done, and ticking it sends done", async () => {
+    await render({
+      keyResult: {
+        title: "No one on the team experienced a major injury",
+        kind: "milestone",
+      },
+    });
+    expect(
+      field("Current value for No one on the team experienced a major injury"),
+    ).toBeNull();
+
+    const done = field(
+      "No one on the team experienced a major injury is done",
+    ) as HTMLInputElement;
+    expect(done.checked).toBe(false);
+    await act(async () => done.click());
+    expect(runOkrMutation).toHaveBeenCalledWith({
+      kind: "patchKeyResult",
+      id: "k",
+      set: { done: true },
+      read: { done: false },
+    });
+  });
+
+  test("asks a baseline nobody has recorded for its first value, from an empty field", async () => {
+    await render({
+      keyResult: {
+        title: "Establish an onboarding NPS baseline",
+        kind: "baseline",
+      },
+    });
+    const baseline = field(
+      "The baseline for Establish an onboarding NPS baseline",
+    ) as HTMLInputElement;
+    expect(baseline.value).toBe("");
+    await leave(
+      await type("The baseline for Establish an onboarding NPS baseline", "31"),
+    );
+    expect(runOkrMutation).toHaveBeenCalledWith({
+      kind: "recordValue",
+      id: "k",
+      value: 31,
+    });
   });
 });
 

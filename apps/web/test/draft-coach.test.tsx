@@ -43,6 +43,7 @@ const keyResult = (confidence: number): CoachKeyResult => ({
   indicatorType: "lagging",
   direction: "increase",
   confidence,
+  keyResultKind: "metric",
 });
 
 async function render(kind: CoachObjective["kind"], confidences: number[]) {

@@ -146,7 +146,7 @@ Each Phase 9 task card in IMPLEMENTATION-PLAN.md lists the steps it must make tr
 
 ## 3. Gaps the year found
 
-Four things a realistic year needed that no task built. Akmal agreed on 2 October 2026 where each belongs, and they joined the plan in P9-T01's commit, so no step is a gap any more. The table stays as the record of why those tasks grew.
+Four things a realistic year needed that no task built. Akmal agreed on 2 October 2026 where each belongs, and they joined the plan in P9-T01's commit. A fifth, G-5, was found while building P9-T12c-a on 5 October 2026 and waits for a decision on where it belongs. The table stays as the record of why those tasks grew.
 
 | Gap | What was missing | Steps | Now built by |
 |---|---|---|---|
@@ -154,6 +154,7 @@ Four things a realistic year needed that no task built. Akmal agreed on 2 Octobe
 | G-2 | **A member on leave.** Nothing holds a person's nudges, routes their reviews or covers their check-ins while they are away. Quiet hours cover a day, not eleven weeks | NW-Q3-06, NW-Q3-08 | P9-T19b, with METHOD v2 §7.4's leave and delegate |
 | G-3 | **The "levels in use" setting.** P9-T01 declares it, but no task makes the level picker, OBJ-5 or the alignment score read it | NW-Q4-13 | P9-T07a for the picker, with §2.7's first sentence, and P9-T16 for alignment |
 | G-4 | **A seed that can place the demo at any date of this year.** P9-T22 seeds a current story; this scenario needs every step before a chosen date to be true, including closed cycles graded under their own snapshots | All steps, README §6 | P9-T22 |
+| G-5 | **A dependency that knows the key result providing it.** The register records the providing space and whether it confirmed, not which key result delivers, so nothing can show a dependency as delivered when a milestone is done. Found at P9-T12c-a, which proves the milestone half of the step and leaves this for a human to place | NW-Q1-20 | Unplanned: needs a decision |
 
 ## 4. Coverage
 

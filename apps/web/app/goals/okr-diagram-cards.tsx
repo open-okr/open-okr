@@ -6,7 +6,12 @@ import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
 import { HealthChip } from "./health-chip.tsx";
-import { InlineNumber, InlineText, KindControl } from "./okr-cells.tsx";
+import {
+  DoneToggle,
+  InlineNumber,
+  InlineText,
+  KindControl,
+} from "./okr-cells.tsx";
 import {
   type Coach,
   type OkrWrite,
@@ -353,25 +358,48 @@ function KeyResultRow({
       ) : (
         <>
           <span aria-hidden="true" className="text-ink-4">
-            ○
+            {keyResult.doneAt !== null ? "●" : "○"}
           </span>
           <span className="min-w-0 flex-1 truncate">{title}</span>
-          <span className="nodrag flex items-center gap-0.5 text-[11px]">
-            <InlineNumber
-              value={keyResult.currentValue}
-              label={t("goals.editor.valueFor", { title })}
-              readOnly={!shared.canEdit || fromKpi}
-              onSave={cells.saveValue}
-            />
-            <span className="text-ink-4">/</span>
-            <InlineNumber
-              key={cells.targetCell}
-              value={keyResult.targetValue}
-              label={t("okrList.targetOf", { title })}
-              readOnly={!shared.canEdit}
-              onSave={cells.saveTarget}
-            />
-          </span>
+          {/* §2.10: what the row asks for is its kind's question. */}
+          {keyResult.kind === "milestone" ? (
+            <span className="nodrag">
+              <DoneToggle
+                done={keyResult.doneAt !== null}
+                title={title}
+                readOnly={!shared.canEdit}
+                onSave={cells.saveDone}
+              />
+            </span>
+          ) : keyResult.kind === "baseline" ? (
+            <span className="nodrag flex items-center gap-0.5 text-[11px]">
+              <InlineNumber
+                value={
+                  keyResult.doneAt === null ? null : keyResult.currentValue
+                }
+                label={t("keyResultKind.baselineFor", { title })}
+                readOnly={!shared.canEdit || fromKpi}
+                onSave={cells.saveValue}
+              />
+            </span>
+          ) : (
+            <span className="nodrag flex items-center gap-0.5 text-[11px]">
+              <InlineNumber
+                value={keyResult.currentValue}
+                label={t("goals.editor.valueFor", { title })}
+                readOnly={!shared.canEdit || fromKpi}
+                onSave={cells.saveValue}
+              />
+              <span className="text-ink-4">/</span>
+              <InlineNumber
+                key={cells.targetCell}
+                value={keyResult.targetValue}
+                label={t("okrList.targetOf", { title })}
+                readOnly={!shared.canEdit}
+                onSave={cells.saveTarget}
+              />
+            </span>
+          )}
         </>
       )}
       <Handle

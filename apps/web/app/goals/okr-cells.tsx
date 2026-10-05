@@ -1,6 +1,6 @@
 "use client";
 
-import type { OkrKind, QualityStatus } from "@openokr/method";
+import type { KeyResultKind, OkrKind, QualityStatus } from "@openokr/method";
 import { Chip, cn, useTranslations } from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
 
@@ -125,18 +125,20 @@ export function InlineNumber({
   wide,
   onSave,
 }: {
-  readonly value: number;
+  /** Null for a number nobody has recorded yet, such as a baseline's. */
+  readonly value: number | null;
   readonly label: string;
   readonly readOnly: boolean;
   readonly wide?: boolean;
   readonly onSave: (next: number) => void;
 }) {
-  const { draft, setDraft, field } = useDraft(String(value));
+  const shown = value === null ? "" : String(value);
+  const { draft, setDraft, field } = useDraft(shown);
 
   if (readOnly) {
     return (
       <span className="px-1 text-xs font-semibold tabular-nums text-ink">
-        {value}
+        {value ?? "–"}
       </span>
     );
   }
@@ -144,7 +146,7 @@ export function InlineNumber({
   const commit = () => {
     const next = Number(draft);
     if (draft.trim() === "" || Number.isNaN(next) || next === value) {
-      setDraft(String(value));
+      setDraft(shown);
       return;
     }
     onSave(next);
@@ -159,7 +161,7 @@ export function InlineNumber({
       aria-label={label}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
-      onKeyDown={keys(() => setDraft(String(value)))}
+      onKeyDown={keys(() => setDraft(shown))}
       className={cn(
         "text-right text-xs font-semibold tabular-nums",
         wide ? "w-20" : "w-14",
@@ -410,6 +412,105 @@ export function KindControl({
         </span>
       ) : null}
     </span>
+  );
+}
+
+const KEY_RESULT_KIND_LABEL: Record<KeyResultKind, string> = {
+  metric: "keyResultKind.metric",
+  maintain: "keyResultKind.maintain",
+  milestone: "keyResultKind.milestone",
+  baseline: "keyResultKind.baseline",
+};
+
+/**
+ * What kind of key result this is (METHOD.md §2.10, P9-T12c-a): a metric, a
+ * maintain, a milestone or a baseline. It decides what the row asks for, so
+ * it is chosen where the row is. A kind the workspace has turned off is not
+ * offered, unless the key result already is one.
+ */
+export function KeyResultKindPicker({
+  kind,
+  title,
+  kinds,
+  readOnly,
+  onSave,
+}: {
+  readonly kind: KeyResultKind;
+  readonly title: string;
+  /** The kinds this workspace uses, from its practice. */
+  readonly kinds: readonly KeyResultKind[];
+  readonly readOnly: boolean;
+  readonly onSave: (kind: KeyResultKind) => void;
+}) {
+  const { t } = useTranslations();
+  if (readOnly) {
+    return (
+      <span className="px-1 text-[11px] text-ink-3" data-key-result-kind={kind}>
+        {t(KEY_RESULT_KIND_LABEL[kind])}
+      </span>
+    );
+  }
+  const offered = kinds.includes(kind) ? kinds : [kind, ...kinds];
+  return (
+    <select
+      aria-label={t("keyResultKind.kindOf", { title })}
+      data-key-result-kind={kind}
+      value={kind}
+      onChange={(event) => {
+        const next = event.target.value as KeyResultKind;
+        if (next !== kind) {
+          onSave(next);
+        }
+      }}
+      className={cn("text-[11px]", FIELD)}
+    >
+      {offered.map((entry) => (
+        <option key={entry} value={entry}>
+          {t(KEY_RESULT_KIND_LABEL[entry])}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * A milestone's one question: done or not done (METHOD.md §2.10). A real
+ * checkbox, so the keyboard and a screen reader meet it as what it is.
+ */
+export function DoneToggle({
+  done,
+  title,
+  readOnly,
+  onSave,
+}: {
+  readonly done: boolean;
+  readonly title: string;
+  readonly readOnly: boolean;
+  readonly onSave: (done: boolean) => void;
+}) {
+  const { t } = useTranslations();
+  // Ticked the moment it is clicked, then whatever the cache says: the
+  // write's own change arrives a tick later, and a box that does not move
+  // when pressed reads as broken. A refusal puts the stored answer back.
+  const [checked, setChecked] = useState(done);
+  useEffect(() => {
+    setChecked(done);
+  }, [done]);
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-ink-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={readOnly}
+        aria-label={t("keyResultKind.doneOf", { title })}
+        onChange={(event) => {
+          setChecked(event.target.checked);
+          onSave(event.target.checked);
+        }}
+        className="size-3.5 accent-brand"
+      />
+      {checked ? t("keyResultKind.done") : t("keyResultKind.notDone")}
+    </label>
   );
 }
 

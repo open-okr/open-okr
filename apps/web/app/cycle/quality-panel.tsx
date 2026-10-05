@@ -95,6 +95,8 @@ export function QualityPanel({
         confidence: row.confidence,
         // KR-6 judges only aspirational key results (METHOD.md §3.2).
         kind: entry.objective.kind,
+        // KR-2, KR-3 and KR-7 judge by the key result's own kind (§2.10).
+        keyResultKind: row.keyResultKind,
       }));
 
       const objective = applyEnforcement(

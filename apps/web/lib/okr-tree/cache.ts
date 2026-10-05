@@ -61,6 +61,10 @@ export interface KeyResultFields {
   readonly weight?: number;
   readonly currentValue?: number;
   readonly targetValue?: number;
+  /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12c-a). */
+  readonly kind?: OkrGoal["keyResults"][number]["kind"];
+  /** A milestone done or a baseline recorded; the node carries `doneAt`. */
+  readonly done?: boolean;
 }
 
 function onGoal(
@@ -93,6 +97,13 @@ export function patchKeyResultIn(
   keyResultId: string,
   set: KeyResultFields,
 ): OkrTree {
+  // `done` is a question the node answers with `doneAt`, so it is drawn as a
+  // moment now, or none, until the server's own arrives.
+  const { done, ...fields } = set;
+  const merged =
+    done === undefined
+      ? fields
+      : { ...fields, doneAt: done ? new Date().toISOString() : null };
   return {
     ...tree,
     goals: tree.goals.map((goal) =>
@@ -100,7 +111,7 @@ export function patchKeyResultIn(
         ? {
             ...goal,
             keyResults: goal.keyResults.map((row) =>
-              row.id === keyResultId ? { ...row, ...set } : row,
+              row.id === keyResultId ? { ...row, ...merged } : row,
             ),
           }
         : goal,

@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui-components/react/dialog";
 import { Tabs } from "@base-ui-components/react/tabs";
-import { okrKindsInUse } from "@openokr/method";
+import { keyResultKindsInUse, okrKindsInUse } from "@openokr/method";
 import {
   Bar,
   Chip,
@@ -28,9 +28,11 @@ import {
 import { unlinkGoals } from "./alignment-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
+  DoneToggle,
   InlineDate,
   InlineNumber,
   InlineText,
+  KeyResultKindPicker,
   KindControl,
   MemberPicker,
   type Person,
@@ -614,56 +616,108 @@ function DrawerKeyResult({
         </span>
       </div>
       <dl className="grid grid-cols-[7rem_1fr] items-center gap-x-3 gap-y-1 text-xs">
-        <dt className="text-ink-3">{t("okrDrawer.value")}</dt>
-        <dd className="flex items-center gap-1">
-          <InlineNumber
-            value={keyResult.currentValue}
-            label={t("goals.editor.valueFor", { title })}
-            readOnly={!canEdit || fromKpi}
-            wide
-            onSave={cells.saveValue}
-          />
-          {fromKpi ? <Chip tone="info">{t("common.fromAKpi")}</Chip> : null}
-        </dd>
-        <dt className="text-ink-3">{t("okrDrawer.target")}</dt>
-        <dd className="flex items-center gap-1">
-          <InlineNumber
-            key={cells.targetCell}
-            value={keyResult.targetValue}
-            label={t("okrList.targetOf", { title })}
-            readOnly={!canEdit}
-            wide
-            onSave={cells.saveTarget}
-          />
-          <InlineText
-            value={keyResult.unit ?? ""}
-            label={t("okrList.unitOf", { title })}
-            readOnly={!canEdit}
-            allowEmpty
-            placeholder={t("okrList.unit")}
-            onSave={(unit) =>
-              cells.patch(
-                { unit: unit === "" ? null : unit },
-                { unit: keyResult.unit },
-              )
-            }
-          />
-        </dd>
-        <dt className="text-ink-3">{t("okrDrawer.baseline")}</dt>
+        {/* §2.10's kind decides which of the rows below it asks for. */}
+        <dt className="text-ink-3">{t("okrKind.label")}</dt>
         <dd>
-          <InlineNumber
-            value={keyResult.baselineValue}
-            label={t("okrList.baselineOf", { title })}
-            readOnly={!canEdit}
-            wide
-            onSave={(baselineValue) =>
-              cells.patch(
-                { baselineValue },
-                { baselineValue: keyResult.baselineValue },
-              )
-            }
+          <KeyResultKindPicker
+            kind={keyResult.kind}
+            title={title}
+            kinds={keyResultKindsInUse(coach.practice)}
+            readOnly={!canEdit || fromKpi}
+            onSave={cells.saveKind}
           />
         </dd>
+        {keyResult.kind === "milestone" ? (
+          <>
+            <dt className="text-ink-3">{t("keyResultKind.milestone")}</dt>
+            <dd>
+              <DoneToggle
+                done={keyResult.doneAt !== null}
+                title={title}
+                readOnly={!canEdit}
+                onSave={cells.saveDone}
+              />
+            </dd>
+          </>
+        ) : null}
+        {keyResult.kind === "baseline" ? (
+          <>
+            <dt className="text-ink-3">
+              {keyResult.doneAt === null
+                ? t("keyResultKind.recordBaseline")
+                : t("keyResultKind.baseline")}
+            </dt>
+            <dd>
+              <InlineNumber
+                value={
+                  keyResult.doneAt === null ? null : keyResult.currentValue
+                }
+                label={t("keyResultKind.baselineFor", { title })}
+                readOnly={!canEdit || fromKpi}
+                wide
+                onSave={cells.saveValue}
+              />
+            </dd>
+          </>
+        ) : null}
+        {keyResult.kind === "metric" || keyResult.kind === "maintain" ? (
+          <>
+            <dt className="text-ink-3">{t("okrDrawer.value")}</dt>
+            <dd className="flex items-center gap-1">
+              <InlineNumber
+                value={keyResult.currentValue}
+                label={t("goals.editor.valueFor", { title })}
+                readOnly={!canEdit || fromKpi}
+                wide
+                onSave={cells.saveValue}
+              />
+              {fromKpi ? <Chip tone="info">{t("common.fromAKpi")}</Chip> : null}
+            </dd>
+            <dt className="text-ink-3">{t("okrDrawer.target")}</dt>
+            <dd className="flex items-center gap-1">
+              <InlineNumber
+                key={cells.targetCell}
+                value={keyResult.targetValue}
+                label={t("okrList.targetOf", { title })}
+                readOnly={!canEdit}
+                wide
+                onSave={cells.saveTarget}
+              />
+              <InlineText
+                value={keyResult.unit ?? ""}
+                label={t("okrList.unitOf", { title })}
+                readOnly={!canEdit}
+                allowEmpty
+                placeholder={t("okrList.unit")}
+                onSave={(unit) =>
+                  cells.patch(
+                    { unit: unit === "" ? null : unit },
+                    { unit: keyResult.unit },
+                  )
+                }
+              />
+            </dd>
+            <dt className="text-ink-3">
+              {keyResult.kind === "maintain"
+                ? t("keyResultKind.band")
+                : t("okrDrawer.baseline")}
+            </dt>
+            <dd>
+              <InlineNumber
+                value={keyResult.baselineValue}
+                label={t("okrList.baselineOf", { title })}
+                readOnly={!canEdit}
+                wide
+                onSave={(baselineValue) =>
+                  cells.patch(
+                    { baselineValue },
+                    { baselineValue: keyResult.baselineValue },
+                  )
+                }
+              />
+            </dd>
+          </>
+        ) : null}
         <dt className="text-ink-3">{t("okrList.owner")}</dt>
         <dd>
           <MemberPicker

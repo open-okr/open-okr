@@ -496,6 +496,27 @@ describe("checking in", () => {
     await act(async () => new Promise((done) => setTimeout(done)));
   }
 
+  test("a milestone is checked in as done, not as a value (P9-T12c-a)", async () => {
+    await render({
+      address: "?okr=g&tab=check-in",
+      keyResults: [keyResult({ kind: "milestone" })],
+    });
+    expect(inDrawer(`Value for ${KR} in this check-in`)).toBeNull();
+    const done = inDrawer(`${KR} is done`) as HTMLInputElement;
+    await act(async () => done.click());
+    await fill(
+      form()?.querySelector("textarea") as HTMLTextAreaElement,
+      "The import shipped on Friday.",
+    );
+    await submit();
+    expect(runOkrMutation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "checkIn",
+        values: [{ keyResultId: "k", done: true }],
+      }),
+    );
+  });
+
   test("a commitment set below the floor is told so before it is published (P9-T11b-c)", async () => {
     await render({ address: "?okr=g&tab=check-in", kind: "committed" });
     const floor = () =>

@@ -151,7 +151,8 @@ export async function readOkrDetail(input: {
   };
 }
 
-type Readable = string | number | null;
+/** Boolean for a milestone's done (P9-T12c-a), compared as it is. */
+type Readable = string | number | boolean | null;
 
 export type OkrMutation =
   | {
@@ -229,6 +230,8 @@ export type OkrMutation =
         readonly keyResultId: string;
         readonly value?: number;
         readonly confidence?: number;
+        /** A milestone done with this check-in (METHOD.md §2.10). */
+        readonly done?: boolean;
       }[];
     };
 

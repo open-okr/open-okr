@@ -722,6 +722,7 @@ export default async function CyclePage({
                   indicatorType: keyResult.indicatorType,
                   direction: keyResult.direction,
                   confidence: keyResult.confidence,
+                  keyResultKind: keyResult.kind,
                 })),
               }))}
               thresholds={draft.thresholds}

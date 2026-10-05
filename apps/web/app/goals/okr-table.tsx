@@ -1,7 +1,7 @@
 "use client";
 
 import type { GoalLevel } from "@openokr/db";
-import { okrKindsInUse } from "@openokr/method";
+import { keyResultKindsInUse, okrKindsInUse } from "@openokr/method";
 import {
   Bar,
   Button,
@@ -29,9 +29,11 @@ import {
 import { addKeyResult, addObjective } from "./editor-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
+  DoneToggle,
   InlineDate,
   InlineNumber,
   InlineText,
+  KeyResultKindPicker,
   KindControl,
   MemberPicker,
   type Person,
@@ -775,6 +777,13 @@ function KeyResultRow({
           />
           <VerdictChips verdicts={cells.verdicts} />
           <span className="flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3">
+            <KeyResultKindPicker
+              kind={keyResult.kind}
+              title={keyResult.title}
+              kinds={keyResultKindsInUse(coach.practice)}
+              readOnly={!canEdit || fromKpi}
+              onSave={cells.saveKind}
+            />
             <span className="flex items-center gap-1">
               {t("okrList.owner")}
               <MemberPicker
@@ -801,51 +810,79 @@ function KeyResultRow({
           </span>
         </div>
 
-        <div className="flex flex-col gap-0.5 text-xs tabular-nums">
-          <span className="flex items-center gap-1">
+        {keyResult.kind === "milestone" ? (
+          // §2.10: a milestone asks one question, done or not done.
+          <DoneToggle
+            done={keyResult.doneAt !== null}
+            title={keyResult.title}
+            readOnly={!canEdit}
+            onSave={cells.saveDone}
+          />
+        ) : keyResult.kind === "baseline" ? (
+          // §2.10: a baseline is recorded by its first value, which then
+          // reads as the value it found.
+          <span className="flex flex-col gap-0.5 text-xs tabular-nums">
+            <span className="text-[11px] text-ink-4">
+              {keyResult.doneAt === null
+                ? t("keyResultKind.recordBaseline")
+                : t("keyResultKind.baseline")}
+            </span>
             <InlineNumber
-              value={keyResult.currentValue}
-              label={t("goals.editor.valueFor", { title: keyResult.title })}
+              value={keyResult.doneAt === null ? null : keyResult.currentValue}
+              label={t("keyResultKind.baselineFor", { title: keyResult.title })}
               readOnly={!canEdit || fromKpi}
               onSave={cells.saveValue}
             />
-            <span className="text-ink-4">/</span>
-            <InlineNumber
-              key={cells.targetCell}
-              value={keyResult.targetValue}
-              label={t("okrList.targetOf", { title: keyResult.title })}
-              readOnly={!canEdit}
-              onSave={cells.saveTarget}
-            />
-            <InlineText
-              value={keyResult.unit ?? ""}
-              label={t("okrList.unitOf", { title: keyResult.title })}
-              readOnly={!canEdit}
-              allowEmpty
-              placeholder={t("okrList.unit")}
-              onSave={(unit) =>
-                patch(
-                  { unit: unit === "" ? null : unit },
-                  { unit: keyResult.unit },
-                )
-              }
-            />
           </span>
-          <span className="flex items-center gap-1 text-[11px] text-ink-4">
-            {t("okrList.from")}
-            <InlineNumber
-              value={keyResult.baselineValue}
-              label={t("okrList.baselineOf", { title: keyResult.title })}
-              readOnly={!canEdit}
-              onSave={(baselineValue) =>
-                patch(
-                  { baselineValue },
-                  { baselineValue: keyResult.baselineValue },
-                )
-              }
-            />
-          </span>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-0.5 text-xs tabular-nums">
+            <span className="flex items-center gap-1">
+              <InlineNumber
+                value={keyResult.currentValue}
+                label={t("goals.editor.valueFor", { title: keyResult.title })}
+                readOnly={!canEdit || fromKpi}
+                onSave={cells.saveValue}
+              />
+              <span className="text-ink-4">/</span>
+              <InlineNumber
+                key={cells.targetCell}
+                value={keyResult.targetValue}
+                label={t("okrList.targetOf", { title: keyResult.title })}
+                readOnly={!canEdit}
+                onSave={cells.saveTarget}
+              />
+              <InlineText
+                value={keyResult.unit ?? ""}
+                label={t("okrList.unitOf", { title: keyResult.title })}
+                readOnly={!canEdit}
+                allowEmpty
+                placeholder={t("okrList.unit")}
+                onSave={(unit) =>
+                  patch(
+                    { unit: unit === "" ? null : unit },
+                    { unit: keyResult.unit },
+                  )
+                }
+              />
+            </span>
+            <span className="flex items-center gap-1 text-[11px] text-ink-4">
+              {keyResult.kind === "maintain"
+                ? t("keyResultKind.band")
+                : t("okrList.from")}
+              <InlineNumber
+                value={keyResult.baselineValue}
+                label={t("okrList.baselineOf", { title: keyResult.title })}
+                readOnly={!canEdit}
+                onSave={(baselineValue) =>
+                  patch(
+                    { baselineValue },
+                    { baselineValue: keyResult.baselineValue },
+                  )
+                }
+              />
+            </span>
+          </div>
+        )}
 
         <div className="hidden items-center gap-2 md:flex">
           <Bar

@@ -10,6 +10,7 @@ import { useState } from "react";
 import type { OkrDetail } from "../../lib/okr-tree/actions.ts";
 import type { OkrGoal } from "../../lib/okr-tree/cache.ts";
 import type { OkrHandle } from "../../lib/okr-tree/use-okr-tree.ts";
+import { DoneToggle } from "./okr-cells.tsx";
 
 /**
  * Checking in from the drawer (P9-T08b, design §4.4).
@@ -77,7 +78,20 @@ export function CheckInTab({
     Object.fromEntries(
       goal.keyResults.map((keyResult) => [
         keyResult.id,
-        String(keyResult.currentValue),
+        // A baseline nobody has recorded starts empty, so the first value
+        // typed is the one it found (§2.10).
+        keyResult.kind === "baseline" && keyResult.doneAt === null
+          ? ""
+          : String(keyResult.currentValue),
+      ]),
+    ),
+  );
+  // §2.10: a milestone is checked in as done or not done.
+  const [dones, setDones] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      goal.keyResults.map((keyResult) => [
+        keyResult.id,
+        keyResult.doneAt !== null,
       ]),
     ),
   );
@@ -116,8 +130,14 @@ export function CheckInTab({
         keyResultId: string;
         value?: number;
         confidence?: number;
+        done?: boolean;
       } = { keyResultId: keyResult.id };
-      if (
+      if (keyResult.kind === "milestone") {
+        const done = dones[keyResult.id] ?? false;
+        if (done !== (keyResult.doneAt !== null)) {
+          entry.done = done;
+        }
+      } else if (
         keyResult.kpiId === null &&
         values[keyResult.id]?.trim() !== "" &&
         Number.isFinite(value) &&
@@ -212,7 +232,19 @@ export function CheckInTab({
               {keyResult.title}
             </span>
             <span className="flex flex-wrap items-center gap-3 text-xs">
-              {keyResult.kpiId ? (
+              {keyResult.kind === "milestone" ? (
+                <DoneToggle
+                  done={dones[keyResult.id] ?? false}
+                  title={keyResult.title}
+                  readOnly={false}
+                  onSave={(done) =>
+                    setDones((current) => ({
+                      ...current,
+                      [keyResult.id]: done,
+                    }))
+                  }
+                />
+              ) : keyResult.kpiId ? (
                 <Chip tone="info">{t("common.fromAKpi")}</Chip>
               ) : (
                 <label className="flex items-center gap-1.5">
