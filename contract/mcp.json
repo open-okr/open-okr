@@ -5240,6 +5240,32 @@
       }
     },
     {
+      "name": "cycles.rules",
+      "description": "The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "cycleId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "cycleId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "cycles.current",
       "description": "The cycle to show: the one containing today, else the soonest ahead, else the most recent behind.",
       "inputSchema": {

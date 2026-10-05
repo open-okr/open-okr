@@ -215,21 +215,22 @@ export default async function CyclePage({
         ).goals
       : [];
 
-  // Phase 7 reads this workspace's own band boundaries. Same cast and same
-  // reason as the phase 4 block below: `rhythm.read` types its thresholds as
-  // an open record at the contract boundary, and one `resolveThresholds`
-  // builds both sides of it.
-  const reviewThresholds =
+  // Phase 7 reads the rules this cycle is graded under (METHOD.md §12,
+  // P9-T14b): the workspace's own while it is open, and the ones it closed
+  // with after, so a band moved later does not repaint a closed cycle. The
+  // casts are the contract boundary's, which types both as open records.
+  const reviewRules =
     viewing === 7
-      ? ((await callAction(context, "rhythm.read", {}))
-          .thresholds as unknown as ResolvedThresholds)
+      ? await callAction(context, "cycles.rules", {
+          cycleId: workflow.cycleId,
+        })
       : null;
-  // And the colours its bands are read in (METHOD.md §3.3, §12, P9-T14a).
-  const reviewPractice =
-    viewing === 7
-      ? ((await callAction(context, "practice.read", {}))
-          .practice as unknown as ResolvedPractice)
-      : null;
+  const reviewThresholds = reviewRules
+    ? (reviewRules.thresholds as unknown as ResolvedThresholds)
+    : null;
+  const reviewPractice = reviewRules
+    ? (reviewRules.practice as unknown as ResolvedPractice)
+    : null;
 
   const cadenceSpaces =
     viewing === 6 ? await callAction(context, "spaces.list", {}) : [];

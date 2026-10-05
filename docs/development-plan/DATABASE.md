@@ -238,6 +238,8 @@ One row per revision of an **agreed** frame within its year, written by `frame.s
 ### cycles *(short_id, importable)*
 `name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `company_published_at?`, `levels jsonb` (the levels the cycle began with, written from the practice when it is created and moved by a practice change only while it has not started, P9-T07a-c), `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
 
+`practice_snapshot jsonb?` (0121, P9-T14b, METHOD.md §12) holds the practice settings and every threshold in force when the cycle closed, resolved, so a band or a cap moved later does not rewrite its verdicts. Null while open, and on a cycle closed before the column existed, which reads today's canon.
+
 `company_published_at` (0110, P9-T03b) is the first of the two publish steps, METHOD.md §4.5: the company set, published before the cycle starts. `published_at` still means the whole set is out, so a set published in one go sets both and a cycle published before the column existed reads as it always did. No legacy source.
 
 The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An imported cycle keeps the name the source used, because that is the name the people being migrated recognise; the period still decides the dates and the mode.

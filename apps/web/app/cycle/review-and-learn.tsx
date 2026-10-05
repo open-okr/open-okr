@@ -197,6 +197,8 @@ export async function ReviewAndLearn({
             return (
               <div
                 key={name}
+                data-testid="score-band-row"
+                data-band={name}
                 className={
                   here
                     ? "flex items-center justify-between gap-2.5 rounded-md bg-brand-weak px-2.5 py-1.5 text-sm text-brand-text"

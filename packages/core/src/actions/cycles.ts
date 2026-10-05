@@ -55,6 +55,7 @@ import {
   resolveRhythm,
   validateRhythmPatch,
 } from "../cycles/rhythm.ts";
+import { cycleRulesInTx } from "../cycles/rules.ts";
 import {
   createCycleInTx,
   ensureCurrentCycleInTx,
@@ -196,6 +197,61 @@ const CYCLE_COLUMNS = {
   sponsorId: cycles.sponsorId,
   facilitatorId: cycles.facilitatorId,
 } as const;
+
+/**
+ * The rules one cycle is read under (METHOD.md §12, P9-T14b): the
+ * workspace's settings while it is open, the ones it closed with after, and
+ * today's canon for a cycle closed before snapshots existed. Every view of a
+ * closed cycle's verdicts reads this rather than the settings as they stand.
+ */
+export const readCycleRules = defineReadAction({
+  name: "cycles.rules",
+  summary:
+    "The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after.",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.object({
+    source: z.enum(["live", "snapshot", "canon"]),
+    thresholds: z.record(z.string(), z.unknown()),
+    practice: z.record(z.string(), z.unknown()),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const memberId = await actingMember(
+          tx as OperationTx,
+          context.workspaceId,
+          userId,
+        );
+        // A cycle is read through the workspace, as `cycles.list` explains.
+        await getAccessScoped(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "workspace",
+          resourceId: context.workspaceId,
+          requires: ACCESS_LEVELS.view,
+        });
+        const rules = await cycleRulesInTx(
+          tx as OperationTx,
+          context.workspaceId,
+          input.cycleId,
+        );
+        return {
+          source: rules.source,
+          thresholds: { ...rules.thresholds },
+          practice: { ...rules.practice },
+        };
+      },
+    );
+  },
+});
 
 /**
  * The OKR levels one cycle offers (P9-T07a-c, METHOD v2 §2.7): the levels it

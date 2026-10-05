@@ -500,3 +500,89 @@ describe("a closed cycle's record", () => {
     ).rejects.toThrow(/closed/i);
   });
 });
+
+describe("a closed cycle keeps the rules it was graded under (§12, P9-T14b)", () => {
+  /** The review again, graded 0.65: on target under Google's colours. */
+  const holdTheReviewAt = async (score: number) => {
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId,
+      score,
+      reason: "Landed most of the way.",
+    });
+    await call("sessions.addRetroNote", {
+      sessionId,
+      columnKey: "didnt",
+      text: "Nobody owned the integration dependency.",
+      anonymous: false,
+    });
+    await call("sessions.submitProcessHealth", {
+      sessionId,
+      scores: [5, 4, 2, 5, 4].map((value, index) => ({
+        statementKey: index + 1,
+        score: value,
+      })),
+    });
+    await call("sessions.close", { id: sessionId });
+  };
+
+  const bandAtTheReview = async () => {
+    const status = (await call("sessions.scoringStatus", { sessionId })) as {
+      objectives: { keyResults: { band: { key: string } | null }[] }[];
+    };
+    return status.objectives[0]?.keyResults[0]?.band?.key;
+  };
+
+  it("acceptance A7: bands moved after the close leave its verdicts as they were, and the open cycle reads the new ones", async () => {
+    await holdTheReviewAt(0.65);
+    await close();
+
+    const [snapshot] = await rows<{
+      practice_snapshot: {
+        thresholds: Record<string, unknown>;
+        practice: Record<string, unknown>;
+      } | null;
+    }>("select practice_snapshot from cycles where id = $1", [cycleId]);
+    expect(snapshot?.practice_snapshot?.practice["scoring.colours"]).toBe(
+      "google",
+    );
+    expect(
+      snapshot?.practice_snapshot?.thresholds["scoring.scoreBands"],
+    ).toEqual({ achieved: 1, strong: 0.6, partial: 0.3 });
+    expect(await bandAtTheReview()).toBe("strong");
+
+    // An admin changes the bands to Doerr's colours.
+    await call("practice.update", {
+      overrides: { "scoring.colours": "doerr" },
+    });
+    expect(await bandAtTheReview()).toBe("strong");
+    expect(
+      ((await call("cycles.rules", { cycleId })) as { source: string }).source,
+    ).toBe("snapshot");
+
+    const next = (await createNext()) as { id: string };
+    const open = (await call("cycles.rules", { cycleId: next.id })) as {
+      source: string;
+      practice: Record<string, unknown>;
+    };
+    expect(open.source).toBe("live");
+    expect(open.practice["scoring.colours"]).toBe("doerr");
+  });
+
+  it("reads today's canon for a cycle closed before snapshots existed", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update cycles set status = 'closed', practice_snapshot = null where id = $1",
+      [cycleId],
+    );
+    await call("practice.update", {
+      overrides: { "scoring.colours": "doerr" },
+    });
+    const rules = (await call("cycles.rules", { cycleId })) as {
+      source: string;
+      practice: Record<string, unknown>;
+    };
+    expect(rules.source).toBe("canon");
+    expect(rules.practice["scoring.colours"]).toBe("google");
+  });
+});

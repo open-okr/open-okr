@@ -114,6 +114,7 @@ import {
   parseLocalDate,
 } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
+import { cycleRulesInTx } from "../cycles/rules.ts";
 import {
   findCurrentCycle,
   readRhythmRow,
@@ -8573,10 +8574,14 @@ export const readScoringStatus = defineReadAction({
           ]),
         );
 
-        const rhythmRow = await readRhythmRow(tx, context.workspaceId);
-        const { thresholds } = resolveRhythm(rhythmRow);
-        // The colours the bands are read in (§3.3, §12, P9-T14a).
-        const { practice } = practiceFromRow(rhythmRow);
+        // The rules this review's cycle is read under (§12, P9-T14b): the
+        // workspace's now while it is open, and the ones it closed with after,
+        // so a band moved later does not rewrite a closed cycle's verdicts.
+        const { thresholds, practice } = await cycleRulesInTx(
+          tx,
+          context.workspaceId,
+          session.cycleId,
+        );
         const kindOf = new Map(rows.map((row) => [row.keyResultId, row.kind]));
         const computed = await computedScoresInTx(
           tx,

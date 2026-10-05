@@ -198,6 +198,16 @@ export const cycles = pgTable("cycles", {
     .$type<Record<string, unknown>>()
     .notNull()
     .default({}),
+  /**
+   * The practice settings and every threshold in force when the cycle closed,
+   * resolved (METHOD.md §12, P9-T14b). Null while open, and on a cycle closed
+   * before snapshots existed, which reads today's canon.
+   */
+  practiceSnapshot: jsonb("practice_snapshot").$type<{
+    readonly thresholds: Record<string, unknown>;
+    readonly practice: Record<string, unknown>;
+    readonly takenAt: string;
+  }>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

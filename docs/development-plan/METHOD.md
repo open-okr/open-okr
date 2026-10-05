@@ -984,6 +984,8 @@ Every parameter has a default, so a workspace practises the full method correctl
 
 The non-numeric choices a workspace makes about its practice. Each has the recommended default first. Changing one is an audited admin action, and no setting can make the product refuse a read or lose data.
 
+**A cycle keeps the rules it was graded under.** When a cycle closes, the practice settings and every threshold in force are recorded with it. Changing a band or a cap later does not rewrite a closed cycle's verdicts.
+
 ### 12.1 The settings
 
 | Setting | Options | Default | Source |

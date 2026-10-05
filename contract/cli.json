@@ -3754,6 +3754,23 @@
       "pages": false
     },
     {
+      "name": "cycles rules",
+      "action": "cycles.rules",
+      "method": "GET",
+      "path": "/cycles/rules",
+      "scope": "read",
+      "summary": "The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "cycles current",
       "action": "cycles.current",
       "method": "GET",

@@ -29,6 +29,7 @@ import { asc, count, desc, eq, gt, inArray, isNull, lt, ne } from "drizzle-orm";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { resolveRhythm } from "./rhythm.ts";
+import { rulesSnapshot } from "./rules.ts";
 import { readRhythmRow } from "./service.ts";
 import { evaluateWorkflow, loadCycleForWorkflow } from "./workflow.ts";
 
@@ -896,12 +897,23 @@ export async function closeCycleInTx(
     now,
   );
 
+  // METHOD.md §12 (P9-T14b): the cycle keeps the rules it was graded under,
+  // so a band or a cap moved later does not rewrite its verdicts.
+  const { practice: inForce } = practiceFromRow(
+    await readRhythmRow(tx, workspaceId),
+  );
+
   // Phase 7 as well as closed, so the cycle opens on the phase that shows
   // how it closed rather than wherever the pointer was left.
   // openokr:allow-mutation: the calling Operation's own transaction.
   await tx
     .update(cycles)
-    .set({ status: "closed", phase: 7, updatedAt: now })
+    .set({
+      status: "closed",
+      phase: 7,
+      practiceSnapshot: rulesSnapshot(thresholds, inForce, now),
+      updatedAt: now,
+    })
     .where(
       activeOnly(
         cycles,
