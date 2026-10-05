@@ -416,7 +416,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // target history, not the feed, where it would be read out of context.
   "key_result.target_changed": z.object({
     keyResultId: z.uuid(),
-    from: z.number(),
+    // Null when the key result had no target before (P9-T13-b-a).
+    from: z.number().nullable(),
     to: z.number(),
     eased: z.boolean(),
   }),

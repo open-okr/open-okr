@@ -30,6 +30,7 @@ import { addKeyResult, addObjective } from "./editor-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
   AddedMidCycle,
+  AdditionDraftMark,
   DoneToggle,
   InlineDate,
   InlineNumber,
@@ -683,6 +684,7 @@ function ObjectiveRow({
               onSave={cells.saveKind}
             />
             <AddedMidCycle at={goal.addedMidCycleAt} />
+            <AdditionDraftMark draft={goal.draft} />
             <span className="flex items-center gap-1">
               {t("okrList.champion")}
               <MemberPicker
@@ -796,6 +798,7 @@ function KeyResultRow({
               onSave={cells.saveKind}
             />
             <AddedMidCycle at={keyResult.addedMidCycleAt} />
+            <AdditionDraftMark draft={keyResult.draft} />
             <span className="flex items-center gap-1">
               {t("okrList.owner")}
               <MemberPicker
@@ -927,7 +930,7 @@ function KeyResultRow({
           }
         />
       </div>
-      {cells.easing !== null ? (
+      {cells.easing !== null && keyResult.targetValue !== null ? (
         <ReasonField
           from={keyResult.targetValue}
           to={cells.easing}

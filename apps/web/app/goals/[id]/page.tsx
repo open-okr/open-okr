@@ -411,7 +411,10 @@ export default async function GoalPage({
                           direction: keyResult.direction,
                           indicatorType: keyResult.indicatorType,
                           baselineValue: formatMeasure(keyResult.baselineValue),
-                          targetValue: formatMeasure(keyResult.targetValue),
+                          targetValue:
+                            keyResult.targetValue === null
+                              ? t("common.noTargetYet")
+                              : formatMeasure(keyResult.targetValue),
                           unit: keyResult.unit ? ` ${keyResult.unit}` : "",
                           weight: keyResult.weight,
                         })}

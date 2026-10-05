@@ -277,6 +277,13 @@ async function recomputeScoring<
 
   for (const row of keyResultRows) {
     const baseline = asNumber(row.baselineValue);
+    // No target yet (P9-T13-b-a) is nothing to move toward, so the key
+    // result reads no progress and no forecast until one is set. Read as
+    // nought instead, a baseline of 4.1 "increasing" to 0 would be a span
+    // running backwards.
+    const untargeted =
+      row.targetValue === null &&
+      (row.kind === "metric" || row.kind === "maintain");
     const target = asNumber(row.targetValue);
     const current = asNumber(row.currentValue);
     const direction = row.direction;
@@ -286,25 +293,27 @@ async function recomputeScoring<
     // recorded is unmeasured, not failing.
     const progress = row.kpiId
       ? (kpiAchievementById.get(row.kpiId) ?? asNumber(row.progressPct))
-      : keyResultProgress(
-          {
-            // §2.10 (P9-T12b): a milestone or a baseline reads its done.
-            kind: row.kind,
-            done: row.doneAt !== null,
-            direction,
-            baseline,
-            target,
-            current,
-          },
-          thresholds,
-        );
+      : untargeted
+        ? 0
+        : keyResultProgress(
+            {
+              // §2.10 (P9-T12b): a milestone or a baseline reads its done.
+              kind: row.kind,
+              done: row.doneAt !== null,
+              direction,
+              baseline,
+              target,
+              current,
+            },
+            thresholds,
+          );
     keyResultProgressById.set(row.id, progress);
 
     const points = pointsByKeyResult.get(row.id) ?? [];
     const horizonDate = cycle?.endsOn ?? row.dueOn;
     forecastById.set(
       row.id,
-      horizonDate
+      horizonDate && !untargeted
         ? trendForecast(
             points,
             new Date(`${horizonDate}T00:00:00Z`).getTime(),

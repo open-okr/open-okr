@@ -202,7 +202,12 @@ export const keyResults = pgTable("key_results", {
   direction: text("direction", { enum: KEY_RESULT_DIRECTIONS }).notNull(),
   indicatorType: text("indicator_type", { enum: INDICATOR_TYPES }).notNull(),
   baselineValue: numeric("baseline_value").notNull(),
-  targetValue: numeric("target_value").notNull(),
+  /**
+   * Null until somebody sets it, since P9-T13-b-a (METHOD.md §2.9): a metric
+   * or a maintain key result may be saved before its target is known, and
+   * fails KR-3 until it is. A milestone or a baseline stores nought to one.
+   */
+  targetValue: numeric("target_value"),
   currentValue: numeric("current_value").notNull(),
   dueOn: date("due_on"),
   ownerId: uuid("owner_id").references(() => workspaceMembers.id),

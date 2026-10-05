@@ -61,7 +61,8 @@ export interface DraftGoal {
     readonly direction: string;
     readonly indicatorType: string;
     readonly baselineValue: number;
-    readonly targetValue: number;
+    /** Null until somebody sets it (P9-T13-b-a). */
+    readonly targetValue: number | null;
     readonly currentValue: number;
     readonly weight: number;
     readonly kpiId: string | null;
@@ -309,7 +310,10 @@ export async function Drafting({
                             baselineValue: formatMeasure(
                               keyResult.baselineValue,
                             ),
-                            targetValue: formatMeasure(keyResult.targetValue),
+                            targetValue:
+                              keyResult.targetValue === null
+                                ? t("common.noTargetYet")
+                                : formatMeasure(keyResult.targetValue),
                             unit: keyResult.unit ? ` ${keyResult.unit}` : "",
                             weight: keyResult.weight,
                           })}

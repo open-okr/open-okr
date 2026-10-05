@@ -650,7 +650,11 @@ export interface CreateKeyResultInput {
   readonly direction: KeyResultDirection;
   readonly indicatorType: IndicatorType;
   readonly baselineValue: number;
-  readonly targetValue: number;
+  /**
+   * Null when nobody knows it yet (P9-T13-b-a): the key result fails KR-3
+   * until it is set, and reads no progress.
+   */
+  readonly targetValue: number | null;
   readonly currentValue?: number;
   readonly dueOn?: string | null;
   readonly ownerId?: string | null;
@@ -719,7 +723,8 @@ export async function createKeyResultInTx<
       direction: input.direction,
       indicatorType: input.indicatorType,
       baselineValue: String(input.baselineValue),
-      targetValue: String(input.targetValue),
+      targetValue:
+        input.targetValue === null ? null : String(input.targetValue),
       currentValue: String(current),
       dueOn: input.dueOn ?? null,
       ownerId: input.ownerId ?? null,

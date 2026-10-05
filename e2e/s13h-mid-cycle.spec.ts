@@ -8,6 +8,11 @@
  * And NW-Q2-13 on screen: with "Reason when adding mid-cycle" required, the
  * list's add row asks why before it saves, and the row carries the mark.
  *
+ * And live or draft (P9-T13-b-a, NW-Q3-11):
+ *   Given a metric key result added mid-cycle without a target, when it is
+ *   saved, then it is a draft its space can see, marked with what is
+ *   missing, and it goes live when the target is added.
+ *
  * **It moves the current cycle and puts it back.** The window is measured
  * from today, so the spec places the shared quarter five weeks in and
  * published, then restores its dates, its publication and the practice
@@ -25,6 +30,8 @@ const STAMP = Date.now().toString(36);
 const LISTED = `Win the teams Brightline is chasing ${STAMP}`;
 const REVIEWED = `Answer Brightline's onboarding in week five ${STAMP}`;
 const REASON = "Brightline entered the segment on 10 May";
+const GROWTH = `Make self-serve a second engine of growth ${STAMP}`;
+const CONVERSION = `Self-serve trial-to-paid conversion from 4.1% ${STAMP}`;
 
 let context: BrowserContext;
 let page: Page;
@@ -217,4 +224,49 @@ test("acceptance: the review shows an objective added in week five as added mid-
   await expect(page.getByTestId("added-mid-cycle")).toHaveText(
     `Added mid-cycle, ${today()}`,
   );
+});
+
+test("acceptance (P9-T13-b-a): a key result saved without its target is a draft naming it, and goes live as the target is typed", async () => {
+  const directory = (await (
+    await api.get("/api/v1/people/directory", { headers: authed() })
+  ).json()).data as { id: string; name: string }[];
+  const me = directory.find((member) => member.name === INSTANCE_ACCOUNT.name);
+  const goalId = (
+    await post<{ id: string }>("goals.create", {
+      title: GROWTH,
+      cycleId,
+      level: "company",
+      ownerKind: "workspace",
+      championId: me?.id,
+      reason: "New Growth team formed 9 August",
+    })
+  ).id;
+  created.push(goalId);
+  // The target is not known yet, so it is left out (NW-Q3-11).
+  await post("goals.addKeyResult", {
+    goalId,
+    title: CONVERSION,
+    direction: "increase",
+    indicatorType: "lagging",
+    baselineValue: 4.1,
+    dueOn: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+    ownerId: me?.id,
+    reason: "Baseline established on 23 August",
+  });
+
+  await goTo(page, "/goals");
+  const target = main().getByLabel(`Target for ${CONVERSION}`);
+  await expect(target).toBeVisible({ timeout: 15_000 });
+  await expect(target).toHaveValue("");
+  const row = target.locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
+  await expect(row.getByTestId("addition-draft")).toHaveText(
+    "Draft: needs a target",
+  );
+
+  await target.fill("7");
+  await target.press("Enter");
+  await expect(row.getByTestId("addition-draft")).toHaveCount(0, {
+    timeout: 15_000,
+  });
+  await expect(row.getByTestId("added-mid-cycle")).toBeVisible();
 });

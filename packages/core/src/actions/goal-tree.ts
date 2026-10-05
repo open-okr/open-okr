@@ -34,6 +34,13 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import {
+  ADDITION_FIELDS,
+  type AdditionDraft,
+  type KeyResultInput,
+  keyResultDraft,
+  objectiveDraft,
+} from "@openokr/method";
 import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -56,6 +63,7 @@ import {
   requirePolicy,
 } from "../practice/policy.ts";
 import {
+  additionJudgeInTx,
   recomputeGoalQualityInTx,
   recomputeUnitQualityInTx,
 } from "../quality/service.ts";
@@ -69,6 +77,17 @@ const localDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Give the date as YYYY-MM-DD.");
 
 const person = z.object({ id: z.uuid(), name: z.string() });
+
+/**
+ * What a mid-cycle addition still lacks before it is live (METHOD.md §2.9):
+ * fields by name, and any other check set to block by its id.
+ */
+const additionDraft = z
+  .object({
+    missing: z.array(z.enum(ADDITION_FIELDS)),
+    failing: z.array(z.string()),
+  })
+  .nullable();
 
 const treeKeyResult = z.object({
   id: z.uuid(),
@@ -85,7 +104,11 @@ const treeKeyResult = z.object({
   /** What KR-4 and KR-5 judge, so a screen can coach as the server does. */
   indicatorType: z.enum(INDICATOR_TYPES),
   baselineValue: z.number(),
-  targetValue: z.number(),
+  /**
+   * Null until somebody sets it (§2.9, P9-T13-b-a). KR-3 fails until then,
+   * so an addition without one is a draft that names it as missing.
+   */
+  targetValue: z.number().nullable(),
   currentValue: z.number(),
   dueOn: z.string().nullable(),
   owner: person.nullable(),
@@ -95,6 +118,11 @@ const treeKeyResult = z.object({
   confidence: z.number().nullable(),
   qualityFlags: z.array(z.string()),
   position: z.number().int(),
+  /**
+   * §2.9's live or draft (P9-T13-b-a): null when it is live, or what it
+   * still lacks. Only a key result added mid-cycle is ever a draft.
+   */
+  draft: additionDraft,
 });
 
 export const treeGoal = z.object({
@@ -123,6 +151,8 @@ export const treeGoal = z.object({
     score: z.number().nullable(),
     flags: z.array(z.string()),
   }),
+  /** As on a key result: only an objective added mid-cycle is a draft. */
+  draft: additionDraft,
   keyResults: z.array(treeKeyResult),
 });
 
@@ -294,6 +324,7 @@ async function treeNodes(
   for (const child of children) {
     byGoal.set(child.goalId, [...(byGoal.get(child.goalId) ?? []), child]);
   }
+  const drafts = await additionDrafts(tx, workspaceId, rows, byGoal);
 
   return rows.map((row) => ({
     id: row.id,
@@ -321,6 +352,7 @@ async function treeNodes(
       score: asNumber(row.qualityScore),
       flags: [...row.qualityFlags],
     },
+    draft: plainDraft(drafts.get(row.id)),
     keyResults: (byGoal.get(row.id) ?? []).map((child) => ({
       id: child.id,
       goalId: child.goalId,
@@ -334,7 +366,7 @@ async function treeNodes(
       direction: child.direction,
       indicatorType: child.indicatorType,
       baselineValue: asNumber(child.baselineValue) ?? 0,
-      targetValue: asNumber(child.targetValue) ?? 0,
+      targetValue: asNumber(child.targetValue),
       currentValue: asNumber(child.currentValue) ?? 0,
       dueOn: child.dueOn,
       owner: child.ownerId ? named(child.ownerId) : null,
@@ -344,8 +376,117 @@ async function treeNodes(
       confidence: asNumber(child.confidence),
       qualityFlags: [...child.qualityFlags],
       position: child.position,
+      draft: plainDraft(drafts.get(child.id)),
     })),
   }));
+}
+
+/** A reading as the contract carries it, which has no readonly arrays. */
+const plainDraft = (draft: AdditionDraft | null | undefined) =>
+  draft ? { missing: [...draft.missing], failing: [...draft.failing] } : null;
+
+/**
+ * Each open addition's draft, keyed by goal or key result id (METHOD.md
+ * §2.9, P9-T13-b-a).
+ *
+ * Judged on every read rather than stored, because what it reads is already
+ * loaded and a stored answer would go stale the moment an admin raised a
+ * check to block. The plan is judged by the gates and reads nothing here, so
+ * a tree with no addition pays for nothing.
+ */
+async function additionDrafts(
+  tx: OperationTx,
+  workspaceId: string,
+  rows: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly cycleId: string | null;
+    readonly level: (typeof GOAL_LEVELS)[number];
+    readonly kind: (typeof GOAL_KINDS)[number];
+    readonly addedMidCycleAt: Date | null;
+    readonly spaceId: string | null;
+    readonly championId: string;
+    readonly reviewerId: string | null;
+    readonly closedAt: Date | null;
+  }[],
+  byGoal: ReadonlyMap<
+    string,
+    readonly {
+      readonly id: string;
+      readonly title: string;
+      readonly kind: (typeof KEY_RESULT_KINDS)[number];
+      readonly addedMidCycleAt: Date | null;
+      readonly direction: (typeof KEY_RESULT_DIRECTIONS)[number];
+      readonly indicatorType: (typeof INDICATOR_TYPES)[number];
+      readonly baselineValue: string;
+      readonly targetValue: string | null;
+      readonly dueOn: string | null;
+      readonly ownerId: string | null;
+      readonly confidence: string | null;
+    }[]
+  >,
+): Promise<Map<string, AdditionDraft | null>> {
+  const drafts = new Map<string, AdditionDraft | null>();
+  const open = rows.filter(
+    (row) =>
+      row.closedAt === null &&
+      (row.addedMidCycleAt !== null ||
+        (byGoal.get(row.id) ?? []).some(
+          (child) => child.addedMidCycleAt !== null,
+        )),
+  );
+  if (open.length === 0) {
+    return drafts;
+  }
+  const judge = await additionJudgeInTx(tx, workspaceId);
+  for (const row of open) {
+    const options = { strict: await judge.strictIn(row.spaceId) };
+    const children = byGoal.get(row.id) ?? [];
+    const inputs: KeyResultInput[] = children.map((child) => ({
+      text: child.title,
+      baseline: asNumber(child.baselineValue),
+      target: asNumber(child.targetValue),
+      dueOn: child.dueOn,
+      ownerId: child.ownerId,
+      indicatorType: child.indicatorType,
+      direction: child.direction,
+      confidence: asNumber(child.confidence),
+      kind: row.kind,
+      keyResultKind: child.kind,
+    }));
+    if (row.addedMidCycleAt !== null) {
+      drafts.set(
+        row.id,
+        objectiveDraft(
+          {
+            title: row.title,
+            hasCycle: row.cycleId !== null,
+            // An addition is always in a cycle; only a goal outside one
+            // reads its own window.
+            hasTimeframe: false,
+            championId: row.championId,
+            reviewerId: row.reviewerId,
+            reviewerRequired: judge.practice.reviewer === "required",
+            level: row.level,
+          },
+          inputs,
+          judge.thresholds,
+          judge.practice,
+          options,
+        ),
+      );
+    }
+    children.forEach((child, index) => {
+      const input = inputs[index];
+      if (child.addedMidCycleAt !== null && input) {
+        drafts.set(
+          child.id,
+          keyResultDraft(input, judge.thresholds, judge.practice, options),
+        );
+      }
+    });
+  }
+  return drafts;
 }
 
 /** One goal's node, read after a write so the caller can merge it. */

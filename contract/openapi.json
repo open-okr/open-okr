@@ -31570,7 +31570,10 @@
                                       "type": "number"
                                     },
                                     "targetValue": {
-                                      "type": "number"
+                                      "type": [
+                                        "number",
+                                        "null"
+                                      ]
                                     },
                                     "currentValue": {
                                       "type": "number"
@@ -32268,7 +32271,10 @@
                                 "type": "number"
                               },
                               "targetValue": {
-                                "type": "number"
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
                               },
                               "currentValue": {
                                 "type": "number"
@@ -34249,6 +34255,43 @@
                                 ],
                                 "additionalProperties": false
                               },
+                              "draft": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "missing": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "enum": [
+                                            "keyResult",
+                                            "baseline",
+                                            "target",
+                                            "dueDate",
+                                            "owner",
+                                            "reviewer"
+                                          ]
+                                        }
+                                      },
+                                      "failing": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "missing",
+                                      "failing"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "keyResults": {
                                 "type": "array",
                                 "items": {
@@ -34314,7 +34357,10 @@
                                       "type": "number"
                                     },
                                     "targetValue": {
-                                      "type": "number"
+                                      "type": [
+                                        "number",
+                                        "null"
+                                      ]
                                     },
                                     "currentValue": {
                                       "type": "number"
@@ -34384,6 +34430,43 @@
                                       "type": "integer",
                                       "minimum": -9007199254740991,
                                       "maximum": 9007199254740991
+                                    },
+                                    "draft": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "missing": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "keyResult",
+                                                  "baseline",
+                                                  "target",
+                                                  "dueDate",
+                                                  "owner",
+                                                  "reviewer"
+                                                ]
+                                              }
+                                            },
+                                            "failing": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string"
+                                              }
+                                            }
+                                          },
+                                          "required": [
+                                            "missing",
+                                            "failing"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -34406,7 +34489,8 @@
                                     "progressPct",
                                     "confidence",
                                     "qualityFlags",
-                                    "position"
+                                    "position",
+                                    "draft"
                                   ],
                                   "additionalProperties": false
                                 }
@@ -34433,6 +34517,7 @@
                               "daysPastDue",
                               "position",
                               "quality",
+                              "draft",
                               "keyResults"
                             ],
                             "additionalProperties": false
@@ -35054,6 +35139,43 @@
                               ],
                               "additionalProperties": false
                             },
+                            "draft": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "missing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "keyResult",
+                                          "baseline",
+                                          "target",
+                                          "dueDate",
+                                          "owner",
+                                          "reviewer"
+                                        ]
+                                      }
+                                    },
+                                    "failing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "missing",
+                                    "failing"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "keyResults": {
                               "type": "array",
                               "items": {
@@ -35119,7 +35241,10 @@
                                     "type": "number"
                                   },
                                   "targetValue": {
-                                    "type": "number"
+                                    "type": [
+                                      "number",
+                                      "null"
+                                    ]
                                   },
                                   "currentValue": {
                                     "type": "number"
@@ -35189,6 +35314,43 @@
                                     "type": "integer",
                                     "minimum": -9007199254740991,
                                     "maximum": 9007199254740991
+                                  },
+                                  "draft": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "missing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "enum": [
+                                                "keyResult",
+                                                "baseline",
+                                                "target",
+                                                "dueDate",
+                                                "owner",
+                                                "reviewer"
+                                              ]
+                                            }
+                                          },
+                                          "failing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "missing",
+                                          "failing"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -35211,7 +35373,8 @@
                                   "progressPct",
                                   "confidence",
                                   "qualityFlags",
-                                  "position"
+                                  "position",
+                                  "draft"
                                 ],
                                 "additionalProperties": false
                               }
@@ -35238,6 +35401,7 @@
                             "daysPastDue",
                             "position",
                             "quality",
+                            "draft",
                             "keyResults"
                           ],
                           "additionalProperties": false
@@ -35538,6 +35702,43 @@
                               ],
                               "additionalProperties": false
                             },
+                            "draft": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "missing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "keyResult",
+                                          "baseline",
+                                          "target",
+                                          "dueDate",
+                                          "owner",
+                                          "reviewer"
+                                        ]
+                                      }
+                                    },
+                                    "failing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "missing",
+                                    "failing"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "keyResults": {
                               "type": "array",
                               "items": {
@@ -35603,7 +35804,10 @@
                                     "type": "number"
                                   },
                                   "targetValue": {
-                                    "type": "number"
+                                    "type": [
+                                      "number",
+                                      "null"
+                                    ]
                                   },
                                   "currentValue": {
                                     "type": "number"
@@ -35673,6 +35877,43 @@
                                     "type": "integer",
                                     "minimum": -9007199254740991,
                                     "maximum": 9007199254740991
+                                  },
+                                  "draft": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "missing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "enum": [
+                                                "keyResult",
+                                                "baseline",
+                                                "target",
+                                                "dueDate",
+                                                "owner",
+                                                "reviewer"
+                                              ]
+                                            }
+                                          },
+                                          "failing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "missing",
+                                          "failing"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -35695,7 +35936,8 @@
                                   "progressPct",
                                   "confidence",
                                   "qualityFlags",
-                                  "position"
+                                  "position",
+                                  "draft"
                                 ],
                                 "additionalProperties": false
                               }
@@ -35722,6 +35964,7 @@
                             "daysPastDue",
                             "position",
                             "quality",
+                            "draft",
                             "keyResults"
                           ],
                           "additionalProperties": false
@@ -36054,6 +36297,43 @@
                               ],
                               "additionalProperties": false
                             },
+                            "draft": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "missing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "keyResult",
+                                          "baseline",
+                                          "target",
+                                          "dueDate",
+                                          "owner",
+                                          "reviewer"
+                                        ]
+                                      }
+                                    },
+                                    "failing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "missing",
+                                    "failing"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "keyResults": {
                               "type": "array",
                               "items": {
@@ -36119,7 +36399,10 @@
                                     "type": "number"
                                   },
                                   "targetValue": {
-                                    "type": "number"
+                                    "type": [
+                                      "number",
+                                      "null"
+                                    ]
                                   },
                                   "currentValue": {
                                     "type": "number"
@@ -36189,6 +36472,43 @@
                                     "type": "integer",
                                     "minimum": -9007199254740991,
                                     "maximum": 9007199254740991
+                                  },
+                                  "draft": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "missing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "enum": [
+                                                "keyResult",
+                                                "baseline",
+                                                "target",
+                                                "dueDate",
+                                                "owner",
+                                                "reviewer"
+                                              ]
+                                            }
+                                          },
+                                          "failing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "missing",
+                                          "failing"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -36211,7 +36531,8 @@
                                   "progressPct",
                                   "confidence",
                                   "qualityFlags",
-                                  "position"
+                                  "position",
+                                  "draft"
                                 ],
                                 "additionalProperties": false
                               }
@@ -36238,6 +36559,7 @@
                             "daysPastDue",
                             "position",
                             "quality",
+                            "draft",
                             "keyResults"
                           ],
                           "additionalProperties": false
@@ -36603,6 +36925,43 @@
                               ],
                               "additionalProperties": false
                             },
+                            "draft": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "missing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "keyResult",
+                                          "baseline",
+                                          "target",
+                                          "dueDate",
+                                          "owner",
+                                          "reviewer"
+                                        ]
+                                      }
+                                    },
+                                    "failing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "missing",
+                                    "failing"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "keyResults": {
                               "type": "array",
                               "items": {
@@ -36668,7 +37027,10 @@
                                     "type": "number"
                                   },
                                   "targetValue": {
-                                    "type": "number"
+                                    "type": [
+                                      "number",
+                                      "null"
+                                    ]
                                   },
                                   "currentValue": {
                                     "type": "number"
@@ -36738,6 +37100,43 @@
                                     "type": "integer",
                                     "minimum": -9007199254740991,
                                     "maximum": 9007199254740991
+                                  },
+                                  "draft": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "missing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "enum": [
+                                                "keyResult",
+                                                "baseline",
+                                                "target",
+                                                "dueDate",
+                                                "owner",
+                                                "reviewer"
+                                              ]
+                                            }
+                                          },
+                                          "failing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "missing",
+                                          "failing"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -36760,7 +37159,8 @@
                                   "progressPct",
                                   "confidence",
                                   "qualityFlags",
-                                  "position"
+                                  "position",
+                                  "draft"
                                 ],
                                 "additionalProperties": false
                               }
@@ -36787,6 +37187,7 @@
                             "daysPastDue",
                             "position",
                             "quality",
+                            "draft",
                             "keyResults"
                           ],
                           "additionalProperties": false
@@ -36795,7 +37196,10 @@
                           "type": "object",
                           "properties": {
                             "from": {
-                              "type": "number"
+                              "type": [
+                                "number",
+                                "null"
+                              ]
                             },
                             "to": {
                               "type": "number"
@@ -37108,6 +37512,43 @@
                               ],
                               "additionalProperties": false
                             },
+                            "draft": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "missing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "keyResult",
+                                          "baseline",
+                                          "target",
+                                          "dueDate",
+                                          "owner",
+                                          "reviewer"
+                                        ]
+                                      }
+                                    },
+                                    "failing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "missing",
+                                    "failing"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "keyResults": {
                               "type": "array",
                               "items": {
@@ -37173,7 +37614,10 @@
                                     "type": "number"
                                   },
                                   "targetValue": {
-                                    "type": "number"
+                                    "type": [
+                                      "number",
+                                      "null"
+                                    ]
                                   },
                                   "currentValue": {
                                     "type": "number"
@@ -37243,6 +37687,43 @@
                                     "type": "integer",
                                     "minimum": -9007199254740991,
                                     "maximum": 9007199254740991
+                                  },
+                                  "draft": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "missing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "enum": [
+                                                "keyResult",
+                                                "baseline",
+                                                "target",
+                                                "dueDate",
+                                                "owner",
+                                                "reviewer"
+                                              ]
+                                            }
+                                          },
+                                          "failing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "missing",
+                                          "failing"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -37265,7 +37746,8 @@
                                   "progressPct",
                                   "confidence",
                                   "qualityFlags",
-                                  "position"
+                                  "position",
+                                  "draft"
                                 ],
                                 "additionalProperties": false
                               }
@@ -37292,6 +37774,7 @@
                             "daysPastDue",
                             "position",
                             "quality",
+                            "draft",
                             "keyResults"
                           ],
                           "additionalProperties": false
@@ -37717,6 +38200,43 @@
                               ],
                               "additionalProperties": false
                             },
+                            "draft": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "missing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "keyResult",
+                                          "baseline",
+                                          "target",
+                                          "dueDate",
+                                          "owner",
+                                          "reviewer"
+                                        ]
+                                      }
+                                    },
+                                    "failing": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "missing",
+                                    "failing"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "keyResults": {
                               "type": "array",
                               "items": {
@@ -37782,7 +38302,10 @@
                                     "type": "number"
                                   },
                                   "targetValue": {
-                                    "type": "number"
+                                    "type": [
+                                      "number",
+                                      "null"
+                                    ]
                                   },
                                   "currentValue": {
                                     "type": "number"
@@ -37852,6 +38375,43 @@
                                     "type": "integer",
                                     "minimum": -9007199254740991,
                                     "maximum": 9007199254740991
+                                  },
+                                  "draft": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "missing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "enum": [
+                                                "keyResult",
+                                                "baseline",
+                                                "target",
+                                                "dueDate",
+                                                "owner",
+                                                "reviewer"
+                                              ]
+                                            }
+                                          },
+                                          "failing": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "missing",
+                                          "failing"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -37874,7 +38434,8 @@
                                   "progressPct",
                                   "confidence",
                                   "qualityFlags",
-                                  "position"
+                                  "position",
+                                  "draft"
                                 ],
                                 "additionalProperties": false
                               }
@@ -37901,6 +38462,7 @@
                             "daysPastDue",
                             "position",
                             "quality",
+                            "draft",
                             "keyResults"
                           ],
                           "additionalProperties": false

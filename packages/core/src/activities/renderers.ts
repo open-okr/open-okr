@@ -346,9 +346,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "key_result.removed": (p) =>
     `Key result "${asString(p.title, "a key result")}" was removed`,
   "key_result.target_changed": (p) =>
-    p.eased
-      ? `A key result's target was eased from ${String(p.from)} to ${String(p.to)}`
-      : `A key result's target moved from ${String(p.from)} to ${String(p.to)}`,
+    p.from === null
+      ? `A key result's target was set to ${String(p.to)}`
+      : p.eased
+        ? `A key result's target was eased from ${String(p.from)} to ${String(p.to)}`
+        : `A key result's target moved from ${String(p.from)} to ${String(p.to)}`,
   "key_result.placed": () => "A key result was moved in its objective's order",
   "goal.placed": () => "An objective was moved in its cycle's order",
   "goal.kind_changed": (p) =>

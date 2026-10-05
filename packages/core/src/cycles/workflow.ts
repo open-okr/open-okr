@@ -560,7 +560,7 @@ async function loadGoalSnapshots<
         // number makes every comparison read as a missing value.
         quality: {
           baseline: Number(child.baselineValue),
-          target: Number(child.targetValue),
+          target: child.targetValue === null ? null : Number(child.targetValue),
           dueOn: child.dueOn,
           ownerId: child.ownerId,
           indicatorType: child.indicatorType,

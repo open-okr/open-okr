@@ -1898,7 +1898,10 @@ export function createProviderDrafter(
                 `Direction: ${context.direction}` +
                 NEWLINE +
                 `Baseline ${context.baseline}${unit}, now ` +
-                `${context.current}${unit}, target ${context.target}${unit}` +
+                `${context.current}${unit}, ` +
+                (context.target === null
+                  ? "no target set yet"
+                  : `target ${context.target}${unit}`) +
                 (context.existingInitiatives.length === 0
                   ? `${NEWLINE}No initiatives are behind it yet.`
                   : NEWLINE +

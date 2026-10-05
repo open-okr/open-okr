@@ -33,7 +33,8 @@ export async function Sparkline({
   readonly history: readonly HistoryPoint[];
   readonly direction: KeyResultDirection;
   readonly baseline: number;
-  readonly target: number;
+  /** Null until somebody sets it, and then nothing is projected toward. */
+  readonly target: number | null;
   /**
    * The instant the fit projects to, on the same axis as the points: the
    * cycle end, or the key result's own due date. The same horizon the scoring
@@ -66,7 +67,7 @@ export async function Sparkline({
     // wants what it returns; the chart sorts for itself.
     .sort((a, b) => a.at - b.at);
   const forecast =
-    horizonAt === null
+    horizonAt === null || target === null
       ? null
       : trendForecast(points, horizonAt, { direction, baseline, target });
 

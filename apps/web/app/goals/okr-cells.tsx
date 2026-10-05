@@ -1,6 +1,14 @@
 "use client";
 
-import type { KeyResultKind, OkrKind, QualityStatus } from "@openokr/method";
+import {
+  type AdditionDraft,
+  type AdditionField,
+  KEY_RESULT_CHECKS,
+  type KeyResultKind,
+  OBJECTIVE_CHECKS,
+  type OkrKind,
+  type QualityStatus,
+} from "@openokr/method";
 import { Chip, cn, useTranslations } from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
 
@@ -489,6 +497,53 @@ export function AddedMidCycle({ at }: { readonly at: string | null }) {
       data-testid="added-mid-cycle"
     >
       {t("midCycle.addedOn", { date: at.slice(0, 10) })}
+    </Chip>
+  );
+}
+
+/** Each field a draft can lack, as a writer reads it. */
+const ADDITION_FIELD_KEYS: Readonly<Record<AdditionField, string>> = {
+  keyResult: "additionDraft.field.keyResult",
+  baseline: "additionDraft.field.baseline",
+  target: "additionDraft.field.target",
+  dueDate: "additionDraft.field.dueDate",
+  owner: "additionDraft.field.owner",
+  reviewer: "additionDraft.field.reviewer",
+};
+
+const CHECK_TITLES = new Map(
+  [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].map((check) => [
+    check.id,
+    check.title,
+  ]),
+);
+
+/**
+ * §2.9's live or draft (P9-T13-b-a): an addition that still lacks what the
+ * checks set to block ask for is a draft, and says what it lacks. Nothing at
+ * all for one that is live, which is every OKR that is not an addition.
+ */
+export function AdditionDraftMark({
+  draft,
+}: {
+  readonly draft: AdditionDraft | null;
+}) {
+  const { t } = useTranslations();
+  if (draft === null) {
+    return null;
+  }
+  const needs = [
+    ...draft.missing.map((field) => t(ADDITION_FIELD_KEYS[field])),
+    ...draft.failing.map((id) =>
+      t("additionDraft.check", { title: CHECK_TITLES.get(id) ?? id }),
+    ),
+  ];
+  return (
+    <Chip
+      className="h-4.5 bg-warn-bg text-[11px] text-warn"
+      data-testid="addition-draft"
+    >
+      {t("additionDraft.needs", { items: needs.join(", ") })}
     </Chip>
   );
 }

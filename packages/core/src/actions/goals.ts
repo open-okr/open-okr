@@ -147,7 +147,8 @@ const keyResultOutput = z.object({
   direction: z.enum(KEY_RESULT_DIRECTIONS),
   indicatorType: z.enum(INDICATOR_TYPES),
   baselineValue: z.number(),
-  targetValue: z.number(),
+  /** Null until somebody sets it (§2.9, P9-T13-b-a). */
+  targetValue: z.number().nullable(),
   currentValue: z.number(),
   dueOn: z.string().nullable(),
   ownerId: z.uuid().nullable(),
@@ -326,7 +327,7 @@ function keyResultRow(row: {
   direction: (typeof KEY_RESULT_DIRECTIONS)[number];
   indicatorType: (typeof INDICATOR_TYPES)[number];
   baselineValue: string;
-  targetValue: string;
+  targetValue: string | null;
   currentValue: string;
   dueOn: string | null;
   ownerId: string | null;
@@ -347,7 +348,7 @@ function keyResultRow(row: {
       ? row.addedMidCycleAt.toISOString()
       : null,
     baselineValue: asNumber(row.baselineValue) ?? 0,
-    targetValue: asNumber(row.targetValue) ?? 0,
+    targetValue: asNumber(row.targetValue),
     currentValue: asNumber(row.currentValue) ?? 0,
     weight: asNumber(row.weight) ?? 0,
     progressPct: asNumber(row.progressPct) ?? 0,
@@ -1952,8 +1953,11 @@ export const createKeyResult = defineWriteAction({
        */
       kind: z.enum(KEY_RESULT_KINDS).optional(),
       /**
-       * Asked of a metric and a maintain key result. A milestone or a baseline
-       * reads its progress from being done, so it may leave all three out.
+       * Asked of a metric and a maintain key result, with a baseline. A
+       * milestone or a baseline reads its progress from being done, so it may
+       * leave all three out. The target may wait for anybody (P9-T13-b-a):
+       * KR-3 fails until it is set, and a key result added mid-cycle is a
+       * draft until then (METHOD.md §2.9).
        */
       direction: z.enum(KEY_RESULT_DIRECTIONS).optional(),
       indicatorType: z.enum(INDICATOR_TYPES),
@@ -1976,12 +1980,10 @@ export const createKeyResult = defineWriteAction({
       (value) =>
         value.kind === "milestone" ||
         value.kind === "baseline" ||
-        (value.direction !== undefined &&
-          value.baselineValue !== undefined &&
-          value.targetValue !== undefined),
+        (value.direction !== undefined && value.baselineValue !== undefined),
       {
         message:
-          "A metric or a maintain key result needs its direction, its baseline and its target.",
+          "A metric or a maintain key result needs its direction and its baseline.",
       },
     ),
   output: z.object({ id: z.uuid() }),
@@ -2047,7 +2049,9 @@ export const createKeyResult = defineWriteAction({
 
       // A milestone or a baseline left without numbers is stored nought to
       // one, increasing, so the columns stay filled; its progress is read
-      // from being done and never from these (§2.10).
+      // from being done and never from these (§2.10). A metric or a maintain
+      // without a target keeps none until somebody sets one (§2.9).
+      const measured = kind === "metric" || kind === "maintain";
       const created = await createKeyResultInTx(tx, {
         workspaceId,
         goalId: input.goalId,
@@ -2057,7 +2061,7 @@ export const createKeyResult = defineWriteAction({
         direction: input.direction ?? "increase",
         indicatorType: input.indicatorType,
         baselineValue: input.baselineValue ?? 0,
-        targetValue: input.targetValue ?? 1,
+        targetValue: input.targetValue ?? (measured ? null : 1),
         currentValue,
         addedMidCycleAt: addedMidCycle ? new Date() : null,
         dueOn: input.dueOn ?? null,
@@ -2949,7 +2953,7 @@ export const rewriteKeyResult = defineReadAction({
         const asInput = (text: string): KeyResultInput => ({
           text,
           baseline: Number(row.baselineValue),
-          target: Number(row.targetValue),
+          target: row.targetValue === null ? null : Number(row.targetValue),
           dueOn: row.dueOn,
           ownerId: row.ownerId,
           indicatorType: row.indicatorType,

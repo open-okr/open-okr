@@ -1,6 +1,14 @@
 export const PACKAGE_NAME = "@openokr/method";
 
 export {
+  ADDITION_FIELDS,
+  type AdditionDraft,
+  type AdditionField,
+  type AdditionOptions,
+  keyResultDraft,
+  objectiveDraft,
+} from "./addition.ts";
+export {
   ALIGNMENT_LEVEL_ORDER,
   type AlignmentFinding,
   type AlignmentGoal,

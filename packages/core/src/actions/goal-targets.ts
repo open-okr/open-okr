@@ -69,7 +69,8 @@ async function actingMember(
 
 export interface TargetChange {
   readonly goalId: string;
-  readonly from: number;
+  /** Null when the key result had no target yet (P9-T13-b-a). */
+  readonly from: number | null;
   readonly to: number;
   readonly eased: boolean;
   /** False when the target was already the one asked for. */
@@ -120,10 +121,33 @@ export async function changeTargetInTx<
   if (!row) {
     throw new OperationError("not_found", "No such key result.");
   }
-  const from = asNumber(row.targetValue) ?? 0;
+  const from = asNumber(row.targetValue);
   const baseline = asNumber(row.baselineValue) ?? 0;
   if (from === input.to) {
     return { goalId: row.goalId, from, to: from, eased: false, changed: false };
+  }
+  if (from === null) {
+    // A first target is neither harder nor easier than one that did not
+    // exist, so it asks nothing and writes no history row: there is no
+    // earlier target to keep on record (METHOD.md §2.9, P9-T13-b-a).
+    // openokr:allow-mutation: inside the operation that called this.
+    await tx
+      .update(keyResults)
+      .set({ targetValue: String(input.to), updatedAt: new Date() })
+      .where(
+        activeOnly(
+          keyResults,
+          eq(keyResults.workspaceId, input.workspaceId),
+          eq(keyResults.id, input.keyResultId),
+        ),
+      );
+    return {
+      goalId: row.goalId,
+      from: null,
+      to: input.to,
+      eased: false,
+      changed: true,
+    };
   }
   const reason = input.reason?.trim() || null;
   await requirePolicy(
@@ -182,7 +206,8 @@ export const changeKeyResultTarget = defineWriteAction({
   output: z.object({
     goal: treeGoal,
     change: z.object({
-      from: z.number(),
+      /** Null when this was the key result's first target. */
+      from: z.number().nullable(),
       to: z.number(),
       eased: z.boolean(),
       changed: z.boolean(),

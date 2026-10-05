@@ -8,6 +8,7 @@ import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
   AddedMidCycle,
+  AdditionDraftMark,
   DoneToggle,
   InlineNumber,
   InlineText,
@@ -152,6 +153,7 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
             onSave={cells.saveKind}
           />
           <AddedMidCycle at={goal.addedMidCycleAt} />
+          <AdditionDraftMark draft={goal.draft} />
         </span>
         {editing ? (
           <TitleEditor
@@ -350,7 +352,7 @@ function KeyResultRow({
       data-kr-id={keyResult.id}
       className="relative flex h-[30px] items-center gap-1.5 border-b border-line px-3 text-[11px] text-ink-2 last:border-b-0"
     >
-      {cells.easing !== null ? (
+      {cells.easing !== null && keyResult.targetValue !== null ? (
         <EasingReason
           from={keyResult.targetValue}
           to={cells.easing}

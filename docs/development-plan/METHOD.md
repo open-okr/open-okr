@@ -200,6 +200,8 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 | Start | Add a new objective or key result mid-cycle | Created and marked **added mid-cycle**, visible in lists and at the close. OKRs created before the team publication window closes (§11) are the cycle's plan, not additions, and carry no mark |
 | Stop | It no longer matters | Closed as abandoned with a one-line reason |
 
+**Live or draft.** An objective or key result added mid-cycle is live at once by default, as soon as it passes the checks set to block (§4): a key result needs its target where its kind has one, its due date and its owner. Until it does, it is a draft its space can see, and the list shows what is missing. A workspace may instead make new objectives start as drafts that their owner publishes, or that their reviewer approves (§12).
+
 ### 2.10 Kinds of key result
 
 | Kind | Written as | Progress | Scored |

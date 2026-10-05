@@ -45,7 +45,8 @@ export interface CoachKeyResult {
   readonly id: string;
   readonly title: string;
   readonly baseline: number;
-  readonly target: number;
+  /** Null until somebody sets it, which KR-3 fails (P9-T13-b-a). */
+  readonly target: number | null;
   readonly dueOn: string | null;
   readonly ownerId: string | null;
   readonly indicatorType: "leading" | "lagging";

@@ -34,7 +34,8 @@ export interface ComposerKeyResult {
   readonly unit: string | null;
   readonly direction: string;
   readonly baselineValue: number;
-  readonly targetValue: number;
+  /** Null until somebody sets it (P9-T13-b-a). */
+  readonly targetValue: number | null;
   readonly currentValue: number;
   readonly progressPct: number;
   readonly confidence: number | null;
@@ -147,9 +148,10 @@ export async function Composer({
                                 baselineValue: formatMeasure(
                                   keyResult.baselineValue,
                                 ),
-                                targetValue: formatMeasure(
-                                  keyResult.targetValue,
-                                ),
+                                targetValue:
+                                  keyResult.targetValue === null
+                                    ? t("common.noTargetYet")
+                                    : formatMeasure(keyResult.targetValue),
                                 unit: keyResult.unit
                                   ? ` ${keyResult.unit}`
                                   : "",

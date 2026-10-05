@@ -37,6 +37,7 @@ import {
   type KeyResultInput,
   type KeyResultVerdict,
   type QualityVerdict,
+  type ResolvedPractice,
   type ResolvedThresholds,
   strengthScore,
 } from "@openokr/method";
@@ -99,6 +100,45 @@ async function spaceStrictnessInTx(
     )
     .limit(1);
   return resolveSpaceSettingsFrom(row?.settings).coachStrictness;
+}
+
+/**
+ * What judging a mid-cycle addition needs, read once for a whole tree
+ * (METHOD.md §2.9, P9-T13-b-a): the thresholds, the practice, and each
+ * space's strictness, asked for only when a space holds an addition.
+ *
+ * The same three things `evaluateGoalInTx` reads, so an addition's draft and
+ * its stored flags are judged to one standard.
+ */
+export interface AdditionJudge {
+  readonly thresholds: ResolvedThresholds;
+  readonly practice: ResolvedPractice;
+  strictIn(spaceId: string | null): Promise<boolean>;
+}
+
+export async function additionJudgeInTx(
+  tx: WorkspaceTx,
+  workspaceId: string,
+): Promise<AdditionJudge> {
+  const row = await readRhythmRow(tx, workspaceId);
+  const thresholds = resolveRhythm(row).thresholds;
+  const { practice } = practiceFromRow(row);
+  const bySpace = new Map<string | null, boolean>();
+  return {
+    thresholds,
+    practice,
+    async strictIn(spaceId) {
+      const known = bySpace.get(spaceId);
+      if (known !== undefined) {
+        return known;
+      }
+      const override = await spaceStrictnessInTx(tx, workspaceId, spaceId);
+      const strict =
+        (override ?? thresholds["quality.coachStrictness"]) === "strict";
+      bySpace.set(spaceId, strict);
+      return strict;
+    },
+  };
 }
 
 export interface GoalQuality {
@@ -219,7 +259,8 @@ export async function evaluateGoalInTx(
   const set: KeyResultInput[] = rows.map((row) => ({
     text: row.title,
     baseline: Number(row.baselineValue),
-    target: Number(row.targetValue),
+    // Null until somebody sets it, which is KR-3's to fail (P9-T13-b-a).
+    target: row.targetValue === null ? null : Number(row.targetValue),
     dueOn: row.dueOn,
     ownerId: row.ownerId,
     indicatorType: row.indicatorType,

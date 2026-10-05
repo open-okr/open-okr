@@ -152,6 +152,7 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 | `goals` | `added_mid_cycle_at timestamptz`, `standalone_reason text`, `draft_state goal_draft_state` (`draft`, `awaiting_approval`; null means it follows its cycle) | None |
 | `goals` | `reviewer_id` drops `not null` | None |
 | `key_results` | `kind key_result_kind not null default 'metric'` (`metric`, `maintain`, `milestone`, `baseline`), `done_at timestamptz` | `maintain` where `direction = 'maintain'` |
+| `key_results` | `target_value` drops `not null` (migration 0116, P9-T13-b-a). Not in the original plan: §2.9's acceptance needs a metric key result saved before its target is known | None; every existing row has a target |
 | `key_results` | `score_computed numeric`, `score_reason text` | `score_computed = score` where scored |
 | New `key_result_target_changes` | `workspace_id`, `key_result_id`, `from_value`, `to_value`, `reason`, `actor`, `changed_at`, `mid_cycle` | None |
 | `cycles` | `practice_snapshot jsonb` | Closed cycles get today's canon |
@@ -223,7 +224,8 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T12c-a | Kinds of key result on screen | None of its own | None |
 | P9-T12c-b | Kinds of key result in the importers | None of its own | None |
 | P9-T13-a | Adding OKRs mid-cycle | §2.9's four moves | None (behaviour) |
-| P9-T13-b | Live or draft | §2.9's live or draft | None (behaviour) |
+| P9-T13-b-a | A target that can wait, and live or draft | §2.9's live or draft | None (behaviour) |
+| P9-T13-b-b | Drafts that wait for a person | none | None (behaviour) |
 | P9-T13-c | Stopping, and targets that move | §2.1, §2.9's changing a target, §7.6 | The four calibration sentences |
 | P9-T13a | Moving an objective to another space (G-1) | §2.9's "When the organisation changes" | None (behaviour) |
 | P9-T14 | Adjustable scores and cycles that keep their rules | §3.3, §12 snapshot paragraph | Score band values |
@@ -237,8 +239,20 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T21 | The coach's voice, and METHOD.md fully landed | The preamble and terms, §1, §9, §10, §11 framing, §13 | Trigger catalogue (AI-NATIVE-PLAN.md §6.4) and the P4-T00 coach watch list; deletes `p9-t00-method-v2.md` and METHOD.md's banner |
 | P9-T22 | Release 0.2.0 and the demo story, placeable at any date of the Northwind year (G-4) | none | None |
 
-**Two questions the build raised, for a human to answer** (5 October 2026):
+**Live or draft under "Live", as built at P9-T13-b-a** ([`addition.ts`](../../packages/method/src/addition.ts)):
+
+| Question | Answer |
+|---|---|
+| Which checks make an addition a draft? | Its own checks after enforcement, at `fail`. Set-level checks (OBJ-5, KR-4, KR-6, the alignment checks) are the gates', which an addition never faces. KR-1 counts for an objective, because one with no key result is not finished |
+| How is "what is missing" named? | KR-3's failure is read field by field: a target, a due date, an owner, or a baseline where KR-3 was raised to block. OBJ-4's is the reviewer. Any other failing check is named by its title |
+| Stored or computed? | Computed on every `goals.tree` read, for additions only. A stored answer would go stale the moment an admin raised a check to block, and the plan reads nothing extra |
+| Who sees a draft? | Its goal's ordinary access. See the second question below |
+| A target that is not set yet | Null. KR-3 fails, progress reads 0% and nothing is forecast, and the first target asks for no reason and writes no history row, because it eases nothing |
+
+**Four questions the build raised, for a human to answer** (5 October 2026):
 - **An OKR written into a set still unpublished after its window** (P9-T13-a). §2.9 says what is created before the team publication window closes is the plan; it does not say what an OKR written after it, into a set nobody has published, is. The build reads it as the plan, late, unmarked and facing the publish gates, because there is no plan yet to add to. If it should be marked instead, `isMidCycleAddition` drops its second condition.
+- **"A draft its space can see"** (P9-T13-b-a). The build reads this as a floor: the draft is never private to its writer. It is not hidden from the rest of the workspace either, because the access model has no deny rule and the built-in Member role views every objective (P8-G13c). Hiding a draft from outside its space would need a narrower default role, which is the workspace's choice, not this task's.
+- **The list's add row invents a target of 100** (P9-T13-b-a). P8-G12 gave a new key result a starting baseline of 0 and target of 100, so it could be saved with a title alone. A key result added that way is live at once, because KR-3 cannot tell an invented target from a real one. Leaving the target empty instead would make a list addition a draft until somebody types its target, which is what §2.9 describes, and would change five specs that record a value straight after adding. Left as it was until somebody decides.
 - **Gap G-5: a dependency that knows the key result providing it** (P9-T12c-a). NW-Q1-20 wants a dependency shown as delivered once the milestone behind it is done, and the register records the providing space, not a key result. Unplanned until somebody places it.
 
 **The gaps the Northwind year found joined the plan at P9-T01**, as Akmal agreed on 2 October 2026: G-1 is P9-T13a, G-2 joins P9-T19b, G-3 is the level picker in P9-T07a and the levels in the alignment score in P9-T16, and G-4 extends P9-T22.

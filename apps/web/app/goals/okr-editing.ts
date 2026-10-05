@@ -200,6 +200,8 @@ export function useKeyResultCells(
     saveTarget: (targetValue: number) => {
       if (
         reasonRequired &&
+        // A first target eases nothing, so it never asks (P9-T13-b-a).
+        keyResult.targetValue !== null &&
         isEasing({
           from: keyResult.targetValue,
           to: targetValue,
