@@ -518,6 +518,27 @@ describe("the daily run: KPI corridors and the morning summary", () => {
     expect(unhealthy[0]?.recipient_member_id).toBe(ownerMemberId);
   });
 
+  it("says nothing about an unhealthy KPI whose recovery is under way (P9-T17b-a)", async () => {
+    // The state is the band now, so this KPI reads unhealthy; it was silent
+    // as `recovering` and stays silent with its recovery beside the band.
+    const kpiId = await kpiAt(60, 100);
+    const wb = await workerDb();
+    const cycle = await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.launchRecovery",
+      { kpiId, cycleId: cycle?.id as string },
+    );
+    await runAt("daily", new Date("2026-08-20T02:00:00Z"));
+    expect(
+      (await sentNudges()).filter((row) => row.rule_key === "kpi.unhealthy"),
+    ).toEqual([]);
+  });
+
   it("says nothing about a KPI inside its corridor", async () => {
     await kpiAt(95, 100);
     await runAt("daily", new Date());

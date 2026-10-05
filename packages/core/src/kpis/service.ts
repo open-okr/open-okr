@@ -3,10 +3,12 @@ import {
   type KpiReading as KpiBandReading,
   type KpiDirection,
   type KpiFrequency,
+  type KpiState,
   type KpiTargetType,
   type KpiThresholds,
   kpiEffectiveHealth,
   kpiReading,
+  kpiState,
   kpiStateOf,
   normalisePeriod,
   type RecoveryLink,
@@ -90,6 +92,43 @@ export function readingOf(
       watchPct: Number(rule.watchPct),
     },
   });
+}
+
+/**
+ * The state a reader shows (§6.4, P9-T17b-a): the band. A row stored as
+ * `recovering` before the recovery moved beside the band is read as the band
+ * its achievement gives, which is the rule it was judged by; data change 0021
+ * rewrites those rows, and this covers any it left.
+ */
+export function shownState(row: {
+  readonly state: string;
+  readonly achievementPct: string | null;
+  readonly healthyPct: string;
+  readonly watchPct: string;
+}): KpiState {
+  if (row.state !== "recovering") {
+    return row.state as KpiState;
+  }
+  return kpiState(
+    row.achievementPct === null ? null : Number(row.achievementPct),
+    { healthyPct: Number(row.healthyPct), watchPct: Number(row.watchPct) },
+  );
+}
+
+/**
+ * Whether a KPI is recovering, read beside its state (§6.4, P9-T17b-a): it
+ * has a recovery goal, and that goal is live and open.
+ */
+export function isRecovering(row: {
+  readonly recoveryGoalId: string | null;
+  readonly recoveryGoalLive: string | null;
+  readonly recoveryGoalClosedAt: Date | null;
+}): boolean {
+  return (
+    row.recoveryGoalId !== null &&
+    row.recoveryGoalLive !== null &&
+    row.recoveryGoalClosedAt === null
+  );
 }
 
 export interface UpsertRecordInput {
@@ -339,7 +378,9 @@ export async function recomputeKpi(
   };
   const healthyPct = Number(kpi.healthyPct);
   const recovery = await loadRecovery(tx, workspaceId, kpi.recoveryGoalId);
-  const state = kpiStateOf(reading.band, recovery.link);
+  // The band, whatever the recovery is doing (§6.4, P9-T17b-a): a recovery is
+  // shown beside it by the readers, never written in its place.
+  const state = kpiStateOf(reading.band);
 
   // Effective health only exists while a recovery is open. A closed one leaves
   // the KPI reading whatever it actually reached, which is the honest outcome

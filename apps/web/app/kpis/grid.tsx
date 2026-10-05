@@ -33,7 +33,10 @@ export interface GridKpi {
   readonly direction: string;
   readonly indicatorType: string;
   readonly tier: string;
+  /** The band, or no data (§6.4). */
   readonly state: string;
+  /** An open recovery objective, shown beside the band (P9-T17b-a). */
+  readonly recovering: boolean;
   readonly achievementPct: number | null;
   readonly targetDefault: number | null;
   readonly healthyPct: number;
@@ -265,6 +268,7 @@ export function KpiGrid({
                       </span>
                     </th>
                     <td
+                      data-state={kpi.state}
                       className={`p-2 text-right font-semibold ${
                         STATE_TONE[kpi.state] ?? "text-ink-4"
                       }`}
@@ -272,6 +276,16 @@ export function KpiGrid({
                       {kpi.achievementPct === null
                         ? kpi.state.replace("_", " ")
                         : `${kpi.achievementPct}%`}
+                      {/* Beside the band, never instead of it (§6.4,
+                          P9-T17b-a). */}
+                      {kpi.recovering ? (
+                        <span
+                          data-testid="kpi-recovering"
+                          className="block text-[10px] font-semibold text-brand-text"
+                        >
+                          {t("kpis.grid.recovering")}
+                        </span>
+                      ) : null}
                     </td>
                     {columns.map((column) => {
                       const record = kpi.records.find(

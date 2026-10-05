@@ -25,16 +25,27 @@ import { LaunchRecovery } from "./launch.tsx";
  * a healthy KPI is not on it, because a board that never empties stops being
  * read.
  *
- * Both figures are shown wherever a KPI is recovering. The effective number is
- * what §6.5 asks a screen to display, and showing it alone would report the
- * recovery's own progress as if it were the metric.
+ * A recovering KPI shows its real band and reading, with the recovery's own
+ * progress beside them (§6.4, P9-T17b-a). It used to show a projected
+ * "displayed health" too, which is the recovery's progress dressed as the
+ * metric, and METHOD v2 says never in its place.
  */
 const stateTone = (state: string) =>
   state === "unhealthy"
     ? ("bad" as const)
-    : state === "recovering"
-      ? ("info" as const)
-      : ("neutral" as const);
+    : state === "watch"
+      ? ("warn" as const)
+      : state === "healthy"
+        ? ("ok" as const)
+        : ("neutral" as const);
+
+/** The words for a card's real band. A card is unhealthy or under recovery. */
+const BAND_WORD: Readonly<Record<string, string>> = {
+  unhealthy: "kpis.recovery.stateUnhealthy",
+  watch: "kpis.recovery.stateWatch",
+  healthy: "kpis.recovery.stateHealthy",
+  no_data: "kpis.recovery.stateNoData",
+};
 
 type Translate = (key: string, values?: MessageValues) => string;
 
@@ -42,43 +53,27 @@ const percent = (value: number | null, t: Translate) =>
   value === null ? t("kpis.recovery.noData") : `${Math.round(value)}%`;
 
 /**
- * The line under a recovery objective: how many key results it has, where it
- * was launched and, when the displayed health is above the real number, both
- * figures. Each variant is a whole message with holes, so no sentence is
- * assembled from English pieces.
+ * The line under a recovery objective: how many key results it has, and where
+ * it was launched. Each variant is a whole message with holes, so no sentence
+ * is assembled from English pieces.
  */
 function recoverySummary(
   recovery: {
     readonly keyResults: number;
     readonly startedPct: number | null;
   },
-  effectivePct: number | null,
-  achievementPct: number | null,
   t: Translate,
 ): string {
   const keyResults =
     recovery.keyResults === 1
       ? t("common.count.keyResultOne", { count: recovery.keyResults })
       : t("common.count.keyResultOther", { count: recovery.keyResults });
-  const summary =
-    recovery.startedPct === null
-      ? keyResults
-      : t("kpis.recovery.keyResultsLaunchedAt", {
-          keyResults,
-          startedPct: Math.round(recovery.startedPct),
-        });
-  if (
-    effectivePct === null ||
-    achievementPct === null ||
-    effectivePct <= achievementPct
-  ) {
-    return summary;
-  }
-  return t("kpis.recovery.displayedHealthReal", {
-    summary,
-    displayed: percent(effectivePct, t),
-    real: percent(achievementPct, t),
-  });
+  return recovery.startedPct === null
+    ? keyResults
+    : t("kpis.recovery.keyResultsLaunchedAt", {
+        keyResults,
+        startedPct: Math.round(recovery.startedPct),
+      });
 }
 
 export default async function RecoveryBoardPage() {
@@ -171,10 +166,12 @@ export default async function RecoveryBoardPage() {
                   {card.title}
                 </h2>
                 <Chip tone={stateTone(card.state)} dot>
-                  {card.state === "recovering"
-                    ? t("kpis.recovery.stateRecovering")
-                    : t("kpis.recovery.stateUnhealthy")}
+                  {t(BAND_WORD[card.state] ?? "kpis.recovery.stateUnhealthy")}
                 </Chip>
+                {/* Beside the band, never instead of it (§6.4, P9-T17b-a). */}
+                {card.recovering ? (
+                  <Chip tone="info">{t("kpis.recovery.stateRecovering")}</Chip>
+                ) : null}
               </div>
               <p className="text-xs text-ink-3">
                 {card.treeName ?? t("kpis.recovery.noTreeYet")}
@@ -212,12 +209,7 @@ export default async function RecoveryBoardPage() {
                 </div>
                 <Bar value={card.recovery.progressPct} max={ceiling} />
                 <p className="text-xs text-ink-3">
-                  {recoverySummary(
-                    card.recovery,
-                    card.effectivePct,
-                    card.achievementPct,
-                    t,
-                  )}
+                  {recoverySummary(card.recovery, t)}
                 </p>
                 {card.recovery.closeProposed && !card.recovery.closed ? (
                   <p className="text-xs font-semibold text-ok">

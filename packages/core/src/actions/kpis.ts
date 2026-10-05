@@ -22,6 +22,7 @@ import {
   KPI_TIERS,
   keyResults,
   kpiCategories,
+  kpiDependencies,
   kpis,
   kpiTrees,
   newId,
@@ -40,7 +41,7 @@ import {
   targetTypeOfDirection,
   thresholdsProblem,
 } from "@openokr/method";
-import { asc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ensureContext } from "../access/contexts.ts";
@@ -62,11 +63,13 @@ import {
 import { followKpisInTx } from "../kpis/linked.ts";
 import { draftRecoveryForKpi, launchRecoveryInTx } from "../kpis/recovery.ts";
 import {
+  isRecovering,
   KPI_RULE_COLUMNS,
   type KpiRule,
   loadKpiRecords,
   readingOf,
   recomputeKpi,
+  shownState,
   targetTypeOf,
   thresholdsOf,
   upsertKpiRecord,
@@ -190,6 +193,21 @@ function ruleWrite(input: RuleInput, existing: KpiRule | null): RuleColumns {
     redHigh: text(merged.redHigh),
   };
 }
+
+/**
+ * The recovery goal beside a KPI, for `isRecovering` (P9-T17b-a). Read with
+ * the left join `recoveryJoin` gives.
+ */
+const RECOVERY_COLUMNS = {
+  recoveryGoalId: kpis.recoveryGoalId,
+  recoveryGoalLive: goals.id,
+  recoveryGoalClosedAt: goals.closedAt,
+} as const;
+
+const recoveryJoin = and(
+  eq(goals.id, kpis.recoveryGoalId),
+  isNull(goals.deletedAt),
+);
 
 /** The rule as every KPI read reports it (P9-T17a). */
 const ruleOutput = {
@@ -561,7 +579,10 @@ export const readKpiGrid = defineReadAction({
         direction: z.string(),
         indicatorType: z.string(),
         tier: z.string(),
+        /** The band, or no data. Never `recovering` since P9-T17b-a. */
         state: z.string(),
+        /** An open recovery objective, shown beside the band (§6.4). */
+        recovering: z.boolean(),
         achievementPct: z.number().nullable(),
         targetDefault: z.number().nullable(),
         healthyPct: z.number(),
@@ -651,10 +672,12 @@ export const readKpiGrid = defineReadAction({
             spaceId: kpis.spaceId,
             spaceName: spaces.name,
             formula: kpis.formula,
+            ...RECOVERY_COLUMNS,
           })
           .from(kpis)
           .leftJoin(workspaceMembers, eq(workspaceMembers.id, kpis.memberId))
           .leftJoin(spaces, eq(spaces.id, kpis.spaceId))
+          .leftJoin(goals, recoveryJoin)
           .where(activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)))
           .orderBy(asc(kpis.position), asc(kpis.title));
 
@@ -669,6 +692,8 @@ export const readKpiGrid = defineReadAction({
           out.push({
             ...kpi,
             ...ruleOf(kpi),
+            state: shownState(kpi),
+            recovering: isRecovering(kpi),
             achievementPct:
               kpi.achievementPct === null ? null : Number(kpi.achievementPct),
             targetDefault:
@@ -1155,7 +1180,9 @@ export const launchKpiRecovery = defineWriteAction({
     goalId: z.uuid(),
     keyResultIds: z.array(z.uuid()),
     startedPct: z.number().nullable(),
+    /** The KPI's band, which the launch does not change (P9-T17b-a). */
     state: z.string(),
+    recovering: z.boolean(),
   }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -1183,7 +1210,8 @@ export const launchKpiRecovery = defineWriteAction({
           goalId: launched.goalId,
           keyResultIds: [...launched.keyResultIds],
           startedPct: launched.startedPct,
-          state: "recovering",
+          state: launched.state,
+          recovering: true,
         },
         activity: {
           kind: "kpi.recovery_launched" as const,
@@ -1218,7 +1246,10 @@ export const readRecoveryBoard = defineReadAction({
         title: z.string(),
         treeId: z.uuid().nullable(),
         treeName: z.string().nullable(),
+        /** The real band. Never `recovering` since P9-T17b-a. */
         state: z.string(),
+        /** An open recovery objective, shown beside the band (§6.4). */
+        recovering: z.boolean(),
         achievementPct: z.number().nullable(),
         effectivePct: z.number().nullable(),
         healthyPct: z.number(),
@@ -1270,15 +1301,25 @@ export const readRecoveryBoard = defineReadAction({
             goalTitle: goals.title,
             goalProgress: goals.progressPct,
             goalClosedAt: goals.closedAt,
+            recoveryGoalLive: goals.id,
+            recoveryGoalClosedAt: goals.closedAt,
           })
           .from(kpis)
           .leftJoin(kpiTrees, eq(kpiTrees.id, kpis.treeId))
-          .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
+          .leftJoin(goals, recoveryJoin)
           .where(
-            activeOnly(
-              kpis,
-              eq(kpis.workspaceId, context.workspaceId),
-              inArray(kpis.state, ["unhealthy", "recovering"]),
+            and(
+              activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)),
+              // Unhealthy, or under an open recovery whatever its band now
+              // (P9-T17b-a): a recovery that has lifted the KPI into watch is
+              // still in flight, and dropping it from the board the day the
+              // band moved would lose the thing being watched. A stored
+              // `recovering` from before the change counts as the latter.
+              or(
+                eq(kpis.state, "unhealthy"),
+                eq(kpis.state, "recovering"),
+                and(isNotNull(goals.id), isNull(goals.closedAt)),
+              ),
             ),
           )
           .orderBy(asc(kpis.title));
@@ -1310,7 +1351,8 @@ export const readRecoveryBoard = defineReadAction({
             title: row.title,
             treeId: row.treeId,
             treeName: row.treeName,
-            state: row.state,
+            state: shownState(row),
+            recovering: isRecovering(row),
             achievementPct:
               row.achievementPct === null ? null : Number(row.achievementPct),
             effectivePct:
@@ -1349,7 +1391,10 @@ const kpiTreeNode = z.object({
   indicatorType: z.string(),
   tier: z.string(),
   direction: z.string(),
+  /** The band, or no data. Never `recovering` since P9-T17b-a. */
   state: z.string(),
+  /** An open recovery objective, shown beside the band (§6.4). */
+  recovering: z.boolean(),
   achievementPct: z.number().nullable(),
   effectivePct: z.number().nullable(),
   healthyPct: z.number(),
@@ -1357,6 +1402,13 @@ const kpiTreeNode = z.object({
   targetDefault: z.number().nullable(),
   recoveryGoalId: z.uuid().nullable(),
   recoveryProgressPct: z.number().nullable(),
+  /**
+   * How this KPI drives its parent (§6.3, P9-T17b-a): `formula` when it is
+   * part of the parent's calculation, `influence` when it is believed to move
+   * it. Read from the parent's formula rather than stored, so the two cannot
+   * disagree. Null for a root or a KPI that stands alone.
+   */
+  link: z.enum(["formula", "influence"]).nullable(),
 });
 type TreeNode = z.infer<typeof kpiTreeNode>;
 
@@ -1381,31 +1433,68 @@ const KPI_TREE_NODE_COLUMNS = {
   watchPct: kpis.watchPct,
   targetDefault: kpis.targetDefault,
   recoveryGoalId: kpis.recoveryGoalId,
+  recoveryGoalLive: goals.id,
+  recoveryGoalClosedAt: goals.closedAt,
   recoveryProgress: goals.progressPct,
   position: kpis.position,
 };
+
+/**
+ * Every parent-to-child pair where the parent's formula reads the child, as
+ * `parent child` (§6.3, P9-T17b-a). One query over the nodes a read returns.
+ */
+async function formulaLinksInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  parentIds: readonly string[],
+): Promise<ReadonlySet<string>> {
+  if (parentIds.length === 0) {
+    return new Set();
+  }
+  const rows = await tx
+    .select({
+      dependentKpiId: kpiDependencies.dependentKpiId,
+      dependsOnKpiId: kpiDependencies.dependsOnKpiId,
+    })
+    .from(kpiDependencies)
+    .where(
+      activeOnly(
+        kpiDependencies,
+        eq(kpiDependencies.workspaceId, workspaceId),
+        inArray(kpiDependencies.dependentKpiId, [...new Set(parentIds)]),
+      ),
+    );
+  return new Set(
+    rows.map((row) => `${row.dependentKpiId} ${row.dependsOnKpiId}`),
+  );
+}
 
 /** A numeric column as a number, or null when it holds none. */
 const numberOrNull = (value: string | null): number | null =>
   value === null ? null : Number(value);
 
-function toTreeNode(row: {
-  readonly id: string;
-  readonly parentKpiId: string | null;
-  readonly title: string;
-  readonly unit: string | null;
-  readonly indicatorType: string;
-  readonly tier: string;
-  readonly direction: string;
-  readonly state: string;
-  readonly achievementPct: string | null;
-  readonly effectivePct: string | null;
-  readonly healthyPct: string;
-  readonly watchPct: string;
-  readonly targetDefault: string | null;
-  readonly recoveryGoalId: string | null;
-  readonly recoveryProgress: string | null;
-}): TreeNode {
+function toTreeNode(
+  formulaLinks: ReadonlySet<string>,
+  row: {
+    readonly id: string;
+    readonly parentKpiId: string | null;
+    readonly title: string;
+    readonly unit: string | null;
+    readonly indicatorType: string;
+    readonly tier: string;
+    readonly direction: string;
+    readonly state: string;
+    readonly achievementPct: string | null;
+    readonly effectivePct: string | null;
+    readonly healthyPct: string;
+    readonly watchPct: string;
+    readonly targetDefault: string | null;
+    readonly recoveryGoalId: string | null;
+    readonly recoveryGoalLive: string | null;
+    readonly recoveryGoalClosedAt: Date | null;
+    readonly recoveryProgress: string | null;
+  },
+): TreeNode {
   return {
     id: row.id,
     parentKpiId: row.parentKpiId,
@@ -1414,7 +1503,8 @@ function toTreeNode(row: {
     indicatorType: row.indicatorType,
     tier: row.tier,
     direction: row.direction,
-    state: row.state,
+    state: shownState(row),
+    recovering: isRecovering(row),
     achievementPct: numberOrNull(row.achievementPct),
     effectivePct: numberOrNull(row.effectivePct),
     healthyPct: Number(row.healthyPct),
@@ -1422,6 +1512,12 @@ function toTreeNode(row: {
     targetDefault: numberOrNull(row.targetDefault),
     recoveryGoalId: row.recoveryGoalId,
     recoveryProgressPct: numberOrNull(row.recoveryProgress),
+    link:
+      row.parentKpiId === null
+        ? null
+        : formulaLinks.has(`${row.parentKpiId} ${row.id}`)
+          ? "formula"
+          : "influence",
   };
 }
 
@@ -1467,7 +1563,7 @@ export const readKpiTree = defineReadAction({
         const rows = await tx
           .select(KPI_TREE_NODE_COLUMNS)
           .from(kpis)
-          .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
+          .leftJoin(goals, recoveryJoin)
           .where(
             activeOnly(
               kpis,
@@ -1477,7 +1573,16 @@ export const readKpiTree = defineReadAction({
           )
           .orderBy(asc(kpis.position), asc(kpis.title));
 
-        return { trees, treeId, nodes: rows.map(toTreeNode) };
+        const links = await formulaLinksInTx(
+          tx,
+          context.workspaceId,
+          rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
+        );
+        return {
+          trees,
+          treeId,
+          nodes: rows.map((row) => toTreeNode(links, row)),
+        };
       },
     );
   },
@@ -1547,7 +1652,7 @@ export const readSpaceKpiTrees = defineReadAction({
             treePosition: kpiTrees.position,
           })
           .from(kpis)
-          .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
+          .leftJoin(goals, recoveryJoin)
           .leftJoin(
             kpiTrees,
             activeOnly(
@@ -1570,6 +1675,11 @@ export const readSpaceKpiTrees = defineReadAction({
             asc(kpis.title),
           );
 
+        const links = await formulaLinksInTx(
+          tx,
+          context.workspaceId,
+          rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
+        );
         // A tree that was deleted leaves its KPIs pointing at nothing live, so
         // they are grouped with the unfiled ones rather than under a name
         // nobody can open.
@@ -1584,7 +1694,7 @@ export const readSpaceKpiTrees = defineReadAction({
             name: key === null ? null : row.treeName,
             nodes: [],
           };
-          group.nodes.push(toTreeNode(row));
+          group.nodes.push(toTreeNode(links, row));
           groups.set(key, group);
         }
         const unfiled = groups.get(null);
@@ -1617,7 +1727,10 @@ export const readKpiDetail = defineReadAction({
       direction: z.string(),
       indicatorType: z.string(),
       tier: z.string(),
+      /** The band, or no data. Never `recovering` since P9-T17b-a. */
       state: z.string(),
+      /** An open recovery objective, shown beside the band (§6.4). */
+      recovering: z.boolean(),
       achievementPct: z.number().nullable(),
       effectivePct: z.number().nullable(),
       healthyPct: z.number(),
@@ -1629,6 +1742,8 @@ export const readKpiDetail = defineReadAction({
       treeId: z.uuid().nullable(),
       treeName: z.string().nullable(),
       recoveryGoalId: z.uuid().nullable(),
+      /** How far the recovery objective has got, shown beside the reading. */
+      recoveryProgressPct: z.number().nullable(),
       recoveryStartedPct: z.number().nullable(),
     }),
     parent: z
@@ -1690,13 +1805,15 @@ export const readKpiDetail = defineReadAction({
             treeId: kpis.treeId,
             treeName: kpiTrees.name,
             parentKpiId: kpis.parentKpiId,
-            recoveryGoalId: kpis.recoveryGoalId,
+            ...RECOVERY_COLUMNS,
+            recoveryProgress: goals.progressPct,
             recoveryStartedPct: kpis.recoveryStartedPct,
           })
           .from(kpis)
           .leftJoin(kpiCategories, eq(kpiCategories.id, kpis.categoryId))
           .leftJoin(workspaceMembers, eq(workspaceMembers.id, kpis.memberId))
           .leftJoin(kpiTrees, eq(kpiTrees.id, kpis.treeId))
+          .leftJoin(goals, recoveryJoin)
           .where(
             activeOnly(
               kpis,
@@ -1795,7 +1912,8 @@ export const readKpiDetail = defineReadAction({
             direction: kpi.direction,
             indicatorType: kpi.indicatorType,
             tier: kpi.tier,
-            state: kpi.state,
+            state: shownState(kpi),
+            recovering: isRecovering(kpi),
             achievementPct:
               kpi.achievementPct === null ? null : Number(kpi.achievementPct),
             effectivePct:
@@ -1810,6 +1928,10 @@ export const readKpiDetail = defineReadAction({
             treeId: kpi.treeId,
             treeName: kpi.treeName,
             recoveryGoalId: kpi.recoveryGoalId,
+            recoveryProgressPct:
+              kpi.recoveryProgress === null
+                ? null
+                : Number(kpi.recoveryProgress),
             recoveryStartedPct:
               kpi.recoveryStartedPct === null
                 ? null

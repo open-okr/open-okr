@@ -23,6 +23,7 @@ import { keyResultKindFromDirection } from "../src/data-changes/0017_key_result_
 import { keyResultScoreComputed } from "../src/data-changes/0018_key_result_score_computed.ts";
 import { dropAlignmentPenalties } from "../src/data-changes/0019_drop_alignment_penalties.ts";
 import { kpiTargetTypeFromDirection } from "../src/data-changes/0020_kpi_target_type_from_direction.ts";
+import { kpiRecoveringToBand } from "../src/data-changes/0021_kpi_recovering_to_band.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1202,6 +1203,57 @@ describe("0020: the target type each KPI's direction implies", () => {
     await client.query("delete from _data_changes");
     const [again] = await runDataChanges(client, {
       scripts: [kpiTargetTypeFromDirection],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0021: a recovering KPI reads its real band", () => {
+  it("rewrites recovering to the corridor band, and leaves the rest", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       )
+       insert into kpis (id, workspace_id, short_id, title, frequency, state,
+                         achievement_pct, green_low, red_low)
+       select gen_random_uuid(), w.id, d.short_id, d.title, 'monthly',
+              d.state, d.pct, d.green, d.red
+         from w,
+              (values ('K-1', 'Collapsed', 'recovering', 20::numeric, null::numeric, null::numeric),
+                      ('K-2', 'Back in watch', 'recovering', 75, null, null),
+                      ('K-3', 'Unmeasured', 'recovering', null, null, null),
+                      ('K-4', 'Thresholds', 'recovering', 50, 99.9, 99.5),
+                      ('K-5', 'Untouched', 'healthy', 95, null, null))
+                as d(short_id, title, state, pct, green, red)`,
+    );
+    const states = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{ title: string; state: string }>(
+            "select title, state from kpis",
+          )
+        ).rows.map((row) => [row.title, row.state]),
+      );
+
+    const [result] = await runDataChanges(client, {
+      scripts: [kpiRecoveringToBand],
+    });
+    expect(result?.rowsChanged).toBe(3);
+    expect(await states()).toEqual({
+      Collapsed: "unhealthy",
+      "Back in watch": "watch",
+      Unmeasured: "no_data",
+      Thresholds: "recovering",
+      Untouched: "healthy",
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [kpiRecoveringToBand],
     });
     expect(again?.rowsChanged).toBe(0);
   });

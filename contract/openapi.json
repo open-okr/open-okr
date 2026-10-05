@@ -45890,6 +45890,9 @@
                               "state": {
                                 "type": "string"
                               },
+                              "recovering": {
+                                "type": "boolean"
+                              },
                               "achievementPct": {
                                 "type": [
                                   "number",
@@ -46040,6 +46043,7 @@
                               "indicatorType",
                               "tier",
                               "state",
+                              "recovering",
                               "achievementPct",
                               "targetDefault",
                               "healthyPct",
@@ -46501,13 +46505,17 @@
                         },
                         "state": {
                           "type": "string"
+                        },
+                        "recovering": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
                         "goalId",
                         "keyResultIds",
                         "startedPct",
-                        "state"
+                        "state",
+                        "recovering"
                       ],
                       "additionalProperties": false
                     }
@@ -46777,6 +46785,9 @@
                               "state": {
                                 "type": "string"
                               },
+                              "recovering": {
+                                "type": "boolean"
+                              },
                               "achievementPct": {
                                 "type": [
                                   "number",
@@ -46859,6 +46870,7 @@
                               "treeId",
                               "treeName",
                               "state",
+                              "recovering",
                               "achievementPct",
                               "effectivePct",
                               "healthyPct",
@@ -47009,6 +47021,9 @@
                               "state": {
                                 "type": "string"
                               },
+                              "recovering": {
+                                "type": "boolean"
+                              },
                               "achievementPct": {
                                 "type": [
                                   "number",
@@ -47050,6 +47065,20 @@
                                   "number",
                                   "null"
                                 ]
+                              },
+                              "link": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "formula",
+                                      "influence"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -47061,13 +47090,15 @@
                               "tier",
                               "direction",
                               "state",
+                              "recovering",
                               "achievementPct",
                               "effectivePct",
                               "healthyPct",
                               "watchPct",
                               "targetDefault",
                               "recoveryGoalId",
-                              "recoveryProgressPct"
+                              "recoveryProgressPct",
+                              "link"
                             ],
                             "additionalProperties": false
                           }
@@ -47223,6 +47254,9 @@
                                     "state": {
                                       "type": "string"
                                     },
+                                    "recovering": {
+                                      "type": "boolean"
+                                    },
                                     "achievementPct": {
                                       "type": [
                                         "number",
@@ -47264,6 +47298,20 @@
                                         "number",
                                         "null"
                                       ]
+                                    },
+                                    "link": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "formula",
+                                            "influence"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -47275,13 +47323,15 @@
                                     "tier",
                                     "direction",
                                     "state",
+                                    "recovering",
                                     "achievementPct",
                                     "effectivePct",
                                     "healthyPct",
                                     "watchPct",
                                     "targetDefault",
                                     "recoveryGoalId",
-                                    "recoveryProgressPct"
+                                    "recoveryProgressPct",
+                                    "link"
                                   ],
                                   "additionalProperties": false
                                 }
@@ -47418,6 +47468,9 @@
                             "state": {
                               "type": "string"
                             },
+                            "recovering": {
+                              "type": "boolean"
+                            },
                             "achievementPct": {
                               "type": [
                                 "number",
@@ -47517,6 +47570,12 @@
                                 }
                               ]
                             },
+                            "recoveryProgressPct": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
                             "recoveryStartedPct": {
                               "type": [
                                 "number",
@@ -47536,6 +47595,7 @@
                             "indicatorType",
                             "tier",
                             "state",
+                            "recovering",
                             "achievementPct",
                             "effectivePct",
                             "healthyPct",
@@ -47552,6 +47612,7 @@
                             "treeId",
                             "treeName",
                             "recoveryGoalId",
+                            "recoveryProgressPct",
                             "recoveryStartedPct"
                           ],
                           "additionalProperties": false

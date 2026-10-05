@@ -212,8 +212,11 @@ describe("the demo builder", () => {
     const grid = await callAction(ctx, "kpis.grid", { periods: 12 });
     const states = new Set(grid.kpis.map((kpi) => kpi.state));
     expect(states).toEqual(
-      new Set(["healthy", "watch", "unhealthy", "recovering", "no_data"]),
+      new Set(["healthy", "watch", "unhealthy", "no_data"]),
     );
+    // Recovering is beside a band, not one of them (P9-T17b-a), and the demo
+    // has one under way.
+    expect(grid.kpis.some((kpi) => kpi.recovering)).toBe(true);
     expect(grid.kpis.some((kpi) => kpi.isCalculated)).toBe(true);
   });
 

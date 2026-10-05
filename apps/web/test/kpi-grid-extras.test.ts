@@ -31,16 +31,14 @@ describe("the subtotal", () => {
     expect(extras).not.toContain("reduce((sum");
   });
 
-  test("names §6.4's five states and no others", () => {
-    for (const state of [
-      "healthy",
-      "watch",
-      "unhealthy",
-      "recovering",
-      "no_data",
-    ]) {
+  test("names §6.4's four states, and counts recovering beside them", () => {
+    for (const state of ["healthy", "watch", "unhealthy", "no_data"]) {
       expect(extras, state).toContain(`"${state}"`);
     }
+    // Since P9-T17b-a a recovering KPI is also in its real band, so it is
+    // counted from the flag and never as a state.
+    expect(extras).not.toContain('state === "recovering"');
+    expect(extras).toContain("recovering: number");
   });
 });
 

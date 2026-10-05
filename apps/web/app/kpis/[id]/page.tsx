@@ -161,6 +161,10 @@ export default async function KpiDetailPage({
               <Chip tone={stateTone(kpi.state)} dot>
                 {kpi.state}
               </Chip>
+              {/* Beside the band, never instead of it (§6.4, P9-T17b-a). */}
+              {kpi.recovering ? (
+                <Chip tone="info">{t("kpis.grid.recovering")}</Chip>
+              ) : null}
             </div>
             <p className="text-xs text-ink-3">
               {[
@@ -195,23 +199,17 @@ export default async function KpiDetailPage({
             >
               {t("kpis.detail.recoveryObjective")}
             </Link>
+            {/* The recovery's own progress beside the KPI's real reading,
+                never a projection in its place (§6.4, NW-Q3-05). */}
             <span className="text-xs text-ink-3">
-              {kpi.effectivePct === null || kpi.achievementPct === null
-                ? kpi.recoveryStartedPct === null
-                  ? t("kpis.detail.launchedAtAnUnknownPoint")
-                  : t("kpis.detail.launchedAtPct", {
-                      recoveryStartedPct: Math.round(kpi.recoveryStartedPct),
-                    })
-                : kpi.recoveryStartedPct === null
-                  ? t("kpis.detail.launchedAtAnUnknownPointDisplayed", {
-                      effectivePct: Math.round(kpi.effectivePct),
-                      achievementPct: Math.round(kpi.achievementPct),
-                    })
-                  : t("kpis.detail.launchedAtPctDisplayed", {
-                      recoveryStartedPct: Math.round(kpi.recoveryStartedPct),
-                      effectivePct: Math.round(kpi.effectivePct),
-                      achievementPct: Math.round(kpi.achievementPct),
-                    })}
+              {kpi.recoveryStartedPct === null
+                ? t("kpis.detail.launchedAtAnUnknownPointProgress", {
+                    progress: Math.round(kpi.recoveryProgressPct ?? 0),
+                  })
+                : t("kpis.detail.launchedAtPctProgress", {
+                    recoveryStartedPct: Math.round(kpi.recoveryStartedPct),
+                    progress: Math.round(kpi.recoveryProgressPct ?? 0),
+                  })}
             </span>
           </CardBody>
         ) : null}

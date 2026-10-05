@@ -91,7 +91,7 @@ KPIs describe the health of your business. OKRs describe what you are changing a
 
 Build KPI driver trees: revenue is driven by new customers and order value, which are driven by conversion and basket size, and so on down to the leading indicators a team can move this week. Every KPI has a health corridor. Above ninety percent of target is healthy. Seventy to ninety is watch. Below seventy is unhealthy.
 
-When a KPI turns unhealthy, OpenOKR drafts a **recovery objective** from its leading drivers. Objective: bring this metric back to target. Key results: move each driver from where it is to where it needs to be. The KPI then reads "recovering", and its health rises as the recovery progresses, so you can see the fix working before the lagging number catches up. A recovery board shows every unhealthy KPI across the company in one list.
+When a KPI turns unhealthy, OpenOKR drafts a **recovery objective** from its leading drivers. Objective: bring this metric back to target. Key results: move each driver from where it is to where it needs to be. The KPI is then marked "recovering" beside its real health, never instead of it, and the recovery's own progress is shown next to the reading, so you can see the fix working without anyone mistaking it for the number having recovered. A recovery board shows every unhealthy KPI across the company in one list.
 
 ### 3.5 The weekly rhythm
 

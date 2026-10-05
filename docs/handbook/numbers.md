@@ -125,8 +125,9 @@ boundary of 99.5% is unhealthy, whatever 95 divided by 99.9 comes to.
 share of its target: ninety and above is healthy, below seventy is unhealthy.
 That suits a positive number counted from zero, and nothing else. When a KPI
 drops out of range the product drafts a recovery objective with at most four
-key results, one per leading child driver, and the KPI reads "recovering" while
-that objective moves.
+key results, one per leading child driver, and the KPI is marked "recovering"
+beside its real band while that objective moves. The band never changes to say
+so: a metric still under its red line still reads unhealthy.
 
 ## Sessions
 

@@ -238,11 +238,16 @@ export async function dueKpiCorridorNudges(
       continue;
     }
 
-    // The corridor message itself. `healthy`, `recovering` and `no_data` are
-    // all silent: a metric inside its corridor needs no message, a recovering
-    // one already has an objective attached, and one nobody has recorded is
-    // unmeasured rather than failing.
-    const corridorRule = RULE_FOR_STATE[kpi.state];
+    const recovery = await recoveryLinkFor(tx, input.workspaceId, kpi);
+
+    // The corridor message itself. `healthy` and `no_data` are silent: a
+    // metric inside its corridor needs no message, and one nobody has
+    // recorded is unmeasured rather than failing. So is a KPI with an open
+    // recovery, whatever its band, because it already has an objective
+    // attached. That was the `recovering` state until P9-T17b-a moved the
+    // recovery beside the band; the silence stays where it was.
+    const corridorRule =
+      recovery === "open" ? undefined : RULE_FOR_STATE[kpi.state];
     if (corridorRule) {
       for (const owner of owners) {
         due.push(
@@ -264,7 +269,6 @@ export async function dueKpiCorridorNudges(
 
     const achievement =
       kpi.achievementPct === null ? null : Number(kpi.achievementPct);
-    const recovery = await recoveryLinkFor(tx, input.workspaceId, kpi);
 
     if (recovery === "none") {
       // §6.5: the proposal waits for consecutive unhealthy periods, so one bad
@@ -478,10 +482,10 @@ async function periodStatesFor(
       row.actualValue === null ? null : Number(row.actualValue),
       target === null ? null : Number(target),
     );
-    // "none" rather than the KPI's real recovery link: this asks what each
-    // period looked like on its own terms, and a recovery opened last month
-    // would otherwise rewrite the history that justified opening it.
-    return kpiStateOf(band, "none");
+    // The band alone: this asks what each period looked like on its own
+    // terms, which is what a state has been since a recovery stopped being
+    // one (P9-T17b-a).
+    return kpiStateOf(band);
   });
 }
 

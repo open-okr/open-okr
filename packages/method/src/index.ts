@@ -109,6 +109,7 @@ export {
   type KpiThresholds,
   kpiAchievement,
   kpiReading,
+  kpiRecovering,
   kpiState,
   kpiStateOf,
   type LocalDate,

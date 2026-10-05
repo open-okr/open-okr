@@ -118,39 +118,41 @@ than working the ratio out in the browser. `kpiStateOf(band, recovery)` keeps
 the precedence below until P9-T17b moves the recovery beside the band.
 
 The fallback, as built at P3-T12. METHOD.md §6.4. Precedence, first match wins:
-no data, then recovering, then the band. Both thresholds are §11 parameters,
-defaults 90 and 70.
+no data, then the band. Both thresholds are §11 parameters, defaults 90 and 70.
 
 | Order | Condition | State |
 |---|---|---|
 | 1 | Achievement is null | `no_data` |
-| 2 | An open recovery goal is linked | `recovering` |
-| 3 | Achievement at or above the healthy threshold | `healthy` |
-| 4 | Achievement at or above the watch threshold | `watch` |
-| 5 | Otherwise | `unhealthy` |
+| 2 | Achievement at or above the healthy threshold | `healthy` |
+| 3 | Achievement at or above the watch threshold | `watch` |
+| 4 | Otherwise | `unhealthy` |
 
-A recovery goal that has been closed no longer holds the KPI in `recovering`.
-The KPI returns to whichever band it has actually reached, which is the honest
-outcome whether the recovery worked or not.
+**Recovering is beside the state, not one of them (P9-T17b-a).** Until then an
+open recovery goal outranked the band, so a collapsing KPI read "recovering"
+for as long as its recovery ran, whatever the metric did. Now the state is
+always the band, and a KPI whose recovery goal is open is marked recovering
+beside it. A closed recovery no longer marks it. A row stored as `recovering`
+before the change is read as the band its achievement gives, which is the rule
+it was judged by, and data change 0021 rewrites those rows.
 
 <!-- golden: kpi.state -->
 
-| case | achievement_pct | recovery | healthy_pct | watch_pct | expected |
-|---|---|---|---|---|---|
-| nothing recorded | | none | 90 | 70 | no_data |
-| comfortably healthy | 95 | none | 90 | 70 | healthy |
-| exactly at the healthy threshold | 90 | none | 90 | 70 | healthy |
-| just below healthy | 89.99 | none | 90 | 70 | watch |
-| exactly at the watch threshold | 70 | none | 90 | 70 | watch |
-| just below watch | 69.99 | none | 90 | 70 | unhealthy |
-| nothing achieved | 0 | none | 90 | 70 | unhealthy |
-| far over target | 200 | none | 90 | 70 | healthy |
-| an open recovery outranks the band | 50 | open | 90 | 70 | recovering |
-| an open recovery outranks even a healthy band | 95 | open | 90 | 70 | recovering |
-| no data outranks a recovery | | open | 90 | 70 | no_data |
-| a closed recovery returns the real band | 50 | closed | 90 | 70 | unhealthy |
-| a stricter workspace | 92 | none | 95 | 80 | watch |
-| a looser workspace | 65 | none | 80 | 60 | watch |
+| case | achievement_pct | recovery | healthy_pct | watch_pct | expected | expected_recovering |
+|---|---|---|---|---|---|---|
+| nothing recorded | | none | 90 | 70 | no_data | no |
+| comfortably healthy | 95 | none | 90 | 70 | healthy | no |
+| exactly at the healthy threshold | 90 | none | 90 | 70 | healthy | no |
+| just below healthy | 89.99 | none | 90 | 70 | watch | no |
+| exactly at the watch threshold | 70 | none | 90 | 70 | watch | no |
+| just below watch | 69.99 | none | 90 | 70 | unhealthy | no |
+| nothing achieved | 0 | none | 90 | 70 | unhealthy | no |
+| far over target | 200 | none | 90 | 70 | healthy | no |
+| an open recovery is shown beside the band, not in its place | 50 | open | 90 | 70 | unhealthy | yes |
+| a recovering KPI that is healthy again says so | 95 | open | 90 | 70 | healthy | yes |
+| no data with a recovery is still no data | | open | 90 | 70 | no_data | yes |
+| a closed recovery no longer marks it | 50 | closed | 90 | 70 | unhealthy | no |
+| a stricter workspace | 92 | none | 95 | 80 | watch | no |
+| a looser workspace | 65 | none | 80 | 60 | watch | no |
 
 ## 4. Effective health while recovering
 

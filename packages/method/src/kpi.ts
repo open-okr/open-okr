@@ -236,19 +236,30 @@ function bandByThresholds(
 }
 
 /**
- * §6.4's state from a band: no data first, then a recovery, then the band.
- * P9-T17b moves the recovery beside the band rather than in its place.
+ * §6.4's state from a band: no data first, then the band (P9-T17b-a).
+ *
+ * A recovery is not a state. A KPI with an active recovery OKR is shown as
+ * recovering beside its real band, never instead of it, because a collapsing
+ * metric that read "recovering" could quietly stay that way while the
+ * recovery's own progress moved.
  */
-export function kpiStateOf(
-  band: KpiBand | null,
-  recovery: RecoveryLink,
-): KpiState {
-  if (band === null) {
-    return "no_data";
-  }
-  return recovery === "open" ? "recovering" : band;
+export function kpiStateOf(band: KpiBand | null): KpiState {
+  return band ?? "no_data";
 }
 
+/**
+ * Whether a KPI is recovering: an overlay beside its state, never the state
+ * itself (§6.4, P9-T17b-a). A closed recovery no longer holds it.
+ */
+export function kpiRecovering(recovery: RecoveryLink): boolean {
+  return recovery === "open";
+}
+
+/**
+ * §6.4's states. `recovering` is no longer written since P9-T17b-a, and is
+ * kept because rows the previous release wrote still carry it and the
+ * database still accepts it; readers turn it back into the band it hid.
+ */
 export const KPI_STATES = [
   "healthy",
   "watch",
@@ -385,26 +396,17 @@ export interface KpiCorridor {
 }
 
 /**
- * §6.4's corridor state (design §3). Precedence, first match wins.
- *
- * No data outranks a recovery on purpose: a KPI nobody has recorded is not
- * recovering, it is unmeasured, and telling somebody a recovery is under way on
- * a metric with no values would be the product inventing progress.
- *
- * A closed recovery no longer holds the KPI. It returns to whichever band it has
- * actually reached, which is the honest outcome whether the recovery worked or
- * not.
+ * §6.4's corridor state on the ratio fallback (design §3): no data, then the
+ * band. Also how a reader turns a stored `recovering`, written before
+ * P9-T17b-a, back into the band it hid: those rows predate thresholds, so the
+ * ratio is the rule they were judged by.
  */
 export function kpiState(
   achievementPct: number | null,
-  recovery: RecoveryLink,
   corridor: KpiCorridor,
 ): KpiState {
   if (achievementPct === null) {
     return "no_data";
-  }
-  if (recovery === "open") {
-    return "recovering";
   }
   if (achievementPct >= corridor.healthyPct) {
     return "healthy";

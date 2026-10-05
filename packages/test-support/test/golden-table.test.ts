@@ -184,6 +184,7 @@ const MANIFEST: Record<
         "healthy_pct",
         "watch_pct",
         "expected",
+        "expected_recovering",
       ],
       minRows: 14,
     },

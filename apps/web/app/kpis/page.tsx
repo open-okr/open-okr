@@ -207,6 +207,9 @@ export default async function KpisPage({
                   </span>
                   <CategorySubtotal
                     states={inCategory.map((kpi) => kpi.state)}
+                    recovering={
+                      inCategory.filter((kpi) => kpi.recovering).length
+                    }
                   />
                 </div>
                 <ul className="flex flex-col gap-1">

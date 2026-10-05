@@ -222,6 +222,8 @@ export interface LaunchedRecovery {
   readonly goalId: string;
   readonly keyResultIds: readonly string[];
   readonly startedPct: number | null;
+  /** The KPI's band after the launch, which a recovery does not change. */
+  readonly state: string;
 }
 
 /**
@@ -343,10 +345,15 @@ export async function launchRecoveryInTx(
       ),
     );
 
-  // The state flips to `recovering` through the one recompute entry point
-  // rather than by writing the word here, so the corridor precedence stays in
-  // one place.
-  await recomputeKpi(tx, input.workspaceId, input.kpiId, now);
+  // Through the one recompute entry point, so the effective figure and the
+  // band are written in one place. The band does not move for a launch: the
+  // recovery sits beside it (P9-T17b-a).
+  const recomputed = await recomputeKpi(
+    tx,
+    input.workspaceId,
+    input.kpiId,
+    now,
+  );
 
-  return { goalId: goal.id, keyResultIds, startedPct };
+  return { goalId: goal.id, keyResultIds, startedPct, state: recomputed.state };
 }

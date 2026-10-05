@@ -35,12 +35,17 @@ export interface KpiTreeNode {
   readonly unit: string | null;
   readonly indicatorType: string;
   readonly tier: string;
+  /** The band, or no data (§6.4). */
   readonly state: string;
+  /** An open recovery objective, shown beside the band (P9-T17b-a). */
+  readonly recovering: boolean;
   readonly achievementPct: number | null;
   readonly effectivePct: number | null;
   readonly healthyPct: number;
   readonly recoveryGoalId: string | null;
   readonly recoveryProgressPct: number | null;
+  /** How it drives its parent (§6.3): part of its formula, or believed to move it. */
+  readonly link: "formula" | "influence" | null;
 }
 
 /** Parents before children, with the depth as a number: the same flattening the
@@ -112,6 +117,13 @@ export async function KpiTreeRows({
           <span className="text-xs text-ink-4">
             {node.indicatorType} · {node.tier}
           </span>
+          {node.link ? (
+            <span data-testid="kpi-link" className="text-xs text-ink-3">
+              {node.link === "formula"
+                ? t("kpis.trees.linkFormula")
+                : t("kpis.trees.linkInfluence")}
+            </span>
+          ) : null}
           <Bar
             value={node.achievementPct ?? 0}
             max={KPI_ACHIEVEMENT_MAX}
@@ -125,7 +137,7 @@ export async function KpiTreeRows({
           <Chip tone={stateTone(node.state)} dot>
             {node.state}
           </Chip>
-          {node.recoveryGoalId ? (
+          {node.recovering && node.recoveryGoalId ? (
             <Link
               href={`/goals/${node.recoveryGoalId}`}
               className="text-xs font-semibold text-brand-text hover:underline"

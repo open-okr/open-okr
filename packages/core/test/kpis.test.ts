@@ -257,6 +257,54 @@ describe("health in the KPI's own units (P9-T17a)", () => {
   });
 });
 
+describe("the tree's links (§6.3, P9-T17b-a)", () => {
+  it("reads formula where the parent's formula uses the child, and influence otherwise", async () => {
+    const wb = await workerDb();
+    const call = (name: string, input: object) =>
+      callAction(
+        { pool: wb.appPool, ...context() },
+        name as never,
+        input as never,
+      ) as Promise<never>;
+    const tree = (await call("kpis.createTree", {
+      name: "Unit economics",
+    })) as {
+      id: string;
+    };
+    const margin = await makeKpi({ title: "Operating margin" });
+    const revenue = await makeKpi({ title: "Revenue" });
+    const cost = await makeKpi({ title: "Support cost" });
+    const nps = await makeKpi({ title: "Onboarding NPS" });
+    for (const [id, parent] of [
+      [margin.id, null],
+      [revenue.id, margin.id],
+      [cost.id, margin.id],
+      [nps.id, margin.id],
+    ] as const) {
+      await call("kpis.update", {
+        kpiId: id,
+        treeId: tree.id,
+        parentKpiId: parent,
+      });
+    }
+    await call("kpis.setFormula", {
+      kpiId: margin.id,
+      formula: { op: "sub", l: { k: revenue.id }, r: { k: cost.id } },
+      on: "2026-08-01",
+    });
+
+    const read = (await call("kpis.tree", { treeId: tree.id })) as {
+      nodes: { id: string; link: string | null }[];
+    };
+    const linkOf = (id: string) =>
+      read.nodes.find((node) => node.id === id)?.link;
+    expect(linkOf(margin.id)).toBeNull();
+    expect(linkOf(revenue.id)).toBe("formula");
+    expect(linkOf(cost.id)).toBe("formula");
+    expect(linkOf(nps.id)).toBe("influence");
+  });
+});
+
 describe("period normalisation on the write path", () => {
   it("buckets every frequency from a date inside the period", async () => {
     const wb = await workerDb();
@@ -681,8 +729,16 @@ describe("recovery OKRs", () => {
       state: string;
       recovery_started_pct: string;
     }>("select state, recovery_started_pct from kpis where id = $1", [root.id]);
-    expect(kpi.rows[0]?.state).toBe("recovering");
+    // The real band, with the recovery beside it rather than in its place
+    // (§6.4, P9-T17b-a).
+    expect(kpi.rows[0]?.state).toBe("unhealthy");
     expect(Number(kpi.rows[0]?.recovery_started_pct)).toBe(60);
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.detail",
+      { kpiId: root.id, periods: 12 },
+    );
+    expect(read.kpi).toMatchObject({ state: "unhealthy", recovering: true });
   });
 
   it("descends through lagging children to their nearest leading descendants", async () => {
@@ -786,7 +842,9 @@ describe("recovery OKRs", () => {
     // The projection has: 60 + (1/3 × (90 − 60)) = 70.
     expect(Number(after.rows[0]?.effective_pct)).toBeGreaterThan(60);
     expect(Number(after.rows[0]?.effective_pct)).toBeCloseTo(70, 1);
-    expect(after.rows[0]?.state).toBe("recovering");
+    // And the state still says where the metric really is: the projection
+    // never stands in for the reading (§6.4, NW-Q3-05).
+    expect(after.rows[0]?.state).toBe("unhealthy");
   });
 
   it("proposes closing the recovery exactly once, on the real number", async () => {

@@ -583,7 +583,12 @@ For every key result, record the main initiatives that will move it and one of t
 
 ### 6.1 What a KPI is here
 
-A KPI is a number you watch every period whether or not it is an OKR. KPIs describe the health of the business. OKRs describe what you are changing about it. The two connect in three ways: a key result can be measured by a live KPI, an unhealthy KPI can trigger a recovery OKR, and the KPI baseline is a Phase 2 input.
+A KPI is a number you watch every period whether or not it is an OKR. KPIs describe the health of the business. OKRs describe what you are changing about it. The two connect in three ways:
+- a key result can be measured by a live KPI;
+- an unhealthy KPI can prompt a response, including a recovery OKR;
+- the KPI baseline is a Phase 2 input.
+
+*Source:* Castro: "Monitoring KPIs are sometimes called health metrics"; whatmatters: "KPIs often track ongoing metrics of health, or BAU".
 
 ### 6.2 KPI attributes
 
@@ -600,9 +605,15 @@ A KPI is a number you watch every period whether or not it is an OKR. KPIs descr
 
 ### 6.3 The KPI tree
 
-KPIs form a driver tree. Each child KPI drives its parent. A tree has one root, usually an impact-tier lagging KPI such as operating margin or revenue. Its children are outcome-tier, theirs are output-tier, and the leaves are input-tier leading indicators a team can act on this week.
+KPIs may form a driver tree. A tree has one root, usually a lagging KPI such as operating margin or revenue, and its leaves are leading drivers a team can act on this week. A link is one of two kinds:
+- **formula**: the child is part of the parent's calculation (§6.7);
+- **influence**: the child is believed to move the parent.
 
-Reading rule: to move the root, find the unhealthy branch, then find the leading drivers at its edge. Those drivers become key results.
+A KPI may also stand alone, outside any tree.
+
+Reading rule: to move the root, find the unhealthy branch, then find the leading drivers at its edge. Those drivers are candidates for key results, beside the KPI itself.
+
+*Source:* Mixpanel (vendor): "component relationships … with a formula" and "influence relationships … correlated but don't have the same quantifiable connection".
 
 ### 6.4 Health corridors
 
@@ -613,12 +624,11 @@ A KPI's health comes from its own thresholds, in its own units, by its target ty
 | Healthy | Inside the green boundary, or 90% of target and above on the fallback |
 | Watch | Between the boundaries, or 70% to below 90% on the fallback. Watch the leading drivers |
 | Unhealthy | Past the red boundary, or below 70% on the fallback. Launch a recovery OKR to focus the team |
-| Recovering | Any, with an active recovery OKR. Health improves as the recovery key results progress |
 | No data | Enter a current value and a target |
 
 For a KPI that should stay within a range, the range is its green band. Its red boundaries sit outside the range: one below, and one above where too high matters too. Between the range and a red boundary is watch.
 
-State precedence, first match wins: no data, then recovering (an active recovery OKR), then the band. The fallback thresholds are workspace settings, and each KPI may carry its own (§11). *Source:* Castro: "as long as the dials on the dashboard are within certain thresholds, you don't care about them".
+State precedence, first match wins: no data, then the band. A KPI with an active recovery OKR is shown as **recovering** beside its real band, never instead of it. The fallback thresholds are workspace settings, and each KPI may carry its own (§11). *Source:* Castro: "as long as the dials on the dashboard are within certain thresholds, you don't care about them".
 
 ### 6.5 Recovery OKRs
 

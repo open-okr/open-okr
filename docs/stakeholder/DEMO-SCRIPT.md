@@ -137,7 +137,7 @@ The alignment health score is **100%**: all six goals below company level align 
 
 Go to `/kpis`. Twelve measures in four categories, six months of readings each, entered like a spreadsheet.
 
-Show the five states on one screen: **healthy**, **watch**, **unhealthy**, **recovering**, and one measure with **no data** at all.
+Show the four states on one screen: **healthy**, **watch**, **unhealthy**, and one measure with **no data** at all, and point at the one marked **recovering** beside its band.
 
 > "A KPI nobody has recorded is unmeasured, not failing. It says `no data` rather than showing zero, because zero is a claim and this product does not make claims it cannot support."
 
@@ -147,13 +147,13 @@ Go to `/kpis/trees`. Two driver trees, drawn by depth and health.
 
 > "Read it the way the method says to: find the unhealthy branch, then look at the leading drivers at its edge. Those drivers are what you can actually pull."
 
-Go to `/kpis/recovery`. **Operating margin** is below its corridor and shows as `recovering`, with an objective under it: *Bring Operating margin back to 15*.
+Go to `/kpis/recovery`. **Operating margin** is below its corridor: it reads `unhealthy`, with `recovering` beside it and an objective under it: *Bring Operating margin back to 15*.
 
 > "Nobody wrote that objective. The metric fell through its corridor floor, and the engine walked the unhealthy branch of its driver tree breadth-first and turned the leading drivers at the edge into key results. This is the product proposing work rather than waiting to be told."
 
-Point at the card showing **both** the projected figure and the real one.
+Point at the card: the real reading, and the recovery objective's own progress beside it.
 
-> "While a recovery is open, the KPI reads better than it is, because the recovery's own progress counts toward it. The card shows you both numbers side by side, so nobody mistakes a recovery in progress for a metric that recovered."
+> "While a recovery is open, the KPI still says where it really is. The recovery's progress sits next to the reading, never in its place, so nobody mistakes a recovery in progress for a metric that recovered."
 
 The other six unhealthy measures each carry a **Launch recovery** button. Click one to show the engine drafting live.
 
