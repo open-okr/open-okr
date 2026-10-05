@@ -586,3 +586,142 @@ describe("a closed cycle keeps the rules it was graded under (§12, P9-T14b)", (
     expect(rules.practice["scoring.colours"]).toBe("google");
   });
 });
+
+describe("the scorecard by cycle (P9-T14c)", () => {
+  /** A review in `cycle` that completes its phase 7, graded at `score`. */
+  const reviewIn = async (
+    cycle: string,
+    keyResult: string,
+    session: string,
+    score: number,
+  ) => {
+    await call("sessions.scoreKeyResult", {
+      sessionId: session,
+      keyResultId: keyResult,
+      score,
+      reason: "Landed most of the way.",
+    });
+    await call("sessions.addRetroNote", {
+      sessionId: session,
+      columnKey: "didnt",
+      text: "Nobody owned the integration dependency.",
+      anonymous: false,
+    });
+    await call("sessions.submitProcessHealth", {
+      sessionId: session,
+      scores: [5, 4, 2, 5, 4].map((value, index) => ({
+        statementKey: index + 1,
+        score: value,
+      })),
+    });
+    await call("sessions.close", { id: session });
+    await call("cycles.close", { cycleId: cycle });
+  };
+
+  interface Row {
+    cycleId: string;
+    bands: { achieved: number; strong: number; partial: number };
+    resultBand: string | null;
+    moved: {
+      adjusted: { score: number; computed: number; reason: string }[];
+      eased: {
+        original: number;
+        target: number | null;
+        reason: string | null;
+      }[];
+      addedMidCycle: number;
+      kindChanges: { from: string; to: string; reason: string | null }[];
+    };
+  }
+
+  it("acceptance: two cycles closed under different bands each read their own, and show what moved in them", async () => {
+    // The first cycle, under Google's colours: its target eased, its
+    // objective made committed, and its grade above what its progress
+    // computes.
+    const [goal] = await rows<{ id: string }>(
+      "select goal_id as id from key_results where id = $1",
+      [keyResultId],
+    );
+    await call("goals.changeTarget", {
+      id: keyResultId,
+      targetValue: 250,
+      reason: "The integration partner left the market",
+    });
+    await call("goals.setKind", {
+      id: goal?.id,
+      kind: "committed",
+      reason: "The board asked for it as a promise",
+    });
+    await reviewIn(cycleId, keyResultId, sessionId, 0.65);
+
+    // The second, under Doerr's.
+    await call("practice.update", {
+      overrides: { "scoring.colours": "doerr" },
+    });
+    const next = await createNext();
+    const nextGoal = (await call("goals.create", {
+      title: "Make the first week the reason teams renew",
+      cycleId: next.id,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: memberId,
+      reviewerId: memberId,
+      weight: 1,
+    })) as { id: string };
+    const nextKeyResult = (await call("goals.addKeyResult", {
+      goalId: nextGoal.id,
+      title: "Renewal after the first week from 61% to 70%",
+      direction: "increase",
+      indicatorType: "lagging",
+      baselineValue: 61,
+      targetValue: 70,
+      weight: 1,
+    })) as { id: string };
+    const nextSession = (await call("sessions.create", {
+      spaceId,
+      cycleId: next.id,
+      kind: "quarterly",
+      title: "Next quarterly review",
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      facilitatorId: memberId,
+    })) as { id: string };
+    await call("sessions.open", { id: nextSession.id });
+    await reviewIn(next.id, nextKeyResult.id, nextSession.id, 0.65);
+
+    const scorecard = (await call("cycles.scorecard", {})) as { rows: Row[] };
+    const first = scorecard.rows.find((row) => row.cycleId === cycleId);
+    const second = scorecard.rows.find((row) => row.cycleId === next.id);
+
+    // Each colours by its own bands: 0.65 is on target under 0.6, partial
+    // under 0.7.
+    expect(first?.bands).toEqual({ achieved: 1, strong: 0.6, partial: 0.3 });
+    expect(first?.resultBand).toBe("strong");
+    expect(second?.bands).toEqual({ achieved: 1, strong: 0.7, partial: 0.4 });
+    expect(second?.resultBand).toBe("partial");
+
+    // And what moved in the first, behind its number.
+    expect(first?.moved.adjusted).toEqual([
+      expect.objectContaining({
+        score: 0.65,
+        computed: 0,
+        reason: "Landed most of the way.",
+      }),
+    ]);
+    expect(first?.moved.eased).toEqual([
+      expect.objectContaining({
+        original: 300,
+        target: 250,
+        reason: "The integration partner left the market",
+      }),
+    ]);
+    expect(first?.moved.kindChanges).toEqual([
+      expect.objectContaining({
+        from: "aspirational",
+        to: "committed",
+        reason: "The board asked for it as a promise",
+      }),
+    ]);
+    expect(second?.moved.eased).toEqual([]);
+  });
+});

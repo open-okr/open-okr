@@ -4034,7 +4034,7 @@
       "method": "GET",
       "path": "/cycles/scorecard",
       "scope": "read",
-      "summary": "Every archived cycle's result with its band counts and verdict, oldest first. Drives the scorecard.",
+      "summary": "Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard.",
       "flags": [],
       "pages": false
     },

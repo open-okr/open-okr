@@ -85,7 +85,7 @@ export async function cycleRulesInTx(
       ),
     )
     .limit(1);
-  if (!cycle || cycle.status !== "closed") {
+  if (cycle?.status !== "closed") {
     return liveRulesInTx(tx, workspaceId);
   }
   if (!cycle.snapshot) {

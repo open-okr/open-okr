@@ -27,6 +27,8 @@ import {
 import {
   CHECK_IN_FREQUENCIES,
   COACH_STRICTNESS,
+  scoreBand,
+  scoreBandsIn,
   THRESHOLD_KEYS,
   THRESHOLDS,
 } from "@openokr/method";
@@ -49,6 +51,7 @@ import {
   localDateIn,
   parseLocalDate,
 } from "../cycles/generation.ts";
+import { cycleMovesInTx } from "../cycles/moved.ts";
 import {
   COLUMN_BACKED_THRESHOLDS,
   mergeOverrides,
@@ -1635,7 +1638,7 @@ export const snapshotCycle = defineWriteAction({
 export const readScorecard = defineReadAction({
   name: "cycles.scorecard",
   summary:
-    "Every archived cycle's result with its band counts and verdict, oldest first. Drives the scorecard.",
+    "Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard.",
   input: z.object({}),
   output: z.object({
     rows: z.array(
@@ -1649,6 +1652,50 @@ export const readScorecard = defineReadAction({
         strong: z.number().int(),
         partial: z.number().int(),
         little: z.number().int(),
+        /**
+         * The bands this cycle was graded under (METHOD.md §12, P9-T14c),
+         * from its own snapshot, and the band its result falls in.
+         */
+        bands: z.object({
+          achieved: z.number(),
+          strong: z.number(),
+          partial: z.number(),
+        }),
+        resultBand: z
+          .enum(["fully_achieved", "strong", "partial", "little"])
+          .nullable(),
+        /** What moved in it, so the close can see behind the number. */
+        moved: z.object({
+          adjusted: z.array(
+            z.object({
+              keyResultId: z.uuid(),
+              title: z.string(),
+              score: z.number(),
+              computed: z.number(),
+              reason: z.string(),
+            }),
+          ),
+          eased: z.array(
+            z.object({
+              keyResultId: z.uuid(),
+              title: z.string(),
+              original: z.number(),
+              target: z.number().nullable(),
+              reason: z.string().nullable(),
+            }),
+          ),
+          addedMidCycle: z.number().int(),
+          kindChanges: z.array(
+            z.object({
+              goalId: z.uuid(),
+              title: z.string(),
+              from: z.string(),
+              to: z.string(),
+              reason: z.string().nullable(),
+              at: z.string(),
+            }),
+          ),
+        }),
       }),
     ),
     pointsEnabled: z.boolean(),
@@ -1685,9 +1732,16 @@ export const readScorecard = defineReadAction({
               performanceSnapshots,
               eq(performanceSnapshots.workspaceId, context.workspaceId),
               eq(performanceSnapshots.ownerKind, "workspace"),
+              // A deleted cycle has no place on the scorecard.
+              isNull(cycles.deletedAt),
             ),
           )
           .orderBy(asc(cycles.startsOn));
+        const memberId = await actingMember(
+          tx as OperationTx,
+          context.workspaceId,
+          userId,
+        );
 
         const [settings] = await tx
           .select({ enabled: scorecardSettings.enabled })
@@ -1700,12 +1754,35 @@ export const readScorecard = defineReadAction({
           )
           .limit(1);
 
-        return {
-          rows: rows.map((row) => ({
+        // Each cycle read under the rules it closed with (§12, P9-T14c), so
+        // a band moved since colours only the cycles graded after it.
+        const shaped = [];
+        for (const row of rows) {
+          const rules = await cycleRulesInTx(
+            tx as OperationTx,
+            context.workspaceId,
+            row.cycleId,
+          );
+          const resultValue =
+            row.resultValue === null ? null : Number(row.resultValue);
+          shaped.push({
             ...row,
-            resultValue:
-              row.resultValue === null ? null : Number(row.resultValue),
-          })),
+            resultValue,
+            bands: scoreBandsIn(rules.thresholds, rules.practice),
+            resultBand:
+              resultValue === null
+                ? null
+                : scoreBand(resultValue, rules.thresholds, rules.practice),
+            moved: await cycleMovesInTx(tx as OperationTx, {
+              workspaceId: context.workspaceId,
+              memberId,
+              cycleId: row.cycleId,
+            }),
+          });
+        }
+
+        return {
+          rows: shaped,
           // No row means off, which is the default and needs no row to say so.
           pointsEnabled: settings?.enabled ?? false,
         };

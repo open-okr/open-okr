@@ -21020,7 +21020,7 @@
     "/cycles/scorecard": {
       "get": {
         "operationId": "cycles.scorecard",
-        "summary": "Every archived cycle's result with its band counts and verdict, oldest first. Drives the scorecard.",
+        "summary": "Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard.",
         "tags": [
           "cycles"
         ],
@@ -21084,6 +21084,171 @@
                                 "type": "integer",
                                 "minimum": -9007199254740991,
                                 "maximum": 9007199254740991
+                              },
+                              "bands": {
+                                "type": "object",
+                                "properties": {
+                                  "achieved": {
+                                    "type": "number"
+                                  },
+                                  "strong": {
+                                    "type": "number"
+                                  },
+                                  "partial": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "achieved",
+                                  "strong",
+                                  "partial"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "resultBand": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "fully_achieved",
+                                      "strong",
+                                      "partial",
+                                      "little"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "moved": {
+                                "type": "object",
+                                "properties": {
+                                  "adjusted": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "keyResultId": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        },
+                                        "title": {
+                                          "type": "string"
+                                        },
+                                        "score": {
+                                          "type": "number"
+                                        },
+                                        "computed": {
+                                          "type": "number"
+                                        },
+                                        "reason": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "keyResultId",
+                                        "title",
+                                        "score",
+                                        "computed",
+                                        "reason"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "eased": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "keyResultId": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        },
+                                        "title": {
+                                          "type": "string"
+                                        },
+                                        "original": {
+                                          "type": "number"
+                                        },
+                                        "target": {
+                                          "type": [
+                                            "number",
+                                            "null"
+                                          ]
+                                        },
+                                        "reason": {
+                                          "type": [
+                                            "string",
+                                            "null"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "keyResultId",
+                                        "title",
+                                        "original",
+                                        "target",
+                                        "reason"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "addedMidCycle": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "kindChanges": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "goalId": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        },
+                                        "title": {
+                                          "type": "string"
+                                        },
+                                        "from": {
+                                          "type": "string"
+                                        },
+                                        "to": {
+                                          "type": "string"
+                                        },
+                                        "reason": {
+                                          "type": [
+                                            "string",
+                                            "null"
+                                          ]
+                                        },
+                                        "at": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "goalId",
+                                        "title",
+                                        "from",
+                                        "to",
+                                        "reason",
+                                        "at"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "adjusted",
+                                  "eased",
+                                  "addedMidCycle",
+                                  "kindChanges"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -21095,7 +21260,10 @@
                               "fullyAchieved",
                               "strong",
                               "partial",
-                              "little"
+                              "little",
+                              "bands",
+                              "resultBand",
+                              "moved"
                             ],
                             "additionalProperties": false
                           }

@@ -237,7 +237,7 @@ the machine-readable document.
 | `cycles.levelsInUse`<br/>The OKR levels one cycle offers: the levels it began with, plus any its objectives already use. | `GET /api/v1/cycles/levelsInUse` | reads |
 | `cycles.list`<br/>Every cycle this workspace has, newest first. | `GET /api/v1/cycles/list` | reads |
 | `cycles.rules`<br/>The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after. | `GET /api/v1/cycles/rules` | reads |
-| `cycles.scorecard`<br/>Every archived cycle's result with its band counts and verdict, oldest first. Drives the scorecard. | `GET /api/v1/cycles/scorecard` | reads |
+| `cycles.scorecard`<br/>Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard. | `GET /api/v1/cycles/scorecard` | reads |
 | `cycles.snapshot`<br/>Records what a cycle achieved: the result, the band counts and the portfolio verdict, one snapshot per owner. | `POST /api/v1/cycles/snapshot` | writes |
 | `cycles.update`<br/>Sets a cycle's roles, phase, levels, session dates or publication deadline. | `POST /api/v1/cycles/update` | writes |
 

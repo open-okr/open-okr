@@ -5648,7 +5648,7 @@
     },
     {
       "name": "cycles.scorecard",
-      "description": "Every archived cycle's result with its band counts and verdict, oldest first. Drives the scorecard.",
+      "description": "Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard.",
       "inputSchema": {
         "type": "object",
         "properties": {}

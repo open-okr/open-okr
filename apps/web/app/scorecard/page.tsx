@@ -9,6 +9,14 @@ import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { closeCycle } from "../cycle/frame-actions.ts";
 
+/** A result coloured by its own cycle's bands (METHOD.md §3.3, §12). */
+const BAND_TONE = {
+  fully_achieved: "ok",
+  strong: "ok",
+  partial: "warn",
+  little: "bad",
+} as const;
+
 /**
  * The scorecard (METHOD.md §8.9, TECHNICAL-PLAN §4.6, P3-T15).
  *
@@ -182,14 +190,32 @@ export default async function ScorecardPage() {
                       <span className="ml-1.5 text-xs text-ink-4">
                         {row.startsOn}
                       </span>
+                      {/* §12 (P9-T14c): the bands this cycle was graded
+                       * under, which a band moved since does not change. */}
+                      <span
+                        className="block text-xs text-ink-4"
+                        data-testid="scorecard-bands"
+                      >
+                        {t("scorecard.gradedOn", {
+                          strong: row.bands.strong.toFixed(1),
+                          partial: row.bands.partial.toFixed(1),
+                        })}
+                      </span>
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-10 text-ink tabular-nums">
-                          {row.resultValue === null
-                            ? "—"
-                            : row.resultValue.toFixed(2)}
-                        </span>
+                        {row.resultValue === null ? (
+                          <span className="w-10 text-ink tabular-nums">—</span>
+                        ) : (
+                          // Coloured by its own cycle's bands (§12).
+                          <Chip
+                            tone={BAND_TONE[row.resultBand ?? "little"]}
+                            data-testid="scorecard-result"
+                            data-band={row.resultBand ?? undefined}
+                          >
+                            {row.resultValue.toFixed(2)}
+                          </Chip>
+                        )}
                         <Bar
                           value={(row.resultValue ?? 0) * 100}
                           className="w-20"
@@ -220,6 +246,104 @@ export default async function ScorecardPage() {
           )}
         </CardBody>
       </Card>
+
+      {/* What moved in each cycle, so the close can see behind its number
+       * (METHOD.md §3.3, §2.9, §2.8, P9-T14c). Only a cycle where something
+       * moved is listed. */}
+      {scorecard.rows.some(
+        (row) =>
+          row.moved.adjusted.length > 0 ||
+          row.moved.eased.length > 0 ||
+          row.moved.addedMidCycle > 0 ||
+          row.moved.kindChanges.length > 0,
+      ) ? (
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-bold text-ink">
+              {t("scorecard.whatMoved")}
+            </h2>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-3">
+            {scorecard.rows
+              .filter(
+                (row) =>
+                  row.moved.adjusted.length > 0 ||
+                  row.moved.eased.length > 0 ||
+                  row.moved.addedMidCycle > 0 ||
+                  row.moved.kindChanges.length > 0,
+              )
+              .map((row) => (
+                <section
+                  key={row.cycleId}
+                  className="flex flex-col gap-1"
+                  data-testid="scorecard-moved"
+                  aria-label={row.cycleName}
+                >
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-ink-3">
+                    {row.cycleName}
+                  </h3>
+                  <ul className="flex flex-col gap-1 text-sm text-ink-2">
+                    {row.moved.adjusted.map((entry) => (
+                      <li key={`a-${entry.keyResultId}`}>
+                        {t("scorecard.adjustedLine", {
+                          title: entry.title,
+                          score: entry.score.toFixed(2),
+                          computed: entry.computed.toFixed(2),
+                          reason: entry.reason,
+                        })}
+                      </li>
+                    ))}
+                    {row.moved.eased.map((entry) => (
+                      <li key={`e-${entry.keyResultId}`}>
+                        {entry.reason
+                          ? t("scorecard.easedLineBecause", {
+                              title: entry.title,
+                              original: String(entry.original),
+                              target:
+                                entry.target === null
+                                  ? "-"
+                                  : String(entry.target),
+                              reason: entry.reason,
+                            })
+                          : t("scorecard.easedLine", {
+                              title: entry.title,
+                              original: String(entry.original),
+                              target:
+                                entry.target === null
+                                  ? "-"
+                                  : String(entry.target),
+                            })}
+                      </li>
+                    ))}
+                    {row.moved.addedMidCycle > 0 ? (
+                      <li>
+                        {t("scorecard.addedMidCycle", {
+                          count: row.moved.addedMidCycle,
+                        })}
+                      </li>
+                    ) : null}
+                    {row.moved.kindChanges.map((entry) => (
+                      <li key={`k-${entry.goalId}-${entry.at}`}>
+                        {entry.reason
+                          ? t("scorecard.kindLineBecause", {
+                              title: entry.title,
+                              from: entry.from,
+                              to: entry.to,
+                              reason: entry.reason,
+                            })
+                          : t("scorecard.kindLine", {
+                              title: entry.title,
+                              from: entry.from,
+                              to: entry.to,
+                            })}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+          </CardBody>
+        </Card>
+      ) : null}
 
       {/*
        * **One control, where two buttons were** (M-05). Recording the result

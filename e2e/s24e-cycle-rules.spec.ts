@@ -1,6 +1,10 @@
 /**
  * A closed cycle keeps the rules it was graded under (P9-T14b, METHOD.md §12).
  *
+ * And the scorecard by cycle (P9-T14c): each closed cycle's row reads its
+ * own bands, and lists what moved in it, here a grade above its computed
+ * score.
+ *
  * Acceptance A7:
  *   Given a closed cycle scored under score bands 1.0, 0.6 and 0.3, when an
  *   admin changes the bands to Doerr's colours, then the closed cycle's
@@ -32,6 +36,7 @@ let api: APIRequestContext;
 let pool: pg.Pool;
 let token = "";
 let cycleId = "";
+let cycleName = "";
 let spaceId = "";
 
 const authed = () => ({ authorization: `Bearer ${token}` });
@@ -99,12 +104,12 @@ test("a quarter two years back, graded 0.65 and closed under Google's colours", 
   ).json()).data as { id: string; name: string }[];
   const me = directory.find((member) => member.name === INSTANCE_ACCOUNT.name);
 
-  cycleId = (
-    await post<{ id: string }>("cycles.create", {
-      on: `${new Date().getUTCFullYear() - 2}-05-15`,
-      cadence: "quarterly",
-    })
-  ).id;
+  const created = await post<{ id: string; name: string }>("cycles.create", {
+    on: `${new Date().getUTCFullYear() - 2}-05-15`,
+    cadence: "quarterly",
+  });
+  cycleId = created.id;
+  cycleName = created.name;
   spaceId = (
     await post<{ id: string }>("spaces.create", { name: `Rules ${STAMP}` })
   ).id;
@@ -178,4 +183,23 @@ test("acceptance A7: Doerr's colours leave the closed cycle's bands alone, and t
   await expect(
     page.locator('[data-testid="score-band-row"][data-band="strong"]'),
   ).toContainText("0.70 to 1.00", { timeout: 15_000 });
+});
+
+test("the scorecard reads the closed cycle under its own bands, and shows the grade beside its computed score", async () => {
+  // Doerr's colours are still on from the test above.
+  await goTo(page, "/scorecard");
+  const row = page.getByRole("row").filter({ hasText: cycleName });
+  await expect(row.getByTestId("scorecard-bands")).toHaveText(
+    "Graded on 0.6 and 0.3",
+    { timeout: 15_000 },
+  );
+  await expect(row.getByTestId("scorecard-result")).toHaveAttribute(
+    "data-band",
+    "strong",
+  );
+  // Nothing was recorded against the key result, so its progress computes
+  // nought and the room's 0.65 is an adjustment, kept with its reason.
+  const moved = page.getByRole("region", { name: cycleName });
+  await expect(moved).toContainText("scored 0.65, computed 0.00.");
+  await expect(moved).toContainText("Landed most of the way.");
 });
