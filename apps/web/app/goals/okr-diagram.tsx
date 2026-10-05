@@ -1,304 +1,592 @@
 "use client";
 
-import { Bar, Button, Chip, useTranslations } from "@openokr/ui";
-import { useRef, useState } from "react";
+import "@xyflow/react/dist/style.css";
+import { Bar, useTranslations } from "@openokr/ui";
+import {
+  Background,
+  Controls,
+  type Edge,
+  Handle,
+  MiniMap,
+  type Node,
+  type NodeProps,
+  Position,
+  ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
+} from "@xyflow/react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  filterGoals,
+  type OkrFilters,
+  type OkrGoal,
+  type OkrScope,
+  type OkrTree,
+} from "../../lib/okr-tree/cache.ts";
+import {
+  useOkrLive,
+  useOkrMutation,
+  useOkrTree,
+} from "../../lib/okr-tree/use-okr-tree.ts";
 import { HealthChip } from "./health-chip.tsx";
-import type { EditableGoal } from "./okr-table.tsx";
+import type { Person } from "./okr-cells.tsx";
+import { OkrDrawer, useDrawerAddress } from "./okr-drawer.tsx";
+import type { Coach } from "./okr-editing.ts";
+import {
+  collapsedByDefault,
+  type DiagramNode,
+  keyResultHandle,
+  layoutOkrTree,
+} from "./okr-layout.ts";
 
 /**
- * The same cycle drawn rather than listed (S-13, P8-G12).
+ * The OKRs drawn as a tree (P9-T09a, docs/design/p9-t00-okr-writing.md §5).
  *
- * The cycle sits at the top, its objectives hang off it, and each objective's
- * key results chain below it. It answers one question the list cannot: how
- * much of this quarter is carried by how few measures, visible in a glance
- * rather than by scrolling.
+ * The cycle at the root, its objectives below it with their key results
+ * stacked inside each card, an objective aligned to a key result hanging from
+ * that key result's row, and every parent from another cycle in a band above.
+ * **The same cache as the list**, so a change in either, or in the drawer
+ * both open, shows in the other at once; the layout is `okr-layout.ts`, a
+ * pure function, and React Flow draws it.
  *
- * **Read-only, and that is the whole difference from the list.** Editing in a
- * pannable canvas means a field that moves under the caret, so a card opens
- * its goal instead. The list is where a value is typed.
+ * **Reading, not yet editing.** A card opens the drawer, where every field is
+ * edited; editing on the card itself, adding and re-parenting are P9-T10's.
  *
- * **Laid out in the component, not by a graph library.** The shape is a
- * two-level tree with a fixed column per objective, which is arithmetic rather
- * than a layout problem, and a dependency added for it would be a runtime
- * dependency on every page that loads this route.
+ * **The keyboard** (§5.4): Tab reaches the cards, the arrow keys move between
+ * connected ones (up to the parent, down to the first child, left and right
+ * along the siblings), and Enter or Space opens the drawer.
  */
 
-const COLUMN = 250;
-const COLUMN_GAP = 42;
-const ROW_GAP = 18;
-const TOP = 150;
-const ORIGIN_X = 60;
-
-export function OkrDiagram({
-  goals,
-  cycleName,
-  progressMax,
-}: {
-  readonly goals: readonly EditableGoal[];
-  readonly cycleName: string;
+type ObjectiveData = {
+  readonly goal: OkrGoal;
+  readonly collapsed: boolean;
+  readonly hiddenBelow: number;
+  readonly hasBelow: boolean;
   readonly progressMax: number;
-}) {
+  readonly onToggle: (id: string) => void;
+};
+type ContextData = { readonly context: OkrTree["context"][number] };
+type CycleData = { readonly name: string };
+
+type ObjectiveFlowNode = Node<ObjectiveData, "objective">;
+type ContextFlowNode = Node<ContextData, "context">;
+type CycleFlowNode = Node<CycleData, "cycle">;
+
+const HIDDEN_HANDLE = "!h-1 !w-1 !min-w-0 !border-0 !bg-transparent";
+
+function ObjectiveCard({ data }: NodeProps<ObjectiveFlowNode>) {
   const { t } = useTranslations();
-  const [collapsed, setCollapsed] = useState<readonly string[]>([]);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const dragging = useRef<{ x: number; y: number } | null>(null);
-
-  const width = Math.max(
-    goals.length * COLUMN + Math.max(goals.length - 1, 0) * COLUMN_GAP,
-    320,
-  );
-  const centre = ORIGIN_X + width / 2;
-
-  const toggle = (id: string) =>
-    setCollapsed((current) =>
-      current.includes(id)
-        ? current.filter((entry) => entry !== id)
-        : [...current, id],
-    );
-
+  const { goal, collapsed, hiddenBelow, hasBelow, progressMax, onToggle } =
+    data;
   return (
-    <div className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface">
-      <div className="flex flex-wrap items-center gap-3 border-b border-line px-3.5 py-2">
-        <div className="flex flex-wrap items-center gap-3 text-[11px] text-ink-3">
-          <Legend tone="ok" label={t("goals.editor.legendOnTrack")} />
-          <Legend tone="warn" label={t("goals.editor.legendCaution")} />
-          <Legend tone="bad" label={t("goals.editor.legendOffTrack")} />
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setCollapsed(goals.map((goal) => goal.id))}
-          >
-            {t("goals.editor.collapseAll")}
-          </Button>
-          <Button type="button" size="sm" onClick={() => setCollapsed([])}>
-            {t("goals.editor.expandAll")}
-          </Button>
-        </div>
-      </div>
-
-      <div
-        // Panning is a pointer affordance on top of a canvas, and every card
-        // inside it is a link. The keyboard reaches the same goals through
-        // those links and through the list, so nothing here is reachable by
-        // dragging alone.
-        className="relative h-136 overflow-auto bg-bg"
-        onPointerDown={(event) => {
-          dragging.current = {
-            x: event.clientX - pan.x,
-            y: event.clientY - pan.y,
-          };
-        }}
-        onPointerMove={(event) => {
-          const from = dragging.current;
-          if (!from) {
-            return;
-          }
-          setPan({ x: event.clientX - from.x, y: event.clientY - from.y });
-        }}
-        onPointerUp={() => {
-          dragging.current = null;
-        }}
-        onPointerLeave={() => {
-          dragging.current = null;
-        }}
-      >
-        <div className="absolute right-3 top-3 z-10 flex flex-col gap-1.5">
-          <Button
-            type="button"
-            size="sm"
-            aria-label={t("goals.editor.zoomIn")}
-            onClick={() => setZoom((current) => Math.min(1.6, current + 0.12))}
-          >
-            +
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            aria-label={t("goals.editor.zoomOut")}
-            onClick={() => setZoom((current) => Math.max(0.5, current - 0.12))}
-          >
-            −
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              setZoom(1);
-              setPan({ x: 0, y: 0 });
-            }}
-          >
-            {t("goals.editor.fit")}
-          </Button>
-        </div>
-
-        <div
-          className="absolute left-0 top-0 origin-top-left"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          }}
-        >
-          <svg
-            aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 overflow-visible"
-          >
-            {goals.map((goal, index) => {
-              const x = ORIGIN_X + index * (COLUMN + COLUMN_GAP) + COLUMN / 2;
-              return (
-                <path
-                  key={goal.id}
-                  d={`M${centre} 104 V${(104 + TOP) / 2} H${x} V${TOP}`}
-                  fill="none"
-                  stroke="var(--line-2)"
-                  strokeWidth="1.5"
-                />
-              );
-            })}
-          </svg>
-
-          <div
-            className="absolute rounded-lg bg-ink px-5 py-2.5 text-center text-sm font-bold text-surface"
-            style={{ left: centre - 95, top: 40, width: 190 }}
-          >
-            {cycleName}
-          </div>
-
-          {goals.map((goal, index) => {
-            const x = ORIGIN_X + index * (COLUMN + COLUMN_GAP);
-            const open = !collapsed.includes(goal.id);
-            return (
-              <div key={goal.id}>
-                <article
-                  className="absolute rounded-lg border border-line border-l-[3px] border-l-brand bg-surface shadow-control"
-                  style={{ left: x, top: TOP, width: COLUMN }}
-                >
-                  <div className="flex items-center gap-2 px-3 pt-2.5">
-                    <HealthChip health={goal.health} />
-                    <button
-                      type="button"
-                      aria-expanded={open}
-                      aria-label={t("goals.editor.toggleKeyResults", {
-                        title: goal.title,
-                      })}
-                      onClick={() => toggle(goal.id)}
-                      className="ml-auto flex size-5 items-center justify-center rounded-control text-ink-4 hover:bg-raised"
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        aria-hidden="true"
-                        className={open ? "size-3" : "size-3 -rotate-90"}
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </button>
-                  </div>
-                  <a
-                    href={`/goals/${goal.id}`}
-                    className="block px-3 pt-2 text-xs font-semibold text-ink hover:underline"
-                  >
-                    {goal.title}
-                  </a>
-                  <div className="flex items-center gap-2 px-3 pt-2">
-                    <Bar
-                      value={goal.progressPct}
-                      max={progressMax}
-                      label={goal.title}
-                      className="flex-1"
-                    />
-                    <span className="w-9 text-right text-[11px] font-semibold tabular-nums text-ink-3">
-                      {Math.round(goal.progressPct)}%
-                    </span>
-                  </div>
-                  <p className="px-3 pb-2.5 pt-2 text-[11px] text-ink-4">
-                    {t("goals.editor.keyResultCount", {
-                      count: goal.keyResults.length,
-                    })}
-                  </p>
-                </article>
-
-                {open
-                  ? goal.keyResults.map((keyResult, position) => (
-                      <article
-                        key={keyResult.id}
-                        className="absolute rounded-lg border border-line border-l-[3px] border-l-line-2 bg-surface shadow-control"
-                        style={{
-                          left: x,
-                          top: TOP + 150 + position * (116 + ROW_GAP),
-                          width: COLUMN,
-                        }}
-                      >
-                        <div className="px-3 pt-2.5">
-                          <Chip tone="neutral">
-                            {Math.round(keyResult.progressPct)}%
-                          </Chip>
-                        </div>
-                        <p className="px-3 pt-2 text-xs text-ink-2">
-                          {keyResult.title}
-                        </p>
-                        <p className="px-3 pt-1.5 text-[11px] tabular-nums text-ink-4">
-                          {keyResult.currentValue} / {keyResult.targetValue}
-                          {keyResult.unit ? ` ${keyResult.unit}` : ""}
-                        </p>
-                        <div className="px-3 pb-3 pt-2">
-                          <Bar
-                            value={keyResult.progressPct}
-                            max={progressMax}
-                            label={keyResult.title}
-                          />
-                        </div>
-                      </article>
-                    ))
-                  : null}
-              </div>
-            );
-          })}
-
-          {/* The canvas has to be as tall and as wide as what is on it, or the
-           * scroll container clips the last column. */}
-          <div
-            style={{
-              width: width + ORIGIN_X * 2,
-              height:
-                TOP +
-                200 +
-                Math.max(
-                  0,
-                  ...goals.map((goal) =>
-                    collapsed.includes(goal.id)
-                      ? 0
-                      : goal.keyResults.length * (116 + ROW_GAP),
-                  ),
-                ),
-            }}
+    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-lg border border-line bg-surface text-left shadow-sm">
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="in"
+        isConnectable={false}
+        className={HIDDEN_HANDLE}
+      />
+      <div className="flex flex-col gap-1 px-3 pt-2">
+        <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-ink-3">
+          {goal.level}
+          <span className="truncate font-normal normal-case tracking-normal">
+            {goal.champion.name}
+          </span>
+        </span>
+        <span className="line-clamp-2 text-xs font-bold leading-snug text-ink">
+          {goal.title}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Bar
+            value={goal.progressPct}
+            max={progressMax}
+            label={goal.title}
+            className="flex-1"
           />
-        </div>
+          <span className="text-[11px] font-semibold tabular-nums text-ink-3">
+            {Math.round(goal.progressPct)}%
+          </span>
+          <HealthChip health={goal.health} />
+        </span>
       </div>
+      {collapsed ? null : (
+        <ul className="mt-1.5 flex flex-col border-t border-line">
+          {goal.keyResults.map((keyResult) => (
+            <li
+              key={keyResult.id}
+              className="relative flex h-[30px] items-center gap-2 border-b border-line px-3 text-[11px] text-ink-2 last:border-b-0"
+            >
+              <span aria-hidden="true" className="text-ink-4">
+                ○
+              </span>
+              <span className="min-w-0 flex-1 truncate">{keyResult.title}</span>
+              <span className="tabular-nums text-ink-3">
+                {Math.round(keyResult.progressPct)}%
+              </span>
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={keyResultHandle(keyResult.id)}
+                isConnectable={false}
+                className={HIDDEN_HANDLE}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+      {hasBelow || goal.keyResults.length > 0 ? (
+        <button
+          type="button"
+          // A press inside a card must not also count as opening it.
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggle(goal.id);
+          }}
+          aria-expanded={!collapsed}
+          aria-label={
+            collapsed
+              ? t("okrDiagram.expand", { title: goal.title })
+              : t("okrDiagram.collapse", { title: goal.title })
+          }
+          className="nodrag absolute right-1.5 top-1.5 rounded-control px-1 text-[10px] font-semibold text-ink-3 hover:bg-raised hover:text-ink"
+        >
+          {collapsed
+            ? hiddenBelow > 0
+              ? t("okrDiagram.moreBelow", { count: String(hiddenBelow) })
+              : "+"
+            : "−"}
+        </button>
+      ) : null}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="out"
+        isConnectable={false}
+        className={HIDDEN_HANDLE}
+      />
     </div>
   );
 }
 
-function Legend({
-  tone,
-  label,
-}: {
-  readonly tone: "ok" | "warn" | "bad";
-  readonly label: string;
-}) {
-  const colour =
-    tone === "ok"
-      ? "bg-ok-dot"
-      : tone === "warn"
-        ? "bg-warn-dot"
-        : "bg-bad-dot";
+function ContextCard({ data }: NodeProps<ContextFlowNode>) {
+  const { t } = useTranslations();
+  const { context } = data;
   return (
-    <span className="flex items-center gap-1.5">
-      <i aria-hidden="true" className={`size-1.5 rounded-full ${colour}`} />
-      {label}
-    </span>
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-dashed border-line bg-raised text-left">
+      <div className="flex flex-col gap-0.5 px-3 pt-2">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-ink-4">
+          {context.cycleName ?? t("okrDiagram.anotherCycle")}
+        </span>
+        {/* Read-only on the canvas: it opens in its own cycle, with the
+         * drawer, because this cycle's cache does not hold it. */}
+        <a
+          href={`/goals?okr=${context.id}`}
+          className="nodrag line-clamp-2 text-xs font-semibold text-ink-2 hover:underline"
+        >
+          {context.title}
+        </a>
+      </div>
+      <ul className="mt-1 flex flex-col">
+        {context.keyResults.map((keyResult) => (
+          <li
+            key={keyResult.id}
+            className="relative flex h-[22px] items-center px-3 text-[10px] text-ink-3"
+          >
+            <span className="truncate">{keyResult.title}</span>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={keyResultHandle(keyResult.id)}
+              isConnectable={false}
+              className={HIDDEN_HANDLE}
+            />
+          </li>
+        ))}
+      </ul>
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="out"
+        isConnectable={false}
+        className={HIDDEN_HANDLE}
+      />
+    </div>
+  );
+}
+
+function CycleCard({ data }: NodeProps<CycleFlowNode>) {
+  return (
+    <div className="flex h-full w-full items-center justify-center rounded-lg border border-brand-line bg-brand-weak px-3 text-sm font-bold text-brand-text">
+      {data.name}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="out"
+        isConnectable={false}
+        className={HIDDEN_HANDLE}
+      />
+    </div>
+  );
+}
+
+const NODE_TYPES = {
+  objective: ObjectiveCard,
+  context: ContextCard,
+  cycle: CycleCard,
+};
+
+export function OkrDiagram(props: {
+  readonly initialTree: OkrTree | null;
+  readonly initialAt: number;
+  readonly scope: OkrScope;
+  readonly filters: OkrFilters;
+  readonly cycleId: string | null;
+  readonly canEdit: boolean;
+  readonly canAdminister: boolean;
+  readonly progressMax: number;
+  readonly members: readonly Person[];
+  readonly coach: Coach;
+  readonly empty: React.ReactNode;
+}) {
+  if (props.cycleId === null || props.initialTree === null) {
+    return (
+      <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        {props.empty}
+      </div>
+    );
+  }
+  return (
+    <ReactFlowProvider>
+      <LiveDiagram
+        {...props}
+        cycleId={props.cycleId}
+        initialTree={props.initialTree}
+      />
+    </ReactFlowProvider>
+  );
+}
+
+function LiveDiagram({
+  initialTree,
+  initialAt,
+  scope,
+  filters,
+  cycleId,
+  canEdit,
+  canAdminister,
+  progressMax,
+  members,
+  coach,
+}: {
+  readonly initialTree: OkrTree;
+  readonly initialAt: number;
+  readonly scope: OkrScope;
+  readonly filters: OkrFilters;
+  readonly cycleId: string;
+  readonly canEdit: boolean;
+  readonly canAdminister: boolean;
+  readonly progressMax: number;
+  readonly members: readonly Person[];
+  readonly coach: Coach;
+}) {
+  const { t } = useTranslations();
+  const tree = useOkrTree({
+    cycleId,
+    scope,
+    initial: initialTree,
+    initialAt,
+  });
+  useOkrLive(cycleId);
+  const okr = useOkrMutation({ cycleId, scope });
+  const drawer = useDrawerAddress();
+  const flow = useReactFlow();
+  const frame = useRef<HTMLElement>(null);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
+    () => new Set(collapsedByDefault(initialTree)),
+  );
+  const [dependencies, setDependencies] = useState(false);
+
+  // The filters narrow the diagram as they narrow the list; an objective
+  // whose parent a filter hides hangs from the cycle.
+  const shown = useMemo(
+    () => ({ ...tree, goals: filterGoals(tree.goals, filters) }),
+    [tree, filters],
+  );
+  const layout = useMemo(
+    () => layoutOkrTree(shown, { collapsed, dependencies }),
+    [shown, collapsed, dependencies],
+  );
+
+  const toggle = useCallback(
+    (id: string) =>
+      setCollapsed((current) => {
+        const next = new Set(current);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        return next;
+      }),
+    [],
+  );
+
+  const nodes = useMemo(
+    () =>
+      layout.nodes.map((entry): Node => {
+        const base = {
+          id: entry.id,
+          position: { x: entry.x, y: entry.y },
+          width: entry.width,
+          height: entry.height,
+          style: { width: entry.width, height: entry.height },
+          draggable: false,
+          connectable: false,
+          domAttributes: { "data-node-id": entry.id } as never,
+        };
+        if (entry.kind === "objective") {
+          return {
+            ...base,
+            type: "objective",
+            ariaLabel: t("okrDiagram.objectiveLabel", {
+              title: entry.goal.title,
+              level: entry.goal.level,
+              progress: String(Math.round(entry.goal.progressPct)),
+              health: entry.goal.health.replace("_", " "),
+            }),
+            data: {
+              goal: entry.goal,
+              collapsed: entry.collapsed,
+              hiddenBelow: entry.hiddenBelow,
+              hasBelow:
+                entry.hiddenBelow > 0 ||
+                (layout.childrenOf.get(entry.id)?.length ?? 0) > 0,
+              progressMax,
+              onToggle: toggle,
+            } satisfies ObjectiveData,
+          };
+        }
+        if (entry.kind === "context") {
+          return {
+            ...base,
+            type: "context",
+            ariaLabel: t("okrDiagram.contextLabel", {
+              title: entry.context.title,
+              cycle: entry.context.cycleName ?? t("okrDiagram.anotherCycle"),
+            }),
+            data: { context: entry.context } satisfies ContextData,
+          };
+        }
+        return {
+          ...base,
+          type: "cycle",
+          ariaLabel: entry.name,
+          data: { name: entry.name } satisfies CycleData,
+        };
+      }),
+    [layout, progressMax, toggle, t],
+  );
+
+  const edges = useMemo(() => {
+    // Each line named in words, so a screen reader hears what it joins.
+    const titleOf = (id: string): string => {
+      const entry = layout.nodes.find((node) => node.id === id);
+      if (entry?.kind === "objective") {
+        return entry.goal.title;
+      }
+      if (entry?.kind === "context") {
+        return entry.context.title;
+      }
+      return entry?.kind === "cycle" ? entry.name : id;
+    };
+    return layout.edges.map(
+      (edge): Edge => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        ariaLabel:
+          edge.kind === "dependency"
+            ? t("okrDiagram.dependsOn", {
+                from: titleOf(edge.source),
+                to: titleOf(edge.target),
+              })
+            : t("okrDiagram.alignsTo", {
+                child: titleOf(edge.target),
+                parent: titleOf(edge.source),
+              }),
+        sourceHandle: edge.sourceHandle ?? "out",
+        targetHandle: "in",
+        type: "smoothstep",
+        focusable: false,
+        selectable: false,
+        ...(edge.kind === "dependency"
+          ? {
+              style: { strokeDasharray: "6 4" },
+              className: "okr-dependency",
+            }
+          : {}),
+      }),
+    );
+  }, [layout, t]);
+
+  const byId = useMemo(
+    () => new Map(layout.nodes.map((entry) => [entry.id, entry])),
+    [layout],
+  );
+
+  /** Puts a card in view, then the keyboard on it once it is drawn. */
+  const focusNode = (id: string) => {
+    const target = byId.get(id);
+    if (!target) {
+      return;
+    }
+    void flow.setCenter(
+      target.x + target.width / 2,
+      target.y + target.height / 2,
+      { zoom: flow.getZoom(), duration: 0 },
+    );
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        frame.current
+          ?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"]`)
+          ?.focus(),
+      ),
+    );
+  };
+
+  const openIn = (entry: DiagramNode | undefined) => {
+    if (entry?.kind === "objective") {
+      drawer.open(entry.id);
+    }
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    const focused = (event.target as HTMLElement).closest<HTMLElement>(
+      "[data-node-id]",
+    );
+    // Only on a card itself: a key in the card's own button is the button's.
+    if (!focused || focused !== event.target) {
+      return;
+    }
+    const id = focused.dataset.nodeId as string;
+    const parent = layout.parentOf.get(id);
+    const siblings = parent ? (layout.childrenOf.get(parent) ?? []) : [];
+    const at = siblings.indexOf(id);
+    const go: Record<string, string | undefined> = {
+      ArrowUp: parent,
+      ArrowDown: layout.childrenOf.get(id)?.[0],
+      ArrowLeft: at > 0 ? siblings[at - 1] : undefined,
+      ArrowRight: at >= 0 ? siblings[at + 1] : undefined,
+    };
+    if (event.key in go) {
+      event.preventDefault();
+      const next = go[event.key];
+      if (next) {
+        focusNode(next);
+      }
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openIn(byId.get(id));
+    }
+  };
+
+  const objectives = layout.nodes.filter((entry) => entry.kind === "objective");
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <button
+          type="button"
+          onClick={() =>
+            setCollapsed(
+              new Set(
+                shown.goals
+                  .filter((goal) => goal.level === "company")
+                  .map((goal) => goal.id),
+              ),
+            )
+          }
+          className="rounded-control border border-line bg-surface px-2 py-1 font-semibold text-ink-2 hover:bg-raised"
+        >
+          {t("okrDiagram.collapseAll")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setCollapsed(new Set())}
+          className="rounded-control border border-line bg-surface px-2 py-1 font-semibold text-ink-2 hover:bg-raised"
+        >
+          {t("okrDiagram.expandAll")}
+        </button>
+        <button
+          type="button"
+          aria-pressed={dependencies}
+          onClick={() => setDependencies((current) => !current)}
+          className="rounded-control border border-line bg-surface px-2 py-1 font-semibold text-ink-2 hover:bg-raised aria-pressed:border-brand aria-pressed:bg-brand-weak aria-pressed:text-brand-text"
+        >
+          {t("okrDiagram.dependencies")}
+        </button>
+        <span className="text-ink-4">{t("okrDiagram.keyboardHint")}</span>
+      </div>
+
+      <section
+        ref={frame}
+        aria-label={t("okrDiagram.label")}
+        data-testid="okr-diagram"
+        onKeyDown={onKeyDown}
+        className="okr-diagram h-[70vh] min-h-96 overflow-hidden rounded-lg border border-line"
+      >
+        {objectives.length === 0 ? (
+          <p className="p-3 text-sm text-ink-2" data-testid="okr-diagram-empty">
+            {t("okrDiagram.empty")}
+          </p>
+        ) : null}
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={NODE_TYPES}
+          fitView
+          fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+          minZoom={0.1}
+          maxZoom={1.5}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          // Only what is on screen is drawn, which is what keeps a cycle of
+          // three hundred objectives quick to open (design §7).
+          onlyRenderVisibleElements
+          onNodeClick={(_event, node) => openIn(byId.get(node.id))}
+          // The canvas's own words, in the reader's language, and true of
+          // this diagram: its arrow keys follow lines rather than move cards.
+          ariaLabelConfig={{
+            "node.a11yDescription.default": t("okrDiagram.keyboardHint"),
+            "node.a11yDescription.keyboardDisabled": t(
+              "okrDiagram.keyboardHint",
+            ),
+            "controls.ariaLabel": t("okrDiagram.controls"),
+            "controls.zoomIn.ariaLabel": t("okrDiagram.zoomIn"),
+            "controls.zoomOut.ariaLabel": t("okrDiagram.zoomOut"),
+            "controls.fitView.ariaLabel": t("okrDiagram.fitView"),
+            "minimap.ariaLabel": t("okrDiagram.minimap"),
+            "handle.ariaLabel": t("okrDiagram.handle"),
+          }}
+        >
+          <Background gap={20} size={1} />
+          <Controls showInteractive={false} />
+          <MiniMap pannable zoomable />
+        </ReactFlow>
+      </section>
+
+      <OkrDrawer
+        tree={tree}
+        okr={okr}
+        canEdit={canEdit}
+        canAdminister={canAdminister}
+        progressMax={progressMax}
+        members={members}
+        coach={coach}
+      />
+    </div>
   );
 }

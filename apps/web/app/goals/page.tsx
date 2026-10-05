@@ -261,8 +261,9 @@ export default async function GoalsPage({
 
   // What the editable list needs beyond the tree: who can champion or own,
   // and the numbers and practice its coaching chips judge by, which the
-  // browser cannot read for itself (P9-T07a-a). Only read for the list.
-  const editing = display === "editor" && okrTree !== null;
+  // browser cannot read for itself (P9-T07a-a). Read for the list and for
+  // the diagram, whose drawer edits with the same coaching (P9-T09a).
+  const editing = display !== "tree" && okrTree !== null;
   const [practiceRead, rhythmRead] = editing
     ? await Promise.all([
         callAction(context, "practice.read", {}),
@@ -508,27 +509,28 @@ export default async function GoalsPage({
 
       {display === "diagram" ? (
         <OkrDiagram
-          goals={treeGoals.map((goal) => ({
-            id: goal.id,
-            title: goal.title,
-            health: goal.health,
-            progressPct: goal.progressPct,
-            champion: goal.champion.name,
-            reviewer: goal.reviewer?.name ?? null,
-            keyResults: goal.keyResults.map((keyResult) => ({
-              id: keyResult.id,
-              title: keyResult.title,
-              unit: keyResult.unit,
-              currentValue: keyResult.currentValue,
-              targetValue: keyResult.targetValue,
-              progressPct: keyResult.progressPct,
-            })),
-          }))}
-          cycleName={
-            cycles.find((cycle) => cycle.id === cycleId)?.name ??
-            t("goals.editor.noCycle")
-          }
+          initialTree={okrTree}
+          initialAt={treeReadAt}
+          scope={scope}
+          filters={filters}
+          cycleId={cycleId}
+          canEdit={canEdit}
+          canAdminister={canAdminister}
           progressMax={progressMax}
+          members={members}
+          coach={{
+            thresholds: (rhythmRead?.thresholds ??
+              defaultThresholds()) as ResolvedThresholds,
+            practice: (practiceRead?.practice ??
+              defaultPractice()) as ResolvedPractice,
+          }}
+          empty={
+            <div className="flex flex-col gap-1.5 p-3">
+              <p className="text-sm text-ink-2">
+                {t("goals.noGoalsMatchThis")}
+              </p>
+            </div>
+          }
         />
       ) : null}
 

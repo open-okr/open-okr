@@ -421,7 +421,11 @@ test("the diagram draws the same cycle", async () => {
   await expect(
     page.getByRole("button", { name: "Collapse all" }),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("link", { name: OBJECTIVE })).toBeVisible();
+  // A card on the diagram since P9-T09a, which opens the drawer rather than
+  // linking to the goal page; `s13e-okr-diagram.spec.ts` drives it.
+  await expect(
+    page.getByTestId("okr-diagram").getByText(OBJECTIVE),
+  ).toBeVisible();
 });
 
 test("a member can take the key result back off the set", async () => {

@@ -107,6 +107,13 @@ catalog:
   "@tiptap/extension-table": 3.31.3
   "@tiptap/extension-mention": 3.31.3
   "@tiptap/suggestion": 3.31.3
+  # The OKR diagram (P9-T09a), approved by Akmal on 2 October 2026 as
+  # decision D1 of the Phase 9 design gate. MIT, bundled at build time, so an
+  # air-gapped install is unaffected; its own dependencies are MIT and ISC.
+  # D1 approved dagre beside it for the layout, and it is not here: alignment
+  # gives every objective one parent, so the tree is laid out in the list's
+  # own order without a graph library (okr-layout.ts says why).
+  "@xyflow/react": ^12.12.0
 
 minimumReleaseAgeExclude:
   - '@next/env@16.3.0'

@@ -149,6 +149,8 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 
 The two are new runtime dependencies, so this needs Akmal's approval (decision D1 in the companion document). Both are bundled at build time, so the air-gapped install is unaffected. The alternative is extending the hand-built `/goals/studio` canvas, which has pan, zoom and keyboard traversal but no drag-to-connect, minimap or node editing; about three tasks of work to reach the same place.
 
+**As built at P9-T09a: React Flow, and no dagre.** Alignment gives every objective one parent, so the picture is a forest: the cycle, and every parent from another cycle as a root of its own. A tidy tree laid out depth first in the list's own order puts siblings exactly where the list does and cannot cross an edge. dagre reorders siblings to reduce crossings, and its order would then have to be undone, which is the §5.2 "Order" step. So the layout is `apps/web/app/goals/okr-layout.ts`, a pure function with its own tests. dagre was approved and is not installed.
+
 ### 5.2 Layout
 
 ```
@@ -175,6 +177,8 @@ The two are new runtime dependencies, so this needs Akmal's approval (decision D
 - **Order.** After layout, siblings are re-sorted to the saved order, so the list and the diagram agree.
 - **Edges.** Alignment edges are solid. Dependencies are dashed and can be switched off.
 - **Collapse.** Objectives collapse one at a time, or all at once. Beyond the node budget (§7) the tree opens collapsed below company level.
+
+**As built at P9-T09a.** Cards are one width, and a row is as tall as its tallest card. A collapsed card folds its key results and says how many objectives it hides ("+9 below"). Dependencies are dashed and off until asked for. A parent from another cycle is a read-only card in the top row, and its title opens it in its own cycle with the drawer, because this cycle's cache does not hold it. A card opens the drawer; editing on the card is P9-T10's. The filters narrow the diagram as they narrow the list, and an objective whose parent a filter hides hangs from the cycle. Every line is named in words ("X aligns to Y"), and React Flow's own texts (its controls, minimap and keyboard description) are given in the reader's language, the last one saying what the arrow keys do here, which is follow lines rather than move cards. The studio's panel moves in at P9-T09b.
 
 ### 5.3 Editing on the diagram
 
@@ -225,7 +229,9 @@ The flaw FlowyLMS has, two views drifting apart, is avoided by having one source
 | Inline commit to visible change | Immediate (optimistic); server confirmation within the §13.1 write budget | The cache patch happens before the request |
 | Diagram, 300 objectives | Interactive in under a second on the reference machine | React Flow renders only visible nodes; the tree opens collapsed below company level past 150 objectives |
 
-The P9-T09 task measures the diagram on the `pnpm db:seed:large` dataset and records the numbers, as P7-T01b did for the other screens.
+P9-T09a measures the diagram on the `pnpm db:seed:large` dataset and records the numbers, as P7-T01b did for the other screens.
+
+**Measured at P9-T09a.** Three hundred objectives in one cycle (thirty company objectives with nine aligned below each) opened collapsed below company level and answered a press **891 ms** after navigation, on the development machine against the standalone production build. `e2e/s13e-okr-diagram.spec.ts` repeats it on every run and prints the number, with a 15-second ceiling for whatever machine runs it. It was measured with the end-to-end dataset rather than `pnpm db:seed:large`: what this budget covers is the browser's work, laying out and drawing one cycle, and the server's read of a cycle's tree is TECHNICAL-PLAN §13.1's own row for the OKR tree, which `pnpm perf:budgets` measures on the large dataset. Only the cards on screen are drawn, which is what keeps a wide tree quick.
 
 ## 8. UIUX-PLAN and mockup changes, made with the tasks
 
@@ -234,10 +240,10 @@ The P9-T09 task measures the diagram on the `pnpm db:seed:large` dataset and rec
 | §3 shell | Sidebar regrouped per Agung's §3.1; "Goals" renamed "OKRs"; `+ New` in the topbar opens "+ New objective" | P9-T07a, P9-T07b |
 | S-13 | Rewritten as the OKRs screen, list view (§3 and §4 here) | P9-T07a |
 | S-14 goal detail | "+ Add key result" row; targets editable with the reason rule; the confidence control actually saved | P9-T08 |
-| S-16 | Becomes the OKRs screen's diagram view (§5) | P9-T09, P9-T10 |
+| S-16 | Becomes the OKRs screen's diagram view (§5) | P9-T09b, P9-T10 |
 | S-36 | A practice card group: profile and settings | P9-T05 |
 | Mockups 12 and 12b | Redrawn: no closed state by default; the restricted state shown only as the governed profile's | P9-T07b |
-| Mockup 05 | Redrawn as the diagram view with key result stacks | P9-T09 |
+| Mockup 05 | Redrawn as the diagram view with key result stacks | P9-T09b |
 
 ## 9. Acceptance criteria
 
@@ -267,5 +273,6 @@ Full text in IMPLEMENTATION-PLAN.md, Phase 9.
 | P9-T07b | Adding and reordering in the list | §4.3, §4.4; "+ New objective"; mockups 12 and 12b |
 | P9-T08a | The OKR drawer | The shared drawer with edit, history and target changes, alignment, in the address |
 | P9-T08b | Checking in from the drawer, and the goal page | The drawer's check-in tab; S-14's add-key-result row; the confidence control wired |
-| P9-T09 | The diagram view | React Flow and dagre, layout, nodes with key result stacks, toggle, collapse, the studio panel, keyboard, the performance measurement |
+| P9-T09a | The diagram on the cache | React Flow and dagre, layout, nodes with key result stacks, toggle, collapse, keyboard, the context band, the performance measurement |
+| P9-T09b | The studio moves into the diagram | The studio's health and findings panel, the redirect, S-16 and mockup 05 |
 | P9-T10 | Editing on the diagram | §5.3: in-place edits, + KR, + aligned, re-parent by drag with undo, sibling reorder |

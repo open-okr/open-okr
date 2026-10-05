@@ -75,26 +75,6 @@ import {
  * one sends is in `okr-editing.ts`, which the drawer shares (P9-T08a).
  */
 
-interface EditableKeyResult {
-  readonly id: string;
-  readonly title: string;
-  readonly unit: string | null;
-  readonly currentValue: number;
-  readonly targetValue: number;
-  readonly progressPct: number;
-}
-
-export interface EditableGoal {
-  readonly id: string;
-  readonly title: string;
-  readonly health: string;
-  readonly progressPct: number;
-  readonly champion: string;
-  /** Null where the goal has no reviewer, which the practice allows (P9-T04). */
-  readonly reviewer: string | null;
-  readonly keyResults: readonly EditableKeyResult[];
-}
-
 const GRID = "md:grid-cols-[2.75rem_minmax(0,1fr)_13rem_8rem_6.5rem_5rem]";
 
 /**

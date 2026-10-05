@@ -111,7 +111,19 @@ async function removeRole(name: RegExp) {
 
 test("a role is added, held, refused removal, then removed", async () => {
   const added = new RegExp(ADDED_ROLE);
-  const assign = page.getByRole("combobox", { name: /^Role for / }).first();
+  // One member, held by name for the whole test rather than by position: a
+  // list read in storage order put the member whose role was just written
+  // at the end, so "the first" became somebody else half way through, and
+  // "No role" went to them. That is how this failed in a full run and not
+  // alone, where the founder is the only member.
+  const named = await page
+    .getByRole("combobox", { name: /^Role for / })
+    .first()
+    .getAttribute("aria-label");
+  const assign = page.getByRole("combobox", {
+    name: named ?? "",
+    exact: true,
+  });
 
   // **Left over from a previous attempt, if there was one.** The file runs
   // serial, so a failure replays all of it, and a role this test added and
@@ -119,7 +131,10 @@ test("a role is added, held, refused removal, then removed", async () => {
   // makes the replay mean the same thing as a first run.
   if ((await page.getByRole("rowheader", { name: added }).count()) > 0) {
     await assign.selectOption({ label: "No role" });
-    await expect(assign).toHaveValue("");
+    await expect(page.getByRole("rowheader", { name: added })).toContainText(
+      "Held by 0",
+      { timeout: 15_000 },
+    );
     await removeRole(added);
     await expect(page.getByRole("rowheader", { name: added })).toHaveCount(0, {
       timeout: 15_000,
@@ -138,6 +153,10 @@ test("a role is added, held, refused removal, then removed", async () => {
   // sentence rather than failing silently.
   await assign.selectOption({ label: ADDED_ROLE });
   await expect(assign).toHaveValue(/.+/);
+  await expect(page.getByRole("rowheader", { name: added })).toContainText(
+    "Held by 1",
+    { timeout: 15_000 },
+  );
 
   await removeRole(added);
   await expect(page.getByText("Somebody still holds this role")).toBeVisible({
@@ -148,10 +167,16 @@ test("a role is added, held, refused removal, then removed", async () => {
   // **Wait for the unassignment to land before removing.** Selecting "No
   // role" starts a transition; pressing Delete before it commits asks the
   // server to remove a role somebody still holds, which is refused, and the
-  // test then reads a role that is still there. The empty value is what says
-  // the write came back.
+  // test then reads a role that is still there. The select's own empty value
+  // said nothing about the server, since it changes the moment it is chosen,
+  // which is how this failed twice in a row in continuous integration on
+  // 5 October 2026; the row's "Held by 0" is the server's answer.
   await assign.selectOption({ label: "No role" });
   await expect(assign).toHaveValue("");
+  await expect(page.getByRole("rowheader", { name: added })).toContainText(
+    "Held by 0",
+    { timeout: 15_000 },
+  );
 
   await removeRole(added);
   await expect(page.getByRole("rowheader", { name: added })).toHaveCount(0, {

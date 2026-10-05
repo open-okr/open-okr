@@ -54,10 +54,11 @@ test.afterAll(async () => {
       title: string;
     }[];
     for (const goal of ours.filter((row) => row.title === OBJECTIVE)) {
-      await api.post("/api/v1/goals/delete", {
+      const deleted = await api.post("/api/v1/goals/delete", {
         headers: authed(),
         data: { id: goal.id },
       });
+      expect(deleted.status()).toBe(200);
     }
   }
   await api?.dispose();
@@ -69,6 +70,9 @@ test("sign in, with a token for putting things back", async () => {
   await goTo(page, "/account/api-tokens");
   await page.getByLabel("Name").fill("OKR drafts e2e");
   await page.getByRole("checkbox", { name: "Write" }).check();
+  // Deleting is destructive, which Write alone is refused, so without this
+  // the clean-up below was refused and left its objectives behind.
+  await page.getByRole("checkbox", { name: "Destructive" }).check();
   await page.getByRole("button", { name: "Create token" }).click();
   const shown = page.getByTestId("minted-token");
   await expect(shown).toBeVisible({ timeout: 10_000 });
