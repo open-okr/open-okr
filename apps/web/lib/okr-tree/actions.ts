@@ -197,6 +197,12 @@ export type OkrMutation =
    * (METHOD.md §2.9, P9-T13-b-b). The server says where it goes.
    */
   | { readonly kind: "publishDraft"; readonly id: string }
+  /**
+   * §2.9's stop, closed as abandoned with a one-line reason, and its undo,
+   * which reopens it (P9-T13-c-a).
+   */
+  | { readonly kind: "stopGoal"; readonly id: string; readonly reason: string }
+  | { readonly kind: "reopenGoal"; readonly id: string }
   | { readonly kind: "approveDraft"; readonly id: string }
   | {
       /** Committed or aspirational, with why (METHOD.md §2.8, P9-T11b-a). */
@@ -326,6 +332,15 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
           ...(mutation.reason ? { reason: mutation.reason } : {}),
         })
       ).goal;
+    case "stopGoal":
+      await callAction(ctx, "goals.stop", {
+        id: mutation.id,
+        reason: mutation.reason,
+      });
+      return null;
+    case "reopenGoal":
+      await callAction(ctx, "goals.reopen", { id: mutation.id });
+      return null;
     case "publishDraft":
       return (await callAction(ctx, "goals.publishDraft", { id: mutation.id }))
         .goal;

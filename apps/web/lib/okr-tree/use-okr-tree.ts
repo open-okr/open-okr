@@ -121,6 +121,7 @@ function optimistic(tree: OkrTree, mutation: OkrMutation): OkrTree {
     case "placeKeyResult":
       return placeKeyResultIn(tree, mutation.id, mutation.afterId);
     case "deleteGoal":
+    case "stopGoal":
       return withoutGoal(tree, mutation.id);
     case "reparent":
       return reparentIn(tree, mutation.id, mutation);
@@ -130,6 +131,7 @@ function optimistic(tree: OkrTree, mutation: OkrMutation): OkrTree {
     case "restoreGoal":
     case "publishDraft":
     case "approveDraft":
+    case "reopenGoal":
     case "checkIn":
       // Nothing to guess: the row comes back with the server's answer, and a
       // check-in's health and next date are the server's to work out.
@@ -250,6 +252,17 @@ export function useOkrMutation(input: {
                 },
                 undo: true,
               }),
+          },
+        });
+      }
+      if (change.kind === "stopGoal") {
+        toast.show({
+          tone: "ok",
+          message: t("okrTree.objectiveStopped"),
+          source: change.id,
+          action: {
+            label: t("okrTree.undo"),
+            run: () => mutation.mutate({ kind: "reopenGoal", id: change.id }),
           },
         });
       }

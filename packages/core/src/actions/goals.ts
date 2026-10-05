@@ -91,6 +91,7 @@ import {
   recomputeGoalQualityInTx,
   recomputeUnitQualityInTx,
 } from "../quality/service.ts";
+import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
@@ -1684,6 +1685,90 @@ export const closeGoal = defineWriteAction({
             successStatus: input.successStatus,
             closeDecision: input.closeDecision,
           },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * §2.9's stop: an OKR that no longer matters, "closed as abandoned with a
+ * one-line reason" (P9-T13-c-a).
+ *
+ * A close with the decision "abandon" and the reason as its one account, so
+ * the archive, the history and a reopen read it as they read any close. Until
+ * §3.5's abandoned outcome arrives at P9-T15, the outcome a stop records is
+ * missed: nothing was achieved, and the decision says why.
+ */
+export const stopGoal = defineWriteAction({
+  name: "goals.stop",
+  // openokr:policy-exempt: a stop is always allowed and always needs its one-line reason (METHOD.md §2.9), which the input requires; no practice setting governs it.
+  summary:
+    "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9).",
+  input: z.object({
+    id: z.uuid(),
+    /** One line: why it no longer matters. */
+    reason: z.string().trim().min(1).max(280),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    subject: { type: "goal", id: input.id },
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+      const [goal] = await tx
+        .select({ title: goals.title })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .limit(1);
+
+      await closeGoalInTx(tx, {
+        workspaceId,
+        goalId: input.id,
+        closedById: memberId,
+        successStatus: "missed",
+        closeDecision: "abandon",
+        closeReason: input.reason,
+        retrospectiveBody: richTextFromPlainText(input.reason),
+      });
+      // The same aftermath as any close: never due again, and the set it
+      // left is judged without it.
+      await clearDue(tx, workspaceId, input.id);
+      await recompute(tx, workspaceId, input.id);
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: input.id });
+      await realign(tx, workspaceId, input.id);
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "goal.stopped",
+          subjectType: "goal",
+          subjectId: input.id,
+          payload: { title: goal?.title ?? "", reason: input.reason },
+          notify: true,
+        },
+        audit: {
+          action: "goals.stop",
+          targetType: "goal",
+          targetId: input.id,
+          payload: { reason: input.reason },
         },
       };
     },

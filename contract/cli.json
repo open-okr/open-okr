@@ -6509,6 +6509,29 @@
       "pages": false
     },
     {
+      "name": "goals stop",
+      "action": "goals.stop",
+      "method": "POST",
+      "path": "/goals/stop",
+      "scope": "write",
+      "summary": "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9).",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals reassignRole",
       "action": "goals.reassignRole",
       "method": "POST",

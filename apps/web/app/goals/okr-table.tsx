@@ -755,6 +755,16 @@ function ObjectiveRow({
           deleteLabel={t("goals.editor.deleteObjective")}
           canDelete={canAdminister && !busy}
           onDelete={onDelete}
+          // §2.9's stop, for an open objective somebody may change.
+          stop={
+            canEdit && goal.closedAt === null && !busy
+              ? {
+                  label: t("okrList.stopObjective", { title: goal.title }),
+                  run: (reason) =>
+                    okr.mutate({ kind: "stopGoal", id: goal.id, reason }),
+                }
+              : null
+          }
         />
       </div>
       <Refused okr={okr} id={goal.id} />
@@ -997,6 +1007,7 @@ function RowActions({
   deleteLabel,
   canDelete,
   onDelete,
+  stop = null,
 }: {
   readonly href: string;
   readonly onOpen: () => void;
@@ -1006,9 +1017,74 @@ function RowActions({
   readonly deleteLabel: string;
   readonly canDelete: boolean;
   readonly onDelete: () => void;
+  /**
+   * Objectives only: stopping one that no longer matters, with its one-line
+   * reason (METHOD.md §2.9, P9-T13-c-a). Null where it cannot be stopped.
+   */
+  readonly stop?: {
+    readonly label: string;
+    readonly run: (reason: string) => void;
+  } | null;
 }) {
   const { t } = useTranslations();
   const [confirming, setConfirming] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [reason, setReason] = useState("");
+
+  if (stopping && stop) {
+    const send = () => {
+      if (reason.trim() === "") {
+        return;
+      }
+      stop.run(reason.trim());
+      setStopping(false);
+      setReason("");
+    };
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <input
+          // The reason is the whole point of the control, so it takes the
+          // focus the moment the control opens.
+          // biome-ignore lint/a11y/noAutofocus: opened by the reader's own press, to type the one thing it asks.
+          autoFocus
+          value={reason}
+          maxLength={280}
+          aria-label={t("okrList.stopReason")}
+          placeholder={t("okrList.stopReason")}
+          onChange={(event) => setReason(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              send();
+            }
+            if (event.key === "Escape") {
+              setStopping(false);
+              setReason("");
+            }
+          }}
+          className="h-7 w-56 rounded-control border border-line bg-surface px-2 text-xs"
+        />
+        <Button
+          type="button"
+          size="sm"
+          disabled={reason.trim() === ""}
+          onClick={send}
+        >
+          {t("okrList.stopConfirm")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => {
+            setStopping(false);
+            setReason("");
+          }}
+        >
+          {t("common.cancel")}
+        </Button>
+      </div>
+    );
+  }
 
   if (confirming) {
     return (
@@ -1076,6 +1152,26 @@ function RowActions({
           <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z" />
         </svg>
       </a>
+      {stop ? (
+        <button
+          type="button"
+          aria-label={stop.label}
+          onClick={() => setStopping(true)}
+          className="flex size-6 items-center justify-center rounded-control text-ink-4 hover:bg-raised hover:text-ink-2"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+            className="size-3.5"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <rect x="9" y="9" width="6" height="6" />
+          </svg>
+        </button>
+      ) : null}
       {canDelete ? (
         <button
           type="button"

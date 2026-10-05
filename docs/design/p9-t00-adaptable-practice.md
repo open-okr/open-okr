@@ -226,7 +226,9 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T13-a | Adding OKRs mid-cycle | §2.9's four moves | None (behaviour) |
 | P9-T13-b-a | A target that can wait, and live or draft | §2.9's live or draft | None (behaviour) |
 | P9-T13-b-b | Drafts that wait for a person | none | None (behaviour) |
-| P9-T13-c | Stopping, and targets that move | §2.1, §2.9's changing a target, §7.6 | The four calibration sentences |
+| P9-T13-c-a | Stopping | none (§2.9's four moves arrived at P9-T13-a) | None (behaviour) |
+| P9-T13-c-b | Targets that move under one rule | §2.9's changing a target, §7.6 | The four calibration sentences |
+| P9-T13-c-c | Annual revisions | §2.1 | None (behaviour) |
 | P9-T13a | Moving an objective to another space (G-1) | §2.9's "When the organisation changes" | None (behaviour) |
 | P9-T14 | Adjustable scores and cycles that keep their rules | §3.3, §12 snapshot paragraph | Score band values |
 | P9-T15 | A progress signal that knows the date | §3.5, §3.6, §3.7 | "Progress signal pace gaps", "Trend forecast minimum values", "Divergence window" |

@@ -127,7 +127,7 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 |---|---|
 | Reorder | Drag by the grip, within the same parent. The keyboard alternative is Alt+↑ and Alt+↓. The whole order is saved, never just the visible rows |
 | Delete a key result | More menu, then delete, with the six-second undo toast. A soft delete through `goals.removeKeyResult`, which P8-G12 built, restorable from deleted items (P9-T06b). One removal rather than a second action beside it |
-| Stop an objective | More menu, then stop, with a one-line reason. It closes as abandoned (§2.9 of the method) |
+| Stop an objective | More menu, then stop, with a one-line reason. It closes as abandoned (§2.9 of the method). **As built at P9-T13-c-a**, the row has no more menu, so Stop sits with its open, check-in and delete controls, revealed on hover and reachable by keyboard, and asks the reason in place |
 | Check in | The row's check-in action opens the drawer on its check-in tab |
 
 **As built at P9-T07b-b.** Reordering is `goals.place` and `goals.placeKeyResult`: one row put after another, or first, and the whole set renumbered on the server in one statement, which is how a row a filter hides keeps its place: the screen names only the new neighbour, never the order it can see. Alt and an arrow anywhere in a row move it, and the keyboard goes back to the row's grip after each move so the next press needs no hunting; the grip also drags onto another row of the same set, landing above or below it by which half it is dropped on. Deleting an objective joined the cache: the row goes at once and the toast offers Undo for six seconds, which restores it through `goals.restore`. **Stopping moved to P9-T13**, which builds the stop as a close-abandoned with a reason; the list's control comes with it.

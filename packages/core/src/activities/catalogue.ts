@@ -345,6 +345,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     closeDecision: z.enum(["keep", "modify", "abandon"]),
   }),
   "goal.reopened": z.object({}),
+  // §2.9's stop, closed as abandoned with its one-line reason (P9-T13-c-a).
+  "goal.stopped": z.object({ title: z.string(), reason: z.string() }),
   // The title, because a feed entry about a goal being removed has to read as
   // a sentence after the goal is gone (P4-T14b-a).
   "goal.deleted": z.object({ title: z.string() }),
