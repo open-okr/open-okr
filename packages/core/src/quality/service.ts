@@ -434,7 +434,12 @@ export async function recomputeUnitQualityInTx(
           ne(goals.id, input.goalId),
         ),
       ),
-    );
+    )
+    // In one order for every writer. Two objectives added to the same unit at
+    // once each update every sibling, and in whatever order Postgres returned
+    // them they could each hold a row the other waits for, which is a
+    // deadlock and a refused write; in one order the second simply waits.
+    .orderBy(goals.id);
 
   for (const sibling of siblings) {
     await recomputeGoalQualityInTx(tx, {

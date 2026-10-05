@@ -638,7 +638,6 @@ export default async function CyclePage({
 
           {viewing === 6 && cadence ? (
             <RunningCadence
-              cycleId={workflow.cycleId}
               sessions={cadence.sessions}
               blockers={cadence.blockers}
               decisions={cycleDecisions.map((decision) => ({
@@ -662,9 +661,6 @@ export default async function CyclePage({
               )}
               streak={cadence.streak}
               calibration={workflow.calibration}
-              // `workflow.calibrate` is declared at full, the same as publishing.
-              canCalibrate={canPublish}
-              closed={workflow.status === "closed"}
             />
           ) : null}
 

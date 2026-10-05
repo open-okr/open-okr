@@ -714,7 +714,12 @@ describe("0011: sealing the identity-provider tokens stored in plain text", () =
     for (const value of Object.values(plain ?? {})) {
       expect(value).toMatch(SEALED);
     }
-    expect(JSON.stringify(plain)).not.toMatch(/access-1|refresh-1|eyJ/);
+    // The plain tokens in full, not a fragment of one: base64 ciphertext
+    // spells "eyJ" by chance about once in a few hundred runs, which is how
+    // this assertion failed on 6 October 2026 with every token sealed.
+    expect(JSON.stringify(plain)).not.toMatch(
+      /access-1|refresh-1|eyJ\.id\.token/,
+    );
     // A fresh data key per token, so equal tokens never look equal at rest.
     expect(new Set(Object.values(plain ?? {})).size).toBe(3);
 

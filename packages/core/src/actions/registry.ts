@@ -170,7 +170,6 @@ import {
 import {
   addIssue,
   addPriority,
-  calibrateCycle,
   distributePack,
   publishCycle,
   readWorkflow,
@@ -691,7 +690,6 @@ export const ACTION_MAP = {
   "workflow.setBaselineHealth": setBaselineHealth,
   "workflow.setCapacityNotes": setCapacityNotes,
   "workflow.setFocusKeyResults": setFocusKeyResults,
-  "workflow.calibrate": calibrateCycle,
   "workflow.publish": publishCycle,
   "documents.list": listDocuments,
   "documents.read": readDocument,

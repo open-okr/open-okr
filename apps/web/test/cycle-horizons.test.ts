@@ -4,14 +4,14 @@ import { keepCycle, phaseHref } from "../app/cycle/cycle-href.ts";
 import { readScreen } from "./screen-text.ts";
 
 /**
- * The annual cycle can be made and opened, and the calibration recorded, from
- * the cycle workspace (completeness review M-06, UIUX-PLAN S-04, S-11).
+ * The annual cycle can be made and opened from the cycle workspace, and phase
+ * 6 shows how a target moves (completeness review M-06, UIUX-PLAN S-04, S-11).
  *
  * **Three gaps, one screen.** The page read `cycles.current` in quarterly mode
  * and nothing else, so an annual cycle could exist and never be opened. The
  * create control passed no cadence, so it could not make one either. And
  * `workflow.calibrate` had no caller while phase 6 read "not calibrated" from
- * a hardcoded null.
+ * a hardcoded null; METHOD v2 has since retired the calibration (P9-T13-c-b).
  *
  * The behaviour of the writes is proved against a real database in
  * `packages/core/test/cycles.test.ts` and `cycle-workflow.test.ts`. What is
@@ -107,38 +107,18 @@ describe("creating a cycle", () => {
   });
 });
 
-describe("the mid-cycle calibration", () => {
-  test("has a caller, and phase 6 reads what it recorded", () => {
-    expect(actions).toContain('"workflow.calibrate"');
-    expect(cadence).toContain("action={calibrateCycle}");
+describe("the mid-cycle calibration, retired (METHOD.md §7.6, P9-T13-c-b)", () => {
+  test("nothing records one any more, and phase 6 shows the rule a target moves by", () => {
+    expect(actions).not.toContain('"workflow.calibrate"');
+    expect(cadence).not.toContain("<form");
+    expect(cadence).not.toContain("ActionForm");
+    expect(cadence).toContain('data-testid="calibration-rule"');
+  });
+
+  test("a calibration recorded before it retired is still shown, as history", () => {
     expect(page).toContain("calibration={workflow.calibration}");
-    expect(page).not.toContain("calibratedAt={null}");
-  });
-
-  test("the reason is required, as §7.6 and the action both ask", () => {
-    expect(cadence).toContain('name="reason"');
-    expect(cadence).toContain("required");
-    expect(actions).toContain("A calibration needs its reason");
-  });
-
-  test("once used, the record replaces the form", () => {
-    // §7.6 allows one. A form that can only be refused would be asking for a
-    // reason nobody can record.
-    expect(cadence).toMatch(
-      /calibration && calibratedOn \?[\s\S]*canCalibrate \?/,
-    );
-    expect(cadence).toContain("This cycle has used its one calibration");
     expect(cadence).toContain('data-testid="calibration-reason"');
-  });
-
-  test("is offered only at the access the action declares", () => {
-    expect(page).toContain("canCalibrate={canPublish}");
-    expect(cadence).toContain("needs full access");
-  });
-
-  test("is not offered on a closed cycle, which the action refuses", () => {
-    expect(page).toContain('closed={workflow.status === "closed"}');
-    expect(cadence).toMatch(/closed \? null : canCalibrate \?/);
+    expect(cadence).toContain("once-a-cycle calibration");
   });
 
   test("states §7.6 from the method package rather than in its own words", () => {

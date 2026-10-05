@@ -262,8 +262,10 @@ The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An i
 ### cycle_capacity_notes
 `cycle_id` to cycles, `cuts` (rich).
 
-### cycle_calibrations
+### cycle_calibrations *(retiring)*
 `cycle_id` to cycles, `used bool`, `reason`, `at`, `author_member_id` to workspace_members.
+
+**Nothing writes it since P9-T13-c-b** (METHOD.md §7.6): a target moves at any time under §2.9's one rule, each eased change keeping its reason in `key_result_target_changes`, so there is no once-a-cycle calibration to record. Migration 0118 dropped the one-per-cycle index. `workflow.read` still shows a row recorded before, as history. **The table is removed in the release after 0.2.0** (PLAN.md §5.1), once no running release reads it.
 
 ### rhythm_settings *(one row per workspace)*
 `default_check_in_frequency`, `check_in_anchor_day`, `coach_strictness` (`advisory` / `warn` / `strict`), `overrides jsonb`, `labels jsonb`, `quiet_mode bool`, `profile` (`recommended` / `googleStyle` / `radicalFocus` / `lightweight` / `governed`, default `recommended`), `practice jsonb` (default `{}`, an object). `overrides` holds sparse deviations from the METHOD.md §11 registry, validated against the method package's schema; an unset key reads the canon default. `profile` and `practice` (0109, P9-T01) are the METHOD.md §12 practice settings: the chosen profile, and only what the workspace changed on top of it, validated against `PRACTICE`. No legacy source.

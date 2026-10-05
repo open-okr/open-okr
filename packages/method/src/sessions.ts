@@ -150,20 +150,19 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
 
 /**
  * §7.6, the mid-cycle calibration, sentence by sentence (completeness review
- * M-06).
+ * M-06), as METHOD v2 rewrote it (P9-T13-c-b).
  *
- * Phase 6 shows it beside the form that records one, because a reason is only
- * worth reading if it was written against the rule. It is split at the
- * document's own full stops, the way `PHASE_GUIDANCE` carries §9, so `pnpm
- * method:check` can compare it word for word. "Once" stays in the text rather
- * than becoming a number here: §11 has no calibration parameter, and the
- * schema already holds at most one calibration per cycle.
+ * There is no longer a once-a-cycle calibration to record: a target moves at
+ * any time under §2.9's one rule, and these four sentences are that rule as
+ * phase 6 shows it. Split at the document's own full stops, the way
+ * `PHASE_GUIDANCE` carries §9, so `pnpm method:check` can compare it word for
+ * word.
  */
 export const MID_CYCLE_CALIBRATION: readonly string[] = [
-  "Once per cycle, optional",
-  "A target may be adjusted only for a verifiable change in external reality, with a written reason",
-  "Not for difficulty, not for mood",
-  "Anything else is moving the goalposts and it destroys the score's meaning",
+  "A target may be changed at any time in the cycle, as §2.9 says",
+  "Making a target harder needs no reason",
+  "Easing one, toward its baseline, needs a written reason, and the original target stays on record",
+  "It got hard is not a reason, and changing a target only because it got hard empties the score of meaning",
 ];
 
 export type ReviewAct = "open" | "review" | "retro" | "reset";

@@ -174,29 +174,6 @@ export async function publishCycle(
 }
 
 /**
- * The one mid-cycle calibration (METHOD.md §7.6, completeness review M-06).
- *
- * `workflow.calibrate` has been registered since P3-T03 with no caller, and the
- * coverage test excused it as an AI draft, which it never was: it records a
- * person's reason. A second calibration is refused by the action, in words,
- * and this puts that sentence in front of whoever tried.
- */
-export async function calibrateCycle(
-  _previous: WriteState,
-  formData: FormData,
-): Promise<WriteState> {
-  const cycleId = String(formData.get("cycleId") ?? "");
-  const reason = String(formData.get("reason") ?? "").trim();
-  if (reason === "") {
-    const { t } = await getTranslations();
-    return { error: t("cycle.actions.calibrationNeedsAReason") };
-  }
-  return run((context) =>
-    callAction(context, "workflow.calibrate", { cycleId, reason }),
-  );
-}
-
-/**
  * The §5.4 dependency register (P6-G17).
  *
  * Publish gate 4 is "every dependency is confirmed, or logged with a named risk

@@ -9,7 +9,7 @@ import { workerDb } from "@openokr/test-support/db";
 import { measureQueryOverlap } from "@openokr/test-support/query-overlap";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { callAction } from "../src/actions/registry.ts";
+import { ACTIONS, callAction } from "../src/actions/registry.ts";
 import {
   ensurePackItemsInTx,
   evaluateWorkflow,
@@ -689,25 +689,18 @@ describe("the workflow actions", () => {
     expect(read.phases[3]?.state).toBe("pass");
   });
 
-  it("allows one calibration and refuses the second in words", async () => {
-    // §7.6 allows one. The unique index would refuse the second anyway; the
-    // action turns a constraint violation into a sentence somebody can read.
-    const wb = await workerDb();
-    await callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
-      cycleId,
-      reason: "The market moved under the set",
-    });
-    await expect(
-      callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
-        cycleId,
-        reason: "Again",
-      }),
-    ).rejects.toThrow(/already been calibrated/i);
+  it("records no calibration any more: a target moves under §2.9's one rule instead", () => {
+    // METHOD.md §7.6, as v2 rewrote it (P9-T13-c-b). Each eased target carries
+    // its own reason, so there is nothing left to record once a cycle.
+    expect(ACTIONS.map((action) => action.name)).not.toContain(
+      "workflow.calibrate",
+    );
   });
 
-  it("reads back what the calibration recorded, and who recorded it", async () => {
-    // Completeness review M-06. The row was written and never read, so phase
-    // 6 said "not calibrated" whatever had been recorded.
+  it("still reads back a calibration recorded before it retired, and who recorded it", async () => {
+    // Completeness review M-06 made phase 6 read the row; it is history now,
+    // and the table stays one more release (PLAN.md §5.1). Written straight
+    // into the table because no action can write one any more.
     const wb = await workerDb();
     const before = await callAction(
       { pool: wb.appPool, ...context() },
@@ -716,10 +709,16 @@ describe("the workflow actions", () => {
     );
     expect(before.calibration).toBeNull();
 
-    await callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
-      cycleId,
-      reason: "The regulator moved the launch window to November",
-    });
+    await wb.admin.query(
+      `insert into cycle_calibrations (id, workspace_id, cycle_id, reason, author_member_id)
+       values (gen_random_uuid(), $1, $2, $3,
+               (select id from workspace_members where workspace_id = $1 limit 1))`,
+      [
+        workspaceId,
+        cycleId,
+        "The regulator moved the launch window to November",
+      ],
+    );
 
     const after = await callAction(
       { pool: wb.appPool, ...context() },
@@ -731,31 +730,6 @@ describe("the workflow actions", () => {
     );
     expect(after.calibration?.authorName).toBe("Workflow Owner");
     expect(Number.isNaN(Date.parse(after.calibration?.at ?? ""))).toBe(false);
-  });
-
-  it("refuses to calibrate a cycle that is not there, in words", async () => {
-    const wb = await workerDb();
-    await expect(
-      callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
-        cycleId: "00000000-0000-4000-8000-000000000000",
-        reason: "The market moved under the set",
-      }),
-    ).rejects.toThrow(/no such cycle/i);
-  });
-
-  it("refuses to calibrate a closed cycle", async () => {
-    // The archive settles the record. A calibration afterwards would move a
-    // target on a set that has already been scored.
-    const wb = await workerDb();
-    await wb.admin.query("update cycles set status = 'closed' where id = $1", [
-      cycleId,
-    ]);
-    await expect(
-      callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
-        cycleId,
-        reason: "The market moved under the set",
-      }),
-    ).rejects.toThrow(/closed/i);
   });
 
   it("promotes an issue into a priority in one write", async () => {

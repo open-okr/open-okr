@@ -28,6 +28,7 @@ import {
   goals,
   keyResultDependencies,
   keyResults,
+  keyResultTargetChanges,
   kudos,
   learnings,
   managementAnswers,
@@ -8332,6 +8333,14 @@ const scoringKeyResult = z.object({
   /** §8.3's evidence, read from the key result rather than typed into the review. */
   baseline: z.number().nullable(),
   target: z.number().nullable(),
+  /**
+   * The target it started the cycle with, when it has moved since (METHOD.md
+   * §2.9, §7.6, P9-T13-c-b): "the original target stays on record so the
+   * close can see both". Null when it never moved, or moved back.
+   */
+  originalTarget: z.number().nullable(),
+  /** Why it was last eased, where it was. Null when it never was. */
+  easedBecause: z.string().nullable(),
   current: z.number().nullable(),
   unit: z.string().nullable(),
   score: z.number().nullable(),
@@ -8498,6 +8507,41 @@ export const readScoringStatus = defineReadAction({
         );
         const kindOf = new Map(rows.map((row) => [row.keyResultId, row.kind]));
 
+        // Every target change, oldest first, so the first one names the
+        // target the cycle began with and the last easing names its reason.
+        const moves =
+          rows.length === 0
+            ? []
+            : await tx
+                .select({
+                  keyResultId: keyResultTargetChanges.keyResultId,
+                  fromValue: keyResultTargetChanges.fromValue,
+                  eased: keyResultTargetChanges.eased,
+                  reason: keyResultTargetChanges.reason,
+                })
+                .from(keyResultTargetChanges)
+                .where(
+                  activeOnly(
+                    keyResultTargetChanges,
+                    eq(keyResultTargetChanges.workspaceId, context.workspaceId),
+                    inArray(
+                      keyResultTargetChanges.keyResultId,
+                      rows.map((row) => row.keyResultId),
+                    ),
+                  ),
+                )
+                .orderBy(keyResultTargetChanges.changedAt);
+        const firstTarget = new Map<string, number>();
+        const easedBecause = new Map<string, string | null>();
+        for (const move of moves) {
+          if (!firstTarget.has(move.keyResultId)) {
+            firstTarget.set(move.keyResultId, Number(move.fromValue));
+          }
+          if (move.eased) {
+            easedBecause.set(move.keyResultId, move.reason);
+          }
+        }
+
         // Grouped in the order the rows came back, so the screen reads down the
         // cascade rather than in whatever order Postgres chose.
         const objectives: {
@@ -8546,6 +8590,12 @@ export const readScoringStatus = defineReadAction({
             weight: Number(row.weight),
             baseline: row.baseline === null ? null : Number(row.baseline),
             target: row.target === null ? null : Number(row.target),
+            originalTarget: (() => {
+              const first = firstTarget.get(row.keyResultId);
+              const now = row.target === null ? null : Number(row.target);
+              return first === undefined || first === now ? null : first;
+            })(),
+            easedBecause: easedBecause.get(row.keyResultId) ?? null,
             current: row.current === null ? null : Number(row.current),
             unit: row.unit ?? null,
             score: grade?.score ?? null,

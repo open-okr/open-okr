@@ -42,6 +42,10 @@ interface ScoringKeyResult {
   readonly weight: number;
   readonly baseline: number | null;
   readonly target: number | null;
+  /** The target it began with, when it has moved (§2.9, P9-T13-c-b). */
+  readonly originalTarget: number | null;
+  /** Why it was last eased, where it was. */
+  readonly easedBecause: string | null;
   readonly current: number | null;
   readonly unit: string | null;
   readonly score: number | null;
@@ -178,6 +182,20 @@ function ScoreRow({
 
       {/* §8.3's evidence: grade against the key result as written. */}
       <span className="text-xs text-ink-3">{evidence(keyResult, t)}</span>
+      {/* §2.9: an eased target keeps its original on record, so the room
+       * grades the target as it stands and can see what it was. */}
+      {keyResult.originalTarget !== null ? (
+        <span className="text-xs text-ink-3" data-testid="original-target">
+          {keyResult.easedBecause
+            ? t("session.detail.scoring.targetMovedBecause", {
+                original: formatMeasure(keyResult.originalTarget),
+                reason: keyResult.easedBecause,
+              })
+            : t("session.detail.scoring.targetMoved", {
+                original: formatMeasure(keyResult.originalTarget),
+              })}
+        </span>
+      ) : null}
       {/* §3.3's note on the grade, in the coach's words. */}
       {keyResult.note ? (
         <span

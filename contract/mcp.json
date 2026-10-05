@@ -6531,39 +6531,6 @@
       }
     },
     {
-      "name": "workflow.calibrate",
-      "description": "Records the one mid-cycle calibration a cycle is allowed (METHOD.md §7.6).",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "cycleId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
-          }
-        },
-        "required": [
-          "cycleId",
-          "reason"
-        ]
-      },
-      "scope": "write",
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": false
-      },
-      "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000",
-        "reason": "…"
-      }
-    },
-    {
       "name": "workflow.publish",
       "description": "Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated.",
       "inputSchema": {

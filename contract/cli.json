@@ -4628,29 +4628,6 @@
       "pages": false
     },
     {
-      "name": "workflow calibrate",
-      "action": "workflow.calibrate",
-      "method": "POST",
-      "path": "/workflow/calibrate",
-      "scope": "write",
-      "summary": "Records the one mid-cycle calibration a cycle is allowed (METHOD.md §7.6).",
-      "flags": [
-        {
-          "name": "cycle-id",
-          "field": "cycleId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "reason",
-          "field": "reason",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "pages": false
-    },
-    {
       "name": "workflow publish",
       "action": "workflow.publish",
       "method": "POST",

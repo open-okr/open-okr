@@ -382,7 +382,13 @@ test("Alt with an arrow moves a card among its siblings, in the list's order too
 });
 
 test("U10: three hundred objectives open collapsed below company level, within the budget", async () => {
-  test.setTimeout(240_000);
+  // The setup is three hundred writes through the API, each rescoring every
+  // open sibling in its unit (OBJ-5 counts them), and it took 2.3 to 3.9
+  // minutes in continuous integration, so the old four-minute limit failed on
+  // a slow runner while the diagram itself was never measured. The budget is
+  // `interactive` below, timed from the page alone; this only gives the
+  // setup room.
+  test.setTimeout(480_000);
   const cycleId = await cycleOn(FAR);
   // Thirty company objectives, each with nine team objectives below it.
   for (let company = 0; company < 30; company += 1) {

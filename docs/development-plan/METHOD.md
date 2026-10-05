@@ -202,6 +202,12 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 
 **Live or draft.** An objective or key result added mid-cycle is live at once by default, as soon as it passes the checks set to block (§4): a key result needs its target where its kind has one, its due date and its owner. Until it does, it is a draft its space can see, and the list shows what is missing. A workspace may instead make new objectives start as drafts that their owner publishes, or that their reviewer approves (§12).
 
+**Changing a target.**
+- Making a target harder needs no reason: raising it on an increase, lowering it on a reduce. Neither does setting a first target where there was none.
+- Easing a target, moving it toward its baseline, needs a written reason, and the original target stays on record so the close can see both.
+- "It got hard" is not a reason. *Source:* whatmatters: "Never change your OKRs because you're afraid you'll fall short."
+- There is no limit on how many times by default.
+
 ### 2.10 Kinds of key result
 
 | Kind | Written as | Progress | Scored |
@@ -686,7 +692,7 @@ The decision log is the artifact that survives the meeting. Every decision names
 
 ### 7.6 Mid-cycle calibration
 
-Once per cycle, optional. A target may be adjusted only for a verifiable change in external reality, with a written reason. Not for difficulty, not for mood. Anything else is moving the goalposts and it destroys the score's meaning.
+A target may be changed at any time in the cycle, as §2.9 says. Making a target harder needs no reason. Easing one, toward its baseline, needs a written reason, and the original target stays on record. It got hard is not a reason, and changing a target only because it got hard empties the score of meaning.
 
 ---
 
