@@ -286,7 +286,13 @@ describe("drafting in a blocked phase 4", () => {
         guided: true,
       }),
     ).rejects.toThrow(
-      /^Drafting waits until the earlier phases are complete\. .*Phase 1: No sponsor named/,
+      // **Not "No sponsor named" any more** (P8-G13d). The sponsor and the
+      // facilitator default to whoever creates the cycle, so phase 1 no longer
+      // lists two things only that person could have answered with their own
+      // name. The refusal itself is unchanged and still names what is
+      // genuinely missing: this anchors on the input pack, which nothing fills
+      // in by default because somebody has to go and gather it.
+      /^Drafting waits until the earlier phases are complete\. .*Phase 1: Input pack item 1 is missing/,
     );
   });
 
