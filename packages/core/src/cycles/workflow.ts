@@ -522,6 +522,7 @@ async function loadGoalSnapshots<
       keyResultId: keyResultDependencies.keyResultId,
       confirmed: keyResultDependencies.confirmed,
       riskOwnerId: keyResultDependencies.riskOwnerId,
+      escalatedToId: keyResultDependencies.escalatedToId,
     })
     .from(keyResultDependencies)
     .where(
@@ -557,6 +558,7 @@ async function loadGoalSnapshots<
           .map((dependency) => ({
             confirmed: dependency.confirmed,
             riskOwnerId: dependency.riskOwnerId,
+            escalatedToId: dependency.escalatedToId,
           })),
         // `numeric` arrives as a string, and a string where §4.2 expects a
         // number makes every comparison read as a missing value.

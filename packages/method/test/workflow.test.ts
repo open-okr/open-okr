@@ -540,8 +540,27 @@ describe("the six publish gates", () => {
     );
     expect(gate?.passed).toBe(false);
     expect(gate?.detail.missing.join(" ")).toMatch(
-      /neither confirmed nor risk-owned/,
+      /neither confirmed, escalated nor risk-owned/,
     );
+  });
+
+  it("gate 4 accepts a dependency escalated to the sponsor (P9-T16b-b)", () => {
+    const escalated = goal({
+      keyResults: [
+        {
+          id: "k1",
+          title: "Cut first response from 9h to 2h",
+          capacity: "fits",
+          dependencies: [
+            { confirmed: false, riskOwnerId: null, escalatedToId: "m5" },
+          ],
+        },
+      ],
+    });
+    const gate = publishGates(base({ goals: [escalated] })).find(
+      (g) => g.gateKey === 4,
+    );
+    expect(gate?.passed).toBe(true);
   });
 
   it("gate 5 warns on a committed key result left exceeding capacity, and lets an aspirational one exceed (P9-T11a)", () => {

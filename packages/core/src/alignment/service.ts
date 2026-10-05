@@ -596,12 +596,21 @@ export function scopesForGoal(
   return scopes;
 }
 
-/** Whether this key result dependency blocks publish gate 4 (METHOD.md §5.4). */
+/**
+ * Whether this key result dependency blocks publish gate 4 (METHOD.md §5.4):
+ * neither confirmed by the providing team, nor escalated to the sponsor, nor
+ * logged as a risk with a named owner.
+ */
 export function blocksPublish(dependency: {
   readonly confirmed: boolean;
   readonly riskOwnerId: string | null;
+  readonly escalatedToId: string | null;
 }): boolean {
-  return !dependency.confirmed && dependency.riskOwnerId === null;
+  return (
+    !dependency.confirmed &&
+    dependency.riskOwnerId === null &&
+    dependency.escalatedToId === null
+  );
 }
 
 /** The register for one cycle's key results, for gate 4 and the S-10 panel. */
@@ -621,6 +630,8 @@ export async function loadDependencyRegister(
         note: keyResultDependencies.note,
         confirmed: keyResultDependencies.confirmed,
         riskOwnerId: keyResultDependencies.riskOwnerId,
+        escalatedToId: keyResultDependencies.escalatedToId,
+        escalatedAt: keyResultDependencies.escalatedAt,
       })
       .from(keyResultDependencies)
       .where(

@@ -830,6 +830,126 @@ describe("findings survive a recompute", () => {
   });
 });
 
+describe("escalating a dependency to the sponsor (P9-T16b-b)", () => {
+  const call = async (name: string, input: object, userId = OWNER) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context(userId) },
+      name as never,
+      input as never,
+    ) as Promise<never>;
+  };
+  const otherMember = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OTHER],
+    );
+    return rows[0]?.id as string;
+  };
+  const dependencyOn = async () => {
+    const goalId = await makeGoal({
+      title: "Lift expansion revenue to 22%",
+      level: "department",
+      spaceId: spaceA,
+    });
+    const keyResultId = await keyResultOf(goalId);
+    return (
+      (await call("goals.addKeyResultDependency", {
+        keyResultId,
+        providerSpaceId: spaceB,
+        note: "In-app expansion prompts",
+      })) as { id: string }
+    ).id;
+  };
+  const gate4 = async () =>
+    (
+      (await call("workflow.read", { cycleId })) as {
+        gates: { passed: boolean }[];
+      }
+    ).gates[3]?.passed;
+  const dependencyRows = async (userId: string) =>
+    (
+      (await call("review.inbox", {}, userId)) as {
+        obligations: { kind: string; title: string; meta: string }[];
+      }
+    ).obligations.filter((row) => row.kind === "dependency");
+
+  it("is refused while the cycle names no sponsor", async () => {
+    const id = await dependencyOn();
+    await expect(call("goals.escalateDependency", { id })).rejects.toThrow(
+      /no active sponsor/,
+    );
+  });
+
+  it("acceptance: the sponsor's inbox lists it, and confirming it clears it (NW-Q2-07)", async () => {
+    const id = await dependencyOn();
+    const sponsor = await otherMember();
+    await call("cycles.update", { id: cycleId, sponsorId: sponsor });
+    expect(await gate4()).toBe(false);
+
+    const escalated = (await call("goals.escalateDependency", { id })) as {
+      escalatedToId: string;
+    };
+    expect(escalated.escalatedToId).toBe(sponsor);
+
+    // Escalated settles gate 4, as a confirmation or a risk owner does.
+    expect(await gate4()).toBe(true);
+    const read = (await call("alignment.read", {
+      cycleId,
+      includeDismissed: false,
+    })) as {
+      register: {
+        id: string;
+        escalatedToName: string | null;
+        blocksPublish: boolean;
+      }[];
+      sponsor: { id: string; name: string } | null;
+    };
+    expect(read.sponsor).toEqual({ id: sponsor, name: "Other" });
+    expect(read.register.find((entry) => entry.id === id)).toMatchObject({
+      escalatedToName: "Other",
+      blocksPublish: false,
+    });
+
+    const listed = await dependencyRows(OTHER);
+    expect(listed).toEqual([
+      expect.objectContaining({
+        title: expect.stringContaining("on Product"),
+        meta: expect.stringContaining("Escalated to you as sponsor"),
+      }),
+    ]);
+    // Nobody else is asked to decide it.
+    expect(await dependencyRows(OWNER)).toEqual([]);
+
+    await call("goals.confirmDependency", { id });
+    expect(await dependencyRows(OTHER)).toEqual([]);
+    expect(await gate4()).toBe(true);
+  });
+
+  it("leaves the inbox once somebody is named to carry the risk", async () => {
+    const id = await dependencyOn();
+    const sponsor = await otherMember();
+    await call("cycles.update", { id: cycleId, sponsorId: sponsor });
+    await call("goals.escalateDependency", { id });
+    expect(await dependencyRows(OTHER)).toHaveLength(1);
+    await call("goals.setDependencyRiskOwner", { id, memberId: sponsor });
+    expect(await dependencyRows(OTHER)).toEqual([]);
+  });
+
+  it("refuses a dependency the providing team already confirmed", async () => {
+    const id = await dependencyOn();
+    await call("cycles.update", {
+      id: cycleId,
+      sponsorId: await otherMember(),
+    });
+    await call("goals.confirmDependency", { id });
+    await expect(call("goals.escalateDependency", { id })).rejects.toThrow(
+      /nothing to escalate/,
+    );
+  });
+});
+
 describe("the dependency register", () => {
   it("blocks publish gate 4 while unconfirmed and unowned", async () => {
     const goalId = await makeGoal({

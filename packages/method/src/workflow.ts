@@ -108,6 +108,8 @@ export interface KeyResultSnapshot {
   readonly dependencies?: readonly {
     readonly confirmed: boolean;
     readonly riskOwnerId: string | null;
+    /** The sponsor it was escalated to (§5.4, P9-T16b-b). */
+    readonly escalatedToId?: string | null;
   }[];
   /**
    * What §4.2's checks need to judge this key result, for publish gate 2.
@@ -1033,7 +1035,8 @@ export function publishGates(
     results.push(gate(3, missing.length === 0, missing));
   }
 
-  // 4. Every dependency is confirmed, or logged with a named risk owner.
+  // 4. Every dependency is confirmed, escalated to the sponsor, or logged with
+  // a named risk owner (§4.5, §5.4).
   if (goals === undefined) {
     results.push(unevaluable(4, goalsBlocked));
   } else if (
@@ -1049,11 +1052,14 @@ export function publishGates(
       goal.keyResults.flatMap((keyResult) =>
         (keyResult.dependencies ?? [])
           .filter(
-            (dependency) => !dependency.confirmed && !dependency.riskOwnerId,
+            (dependency) =>
+              !dependency.confirmed &&
+              !dependency.riskOwnerId &&
+              !dependency.escalatedToId,
           )
           .map(
             () =>
-              `"${keyResult.title}" has a dependency that is neither confirmed nor risk-owned`,
+              `"${keyResult.title}" has a dependency that is neither confirmed, escalated nor risk-owned`,
           ),
       ),
     );

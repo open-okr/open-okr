@@ -353,6 +353,44 @@ describe("the level-skip nudge (P9-T16b-a)", () => {
   });
 });
 
+describe("the unowned-dependency nudge (P9-T16b-b)", () => {
+  const unsettled = async (escalate: boolean) => {
+    const goal = await createGoal("Become the preferred platform for teams");
+    const keyResult = await addKeyResult(
+      goal.id,
+      "Monthly active teams",
+      "lagging",
+    );
+    const wb = await workerDb();
+    const call = (name: string, input: object) =>
+      callAction(
+        { pool: wb.appPool, ...context() },
+        name as never,
+        input as never,
+      );
+    const dependency = (await call("goals.addKeyResultDependency", {
+      keyResultId: keyResult.id,
+      providerText: "Legal",
+    })) as { id: string };
+    if (escalate) {
+      await call("cycles.update", { id: cycleId, sponsorId: secondMemberId });
+      await call("goals.escalateDependency", { id: dependency.id });
+    }
+    await runCoach();
+    return (await sentNudges()).filter(
+      (row) => row.rule_key === "quality.dependency_unowned",
+    );
+  };
+
+  it("is sent for a dependency nobody has settled", async () => {
+    expect(await unsettled(false)).toHaveLength(1);
+  });
+
+  it("is not sent for one escalated to the sponsor, who has it in their inbox", async () => {
+    expect(await unsettled(true)).toEqual([]);
+  });
+});
+
 describe("the quality pass, with no provider configured", () => {
   it("sends no all-lagging nudge by default, because KR-4 is a note", async () => {
     const goal = await createGoal("Become the preferred platform for teams");

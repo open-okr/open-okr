@@ -231,6 +231,21 @@ export async function setDependencyRiskOwner(
   );
 }
 
+/**
+ * Escalates an unconfirmed dependency to the cycle's sponsor (METHOD.md §5.4,
+ * P9-T16b-b): the third way to settle one, beside a confirmation and a named
+ * risk owner.
+ */
+export async function escalateDependency(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const id = String(formData.get("id") ?? "");
+  return run((context) =>
+    callAction(context, "goals.escalateDependency", { id }),
+  );
+}
+
 export async function removeDependency(
   _previous: WriteState,
   formData: FormData,

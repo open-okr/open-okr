@@ -481,7 +481,7 @@ The lower bound of four words was removed on 1 October 2026: whatmatters' own "A
 
 **AL-4 Company anchor.** Warn. At least one company-level objective anchors the tree. *Source:* re:Work: "it can be helpful to commit first to organizational objectives".
 
-**AL-5 Dependencies declared.** Every cross-team dependency is either confirmed by the providing team, or logged as a risk with a named risk owner.
+**AL-5 Dependencies declared.** Warn. Every cross-team dependency is confirmed by the providing team, or escalated to the sponsor, or logged as a risk with a named owner. *Source:* Google's OKR playbook: contributions "should appear explicitly in each such group's OKRs", and "escalation is good".
 
 **AL-6 Not siloed.** Off by default. Where on, a department whose whole subtree has no horizontal dependency with any other department is noted as a possible silo. Finance, legal and platform teams are often legitimately self-contained. *Source:* OpenOKR default.
 
@@ -566,7 +566,7 @@ Each finding carries a severity of high, medium or low and one specific sentence
 
 ### 5.4 Dependencies
 
-Every dependency records: the key result that depends, the providing team, whether the providing team has confirmed it, and if not, a named risk owner. Anything unconfirmed and unowned blocks the publish gate.
+Every dependency records: the key result that depends, the providing team, and whether the providing team has confirmed it. A dependency that is not confirmed is escalated to the sponsor, or logged as a risk with a named owner. *Source:* Google's OKR playbook on escalation; Lamorte on naming a co-owner from each team.
 
 ### 5.5 Capacity
 

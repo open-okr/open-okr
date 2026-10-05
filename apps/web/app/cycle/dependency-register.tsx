@@ -11,6 +11,7 @@ import { ActionForm } from "./action-form.tsx";
 import {
   addDependency,
   confirmDependency,
+  escalateDependency,
   removeDependency,
   setDependencyRiskOwner,
 } from "./actions.ts";
@@ -50,6 +51,9 @@ export interface RegisterEntry {
   readonly confirmed: boolean;
   readonly riskOwnerId: string | null;
   readonly riskOwnerName: string | null;
+  /** The sponsor it was escalated to, when it was (§5.4, P9-T16b-b). */
+  readonly escalatedToName: string | null;
+  readonly escalatedAt: string | null;
   readonly blocksPublish: boolean;
 }
 
@@ -97,6 +101,16 @@ function stateOf(
           : t("cycle.dependencyRegister.riskOwnedBySomebody"),
     };
   }
+  if (entry.escalatedAt) {
+    return {
+      label: t("cycle.dependencyRegister.escalated"),
+      tone: "warn",
+      detail: t("cycle.dependencyRegister.escalatedDetail", {
+        name: entry.escalatedToName ?? t("cycle.dependencyRegister.theSponsor"),
+        date: entry.escalatedAt.slice(0, 10),
+      }),
+    };
+  }
   return {
     label: t("cycle.dependencyRegister.unsettled"),
     tone: "bad",
@@ -109,12 +123,15 @@ export async function DependencyRegister({
   keyResults,
   members,
   spaces,
+  sponsor,
   canEdit,
 }: {
   readonly entries: readonly RegisterEntry[];
   readonly keyResults: readonly RegisterKeyResult[];
   readonly members: readonly RegisterMember[];
   readonly spaces: readonly RegisterSpace[];
+  /** Who an escalation reaches. Null when the cycle names nobody. */
+  readonly sponsor: RegisterMember | null;
   readonly canEdit: boolean;
 }) {
   const { t } = await getTranslations();
@@ -191,6 +208,26 @@ export async function DependencyRegister({
                             {t("cycle.dependencyRegister.confirm")}
                           </button>
                         </ActionForm>
+                      )}
+
+                      {entry.confirmed ||
+                      entry.riskOwnerId ||
+                      entry.escalatedAt ? null : sponsor ? (
+                        <ActionForm action={escalateDependency}>
+                          <input type="hidden" name="id" value={entry.id} />
+                          <button
+                            type="submit"
+                            className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2"
+                          >
+                            {t("cycle.dependencyRegister.escalateTo", {
+                              name: sponsor.name,
+                            })}
+                          </button>
+                        </ActionForm>
+                      ) : (
+                        <span className="text-xs text-ink-4">
+                          {t("cycle.dependencyRegister.noSponsorToEscalate")}
+                        </span>
                       )}
 
                       <ActionForm

@@ -1073,16 +1073,16 @@ export const ALIGNMENT_CHECKS: readonly QualityCheck[] = [
     conditions: [
       {
         condition:
-          "A cross-team dependency is neither confirmed nor risk-owned",
-        status: "fail",
+          "A cross-team dependency is neither confirmed, escalated nor risk-owned",
+        status: "warn",
         prompt:
-          "A cross-team dependency is neither confirmed by the providing team nor logged as a risk with a named owner. Get one or the other before this is published.",
+          "A cross-team dependency is not confirmed by the providing team, not escalated to the sponsor and not logged as a risk with a named owner. Which will it be?",
       },
       {
-        condition: "Every dependency confirmed or risk-owned",
+        condition: "Every dependency confirmed, escalated or risk-owned",
         status: "pass",
         prompt:
-          "Every cross-team dependency is either confirmed or owned as a risk.",
+          "Every cross-team dependency is confirmed, escalated to the sponsor, or owned as a risk.",
       },
     ],
   },
@@ -1154,7 +1154,7 @@ export function evaluateAlignment(
           id: entry.id,
           status: "todo" as const,
           prompt:
-            "Nobody has answered whether the cross-team dependencies are confirmed or risk-owned yet.",
+            "Nobody has answered whether the cross-team dependencies are confirmed, escalated or risk-owned yet.",
           condition: "Nobody has answered yet",
           feedsStrengthScore: entry.feedsStrengthScore,
         };
@@ -1162,8 +1162,8 @@ export function evaluateAlignment(
       return verdictOf(
         entry,
         input.everyDependencyResolved
-          ? "Every dependency confirmed or risk-owned"
-          : "A cross-team dependency is neither confirmed nor risk-owned",
+          ? "Every dependency confirmed, escalated or risk-owned"
+          : "A cross-team dependency is neither confirmed, escalated nor risk-owned",
       );
     }
     const failing = ALIGNMENT_FINDING_CONDITIONS[entry.id];
@@ -1335,15 +1335,15 @@ export const CYCLE_CHECKS: readonly QualityCheck[] = [
     feedsStrengthScore: false,
     conditions: [
       {
-        condition: "A dependency neither confirmed nor risk-owned",
+        condition: "A dependency neither confirmed, escalated nor risk-owned",
         status: "fail",
         prompt:
-          "A dependency is neither confirmed by the team providing it nor logged as a risk with a named owner. One or the other, before this cycle starts.",
+          "A dependency is not confirmed by the team providing it, not escalated to the sponsor and not logged as a risk with a named owner. One of the three, before this cycle starts.",
       },
       {
-        condition: "Every dependency confirmed or risk-owned",
+        condition: "Every dependency confirmed, escalated or risk-owned",
         status: "pass",
-        prompt: "Every dependency is confirmed or owned as a risk.",
+        prompt: "Every dependency is confirmed, escalated or owned as a risk.",
       },
     ],
   },
@@ -1440,8 +1440,8 @@ export function evaluateCycle(
     : "Unchecked, or a committed OKR still exceeds";
 
   const cy7 = gate(4)?.passed
-    ? "Every dependency confirmed or risk-owned"
-    : "A dependency neither confirmed nor risk-owned";
+    ? "Every dependency confirmed, escalated or risk-owned"
+    : "A dependency neither confirmed, escalated nor risk-owned";
 
   const verdicts: QualityVerdict[] = [
     verdictOf(check("CY-1"), cy1),

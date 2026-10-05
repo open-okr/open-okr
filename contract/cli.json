@@ -7908,6 +7908,23 @@
       "pages": false
     },
     {
+      "name": "goals escalateDependency",
+      "action": "goals.escalateDependency",
+      "method": "POST",
+      "path": "/goals/escalateDependency",
+      "scope": "write",
+      "summary": "Escalates an unconfirmed dependency to the cycle's sponsor, whose review inbox lists it until it is confirmed or a risk owner is named.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals removeKeyResultDependency",
       "action": "goals.removeKeyResultDependency",
       "method": "POST",

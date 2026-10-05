@@ -644,12 +644,13 @@ describe("AL-5, which lives in the dependency register", () => {
     expect(result.find((entry) => entry.id === "AL-5")?.status).toBe("todo");
   });
 
-  it("fails when a cross-team dependency is neither confirmed nor risk-owned", () => {
+  it("warns when a cross-team dependency is neither confirmed, escalated nor risk-owned", () => {
+    // METHOD v2 §4.3: "AL-5 Dependencies declared. Warn." (P9-T16b-b).
     const result = evaluateAlignment({
       findings: [],
       everyDependencyResolved: false,
     });
-    expect(result.find((entry) => entry.id === "AL-5")?.status).toBe("fail");
+    expect(result.find((entry) => entry.id === "AL-5")?.status).toBe("warn");
   });
 });
 

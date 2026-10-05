@@ -481,6 +481,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "alignment.register_added": z.object({ provider: z.string() }),
   "alignment.register_confirmed": z.object({}),
   "alignment.register_risk_owned": z.object({}),
+  // Escalated to the cycle's sponsor (§5.4, P9-T16b-b).
+  "alignment.register_escalated": z.object({}),
   "alignment.register_removed": z.object({}),
   "alignment.finding_dismissed": z.object({ ruleKey: z.string() }),
   // The one finding kind with a mechanical fix (§5.3, P4-T06b-b). The re-parent

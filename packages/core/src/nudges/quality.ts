@@ -303,6 +303,9 @@ async function dependencyNudges(
         eq(keyResults.goalId, goal.id),
         eq(keyResultDependencies.confirmed, false),
         isNull(keyResultDependencies.riskOwnerId),
+        // Escalated is answered too (§5.4, P9-T16b-b): the sponsor's review
+        // inbox carries it from there.
+        isNull(keyResultDependencies.escalatedToId),
       ),
     )
     .limit(1);

@@ -564,6 +564,7 @@ export default async function CyclePage({
                 goalTitle: keyResult.goalTitle,
               }))}
               members={registerMembers}
+              sponsor={register.sponsor}
               spaces={registerSpaces.map((space) => ({
                 id: space.id,
                 name: space.name,

@@ -400,6 +400,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "The providing team confirmed a dependency",
   "alignment.register_risk_owned": () =>
     "A risk owner was named for an unconfirmed dependency",
+  "alignment.register_escalated": () =>
+    "An unconfirmed dependency was escalated to the cycle's sponsor",
   "alignment.register_removed": () =>
     "A dependency was removed from the register",
   "alignment.finding_dismissed": (p) =>
