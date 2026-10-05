@@ -49,10 +49,10 @@ These are not preferences. Every rule below serves one of them.
 
 | Horizon | Runs | Sets | Revisited |
 |---|---|---|---|
-| Annual | Once a year, about 6 weeks before the year starts | The annual frame (mission, vision, mid-term strategy), 2 to 5 annual strategies, up to 5 annual OKRs, the year's not-doing list | Never rewritten mid-year. Revalidated each quarter in 30 to 60 minutes |
-| Quarterly | Four times a year, about 3 weeks before the quarter starts | Quarterly OKRs inside the annual frame | Scored and closed at the end of the quarter |
+| Annual | Once a year, about 6 weeks before the year starts | The annual frame (mission, vision, mid-term strategy), 2 to 5 annual strategies, up to 5 annual OKRs, the year's not-doing list | Mission and vision stay stable. Annual OKRs and the not-doing list may be revised at a quarterly revalidation, with a written reason. An annual target changes under the same rules as any target (§2.9): easing it needs a reason, and the original stays on record |
+| Quarterly | Four times a year, planning opens about 3 weeks before the quarter | Quarterly OKRs inside the annual frame | Scored and closed at the end of the quarter |
 
-The annual frame is read-only reference material during a quarterly cycle. Phase 3 of a quarterly cycle revalidates it. It does not rewrite it.
+The annual frame is reference material during a quarterly cycle. Phase 3 of a quarterly cycle revalidates it: it holds, or it changes with a documented reason. *Source:* Castro: company OKRs "are not set in stone"; whatmatters: "it's rare to adjust company-level OKRs … it may be necessary".
 
 ### 2.2 The eight phases
 

@@ -787,6 +787,14 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason: "The measured history of every key result.",
   },
   {
+    table: "annual_frame_revisions",
+    decision: "export",
+    // After the members it names (P9-T13-c-c): the export order is the
+    // order rows are restored in.
+    reason:
+      "Every mid-year revision of an agreed annual frame, with what it held before and why it changed.",
+  },
+  {
     table: "key_result_target_changes",
     decision: "export",
     reason:

@@ -282,6 +282,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "practice.updated": z.object({ keys: z.array(z.string()) }),
   "practice.profile_applied": z.object({ from: z.string(), to: z.string() }),
   "frame.set": z.object({ yearLabel: z.string() }),
+  // An agreed frame revised within its year, with why (P9-T13-c-c, §2.1).
+  "frame.revised": z.object({
+    yearLabel: z.string(),
+    fields: z.array(z.string()),
+    reason: z.string(),
+  }),
   // The guided cycle workflow (P3-T03).
   "cycle.pack_item_set": z.object({
     itemKey: z.number().int(),

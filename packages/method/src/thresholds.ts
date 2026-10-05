@@ -601,7 +601,7 @@ export const THRESHOLDS = {
     group: "sessions",
     label: "Annual revalidation length",
     section: "§2.1",
-    why: "Thirty to sixty minutes. The annual frame is revalidated each quarter, never rewritten.",
+    why: "Thirty to sixty minutes. The annual frame is revalidated each quarter: it holds, or it changes with a written reason.",
     default: { low: 30, high: 60 },
     schema: bounds(1, 600),
   }),

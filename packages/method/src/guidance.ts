@@ -139,14 +139,14 @@ export const HORIZONS: Readonly<Record<"annual" | "quarterly", Horizon>> = {
     runs: "Once a year, about 6 weeks before the year starts",
     sets: "The annual frame (mission, vision, mid-term strategy), 2 to 5 annual strategies, up to 5 annual OKRs, the year's not-doing list",
     revisited:
-      "Never rewritten mid-year. Revalidated each quarter in 30 to 60 minutes",
+      "Mission and vision stay stable. Annual OKRs and the not-doing list may be revised at a quarterly revalidation, with a written reason. An annual target changes under the same rules as any target (§2.9): easing it needs a reason, and the original stays on record",
     note: "Phases 0 to 5 happen before the cycle starts. Phase 6 runs through it. Phase 7 closes it and feeds the next one.",
   },
   quarterly: {
-    runs: "Four times a year, about 3 weeks before the quarter starts",
+    runs: "Four times a year, planning opens about 3 weeks before the quarter",
     sets: "Quarterly OKRs inside the annual frame",
     revisited: "Scored and closed at the end of the quarter",
-    note: "The annual frame is read-only reference material during a quarterly cycle. Phase 3 of a quarterly cycle revalidates it. It does not rewrite it.",
+    note: "The annual frame is reference material during a quarterly cycle. Phase 3 of a quarterly cycle revalidates it: it holds, or it changes with a documented reason.",
   },
 };
 

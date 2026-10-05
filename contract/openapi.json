@@ -22529,7 +22529,7 @@
     "/frame/read": {
       "get": {
         "operationId": "frame.read",
-        "summary": "The current annual frame and its strategic thrusts.",
+        "summary": "The current annual frame, its strategic thrusts, and every revision made since it was agreed.",
         "tags": [
           "frame"
         ],
@@ -22630,6 +22630,60 @@
                                 ],
                                 "additionalProperties": false
                               }
+                            },
+                            "revisions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "fields": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "mission",
+                                        "vision",
+                                        "strategy",
+                                        "notDoing",
+                                        "strategies"
+                                      ]
+                                    }
+                                  },
+                                  "before": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  },
+                                  "reason": {
+                                    "type": "string"
+                                  },
+                                  "revisedAt": {
+                                    "type": "string"
+                                  },
+                                  "authorName": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "fields",
+                                  "before",
+                                  "reason",
+                                  "revisedAt",
+                                  "authorName"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -22641,7 +22695,8 @@
                             "vision",
                             "strategy",
                             "notDoing",
-                            "strategies"
+                            "strategies",
+                            "revisions"
                           ],
                           "additionalProperties": false
                         },
@@ -22691,7 +22746,7 @@
     "/frame/set": {
       "post": {
         "operationId": "frame.set",
-        "summary": "Creates or replaces the current annual frame. A replacement supersedes rather than edits.",
+        "summary": "Creates or replaces the current annual frame. A replacement supersedes rather than edits. Revising an agreed frame within its year needs a written reason, and the revision is kept.",
         "tags": [
           "frame"
         ],
@@ -22928,6 +22983,11 @@
                         "text"
                       ]
                     }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
                   }
                 },
                 "required": [

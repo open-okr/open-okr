@@ -272,8 +272,8 @@ the machine-readable document.
 | Action | Method and path | Class |
 |---|---|---|
 | `frame.annualObjectives`<br/>This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter. | `GET /api/v1/frame/annualObjectives` | reads |
-| `frame.read`<br/>The current annual frame and its strategic thrusts. | `GET /api/v1/frame/read` | reads |
-| `frame.set`<br/>Creates or replaces the current annual frame. A replacement supersedes rather than edits. | `POST /api/v1/frame/set` | writes |
+| `frame.read`<br/>The current annual frame, its strategic thrusts, and every revision made since it was agreed. | `GET /api/v1/frame/read` | reads |
+| `frame.set`<br/>Creates or replaces the current annual frame. A replacement supersedes rather than edits. Revising an agreed frame within its year needs a written reason, and the revision is kept. | `POST /api/v1/frame/set` | writes |
 
 ## goals
 

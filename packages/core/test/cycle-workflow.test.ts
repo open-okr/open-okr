@@ -658,7 +658,7 @@ describe("the workflow actions", () => {
   });
 
   it("refuses a change to a revalidation marked as changed with no note", async () => {
-    // §2.1: the frame is revalidated, never rewritten. A change with no note is
+    // §2.1: the frame holds, or changes with a documented reason. A change with no note is
     // a rewrite nobody recorded.
     const wb = await workerDb();
     await expect(

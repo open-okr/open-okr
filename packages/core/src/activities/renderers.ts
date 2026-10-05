@@ -267,6 +267,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `sent ${String(p.claimed)} notification digest(s)`,
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
+  "frame.revised": (p) =>
+    `The agreed annual frame for ${asString(p.yearLabel, "the year")} was revised: ${asString(p.reason, "no reason recorded")}`,
   "goal.created": (p) =>
     p.addedMidCycle
       ? `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was added mid-cycle`

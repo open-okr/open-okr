@@ -228,14 +228,14 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T13-b-b | Drafts that wait for a person | none | None (behaviour) |
 | P9-T13-c-a | Stopping | none (§2.9's four moves arrived at P9-T13-a) | None (behaviour) |
 | P9-T13-c-b | Targets that move under one rule | §2.9's changing a target, §7.6 | The four calibration sentences |
-| P9-T13-c-c | Annual revisions | §2.1 | None (behaviour) |
+| P9-T13-c-c | Annual revisions | §2.1, but its quarterly row's planning-open lead, which waits for P9-T19a | None (behaviour) |
 | P9-T13a | Moving an objective to another space (G-1) | §2.9's "When the organisation changes" | None (behaviour) |
 | P9-T14 | Adjustable scores and cycles that keep their rules | §3.3, §12 snapshot paragraph | Score band values |
 | P9-T15 | A progress signal that knows the date | §3.5, §3.6, §3.7 | "Progress signal pace gaps", "Trend forecast minimum values", "Divergence window" |
 | P9-T16 | Alignment on ratios, over the levels in use (G-3) | §4.3, §5 | "Contribution minimum", "Alignment watch threshold"; retire "Alignment penalties" |
 | P9-T17 | KPI target types and their own thresholds | §6.1 to §6.4, §6.7 | None (behaviour) |
 | P9-T18 | Responding to an unhealthy KPI | §6.5, §6.6 | Recovery proposal delay value |
-| P9-T19a | Calmer escalation and cadence | §7.1, §7.2, §7.3, §7.5, the §11 cadence group | Blocker taxonomy and definitions; rituals; weekly steps; "Planning-open lead" for a quarter, 3 to 4 weeks |
+| P9-T19a | Calmer escalation and cadence | §7.1, §7.2, §7.3, §7.5, the §11 cadence group, and §2.1's quarterly row's "about 4 weeks", which P9-T13-c-c left at 3 so the method did not disagree with its own §11 | Blocker taxonomy and definitions; rituals; weekly steps; "Planning-open lead" for a quarter, 3 to 4 weeks |
 | P9-T19b | Holidays, leave, and a rhythm that follows them | §7.4, holidays and leave (G-2) | None (behaviour) |
 | P9-T20 | The quarterly review, re-timed, and the annual review | §8 | Review stages and purposes; root causes; close decisions and meanings; rhythm diagnostic; "Diagnostic rhythm threshold"; retire "Diagnostic rhythm-score threshold" |
 | P9-T21 | The coach's voice, and METHOD.md fully landed | The preamble and terms, §1, §9, §10, §11 framing, §13 | Trigger catalogue (AI-NATIVE-PLAN.md §6.4) and the P4-T00 coach watch list; deletes `p9-t00-method-v2.md` and METHOD.md's banner |
@@ -263,6 +263,8 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | A setting changed while drafts wait | Nothing is lost: a waiting draft still waits for its owner's publish or its reviewer's approval, as it was created to (§2.5) |
 
 **Targets under one rule, as built at P9-T13-c-b.** `workflow.calibrate` is gone from the registry, so the API, the command line and the agents lose it together, and phase 6 states §7.6's four sentences with nothing to record; a calibration written before is still shown there, read-only. Migration 0118 dropped the one-per-cycle index; the table itself is removed one release after 0.2.0, which is not a Phase 9 task. The close reads the record the rule keeps: `sessions.scoringStatus` answers each key result's `originalTarget`, the target it began the cycle with when it has moved since, and `easedBecause`, the reason given for its last easing, and the scoring stage prints both beside the evidence.
+
+**Annual revisions, as built at P9-T13-c-c.** An agreed frame may be revised within its year with a written reason; `frame.set` refuses one without, keeps each in `annual_frame_revisions` with which fields changed and what they held, and `frame.read` lists them. A draft frame keeps no history and a new year supersedes. Phase 0's form asks for the reason once the frame is agreed and lists the revisions beneath it. Building it found `frame.set` writing only the horizon and the agreement when it edited a frame in place, so a same-year edit to the mission or the not-doing list was answered as saved and dropped; the prose is written now. An annual key result's target already eased under §2.9's rule, so its 35 to 32 keeps its reason in the target history, and the close shows the original once P9-T20 brings the annual review to a session.
 
 **Four questions the build raised, for a human to answer** (5 October 2026):
 - **An OKR written into a set still unpublished after its window** (P9-T13-a). §2.9 says what is created before the team publication window closes is the plan; it does not say what an OKR written after it, into a set nobody has published, is. The build reads it as the plan, late, unmarked and facing the publish gates, because there is no plan yet to add to. If it should be marked instead, `isMidCycleAddition` drops its second condition.

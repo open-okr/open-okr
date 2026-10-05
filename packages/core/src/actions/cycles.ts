@@ -9,10 +9,13 @@
  */
 import {
   activeOnly,
+  annualFrameRevisions,
   annualFrames,
   annualStrategies,
   CYCLE_CADENCES,
   cycles,
+  FRAME_FIELDS,
+  type FrameField,
   GOAL_LEVELS,
   goals,
   performanceSnapshots,
@@ -972,11 +975,29 @@ const frameOutput = z.object({
   ),
 });
 
+/**
+ * The frame as read, with every revision since it was agreed (METHOD.md §2.1,
+ * P9-T13-c-c), newest first. `before` is what the changed fields held.
+ */
+const frameReadOutput = frameOutput.extend({
+  revisions: z.array(
+    z.object({
+      id: z.uuid(),
+      fields: z.array(z.enum(FRAME_FIELDS)),
+      before: z.record(z.string(), z.unknown()),
+      reason: z.string(),
+      revisedAt: z.string(),
+      authorName: z.string().nullable(),
+    }),
+  ),
+});
+
 export const readAnnualFrame = defineReadAction({
   name: "frame.read",
-  summary: "The current annual frame and its strategic thrusts.",
+  summary:
+    "The current annual frame, its strategic thrusts, and every revision made since it was agreed.",
   input: z.object({}),
-  output: frameOutput.nullable(),
+  output: frameReadOutput.nullable(),
   access: ACCESS_LEVELS.view,
   async handler(context) {
     const db = drizzle(context.pool);
@@ -1042,7 +1063,38 @@ export const readAnnualFrame = defineReadAction({
           )
           .orderBy(asc(annualStrategies.position));
 
-        return { ...frame, strategies };
+        const revisions = await tx
+          .select({
+            id: annualFrameRevisions.id,
+            fields: annualFrameRevisions.fields,
+            before: annualFrameRevisions.before,
+            reason: annualFrameRevisions.reason,
+            revisedAt: annualFrameRevisions.revisedAt,
+            authorName: workspaceMembers.name,
+          })
+          .from(annualFrameRevisions)
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, annualFrameRevisions.authorMemberId),
+          )
+          .where(
+            activeOnly(
+              annualFrameRevisions,
+              eq(annualFrameRevisions.workspaceId, context.workspaceId),
+              eq(annualFrameRevisions.frameId, frame.id),
+            ),
+          )
+          .orderBy(desc(annualFrameRevisions.revisedAt));
+
+        return {
+          ...frame,
+          strategies,
+          revisions: revisions.map((revision) => ({
+            ...revision,
+            fields: [...revision.fields],
+            revisedAt: new Date(revision.revisedAt).toISOString(),
+          })),
+        };
       },
     );
   },
@@ -1146,10 +1198,32 @@ export const readAnnualObjectives = defineReadAction({
   },
 });
 
+/**
+ * A value as a string that does not depend on key order, so a frame field
+ * read back from `jsonb`, which reorders keys, compares equal to the same
+ * document sent again.
+ */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonical).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map(
+        (key) =>
+          `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`,
+      )
+      .join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
 export const setAnnualFrame = defineWriteAction({
   name: "frame.set",
+  // openokr:policy-exempt: the annual frame is not an OKR write the practice governs; a revision of an agreed frame always needs its reason (METHOD.md §2.1), which this action asks for itself.
   summary:
-    "Creates or replaces the current annual frame. A replacement supersedes rather than edits.",
+    "Creates or replaces the current annual frame. A replacement supersedes rather than edits. Revising an agreed frame within its year needs a written reason, and the revision is kept.",
   input: z.object({
     yearLabel: z.string().trim().min(1).max(40),
     horizonLabel: z.string().trim().max(80).nullable().optional(),
@@ -1173,15 +1247,22 @@ export const setAnnualFrame = defineWriteAction({
       )
       .max(20)
       .default([]),
+    /**
+     * Why an agreed frame changes within its year (METHOD.md §2.1,
+     * P9-T13-c-c). Required then, and kept with the revision; ignored for a
+     * frame still being drafted, and for a new year.
+     */
+    reason: z.string().trim().min(1).max(500).optional(),
   }),
   output: frameOutput,
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId }) {
+    async execute({ tx, workspaceId, actor }) {
       const [current] = await tx
         .select({
           id: annualFrames.id,
           yearLabel: annualFrames.yearLabel,
+          agreed: annualFrames.agreed,
           mission: annualFrames.mission,
           missionVersion: annualFrames.missionVersion,
           vision: annualFrames.vision,
@@ -1201,10 +1282,13 @@ export const setAnnualFrame = defineWriteAction({
         )
         .limit(1);
 
-      // METHOD.md §2.1: the frame is "never rewritten mid-year". A new year
-      // supersedes; the same year's frame is edited in place, because recording
-      // a correction as a supersession would make history unreadable.
+      // METHOD.md §2.1: a new year supersedes; the same year's frame is edited
+      // in place, because recording a correction as a supersession would make
+      // history unreadable. Since P9-T13-c-c an agreed frame may be revised
+      // within its year with a written reason, and the revision is kept in
+      // `annual_frame_revisions` with what the changed fields held before.
       let frameId = current?.id;
+      let revised: readonly FrameField[] = [];
       if (current && current.yearLabel !== input.yearLabel) {
         await tx
           .update(annualFrames)
@@ -1213,12 +1297,99 @@ export const setAnnualFrame = defineWriteAction({
         frameId = undefined;
       }
 
-      if (frameId) {
+      if (frameId && current) {
+        const priorStrategies = await tx
+          .select({ text: annualStrategies.text, note: annualStrategies.note })
+          .from(annualStrategies)
+          .where(
+            activeOnly(
+              annualStrategies,
+              eq(annualStrategies.workspaceId, workspaceId),
+              eq(annualStrategies.frameId, frameId),
+            ),
+          )
+          .orderBy(asc(annualStrategies.position));
+        const prose = {
+          mission: input.mission,
+          vision: input.vision,
+          strategy: input.strategy,
+          notDoing: input.notDoing,
+        } as const;
+        const changed: FrameField[] = (
+          ["mission", "vision", "strategy", "notDoing"] as const
+        ).filter(
+          (field) =>
+            prose[field] !== undefined &&
+            canonical(prose[field]) !== canonical(current[field]),
+        );
+        if (
+          canonical(
+            input.strategies.map((entry) => ({
+              text: entry.text,
+              note: entry.note ?? null,
+            })),
+          ) !== canonical(priorStrategies)
+        ) {
+          changed.push("strategies");
+        }
+
+        // A draft keeps no history; an agreed frame keeps every revision.
+        if (current.agreed && changed.length > 0) {
+          if (!input.reason) {
+            throw new OperationError(
+              "forbidden",
+              "This year's frame is agreed, so a revision needs a written reason (METHOD.md §2.1): what changed, and why it changes now.",
+            );
+          }
+          const before = Object.fromEntries(
+            changed.map((field) => [
+              field,
+              field === "strategies" ? priorStrategies : current[field],
+            ]),
+          );
+          await tx.insert(annualFrameRevisions).values({
+            workspaceId,
+            frameId,
+            fields: changed,
+            before,
+            reason: input.reason,
+            authorMemberId: actor.memberId,
+          });
+          revised = changed;
+        }
+
+        // The prose is written in place too. Before P9-T13-c-c only the
+        // horizon and the agreement were, so an edit to the same year's
+        // mission or not-doing list was answered as saved and dropped.
         await tx
           .update(annualFrames)
           .set({
             horizonLabel: input.horizonLabel ?? null,
             agreed: input.agreed,
+            ...(input.mission === undefined
+              ? {}
+              : {
+                  mission: input.mission,
+                  missionVersion: RICH_TEXT_SCHEMA_VERSION,
+                }),
+            ...(input.vision === undefined
+              ? {}
+              : {
+                  vision: input.vision,
+                  visionVersion: RICH_TEXT_SCHEMA_VERSION,
+                }),
+            ...(input.strategy === undefined
+              ? {}
+              : {
+                  strategy: input.strategy,
+                  strategyVersion: RICH_TEXT_SCHEMA_VERSION,
+                }),
+            ...(input.notDoing === undefined
+              ? {}
+              : {
+                  notDoing: input.notDoing,
+                  notDoingVersion: RICH_TEXT_SCHEMA_VERSION,
+                }),
             updatedAt: new Date(),
           })
           .where(activeOnly(annualFrames, eq(annualFrames.id, frameId)));
@@ -1315,12 +1486,24 @@ export const setAnnualFrame = defineWriteAction({
           notDoing: input.notDoing ?? current?.notDoing ?? null,
           strategies,
         },
-        activity: {
-          kind: "frame.set",
-          subjectType: "workspace",
-          subjectId: workspaceId,
-          payload: { yearLabel: input.yearLabel },
-        },
+        activity:
+          revised.length > 0
+            ? {
+                kind: "frame.revised",
+                subjectType: "workspace",
+                subjectId: workspaceId,
+                payload: {
+                  yearLabel: input.yearLabel,
+                  fields: [...revised],
+                  reason: input.reason ?? "",
+                },
+              }
+            : {
+                kind: "frame.set",
+                subjectType: "workspace",
+                subjectId: workspaceId,
+                payload: { yearLabel: input.yearLabel },
+              },
         audit: {
           action: "frame.set",
           targetType: "annual_frame",

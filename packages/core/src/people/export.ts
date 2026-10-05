@@ -197,6 +197,12 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     label: "Values you recorded",
   },
   {
+    table: "annual_frame_revisions",
+    column: "author_member_id",
+    // A revision somebody made to the year's frame, with their reason (P9-T13-c-c).
+    label: "Annual frame revisions you made",
+  },
+  {
     table: "key_result_target_changes",
     column: "actor_member_id",
     // A change somebody made, with the reason they gave, is theirs (P9-T06b).

@@ -4268,7 +4268,7 @@
       "method": "GET",
       "path": "/frame/read",
       "scope": "read",
-      "summary": "The current annual frame and its strategic thrusts.",
+      "summary": "The current annual frame, its strategic thrusts, and every revision made since it was agreed.",
       "flags": [],
       "pages": false
     },
@@ -4278,7 +4278,7 @@
       "method": "POST",
       "path": "/frame/set",
       "scope": "write",
-      "summary": "Creates or replaces the current annual frame. A replacement supersedes rather than edits.",
+      "summary": "Creates or replaces the current annual frame. A replacement supersedes rather than edits. Revising an agreed frame within its year needs a written reason, and the revision is kept.",
       "flags": [
         {
           "name": "year-label",
@@ -4326,6 +4326,12 @@
           "name": "strategies",
           "field": "strategies",
           "type": "array",
+          "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
           "required": false
         }
       ],

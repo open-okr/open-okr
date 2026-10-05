@@ -13,10 +13,16 @@ import { setFrame } from "./frame-actions.ts";
  * arrives later while the storage for it had been waiting for months. That is
  * what made B-03 a blocker rather than a missing screen.
  *
- * **A replacement supersedes rather than edits**, which is METHOD.md §2.1's
- * rule that the frame is "never rewritten mid-year". The action carries the
- * prose forward when this form does not name it, so adding a strategy in March
- * does not silently drop the mission somebody wrote in January.
+ * **A new year supersedes; the same year is edited in place.** The action
+ * carries the prose forward when this form does not name it, so adding a
+ * strategy in March does not silently drop the mission somebody wrote in
+ * January.
+ *
+ * **An agreed frame may be revised within its year, with a written reason**
+ * (METHOD.md §2.1, P9-T13-c-c), so the form asks for one once the frame is
+ * agreed and lists every revision since, with its reason, beneath it. The
+ * action refuses a revision without one, so the field is a convenience and
+ * not the rule.
  *
  * **Two to five strategies, and the form says so rather than enforcing it.**
  * §2.1 gives that range as the practice; the action accepts up to twenty
@@ -54,6 +60,20 @@ function asText(value: unknown): string {
     : "";
 }
 
+interface FrameRevision {
+  readonly id: string;
+  readonly fields: readonly (
+    | "mission"
+    | "vision"
+    | "strategy"
+    | "notDoing"
+    | "strategies"
+  )[];
+  readonly reason: string;
+  readonly revisedAt: string;
+  readonly authorName: string | null;
+}
+
 export interface Frame {
   readonly yearLabel: string;
   readonly horizonLabel: string | null;
@@ -62,6 +82,8 @@ export interface Frame {
   readonly vision: unknown;
   readonly strategy: unknown;
   readonly notDoing: unknown;
+  /** Every revision since it was agreed, newest first (P9-T13-c-c). */
+  readonly revisions: readonly FrameRevision[];
   readonly strategies: readonly {
     readonly id: string;
     readonly text: string;
@@ -209,6 +231,20 @@ export async function AnnualFrame({
                 ))}
               </fieldset>
 
+              {frame?.agreed ? (
+                <label className="flex flex-col gap-1 text-xs text-ink-3">
+                  {t("cycle.annualFrame.revisionReason")}
+                  <span className="text-ink-4">
+                    {t("cycle.annualFrame.revisionReasonHint")}
+                  </span>
+                  <input
+                    name="reason"
+                    maxLength={500}
+                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                  />
+                </label>
+              ) : null}
+
               <Button type="submit" variant="default" size="sm">
                 {frame
                   ? t("cycle.annualFrame.replaceTheFrame")
@@ -218,9 +254,65 @@ export async function AnnualFrame({
           ) : (
             <ReadOnlyFrame frame={frame} />
           )}
+          {frame && frame.revisions.length > 0 ? (
+            <Revisions revisions={frame.revisions} />
+          ) : null}
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+/** What each revised field is called on this screen. */
+const FIELD_LABEL_KEYS = {
+  mission: "common.mission",
+  vision: "cycle.annualFrame.vision",
+  strategy: "cycle.annualFrame.midTermStrategy",
+  notDoing: "cycle.annualFrame.notDoingThisYear",
+  strategies: "cycle.annualFrame.strategies",
+} as const;
+
+/**
+ * The frame's revisions this year, each with its reason (METHOD.md §2.1,
+ * NW-Q2-22): what the year's frame said in March and why it changed in June.
+ */
+async function Revisions({
+  revisions,
+}: {
+  readonly revisions: readonly FrameRevision[];
+}) {
+  const { t } = await getTranslations();
+  return (
+    <section
+      className="mt-4 flex flex-col gap-1.5 border-line border-t pt-3"
+      data-testid="frame-revisions"
+    >
+      <h3 className="text-xs font-bold uppercase tracking-wide text-ink-3">
+        {t("cycle.annualFrame.revisions")}
+      </h3>
+      <ul className="flex flex-col gap-1.5">
+        {revisions.map((revision) => {
+          const fields = revision.fields
+            .map((field) => t(FIELD_LABEL_KEYS[field]))
+            .join(", ");
+          const date = revision.revisedAt.slice(0, 10);
+          return (
+            <li key={revision.id} className="flex flex-col text-sm text-ink-2">
+              <span className="text-xs text-ink-3">
+                {revision.authorName
+                  ? t("cycle.annualFrame.revisedBy", {
+                      date,
+                      name: revision.authorName,
+                      fields,
+                    })
+                  : t("cycle.annualFrame.revisedOn", { date, fields })}
+              </span>
+              <span>{revision.reason}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

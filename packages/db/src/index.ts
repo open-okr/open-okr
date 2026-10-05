@@ -241,6 +241,7 @@ export {
 export {
   type AnnualFrame,
   type AnnualStrategy,
+  annualFrameRevisions,
   annualFrames,
   annualStrategies,
   CYCLE_CADENCES,
@@ -252,6 +253,8 @@ export {
   type CycleSessionDate,
   type CycleStatus,
   cycles,
+  FRAME_FIELDS,
+  type FrameField,
   GOAL_LEVELS,
   type GoalLevel,
   type RhythmSettingsRow,

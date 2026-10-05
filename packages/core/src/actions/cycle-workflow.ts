@@ -915,7 +915,7 @@ export const setRevalidation = defineWriteAction({
     })
     .refine((value) => !(value.changed && !value.changeNote?.trim()), {
       message:
-        "A frame recorded as changed needs a note saying what changed (§2.1: it is revalidated, never rewritten)",
+        "A frame recorded as changed needs a note saying what changed (§2.1: it holds, or it changes with a documented reason)",
     }),
   output: z.object({ cycleId: z.uuid() }),
   access: ACCESS_LEVELS.edit,

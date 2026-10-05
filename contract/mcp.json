@@ -6023,7 +6023,7 @@
     },
     {
       "name": "frame.read",
-      "description": "The current annual frame and its strategic thrusts.",
+      "description": "The current annual frame, its strategic thrusts, and every revision made since it was agreed.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -6038,7 +6038,7 @@
     },
     {
       "name": "frame.set",
-      "description": "Creates or replaces the current annual frame. A replacement supersedes rather than edits.",
+      "description": "Creates or replaces the current annual frame. A replacement supersedes rather than edits. Revising an agreed frame within its year needs a written reason, and the revision is kept.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6122,6 +6122,11 @@
                 "text"
               ]
             }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
           }
         },
         "required": [

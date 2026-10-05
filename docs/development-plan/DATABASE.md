@@ -225,6 +225,13 @@ The two legacy columns and their unique partial index arrived at P6-T03a, sevent
 ### annual_frames
 `year_label`, `horizon_label`, `mission` (rich), `vision` (rich), `strategy` (rich), `agreed bool`, `open_issues` (rich), `not_doing` (rich).
 
+A new year's frame supersedes the last; within its year a frame is edited in place, prose included (P9-T13-c-c corrected `frame.set`, which wrote only the horizon and the agreement on an in-place edit and dropped the rest). An agreed frame keeps each revision in `annual_frame_revisions`.
+
+### annual_frame_revisions
+`frame_id` to annual_frames, `fields text[]` (`mission` / `vision` / `strategy` / `notDoing` / `strategies`), `before jsonb` (what the changed fields held, editor JSON for prose and a list for the strategies), `reason` (never blank), `author_member_id?` to workspace_members, `revised_at`. 0119, P9-T13-c-c, METHOD.md §2.1.
+
+One row per revision of an **agreed** frame within its year, written by `frame.set` and refused without a reason. A frame still being drafted keeps no history, and a new year supersedes rather than revises. `frame.read` answers them newest first. No legacy source.
+
 ### annual_strategies
 `frame_id` to annual_frames, `text`, `note?`, `position`.
 

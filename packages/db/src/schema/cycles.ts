@@ -75,8 +75,52 @@ export const annualFrames = pgTable("annual_frames", {
   openIssuesVersion: integer("open_issues_version"),
   notDoing: jsonb("not_doing"),
   notDoingVersion: integer("not_doing_version"),
-  /** Set when a newer frame replaces this one. §2.1 never rewrites a frame. */
+  /**
+   * Set when a new year's frame replaces this one. Within its year a frame
+   * is edited in place, and an agreed one keeps its revisions (§2.1).
+   */
   supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+/** The frame fields a revision can change (METHOD.md §2.1, P9-T13-c-c). */
+export const FRAME_FIELDS = [
+  "mission",
+  "vision",
+  "strategy",
+  "notDoing",
+  "strategies",
+] as const;
+export type FrameField = (typeof FRAME_FIELDS)[number];
+
+/**
+ * Every revision of an agreed annual frame, with its reason (METHOD.md §2.1,
+ * P9-T13-c-c). `before` holds the changed fields' previous values only.
+ */
+export const annualFrameRevisions = pgTable("annual_frame_revisions", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  frameId: uuid("frame_id")
+    .notNull()
+    .references(() => annualFrames.id, { onDelete: "cascade" }),
+  fields: text("fields").array().notNull().$type<FrameField[]>(),
+  before: jsonb("before").notNull().$type<Record<string, unknown>>(),
+  reason: text("reason").notNull(),
+  authorMemberId: uuid("author_member_id").references(
+    () => workspaceMembers.id,
+    { onDelete: "set null" },
+  ),
+  revisedAt: timestamp("revised_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
