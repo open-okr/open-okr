@@ -113,6 +113,7 @@ import {
   localDateIn,
   parseLocalDate,
 } from "../cycles/generation.ts";
+import { paceInTx } from "../cycles/pace.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { cycleRulesInTx } from "../cycles/rules.ts";
 import {
@@ -3858,6 +3859,13 @@ export const readMonthlyRecord = defineReadAction({
             ),
           );
         const byGoal = new Map(trendRows.map((row) => [row.goalId, row.trend]));
+        // §3.7 (P9-T15a): against the progress expected for the date, where
+        // the workspace reads its signal that way.
+        const pace = await paceInTx(
+          tx,
+          context.workspaceId,
+          session.cycleId ?? null,
+        );
 
         const trends = goalRows.flatMap((goal) => {
           const trend = byGoal.get(goal.id);
@@ -3871,7 +3879,7 @@ export const readMonthlyRecord = defineReadAction({
               goalTitle: goal.title,
               trend,
               signal: Number.isFinite(progressPct)
-                ? progressSignal(progressPct, thresholds)
+                ? progressSignal(progressPct, thresholds, pace)
                 : null,
               progressPct,
             },

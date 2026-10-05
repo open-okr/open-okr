@@ -181,6 +181,14 @@ beforeEach(async () => {
   )) as { id: string };
   cycleId = current.id;
 
+  // The absolute signal, so "red progress" means a fixed number whatever day
+  // of the quarter the suite runs on. The pace-aware default (METHOD.md §3.7,
+  // P9-T15a) would read a young quarter's low progress as on pace, which is
+  // the point of it and not what these tests are about.
+  await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+    overrides: { "progress.signal": "absolute" },
+  });
+
   const second = await wb.admin.query<{ id: string }>(
     `insert into workspace_members (id, workspace_id, user_id, name, status)
      values (gen_random_uuid(), $1, $2, 'Divergence Second', 'active') returning id`,

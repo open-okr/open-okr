@@ -5,16 +5,19 @@ import {
   computedScore,
   cycleScore,
   draftVerdict,
+  expectedProgressPct,
   keyResultProgress,
   needsRootCause,
   objectiveScore,
   portfolioVerdictOf,
+  progressSignal,
   SCORE_BAND_TEXT,
   scoreBand,
   scoreBandsIn,
   scoreNote,
   shareInsideBand,
   tooSafePattern,
+  trendForecast,
 } from "../src/scoring.ts";
 import { canonThresholds } from "../src/thresholds.ts";
 
@@ -293,5 +296,90 @@ describe("§3.3's bands under each colouring (P9-T14a)", () => {
     for (const band of ["strong", "partial", "little"] as const) {
       expect(SCORE_BAND_TEXT.committed[band]).toBe("Missed. Explain the miss");
     }
+  });
+});
+
+describe("§3.7's signal knows the date (P9-T15a)", () => {
+  const thresholds = canonThresholds();
+  const paceAware = { "progress.signal": "paceAware" } as const;
+  const absolute = { "progress.signal": "absolute" } as const;
+  // A thirteen-week quarter, 1 January to 1 April, read week by week.
+  const week = (n: number) =>
+    expectedProgressPct(
+      "2027-01-01",
+      "2027-04-01",
+      (() => {
+        const day = new Date(Date.UTC(2027, 0, 1 + 7 * n));
+        return day.toISOString().slice(0, 10);
+      })(),
+    );
+
+  it("acceptance: week 2 of 13 at 15% is green", () => {
+    expect(
+      progressSignal(15, thresholds, {
+        practice: paceAware,
+        expectedPct: week(2),
+      }),
+    ).toBe("green");
+  });
+
+  it("is amber more than 10 points behind the date, and red more than 25 behind", () => {
+    const expected = week(8);
+    expect(expected).toBeGreaterThan(60);
+    const at = (progress: number) =>
+      progressSignal(progress, thresholds, {
+        practice: paceAware,
+        expectedPct: expected,
+      });
+    expect(at(expected - 10)).toBe("green");
+    expect(at(expected - 11)).toBe("amber");
+    expect(at(expected - 25)).toBe("amber");
+    expect(at(expected - 26)).toBe("red");
+  });
+
+  it("reads the absolute thresholds where the workspace chose them, or where no date is known", () => {
+    expect(
+      progressSignal(15, thresholds, {
+        practice: absolute,
+        expectedPct: week(2),
+      }),
+    ).toBe("red");
+    expect(
+      progressSignal(15, thresholds, {
+        practice: paceAware,
+        expectedPct: null,
+      }),
+    ).toBe("red");
+    expect(progressSignal(80, thresholds)).toBe("green");
+  });
+
+  it("expects nothing before the cycle and everything from its last day", () => {
+    expect(expectedProgressPct("2027-01-01", "2027-04-01", "2026-12-20")).toBe(
+      0,
+    );
+    expect(expectedProgressPct("2027-01-01", "2027-04-01", "2027-04-01")).toBe(
+      100,
+    );
+    expect(expectedProgressPct("2027-01-01", "2027-04-01", "2027-05-01")).toBe(
+      100,
+    );
+  });
+});
+
+describe("§3.6's forecast waits for enough values (P9-T15a)", () => {
+  const target = { direction: "increase" as const, baseline: 0, target: 100 };
+  const points = [
+    { at: 0, value: 10 },
+    { at: 1, value: 20 },
+    { at: 2, value: 30 },
+    { at: 3, value: 40 },
+  ];
+
+  it("projects nothing from three values when four are asked for", () => {
+    expect(trendForecast(points.slice(0, 3), 10, target, 4)).toBeNull();
+  });
+
+  it("projects from the fourth", () => {
+    expect(trendForecast(points, 10, target, 4)?.projected).toBe(110);
   });
 });

@@ -500,15 +500,65 @@ export function goalHealth(input: HealthInput): GoalHealth {
 
 export type ProgressSignal = "green" | "amber" | "red";
 
+/** The practice this reads: which signal the workspace uses (§12). */
+export interface ProgressSignalPractice {
+  readonly "progress.signal": "paceAware" | "absolute";
+}
+
+/**
+ * The progress expected for the date (§3.7, P9-T15a): the share of the
+ * cycle's days gone, 0 before it starts and 100 from its last day. Days are
+ * local `YYYY-MM-DD` dates, compared as such.
+ */
+export function expectedProgressPct(
+  startsOn: string,
+  endsOn: string,
+  today: string,
+): number {
+  const day = (on: string) => new Date(`${on}T00:00:00Z`).getTime();
+  const span = day(endsOn) - day(startsOn);
+  if (span <= 0) {
+    return today >= endsOn ? 100 : 0;
+  }
+  const gone = (day(today) - day(startsOn)) / span;
+  return round2(Math.min(100, Math.max(0, gone * 100)));
+}
+
 /**
  * §3.7, shown beside health and never instead of it.
  *
- * The asymmetry is the canon's: green includes its boundary, red excludes its own.
+ * **Pace-aware by default** (P9-T15a): progress against the progress expected
+ * for the date, green on pace, amber behind by more than the first gap, red
+ * by more than the second. A goal is not red because its cycle is young.
+ * Where the workspace chose the absolute signal, or no date is known, it is
+ * green at or above the pass threshold and red below the fail one; the
+ * asymmetry is the canon's, green including its boundary and red excluding
+ * its own.
  */
 export function progressSignal(
   progressPct: number,
   thresholds: ResolvedThresholds,
+  pace?: {
+    readonly practice: ProgressSignalPractice;
+    /** `expectedProgressPct` for the goal's cycle, or null with no cycle. */
+    readonly expectedPct: number | null;
+  },
 ): ProgressSignal {
+  if (
+    pace !== undefined &&
+    pace.practice["progress.signal"] === "paceAware" &&
+    pace.expectedPct !== null
+  ) {
+    const gaps = thresholds["scoring.progressSignalPaceGaps"];
+    const behind = pace.expectedPct - progressPct;
+    if (behind > gaps.red) {
+      return "red";
+    }
+    if (behind > gaps.amber) {
+      return "amber";
+    }
+    return "green";
+  }
   const pass = thresholds["scoring.progressSignalPass"];
   const fail = thresholds["scoring.progressSignalFail"];
   if (progressPct >= pass) {
@@ -928,9 +978,14 @@ export function trendForecast(
     readonly baseline: number;
     readonly target: number;
   },
+  /**
+   * §3.6's "once there are enough values" (§11 "Trend forecast minimum
+   * values", P9-T15a). Left out, two, the fewest a line can be fitted to.
+   */
+  minimumValues = 2,
 ): Forecast | null {
   const distinct = new Set(points.map((point) => point.at));
-  if (points.length < 2 || distinct.size < 2) {
+  if (points.length < Math.max(2, minimumValues) || distinct.size < 2) {
     return null;
   }
 

@@ -311,9 +311,12 @@ async function recomputeScoring<
 
     const points = pointsByKeyResult.get(row.id) ?? [];
     const horizonDate = cycle?.endsOn ?? row.dueOn;
+    // §3.6 (P9-T15a): only a metric key result is forecast, and only once
+    // it has enough values. A milestone or a baseline is done or not, and a
+    // maintain is judged on its band, so a line through either says nothing.
     forecastById.set(
       row.id,
-      horizonDate && !untargeted
+      horizonDate && !untargeted && row.kind === "metric"
         ? trendForecast(
             points,
             new Date(`${horizonDate}T00:00:00Z`).getTime(),
@@ -322,6 +325,7 @@ async function recomputeScoring<
               baseline,
               target,
             },
+            thresholds["scoring.forecastMinimumValues"],
           )
         : null,
     );

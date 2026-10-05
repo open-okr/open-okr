@@ -86,6 +86,13 @@ beforeEach(async () => {
   };
   cycleId = current.id;
 
+  // The absolute signal, so the key result that has not moved reads red on
+  // whatever day the suite runs. The pace-aware default (METHOD.md §3.7,
+  // P9-T15a) reads a young quarter as on pace, which is its point.
+  await call("practice.update", {
+    overrides: { "progress.signal": "absolute" },
+  });
+
   const goal = (await call("goals.create", {
     title: "Become the platform mid-market teams reach for first",
     cycleId,
@@ -197,6 +204,25 @@ describe("sessions.setTrend", () => {
     };
     expect(record.trends[0]?.trend).toBe("improving");
     expect(record.trends[0]?.signal).toBe("red");
+  });
+
+  it("reads the signal against the date by default, so a quarter one week old is not red for being young (P9-T15a)", async () => {
+    // Back to the default, and the quarter placed one week in: nothing has
+    // moved, and a week in nothing is expected to have much.
+    await call("practice.update", {
+      overrides: { "progress.signal": null },
+    });
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update cycles set starts_on = current_date - 7, ends_on = current_date + 84
+        where id = $1`,
+      [cycleId],
+    );
+    await call("sessions.setTrend", { sessionId, goalId, trend: "flat" });
+    const record = (await call("sessions.monthlyRecord", { sessionId })) as {
+      trends: { signal: string | null }[];
+    };
+    expect(record.trends[0]?.signal).toBe("green");
   });
 
   it("does not ask for a trend on a closed objective", async () => {

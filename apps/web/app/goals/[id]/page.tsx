@@ -163,11 +163,11 @@ export default async function GoalPage({
   // `ai.readProviderConfig`, which is declared `full` because it carries every
   // provider's admin configuration and a masked key hint, so the whole screen
   // failed for any member who did not create the workspace.
-  // The strength bands the coach strip colours its score by (H-17).
-  const strengthBands = (
-    (await callAction(context, "rhythm.read", {}))
-      .thresholds as unknown as ResolvedThresholds
-  )["quality.strengthScoreBands"];
+  // The strength bands the coach strip colours its score by (H-17), and the
+  // values a forecast waits for (§3.6, P9-T15a).
+  const pageThresholds = (await callAction(context, "rhythm.read", {}))
+    .thresholds as unknown as ResolvedThresholds;
+  const strengthBands = pageThresholds["quality.strengthScoreBands"];
   const { available: drafting } = await callAction(
     context,
     "ai.readAvailability",
@@ -423,8 +423,16 @@ export default async function GoalPage({
                         history={histories.get(keyResult.id) ?? []}
                         direction={keyResult.direction}
                         baseline={keyResult.baselineValue}
-                        target={keyResult.targetValue}
+                        // Only a metric is projected (§3.6, P9-T15a).
+                        target={
+                          keyResult.kind === "metric"
+                            ? keyResult.targetValue
+                            : null
+                        }
                         horizonAt={horizonFor(keyResult.dueOn)}
+                        minimumValues={
+                          pageThresholds["scoring.forecastMinimumValues"]
+                        }
                       />
                       {decomposeOffered ? (
                         <DecomposeKeyResult

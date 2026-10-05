@@ -29,6 +29,7 @@ export async function Sparkline({
   baseline,
   target,
   horizonAt,
+  minimumValues,
 }: {
   readonly history: readonly HistoryPoint[];
   readonly direction: KeyResultDirection;
@@ -42,6 +43,8 @@ export async function Sparkline({
    * Null when neither date exists, and then no forecast is drawn.
    */
   readonly horizonAt: number | null;
+  /** §3.6's values to wait for before projecting (P9-T15a). */
+  readonly minimumValues: number;
 }) {
   const { t } = await getTranslations();
 
@@ -69,7 +72,12 @@ export async function Sparkline({
   const forecast =
     horizonAt === null || target === null
       ? null
-      : trendForecast(points, horizonAt, { direction, baseline, target });
+      : trendForecast(
+          points,
+          horizonAt,
+          { direction, baseline, target },
+          minimumValues,
+        );
 
   // The date the projection lands on, spelled out beside the number. A bare
   // figure reads as a claim; "by 2026-09-30" reads as the straight line it is,

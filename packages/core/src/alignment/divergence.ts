@@ -42,6 +42,7 @@ import {
 } from "@openokr/method";
 import { eq, isNull } from "drizzle-orm";
 import { type AgentScope, agentSeesGoal } from "../agents/scope.ts";
+import { paceInTx } from "../cycles/pace.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { linkedWorkForKeyResults } from "../tasks/service.ts";
 import { reconcileFindingsInTx, type WantedFinding } from "./service.ts";
@@ -95,6 +96,9 @@ export async function sweepDivergenceInTx(
 
   const wanted: WantedFinding[] = [];
 
+  // §3.7 (P9-T15a): the signal the data gives is read against the progress
+  // expected for the date, so a young cycle does not read as diverging.
+  const pace = await paceInTx(tx, input.workspaceId, input.cycleId);
   for (const goal of open) {
     const measures = await tx
       .select({
@@ -142,7 +146,7 @@ export async function sweepDivergenceInTx(
     const signal =
       confidences.length === 0
         ? null
-        : progressSignal(Number(goal.progressPct), input.thresholds);
+        : progressSignal(Number(goal.progressPct), input.thresholds, pace);
 
     const found = divergences(
       {

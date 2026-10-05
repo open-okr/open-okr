@@ -332,11 +332,13 @@ A goal that has never been checked in is `pending`, not `on track`. Silence is n
 
 ### 3.6 Trend forecast
 
-From the key result's value history, project the end-of-cycle value with a linear fit over the recent window. If the projection misses the target, flag `trending off track` before the human status changes. This is the coach's earliest honest signal.
+From a metric key result's value history, project the end-of-cycle value with a linear fit over the recent window, once there are enough values (§11). If the projection misses the target, flag `trending off track` before the human status changes. It is labelled a projection. Milestone, baseline and maintain key results get no forecast. *Source:* Lamorte: predictive progress "acts as an early warning system".
 
 ### 3.7 The progress signal
 
-Beside health, every goal and key result carries a red, amber or green signal computed from progress alone: green at or above the pass threshold, red below the fail threshold, amber between. The defaults are 75% and 50%, both workspace settings (§11). The signal is shown beside health, never instead of it. A green progress bar on an outdated goal still reads outdated.
+Beside health, every goal and key result carries a red, amber or green signal. By default it compares progress with the progress expected for the date: on pace is green, behind by more than the first gap is amber, behind by more than the second is red (§11). A workspace may choose the absolute signal instead, green at or above the pass threshold and red below the fail threshold (§12).
+
+The signal is shown beside health, never instead of it. A green progress bar on an outdated goal still reads outdated. *Source:* Microsoft Viva Goals (vendor): "expected progress % based on the Start date and End date"; "If (Expected Progress - Aggregate Progress > 25%), then At Risk".
 
 ---
 
@@ -922,8 +924,10 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Close too-safe pattern | Three quarters or more of a closed cycle's aspirational key results at 1.0 |
 | Root-cause threshold | Aspirational below 0.6, committed below 1.0 |
 | Progress ceiling | 100%, raisable to 200% |
-| Progress signal pass | 75% |
-| Progress signal fail | 50% |
+| Progress signal pace gaps | 10 and 25 percentage points behind expected progress |
+| Progress signal pass | 75%, for the absolute signal |
+| Progress signal fail | 50%, for the absolute signal |
+| Trend forecast minimum values | 4 |
 
 **Quality and planning**
 
