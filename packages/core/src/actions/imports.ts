@@ -400,6 +400,8 @@ const runReport = z.object({
   updated: z.number().int(),
   skipped: z.number().int(),
   unmappedHeaders: z.array(z.string()),
+  /** What the file did not say and the import assumed (P9-T12c-b). */
+  assumed: z.array(z.string()),
   rows: z.array(rowOutcome),
 });
 
@@ -472,6 +474,7 @@ async function runFromTable(
     report: {
       ...result.report,
       unmappedHeaders: [...result.report.unmappedHeaders],
+      assumed: [...result.report.assumed],
       rows: result.report.rows.map((row) => ({ ...row })),
     },
   };

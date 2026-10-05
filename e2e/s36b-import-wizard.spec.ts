@@ -150,9 +150,9 @@ test("the entity step offers a template the wizard reads back without a question
       timeout: 1_000,
     });
   }).toPass({ timeout: 20_000 });
-  await expect(offered).toContainText(
-    "externalId, goal, title, direction, baselineValue, targetValue",
-  );
+  // Since P9-T12c-b the direction and the numbers are asked of each row by
+  // its kind, so a file of milestones needs none of them (METHOD.md §2.10).
+  await expect(offered).toContainText("Required columns: externalId, goal, title.");
 
   const [download] = await Promise.all([
     page.waitForEvent("download"),
@@ -202,6 +202,11 @@ test("acceptance: the dry run reports accurately, and writes nothing", async () 
   await expect(page.getByTestId("import-counts")).toContainText("To create");
   await expect(page.getByTestId("import-rows")).toContainText("divisional");
   await expect(page.getByTestId("import-confirm")).toContainText("Import 2");
+  // NW-P-11 (P9-T12c-b): the file has no kind column, and the report says
+  // what every objective will take instead.
+  await expect(page.getByTestId("import-assumed")).toContainText(
+    "This file has no kind column, so every new objective arrives as the workspace's default kind",
+  );
 
   const { rows } = await pool.query<{ count: string }>(
     "select count(*) from goals where workspace_id = $1 and legacy_id = 'imp-1'",
@@ -217,14 +222,20 @@ test("acceptance: the real run matches what the preview reported", async () => {
   });
   await expect(page.getByTestId("import-counts")).toContainText("Created");
 
-  const { rows } = await pool.query<{ title: string; legacy_id: string }>(
-    `select title, legacy_id from goals
+  const { rows } = await pool.query<{
+    title: string;
+    legacy_id: string;
+    kind: string;
+  }>(
+    `select title, legacy_id, kind from goals
       where workspace_id = $1 and legacy_type = 'csv'
       order by legacy_id`,
     [workspaceId],
   );
   expect(rows.map((row) => row.legacy_id)).toEqual(["imp-1", "imp-2"]);
   expect(rows[0]?.title).toBe("Make the import obvious");
+  // As the preview said: the workspace's default kind (NW-P-11).
+  expect(rows.map((row) => row.kind)).toEqual(["aspirational", "aspirational"]);
 });
 
 test("the run list shows the preview and the import, and a re-run writes nothing new", async () => {

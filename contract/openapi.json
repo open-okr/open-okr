@@ -27268,6 +27268,12 @@
                                 "type": "string"
                               }
                             },
+                            "assumed": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
                             "rows": {
                               "type": "array",
                               "items": {
@@ -27310,6 +27316,7 @@
                             "updated",
                             "skipped",
                             "unmappedHeaders",
+                            "assumed",
                             "rows"
                           ],
                           "additionalProperties": false
@@ -27493,6 +27500,12 @@
                                 "type": "string"
                               }
                             },
+                            "assumed": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
                             "rows": {
                               "type": "array",
                               "items": {
@@ -27535,6 +27548,7 @@
                             "updated",
                             "skipped",
                             "unmappedHeaders",
+                            "assumed",
                             "rows"
                           ],
                           "additionalProperties": false
