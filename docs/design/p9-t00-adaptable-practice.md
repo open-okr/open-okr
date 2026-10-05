@@ -77,6 +77,8 @@ export function resolvePractice(profile: string, overrides: unknown): ResolvedPr
 
 Every entry carries a Zod schema, a label, the METHOD.md section and a source line, exactly as a threshold does. The conformance suite gains one comparison: METHOD.md §12.1 against `PRACTICE`, in both directions, so a setting cannot exist in one and not the other.
 
+**As built at P9-T07a-c**: the levels in use. `cycles.levels`, a column since P3-T01 that only its default and `cycles.update` ever wrote, is the record of the levels a cycle began with: it is written from the practice when the cycle is created, and a change to the practice's levels (an update or a profile) reaches only cycles that have not started, by the workspace's local date. `cycles.levelsInUse` answers what a cycle offers, its record plus any level an objective in it already has, and every level picker and the level filter read it. The policy refuses an objective at a level its cycle does not use, from every surface, citing that level's setting; an import is never refused. No migration was needed. P9-T14's snapshot at close records the practice in full; this keeps only what a running cycle has to keep before then.
+
 ### 2.2 One policy decides every practice refusal
 
 A pure function, also in `packages/method` (`policy.ts`):

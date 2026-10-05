@@ -3,6 +3,7 @@ import {
   defaultPractice,
   differencesFromProfile,
   isPracticeKey,
+  levelsInUse,
   PRACTICE,
   PRACTICE_CHECK_IDS,
   PRACTICE_KEYS,
@@ -325,5 +326,29 @@ describe("switching profile (P9-T05)", () => {
     expect(change.from).toBe("recommended");
     expect(change.practice).toEqual([]);
     expect(change.thresholds).toEqual([]);
+  });
+});
+
+describe("levels in use (P9-T07a-c)", () => {
+  it("are company, department and team by default, in §2.7's order", () => {
+    expect(levelsInUse(defaultPractice())).toEqual([
+      "company",
+      "department",
+      "team",
+    ]);
+  });
+
+  it("follow the profile and the workspace's own changes", () => {
+    // Google-style turns individual on and department off.
+    expect(levelsInUse(resolvePractice("googleStyle"))).toEqual([
+      "company",
+      "team",
+      "individual",
+    ]);
+    expect(
+      levelsInUse(
+        resolvePractice("recommended", { "levels.department": "off" }),
+      ),
+    ).toEqual(["company", "team"]);
   });
 });

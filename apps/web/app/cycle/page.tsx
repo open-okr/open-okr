@@ -607,6 +607,13 @@ export default async function CyclePage({
               checkTitles={draft.checkTitles}
               memberId={workspace.memberId}
               assistsAvailable={await assistsAvailableAction()}
+              levels={
+                (
+                  await callAction(context, "cycles.levelsInUse", {
+                    cycleId: workflow.cycleId,
+                  })
+                ).levels
+              }
             />
           ) : null}
 

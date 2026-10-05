@@ -90,6 +90,7 @@ export async function Drafting({
   checkTitles,
   memberId,
   assistsAvailable,
+  levels,
 }: {
   readonly cycleId: string;
   /** The cycle's last day, which a new key result is due on unless changed. */
@@ -134,6 +135,12 @@ export async function Drafting({
    * `Topbar` left its own slot empty for two phases.
    */
   readonly assistsAvailable: boolean;
+  /**
+   * The levels this cycle offers (METHOD v2 §2.7, P9-T07a-c): the ones it
+   * began with, plus any its objectives already use. The level picker offers
+   * only these, because the policy refuses any other.
+   */
+  readonly levels: readonly string[];
 }) {
   const { t } = await getTranslations();
   const canDraft = canEdit && draftingAllowed;
@@ -610,16 +617,14 @@ export async function Drafting({
                 <select
                   id="goal-level"
                   name="level"
-                  defaultValue="company"
+                  defaultValue={levels[0] ?? "company"}
                   className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
                 >
-                  {["company", "department", "team", "individual"].map(
-                    (value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ),
-                  )}
+                  {levels.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
                 </select>
                 <label className="sr-only" htmlFor="goal-champion">
                   {t("common.champion")}

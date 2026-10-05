@@ -96,6 +96,12 @@ beforeEach(async () => {
   cycleId = (
     (await call("cycles.current", { mode: "quarterly" })) as { id: string }
   ).id;
+  // An individual objective below needs a cycle that uses that level; the
+  // practice has it off by default (METHOD v2 §2.7, P9-T07a-c).
+  await call("cycles.update", {
+    id: cycleId,
+    levels: ["company", "department", "team", "individual"],
+  });
 
   companyGoalId = await goal(
     "Become the platform mid-market teams reach for first",

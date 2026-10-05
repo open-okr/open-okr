@@ -62,6 +62,7 @@ import {
 } from "../cycles/service.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { cycleLevelsInTx } from "../practice/levels.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -191,6 +192,54 @@ const CYCLE_COLUMNS = {
   sponsorId: cycles.sponsorId,
   facilitatorId: cycles.facilitatorId,
 } as const;
+
+/**
+ * The OKR levels one cycle offers (P9-T07a-c, METHOD v2 §2.7): the levels it
+ * began with, plus any level its objectives already use. What every level
+ * picker and the level filter read, so a cycle never offers a level the
+ * policy would refuse, and never hides one an objective in it already has.
+ */
+export const readCycleLevels = defineReadAction({
+  name: "cycles.levelsInUse",
+  summary:
+    "The OKR levels one cycle offers: the levels it began with, plus any its objectives already use.",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.object({ levels: z.array(z.enum(GOAL_LEVELS)) }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const memberId = await actingMember(
+          tx as OperationTx,
+          context.workspaceId,
+          userId,
+        );
+        // A cycle is read through the workspace, as `cycles.list` explains.
+        await getAccessScoped(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "workspace",
+          resourceId: context.workspaceId,
+          requires: ACCESS_LEVELS.view,
+        });
+        return {
+          levels: await cycleLevelsInTx(
+            tx as OperationTx,
+            context.workspaceId,
+            input.cycleId,
+          ),
+        };
+      },
+    );
+  },
+});
 
 export const listCycles = defineReadAction({
   name: "cycles.list",

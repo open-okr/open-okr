@@ -184,6 +184,12 @@ describe("what the agents are bound to", () => {
       "cycles.current",
       { mode: "quarterly" },
     )) as { id: string };
+    // The member's objective is an individual one, which the practice has
+    // off by default, so this cycle is told to use it (P9-T07a-c).
+    await callAction({ pool: wb.appPool, ...context() }, "cycles.update", {
+      id: cycle.id,
+      levels: ["company", "department", "team", "individual"],
+    });
     for (const ownerKind of ["workspace", "member"] as const) {
       const goal = (await callAction(
         { pool: wb.appPool, ...context() },

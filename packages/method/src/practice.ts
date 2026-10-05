@@ -511,6 +511,17 @@ export function defaultPractice(): ResolvedPractice {
   return resolved as ResolvedPractice;
 }
 
+/**
+ * The OKR levels a practice uses, in the order §2.7 lists them (P9-T07a-c).
+ *
+ * A cycle keeps the levels it was created with; this is what it is created
+ * with, and what a change to the practice hands the cycles that have not
+ * started yet.
+ */
+export function levelsInUse(practice: ResolvedPractice): OkrLevel[] {
+  return OKR_LEVELS.filter((level) => practice[`levels.${level}`] === "on");
+}
+
 /** Every setting in one group, for the admin card that renders them together. */
 export function practiceInGroup(group: PracticeGroup): readonly PracticeKey[] {
   return PRACTICE_KEYS.filter((key) => PRACTICE[key].group === group);

@@ -119,7 +119,22 @@ export default async function GoalsPage({
   });
   const cycleId = query.cycle ?? current?.id ?? cycles[0]?.id ?? null;
 
-  const level = ALIGNMENT_LEVEL_ORDER.find((entry) => entry === query.level);
+  // The levels this cycle offers (METHOD v2 §2.7, P9-T07a-c): the ones it
+  // began with, plus any its objectives already use. The chips offer only
+  // these, and a new objective is written at one of them, because the policy
+  // refuses any other.
+  const cycleLevels: readonly string[] = cycleId
+    ? (await callAction(context, "cycles.levelsInUse", { cycleId })).levels
+    : ALIGNMENT_LEVEL_ORDER;
+  const level = ALIGNMENT_LEVEL_ORDER.find(
+    (entry) => entry === query.level && cycleLevels.includes(entry),
+  );
+  const levelForNew = (level ??
+    (cycleLevels.includes("team") ? "team" : (cycleLevels[0] ?? "team"))) as
+    | "company"
+    | "department"
+    | "team"
+    | "individual";
   // Validated against the band list rather than passed through, so a hand-edited
   // URL cannot ask for a band the product does not have.
   const health = GOAL_HEALTH_BANDS.find((entry) => entry === query.health);
@@ -356,7 +371,7 @@ export default async function GoalsPage({
                * The set also carries an add row under it, for the moment
                * somebody is already reading. */}
               {canEdit && cycleId ? (
-                <NewObjectiveButton cycleId={cycleId} level={level ?? "team"} />
+                <NewObjectiveButton cycleId={cycleId} level={levelForNew} />
               ) : null}
               {/* Check in's door now that it has left the sidebar
                * (P9-T07a-b, okr-entry-points.md §3.1). */}
@@ -387,6 +402,7 @@ export default async function GoalsPage({
         <CardBody className="flex flex-col gap-2.5">
           <Filters
             level={level ?? null}
+            levels={cycleLevels}
             health={health ?? null}
             scope={scopeTab}
             members={members}
@@ -420,7 +436,7 @@ export default async function GoalsPage({
           // chosen, so a filtered set adds to itself rather than adding a row
           // the filter immediately hides; team otherwise, which is the level
           // §4.3 puts most objectives at.
-          level={level ?? "team"}
+          level={levelForNew}
           canEdit={canEdit}
           canAdminister={canAdminister}
           progressMax={progressMax}
@@ -635,6 +651,7 @@ const GOAL_HEALTH_BANDS = [
 
 async function Filters({
   level,
+  levels,
   health,
   scope,
   members,
@@ -648,6 +665,8 @@ async function Filters({
   filterAssist,
 }: {
   readonly level: string | null;
+  /** The levels this cycle offers; the level chips show only these. */
+  readonly levels: readonly string[];
   readonly health: string | null;
   readonly scope: "all" | "mine" | "team" | "company";
   readonly members: readonly { readonly id: string; readonly name: string }[];
@@ -726,15 +745,17 @@ async function Filters({
           <Tab href={href({ level: null })} active={level === null}>
             {t("goals.all")}
           </Tab>
-          {ALIGNMENT_LEVEL_ORDER.map((entry) => (
-            <Tab
-              key={entry}
-              href={href({ level: entry })}
-              active={level === entry}
-            >
-              {entry}
-            </Tab>
-          ))}
+          {ALIGNMENT_LEVEL_ORDER.filter((entry) => levels.includes(entry)).map(
+            (entry) => (
+              <Tab
+                key={entry}
+                href={href({ level: entry })}
+                active={level === entry}
+              >
+                {entry}
+              </Tab>
+            ),
+          )}
         </Group>
 
         <Group label={t("workMap.health")}>

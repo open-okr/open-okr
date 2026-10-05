@@ -19,6 +19,8 @@ import type { WorkspaceTx } from "@openokr/db";
 import {
   type CycleFacts,
   decide,
+  levelsInUse,
+  OKR_LEVELS,
   type PolicyDecision,
   policyNeedsPhases,
 } from "@openokr/method";
@@ -27,6 +29,7 @@ import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { evaluateWorkflow, loadCycleForWorkflow } from "../cycles/workflow.ts";
 import { OperationError } from "../operations/operation.ts";
+import { cycleLevelsInTx } from "./levels.ts";
 import { practiceFromRow } from "./settings.ts";
 
 /** A write the practice governs, named by what it touches. */
@@ -36,6 +39,8 @@ export type PolicyRequest =
       readonly cycleId: string | null;
       /** Whether it names a reviewer (P9-T04). */
       readonly hasReviewer?: boolean;
+      /** The level it is written at, judged against the levels in use (P9-T07a-c). */
+      readonly level?: string;
     }
   /** Taking the reviewer off an objective (P9-T04). */
   | { readonly kind: "reviewer.remove" }
@@ -112,6 +117,15 @@ export async function policyDecisionInTx<
       : decide({ kind: "set.publish", cycle }, practice, thresholds);
   }
   if (request.kind === "objective.create") {
+    // §2.7: the cycle's own levels, or today's for an objective with its own
+    // timeframe, which is in no cycle to have begun with any.
+    const level = OKR_LEVELS.find((entry) => entry === request.level);
+    const levels =
+      level === undefined
+        ? undefined
+        : request.cycleId === null
+          ? levelsInUse(practice)
+          : await cycleLevelsInTx(tx, workspaceId, request.cycleId);
     return decide(
       {
         kind: "objective.create",
@@ -119,6 +133,9 @@ export async function policyDecisionInTx<
         ...(request.hasReviewer === undefined
           ? {}
           : { hasReviewer: request.hasReviewer }),
+        ...(level === undefined || levels === undefined
+          ? {}
+          : { level, levelsInUse: levels }),
       },
       practice,
       thresholds,

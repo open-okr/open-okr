@@ -3737,6 +3737,23 @@
       "pages": false
     },
     {
+      "name": "cycles levelsInUse",
+      "action": "cycles.levelsInUse",
+      "method": "GET",
+      "path": "/cycles/levelsInUse",
+      "scope": "read",
+      "summary": "The OKR levels one cycle offers: the levels it began with, plus any its objectives already use.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "cycles current",
       "action": "cycles.current",
       "method": "GET",

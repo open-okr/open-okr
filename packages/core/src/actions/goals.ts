@@ -1069,6 +1069,8 @@ export const createGoal = defineWriteAction({
           kind: "objective.create",
           cycleId: input.cycleId ?? null,
           hasReviewer: Boolean(input.reviewerId),
+          // §2.7: only a level the cycle uses (P9-T07a-c).
+          level: input.level,
         },
       );
 

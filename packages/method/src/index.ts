@@ -160,6 +160,7 @@ export {
   isProfileKey,
   KEY_RESULT_KINDS,
   type KeyResultKind,
+  levelsInUse,
   OKR_LEVELS,
   type OkrLevel,
   PRACTICE,

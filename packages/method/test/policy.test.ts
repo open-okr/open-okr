@@ -369,3 +369,40 @@ describe("changing a target (P9-T06b, METHOD v2 §2.9)", () => {
     expect(policyNeedsPhases(change(100, 80, 40), required)).toBe(false);
   });
 });
+
+describe("the levels in use (P9-T07a-c, METHOD v2 §2.7)", () => {
+  const practice = resolvePractice("recommended");
+  const create = (
+    level: "company" | "department" | "team" | "individual",
+    levelsInUse: readonly ("company" | "department" | "team" | "individual")[],
+  ): PolicyIntent => ({
+    kind: "objective.create",
+    cycle: null,
+    level,
+    levelsInUse,
+  });
+
+  it("refuses an objective at a level its cycle does not use, citing that level", () => {
+    const refused = decide(
+      create("individual", ["company", "department", "team"]),
+      practice,
+      thresholds,
+    );
+    expect(refused.outcome).toBe("block");
+    expect(refused.rules).toEqual(["levels.individual"]);
+    expect(refused.reasons[0]).toMatch(/has no place in it/);
+  });
+
+  it("allows one at a level in use, and decides nothing when the caller cannot say", () => {
+    expect(
+      decide(create("team", ["company", "team"]), practice, thresholds).outcome,
+    ).toBe("allow");
+    expect(
+      decide(
+        { kind: "objective.create", cycle: null, level: "individual" },
+        practice,
+        thresholds,
+      ).outcome,
+    ).toBe("allow");
+  });
+});

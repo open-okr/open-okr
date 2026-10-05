@@ -151,7 +151,7 @@ Distribute it a few working days before the first session (3 by default, §11). 
 
 ### 2.7 Levels and quantities
 
-Many organisations use only two, company and team. *Source:* Castro: "Use as few OKR levels as possible"; Cagan: focus on team objectives.
+A workspace chooses the levels it uses (§12). A change applies to cycles that start after it: a running or closed cycle keeps the levels it began with, so no objective is ever left at a level that no longer exists. Many organisations use only two, company and team. *Source:* Castro: "Use as few OKR levels as possible"; Cagan: focus on team objectives.
 
 | Level | Objectives | Rule |
 |---|---|---|

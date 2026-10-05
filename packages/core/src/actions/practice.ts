@@ -21,10 +21,12 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
+  levelsInUse,
   PRACTICE,
   PRACTICE_KEYS,
   PROFILE_KEYS,
   PROFILES,
+  type ResolvedPractice,
   resolvePractice,
   switchProfile,
   validatePracticeOverrides,
@@ -34,9 +36,15 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { mergeOverrides, resolveRhythm } from "../cycles/rhythm.ts";
-import { ensureRhythmSettingsInTx, readRhythmRow } from "../cycles/service.ts";
+import {
+  ensureRhythmSettingsInTx,
+  readRhythmRow,
+  workspaceTimeZone,
+} from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { carryLevelsToUnstartedCyclesInTx } from "../practice/levels.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -98,6 +106,28 @@ async function actingMember(
     throw new OperationError("not_found", "No such workspace.");
   }
   return member.id;
+}
+
+/**
+ * Hands a change to the levels in use to the cycles that have not started
+ * (METHOD v2 §2.7, P9-T07a-c). A cycle that has started keeps the levels it
+ * began with. Returns how many cycles took the new levels, for the audit.
+ */
+async function carryLevels(
+  tx: OperationTx,
+  workspaceId: string,
+  before: ResolvedPractice,
+  after: ResolvedPractice,
+): Promise<number> {
+  const from = levelsInUse(before);
+  const to = levelsInUse(after);
+  if (from.join(",") === to.join(",")) {
+    return 0;
+  }
+  const today = formatLocalDate(
+    localDateIn(new Date(), await workspaceTimeZone(tx, workspaceId)),
+  );
+  return carryLevelsToUnstartedCyclesInTx(tx, workspaceId, to, today);
 }
 
 export const readPractice = defineReadAction({
@@ -258,6 +288,12 @@ export const updatePractice = defineWriteAction({
 
       const state = practiceFromRow(updated);
       const keys = [...Object.keys(values), ...resets];
+      const cyclesGivenLevels = await carryLevels(
+        tx,
+        workspaceId,
+        stored.practice,
+        state.practice,
+      );
       return {
         result: {
           ...state,
@@ -279,6 +315,7 @@ export const updatePractice = defineWriteAction({
             set: valid,
             reset: resets,
             practice: next,
+            cyclesGivenLevels,
           },
         },
       };
@@ -357,6 +394,12 @@ export const applyPracticeProfile = defineWriteAction({
       }
 
       const state = practiceFromRow(updated);
+      const cyclesGivenLevels = await carryLevels(
+        tx,
+        workspaceId,
+        before.practice,
+        state.practice,
+      );
       const thresholdsChanged = change.thresholds.map(
         (threshold) => threshold.key as string,
       );
@@ -391,6 +434,7 @@ export const applyPracticeProfile = defineWriteAction({
               to: threshold.to,
             })),
             keptThresholds: [...change.keptThresholds],
+            cyclesGivenLevels,
           },
         },
       };

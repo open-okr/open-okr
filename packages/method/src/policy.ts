@@ -21,7 +21,7 @@
  *
  * Pure. No database, no clock: the caller passes the date.
  */
-import type { PracticeKey, ResolvedPractice } from "./practice.ts";
+import type { OkrLevel, PracticeKey, ResolvedPractice } from "./practice.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 import type { PhaseResult } from "./workflow.ts";
 
@@ -50,6 +50,13 @@ export type PolicyIntent =
       readonly kind: "objective.create";
       readonly cycle: CycleFacts | null;
       readonly hasReviewer?: boolean;
+      /**
+       * The level it is written at, and the levels its cycle uses (§2.7,
+       * P9-T07a-c). Both or neither: a caller that cannot say which levels
+       * are in use is not asking this question.
+       */
+      readonly level?: OkrLevel;
+      readonly levelsInUse?: readonly OkrLevel[];
     }
   /** Taking the reviewer off an objective that has one (P9-T04). */
   | { readonly kind: "reviewer.remove" }
@@ -241,6 +248,22 @@ export function decide(
     reviewerRequired
   ) {
     return REVIEWER_REQUIRED;
+  }
+  // §2.7: a cycle uses the levels it began with, so an objective at a level
+  // it does not use would sit somewhere nothing reads.
+  if (
+    intent.kind === "objective.create" &&
+    intent.level !== undefined &&
+    intent.levelsInUse !== undefined &&
+    !intent.levelsInUse.includes(intent.level)
+  ) {
+    return {
+      outcome: "block",
+      rules: [`levels.${intent.level}`],
+      reasons: [
+        `This cycle uses ${intent.levelsInUse.join(", ")} objectives, so a ${intent.level} objective has no place in it. A change to the levels in use applies to cycles that have not started.`,
+      ],
+    };
   }
 
   const cycle = intent.cycle;

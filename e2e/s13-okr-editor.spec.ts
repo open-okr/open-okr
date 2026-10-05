@@ -140,20 +140,30 @@ test("a title changed in one tab shows in another without a reload", async () =>
   await expect(titled(other, OBJECTIVE)).toBeVisible({ timeout: 15_000 });
 
   const renamed = `${OBJECTIVE}, from the first tab`;
-  // Enter on the keyboard rather than on the locator: the locator finds the
-  // field by its value, which is no longer the old title once it is filled.
-  await titled(page, OBJECTIVE).fill(renamed);
-  await page.keyboard.press("Enter");
-  // At once in this tab, and in the other without a navigation.
-  await expect(titled(page, renamed)).toBeVisible({ timeout: 5_000 });
-  await expect(titled(other, renamed)).toBeVisible({ timeout: 15_000 });
-
-  // Back, so the rest of this file and every later spec meet the title they
-  // expect.
-  await titled(page, renamed).fill(OBJECTIVE);
-  await page.keyboard.press("Enter");
-  await expect(titled(other, OBJECTIVE)).toBeVisible({ timeout: 15_000 });
-  await other.close();
+  try {
+    // Enter on the keyboard rather than on the locator: the locator finds
+    // the field by its value, which is no longer the old title once filled.
+    await titled(page, OBJECTIVE).fill(renamed);
+    await page.keyboard.press("Enter");
+    // At once in this tab, and in the other without a navigation.
+    await expect(titled(page, renamed)).toBeVisible({ timeout: 5_000 });
+    await settled();
+    // Brought forward as a person switching to it would be. A browser may
+    // hold a background tab's work back, which is how this case failed in
+    // continuous integration with every save already made.
+    await other.bringToFront();
+    await expect(titled(other, renamed)).toBeVisible({ timeout: 20_000 });
+  } finally {
+    // Back, whatever happened, so a retry and every later case meet the
+    // title they expect rather than adding a second objective beside it.
+    await page.bringToFront();
+    if ((await titled(page, renamed).count()) > 0) {
+      await titled(page, renamed).fill(OBJECTIVE);
+      await page.keyboard.press("Enter");
+      await settled();
+    }
+    await other.close();
+  }
 });
 
 test("a value typed into the table is recorded and moves the progress", async () => {
@@ -338,6 +348,13 @@ test("the scope tabs and filters narrow the list, and the address keeps them", a
   await expect(ours).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("okr-summary")).toContainText("Objectives:");
   const scope = page.getByRole("group", { name: "Scope" });
+  // The level chips offer only the levels this cycle uses (P9-T07a-c), and
+  // individual OKRs are off by default.
+  const levels = page.locator("#main-content").getByRole("group", {
+    name: "Level",
+  });
+  await expect(levels.getByRole("link", { name: "team" })).toBeVisible();
+  await expect(levels.getByRole("link", { name: "individual" })).toHaveCount(0);
 
   await scope.getByRole("link", { name: "My team" }).click();
   await expect(page).toHaveURL(/scope=team/);
