@@ -195,8 +195,11 @@ export async function sendForward(
       cycleId: quarter.id,
       level: "company",
       ownerKind: "workspace",
-      championId,
-      reviewerId,
+      // Omitted rather than sent empty when nobody was chosen (P8-G13d):
+      // `goals.create` then names whoever is drafting, and an empty string
+      // would fail the uuid schema instead.
+      ...(championId ? { championId } : {}),
+      ...(reviewerId ? { reviewerId } : {}),
       parentGoalId: goalId,
       weight: 1,
     });

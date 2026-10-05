@@ -21,7 +21,7 @@ import {
   workspaceMembers,
   workspaceRoles,
 } from "@openokr/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -248,6 +248,33 @@ export const createRole = defineWriteAction({
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
+      // **A name already taken is a sentence, not a crash** (P8-G13b, found
+      // by the end-to-end suite). The unique index refuses a second role with
+      // the same name, and without this the refusal arrives as a raw database
+      // error rather than an `OperationError`: the server action rethrows it,
+      // the screen falls to its error boundary, and an administrator who
+      // typed a name that exists loses the whole page instead of being told
+      // which name to change.
+      const [taken] = await tx
+        .select({ id: workspaceRoles.id })
+        .from(workspaceRoles)
+        .where(
+          activeOnly(
+            workspaceRoles,
+            and(
+              eq(workspaceRoles.workspaceId, workspaceId),
+              sql`lower(${workspaceRoles.name}) = lower(${input.name})`,
+            ),
+          ),
+        )
+        .limit(1);
+      if (taken) {
+        throw new OperationError(
+          "forbidden",
+          `A role called "${input.name}" already exists. Give this one another name.`,
+        );
+      }
+
       // openokr:allow-mutation: the operation's own execute.
       const [created] = await tx
         .insert(workspaceRoles)

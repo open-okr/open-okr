@@ -244,6 +244,23 @@ describe("what a role does to a level", () => {
 });
 
 describe("what the Owner role refuses", () => {
+  it("refuses a name another role already holds, as a sentence", async () => {
+    const wb = await workerDb();
+    // Found by the end-to-end suite rather than by review: the unique index
+    // refused the second insert and the raw database error reached the
+    // screen, which fell to its error boundary. An administrator who types a
+    // name that exists should be told which name to change, not lose the
+    // page.
+    await callAction({ pool: wb.appPool, ...context() }, "roles.create", {
+      name: "Auditor",
+    });
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "roles.create", {
+        name: "auditor",
+      }),
+    ).rejects.toThrow(/already exists/i);
+  });
+
   it("refuses to have its permissions changed", async () => {
     const wb = await workerDb();
     const { roles } = await callAction(
@@ -339,5 +356,156 @@ describe("the member row", () => {
         .where(eq(workspaceMembers.id, ownerMemberId)),
     );
     expect(rows[0]?.roleId).not.toBeNull();
+  });
+});
+
+describe("a goal in a space, after P8-G13c", () => {
+  /**
+   * The binding that used to answer "who may edit this objective" is gone, so
+   * the role is the only thing that answers it. These two tests are the pair
+   * that would have caught putting it back: one says the space grants nothing
+   * beyond the workspace-wide view, the other says the role still does.
+   */
+  const goalInASpace = async () => {
+    const wb = await workerDb();
+    const space = await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.create",
+      { name: "Revenue" },
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "spaces.addMember", {
+      spaceId: space.id,
+      memberId: otherMemberId,
+      role: "member",
+    });
+    const cycle = await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.create",
+      {
+        title: "Make renewal a decision customers do not have to think about",
+        level: "team",
+        ownerKind: "space",
+        spaceId: space.id,
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        cycleId: cycle?.id as string,
+        weight: 1,
+      },
+    );
+    return created.id;
+  };
+
+  const levelOn = async (goalId: string, memberId: string) =>
+    withTx(async (tx) => {
+      const resolved = await resolveSubjectContext(
+        tx,
+        "goal",
+        goalId,
+        workspaceId,
+      );
+      return resolveMemberAccessLevel(tx, {
+        workspaceId,
+        memberId,
+        contextId: resolved?.contextId as string,
+      });
+    });
+
+  it("grants a member of that space nothing beyond the workspace-wide view", async () => {
+    const goalId = await goalInASpace();
+    // No role, so the only thing reaching them is `workspace_standard` at
+    // view. Before P8-G13c the space binding made this `edit`.
+    expect(await levelOn(goalId, otherMemberId)).toBe(ACCESS_LEVELS.view);
+  });
+
+  it("still grants the edit through the role, which is the point", async () => {
+    const wb = await workerDb();
+    const goalId = await goalInASpace();
+    const { roles } = await callAction(
+      { pool: wb.appPool, ...context() },
+      "roles.list",
+      {},
+    );
+    const member = roles.find((role) => role.builtinKey === "member");
+    await callAction({ pool: wb.appPool, ...context() }, "roles.assign", {
+      memberId: otherMemberId,
+      roleId: member?.id as string,
+    });
+    expect(await levelOn(goalId, otherMemberId)).toBe(ACCESS_LEVELS.edit);
+
+    // And lowering that role is what takes it away, which is what the screen
+    // promises and what could not be true while the space binding stood.
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "roles.setPermission",
+      { roleId: member?.id as string, domain: "goal", level: 10 },
+    );
+    expect(await levelOn(goalId, otherMemberId)).toBe(ACCESS_LEVELS.view);
+  });
+});
+
+describe("the number of answers a form demands (P8-G13d)", () => {
+  it("creates a cycle from a date alone, with every field resolved", async () => {
+    const wb = await workerDb();
+    const half = new Date();
+    half.setUTCMonth(half.getUTCMonth() + 6);
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.create",
+      { on: half.toISOString().slice(0, 10), firstCycle: false } as never,
+    );
+
+    const row = created as {
+      id: string;
+      sponsorId: string | null;
+      facilitatorId: string | null;
+      publicationDeadline: string | null;
+      startsOn: string;
+    };
+    // Named rather than left for somebody to answer: METHOD.md §2 phase 1
+    // asks that both be named, and whoever made the cycle is both until they
+    // say otherwise.
+    expect(row.sponsorId).toBe(ownerMemberId);
+    expect(row.facilitatorId).toBe(ownerMemberId);
+    // Publish gate 6 asks for a date strictly before day one and says nothing
+    // about how far before, so the latest allowed date is the only one the
+    // product can choose without inventing a judgement.
+    expect(row.publicationDeadline).not.toBeNull();
+    expect((row.publicationDeadline as string) < row.startsOn).toBe(true);
+  });
+
+  it("creates an objective from a title alone, championed by whoever typed it", async () => {
+    const wb = await workerDb();
+    const cycle = await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.create",
+      {
+        title: "Make onboarding something customers finish by themselves",
+        level: "team",
+        ownerKind: "workspace",
+        cycleId: cycle?.id as string,
+        weight: 1,
+      } as never,
+    );
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.read",
+      { id: created.id },
+    );
+    expect(read.champion.id).toBe(ownerMemberId);
+    expect(read.reviewer.id).toBe(ownerMemberId);
+    // And the quality canon says what is still missing rather than the create
+    // refusing: a reviewer who is also the champion is a finding, not a wall.
+    expect(read.quality).toBeTruthy();
   });
 });

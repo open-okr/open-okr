@@ -3035,12 +3035,26 @@ Deliverables: an admin screen listing the roles, their matrix as a grid of four 
 Test plan: changing a cell writes one audit row and the member it affects resolves the new level on their next read; the Owner row offers no control; removing a role somebody holds is refused with the sentence the action gives.
 Acceptance: Given an administrator on the roles screen, when they lower Member to view on objectives, then a member holding that role opens an objective read-only.
 
+**Built on 2 October 2026.** Two cards rather than one: the matrix, and who
+holds which role. `people.directory` gained `roleId` so the second card needs
+no read per person, which meant three producers of the member summary had to
+select it; two are `returning` clauses that only a run-time schema would have
+caught. The screen is registered at `/admin/roles` and takes `full`, the same
+level as invitations and support access, because deciding what a role may do
+is deciding who can change what.
+
 ### P8-G13c: An objective's edit stops coming from its space [M]
 Depends on: P8-G13a, P8-G13b
 Goal: one answer to "who may edit this", not two.
 Deliverables: `createGoalInTx` stops writing the `space_standard` binding at `edit`; a data change removing it from existing goals; the space screens saying what a space now decides, which is membership and the session cadence rather than edit rights.
 Test plan: a goal created in a space grants its members nothing beyond their role; a member whose role grants `view` cannot edit a goal in their own space; the alignment and session paths that read space membership are unaffected.
 Acceptance: Given a workspace that has lowered Member to view, when a member of the owning space opens an objective, then it is read-only.
+
+**Built on 4 October 2026.** The binding goes from `createGoalInTx` and data change 0013
+removes the ones already written, ordered after 0012 so nobody loses the edit on the day it
+runs. The initiative's identical binding is deliberately untouched: this row names the
+objective, and the two now disagree, which the design note §9 records rather than resolving
+quietly.
 
 ### P8-G13d: Fewer required fields on the way in [S]
 Depends on: P8-G13a
@@ -3398,6 +3412,8 @@ Deliverables:
 Test plan: the upgrade workflow from 0.1.2; the demo seed run against today's date.
 Acceptance: Given an instance on 0.1.2, when it upgrades to 0.2.0, then every workspace is on the recommended profile and its data is intact.
 Scenario steps: NW-P-07.
+
+**P8-G13d was built on 5 October 2026.** None of the three cycle defaults is a stored setting: the answer is always derived from who is asking or from the period itself, so §4.14 records them as rules rather than as a card nobody would open. Champion and reviewer default in `goals.create` rather than in each of the four surfaces that call it, so the command line and the REST surface get the same behaviour as the screens.
 
 ## Appendix A: index
 

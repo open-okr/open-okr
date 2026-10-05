@@ -62,8 +62,11 @@ export async function createGoal(
       title,
       level: level as "company" | "department" | "team" | "individual",
       ownerKind: "workspace",
-      championId,
-      reviewerId,
+      // Omitted rather than sent empty when nobody was chosen (P8-G13d):
+      // `goals.create` then names whoever is drafting, and an empty string
+      // would fail the uuid schema instead.
+      ...(championId ? { championId } : {}),
+      ...(reviewerId ? { reviewerId } : {}),
       weight: 1,
       ...(contributionStatement === "" ? {} : { contributionStatement }),
       // Phase 4 of the guided cycle: refused, with the reason, while an

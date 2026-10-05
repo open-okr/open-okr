@@ -31,6 +31,7 @@ import {
   Target,
   Trophy,
   Upload,
+  UserCog,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -96,6 +97,13 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   // `UserPlus` sits four rows below for Invitations, and two people icons in
   // one column at sidebar size is the "unreadable at a glance" this file
   // exists to prevent.
+  // A person with a setting on them, because a role is what a person is given
+  // rather than a thing they hold: `KeyRound` is already the API token and
+  // `Shield` is already Security, and two of either in one column is the
+  // "unreadable at a glance" this file exists to prevent. `Users` is the
+  // directory and `UserPlus` the invitation, so the people shapes are taken
+  // by what is done to people rather than by what people may do.
+  "admin-roles": <UserCog className="size-full" />,
   "admin-support": <LifeBuoy className="size-full" />,
   "admin-sso": <Lock className="size-full" />,
   "admin-directory": <Users className="size-full" />,

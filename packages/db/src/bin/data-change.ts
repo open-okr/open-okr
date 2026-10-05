@@ -22,6 +22,7 @@ import { bindAgentsToSpacelessItems } from "../data-changes/0009_bind_agents_to_
 import { scrubErasedMemberNames } from "../data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../data-changes/0011_seal_account_tokens.ts";
 import { backfillWorkspaceRoles } from "../data-changes/0012_backfill_workspace_roles.ts";
+import { dropSpaceEditOnGoals } from "../data-changes/0013_drop_space_edit_on_goals.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -46,6 +47,9 @@ try {
       // resolves its own ring. Absent is fine until there is a token to seal.
       sealAccountTokens(process.env.OPENOKR_ENCRYPTION_KEY),
       backfillWorkspaceRoles,
+      // After 0012, never before it: 0012 is what gives everybody the role
+      // that replaces the binding this removes.
+      dropSpaceEditOnGoals,
     ],
   });
   process.stdout.write(
