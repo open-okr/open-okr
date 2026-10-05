@@ -1,7 +1,7 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { Bar, useTranslations } from "@openokr/ui";
+import { Bar, useQueryClient, useTranslations } from "@openokr/ui";
 import {
   Background,
   Controls,
@@ -15,19 +15,23 @@ import {
   ReactFlowProvider,
   useReactFlow,
 } from "@xyflow/react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import {
   filterGoals,
   type OkrFilters,
   type OkrGoal,
   type OkrScope,
   type OkrTree,
+  okrCycleKey,
 } from "../../lib/okr-tree/cache.ts";
 import {
   useOkrLive,
   useOkrMutation,
   useOkrTree,
 } from "../../lib/okr-tree/use-okr-tree.ts";
+import { linkGoals } from "./alignment-actions.ts";
+import { AlignmentPanel, type AlignmentReading } from "./alignment-panel.tsx";
 import { HealthChip } from "./health-chip.tsx";
 import type { Person } from "./okr-cells.tsx";
 import { OkrDrawer, useDrawerAddress } from "./okr-drawer.tsx";
@@ -51,6 +55,8 @@ import {
  *
  * **Reading, not yet editing.** A card opens the drawer, where every field is
  * edited; editing on the card itself, adding and re-parenting are P9-T10's.
+ * Linking two objectives into a dependency is here since P9-T09b, from the
+ * studio, with the alignment panel beside the canvas.
  *
  * **The keyboard** (§5.4): Tab reaches the cards, the arrow keys move between
  * connected ones (up to the parent, down to the first child, left and right
@@ -64,6 +70,8 @@ type ObjectiveData = {
   readonly hasBelow: boolean;
   readonly progressMax: number;
   readonly onToggle: (id: string) => void;
+  /** The first of two cards being linked into a dependency. */
+  readonly linkFrom: boolean;
 };
 type ContextData = { readonly context: OkrTree["context"][number] };
 type CycleData = { readonly name: string };
@@ -76,10 +84,19 @@ const HIDDEN_HANDLE = "!h-1 !w-1 !min-w-0 !border-0 !bg-transparent";
 
 function ObjectiveCard({ data }: NodeProps<ObjectiveFlowNode>) {
   const { t } = useTranslations();
-  const { goal, collapsed, hiddenBelow, hasBelow, progressMax, onToggle } =
-    data;
+  const {
+    goal,
+    collapsed,
+    hiddenBelow,
+    hasBelow,
+    progressMax,
+    onToggle,
+    linkFrom,
+  } = data;
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-lg border border-line bg-surface text-left shadow-sm">
+    <div
+      className={`relative flex h-full w-full flex-col overflow-hidden rounded-lg border bg-surface text-left shadow-sm ${linkFrom ? "border-brand ring-2 ring-brand" : "border-line"}`}
+    >
       <Handle
         type="target"
         position={Position.Top}
@@ -247,6 +264,8 @@ export function OkrDiagram(props: {
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
+  /** The cycle's alignment score and findings, for the panel beside it. */
+  readonly alignment: AlignmentReading | null;
   readonly empty: React.ReactNode;
 }) {
   if (props.cycleId === null || props.initialTree === null) {
@@ -278,6 +297,7 @@ function LiveDiagram({
   progressMax,
   members,
   coach,
+  alignment,
 }: {
   readonly initialTree: OkrTree;
   readonly initialAt: number;
@@ -289,8 +309,11 @@ function LiveDiagram({
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
+  readonly alignment: AlignmentReading | null;
 }) {
   const { t } = useTranslations();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const tree = useOkrTree({
     cycleId,
     scope,
@@ -306,6 +329,11 @@ function LiveDiagram({
     () => new Set(collapsedByDefault(initialTree)),
   );
   const [dependencies, setDependencies] = useState(false);
+  // Link mode, as the studio had it: the first card pressed depends on the
+  // second. Null when not linking.
+  const [linking, setLinking] = useState<{ from: string | null } | null>(null);
+  const [linkProblem, setLinkProblem] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
 
   // The filters narrow the diagram as they narrow the list; an objective
   // whose parent a filter hides hangs from the cycle.
@@ -364,6 +392,7 @@ function LiveDiagram({
                 (layout.childrenOf.get(entry.id)?.length ?? 0) > 0,
               progressMax,
               onToggle: toggle,
+              linkFrom: linking?.from === entry.id,
             } satisfies ObjectiveData,
           };
         }
@@ -385,7 +414,7 @@ function LiveDiagram({
           data: { name: entry.name } satisfies CycleData,
         };
       }),
-    [layout, progressMax, toggle, t],
+    [layout, progressMax, toggle, t, linking],
   );
 
   const edges = useMemo(() => {
@@ -455,9 +484,44 @@ function LiveDiagram({
     );
   };
 
+  /**
+   * A card pressed: the drawer, or in link mode the next end of a
+   * dependency. The second end saves at once, and the dependencies are
+   * switched on so the new line is seen.
+   */
   const openIn = (entry: DiagramNode | undefined) => {
-    if (entry?.kind === "objective") {
+    if (entry?.kind !== "objective") {
+      return;
+    }
+    if (!linking) {
       drawer.open(entry.id);
+      return;
+    }
+    if (linking.from === null || linking.from === entry.id) {
+      setLinking({ from: entry.id });
+      return;
+    }
+    const from = linking.from;
+    setLinkProblem(null);
+    startSaving(async () => {
+      const result = await linkGoals(from, entry.id);
+      if (result.error) {
+        setLinkProblem(result.error);
+        return;
+      }
+      setLinking(null);
+      setDependencies(true);
+      await queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
+      router.refresh();
+    });
+  };
+
+  /** A finding's objective: in the drawer here, or in its own cycle. */
+  const openGoal = (goalId: string) => {
+    if (tree.goals.some((goal) => goal.id === goalId)) {
+      drawer.open(goalId);
+    } else {
+      router.push(`/goals?okr=${goalId}`);
     }
   };
 
@@ -490,6 +554,9 @@ function LiveDiagram({
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       openIn(byId.get(id));
+    }
+    if (event.key === "Escape" && linking) {
+      setLinking(null);
     }
   };
 
@@ -528,55 +595,98 @@ function LiveDiagram({
         >
           {t("okrDiagram.dependencies")}
         </button>
-        <span className="text-ink-4">{t("okrDiagram.keyboardHint")}</span>
-      </div>
-
-      <section
-        ref={frame}
-        aria-label={t("okrDiagram.label")}
-        data-testid="okr-diagram"
-        onKeyDown={onKeyDown}
-        className="okr-diagram h-[70vh] min-h-96 overflow-hidden rounded-lg border border-line"
-      >
-        {objectives.length === 0 ? (
-          <p className="p-3 text-sm text-ink-2" data-testid="okr-diagram-empty">
-            {t("okrDiagram.empty")}
-          </p>
+        {canEdit ? (
+          <button
+            type="button"
+            aria-pressed={linking !== null}
+            onClick={() => {
+              setLinkProblem(null);
+              setLinking((current) => (current ? null : { from: null }));
+            }}
+            className="rounded-control border border-line bg-surface px-2 py-1 font-semibold text-ink-2 hover:bg-raised aria-pressed:border-brand aria-pressed:bg-brand-weak aria-pressed:text-brand-text"
+          >
+            {t("okrDiagram.linkTwo")}
+          </button>
         ) : null}
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={NODE_TYPES}
-          fitView
-          fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
-          minZoom={0.1}
-          maxZoom={1.5}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          // Only what is on screen is drawn, which is what keeps a cycle of
-          // three hundred objectives quick to open (design §7).
-          onlyRenderVisibleElements
-          onNodeClick={(_event, node) => openIn(byId.get(node.id))}
-          // The canvas's own words, in the reader's language, and true of
-          // this diagram: its arrow keys follow lines rather than move cards.
-          ariaLabelConfig={{
-            "node.a11yDescription.default": t("okrDiagram.keyboardHint"),
-            "node.a11yDescription.keyboardDisabled": t(
-              "okrDiagram.keyboardHint",
-            ),
-            "controls.ariaLabel": t("okrDiagram.controls"),
-            "controls.zoomIn.ariaLabel": t("okrDiagram.zoomIn"),
-            "controls.zoomOut.ariaLabel": t("okrDiagram.zoomOut"),
-            "controls.fitView.ariaLabel": t("okrDiagram.fitView"),
-            "minimap.ariaLabel": t("okrDiagram.minimap"),
-            "handle.ariaLabel": t("okrDiagram.handle"),
-          }}
+        <span className="text-ink-4" aria-live="polite">
+          {saving
+            ? t("goals.studio.studio.savingTheLink")
+            : linking
+              ? linking.from === null
+                ? t("okrDiagram.linkPickFirst")
+                : t("okrDiagram.linkPickSecond")
+              : t("okrDiagram.keyboardHint")}
+        </span>
+      </div>
+      {linkProblem ? (
+        <p
+          role="alert"
+          className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"
         >
-          <Background gap={20} size={1} />
-          <Controls showInteractive={false} />
-          <MiniMap pannable zoomable />
-        </ReactFlow>
-      </section>
+          {linkProblem}
+        </p>
+      ) : null}
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+        <section
+          ref={frame}
+          aria-label={t("okrDiagram.label")}
+          data-testid="okr-diagram"
+          onKeyDown={onKeyDown}
+          className="okr-diagram h-[70vh] min-h-96 min-w-0 flex-1 overflow-hidden rounded-lg border border-line"
+        >
+          {objectives.length === 0 ? (
+            <p
+              className="p-3 text-sm text-ink-2"
+              data-testid="okr-diagram-empty"
+            >
+              {t("okrDiagram.empty")}
+            </p>
+          ) : null}
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={NODE_TYPES}
+            fitView
+            fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+            // Low enough that thirty company objectives side by side still fit,
+            // so every card the budget opens with is drawn rather than cut off.
+            minZoom={0.05}
+            maxZoom={1.5}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            // Only what is on screen is drawn, which is what keeps a cycle of
+            // three hundred objectives quick to open (design §7).
+            onlyRenderVisibleElements
+            onNodeClick={(_event, node) => openIn(byId.get(node.id))}
+            // The canvas's own words, in the reader's language, and true of
+            // this diagram: its arrow keys follow lines rather than move cards.
+            ariaLabelConfig={{
+              "node.a11yDescription.default": t("okrDiagram.keyboardHint"),
+              "node.a11yDescription.keyboardDisabled": t(
+                "okrDiagram.keyboardHint",
+              ),
+              "controls.ariaLabel": t("okrDiagram.controls"),
+              "controls.zoomIn.ariaLabel": t("okrDiagram.zoomIn"),
+              "controls.zoomOut.ariaLabel": t("okrDiagram.zoomOut"),
+              "controls.fitView.ariaLabel": t("okrDiagram.fitView"),
+              "minimap.ariaLabel": t("okrDiagram.minimap"),
+              "handle.ariaLabel": t("okrDiagram.handle"),
+            }}
+          >
+            <Background gap={20} size={1} />
+            <Controls showInteractive={false} />
+            <MiniMap pannable zoomable />
+          </ReactFlow>
+        </section>
+        {alignment ? (
+          <AlignmentPanel
+            alignment={alignment}
+            canEdit={canEdit}
+            onOpen={openGoal}
+          />
+        ) : null}
+      </div>
 
       <OkrDrawer
         tree={tree}

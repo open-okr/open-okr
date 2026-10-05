@@ -1,92 +1,23 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
-import { workspaceReaderLevel } from "../../../lib/access";
-import { getPool } from "../../../lib/auth";
-import { progressCeiling } from "../../../lib/ceilings.ts";
-import { GOAL_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
-import { getTranslations } from "../../../lib/translations";
-import { requireWorkspace } from "../../../lib/workspace";
-import { Studio } from "./studio.tsx";
+import { redirect } from "next/navigation";
 
 /**
- * The alignment studio (UIUX-PLAN.md §4 S-16, P3-T10).
+ * The alignment studio's old address (UIUX-PLAN.md S-16, P9-T09b).
  *
- * The cascade as a canvas, with the alignment score and its gaps beside it. The
- * data is server-rendered and the interaction is client-owned, which is the
- * split §13.3 asks for: a canvas is an interactive surface, and the tree behind
- * it is a read.
+ * The studio is the OKRs screen's diagram now, with its health and review
+ * panel beside the canvas, its link mode on the toolbar, and its details in
+ * the drawer. A bookmark or a link in an old message still points here, so
+ * this sends it to the same cycle on the diagram rather than to a page that
+ * no longer exists.
  */
 export default async function StudioPage({
   searchParams,
 }: {
   searchParams: Promise<{ cycle?: string }>;
 }) {
-  const { t } = await getTranslations();
-
-  const { session, workspace } = await requireWorkspace();
-  const context = {
-    pool: getPool(),
-    workspaceId: workspace.workspaceId,
-    actor: { kind: "human" as const, userId: session.user.id },
-  };
-
-  const level = await workspaceReaderLevel(
-    workspace.workspaceId,
-    workspace.memberId,
-  );
-  const canEdit = level >= ACCESS_LEVELS.edit;
-
-  const cycles = await callAction(context, "cycles.list", {});
-  const current = await callAction(context, "cycles.current", {
-    mode: "quarterly",
-  });
-  const query = await searchParams;
-  const cycleId = query.cycle ?? current?.id ?? cycles[0]?.id ?? null;
-
-  if (!cycleId) {
-    return (
-      <Card>
-        <CardBody>
-          <p className="text-sm text-ink-2">
-            {t("goals.studio.thereIsNoCycle")}
-          </p>
-        </CardBody>
-      </Card>
-    );
+  const { cycle } = await searchParams;
+  const query = new URLSearchParams({ display: "diagram" });
+  if (cycle) {
+    query.set("cycle", cycle);
   }
-
-  const graph = await callAction(context, "alignment.graph", { cycleId });
-  const alignment = await callAction(context, "alignment.read", {
-    cycleId,
-    includeDismissed: false,
-  });
-
-  return (
-    <div className="flex flex-col gap-3.5">
-      <SectionTabs items={GOAL_TABS} active="/goals/studio" />
-      <Card>
-        <CardHeader>
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">
-              {t("goals.studio.alignmentStudio")}
-            </h1>
-            <p className="text-xs text-ink-3">
-              {t("goals.studio.theCascadeWithDashed")}
-            </p>
-          </div>
-        </CardHeader>
-      </Card>
-
-      <Studio
-        nodes={graph.nodes}
-        edges={graph.edges}
-        findings={alignment.findings}
-        score={alignment.score}
-        healthy={alignment.healthy}
-        threshold={alignment.threshold}
-        progressMax={await progressCeiling()}
-        canEdit={canEdit}
-      />
-    </div>
-  );
+  redirect(`/goals?${query.toString()}`);
 }

@@ -6,18 +6,25 @@ import {
   Bar,
   Chip,
   formatMeasure,
+  useQueryClient,
   useToast,
   useTranslations,
 } from "@openokr/ui";
 import { X } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import type { OkrDetail } from "../../lib/okr-tree/actions.ts";
-import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
+import {
+  OKR_DETAIL_ALL,
+  type OkrGoal,
+  type OkrTree,
+  okrCycleKey,
+} from "../../lib/okr-tree/cache.ts";
 import {
   type OkrHandle,
   useOkrDetail,
 } from "../../lib/okr-tree/use-okr-tree.ts";
+import { unlinkGoals } from "./alignment-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
   InlineDate,
@@ -291,7 +298,7 @@ function DrawerBody({
           <Tabs.Tab
             key={entry}
             value={entry}
-            className="-mb-px border-b-2 border-transparent px-2 py-2 text-xs font-semibold text-ink-3 hover:text-ink data-selected:border-brand data-selected:text-ink"
+            className="-mb-px border-b-2 border-transparent px-2 py-2 text-xs font-semibold text-ink-3 hover:text-ink data-active:border-brand data-active:text-ink"
           >
             {t(TAB_LABEL[entry])}
           </Tabs.Tab>
@@ -452,6 +459,7 @@ function DrawerBody({
               goal={goal}
               tree={tree}
               detail={loaded}
+              canEdit={canEdit}
               onOpen={onOpen}
             />
           )}
@@ -850,14 +858,37 @@ function Alignment({
   goal,
   tree,
   detail,
+  canEdit,
   onOpen,
 }: {
   readonly goal: OkrGoal;
   readonly tree: OkrTree;
   readonly detail: OkrDetail;
+  readonly canEdit: boolean;
   readonly onOpen: (goalId: string) => void;
 }) {
   const { t } = useTranslations();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [removing, startRemoving] = useTransition();
+  const [problem, setProblem] = useState<string | null>(null);
+  // Taking a dependency apart (completeness review M-35), here since the
+  // studio's details panel became this tab (P9-T09b). Either end may.
+  const remove = (dependencyId: string) => {
+    setProblem(null);
+    startRemoving(async () => {
+      const result = await unlinkGoals(dependencyId);
+      if (result.error) {
+        setProblem(result.error);
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: OKR_DETAIL_ALL });
+      await queryClient.invalidateQueries({
+        queryKey: okrCycleKey(tree.cycle.id),
+      });
+      router.refresh();
+    });
+  };
   const inTree = (id: string) => tree.goals.some((entry) => entry.id === id);
   // The key result this objective aligns to, named where the tree holds it.
   const parentKeyResult = goal.parentKeyResultId
@@ -936,15 +967,37 @@ function Alignment({
         ) : (
           <ul className="flex flex-col gap-1">
             {detail.relations.dependencies.map((dependency) => (
-              <li key={dependency.id} className="flex flex-col">
-                {opener(dependency.goalId, dependency.title)}
-                {dependency.note ? (
-                  <span className="text-xs text-ink-3">{dependency.note}</span>
+              <li key={dependency.id} className="flex items-start gap-2">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  {opener(dependency.goalId, dependency.title)}
+                  {dependency.note ? (
+                    <span className="text-xs text-ink-3">
+                      {dependency.note}
+                    </span>
+                  ) : null}
+                </span>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    disabled={removing}
+                    onClick={() => remove(dependency.id)}
+                    aria-label={t("goals.studio.studio.removeDependencyOn", {
+                      title: dependency.title,
+                    })}
+                    className="flex-none rounded-control px-2 py-0.5 text-xs text-ink-3 hover:bg-bad-bg hover:text-bad disabled:text-ink-4"
+                  >
+                    {t("goals.studio.studio.removeDependency")}
+                  </button>
                 ) : null}
               </li>
             ))}
           </ul>
         )}
+        {problem ? (
+          <p role="alert" className="text-xs text-bad">
+            {problem}
+          </p>
+        ) : null}
       </section>
     </>
   );

@@ -1,20 +1,19 @@
 "use server";
 
 /**
- * The studio's writes (P3-T10).
+ * The alignment writes (P3-T10, moved from the studio at P9-T09b).
  *
- * Four, and each is one click: link mode connects two goals into a dependency,
- * the details panel takes one apart again (M-35), a finding can be dismissed,
- * and a relink finding can be applied (P4-T06c).
- * Everything else on the panel is a link to the goal page, because editing a
- * goal properly belongs on the screen built for it rather than in a side panel
- * that would drift from it.
+ * Four, and each is one click: the diagram's link mode connects two
+ * objectives into a dependency, the drawer's alignment tab takes one apart
+ * again (M-35), a finding can be dismissed, and a relink finding can be
+ * applied (P4-T06c). The studio these were written for is the OKRs screen's
+ * diagram now, and `/goals/studio` sends a reader there.
  */
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
-import { getPool } from "../../../lib/auth";
-import { requireWorkspace } from "../../../lib/workspace";
-import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
+import { getPool } from "../../lib/auth";
+import { requireWorkspace } from "../../lib/workspace";
+import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
 async function run(
   fn: (context: {
@@ -37,8 +36,7 @@ async function run(
     throw error;
   }
   // The score and the findings both move on a structural write, and so does the
-  // explorer's header.
-  revalidatePath("/goals/studio");
+  // OKRs screen's header.
   revalidatePath("/goals");
   revalidatePath("/cycle");
   return NO_ERROR;

@@ -3333,11 +3333,15 @@ Test plan: layout unit tests (order matches the list, key result parents, contex
 Acceptance: Given 300 objectives in one cycle, when the diagram opens, then it is interactive within the budget and collapsed below company level.
 Scenario steps: none of its own. The diagram steps NW-Q1-10, NW-Q2-10 and NW-Q3-09 edit it, and P9-T10 proves them.
 
-### P9-T09b: The studio moves into the diagram [S]
+### P9-T09b: The studio moves into the diagram [M]
 Depends on: P9-T09a
 Goal: one place to see and fix alignment.
+
+Cut as S, built as M: the studio's link mode and its way of taking a dependency apart had to move with the panel, or the redirect would have taken both away.
+
 Deliverables:
 - **The studio's panel.** Alignment health with its gaps, and the coach's semantic findings with apply or dismiss, as a side panel of the diagram.
+- **Dependencies.** The link mode on the diagram's toolbar, and removal in the drawer's alignment tab.
 - **The redirect.** `/goals/studio` redirects to the diagram, keeping the cycle.
 - **Documents.** UIUX-PLAN S-16; mockup 05 redrawn as the diagram view with key result stacks.
 

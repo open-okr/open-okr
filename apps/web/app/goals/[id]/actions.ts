@@ -47,7 +47,6 @@ async function run(
   // The explorer and the canvas read the same numbers, and S-14's acceptance
   // criterion is that a value recorded here moves both (P3-T10).
   revalidatePath("/goals");
-  revalidatePath("/goals/studio");
   return NO_ERROR;
 }
 

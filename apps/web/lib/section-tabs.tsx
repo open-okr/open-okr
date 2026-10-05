@@ -67,9 +67,3 @@ export const CYCLE_TABS = [
   { href: "/sessions", labelKey: "common.sessions" },
   { href: "/scorecard", labelKey: "scorecard.scorecard" },
 ] as const;
-
-/** The goal module's screens. The detail page is a leaf and has no tab. */
-export const GOAL_TABS = [
-  { href: "/goals", labelKey: "lib.sectionTabs.explorer" },
-  { href: "/goals/studio", labelKey: "goals.studio.alignmentStudio" },
-] as const;

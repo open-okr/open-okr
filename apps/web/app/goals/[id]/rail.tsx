@@ -137,7 +137,7 @@ export async function Rail({
           {relations.dependencies.length === 0 ? (
             <p className="text-xs text-ink-3">
               {t("goals.detail.rail.noHorizontalLinksA")}{" "}
-              <a className="underline" href="/goals/studio">
+              <a className="underline" href="/goals?display=diagram">
                 {t("goals.detail.rail.addOneInThe")}
               </a>
               .

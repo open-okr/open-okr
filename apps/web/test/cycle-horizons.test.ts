@@ -71,7 +71,9 @@ describe("keeping the chosen cycle on every link", () => {
   });
 
   test("a remedy that leaves the screen, or stays on the page, is left alone", () => {
-    expect(keepCycle("/goals/studio", "c1")).toBe("/goals/studio");
+    expect(keepCycle("/goals?display=diagram", "c1")).toBe(
+      "/goals?display=diagram",
+    );
     expect(keepCycle("#dependency-register", "c1")).toBe(
       "#dependency-register",
     );

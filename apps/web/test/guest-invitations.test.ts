@@ -87,7 +87,6 @@ describe("where a guest lands", () => {
     "../app/check-in/page.tsx",
     "../app/cycle/page.tsx",
     "../app/goals/page.tsx",
-    "../app/goals/studio/page.tsx",
     "../app/kpis/page.tsx",
     "../app/kpis/recovery/page.tsx",
     "../app/scorecard/page.tsx",

@@ -256,7 +256,7 @@ export default async function HomePage({
         <a className="text-brand-text underline" href="/goals">
           {t("home.filterAndSearchIn")}
         </a>
-        <a className="text-brand-text underline" href="/goals/studio">
+        <a className="text-brand-text underline" href="/goals?display=diagram">
           {t("home.seeTheCascade")}
         </a>
         <a className="text-brand-text underline" href="/review">

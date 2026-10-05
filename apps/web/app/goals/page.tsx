@@ -20,7 +20,6 @@ import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
 import { filterGoals, type OkrScope } from "../../lib/okr-tree/cache.ts";
-import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { mapNodesFor } from "../goal-nodes.ts";
@@ -348,7 +347,6 @@ export default async function GoalsPage({
 
   return (
     <div className="flex flex-col gap-4.5">
-      <SectionTabs items={GOAL_TABS} active="/goals" />
       <Card>
         {/* **Two rows of two, not four things on one line.** Four groups on
          * one line put the title, the set it belongs to, a score and an export
@@ -511,6 +509,7 @@ export default async function GoalsPage({
         <OkrDiagram
           initialTree={okrTree}
           initialAt={treeReadAt}
+          alignment={alignment}
           scope={scope}
           filters={filters}
           cycleId={cycleId}

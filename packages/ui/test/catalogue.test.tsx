@@ -84,7 +84,6 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "common.ai",
   "dev.components.ai",
   "term.kpi.singular",
-  "common.count.krOne",
   "workMap.kr",
   "workMap.obj",
   // Words Bahasa Melayu uses as they are.

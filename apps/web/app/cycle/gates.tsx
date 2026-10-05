@@ -47,7 +47,10 @@ export const FIX: Record<
 > = {
   1: { href: "/cycle?phase=4", label: "cycle.gates.fix.nameTheChampion" },
   2: { href: "/cycle?phase=4", label: "cycle.gates.fix.openTheQualityPanel" },
-  3: { href: "/goals/studio", label: "cycle.gates.fix.mapTheAlignment" },
+  3: {
+    href: "/goals?display=diagram",
+    label: "cycle.gates.fix.mapTheAlignment",
+  },
   // The register is on this page, so the link is an anchor to it rather than a
   // second visit to the address the reader is already at. It pointed at
   // `/cycle?phase=5` from P4-T03 until P6-G17, which meant gate 4's remedy was

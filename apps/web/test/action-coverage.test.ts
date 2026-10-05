@@ -139,6 +139,12 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     answeredBy: "decisions.forGoal",
     why: "the goal page shows the decision log from `decisions.forGoal`, which carries the same answer with its author and its session",
   },
+  // The studio drew the cascade from it until P9-T09b, when the studio
+  // became the OKRs screen's diagram, which draws from the tree.
+  "alignment.graph": {
+    answeredBy: "goals.tree",
+    why: "the OKRs screen's diagram draws the cascade from `goals.tree`, which carries the same objectives, alignment and dependencies with the key results they hang from",
+  },
   "ai.updateCustomModel": {
     answeredBy: "ai.addCustomModel",
     why: "the model catalogue changes a model by removing it and adding it again with `ai.addCustomModel`, so there is no edit form",

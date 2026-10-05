@@ -180,6 +180,8 @@ The two are new runtime dependencies, so this needs Akmal's approval (decision D
 
 **As built at P9-T09a.** Cards are one width, and a row is as tall as its tallest card. A collapsed card folds its key results and says how many objectives it hides ("+9 below"). Dependencies are dashed and off until asked for. A parent from another cycle is a read-only card in the top row, and its title opens it in its own cycle with the drawer, because this cycle's cache does not hold it. A card opens the drawer; editing on the card is P9-T10's. The filters narrow the diagram as they narrow the list, and an objective whose parent a filter hides hangs from the cycle. Every line is named in words ("X aligns to Y"), and React Flow's own texts (its controls, minimap and keyboard description) are given in the reader's language, the last one saying what the arrow keys do here, which is follow lines rather than move cards. The studio's panel moves in at P9-T09b.
 
+**As built at P9-T09b.** The studio is the diagram. Its health and review tabs are a panel beside the canvas, a finding's objective opening in the drawer when this cycle holds it and in its own cycle otherwise; its link mode is on the toolbar (press one objective, then the one it depends on; Escape stops), saving at once and switching the dependencies on so the new line is seen; and its details tab is the drawer, whose alignment tab now removes a dependency too, which the studio's details panel used to answer (completeness review M-35). `/goals/studio` redirects to the diagram, keeping the cycle, and the cycle gates, the goal page's rail and the Work Map link straight to the diagram. The goals section's one remaining tab went with it.
+
 ### 5.3 Editing on the diagram
 
 | Action | How | Saved through |
