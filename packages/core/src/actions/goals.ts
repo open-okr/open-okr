@@ -185,6 +185,8 @@ const goalOutput = z.object({
   parentKeyResultId: z.uuid().nullable(),
   weight: z.number(),
   contributionStatement: z.string().nullable(),
+  /** Why it stands alone, when it does (METHOD.md §5.2, P9-T16a). */
+  standaloneReason: z.string().nullable(),
   closedAt: z.string().nullable(),
   successStatus: z.enum(GOAL_SUCCESS_STATUSES).nullable(),
   closeDecision: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
@@ -377,6 +379,7 @@ const GOAL_COLUMNS = {
   parentKeyResultId: goals.parentKeyResultId,
   weight: goals.weight,
   contributionStatement: goals.contributionStatement,
+  standaloneReason: goals.standaloneReason,
   closedAt: goals.closedAt,
   successStatus: goals.successStatus,
   closeDecision: goals.closeDecision,
@@ -1312,6 +1315,12 @@ export const updateGoal = defineWriteAction({
     parentGoalId: z.uuid().nullable().optional(),
     parentKeyResultId: z.uuid().nullable().optional(),
     /**
+     * Why this goal stands alone (METHOD.md §5.2, P9-T16a). Setting one clears
+     * the parent, and setting a parent clears it, because a goal that aligns
+     * has no need to explain why it does not. Null or blank clears it.
+     */
+    standaloneReason: z.string().trim().max(1000).nullable().optional(),
+    /**
      * The §2.1 annual strategy this objective serves, or null (P6-G14b).
      *
      * Separate from the parent pointers above and does not clear them: a
@@ -1351,6 +1360,16 @@ export const updateGoal = defineWriteAction({
         throw new OperationError(
           "forbidden",
           "A goal aligns to one parent, not two.",
+        );
+      }
+      const standaloneReason =
+        input.standaloneReason === undefined
+          ? undefined
+          : input.standaloneReason || null;
+      if (standaloneReason && (input.parentGoalId || input.parentKeyResultId)) {
+        throw new OperationError(
+          "forbidden",
+          "A goal either aligns to a parent or says why it stands alone, not both.",
         );
       }
 
@@ -1460,6 +1479,19 @@ export const updateGoal = defineWriteAction({
       if (input.parentKeyResultId !== undefined) {
         patch.parentKeyResultId = input.parentKeyResultId;
         patch.parentGoalId = null;
+      }
+      // A parent and a reason to stand alone are one or the other, for the
+      // same reason. Clearing a parent leaves a reason alone, so a goal can
+      // be unhung and explained in one call.
+      if (input.parentGoalId || input.parentKeyResultId) {
+        patch.standaloneReason = null;
+      }
+      if (standaloneReason !== undefined) {
+        patch.standaloneReason = standaloneReason;
+        if (standaloneReason !== null) {
+          patch.parentGoalId = null;
+          patch.parentKeyResultId = null;
+        }
       }
 
       const [updated] = await tx

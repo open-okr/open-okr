@@ -31662,6 +31662,12 @@
                                   "null"
                                 ]
                               },
+                              "standaloneReason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "closedAt": {
                                 "type": [
                                   "string",
@@ -31980,6 +31986,7 @@
                               "parentKeyResultId",
                               "weight",
                               "contributionStatement",
+                              "standaloneReason",
                               "closedAt",
                               "successStatus",
                               "closeDecision",
@@ -32365,6 +32372,12 @@
                             "null"
                           ]
                         },
+                        "standaloneReason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "closedAt": {
                           "type": [
                             "string",
@@ -32683,6 +32696,7 @@
                         "parentKeyResultId",
                         "weight",
                         "contributionStatement",
+                        "standaloneReason",
                         "closedAt",
                         "successStatus",
                         "closeDecision",
@@ -33099,6 +33113,17 @@
                         "type": "string",
                         "format": "uuid",
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "standaloneReason": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1000
                       },
                       {
                         "type": "null"
@@ -44374,6 +44399,21 @@
                             "null"
                           ]
                         },
+                        "band": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "healthy",
+                                "watch",
+                                "gap"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "healthy": {
                           "type": [
                             "boolean",
@@ -44382,6 +44422,22 @@
                         },
                         "threshold": {
                           "type": "number"
+                        },
+                        "watchThreshold": {
+                          "type": "number"
+                        },
+                        "anchored": {
+                          "type": "boolean"
+                        },
+                        "measured": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "counted": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
                         },
                         "goalCount": {
                           "type": "integer",
@@ -44537,8 +44593,13 @@
                       },
                       "required": [
                         "score",
+                        "band",
                         "healthy",
                         "threshold",
+                        "watchThreshold",
+                        "anchored",
+                        "measured",
+                        "counted",
                         "goalCount",
                         "findings",
                         "register"

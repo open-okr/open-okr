@@ -129,9 +129,9 @@ Then open *Onboarding runs without us in the room* to show the other side: a dep
 
 Go to `/goals/studio`.
 
-The alignment health score is **79**, above its threshold of 75, so the set is healthy — and there are still four open findings, including one at high severity.
+The alignment health score is **83%**: five of the six goals below company level align to a parent or say why they stand alone. That is watch, between 80% and the 90% that is healthy, and the panel lists the one goal it did not count, at high severity.
 
-> "Healthy is not the same as finished. The high-severity finding is a team objective with no parent, which supports nothing above it. The score does not hide it, and the score is not a grade — it is a prompt."
+> "The score is a share, not a grade. The goal it lists is the recovery objective for operating margin, which has no parent and no reason to stand alone. Give it either and the set reads healthy. The score does not hide it: it is a prompt."
 
 ### Beat 6 — KPIs, and an objective the product wrote (4 min)
 

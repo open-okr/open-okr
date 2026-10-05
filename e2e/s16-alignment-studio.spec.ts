@@ -11,6 +11,12 @@
  *
  * It uses the first two objectives the diagram draws, which earlier specs in
  * this suite have created, and leaves no dependency behind.
+ *
+ * P9-T16a: the score is a share, METHOD.md §5.2.
+ *   Given the health panel with a score, when it is read, then the share is
+ *   the counted goals over the measured ones as a percentage, and the band
+ *   sentence is the one §5.2 gives that share. The header carries the same
+ *   figure with "%".
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -61,6 +67,48 @@ test("the studio's old address opens the same cycle's diagram, with the health p
   await expect(panel()).toContainText(
     /Alignment health|No score|no structural gaps/i,
   );
+});
+
+test("acceptance: the share, its counts and its band agree, in the panel and the header", async () => {
+  await goTo(page, "/goals?display=diagram");
+  await expect(panel()).toBeVisible({ timeout: 15_000 });
+  const share = panel().getByTestId("alignment-share");
+  if ((await share.count()) === 0) {
+    // Nothing below company level in this cycle: the panel says so.
+    await expect(panel()).toContainText("No score");
+    console.log("S-16: no score, nothing below company level");
+    return;
+  }
+  const figure = (await share.innerText()).trim();
+  expect(figure).toMatch(/^\d{1,3}%$/);
+  const score = Number(figure.slice(0, -1));
+
+  const counted = (
+    await panel().getByText(/ goals below company level align/).innerText()
+  ).match(/^(\d+) of (\d+) /);
+  expect(counted).not.toBeNull();
+  const [, of, measured] = counted as RegExpMatchArray;
+  expect(score).toBe(Math.floor((100 * Number(of)) / Number(measured)));
+  // Which branch ran, in the run's own output, since either passes.
+  console.log(`S-16: ${score}%, ${of} of ${measured} counted`);
+
+  // The canon thresholds: nothing in this suite changes them.
+  const band = panel().getByTestId("alignment-band");
+  const sentence = await band.innerText();
+  if (!/No company-level objective/.test(sentence)) {
+    expect(sentence).toBe(
+      score >= 90
+        ? "At or above 90%, which METHOD.md §5.2 calls healthy."
+        : score >= 80
+          ? "From 80% to below 90% is watch. Each unaligned goal below opens it."
+          : "Below 80% is a gap. Each unaligned goal below opens it.",
+    );
+  }
+
+  const header = main().locator('a[href="/cycle?phase=5"]');
+  await expect(header).toContainText(String(score));
+  await expect(header).toContainText("%");
+  await expect(header).not.toContainText("/ 100");
 });
 
 test("two objectives are linked on the diagram and unlinked from the drawer", async () => {

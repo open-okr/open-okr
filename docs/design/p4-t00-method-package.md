@@ -18,7 +18,7 @@ already shipped in `scoring.ts`, `thresholds.ts`, `kpi.ts`, `workflow.ts` and
 | `kpi-formula.ts` | SS6.7 | P3-T13 | Formula tree, evaluator, cascade, validation |
 | `kpi-aggregate.ts` | SS6.7 | P3-T13 | Cross-frequency aggregation |
 | `workflow.ts` | SS2.3, SS4.5 | P3-T03 | Phase predicates, publish gates, phase work allowed |
-| `alignment.ts` | SS5.2 | P3-T09 | Alignment score, penalties, finding types |
+| `alignment.ts` | SS5.2 | P3-T09 | Alignment share and bands (penalties until P9-T16a), finding types |
 | `escalation.ts` | SS6.3 | P3-T06 | Escalation ladder data |
 | `guidance.ts` | SS9 | P3-T03 | Facilitator guidance per phase, horizons, timeline |
 | `terminology.ts` | SS2 | P3-T02 | Customisable term labels |

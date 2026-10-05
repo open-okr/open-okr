@@ -21,6 +21,7 @@ import { carryObjectiveLengthLimit } from "../src/data-changes/0015_carry_object
 import { carryCoachStrictness } from "../src/data-changes/0016_carry_coach_strictness.ts";
 import { keyResultKindFromDirection } from "../src/data-changes/0017_key_result_kind_from_direction.ts";
 import { keyResultScoreComputed } from "../src/data-changes/0018_key_result_score_computed.ts";
+import { dropAlignmentPenalties } from "../src/data-changes/0019_drop_alignment_penalties.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1102,6 +1103,57 @@ describe("0018: the computed score of key results scored before adjusting existe
     await client.query("delete from _data_changes");
     const [again] = await runDataChanges(client, {
       scripts: [keyResultScoreComputed],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0019: the retired alignment penalties", () => {
+  it("removes the penalties and keeps every other override, the healthy threshold included", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, overrides: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, $2::jsonb from w
+         returning workspace_id as id`,
+        [slug, JSON.stringify(overrides)],
+      );
+      return rows[0]?.id as string;
+    };
+    const tuned = await seed("tuned", {
+      "alignment.penalties": { noAnchor: 20, orphan: 5 },
+      "alignment.healthyThreshold": 70,
+      "cadence.graceDays": 2,
+    });
+    const untouched = await seed("untouched", { "cadence.graceDays": 3 });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [dropAlignmentPenalties],
+    });
+    expect(result?.rowsChanged).toBe(1);
+
+    const overridesOf = async (id: string) =>
+      (
+        await client.query<{ overrides: object }>(
+          "select overrides from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0]?.overrides;
+    expect(await overridesOf(tuned)).toEqual({
+      "alignment.healthyThreshold": 70,
+      "cadence.graceDays": 2,
+    });
+    expect(await overridesOf(untouched)).toEqual({ "cadence.graceDays": 3 });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [dropAlignmentPenalties],
     });
     expect(again?.rowsChanged).toBe(0);
   });

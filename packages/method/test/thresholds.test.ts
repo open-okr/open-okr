@@ -159,15 +159,10 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
   });
 
   it("alignment", () => {
-    expect(canon["alignment.healthyThreshold"]).toBe(75);
-    expect(canon["alignment.penalties"]).toEqual({
-      noAnchor: 10,
-      orphan: 12,
-      noKeyResults: 4,
-      levelSkip: 3,
-      silo: 8,
-      floor: 5,
-    });
+    expect(canon["alignment.healthyThreshold"]).toBe(90);
+    expect(canon["alignment.watchThreshold"]).toBe(80);
+    // Retired at P9-T16a with the penalty score it fed.
+    expect(Object.keys(canon)).not.toContain("alignment.penalties");
   });
 
   it("KPIs and recovery", () => {

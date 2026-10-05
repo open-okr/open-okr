@@ -8779,6 +8779,17 @@
               }
             ]
           },
+          "standaloneReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "strategyId": {
             "anyOf": [
               {

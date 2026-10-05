@@ -28,6 +28,7 @@ import { carryObjectiveLengthLimit } from "../data-changes/0015_carry_objective_
 import { carryCoachStrictness } from "../data-changes/0016_carry_coach_strictness.ts";
 import { keyResultKindFromDirection } from "../data-changes/0017_key_result_kind_from_direction.ts";
 import { keyResultScoreComputed } from "../data-changes/0018_key_result_score_computed.ts";
+import { dropAlignmentPenalties } from "../data-changes/0019_drop_alignment_penalties.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -63,6 +64,7 @@ try {
       carryCoachStrictness,
       keyResultKindFromDirection,
       keyResultScoreComputed,
+      dropAlignmentPenalties,
     ],
   });
   process.stdout.write(

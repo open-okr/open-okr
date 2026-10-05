@@ -28,11 +28,23 @@ interface AlignmentFinding {
 }
 
 export interface AlignmentReading {
+  /** The share aligned or standing alone, as a percentage (METHOD.md §5.2). */
   readonly score: number | null;
-  readonly healthy: boolean | null;
+  readonly band: "healthy" | "watch" | "gap" | null;
   readonly threshold: number;
+  readonly watchThreshold: number;
+  readonly anchored: boolean;
+  readonly measured: number;
+  readonly counted: number;
   readonly findings: readonly AlignmentFinding[];
 }
+
+/** How each band reads, the same three tones a KPI corridor uses. */
+const BAND_TEXT: Readonly<Record<string, string>> = {
+  healthy: "text-ok",
+  watch: "text-warn",
+  gap: "text-bad",
+};
 
 /**
  * Gaps drawn before "Show all". A cycle of three hundred objectives can hold
@@ -101,13 +113,12 @@ export function AlignmentPanel({
                   {t("goals.studio.studio.alignmentHealth")}
                 </span>
                 <span
-                  className={
-                    alignment.healthy
-                      ? "text-lg font-bold text-ok"
-                      : "text-lg font-bold text-warn"
-                  }
+                  data-testid="alignment-share"
+                  className={`text-lg font-bold tabular-nums ${
+                    BAND_TEXT[alignment.band ?? ""] ?? "text-ink"
+                  }`}
                 >
-                  {alignment.score}
+                  {alignment.score}%
                 </span>
               </div>
               <Bar
@@ -116,13 +127,13 @@ export function AlignmentPanel({
                 className="h-1.5"
               />
               <p className="text-xs text-ink-3">
-                {alignment.healthy
-                  ? t("goals.studio.studio.atOrAboveHealthy", {
-                      threshold: alignment.threshold,
-                    })
-                  : t("goals.studio.studio.belowThreshold", {
-                      threshold: alignment.threshold,
-                    })}
+                {t("goals.studio.studio.alignmentCounted", {
+                  counted: alignment.counted,
+                  measured: alignment.measured,
+                })}
+              </p>
+              <p data-testid="alignment-band" className="text-xs text-ink-3">
+                {bandSentence(t, alignment)}
               </p>
             </>
           )}
@@ -234,6 +245,32 @@ export function AlignmentPanel({
       </Tabs.Root>
     </aside>
   );
+}
+
+/**
+ * What the band means, in §5.2's words. The missing anchor comes first,
+ * because it is why a perfect share can still read as a gap.
+ */
+function bandSentence(
+  t: ReturnType<typeof useTranslations>["t"],
+  alignment: AlignmentReading,
+): string {
+  if (!alignment.anchored) {
+    return t("goals.studio.studio.alignmentNoAnchor");
+  }
+  if (alignment.band === "healthy") {
+    return t("goals.studio.studio.atOrAboveHealthy", {
+      threshold: alignment.threshold,
+    });
+  }
+  return alignment.band === "watch"
+    ? t("goals.studio.studio.alignmentWatch", {
+        watch: alignment.watchThreshold,
+        threshold: alignment.threshold,
+      })
+    : t("goals.studio.studio.alignmentGap", {
+        watch: alignment.watchThreshold,
+      });
 }
 
 /** The objective a finding is about, opened in the drawer beside it. */

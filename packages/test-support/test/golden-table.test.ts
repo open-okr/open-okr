@@ -242,8 +242,8 @@ const MANIFEST: Record<
     },
   },
   "p3-t00-alignment-engine.md": {
-    "alignment.penalties": {
-      columns: ["finding", "penalty", "rule_key", "severity", "fires"],
+    "alignment.findings": {
+      columns: ["finding", "rule_key", "severity", "fires", "in_the_share"],
       minRows: 5,
     },
     "alignment.score": {
@@ -252,13 +252,14 @@ const MANIFEST: Record<
         "scope",
         "graph",
         "expected_score",
+        "expected_band",
         "expected_findings",
       ],
-      minRows: 16,
+      minRows: 24,
     },
-    "alignment.health": {
-      columns: ["case", "score", "threshold", "expected"],
-      minRows: 6,
+    "alignment.band": {
+      columns: ["case", "score", "anchored", "healthy", "watch", "expected"],
+      minRows: 8,
     },
   },
 };
@@ -428,7 +429,7 @@ describe("the golden-table reader", () => {
   it("names the tables it did find when the wanted one is absent", () => {
     const path = designPath("p3-t00-alignment-engine.md");
     expect(() => loadGoldenTable(path, "alignment.nope")).toThrow(
-      /alignment\.health, alignment\.penalties, alignment\.score/,
+      /alignment\.band, alignment\.findings, alignment\.score/,
     );
   });
 });

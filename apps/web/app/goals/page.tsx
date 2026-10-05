@@ -48,7 +48,7 @@ import { CYCLE_PLACEHOLDER, FILTER_PLACEHOLDER } from "./placeholders.ts";
  * **Tree mode indents by the parent pointer, not by level.** Those two disagree
  * exactly where it matters: a team goal aligned straight to a company goal is a
  * level skip, and drawing it at team depth would hide the very thing the
- * alignment score penalises. A goal whose parent is outside the current filter
+ * alignment checks flag. A goal whose parent is outside the current filter
  * is drawn at the root with a note, rather than silently disappearing.
  */
 
@@ -397,7 +397,7 @@ export default async function GoalsPage({
             {alignment?.score !== null && alignment !== null ? (
               <AlignmentScore
                 score={alignment.score}
-                healthy={alignment.healthy === true}
+                band={alignment.band}
                 label={t("goals.alignment")}
               />
             ) : null}
@@ -642,21 +642,23 @@ async function drawerCycle(
 }
 
 /**
- * The alignment score, as a figure with its denominator.
+ * The alignment score, as a share with its unit.
  *
  * "ALIGNMENT 100" on its own could be a percentage, a score out of a hundred
- * or a points total; `05-alignment-studio` writes "73 / 100". Only the value
- * is coloured, because the total carries no verdict. Lifted out of the header
- * when that header became two rows, so the row is a line of two things rather
- * than a line with a paragraph of markup in the middle of it.
+ * or a points total. Since P9-T16a it is a percentage, the share of goals below
+ * company level that align or stand alone (METHOD.md §5.2), so the figure
+ * carries "%" rather than the "/ 100" the penalty score needed. Only the value
+ * is coloured, by its band. Lifted out of the header when that header became
+ * two rows, so the row is a line of two things rather than a line with a
+ * paragraph of markup in the middle of it.
  */
 function AlignmentScore({
   score,
-  healthy,
+  band,
   label,
 }: {
   readonly score: number;
-  readonly healthy: boolean;
+  readonly band: "healthy" | "watch" | "gap" | null;
   readonly label: string;
 }) {
   return (
@@ -669,19 +671,19 @@ function AlignmentScore({
       </span>
       <span className="flex items-baseline gap-0.5">
         <span
-          className={
-            healthy
-              ? "text-lg font-bold tabular-nums text-ok"
-              : "text-lg font-bold tabular-nums text-warn"
-          }
+          className={`text-lg font-bold tabular-nums ${
+            band === "healthy"
+              ? "text-ok"
+              : band === "watch"
+                ? "text-warn"
+                : "text-bad"
+          }`}
         >
           {score}
         </span>
-        {/* `--ink-3`, not `--ink-4`. The denominator is content, and
-         * `--ink-4` measures 2.56:1 on this surface. */}
-        <span className="text-xs font-semibold tabular-nums text-ink-3">
-          / 100
-        </span>
+        {/* `--ink-3`, not `--ink-4`. The unit is content, and `--ink-4`
+         * measures 2.56:1 on this surface. */}
+        <span className="text-xs font-semibold tabular-nums text-ink-3">%</span>
       </span>
     </a>
   );

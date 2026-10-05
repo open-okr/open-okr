@@ -97,12 +97,16 @@ workspace has made its phases binding.
 
 | Threshold | Default | Section |
 |---|---|---|
-| `alignment.healthyThreshold` | 75 | §5.2 |
+| `alignment.healthyThreshold` | 90 | §5.2 |
+| `alignment.watchThreshold` | 80 | §5.2 |
 
-Alignment health is a score out of a hundred with named penalties: an
-unanchored goal, an orphan, a goal with no key results, a level skipped, and a
-silo. Seventy-five or better is healthy. The score always names its own gaps,
-so it is actionable rather than a grade.
+Alignment health is a share: of the goals below company level, how many align
+to a parent or say why they stand alone. Ninety per cent or more is healthy,
+eighty to below ninety is watch, and below eighty is a gap. A cycle with no
+company objective at the top reads as a gap whatever the share. A share, not a
+points score, so eight unaligned goals weigh lightly in a large company and
+heavily in a small one. The score always lists the goals it did not count, so
+it is actionable rather than a grade.
 
 ## KPIs
 

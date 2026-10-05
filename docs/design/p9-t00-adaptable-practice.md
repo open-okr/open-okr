@@ -236,7 +236,8 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T15a | A progress signal that knows the date | §3.6, §3.7 | "Progress signal pace gaps", "Trend forecast minimum values" |
 | P9-T15b-a | Health that says what happened | §3.5 but its divergence paragraph | None (behaviour) |
 | P9-T15b-b | Divergence over a window | §3.5's divergence paragraph | "Divergence window" |
-| P9-T16 | Alignment on ratios, over the levels in use (G-3) | §4.3, §5 | "Contribution minimum", "Alignment watch threshold"; retire "Alignment penalties" |
+| P9-T16a | Alignment on ratios | §1 principle 9, §5.1, §5.2, §5.3 (§5.5 arrived at P9-T11a) | "Alignment watch threshold", "Alignment healthy threshold" at 90; retire "Alignment penalties" |
+| P9-T16b | Alignment checks at their levels, over the levels in use (G-3) | §4.3, and §5.4, whose escalation to the sponsor it builds | "Contribution minimum" |
 | P9-T17 | KPI target types and their own thresholds | §6.1 to §6.4, §6.7 | None (behaviour) |
 | P9-T18 | Responding to an unhealthy KPI | §6.5, §6.6 | Recovery proposal delay value |
 | P9-T19a | Calmer escalation and cadence | §7.1, §7.2, §7.3, §7.5, the §11 cadence group, and §2.1's quarterly row's "about 4 weeks", which P9-T13-c-c left at 3 so the method did not disagree with its own §11 | Blocker taxonomy and definitions; rituals; weekly steps; "Planning-open lead" for a quarter, 3 to 4 weeks |
@@ -283,6 +284,18 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 **Health that says what happened, as built at P9-T15b-a.** Migration 0122 widens the goal's outcome and health to `abandoned`, and a stop records it, so an objective set down because it stopped mattering no longer reads as missed. "At risk" is a new term, `atRisk`, whose hole fills `common.caution`, so a workspace renames it as it renames any term. Every surface that printed the stored health code now reads `healthWord`, and the chip shows an outdated goal's last reported status beside it from the tree's new `reportedStatus`. Three specs that read the old lowercase codes moved with it.
 
 **Divergence over a window, as built at P9-T15b-b.** `stalledWhileOnTrack` is §3.5's rule beside the two cases P4-T06b-a built: a goal reported on track whose metric key result has not moved within "Divergence window", four weeks. A key result last moved at its latest reading that differs from the one before it, the first compared with its baseline; one never measured last moved when it was written. The coach's sweep raises it as `quality.divergence` against the key result, one finding per key result, and not where the linked-work case already holds that key result.
+
+**Alignment on ratios, as built at P9-T16a** ([`alignment.ts`](../../packages/method/src/alignment.ts), [design](p3-t00-alignment-engine.md)):
+
+| Question | Answer |
+|---|---|
+| What is counted? | Goals below company level. A goal counts when it has a live parent anywhere, in this scope, another space or another cycle, or a standalone reason that is not blank. A contribution statement does not count: it names what the goal supports without pointing at it |
+| How is it rounded? | Down to a whole percentage, so 89.6 reads 89 and the figure never shows a band it has not reached |
+| What is "no company-level objective"? | At workspace scope, no company goal in the cycle and none that a goal in it aligns to. A quarter hung under the annual company objectives is anchored by them, because §5.1 lets it align to a longer cycle. At space scope the rule is skipped, as before |
+| What happened to the other findings? | KR-1, AL-3 and AL-6 are still raised and listed, at the severities the penalties gave them, and still drive the orphan, level-skip and silo nudges. None is in the share. P9-T16b turns AL-3 and AL-6 off by default |
+| A parent and a reason together? | One or the other. `goals.update` clears the reason when it sets a parent and the parent when it sets a reason, and refuses both in one call. Not a check constraint, because an importer or a relink setting a parent would then fail outright |
+| A workspace that tuned the old numbers | Data change 0019 removes the stored penalties, which nothing reads. A stored healthy threshold is kept and now reads as a share |
+| The screens | The figure carries "%" where it carried "/ 100", coloured by band, and the panel says how many of how many count and what the band means. The standalone reason's own control is P9-T16b's, in the drawer |
 
 **Four questions the build raised, for a human to answer** (5 October 2026):
 - **An OKR written into a set still unpublished after its window** (P9-T13-a). §2.9 says what is created before the team publication window closes is the plan; it does not say what an OKR written after it, into a set nobody has published, is. The build reads it as the plan, late, unmarked and facing the publish gates, because there is no plan yet to add to. If it should be marked instead, `isMidCycleAddition` drops its second condition.

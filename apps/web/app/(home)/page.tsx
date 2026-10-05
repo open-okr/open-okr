@@ -152,7 +152,7 @@ export default async function HomePage({
       keyResultCount === 0 ? null : (onTrackKeyResults / keyResultCount) * 100,
     outdatedGoals: goals.filter((goal) => goal.health === "outdated").length,
     alignmentScore: alignment?.score ?? null,
-    alignmentThreshold: alignment?.threshold ?? 0,
+    alignmentBand: alignment?.band ?? null,
   };
 
   const workMapContext: WorkMapContext | null = workflow

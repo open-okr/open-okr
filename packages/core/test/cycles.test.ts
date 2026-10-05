@@ -532,7 +532,7 @@ describe("changing a threshold", () => {
       {},
     );
     expect(after.thresholds["cadence.toleranceDays"]).toBe(1);
-    expect(after.thresholds["alignment.healthyThreshold"]).toBe(75);
+    expect(after.thresholds["alignment.healthyThreshold"]).toBe(90);
   });
 
   it("merges one key at a time rather than replacing the map", async () => {

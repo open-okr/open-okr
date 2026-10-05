@@ -26,13 +26,14 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { alignmentHealthy, alignmentScore } from "@openokr/method";
+import { ALIGNMENT_BANDS, alignmentScore } from "@openokr/method";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import {
+  alignmentThresholdsOf,
   blocksPublish,
   loadAlignmentGraph,
   loadDependencyRegister,
@@ -147,7 +148,7 @@ export async function recomputeAlignmentFor(
   touched: readonly { cycleId: string | null; spaceId: string | null }[],
 ): Promise<void> {
   const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
-  const penalties = rhythm.thresholds["alignment.penalties"];
+  const thresholds = alignmentThresholdsOf(rhythm.thresholds);
 
   const done = new Set<string>();
   for (const goal of touched) {
@@ -167,7 +168,7 @@ export async function recomputeAlignmentFor(
       await recomputeAlignment(
         tx,
         { workspaceId, cycleId: goal.cycleId, scope },
-        penalties,
+        thresholds,
       );
     }
   }
@@ -1042,9 +1043,26 @@ export const readAlignment = defineReadAction({
     includeDismissed: z.boolean().default(false),
   }),
   output: z.object({
+    /**
+     * The share of goals below company level that align or stand alone with
+     * a reason, as a whole percentage (METHOD.md §5.2). Null when nothing
+     * below company level is in scope.
+     */
     score: z.number().nullable(),
+    band: z.enum(ALIGNMENT_BANDS).nullable(),
+    /** The band is healthy. Kept for the readers that only ask that. */
     healthy: z.boolean().nullable(),
+    /** The healthy threshold, as a percentage. */
     threshold: z.number(),
+    watchThreshold: z.number(),
+    /**
+     * A company-level objective anchors the cycle. Without one the band is a
+     * gap whatever the share. Always true at space scope.
+     */
+    anchored: z.boolean(),
+    /** Goals below company level in scope, and how many of them count. */
+    measured: z.number().int(),
+    counted: z.number().int(),
     goalCount: z.number().int(),
     findings: z.array(
       z.object({
@@ -1093,7 +1111,7 @@ export const readAlignment = defineReadAction({
         const rhythm = resolveRhythm(
           await readRhythmRow(tx, context.workspaceId),
         );
-        const threshold = rhythm.thresholds["alignment.healthyThreshold"];
+        const thresholds = alignmentThresholdsOf(rhythm.thresholds);
         const scope = input.spaceId
           ? ({ kind: "space", spaceId: input.spaceId } as const)
           : ({ kind: "workspace" } as const);
@@ -1107,11 +1125,7 @@ export const readAlignment = defineReadAction({
           cycleId: input.cycleId,
           scope,
         });
-        const live = alignmentScore(
-          graph,
-          scope,
-          rhythm.thresholds["alignment.penalties"],
-        );
+        const live = alignmentScore(graph, scope, thresholds);
 
         const stateFilter = input.includeDismissed
           ? undefined
@@ -1279,11 +1293,15 @@ export const readAlignment = defineReadAction({
 
         return {
           score: live.score,
-          healthy:
-            live.score === null
-              ? null
-              : alignmentHealthy(live.score, threshold),
-          threshold,
+          band: live.band,
+          healthy: live.band === null ? null : live.band === "healthy",
+          threshold: thresholds.healthy,
+          watchThreshold: thresholds.watch,
+          anchored: !live.findings.some(
+            (finding) => finding.ruleKey === "AL-4",
+          ),
+          measured: live.measured,
+          counted: live.counted,
           goalCount: graph.goals.length,
           findings: visible,
           register,

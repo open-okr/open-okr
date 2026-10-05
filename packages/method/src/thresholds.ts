@@ -535,31 +535,17 @@ export const THRESHOLDS = {
     group: "alignment",
     label: "Alignment healthy threshold",
     section: "§5.2",
-    why: "75 and above is healthy. Below it the coach lists the gaps, each linking to the goal that caused it.",
-    default: 75,
+    why: "90% of goals below company level aligned or standing alone with a reason is healthy. Fewer than 10% without a traceable parent is the published line.",
+    default: 90,
     schema: z.number().int().min(0).max(100),
   }),
-  "alignment.penalties": param({
+  "alignment.watchThreshold": param({
     group: "alignment",
-    label: "Alignment penalties",
+    label: "Alignment watch threshold",
     section: "§5.2",
-    why: "10 for no company anchor, 12 per orphan, 4 per objective with no key results, 3 per level skip, 8 per siloed department, floor 5. An orphan costs most because a goal supporting nothing is the clearest failure on the page.",
-    default: {
-      noAnchor: 10,
-      orphan: 12,
-      noKeyResults: 4,
-      levelSkip: 3,
-      silo: 8,
-      floor: 5,
-    },
-    schema: z.object({
-      noAnchor: z.number().int().min(0).max(100),
-      orphan: z.number().int().min(0).max(100),
-      noKeyResults: z.number().int().min(0).max(100),
-      levelSkip: z.number().int().min(0).max(100),
-      silo: z.number().int().min(0).max(100),
-      floor: z.number().int().min(0).max(100),
-    }),
+    why: "80% to below the healthy threshold is watch. Below 80%, more than one goal in five supports nothing it names, and that is a gap.",
+    default: 80,
+    schema: z.number().int().min(0).max(100),
   }),
 
   // --- KPIs and recovery -------------------------------------------------

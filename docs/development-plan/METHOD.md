@@ -37,7 +37,7 @@ These are not preferences. Every rule below serves one of them.
 6. **Scores are planning data, never appraisal.** The moment a score feels like a performance review, candour dies and the numbers stop being useful.
 7. **Nothing carries over by default.** Every cycle starts with a blank sheet. An objective that survives should survive on purpose.
 8. **Neglect must be visible.** A goal nobody has updated cannot quietly stay green.
-9. **Alignment is contribution, not copying.** A team's OKR states its own distinct contribution to the level above. It does not restate the parent.
+9. **Alignment is contribution, not copying.** A team's OKR states its own contribution to a goal above or beside it. It may turn a parent's key result into its own objective; it does not restate the parent's objective word for word. *Source:* whatmatters; Castro.
 10. **Diagnose before you prescribe.** A missed cycle with a strong rhythm is a strategy problem. A missed cycle with a weak rhythm is a cadence problem. They need opposite fixes.
 11. **Anybody can write.** A member who can edit a space can add or change its OKRs at any time. Coaching happens while they type. It never refuses them, unless the workspace has chosen to (§2.9). *Source:* Doerr: "Start: Launch a new OKR mid-cycle, whenever the need arises"; decided by Akmal on 1 October 2026.
 
@@ -533,24 +533,23 @@ The coach shows these beside the check that fired.
 
 | Direction | Meaning | Recorded as |
 |---|---|---|
-| Vertical | This goal supports a goal one level up | A single parent pointer |
+| Vertical | This goal supports a goal or key result at its own level or any level above it, in any space and in an earlier or longer cycle, such as an annual objective | A single parent pointer |
 | Horizontal | This goal and another goal in a different team depend on each other | A two-way dependency link |
 
-Vertical alignment is contribution, not copying. A team states its own distinct contribution to the level above.
+Vertical alignment is contribution, not copying (principle 9). Roughly half of a healthy organisation's OKRs are proposed by the teams themselves and laddered up. *Source:* Doerr: "roughly half"; Castro: "60% of the OKRs are created bottom-up".
 
 ### 5.2 Alignment health score
 
-Starts at 100. Each finding subtracts. Floor 5, ceiling 100.
+The share of goals below company level that align to a parent or state why they stand alone, as a percentage.
+- **Healthy:** 90% and above.
+- **Watch:** 80% to below 90%.
+- **Gap:** below 80%.
 
-| Finding | Penalty |
-|---|---|
-| No company-level objective anchors the tree | 10 |
-| A goal below company level has no parent | 12 each |
-| An objective has no key results | 4 each |
-| A goal skips a level | 3 each |
-| A department and its whole subtree have no horizontal dependency | 8 each |
+With no company-level objective, the score reads as a gap whatever the share.
 
-75 and above is healthy. Below 75 the coach lists the gaps, each linking straight to the goal that caused it.
+The coach lists every unaligned goal, each linking straight to it. *Source:* Profit.co (vendor): fewer than 10% of team OKRs without a traceable parent is healthy, more than 20% is a warning.
+
+The fixed per-goal penalties this section used to carry were removed on 1 October 2026. Eight unaligned goals cost the same 96 points in a ten-goal company and a five-hundred-goal one.
 
 ### 5.3 Semantic review
 
@@ -558,12 +557,12 @@ Structure is not enough. Two goals can be perfectly wired and still pull against
 
 | Type | Meaning |
 |---|---|
-| Relink | This goal's content actually supports a different parent better than its current one, or it is unaligned and this is the right parent |
+| Relink | This goal's content supports a different parent better than its current one, or it is unaligned and this is the right parent |
 | Dependency | These two goals share metrics or workstreams but no explicit horizontal link exists |
-| Conflict | These two goals pull in opposite directions, or double-count the same metric |
+| Conflict | These two goals pull in opposite directions, or may double-count the same metric |
 | Gap | Something is missing or weak, with no second goal involved |
 
-Each finding carries a severity of high, medium or low, one specific sentence of reasoning, and where the fix is mechanical (relink, dependency) a one-click apply. Findings are dismissible and stay dismissed.
+Each finding carries a severity of high, medium or low and one specific sentence of reasoning. Findings are advice. Where the fix is mechanical (relink, dependency), the finding offers a one-click proposal for a person to accept. Findings are dismissible and stay dismissed.
 
 ### 5.4 Dependencies
 
@@ -954,8 +953,8 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 
 | Parameter | Canon default |
 |---|---|
-| Alignment healthy threshold | 75 |
-| Alignment penalties | 10 no anchor, 12 per orphan, 4 per objective without key results, 3 per level skip, 8 per silo, floor 5 |
+| Alignment healthy threshold | 90% of goals below company level aligned or standing alone with a reason |
+| Alignment watch threshold | 80% |
 
 **KPIs and recovery**
 

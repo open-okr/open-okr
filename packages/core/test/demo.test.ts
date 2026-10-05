@@ -190,7 +190,20 @@ describe("the demo builder", () => {
       expect(entry.blocksPublish).toBe(false);
     }
     expect(alignment.register.some((entry) => entry.confirmed)).toBe(true);
-    expect(alignment.score).not.toBeNull();
+    // The share DEMO-SCRIPT.md beat 5 quotes (P9-T16a): five of the six goals
+    // below company level align, and the recovery objective is the one that
+    // does not, which is the high-severity finding the script points at.
+    expect(alignment).toMatchObject({
+      score: 83,
+      band: "watch",
+      measured: 6,
+      counted: 5,
+    });
+    expect(
+      alignment.findings
+        .filter((finding) => finding.ruleKey === "AL-1")
+        .map((finding) => finding.subjectGoalTitle),
+    ).toEqual(["Bring Operating margin back to 15"]);
   });
 
   it("puts every KPI state on the grid, including one nobody has measured", async () => {

@@ -177,6 +177,11 @@ export const goals = pgTable("goals", {
   nextCheckInAt: timestamp("next_check_in_at", { withTimezone: true }),
   lastCheckInId: uuid("last_check_in_id"),
   contributionStatement: text("contribution_statement"),
+  /**
+   * Why this goal stands alone, when it does (METHOD.md §5.2, P9-T16a). Counts
+   * as aligned in the alignment score; cleared when a parent is set.
+   */
+  standaloneReason: text("standalone_reason"),
   closedAt: timestamp("closed_at", { withTimezone: true }),
   closedById: uuid("closed_by_id").references(() => workspaceMembers.id),
   successStatus: text("success_status", { enum: GOAL_SUCCESS_STATUSES }),

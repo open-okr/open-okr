@@ -58,7 +58,7 @@ The mockups quote the canon rather than inventing numbers, because a developer w
 |---|---|
 | `OBJ-1`, `KR-2`, `AL-1`, `CY-6` and the other quality rules | METHOD.md §4 |
 | Confidence bands: high 0.7 and above, medium 0.4 to below 0.7, low below 0.4, escalating at 0.3 | METHOD.md §3.2 |
-| Alignment penalties: 12 orphan, 8 silo, 4 no key results, 3 level skip, healthy at 75 | METHOD.md §5.2 |
+| Alignment as a share of goals below company level aligned or standing alone: healthy at 90%, watch from 80% (P9-T16a; the penalties it replaced are gone) | METHOD.md §5.2 |
 | Semantic finding types: relink, dependency, conflict, gap | METHOD.md §5.3 |
 | KPI corridors, tiers and the effective-health projection | METHOD.md §6.2, §6.4, §6.5 |
 | The five blocker types and the 24-hour clock | METHOD.md §7.3 |

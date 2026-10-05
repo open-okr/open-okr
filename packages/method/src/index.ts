@@ -11,16 +11,18 @@ export {
   objectiveDraft,
 } from "./addition.ts";
 export {
+  ALIGNMENT_BANDS,
   ALIGNMENT_LEVEL_ORDER,
+  type AlignmentBand,
   type AlignmentFinding,
   type AlignmentGoal,
   type AlignmentGraph,
-  type AlignmentPenalties,
   type AlignmentResult,
   type AlignmentRuleKey,
   type AlignmentScope,
   type AlignmentSeverity,
-  alignmentHealthy,
+  type AlignmentThresholds,
+  alignmentBand,
   alignmentScore,
 } from "./alignment.ts";
 export {

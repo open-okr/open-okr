@@ -6377,6 +6377,12 @@
           "required": false
         },
         {
+          "name": "standalone-reason",
+          "field": "standaloneReason",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "strategy-id",
           "field": "strategyId",
           "type": "string",

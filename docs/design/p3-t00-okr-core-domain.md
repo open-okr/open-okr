@@ -13,7 +13,7 @@ matrix:
 | [p3-t00-scoring-and-health-engine.md](p3-t00-scoring-and-health-engine.md) | Scoring, health, RAG, forecast, portfolio verdict | P3-T05 |
 | [p3-t00-cadence-engine.md](p3-t00-cadence-engine.md) | Next due date, tolerance, staleness | P3-T06 |
 | [p3-t00-kpi-engine.md](p3-t00-kpi-engine.md) | Periods, corridors, formulas, recovery drafting | P3-T12, P3-T13, P3-T14 |
-| [p3-t00-alignment-engine.md](p3-t00-alignment-engine.md) | Penalty arithmetic, structural findings | P3-T09 |
+| [p3-t00-alignment-engine.md](p3-t00-alignment-engine.md) | The share and its bands (penalty arithmetic until P9-T16a), structural findings | P3-T09 |
 
 Authority for every rule below is METHOD.md, then TECHNICAL-PLAN.md §4.3 to
 §4.6 and §6. Where those documents are silent on something the code cannot
