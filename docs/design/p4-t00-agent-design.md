@@ -203,6 +203,7 @@ the build.
 | `quality.too_many_objectives` | Level exceeds cap | Facilitator | No | Yes |
 | `quality.all_lagging` | All KRs lagging | Champion | No | Yes |
 | `quality.no_baseline` | KR lacks baseline at Phase 4 exit | Champion | No | Yes |
+| `quality.committed_floor` | Committed KR confidence < 0.7 at draft or check-in (P9-T11b-c) | Champion | No | Yes |
 | `quality.sandbagging_draft` | Avg aspirational draft confidence > 0.9 | Champion + facilitator | No | Yes |
 | `quality.sandbagging_close` | 3/4 or more of aspirational KRs at 1.0 at close | Sponsor | No | Yes |
 | `quality.orphan_goal` | Goal below company has no parent | Champion | No | Yes |

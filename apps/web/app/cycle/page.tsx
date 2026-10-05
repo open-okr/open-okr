@@ -710,6 +710,7 @@ export default async function CyclePage({
                     (other) => other.level === goal.level,
                   ).length,
                   level: goal.level,
+                  kind: goal.kind,
                 },
                 keyResults: goal.keyResults.map((keyResult) => ({
                   id: keyResult.id,

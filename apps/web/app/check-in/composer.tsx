@@ -1,3 +1,4 @@
+import type { OkrKind, ResolvedThresholds } from "@openokr/method";
 import {
   Button,
   Card,
@@ -9,6 +10,7 @@ import {
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { publishCheckIn } from "./actions.ts";
+import { ConfidenceRange } from "./confidence-range.tsx";
 import { VotePanel, type VoteState } from "./vote-panel.tsx";
 
 /**
@@ -42,11 +44,16 @@ export interface ComposerKeyResult {
 export async function Composer({
   checkInId,
   goalTitle,
+  kind,
+  thresholds,
   keyResults,
   nextGoalId,
 }: {
   readonly checkInId: string;
   readonly goalTitle: string;
+  /** The objective's kind, for §3.2's committed floor (P9-T11b-c). */
+  readonly kind: OkrKind;
+  readonly thresholds: ResolvedThresholds;
   readonly keyResults: readonly ComposerKeyResult[];
   /** The goal the walker moves to after this one, when there is one. */
   readonly nextGoalId: string | null;
@@ -167,22 +174,19 @@ export async function Composer({
                       )}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <label
                       className="text-xs text-ink-3"
                       htmlFor={`confidence-${keyResult.id}`}
                     >
                       {t("common.confidence")}
                     </label>
-                    <input
+                    <ConfidenceRange
                       id={`confidence-${keyResult.id}`}
                       name={`confidence:${keyResult.id}`}
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
                       defaultValue={keyResult.confidence ?? 0.5}
-                      className="w-32"
+                      kind={kind}
+                      thresholds={thresholds}
                     />
                   </div>
                 </li>

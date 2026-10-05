@@ -484,6 +484,10 @@ export const SCORE_NOTE_TEXT: Readonly<
 /** §3.3's pattern, said of a closed set of aspirational key results. */
 export const TOO_SAFE_TEXT = "The targets were too safe";
 
+/** §10's words for a committed key result below §3.2's floor. */
+export const COMMITTED_FLOOR_TEXT =
+  "A commitment nobody believes in is a risk. Escalate now, or make it aspirational";
+
 /** A scored key result and the kind of promise it was. */
 export interface KindedScore {
   readonly score: number | null;

@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  belowCommittedFloor,
+  COMMITTED_FLOOR_TEXT,
+  type ResolvedThresholds,
+} from "@openokr/method";
 import { Button, Chip, useTranslations } from "@openokr/ui";
 import { useState } from "react";
 import type { OkrDetail } from "../../lib/okr-tree/actions.ts";
@@ -52,11 +57,14 @@ export function CheckInTab({
   goal,
   detail,
   okr,
+  thresholds,
   onPublished,
 }: {
   readonly goal: OkrGoal;
   readonly detail: OkrDetail;
   readonly okr: OkrHandle;
+  /** This workspace's numbers, for §3.2's committed floor. */
+  readonly thresholds: ResolvedThresholds;
   readonly onPublished: () => void;
 }) {
   const { t } = useTranslations();
@@ -250,6 +258,20 @@ export function CheckInTab({
                 <span className="text-ink-4">{t("okrDrawer.outOfTen")}</span>
               </label>
             </span>
+            {/* §3.2's committed rule, said before it is published: the
+             * Coach will say it to the champion once it is (P9-T11b-c). */}
+            {belowCommittedFloor(
+              tenths(confidences[keyResult.id] ?? "") ?? 1,
+              goal.kind,
+              thresholds,
+            ) ? (
+              <span
+                data-testid="committed-floor"
+                className="rounded-control bg-warn-bg px-2 py-1 text-xs text-warn"
+              >
+                {COMMITTED_FLOOR_TEXT}
+              </span>
+            ) : null}
           </li>
         ))}
       </ul>

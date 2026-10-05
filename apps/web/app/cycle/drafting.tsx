@@ -46,6 +46,8 @@ export interface DraftGoal {
   readonly id: string;
   readonly title: string;
   readonly level: string;
+  /** Committed or aspirational (METHOD.md §2.8). */
+  readonly kind: "committed" | "aspirational";
   readonly progressPct: number;
   readonly health: string;
   readonly contributionStatement: string | null;
@@ -236,6 +238,7 @@ export async function Drafting({
                   | "department"
                   | "team"
                   | "individual",
+                kind: goal.kind,
               }}
               keyResults={goal.keyResults.map((keyResult) => ({
                 id: keyResult.id,

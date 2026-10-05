@@ -294,6 +294,15 @@ const QUALITY_ROWS = [
     deterministic: true,
   },
   {
+    // METHOD.md §3.2's committed rule (P9-T11b-c): high confidence is right
+    // for a commitment, and one nobody believes in is a risk to raise now.
+    key: "quality.committed_floor",
+    title: "A commitment nobody believes in",
+    fires: "Committed KR confidence < 0.7 at draft or check-in",
+    recipient: "Champion",
+    deterministic: true,
+  },
+  {
     key: "quality.sandbagging_draft",
     title: "Draft targets look too safe",
     fires: "Avg aspirational draft confidence > 0.9",

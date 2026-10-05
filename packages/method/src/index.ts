@@ -220,6 +220,7 @@ export {
   belowCommittedFloor,
   type CascadeGoal,
   type CascadeResult,
+  COMMITTED_FLOOR_TEXT,
   type ConfidenceBand,
   type ConfidenceVerdict,
   cascadeProgress,
@@ -343,6 +344,7 @@ export {
 export {
   closeIsSandbagged,
   commitmentDueToday,
+  committedBelowFloor,
   confidenceIsCritical,
   draftIsSandbagged,
   objectivesOverCap,

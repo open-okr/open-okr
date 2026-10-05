@@ -45,6 +45,7 @@ import {
 } from "./quality-triggers.ts";
 import {
   dueCommitmentNudges,
+  dueCommittedFloorNudges,
   dueCriticalConfidenceNudges,
   duePhaseBlockedNudges,
   dueStreakNudges,
@@ -234,6 +235,13 @@ export async function runDueNudgesInTx(
       // The two that react to an event, looking back one deduplication
       // window (completeness review H-11).
       ...(await dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: at,
+        thresholds,
+        ...scoped,
+      })),
+      // §3.2's committed floor at a check-in (P9-T11b-c), beside it.
+      ...(await dueCommittedFloorNudges(tx, {
         workspaceId,
         now: at,
         thresholds,

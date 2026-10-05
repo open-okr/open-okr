@@ -22,6 +22,7 @@ test.describe.configure({ mode: "serial" });
 const PROMISED = "Answer every enterprise ticket inside one working day";
 const STRETCH = "Make the first week the reason teams renew";
 const REASON = "The board made it a promise to our three largest customers.";
+const FLOOR_KEY_RESULT = "Enterprise tickets closed in a day from 60% to 95%";
 
 let context: BrowserContext;
 let page: Page;
@@ -36,7 +37,7 @@ const kindOf = (title: string) =>
 const titled = (title: string) =>
   main().locator(`input[aria-label="Objective title"][value="${title}"]`);
 
-async function goalId(title: string): Promise<string> {
+async function idOf(title: string): Promise<string> {
   const listed = await api.get("/api/v1/goals/list", { headers: authed() });
   const found = ((await listed.json()).data.goals as {
     id: string;
@@ -62,7 +63,7 @@ test.beforeAll(async ({ browser, playwright, baseURL }) => {
 test.afterAll(async () => {
   if (token) {
     for (const title of [PROMISED, STRETCH]) {
-      const id = await goalId(title);
+      const id = await idOf(title);
       if (id) {
         const deleted = await api.post("/api/v1/goals/delete", {
           headers: authed(),
@@ -91,7 +92,7 @@ test.describe("NW-Q1-04 and NW-Q2-10: objectives drafted by kind, and a change o
 
   test("NW-Q1-04: a new objective is drafted as committed, and one added from the list starts aspirational", async () => {
     await goTo(page, "/goals");
-    if (!(await goalId(PROMISED))) {
+    if (!(await idOf(PROMISED))) {
       await main().getByRole("button", { name: "New objective" }).click();
       // Aspirational unless somebody says otherwise (decision D2).
       const kind = main().getByRole("combobox", { name: "Kind", exact: true });
@@ -104,7 +105,7 @@ test.describe("NW-Q1-04 and NW-Q2-10: objectives drafted by kind, and a change o
       timeout: 15_000,
     });
 
-    if (!(await goalId(STRETCH))) {
+    if (!(await idOf(STRETCH))) {
       await main().getByRole("button", { name: "Add objective" }).last().click();
       await page.keyboard.type(STRETCH);
       await page.keyboard.press("Enter");
@@ -155,6 +156,41 @@ test.describe("NW-Q1-04 and NW-Q2-10: objectives drafted by kind, and a change o
         name: new RegExp(`^${STRETCH}, committed `),
       }),
     ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("NW-Q1-25: a commitment checked in below the floor is told so before it is published", async () => {
+    // P9-T11b-c. The Coach's message to the champion once it is published is
+    // proved in packages/core/test/silent-triggers.test.ts.
+    const goalId = await idOf(PROMISED);
+    const listed = await api.get(`/api/v1/goals/read?id=${goalId}`, {
+      headers: authed(),
+    });
+    const keyResults = (await listed.json()).data.keyResults as unknown[];
+    if (keyResults.length === 0) {
+      const added = await api.post("/api/v1/goals/addKeyResult", {
+        headers: authed(),
+        data: {
+          goalId,
+          title: FLOOR_KEY_RESULT,
+          direction: "increase",
+          indicatorType: "lagging",
+          baselineValue: 60,
+          targetValue: 95,
+        },
+      });
+      expect(added.status()).toBe(200);
+    }
+    await goTo(page, `/goals?okr=${goalId}&tab=check-in`);
+    const confidence = drawer().getByLabel(
+      `Confidence in ${FLOOR_KEY_RESULT}, out of 10`,
+    );
+    await expect(confidence).toBeVisible({ timeout: 15_000 });
+    await confidence.fill("4");
+    await expect(drawer().getByTestId("committed-floor")).toHaveText(
+      "A commitment nobody believes in is a risk. Escalate now, or make it aspirational",
+    );
+    await confidence.fill("8");
+    await expect(drawer().getByTestId("committed-floor")).toHaveCount(0);
   });
 
   test("the kind filter keeps one kind, in the address", async () => {

@@ -802,7 +802,7 @@ What a good coach says at each phase. The product surfaces these as notes to the
 
 ## 10. What the coach watches for
 
-The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice behind it: the twenty situations a real OKR coach spots, and what they say.
+The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice behind it: the situations a real OKR coach spots, and what they say.
 
 | Situation | What the coach says |
 |---|---|
@@ -812,6 +812,7 @@ The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice beh
 | Key result measures activity volume | More calls, to what end? Name that impact and make it the key result |
 | All key results are lagging | You will only find out at the end. Add a leading indicator you can act on weekly |
 | Aspirational set near certain at draft | If this must be delivered, mark it committed. If it is a stretch, raise the targets |
+| Committed key result below 0.7 confidence, at drafting or at a check-in | A commitment nobody believes in is a risk. Escalate now, or make it aspirational |
 | More than five company objectives | If everything is a priority, nothing can be chosen. Which two would you drop? |
 | Not-doing list empty at Phase 3 exit | A list that accommodates everything is a to-do list, not a strategy |
 | Goal with no parent | This OKR is an island. Name the priority it moves forward |
@@ -827,7 +828,7 @@ The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice beh
 | KPI drops out of its corridor | This KPI is unhealthy. Here is a recovery OKR drafted from its leading drivers |
 | Pattern of 1.0s on aspirational key results at the close | Targets were too safe. Address stretch explicitly when drafting the next cycle |
 
-The coach never guesses at the situation. Every one of the twenty maps to a rule in this document, and every message cites the rule so the recipient can argue with it.
+The coach never guesses at the situation. Every one maps to a rule in this document, and every message cites the rule so the recipient can argue with it.
 
 ---
 

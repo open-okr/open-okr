@@ -108,7 +108,10 @@ const goal = (
   keyResults,
 });
 
-const tree = (keyResults = [keyResult()]): OkrTree => ({
+const tree = (
+  keyResults = [keyResult()],
+  kind: "committed" | "aspirational" = "aspirational",
+): OkrTree => ({
   cycle: {
     id: "c",
     name: "Q1",
@@ -117,7 +120,10 @@ const tree = (keyResults = [keyResult()]): OkrTree => ({
     endsOn: "2027-03-31",
   },
   goals: [
-    goal("g", "Make onboarding the reason teams stay", keyResults, "p"),
+    {
+      ...goal("g", "Make onboarding the reason teams stay", keyResults, "p"),
+      kind,
+    },
     goal("p", "Grow the business on the teams we keep", []),
   ],
   context: [],
@@ -177,10 +183,11 @@ async function render(options: {
   address: string;
   canEdit?: boolean;
   keyResults?: OkrTree["goals"][number]["keyResults"];
+  kind?: "committed" | "aspirational";
 }) {
   window.history.replaceState(null, "", `/goals${options.address}`);
   // A read again returns what the server holds, which is what was drawn.
-  readOkrTree.mockResolvedValue(tree(options.keyResults));
+  readOkrTree.mockResolvedValue(tree(options.keyResults, options.kind));
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -190,7 +197,7 @@ async function render(options: {
         <TranslationsProvider locale="en">
           <ToastProvider>
             <OkrTable
-              initialTree={tree(options.keyResults)}
+              initialTree={tree(options.keyResults, options.kind)}
               initialAt={Date.now()}
               scope="all"
               filters={{ includeClosed: false }}
@@ -486,6 +493,35 @@ describe("checking in", () => {
     });
     await act(async () => new Promise((done) => setTimeout(done)));
   }
+
+  test("a commitment set below the floor is told so before it is published (P9-T11b-c)", async () => {
+    await render({ address: "?okr=g&tab=check-in", kind: "committed" });
+    const floor = () =>
+      drawer()?.querySelector('[data-testid="committed-floor"]') ?? null;
+    await fill(
+      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      "4",
+    );
+    expect(floor()?.textContent).toBe(
+      "A commitment nobody believes in is a risk. Escalate now, or make it aspirational",
+    );
+    await fill(
+      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      "7",
+    );
+    expect(floor()).toBeNull();
+  });
+
+  test("an aspirational key result at the same confidence is told nothing", async () => {
+    await render({ address: "?okr=g&tab=check-in" });
+    await fill(
+      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      "4",
+    );
+    expect(
+      drawer()?.querySelector('[data-testid="committed-floor"]'),
+    ).toBeNull();
+  });
 
   test("the row's check-in action opens the drawer on its check-in tab", async () => {
     await render({ address: "" });

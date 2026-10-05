@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import type { ResolvedThresholds } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
@@ -242,6 +243,11 @@ async function CheckInForGoal({
         <Composer
           checkInId={draft.id}
           goalTitle={goal.title}
+          kind={goal.kind}
+          thresholds={
+            (await callAction(context, "rhythm.read", {}))
+              .thresholds as ResolvedThresholds
+          }
           keyResults={goal.keyResults}
           nextGoalId={nextGoalId}
         />

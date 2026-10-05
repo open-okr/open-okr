@@ -23,6 +23,7 @@ import {
 } from "@openokr/db";
 import {
   closeIsSandbagged,
+  committedBelowFloor,
   draftIsSandbagged,
   isTriggerKey,
   objectivesOverCap,
@@ -152,6 +153,29 @@ export async function dueObjectiveQualityNudges(
           }),
         );
       }
+    }
+    // §3.2's committed rule at drafting (P9-T11b-c): a commitment drafted
+    // below the floor is a risk to raise now, not at the first check-in. The
+    // check-in half is `dueCommittedFloorNudges`, hourly.
+    if (
+      drafting &&
+      first.championId &&
+      committedBelowFloor(
+        keyResultRows.map((row) => ({
+          confidence: row.confidence === null ? null : Number(row.confidence),
+          kind: row.kind,
+        })),
+        input.thresholds,
+      )
+    ) {
+      due.push(
+        qualityNudge({
+          ruleKey: "quality.committed_floor",
+          subjectType: "goal",
+          subjectId: goalId,
+          recipientMemberId: first.championId,
+        }),
+      );
     }
     const offTrack = keyResultRows.some(
       (row) =>

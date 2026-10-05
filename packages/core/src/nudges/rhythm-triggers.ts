@@ -12,6 +12,10 @@
  * only as far as §11's deduplication window: the first run after the event
  * says it once, and deduplication holds the rest of the window. The three on a
  * calendar fire on one named day.
+ *
+ * The Coach's `quality.committed_floor` at a check-in lives here too
+ * (P9-T11b-c), because it reacts to the same two events as
+ * `confidence.critical` and is bounded by the same window.
  */
 import {
   activeOnly,
@@ -29,6 +33,7 @@ import {
 } from "@openokr/db";
 import {
   commitmentDueToday,
+  committedBelowFloor,
   confidenceIsCritical,
   isTriggerKey,
   phasesClosingToday,
@@ -189,6 +194,109 @@ export async function dueCriticalConfidenceNudges(
     );
   }
   return due;
+}
+
+/**
+ * `quality.committed_floor` at a check-in: a committed key result whose
+ * confidence was published with a check-in, or confirmed in a session, inside
+ * the window and below §3.2's floor, to the champion (P9-T11b-c). The Coach's
+ * message, beside `confidence.critical`'s escalation: at 0.3 a commitment
+ * hears both, one asking for a decision and one telling management.
+ *
+ * Read from the key result as the check-in left it, as the critical check
+ * does, so a confidence corrected the same hour is the one judged. The
+ * drafting half runs nightly with the other drafting checks.
+ */
+export async function dueCommittedFloorNudges(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly now: Date;
+    readonly thresholds: ResolvedThresholds;
+    readonly scope?: AgentScope;
+  },
+): Promise<readonly DueNudge[]> {
+  const since = windowStart(input.now, input.thresholds);
+  const below = new Map<string, string>();
+  const judge = (
+    goalId: string,
+    championId: string,
+    confidence: string | null,
+  ) => {
+    if (
+      committedBelowFloor(
+        [
+          {
+            confidence: confidence === null ? null : Number(confidence),
+            kind: "committed",
+          },
+        ],
+        input.thresholds,
+      )
+    ) {
+      below.set(goalId, championId);
+    }
+  };
+
+  const confirmed = await tx
+    .select({
+      goalId: keyResults.goalId,
+      championId: goals.championId,
+      confidence: sessionConfidences.confirmedConfidence,
+    })
+    .from(sessionConfidences)
+    .innerJoin(keyResults, eq(keyResults.id, sessionConfidences.keyResultId))
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        sessionConfidences,
+        eq(sessionConfidences.workspaceId, input.workspaceId),
+        gte(sessionConfidences.createdAt, since),
+        eq(goals.kind, "committed"),
+        isNull(goals.deletedAt),
+        isNull(goals.closedAt),
+        input.scope ? agentSeesGoal(input.scope) : undefined,
+      ),
+    );
+  for (const row of confirmed) {
+    judge(row.goalId, row.championId, row.confidence);
+  }
+
+  const published = await tx
+    .select({
+      goalId: keyResults.goalId,
+      championId: goals.championId,
+      confidence: keyResults.confidence,
+    })
+    .from(checkIns)
+    .innerJoin(keyResults, eq(keyResults.goalId, checkIns.subjectId))
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        checkIns,
+        eq(checkIns.workspaceId, input.workspaceId),
+        isNotNull(checkIns.publishedAt),
+        gte(checkIns.publishedAt, since),
+        eq(goals.kind, "committed"),
+        isNull(keyResults.deletedAt),
+        isNull(goals.deletedAt),
+        isNull(goals.closedAt),
+        input.scope ? agentSeesGoal(input.scope) : undefined,
+      ),
+    );
+  for (const row of published) {
+    judge(row.goalId, row.championId, row.confidence);
+  }
+
+  return [...below].map(([goalId, championId]) =>
+    nudge({
+      ruleKey: "quality.committed_floor",
+      subjectType: "goal",
+      subjectId: goalId,
+      recipientMemberId: championId,
+      urgent: false,
+    }),
+  );
 }
 
 async function cycleSponsor(

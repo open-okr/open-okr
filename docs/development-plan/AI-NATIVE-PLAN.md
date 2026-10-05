@@ -307,6 +307,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `quality.too_many_objectives` | A level exceeds its cap | Facilitator |
 | `quality.all_lagging` | An objective's key results are all lagging | Champion |
 | `quality.no_baseline` | A key result lacks a baseline at Phase 4 exit | Champion |
+| `quality.committed_floor` | A committed key result drafted or checked in below 0.7 confidence (METHOD.md §3.2) | Champion |
 | `quality.sandbagging_draft` | Average draft confidence on an objective's aspirational key results above 0.9 | Champion and facilitator |
 | `quality.sandbagging_close` | Three quarters or more of a closed cycle's aspirational key results scored 1.0 | Sponsor |
 | `quality.orphan_goal` | A goal below company level has no parent | Champion |

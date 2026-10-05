@@ -11,6 +11,7 @@ import {
 } from "../src/nudges/quality-triggers.ts";
 import {
   dueCommitmentNudges,
+  dueCommittedFloorNudges,
   dueCriticalConfidenceNudges,
   duePhaseBlockedNudges,
   dueStreakNudges,
@@ -482,5 +483,104 @@ describe("the Coach's seven", () => {
       dueProcessHealthNudges(tx, { workspaceId, now: new Date() }),
     );
     expect(said(nudges, "quality.process_health_low")).toEqual([ownerMemberId]);
+  });
+});
+
+describe("the committed floor (METHOD.md §3.2, P9-T11b-c)", () => {
+  const narrative = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "The contractor left." }],
+      },
+    ],
+  };
+
+  it("quality.committed_floor tells the champion of a commitment drafted below the floor", async () => {
+    const wb = await workerDb();
+    const committed = await goal({
+      cycleId: planningCycleId,
+      kind: "committed",
+    });
+    const aspirational = await goal({
+      cycleId: planningCycleId,
+      title: "Make the first week the reason teams renew",
+    });
+    await keyResult(committed);
+    await keyResult(aspirational);
+    await wb.admin.query(
+      "update key_results set confidence = 0.4 where goal_id = any($1::uuid[])",
+      [[committed, aspirational]],
+    );
+    const nudges = await read((tx) =>
+      dueObjectiveQualityNudges(tx, { workspaceId, thresholds }),
+    );
+    const floor = nudges.filter(
+      (nudge) => nudge.ruleKey === "quality.committed_floor",
+    );
+    expect(floor.map((nudge) => nudge.subjectId)).toEqual([committed]);
+    expect(floor.map((nudge) => nudge.recipientMemberId)).toEqual([
+      secondMemberId,
+    ]);
+    // The Coach's, so it is a quality nudge, and it does not escalate.
+    expect(floor[0]?.kind).toBe("quality");
+    expect(floor[0]?.urgent).toBe(false);
+  });
+
+  it("quality.committed_floor tells the champion when a committed check-in lands below the floor, and says nothing of an aspirational one", async () => {
+    const committed = await goal({
+      cycleId: planningCycleId,
+      kind: "committed",
+    });
+    const aspirational = await goal({
+      cycleId: planningCycleId,
+      title: "Make the first week the reason teams renew",
+    });
+    for (const goalId of [committed, aspirational]) {
+      const keyResultId = await keyResult(goalId);
+      await call("goals.publishDraftedCheckIn", {
+        goalId,
+        status: "caution",
+        confidence: 0.4,
+        narrative,
+        values: [{ keyResultId, confidence: 0.4 }],
+      });
+    }
+    const now = new Date();
+    const nudges = await read((tx) =>
+      dueCommittedFloorNudges(tx, { workspaceId, now, thresholds }),
+    );
+    expect(nudges.map((nudge) => nudge.subjectId)).toEqual([committed]);
+    expect(said(nudges, "quality.committed_floor")).toEqual([secondMemberId]);
+
+    // A day later it is not news; deduplication holds the window between.
+    const later = await read((tx) =>
+      dueCommittedFloorNudges(tx, {
+        workspaceId,
+        now: new Date(now.getTime() + 30 * 3_600_000),
+        thresholds,
+      }),
+    );
+    expect(later).toEqual([]);
+  });
+
+  it("says nothing of a commitment checked in at the floor", async () => {
+    const committed = await goal({
+      cycleId: planningCycleId,
+      kind: "committed",
+    });
+    const keyResultId = await keyResult(committed);
+    await call("goals.publishDraftedCheckIn", {
+      goalId: committed,
+      status: "on_track",
+      confidence: 0.7,
+      narrative,
+      values: [{ keyResultId, confidence: 0.7 }],
+    });
+    const nudges = await read((tx) =>
+      dueCommittedFloorNudges(tx, { workspaceId, now: new Date(), thresholds }),
+    );
+    expect(nudges).toEqual([]);
   });
 });

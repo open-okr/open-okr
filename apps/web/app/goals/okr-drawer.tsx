@@ -447,6 +447,7 @@ function DrawerBody({
                 goal={goal}
                 detail={loaded}
                 okr={okr}
+                thresholds={coach.thresholds}
                 onPublished={() => {
                   toast.show({ tone: "ok", message: t("okrDrawer.checkedIn") });
                   onTab("history");

@@ -17,6 +17,7 @@
  * | `quality.no_not_doing` | Phase 3 is done and the frame has no not-doing list |
  * | `quality.too_many_objectives` | A level or a unit holds more objectives than its cap |
  * | `quality.sandbagging_draft` | An objective's average draft confidence on its aspirational key results is above `scoring.draftSandbagging` |
+ * | `quality.committed_floor` | A committed key result's confidence is below `scoring.committedConfidenceFloor`, drafted there or checked in there (P9-T11b-c) |
  * | `quality.sandbagging_close` | Three quarters or more of a closed cycle's aspirational key results scored 1.0 (`scoring.closeTooSafeShare`) |
  * | `quality.no_cuts` | Capacity has verdicts and nothing is recorded as cut |
  * | `quality.trending_off` | A key result's stored forecast misses its target |
@@ -25,7 +26,12 @@
  * Dates are local `YYYY-MM-DD` strings in the workspace timezone.
  */
 import { SUGGESTED_TIMELINE } from "./guidance.ts";
-import { type KindedScore, type OkrKind, tooSafePattern } from "./scoring.ts";
+import {
+  belowCommittedFloor,
+  type KindedScore,
+  type OkrKind,
+  tooSafePattern,
+} from "./scoring.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
 const DAY_MS = 86_400_000;
@@ -47,6 +53,25 @@ const average = (values: readonly (number | null)[]): number | null => {
     ? null
     : known.reduce((sum, value) => sum + value, 0) / known.length;
 };
+
+/**
+ * §3.2's committed rule: any committed key result below the floor. A key
+ * result nobody has given a confidence is not below anything yet, and an
+ * aspirational one is never judged by the floor.
+ */
+export function committedBelowFloor(
+  keyResults: readonly {
+    readonly confidence: number | null;
+    readonly kind: OkrKind;
+  }[],
+  thresholds: ResolvedThresholds,
+): boolean {
+  return keyResults.some(
+    (keyResult) =>
+      keyResult.confidence !== null &&
+      belowCommittedFloor(keyResult.confidence, keyResult.kind, thresholds),
+  );
+}
 
 /** §3.2: "0.3 and below is raised with management the same day." */
 export function confidenceIsCritical(

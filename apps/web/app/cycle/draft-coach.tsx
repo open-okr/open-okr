@@ -2,6 +2,8 @@
 
 import {
   applyEnforcement,
+  COMMITTED_FLOOR_TEXT,
+  committedBelowFloor,
   evaluateKeyResults,
   evaluateObjective,
   examplesFor,
@@ -60,6 +62,11 @@ export interface CoachObjective {
   readonly reviewerId: string | null;
   readonly objectivesInUnit: number;
   readonly level: "company" | "department" | "team" | "individual";
+  /**
+   * Committed or aspirational (METHOD.md §2.8). KR-6 judges only aspirational
+   * key results, and a committed one has the floor instead (P9-T11b-c).
+   */
+  readonly kind: "committed" | "aspirational";
 }
 
 /** The field's dot, at the worst verdict on screen. `.vd` in the mockup. */
@@ -123,6 +130,7 @@ export function DraftCoach({
       indicatorType: row.indicatorType,
       direction: row.direction,
       confidence: row.confidence,
+      kind: objective.kind,
     }));
 
     const objectiveVerdicts = applyEnforcement(
@@ -231,6 +239,25 @@ export function DraftCoach({
             <RuleVerdict key={view.id} verdict={view} />
           ))}
       </div>
+
+      {/* §3.2's committed rule, which no check carries: high confidence is
+       * right for a commitment, and one drafted below the floor is a risk to
+       * raise now rather than at the first check-in. */}
+      {objective.kind === "committed" &&
+      committedBelowFloor(
+        keyResults.map((row) => ({
+          confidence: row.confidence,
+          kind: objective.kind,
+        })),
+        thresholds,
+      ) ? (
+        <p
+          data-testid="committed-floor"
+          className="rounded-control bg-warn-bg px-2.5 py-1.5 text-xs text-warn"
+        >
+          {COMMITTED_FLOOR_TEXT}
+        </p>
+      ) : null}
 
       {views.every((view) => view.status === "pass") ? (
         <p className="text-xs text-ok">

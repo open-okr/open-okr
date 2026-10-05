@@ -3264,6 +3264,7 @@
   "triggers.kpiUnhealthy": "KPI tidak sihat",
   "triggers.kpiWatch": "KPI memasuki koridor perhatian",
   "triggers.qualityAllLagging": "Semua keputusan utama ketinggalan",
+  "triggers.qualityCommittedFloor": "Komitmen yang tiada siapa percaya",
   "triggers.qualityConflict": "Dua matlamat bercanggah",
   "triggers.qualityDependencyUnowned": "Kebergantungan tiada pemilik",
   "triggers.qualityDivergence": "Kesihatan tidak sepadan dengan data",

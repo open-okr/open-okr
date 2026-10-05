@@ -3,6 +3,7 @@ import { canonThresholds } from "../src/thresholds.ts";
 import {
   closeIsSandbagged,
   commitmentDueToday,
+  committedBelowFloor,
   confidenceIsCritical,
   draftIsSandbagged,
   objectivesOverCap,
@@ -19,6 +20,38 @@ describe("confidence.critical", () => {
     expect(confidenceIsCritical(0.1, thresholds)).toBe(true);
     expect(confidenceIsCritical(0.31, thresholds)).toBe(false);
     expect(confidenceIsCritical(null, thresholds)).toBe(false);
+  });
+});
+
+describe("quality.committed_floor (METHOD.md §3.2, P9-T11b-c)", () => {
+  it("fires on a committed key result below the floor, never on an aspirational one", () => {
+    expect(
+      committedBelowFloor(
+        [
+          { confidence: 0.9, kind: "committed" },
+          { confidence: 0.4, kind: "committed" },
+        ],
+        thresholds,
+      ),
+    ).toBe(true);
+    expect(
+      committedBelowFloor(
+        [{ confidence: 0.4, kind: "aspirational" }],
+        thresholds,
+      ),
+    ).toBe(false);
+  });
+
+  it("is quiet at the floor and on a key result nobody has given a confidence", () => {
+    expect(
+      committedBelowFloor([{ confidence: 0.7, kind: "committed" }], thresholds),
+    ).toBe(false);
+    expect(
+      committedBelowFloor(
+        [{ confidence: null, kind: "committed" }],
+        thresholds,
+      ),
+    ).toBe(false);
   });
 });
 

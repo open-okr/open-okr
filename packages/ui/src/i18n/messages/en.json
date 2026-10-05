@@ -3264,6 +3264,7 @@
   "triggers.kpiUnhealthy": "KPI unhealthy",
   "triggers.kpiWatch": "KPI entered the watch corridor",
   "triggers.qualityAllLagging": "Every key result lagging",
+  "triggers.qualityCommittedFloor": "A commitment nobody believes in",
   "triggers.qualityConflict": "Two goals conflict",
   "triggers.qualityDependencyUnowned": "Dependency has no owner",
   "triggers.qualityDivergence": "Health disagrees with the data",
