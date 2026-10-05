@@ -4,6 +4,7 @@ import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
+import { healthWord } from "../../lib/health-words.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Composer, Votes } from "./composer.tsx";
@@ -139,7 +140,7 @@ export default async function CheckInPage({
                               : t("checkIn.dueOn", {
                                   date: String(goal.nextCheckInOn),
                                 }),
-                          health: goal.health.replace("_", " "),
+                          health: healthWord(t, goal.health),
                         },
                       )}
                     </span>

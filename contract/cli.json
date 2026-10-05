@@ -6126,7 +6126,8 @@
             "off_track",
             "outdated",
             "achieved",
-            "missed"
+            "missed",
+            "abandoned"
           ]
         },
         {
@@ -6411,7 +6412,8 @@
           "required": true,
           "enum": [
             "achieved",
-            "missed"
+            "missed",
+            "abandoned"
           ]
         },
         {

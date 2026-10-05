@@ -131,7 +131,8 @@ test("the walker offers it, and publishing puts the card in the history", async 
   const card = history();
   await expect(card).toBeVisible({ timeout: 15_000 });
   await expect(card).toContainText("40 → 60 (+20)");
-  await expect(card).toContainText("caution");
+  // "At risk", §3.5's default label for the stored `caution` (P9-T15b-a).
+  await expect(card).toContainText("At risk");
   await expect(card).toContainText("awaiting the reviewer");
 });
 

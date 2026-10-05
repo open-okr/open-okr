@@ -215,7 +215,7 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
           <span className="text-[11px] font-semibold tabular-nums text-ink-3">
             {Math.round(goal.progressPct)}%
           </span>
-          <HealthChip health={goal.health} />
+          <HealthChip health={goal.health} reported={goal.reportedStatus} />
         </span>
       </div>
       {collapsed ? null : (

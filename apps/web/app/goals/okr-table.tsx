@@ -770,7 +770,7 @@ function ObjectiveRow({
         </div>
 
         <div className="hidden md:block">
-          <HealthChip health={goal.health} />
+          <HealthChip health={goal.health} reported={goal.reportedStatus} />
         </div>
 
         <RowActions

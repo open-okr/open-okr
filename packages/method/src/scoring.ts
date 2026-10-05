@@ -463,11 +463,13 @@ export type GoalHealth =
   | "off_track"
   | "outdated"
   | "achieved"
-  | "missed";
+  | "missed"
+  | "abandoned";
 
 export interface HealthInput {
   readonly closed: boolean;
-  readonly successStatus?: "achieved" | "missed" | null;
+  /** §3.5's three closed outcomes; `abandoned` since P9-T15b-a. */
+  readonly successStatus?: "achieved" | "missed" | "abandoned" | null;
   /** The latest published check-in's status, or null when there is none. */
   readonly latestStatus?: "on_track" | "caution" | "off_track" | null;
   /** Days past `next_check_in_at`. Negative before it, 0 on the day. */
@@ -487,7 +489,12 @@ export interface HealthInput {
  */
 export function goalHealth(input: HealthInput): GoalHealth {
   if (input.closed) {
-    return input.successStatus === "missed" ? "missed" : "achieved";
+    // "Closed as achieved, missed or abandoned" (§3.5). An abandoned
+    // objective was stopped because it stopped mattering, which is neither.
+    return input.successStatus === "missed" ||
+      input.successStatus === "abandoned"
+      ? input.successStatus
+      : "achieved";
   }
   if (input.daysPastDue !== null && input.daysPastDue > input.graceDays) {
     return "outdated";

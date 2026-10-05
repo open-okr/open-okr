@@ -31674,7 +31674,8 @@
                                     "type": "string",
                                     "enum": [
                                       "achieved",
-                                      "missed"
+                                      "missed",
+                                      "abandoned"
                                     ]
                                   },
                                   {
@@ -32101,7 +32102,8 @@
                 "off_track",
                 "outdated",
                 "achieved",
-                "missed"
+                "missed",
+                "abandoned"
               ]
             }
           },
@@ -32375,7 +32377,8 @@
                               "type": "string",
                               "enum": [
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
                               ]
                             },
                             {
@@ -33227,7 +33230,8 @@
                     "type": "string",
                     "enum": [
                       "achieved",
-                      "missed"
+                      "missed",
+                      "abandoned"
                     ]
                   },
                   "closeDecision": {
@@ -34534,7 +34538,23 @@
                                   "off_track",
                                   "outdated",
                                   "achieved",
-                                  "missed"
+                                  "missed",
+                                  "abandoned"
+                                ]
+                              },
+                              "reportedStatus": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "on_track",
+                                      "caution",
+                                      "off_track"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "closedAt": {
@@ -34859,6 +34879,7 @@
                               "contributionStatement",
                               "progressPct",
                               "health",
+                              "reportedStatus",
                               "closedAt",
                               "nextCheckInOn",
                               "daysPastDue",
@@ -35434,7 +35455,23 @@
                                 "off_track",
                                 "outdated",
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
+                              ]
+                            },
+                            "reportedStatus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "on_track",
+                                    "caution",
+                                    "off_track"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "closedAt": {
@@ -35759,6 +35796,7 @@
                             "contributionStatement",
                             "progressPct",
                             "health",
+                            "reportedStatus",
                             "closedAt",
                             "nextCheckInOn",
                             "daysPastDue",
@@ -36012,7 +36050,23 @@
                                 "off_track",
                                 "outdated",
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
+                              ]
+                            },
+                            "reportedStatus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "on_track",
+                                    "caution",
+                                    "off_track"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "closedAt": {
@@ -36337,6 +36391,7 @@
                             "contributionStatement",
                             "progressPct",
                             "health",
+                            "reportedStatus",
                             "closedAt",
                             "nextCheckInOn",
                             "daysPastDue",
@@ -36622,7 +36677,23 @@
                                 "off_track",
                                 "outdated",
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
+                              ]
+                            },
+                            "reportedStatus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "on_track",
+                                    "caution",
+                                    "off_track"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "closedAt": {
@@ -36947,6 +37018,7 @@
                             "contributionStatement",
                             "progressPct",
                             "health",
+                            "reportedStatus",
                             "closedAt",
                             "nextCheckInOn",
                             "daysPastDue",
@@ -37265,7 +37337,23 @@
                                 "off_track",
                                 "outdated",
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
+                              ]
+                            },
+                            "reportedStatus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "on_track",
+                                    "caution",
+                                    "off_track"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "closedAt": {
@@ -37590,6 +37678,7 @@
                             "contributionStatement",
                             "progressPct",
                             "health",
+                            "reportedStatus",
                             "closedAt",
                             "nextCheckInOn",
                             "daysPastDue",
@@ -37867,7 +37956,23 @@
                                 "off_track",
                                 "outdated",
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
+                              ]
+                            },
+                            "reportedStatus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "on_track",
+                                    "caution",
+                                    "off_track"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "closedAt": {
@@ -38192,6 +38297,7 @@
                             "contributionStatement",
                             "progressPct",
                             "health",
+                            "reportedStatus",
                             "closedAt",
                             "nextCheckInOn",
                             "daysPastDue",
@@ -38449,7 +38555,23 @@
                                 "off_track",
                                 "outdated",
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
+                              ]
+                            },
+                            "reportedStatus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "on_track",
+                                    "caution",
+                                    "off_track"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "closedAt": {
@@ -38774,6 +38896,7 @@
                             "contributionStatement",
                             "progressPct",
                             "health",
+                            "reportedStatus",
                             "closedAt",
                             "nextCheckInOn",
                             "daysPastDue",
@@ -39020,7 +39143,23 @@
                                 "off_track",
                                 "outdated",
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
+                              ]
+                            },
+                            "reportedStatus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "on_track",
+                                    "caution",
+                                    "off_track"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "closedAt": {
@@ -39345,6 +39484,7 @@
                             "contributionStatement",
                             "progressPct",
                             "health",
+                            "reportedStatus",
                             "closedAt",
                             "nextCheckInOn",
                             "daysPastDue",
@@ -39589,7 +39729,23 @@
                                 "off_track",
                                 "outdated",
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
+                              ]
+                            },
+                            "reportedStatus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "on_track",
+                                    "caution",
+                                    "off_track"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "closedAt": {
@@ -39914,6 +40070,7 @@
                             "contributionStatement",
                             "progressPct",
                             "health",
+                            "reportedStatus",
                             "closedAt",
                             "nextCheckInOn",
                             "daysPastDue",
@@ -40275,7 +40432,23 @@
                                 "off_track",
                                 "outdated",
                                 "achieved",
-                                "missed"
+                                "missed",
+                                "abandoned"
+                              ]
+                            },
+                            "reportedStatus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "on_track",
+                                    "caution",
+                                    "off_track"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "closedAt": {
@@ -40600,6 +40773,7 @@
                             "contributionStatement",
                             "progressPct",
                             "health",
+                            "reportedStatus",
                             "closedAt",
                             "nextCheckInOn",
                             "daysPastDue",

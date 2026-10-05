@@ -62,6 +62,7 @@ const goal = (
     addedMidCycleAt: null,
     draft: null,
     draftState: null,
+    reportedStatus: null,
     spaceId: null,
     champion: { id: "m", name: "Mei" },
     reviewer: null,

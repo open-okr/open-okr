@@ -6,6 +6,7 @@ import {
   cycleScore,
   draftVerdict,
   expectedProgressPct,
+  goalHealth,
   keyResultProgress,
   needsRootCause,
   objectiveScore,
@@ -381,5 +382,33 @@ describe("§3.6's forecast waits for enough values (P9-T15a)", () => {
 
   it("projects from the fourth", () => {
     expect(trendForecast(points, 10, target, 4)?.projected).toBe(110);
+  });
+});
+
+describe("§3.5's health says what happened (P9-T15b-a)", () => {
+  const closed = (successStatus: "achieved" | "missed" | "abandoned") =>
+    goalHealth({
+      closed: true,
+      successStatus,
+      latestStatus: "on_track",
+      daysPastDue: 40,
+      graceDays: 3,
+    });
+
+  it("reads an abandoned objective as abandoned, before anything else", () => {
+    expect(closed("abandoned")).toBe("abandoned");
+    expect(closed("missed")).toBe("missed");
+    expect(closed("achieved")).toBe("achieved");
+  });
+
+  it("still reads outdated over the last status, which the screen shows beside it", () => {
+    expect(
+      goalHealth({
+        closed: false,
+        latestStatus: "on_track",
+        daysPastDue: 10,
+        graceDays: 3,
+      }),
+    ).toBe("outdated");
   });
 });

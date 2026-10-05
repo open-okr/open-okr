@@ -229,7 +229,7 @@ test("acceptance: checking in from the row moves its health, and the history sho
   await expect(title).toBeVisible({ timeout: 15_000 });
   const row = title.locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   // Never checked in, so pending: silence is never green (METHOD.md §3.5).
-  await expect(row).toContainText("pending");
+  await expect(row).toContainText("Pending");
   await row.hover();
   await row.getByRole("button", { name: "Check in on this objective" }).click();
 
@@ -248,8 +248,9 @@ test("acceptance: checking in from the row moves its health, and the history sho
     { timeout: 15_000 },
   );
   await expect(drawer()).toContainText(NARRATIVE, { timeout: 15_000 });
-  // The row behind it, without a reload.
-  await expect(row).toContainText("caution", { timeout: 15_000 });
+  // The row behind it, without a reload. The stored `caution` reads "At
+  // risk", §3.5's default label for it (P9-T15b-a).
+  await expect(row).toContainText("At risk", { timeout: 15_000 });
 });
 
 test("the goal page adds a key result, and a changed confidence there is a check-in", async () => {

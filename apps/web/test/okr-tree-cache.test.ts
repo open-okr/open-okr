@@ -57,6 +57,7 @@ const goal = (id: string, extra: Partial<OkrGoal> = {}): OkrGoal => ({
   addedMidCycleAt: null,
   draft: null,
   draftState: null,
+  reportedStatus: null,
   spaceId: null,
   champion: { id: "m", name: "Mei" },
   reviewer: null,

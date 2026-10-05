@@ -124,8 +124,15 @@ export async function Timeline({
             >
               <header className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-2">
+                  {/* The status in words, "At risk" for caution (§3.5). */}
                   <Chip tone={STATUS_TONE[entry.status ?? ""] ?? "neutral"}>
-                    {(entry.status ?? "").replace("_", " ")}
+                    {entry.status === "on_track"
+                      ? t("common.onTrack")
+                      : entry.status === "caution"
+                        ? t("common.caution")
+                        : entry.status === "off_track"
+                          ? t("common.offTrack")
+                          : ""}
                   </Chip>
                   <span className="text-xs text-ink-3">{byline(t, entry)}</span>
                 </span>

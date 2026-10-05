@@ -323,12 +323,12 @@ Committed and aspirational key results are reported separately, because averagin
 
 Health is derived, never typed in. Precedence, first match wins:
 
-1. **Closed outcome.** The goal is closed as achieved or missed.
-2. **Outdated.** The check-in is overdue past the grace window. This overrides whatever the last check-in said.
-3. **Latest published check-in status.** On track, caution, or off track.
+1. **Closed outcome.** The goal is closed as achieved, missed or abandoned.
+2. **Outdated.** The check-in is overdue past the grace window. This overrides whatever the last check-in said, and the last reported status is still shown beside it.
+3. **Latest published check-in status.** On track, at risk, or off track. "At risk" is the default label for the stored status `caution`, set in terminology.
 4. **Pending.** No check-in yet.
 
-A goal that has never been checked in is `pending`, not `on track`. Silence is never green.
+A goal that has never been checked in is `pending`, not `on track`. Silence is never green. *Source:* Perdoo (vendor) uses the same "no status" grey and an "outdated" flag.
 
 ### 3.6 Trend forecast
 

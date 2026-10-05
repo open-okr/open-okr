@@ -735,7 +735,8 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
 
   await page.getByRole("button", { name: "Reopen this goal" }).click();
   // Exact: the page also explains that every goal reads pending until P3-T05.
-  await expect(page.getByText("pending", { exact: true })).toBeVisible();
+  // In words since P9-T15b-a, where it printed the stored code.
+  await expect(page.getByText("Pending", { exact: true })).toBeVisible();
   // The account of what happened survives the reopen.
   await expect(
     page.getByText("Activation moved. Onboarding did the work"),

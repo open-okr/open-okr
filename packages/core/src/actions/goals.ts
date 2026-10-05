@@ -1696,9 +1696,8 @@ export const closeGoal = defineWriteAction({
  * one-line reason" (P9-T13-c-a).
  *
  * A close with the decision "abandon" and the reason as its one account, so
- * the archive, the history and a reopen read it as they read any close. Until
- * §3.5's abandoned outcome arrives at P9-T15, the outcome a stop records is
- * missed: nothing was achieved, and the decision says why.
+ * the archive, the history and a reopen read it as they read any close. Its
+ * outcome is §3.5's abandoned, since P9-T15b-a; it read missed before that.
  */
 export const stopGoal = defineWriteAction({
   name: "goals.stop",
@@ -1743,7 +1742,9 @@ export const stopGoal = defineWriteAction({
         workspaceId,
         goalId: input.id,
         closedById: memberId,
-        successStatus: "missed",
+        // §3.5's abandoned outcome (P9-T15b-a): it stopped mattering, which
+        // is neither achieved nor missed.
+        successStatus: "abandoned",
         closeDecision: "abandon",
         closeReason: input.reason,
         retrospectiveBody: richTextFromPlainText(input.reason),

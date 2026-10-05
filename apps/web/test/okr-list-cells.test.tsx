@@ -80,6 +80,7 @@ const tree = (over: Partial<FixtureKeyResult> = {}): OkrTree => ({
       addedMidCycleAt: null,
       draft: null,
       draftState: null,
+      reportedStatus: null,
       spaceId: null,
       champion: PRIYA,
       reviewer: null,

@@ -8489,7 +8489,8 @@
               "off_track",
               "outdated",
               "achieved",
-              "missed"
+              "missed",
+              "abandoned"
             ]
           },
           "mine": {
@@ -8836,7 +8837,8 @@
             "type": "string",
             "enum": [
               "achieved",
-              "missed"
+              "missed",
+              "abandoned"
             ]
           },
           "closeDecision": {

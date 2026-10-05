@@ -21,6 +21,7 @@
 import {
   activeOnly,
   activities,
+  checkIns,
   cycles,
   GOAL_DRAFT_STATES,
   GOAL_HEALTH,
@@ -144,6 +145,12 @@ export const treeGoal = z.object({
   contributionStatement: z.string().nullable(),
   progressPct: z.number(),
   health: z.enum(GOAL_HEALTH),
+  /**
+   * What the last published check-in said, for a goal that has gone
+   * outdated (METHOD.md §3.5, P9-T15b-a): "outdated" overrides it, and the
+   * last reported status is still shown beside it. Null otherwise.
+   */
+  reportedStatus: z.enum(["on_track", "caution", "off_track"]).nullable(),
   closedAt: z.string().nullable(),
   nextCheckInOn: z.string().nullable(),
   daysPastDue: z.number().int().nullable(),
@@ -243,6 +250,7 @@ const GOAL_COLUMNS = {
   contributionStatement: goals.contributionStatement,
   progressPct: goals.progressPct,
   health: goals.health,
+  lastCheckInId: goals.lastCheckInId,
   closedAt: goals.closedAt,
   nextCheckInAt: goals.nextCheckInAt,
   position: goals.position,
@@ -298,6 +306,7 @@ async function treeNodes(
     readonly contributionStatement: string | null;
     readonly progressPct: string;
     readonly health: (typeof GOAL_HEALTH)[number];
+    readonly lastCheckInId: string | null;
     readonly closedAt: Date | null;
     readonly nextCheckInAt: Date | null;
     readonly position: number;
@@ -334,6 +343,28 @@ async function treeNodes(
     byGoal.set(child.goalId, [...(byGoal.get(child.goalId) ?? []), child]);
   }
   const drafts = await additionDrafts(tx, workspaceId, rows, byGoal);
+  // §3.5: the status behind "outdated", read only for goals that are.
+  const lastIds = rows.flatMap((row) =>
+    row.health === "outdated" && row.lastCheckInId ? [row.lastCheckInId] : [],
+  );
+  const reported = new Map<string, "on_track" | "caution" | "off_track">();
+  if (lastIds.length > 0) {
+    const last = await tx
+      .select({ id: checkIns.id, status: checkIns.status })
+      .from(checkIns)
+      .where(
+        activeOnly(
+          checkIns,
+          eq(checkIns.workspaceId, workspaceId),
+          inArray(checkIns.id, lastIds),
+        ),
+      );
+    for (const entry of last) {
+      if (entry.status) {
+        reported.set(entry.id, entry.status);
+      }
+    }
+  }
 
   return rows.map((row) => ({
     id: row.id,
@@ -354,6 +385,10 @@ async function treeNodes(
     contributionStatement: row.contributionStatement,
     progressPct: asNumber(row.progressPct) ?? 0,
     health: row.health,
+    reportedStatus:
+      row.health === "outdated" && row.lastCheckInId
+        ? (reported.get(row.lastCheckInId) ?? null)
+        : null,
     closedAt: row.closedAt ? new Date(row.closedAt).toISOString() : null,
     nextCheckInOn: dueLocalDate(row.nextCheckInAt, timeZone),
     daysPastDue: daysPastDue(row.nextCheckInAt, now, timeZone),

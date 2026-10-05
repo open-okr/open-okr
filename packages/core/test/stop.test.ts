@@ -1,6 +1,7 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -84,10 +85,11 @@ describe("a stop", () => {
   it("closes the objective as abandoned, with its reason as the close's account, and owes no check-in", async () => {
     const goalId = await expansion();
     await call("goals.stop", { id: goalId, reason: REASON });
+    // §3.5's abandoned outcome (P9-T15b-a): neither achieved nor missed.
     expect(await row(goalId)).toMatchObject({
       close_decision: "abandon",
       close_reason: REASON,
-      health: "missed",
+      health: "abandoned",
       next_check_in_at: null,
     });
     expect((await row(goalId))?.closed_at).not.toBeNull();
@@ -124,5 +126,41 @@ describe("a stop", () => {
     expect(reopened?.closed_at).toBeNull();
     expect(reopened?.close_decision).toBeNull();
     expect(reopened?.next_check_in_at).not.toBeNull();
+  });
+});
+
+describe("the status behind outdated (METHOD.md §3.5, P9-T15b-a)", () => {
+  it("is answered with an outdated goal, and only with one", async () => {
+    const goalId = await expansion();
+    await call("goals.publishDraftedCheckIn", {
+      goalId,
+      status: "on_track",
+      confidence: 0.7,
+      narrative: richTextFromPlainText("Steady."),
+    });
+    const read = async () =>
+      (
+        await call<{
+          goals: {
+            id: string;
+            health: string;
+            reportedStatus: string | null;
+          }[];
+        }>("goals.tree", { cycleId, scope: "all" })
+      ).goals.find((goal) => goal.id === goalId);
+    expect(await read()).toMatchObject({
+      health: "on_track",
+      reportedStatus: null,
+    });
+
+    // What the staleness sweep writes once the grace has passed.
+    const wb = await workerDb();
+    await wb.admin.query("update goals set health = 'outdated' where id = $1", [
+      goalId,
+    ]);
+    expect(await read()).toMatchObject({
+      health: "outdated",
+      reportedStatus: "on_track",
+    });
   });
 });

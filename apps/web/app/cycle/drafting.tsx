@@ -13,6 +13,7 @@ import {
   Chip,
   formatMeasure,
 } from "@openokr/ui";
+import { healthWord } from "../../lib/health-words.ts";
 import type { KpiOption } from "../../lib/kpi-options.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
@@ -83,6 +84,7 @@ const HEALTH_TONE: Readonly<
   outdated: "warn",
   achieved: "ok",
   missed: "bad",
+  abandoned: "neutral",
 };
 
 export async function Drafting({
@@ -207,7 +209,7 @@ export async function Drafting({
             </div>
             <span className="flex flex-none items-center gap-2">
               <Chip tone={HEALTH_TONE[goal.health] ?? "neutral"}>
-                {goal.health.replace("_", " ")}
+                {healthWord(t, goal.health)}
               </Chip>
               {assistsAvailable && canEdit ? (
                 <SuggestParent goalId={goal.id} />

@@ -107,6 +107,15 @@ export const TERMINOLOGY = {
     meaning:
       "A number you watch every period whether or not it is an OKR. KPIs describe the health of the business.",
   },
+  // METHOD.md §3.5 (P9-T15b-a): "At risk" is the default label for the
+  // stored check-in status `caution`, set here so a workspace can say it its
+  // own way, as it can every other term.
+  atRisk: {
+    singular: "At risk",
+    plural: "At risk",
+    meaning:
+      "The label for a check-in status of caution: the work may miss unless something changes.",
+  },
 } as const satisfies Record<string, TermDefinition>;
 
 export type TermKey = keyof typeof TERMINOLOGY;

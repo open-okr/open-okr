@@ -28,6 +28,7 @@ import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { readConversation } from "../../../lib/conversation.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { healthWord } from "../../../lib/health-words.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
@@ -300,7 +301,7 @@ export default async function GoalPage({
                 ? t("goals.detail.closedStatus", {
                     status: String(goal.successStatus),
                   })
-                : goal.health.replace("_", " ")}
+                : healthWord(t, goal.health)}
             </Chip>
             <WatchControl subjectType="goal" subjectId={id} initial={watch} />
             {/* Check in's door on the goal itself, now that it has left the

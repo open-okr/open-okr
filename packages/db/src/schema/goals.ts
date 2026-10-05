@@ -42,7 +42,10 @@ import { workspaceMembers, workspaces } from "./workspaces.ts";
 export const GOAL_OWNER_KINDS = ["workspace", "space", "member"] as const;
 export type GoalOwnerKind = (typeof GOAL_OWNER_KINDS)[number];
 
-/** The seven §4.1 values. The last two are outcomes, not live statuses. */
+/**
+ * The eight §3.5 values. The last three are outcomes, not live statuses;
+ * `abandoned` arrived at P9-T15b-a for an objective stopped mid-cycle.
+ */
 export const GOAL_HEALTH = [
   "pending",
   "on_track",
@@ -51,6 +54,7 @@ export const GOAL_HEALTH = [
   "outdated",
   "achieved",
   "missed",
+  "abandoned",
 ] as const;
 export type GoalHealth = (typeof GOAL_HEALTH)[number];
 
@@ -70,7 +74,11 @@ export type GoalKind = (typeof GOAL_KINDS)[number];
 export const GOAL_DRAFT_STATES = ["draft", "awaiting_approval"] as const;
 export type GoalDraftState = (typeof GOAL_DRAFT_STATES)[number];
 
-export const GOAL_SUCCESS_STATUSES = ["achieved", "missed"] as const;
+export const GOAL_SUCCESS_STATUSES = [
+  "achieved",
+  "missed",
+  "abandoned",
+] as const;
 export type GoalSuccessStatus = (typeof GOAL_SUCCESS_STATUSES)[number];
 
 /** METHOD.md §8.8, on every closed goal. */

@@ -98,6 +98,7 @@ const goal = (
   addedMidCycleAt: null,
   draft: null,
   draftState: null,
+  reportedStatus: null,
   spaceId: null,
   champion: PRIYA,
   reviewer: null,

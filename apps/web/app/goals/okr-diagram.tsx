@@ -15,6 +15,7 @@ import {
 } from "@xyflow/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { healthWord } from "../../lib/health-words.ts";
 import {
   filterGoals,
   type OkrFilters,
@@ -244,7 +245,7 @@ function LiveDiagram({
               ).toLowerCase(),
               level: entry.goal.level,
               progress: String(Math.round(entry.goal.progressPct)),
-              health: entry.goal.health.replace("_", " "),
+              health: healthWord(t, entry.goal.health),
             }),
             data: {
               goal: entry.goal,

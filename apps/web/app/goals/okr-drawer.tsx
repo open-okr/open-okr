@@ -357,7 +357,7 @@ function DrawerBody({
             <span className="text-xs font-semibold tabular-nums text-ink-3">
               {Math.round(goal.progressPct)}%
             </span>
-            <HealthChip health={goal.health} />
+            <HealthChip health={goal.health} reported={goal.reportedStatus} />
           </div>
           <dl className="grid grid-cols-[7rem_1fr] items-center gap-x-3 gap-y-1.5 text-xs">
             <dt className="text-ink-3">{t("okrList.champion")}</dt>

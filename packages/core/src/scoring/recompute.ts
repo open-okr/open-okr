@@ -783,7 +783,7 @@ async function writeGoals<
 function healthFor(
   row: {
     closedAt: Date | string | null;
-    successStatus: "achieved" | "missed" | null;
+    successStatus: "achieved" | "missed" | "abandoned" | null;
     nextCheckInAt: Date | string | null;
   },
   graceDays: number,
