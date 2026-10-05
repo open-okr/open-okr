@@ -29,6 +29,7 @@ import { carryCoachStrictness } from "../data-changes/0016_carry_coach_strictnes
 import { keyResultKindFromDirection } from "../data-changes/0017_key_result_kind_from_direction.ts";
 import { keyResultScoreComputed } from "../data-changes/0018_key_result_score_computed.ts";
 import { dropAlignmentPenalties } from "../data-changes/0019_drop_alignment_penalties.ts";
+import { kpiTargetTypeFromDirection } from "../data-changes/0020_kpi_target_type_from_direction.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -65,6 +66,7 @@ try {
       keyResultKindFromDirection,
       keyResultScoreComputed,
       dropAlignmentPenalties,
+      kpiTargetTypeFromDirection,
     ],
   });
   process.stdout.write(

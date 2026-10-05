@@ -138,7 +138,7 @@ KPIs, one per row, with their frequency and their corridor.
 | `direction` | No | One of: higher_better, lower_better. Higher is better by default. |
 | `indicatorType` | No | One of: leading, lagging. Lagging by default, and flagged for review. |
 | `tier` | No | One of: input, output, outcome, impact. Output by default. |
-| `aggregate` | No | How a period's values combine. One of: sum, avg, max, min, count. |
+| `aggregate` | No | How a period's values combine. One of: sum, avg, max, min, count, last, first. |
 | `unit` | No | What the numbers are in. |
 | `space` | No | The space that owns it, by name. Leave it empty for a workspace-level KPI. |
 | `targetDefault` | No | The target every period gets when a record does not carry one. |

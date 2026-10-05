@@ -116,10 +116,17 @@ it is actionable rather than a grade.
 | `kpi.watchThreshold` | 70 | §6.4 |
 | `kpi.recoveryKeyResultCap` | 4 | §6.5 |
 
-**Ninety and seventy are the corridor.** Above ninety is healthy, below seventy
-is unhealthy, and between them is watch. When a KPI drops out of range the
-product drafts a recovery objective with at most four key results, one per
-leading child driver, and the KPI reads "recovering" while that objective moves.
+**A KPI is judged in its own units first.** Give it a green value and a red
+value, or a green band for a range, and those decide: inside green is healthy,
+past red is unhealthy, and between them is watch. Uptime at 95% against a red
+boundary of 99.5% is unhealthy, whatever 95 divided by 99.9 comes to.
+
+**Ninety and seventy are the fallback.** A KPI with no thresholds is read as a
+share of its target: ninety and above is healthy, below seventy is unhealthy.
+That suits a positive number counted from zero, and nothing else. When a KPI
+drops out of range the product drafts a recovery objective with at most four
+key results, one per leading child driver, and the KPI reads "recovering" while
+that objective moves.
 
 ## Sessions
 

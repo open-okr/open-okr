@@ -589,11 +589,14 @@ A KPI is a number you watch every period whether or not it is an OKR. KPIs descr
 
 | Attribute | Values |
 |---|---|
-| Direction | Higher is better, lower is better |
+| Target type | Stay at or above, stay at or below, increase to, decrease to, stay within a range |
+| Thresholds | Green and red boundaries in the KPI's own units. Optional; without them the ratio fallback in §6.4 applies |
 | Type | Leading, lagging |
 | Tier | Input, output, outcome, impact |
 | Frequency | Daily, weekly, monthly, quarterly, yearly |
-| Aggregate | Sum, average, max, min, count. Used when a finer period rolls into a coarser one |
+| Aggregate | Sum, average, max, min, count, last value, first value. Used when a finer period rolls into a coarser one. Use last value for balances and headcount, and model a rate as a calculated KPI (§6.7) |
+
+*Source:* Perdoo (vendor) target types; Intrafocus (vendor) on banded thresholds for "measures where both extremes are undesirable".
 
 ### 6.3 The KPI tree
 
@@ -603,17 +606,19 @@ Reading rule: to move the root, find the unhealthy branch, then find the leading
 
 ### 6.4 Health corridors
 
-Achievement is the direction-aware ratio of current to target.
+A KPI's health comes from its own thresholds, in its own units, by its target type. A KPI without thresholds falls back to achievement, the direction-aware ratio of current to target. The fallback suits positive KPIs measured from zero. It does not suit uptime, rating scales, net promoter score, or anything that can be negative, and the KPI form says so when it is used for one.
 
-| Achievement | State | Meaning |
-|---|---|---|
-| 90% and above | Healthy | At or above the healthy corridor |
-| 70% to below 90% | Watch | Watch the leading drivers |
-| Below 70% | Unhealthy | Launch a recovery OKR to focus the team |
-| Any, with an active recovery OKR | Recovering | Health improves as the recovery key results progress |
-| No data | No data | Enter a current value and a target |
+| State | Meaning |
+|---|---|
+| Healthy | Inside the green boundary, or 90% of target and above on the fallback |
+| Watch | Between the boundaries, or 70% to below 90% on the fallback. Watch the leading drivers |
+| Unhealthy | Past the red boundary, or below 70% on the fallback. Launch a recovery OKR to focus the team |
+| Recovering | Any, with an active recovery OKR. Health improves as the recovery key results progress |
+| No data | Enter a current value and a target |
 
-State precedence, first match wins: no data, then recovering (an active recovery OKR), then the corridor band. Both thresholds are workspace settings (§11). The defaults are 90 and 70.
+For a KPI that should stay within a range, the range is its green band. Its red boundaries sit outside the range: one below, and one above where too high matters too. Between the range and a red boundary is watch.
+
+State precedence, first match wins: no data, then recovering (an active recovery OKR), then the band. The fallback thresholds are workspace settings, and each KPI may carry its own (§11). *Source:* Castro: "as long as the dials on the dashboard are within certain thresholds, you don't care about them".
 
 ### 6.5 Recovery OKRs
 
@@ -634,7 +639,7 @@ One list across every KPI tree in the workspace: every KPI that is unhealthy or 
 
 ### 6.7 Calculated KPIs
 
-A KPI may be calculated from a formula over other KPIs rather than entered. Sources at a finer frequency roll up using their own aggregate function. Changing a source recomputes every dependent KPI. Self-reference and cycles are rejected.
+A KPI may be calculated from a formula over other KPIs rather than entered. Sources at a finer frequency roll up using their own aggregate function before the formula applies, which keeps a ratio a ratio of sums. Changing a source recomputes every dependent KPI. Self-reference and cycles are rejected.
 
 ---
 
@@ -961,8 +966,8 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 
 | Parameter | Canon default |
 |---|---|
-| KPI healthy threshold | 90% of target |
-| KPI watch threshold | 70% of target |
+| KPI healthy threshold | 90% of target, on the ratio fallback |
+| KPI watch threshold | 70% of target, on the ratio fallback |
 | Recovery key result cap | 4 |
 | Recovery proposal delay | 2 consecutive unhealthy periods |
 

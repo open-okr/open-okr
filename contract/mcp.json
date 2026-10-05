@@ -11182,11 +11182,44 @@
             ]
           },
           "direction": {
-            "default": "higher_better",
             "type": "string",
             "enum": [
               "higher_better",
               "lower_better"
+            ]
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "at_least",
+              "at_most",
+              "increase_to",
+              "decrease_to",
+              "range"
+            ]
+          },
+          "greenLow": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "greenHigh": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "redLow": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "redHigh": {
+            "type": [
+              "number",
+              "null"
             ]
           },
           "indicatorType": {
@@ -11215,7 +11248,9 @@
               "avg",
               "max",
               "min",
-              "count"
+              "count",
+              "last",
+              "first"
             ]
           },
           "ownerKind": {
@@ -11657,6 +11692,40 @@
             "enum": [
               "higher_better",
               "lower_better"
+            ]
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "at_least",
+              "at_most",
+              "increase_to",
+              "decrease_to",
+              "range"
+            ]
+          },
+          "greenLow": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "greenHigh": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "redLow": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "redHigh": {
+            "type": [
+              "number",
+              "null"
             ]
           },
           "indicatorType": {

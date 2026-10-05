@@ -1,4 +1,4 @@
-import type { KpiDirection, KpiState, RecoveryLink } from "./kpi.ts";
+import type { KpiBand, KpiDirection, KpiState, RecoveryLink } from "./kpi.ts";
 import { round2 } from "./scoring.ts";
 
 /**
@@ -224,6 +224,11 @@ export interface RecoveryCloseInput {
   readonly recovery: RecoveryLink;
   readonly alreadyProposed: boolean;
   readonly healthyPct: number;
+  /**
+   * The real band, where a KPI's own thresholds decide it (§6.4, P9-T17a).
+   * When given, healthy is what it says rather than what the ratio says.
+   */
+  readonly band?: KpiBand | null;
 }
 
 /**
@@ -237,6 +242,9 @@ export interface RecoveryCloseInput {
 export function shouldProposeRecoveryClose(input: RecoveryCloseInput): boolean {
   if (input.recovery !== "open" || input.alreadyProposed) {
     return false;
+  }
+  if (input.band !== undefined) {
+    return input.band === "healthy";
   }
   return (
     input.achievementPct !== null && input.achievementPct >= input.healthyPct

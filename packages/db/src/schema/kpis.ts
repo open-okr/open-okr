@@ -45,8 +45,25 @@ export type KpiDirectionValue = (typeof KPI_DIRECTIONS)[number];
 export const KPI_TIERS = ["input", "output", "outcome", "impact"] as const;
 export type KpiTier = (typeof KPI_TIERS)[number];
 
-export const KPI_AGGREGATES = ["sum", "avg", "max", "min", "count"] as const;
+export const KPI_AGGREGATES = [
+  "sum",
+  "avg",
+  "max",
+  "min",
+  "count",
+  "last",
+  "first",
+] as const;
 export type KpiAggregate = (typeof KPI_AGGREGATES)[number];
+
+/** §6.2's kinds of target (P9-T17a). */
+const KPI_TARGET_TYPES = [
+  "at_least",
+  "at_most",
+  "increase_to",
+  "decrease_to",
+  "range",
+] as const;
 
 export const KPI_STATES = [
   "healthy",
@@ -134,6 +151,21 @@ export const kpis = pgTable("kpis", {
   direction: text("direction", { enum: KPI_DIRECTIONS })
     .notNull()
     .default("higher_better"),
+  /**
+   * §6.2's kind of target (P9-T17a). Null is a KPI written before it, which
+   * reads as the type its direction implies; `direction` is still written for
+   * the release that reads only that.
+   */
+  targetType: text("target_type", { enum: KPI_TARGET_TYPES }),
+  /**
+   * §6.2's thresholds, in the KPI's own units. A high-is-good type uses the
+   * low pair, a low-is-good type the high pair, a range the green pair as its
+   * band with a red boundary either side. All null is the ratio fallback.
+   */
+  greenLow: numeric("green_low"),
+  greenHigh: numeric("green_high"),
+  redLow: numeric("red_low"),
+  redHigh: numeric("red_high"),
   indicatorType: text("indicator_type", { enum: ["leading", "lagging"] })
     .notNull()
     .default("lagging"),

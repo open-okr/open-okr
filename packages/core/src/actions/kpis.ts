@@ -29,7 +29,17 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { type KpiFrequency, normalisePeriod } from "@openokr/method";
+import {
+  directionOfTargetType,
+  KPI_TARGET_TYPES,
+  type KpiDirection,
+  type KpiFrequency,
+  type KpiTargetType,
+  type KpiThresholds,
+  normalisePeriod,
+  targetTypeOfDirection,
+  thresholdsProblem,
+} from "@openokr/method";
 import { asc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -52,12 +62,158 @@ import {
 import { followKpisInTx } from "../kpis/linked.ts";
 import { draftRecoveryForKpi, launchRecoveryInTx } from "../kpis/recovery.ts";
 import {
+  KPI_RULE_COLUMNS,
+  type KpiRule,
   loadKpiRecords,
+  readingOf,
   recomputeKpi,
+  targetTypeOf,
+  thresholdsOf,
   upsertKpiRecord,
 } from "../kpis/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+
+/**
+ * §6.2's target type and thresholds, as `kpis.create` and `kpis.update` take
+ * them (P9-T17a). Each threshold is in the KPI's own units; null clears one,
+ * and none at all leaves the KPI on the ratio fallback.
+ */
+const ruleFields = {
+  targetType: z.enum(KPI_TARGET_TYPES).optional(),
+  greenLow: z.number().nullable().optional(),
+  greenHigh: z.number().nullable().optional(),
+  redLow: z.number().nullable().optional(),
+  redHigh: z.number().nullable().optional(),
+};
+
+type RuleInput = {
+  readonly direction?: KpiDirection;
+  readonly targetType?: KpiTargetType;
+  readonly greenLow?: number | null;
+  readonly greenHigh?: number | null;
+  readonly redLow?: number | null;
+  readonly redHigh?: number | null;
+};
+
+const FLIPPED: Readonly<Record<KpiTargetType, KpiTargetType>> = {
+  at_least: "at_most",
+  at_most: "at_least",
+  increase_to: "decrease_to",
+  decrease_to: "increase_to",
+  range: "range",
+};
+
+/**
+ * The columns a create or an update writes for a KPI's rule, refused in words
+ * when they cannot be judged (§6.2, P9-T17a).
+ *
+ * A direction alone still works, for a caller written before target types: it
+ * picks the type that faces that way. `direction` keeps being written beside
+ * the type, because the release before this one reads only that.
+ *
+ * A type uses only its own thresholds, so changing the type drops the stored
+ * ones it does not use. One given explicitly that the type does not use is
+ * refused rather than dropped, because the caller meant something by it.
+ */
+interface RuleColumns {
+  readonly targetType: KpiTargetType;
+  readonly direction: KpiDirection;
+  readonly greenLow: string | null;
+  readonly greenHigh: string | null;
+  readonly redLow: string | null;
+  readonly redHigh: string | null;
+}
+
+function ruleWrite(input: RuleInput, existing: KpiRule | null): RuleColumns {
+  const before = existing ? targetTypeOf(existing) : null;
+  let type: KpiTargetType;
+  if (input.targetType !== undefined) {
+    type = input.targetType;
+  } else if (input.direction !== undefined) {
+    type =
+      before === null
+        ? targetTypeOfDirection(input.direction)
+        : directionOfTargetType(before) === input.direction ||
+            before === "range"
+          ? before
+          : FLIPPED[before];
+  } else {
+    type = before ?? "at_least";
+  }
+
+  const stored = existing
+    ? thresholdsOf(existing)
+    : { greenLow: null, greenHigh: null, redLow: null, redHigh: null };
+  const merged: { -readonly [K in keyof KpiThresholds]: number | null } = {
+    greenLow: input.greenLow !== undefined ? input.greenLow : stored.greenLow,
+    greenHigh:
+      input.greenHigh !== undefined ? input.greenHigh : stored.greenHigh,
+    redLow: input.redLow !== undefined ? input.redLow : stored.redLow,
+    redHigh: input.redHigh !== undefined ? input.redHigh : stored.redHigh,
+  };
+  const facing = directionOfTargetType(type);
+  const unused: readonly (keyof KpiThresholds)[] =
+    facing === "higher_better"
+      ? ["greenHigh", "redHigh"]
+      : facing === "lower_better"
+        ? ["greenLow", "redLow"]
+        : [];
+  for (const key of unused) {
+    if (input[key] !== undefined && input[key] !== null) {
+      throw new OperationError(
+        "forbidden",
+        facing === "higher_better"
+          ? "A KPI that should stay high has a green value and a red value below it, not above."
+          : "A KPI that should stay low has a green value and a red value above it, not below.",
+      );
+    }
+    merged[key] = null;
+  }
+  const problem = thresholdsProblem(type, merged);
+  if (problem) {
+    throw new OperationError("forbidden", problem);
+  }
+
+  const text = (value: number | null) =>
+    value === null ? null : String(value);
+  return {
+    targetType: type,
+    direction:
+      facing ??
+      input.direction ??
+      (existing?.direction as KpiDirection | undefined) ??
+      "higher_better",
+    greenLow: text(merged.greenLow),
+    greenHigh: text(merged.greenHigh),
+    redLow: text(merged.redLow),
+    redHigh: text(merged.redHigh),
+  };
+}
+
+/** The rule as every KPI read reports it (P9-T17a). */
+const ruleOutput = {
+  targetType: z.enum(KPI_TARGET_TYPES),
+  greenLow: z.number().nullable(),
+  greenHigh: z.number().nullable(),
+  redLow: z.number().nullable(),
+  redHigh: z.number().nullable(),
+  /**
+   * What decides this KPI's band: its own thresholds, or the ratio of current
+   * to target where it has none (§6.4). The ratio suits a positive number
+   * counted from zero and nothing else, so a screen says which it is reading.
+   */
+  basis: z.enum(["thresholds", "ratio"]),
+};
+
+function ruleOf(rule: KpiRule) {
+  const thresholds = thresholdsOf(rule);
+  return {
+    targetType: targetTypeOf(rule),
+    ...thresholds,
+    basis: readingOf(rule, null, null).basis,
+  };
+}
 
 async function actingMember(
   tx: OperationTx,
@@ -151,7 +307,9 @@ export const createKpi = defineWriteAction({
   input: z.object({
     title: z.string().trim().min(1).max(500),
     frequency: z.enum(KPI_FREQUENCY_VALUES),
-    direction: z.enum(KPI_DIRECTION_VALUES).default("higher_better"),
+    /** Kept for callers written before target types; a type wins over it. */
+    direction: z.enum(KPI_DIRECTION_VALUES).optional(),
+    ...ruleFields,
     indicatorType: z.enum(["leading", "lagging"]).default("lagging"),
     tier: z.enum(KPI_TIERS).default("output"),
     aggregate: z.enum(KPI_AGGREGATES).default("sum"),
@@ -193,6 +351,8 @@ export const createKpi = defineWriteAction({
         );
       }
 
+      const rule = ruleWrite(input, null);
+
       const id = newId();
       const short = shortId();
       // openokr:allow-mutation: same transaction.
@@ -202,7 +362,7 @@ export const createKpi = defineWriteAction({
         shortId: short,
         title: input.title,
         frequency: input.frequency,
-        direction: input.direction,
+        ...rule,
         indicatorType: input.indicatorType,
         tier: input.tier,
         aggregate: input.aggregate,
@@ -406,6 +566,7 @@ export const readKpiGrid = defineReadAction({
         targetDefault: z.number().nullable(),
         healthyPct: z.number(),
         watchPct: z.number(),
+        ...ruleOutput,
         isCalculated: z.boolean(),
         /**
          * Who answers for this KPI, so the grid can filter by owner (P6-G30).
@@ -430,6 +591,12 @@ export const readKpiGrid = defineReadAction({
             actualValue: z.number().nullable(),
             targetValue: z.number().nullable(),
             remark: z.string().nullable(),
+            /**
+             * This period's own band, by the KPI's rule (P9-T17a), so a cell
+             * is coloured the way its state would be read rather than by a
+             * ratio the KPI may not use. Null with no value to judge.
+             */
+            band: z.enum(["healthy", "watch", "unhealthy"]).nullable(),
           }),
         ),
       }),
@@ -467,14 +634,12 @@ export const readKpiGrid = defineReadAction({
             categoryId: kpis.categoryId,
             frequency: kpis.frequency,
             unit: kpis.unit,
-            direction: kpis.direction,
             indicatorType: kpis.indicatorType,
             tier: kpis.tier,
             state: kpis.state,
             achievementPct: kpis.achievementPct,
             targetDefault: kpis.targetDefault,
-            healthyPct: kpis.healthyPct,
-            watchPct: kpis.watchPct,
+            ...KPI_RULE_COLUMNS,
             isCalculated: kpis.isCalculated,
             // **The owner is a kind and one of two columns**, not a single
             // id: a KPI belongs to the workspace, a space or a member
@@ -503,6 +668,7 @@ export const readKpiGrid = defineReadAction({
           );
           out.push({
             ...kpi,
+            ...ruleOf(kpi),
             achievementPct:
               kpi.achievementPct === null ? null : Number(kpi.achievementPct),
             targetDefault:
@@ -524,14 +690,28 @@ export const readKpiGrid = defineReadAction({
                   ? kpi.formula
                   : JSON.stringify(kpi.formula),
             watchPct: Number(kpi.watchPct),
-            records: records.map((record) => ({
-              periodStart: String(record.periodStart),
-              actualValue:
-                record.actualValue === null ? null : Number(record.actualValue),
-              targetValue:
-                record.targetValue === null ? null : Number(record.targetValue),
-              remark: record.remark,
-            })),
+            records: records.map((record) => {
+              const actual =
+                record.actualValue === null ? null : Number(record.actualValue);
+              const target =
+                record.targetValue === null ? null : Number(record.targetValue);
+              return {
+                periodStart: String(record.periodStart),
+                actualValue: actual,
+                targetValue: target,
+                remark: record.remark,
+                // A period with no target of its own is read against the
+                // standing one, as the recompute reads it.
+                band: readingOf(
+                  kpi,
+                  actual,
+                  target ??
+                    (kpi.targetDefault === null
+                      ? null
+                      : Number(kpi.targetDefault)),
+                ).band,
+              };
+            }),
           });
         }
 
@@ -718,6 +898,7 @@ export const updateKpi = defineWriteAction({
     title: z.string().trim().min(1).max(500).optional(),
     unit: z.string().trim().max(60).nullable().optional(),
     direction: z.enum(KPI_DIRECTION_VALUES).optional(),
+    ...ruleFields,
     indicatorType: z.enum(["leading", "lagging"]).optional(),
     tier: z.enum(KPI_TIERS).optional(),
     targetDefault: z.number().nullable().optional(),
@@ -745,8 +926,7 @@ export const updateKpi = defineWriteAction({
       const [existing] = await tx
         .select({
           id: kpis.id,
-          healthyPct: kpis.healthyPct,
-          watchPct: kpis.watchPct,
+          ...KPI_RULE_COLUMNS,
         })
         .from(kpis)
         .where(
@@ -812,8 +992,15 @@ export const updateKpi = defineWriteAction({
       if (input.unit !== undefined) {
         set.unit = input.unit;
       }
-      if (input.direction !== undefined) {
-        set.direction = input.direction;
+      const ruleTouched =
+        input.direction !== undefined ||
+        input.targetType !== undefined ||
+        input.greenLow !== undefined ||
+        input.greenHigh !== undefined ||
+        input.redLow !== undefined ||
+        input.redHigh !== undefined;
+      if (ruleTouched) {
+        Object.assign(set, ruleWrite(input, existing));
       }
       if (input.indicatorType !== undefined) {
         set.indicatorType = input.indicatorType;
@@ -1435,6 +1622,7 @@ export const readKpiDetail = defineReadAction({
       effectivePct: z.number().nullable(),
       healthyPct: z.number(),
       watchPct: z.number(),
+      ...ruleOutput,
       targetDefault: z.number().nullable(),
       isCalculated: z.boolean(),
       formula: z.unknown(),
@@ -1490,14 +1678,12 @@ export const readKpiDetail = defineReadAction({
             ownerName: workspaceMembers.name,
             frequency: kpis.frequency,
             unit: kpis.unit,
-            direction: kpis.direction,
             indicatorType: kpis.indicatorType,
             tier: kpis.tier,
             state: kpis.state,
             achievementPct: kpis.achievementPct,
             effectivePct: kpis.effectivePct,
-            healthyPct: kpis.healthyPct,
-            watchPct: kpis.watchPct,
+            ...KPI_RULE_COLUMNS,
             targetDefault: kpis.targetDefault,
             isCalculated: kpis.isCalculated,
             formula: kpis.formula,
@@ -1616,6 +1802,7 @@ export const readKpiDetail = defineReadAction({
               kpi.effectivePct === null ? null : Number(kpi.effectivePct),
             healthyPct: Number(kpi.healthyPct),
             watchPct: Number(kpi.watchPct),
+            ...ruleOf(kpi),
             targetDefault:
               kpi.targetDefault === null ? null : Number(kpi.targetDefault),
             isCalculated: kpi.isCalculated,

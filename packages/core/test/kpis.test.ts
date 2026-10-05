@@ -101,6 +101,162 @@ describe("the acceptance criterion", () => {
   });
 });
 
+describe("health in the KPI's own units (P9-T17a)", () => {
+  const call = async (name: string, input: object) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context() },
+      name as never,
+      input as never,
+    ) as Promise<never>;
+  };
+  const uptime = async () =>
+    (await call("kpis.create", {
+      title: "Uptime",
+      frequency: "monthly",
+      unit: "%",
+      targetType: "at_least",
+      targetDefault: 99.9,
+      greenLow: 99.9,
+      redLow: 99.5,
+    })) as { id: string };
+
+  it("acceptance: uptime at 95 against 99.9 with red below 99.5 reads unhealthy", async () => {
+    const kpi = await uptime();
+    const recorded = (await call("kpis.record", {
+      kpiId: kpi.id,
+      on: "2026-12-03",
+      actualValue: 95,
+    })) as { state: string; achievementPct: number | null };
+    expect(recorded.state).toBe("unhealthy");
+    // The ratio is still reported, and is the number that used to call it
+    // healthy.
+    expect(recorded.achievementPct).toBe(95.1);
+
+    const detail = (await call("kpis.detail", { kpiId: kpi.id })) as {
+      kpi: {
+        targetType: string;
+        greenLow: number | null;
+        redLow: number | null;
+        basis: string;
+        direction: string;
+      };
+    };
+    expect(detail.kpi).toMatchObject({
+      targetType: "at_least",
+      greenLow: 99.9,
+      redLow: 99.5,
+      basis: "thresholds",
+      direction: "higher_better",
+    });
+  });
+
+  it("colours each grid period by its own band", async () => {
+    const kpi = await uptime();
+    for (const [on, actualValue] of [
+      ["2026-10-05", 99.95],
+      ["2026-11-05", 99.7],
+      ["2026-12-05", 99.4],
+    ] as const) {
+      await call("kpis.record", { kpiId: kpi.id, on, actualValue });
+    }
+    const grid = (await call("kpis.grid", { periods: 12 })) as {
+      kpis: {
+        id: string;
+        basis: string;
+        records: { periodStart: string; band: string | null }[];
+      }[];
+    };
+    const row = grid.kpis.find((entry) => entry.id === kpi.id);
+    expect(row?.basis).toBe("thresholds");
+    expect(
+      Object.fromEntries(
+        (row?.records ?? []).map((record) => [record.periodStart, record.band]),
+      ),
+    ).toEqual({
+      "2026-10-01": "healthy",
+      "2026-11-01": "watch",
+      "2026-12-01": "unhealthy",
+    });
+  });
+
+  it("reads a range, and a direction alone still picks a type", async () => {
+    const range = (await call("kpis.create", {
+      title: "Uptime band",
+      frequency: "monthly",
+      targetType: "range",
+      greenLow: 99.9,
+      greenHigh: 100,
+      redLow: 99.5,
+    })) as { id: string };
+    const recorded = (await call("kpis.record", {
+      kpiId: range.id,
+      on: "2026-12-03",
+      actualValue: 99.7,
+    })) as { state: string };
+    expect(recorded.state).toBe("watch");
+
+    const legacy = await makeKpi({ direction: "lower_better" });
+    const detail = (await call("kpis.detail", { kpiId: legacy.id })) as {
+      kpi: { targetType: string; basis: string };
+    };
+    expect(detail.kpi).toMatchObject({ targetType: "at_most", basis: "ratio" });
+  });
+
+  it("refuses thresholds the type cannot be judged by, in words", async () => {
+    await expect(
+      call("kpis.create", {
+        title: "Half a rule",
+        frequency: "monthly",
+        targetType: "at_least",
+        greenLow: 10,
+      }),
+    ).rejects.toThrow(/both the green value and the red value/);
+    await expect(
+      call("kpis.create", {
+        title: "A range with no band",
+        frequency: "monthly",
+        targetType: "range",
+      }),
+    ).rejects.toThrow(/needs its band/);
+    await expect(
+      call("kpis.create", {
+        title: "Upside down",
+        frequency: "monthly",
+        targetType: "at_least",
+        greenHigh: 5,
+        redHigh: 10,
+      }),
+    ).rejects.toThrow(/below it, not above/);
+  });
+
+  it("drops the thresholds a new type does not use, and keeps the KPI judged", async () => {
+    const kpi = await uptime();
+    await call("kpis.update", {
+      kpiId: kpi.id,
+      targetType: "at_most",
+      greenHigh: 2,
+      redHigh: 5,
+    });
+    const detail = (await call("kpis.detail", { kpiId: kpi.id })) as {
+      kpi: {
+        targetType: string;
+        greenLow: number | null;
+        redLow: number | null;
+        greenHigh: number | null;
+        direction: string;
+      };
+    };
+    expect(detail.kpi).toMatchObject({
+      targetType: "at_most",
+      greenLow: null,
+      redLow: null,
+      greenHigh: 2,
+      direction: "lower_better",
+    });
+  });
+});
+
 describe("period normalisation on the write path", () => {
   it("buckets every frequency from a date inside the period", async () => {
     const wb = await workerDb();

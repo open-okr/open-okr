@@ -37,10 +37,8 @@ import {
 import {
   blockerEscalation,
   isTriggerKey,
-  type KpiDirection,
   type KpiState,
-  kpiAchievement,
-  kpiState,
+  kpiStateOf,
   type ResolvedThresholds,
   shouldProposeRecovery,
   type TriggerKey,
@@ -53,6 +51,7 @@ import {
   agentSeesBlocker,
   agentSeesKpi,
 } from "../agents/scope.ts";
+import { KPI_RULE_COLUMNS, type KpiRule, readingOf } from "../kpis/service.ts";
 import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
 import { workspaceAdministratorIds } from "../people/lifecycle.ts";
@@ -212,10 +211,8 @@ export async function dueKpiCorridorNudges(
       id: kpis.id,
       title: kpis.title,
       state: kpis.state,
-      direction: kpis.direction,
+      ...KPI_RULE_COLUMNS,
       achievementPct: kpis.achievementPct,
-      healthyPct: kpis.healthyPct,
-      watchPct: kpis.watchPct,
       ownerKind: kpis.ownerKind,
       memberId: kpis.memberId,
       spaceId: kpis.spaceId,
@@ -445,11 +442,8 @@ async function recoveryLinkFor(
 async function periodStatesFor(
   tx: WorkspaceTx,
   workspaceId: string,
-  kpi: {
+  kpi: KpiRule & {
     readonly id: string;
-    readonly direction: KpiDirection;
-    readonly healthyPct: string;
-    readonly watchPct: string;
     readonly targetDefault: string | null;
   },
 ): Promise<readonly KpiState[]> {
@@ -468,31 +462,26 @@ async function periodStatesFor(
     )
     .orderBy(asc(kpiRecords.periodStart));
 
-  const corridor = {
-    healthyPct: Number(kpi.healthyPct),
-    watchPct: Number(kpi.watchPct),
-  };
   return rows.map((row) => {
-    // Achievement per period is derived, not stored: `kpi_records` holds the
-    // target and the actual, and §6.4's ratio is the one function that turns
-    // them into a percentage. Reading a stored column here would need a column
-    // that does not exist, and computing the ratio a second way would give the
-    // sweep its own opinion about a number the grid already shows.
+    // Each period judged by the KPI's own rule (§6.4, P9-T17a): its
+    // thresholds where it has them, the ratio where it has not, through the
+    // one function the recompute uses, so the sweep has no opinion of its own
+    // about a number the grid already shows.
     //
     // A period with no target of its own is measured against the KPI's
     // standing one, exactly as `recomputeKpi` does (completeness review
     // M-29). Without the fallback a KPI that only ever had a standing target
     // read as "no data" in every period and never earned its proposal.
     const target = row.targetValue ?? kpi.targetDefault;
-    const { pct } = kpiAchievement(
-      kpi.direction,
+    const { band } = readingOf(
+      kpi,
       row.actualValue === null ? null : Number(row.actualValue),
       target === null ? null : Number(target),
     );
     // "none" rather than the KPI's real recovery link: this asks what each
     // period looked like on its own terms, and a recovery opened last month
     // would otherwise rewrite the history that justified opening it.
-    return kpiState(pct, "none", corridor);
+    return kpiStateOf(band, "none");
   });
 }
 

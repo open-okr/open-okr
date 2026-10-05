@@ -100,8 +100,26 @@ answer: an operating margin of -3% against a target of 12% is nowhere near it.
 
 ## 3. The corridor state
 
-METHOD.md §6.4. Precedence, first match wins: no data, then recovering, then the
-band. Both thresholds are §11 parameters, defaults 90 and 70.
+**Since P9-T17a this is the fallback.** METHOD v2 §6.2 gives a KPI a target
+type (at or above, at or below, increase to, decrease to, a range) and green and
+red thresholds in its own units, and `kpiReading` judges by those first:
+
+| Type | Healthy | Unhealthy | Watch |
+|---|---|---|---|
+| At or above, increase to | At or above the green value | Below the red value | Between |
+| At or below, decrease to | At or below the green value | Above the red value | Between |
+| Range | Inside the green band, ends included | Past a red boundary on either side | Outside the band, short of a red boundary |
+
+Green is inclusive and red is strict, as the method writes them. A KPI with no
+thresholds, or half a pair, falls back to the table below, and every read says
+which basis it used. A range has no ratio, because it has no single target to
+divide by. The grid colours each period by its own band from the server rather
+than working the ratio out in the browser. `kpiStateOf(band, recovery)` keeps
+the precedence below until P9-T17b moves the recovery beside the band.
+
+The fallback, as built at P3-T12. METHOD.md §6.4. Precedence, first match wins:
+no data, then recovering, then the band. Both thresholds are §11 parameters,
+defaults 90 and 70.
 
 | Order | Condition | State |
 |---|---|---|

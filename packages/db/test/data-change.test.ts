@@ -22,6 +22,7 @@ import { carryCoachStrictness } from "../src/data-changes/0016_carry_coach_stric
 import { keyResultKindFromDirection } from "../src/data-changes/0017_key_result_kind_from_direction.ts";
 import { keyResultScoreComputed } from "../src/data-changes/0018_key_result_score_computed.ts";
 import { dropAlignmentPenalties } from "../src/data-changes/0019_drop_alignment_penalties.ts";
+import { kpiTargetTypeFromDirection } from "../src/data-changes/0020_kpi_target_type_from_direction.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1154,6 +1155,53 @@ describe("0019: the retired alignment penalties", () => {
     await client.query("delete from _data_changes");
     const [again] = await runDataChanges(client, {
       scripts: [dropAlignmentPenalties],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0020: the target type each KPI's direction implies", () => {
+  it("writes at least or at most, and leaves a type already set", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       )
+       insert into kpis (id, workspace_id, short_id, title, frequency,
+                         direction, target_type)
+       select gen_random_uuid(), w.id, d.short_id, d.title, 'monthly',
+              d.direction, d.target_type
+         from w,
+              (values ('K-1', 'Revenue', 'higher_better', null),
+                      ('K-2', 'Churn', 'lower_better', null),
+                      ('K-3', 'Uptime', 'higher_better', 'range'))
+                as d(short_id, title, direction, target_type)`,
+    );
+    const types = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{ title: string; target_type: string | null }>(
+            "select title, target_type from kpis",
+          )
+        ).rows.map((row) => [row.title, row.target_type]),
+      );
+
+    const [result] = await runDataChanges(client, {
+      scripts: [kpiTargetTypeFromDirection],
+    });
+    expect(result?.rowsChanged).toBe(2);
+    expect(await types()).toEqual({
+      Revenue: "at_least",
+      Churn: "at_most",
+      Uptime: "range",
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [kpiTargetTypeFromDirection],
     });
     expect(again?.rowsChanged).toBe(0);
   });

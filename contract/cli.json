@@ -8065,6 +8065,43 @@
           ]
         },
         {
+          "name": "target-type",
+          "field": "targetType",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "at_least",
+            "at_most",
+            "increase_to",
+            "decrease_to",
+            "range"
+          ]
+        },
+        {
+          "name": "green-low",
+          "field": "greenLow",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "green-high",
+          "field": "greenHigh",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "red-low",
+          "field": "redLow",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "red-high",
+          "field": "redHigh",
+          "type": "number",
+          "required": false
+        },
+        {
           "name": "indicator-type",
           "field": "indicatorType",
           "type": "string",
@@ -8096,7 +8133,9 @@
             "avg",
             "max",
             "min",
-            "count"
+            "count",
+            "last",
+            "first"
           ]
         },
         {
@@ -8435,6 +8474,43 @@
             "higher_better",
             "lower_better"
           ]
+        },
+        {
+          "name": "target-type",
+          "field": "targetType",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "at_least",
+            "at_most",
+            "increase_to",
+            "decrease_to",
+            "range"
+          ]
+        },
+        {
+          "name": "green-low",
+          "field": "greenLow",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "green-high",
+          "field": "greenHigh",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "red-low",
+          "field": "redLow",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "red-high",
+          "field": "redHigh",
+          "type": "number",
+          "required": false
         },
         {
           "name": "indicator-type",

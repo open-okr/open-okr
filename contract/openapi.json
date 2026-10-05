@@ -45501,11 +45501,44 @@
                     ]
                   },
                   "direction": {
-                    "default": "higher_better",
                     "type": "string",
                     "enum": [
                       "higher_better",
                       "lower_better"
+                    ]
+                  },
+                  "targetType": {
+                    "type": "string",
+                    "enum": [
+                      "at_least",
+                      "at_most",
+                      "increase_to",
+                      "decrease_to",
+                      "range"
+                    ]
+                  },
+                  "greenLow": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "greenHigh": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "redLow": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "redHigh": {
+                    "type": [
+                      "number",
+                      "null"
                     ]
                   },
                   "indicatorType": {
@@ -45534,7 +45567,9 @@
                       "avg",
                       "max",
                       "min",
-                      "count"
+                      "count",
+                      "last",
+                      "first"
                     ]
                   },
                   "ownerKind": {
@@ -45873,6 +45908,47 @@
                               "watchPct": {
                                 "type": "number"
                               },
+                              "targetType": {
+                                "type": "string",
+                                "enum": [
+                                  "at_least",
+                                  "at_most",
+                                  "increase_to",
+                                  "decrease_to",
+                                  "range"
+                                ]
+                              },
+                              "greenLow": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "greenHigh": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "redLow": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "redHigh": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "basis": {
+                                "type": "string",
+                                "enum": [
+                                  "thresholds",
+                                  "ratio"
+                                ]
+                              },
                               "isCalculated": {
                                 "type": "boolean"
                               },
@@ -45925,13 +46001,29 @@
                                         "string",
                                         "null"
                                       ]
+                                    },
+                                    "band": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "healthy",
+                                            "watch",
+                                            "unhealthy"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
                                     "periodStart",
                                     "actualValue",
                                     "targetValue",
-                                    "remark"
+                                    "remark",
+                                    "band"
                                   ],
                                   "additionalProperties": false
                                 }
@@ -45952,6 +46044,12 @@
                               "targetDefault",
                               "healthyPct",
                               "watchPct",
+                              "targetType",
+                              "greenLow",
+                              "greenHigh",
+                              "redLow",
+                              "redHigh",
+                              "basis",
                               "isCalculated",
                               "ownerId",
                               "ownerName",
@@ -47338,6 +47436,47 @@
                             "watchPct": {
                               "type": "number"
                             },
+                            "targetType": {
+                              "type": "string",
+                              "enum": [
+                                "at_least",
+                                "at_most",
+                                "increase_to",
+                                "decrease_to",
+                                "range"
+                              ]
+                            },
+                            "greenLow": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
+                            "greenHigh": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
+                            "redLow": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
+                            "redHigh": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
+                            "basis": {
+                              "type": "string",
+                              "enum": [
+                                "thresholds",
+                                "ratio"
+                              ]
+                            },
                             "targetDefault": {
                               "type": [
                                 "number",
@@ -47401,6 +47540,12 @@
                             "effectivePct",
                             "healthyPct",
                             "watchPct",
+                            "targetType",
+                            "greenLow",
+                            "greenHigh",
+                            "redLow",
+                            "redHigh",
+                            "basis",
                             "targetDefault",
                             "isCalculated",
                             "formula",
@@ -47747,6 +47892,40 @@
                     "enum": [
                       "higher_better",
                       "lower_better"
+                    ]
+                  },
+                  "targetType": {
+                    "type": "string",
+                    "enum": [
+                      "at_least",
+                      "at_most",
+                      "increase_to",
+                      "decrease_to",
+                      "range"
+                    ]
+                  },
+                  "greenLow": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "greenHigh": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "redLow": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "redHigh": {
+                    "type": [
+                      "number",
+                      "null"
                     ]
                   },
                   "indicatorType": {

@@ -1,13 +1,17 @@
 import { activeOnly, goals, kpiRecords, kpis, newId } from "@openokr/db";
 import {
+  type KpiReading as KpiBandReading,
   type KpiDirection,
   type KpiFrequency,
-  kpiAchievement,
+  type KpiTargetType,
+  type KpiThresholds,
   kpiEffectiveHealth,
-  kpiState,
+  kpiReading,
+  kpiStateOf,
   normalisePeriod,
   type RecoveryLink,
   shouldProposeRecoveryClose,
+  targetTypeOfDirection,
 } from "@openokr/method";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import type { OperationTx } from "../operations/operation.ts";
@@ -25,6 +29,68 @@ import type { OperationTx } from "../operations/operation.ts";
  * reasons: no relay host drains the outbox, and in-transaction leaves no window
  * where the grid shows a state the records no longer support.
  */
+
+/** The columns a KPI's reading is decided by (§6.2, §6.4, P9-T17a). */
+export interface KpiRule {
+  readonly direction: string;
+  readonly targetType: string | null;
+  readonly greenLow: string | null;
+  readonly greenHigh: string | null;
+  readonly redLow: string | null;
+  readonly redHigh: string | null;
+  readonly healthyPct: string;
+  readonly watchPct: string;
+}
+
+/** The selection that loads a `KpiRule`, so every reader asks for the same columns. */
+export const KPI_RULE_COLUMNS = {
+  direction: kpis.direction,
+  targetType: kpis.targetType,
+  greenLow: kpis.greenLow,
+  greenHigh: kpis.greenHigh,
+  redLow: kpis.redLow,
+  redHigh: kpis.redHigh,
+  healthyPct: kpis.healthyPct,
+  watchPct: kpis.watchPct,
+} as const;
+
+/** A KPI written before target types reads as the type its direction implies. */
+export function targetTypeOf(rule: KpiRule): KpiTargetType {
+  return (
+    (rule.targetType as KpiTargetType | null) ??
+    targetTypeOfDirection(rule.direction as KpiDirection)
+  );
+}
+
+const numberOrNull = (value: string | null): number | null =>
+  value === null ? null : Number(value);
+
+export function thresholdsOf(rule: KpiRule): KpiThresholds {
+  return {
+    greenLow: numberOrNull(rule.greenLow),
+    greenHigh: numberOrNull(rule.greenHigh),
+    redLow: numberOrNull(rule.redLow),
+    redHigh: numberOrNull(rule.redHigh),
+  };
+}
+
+/** One reading of this KPI, for an actual against a target (§6.4). */
+export function readingOf(
+  rule: KpiRule,
+  actual: number | null,
+  target: number | null,
+): KpiBandReading {
+  return kpiReading({
+    targetType: targetTypeOf(rule),
+    thresholds: thresholdsOf(rule),
+    actual,
+    target,
+    corridor: {
+      healthyPct: Number(rule.healthyPct),
+      watchPct: Number(rule.watchPct),
+    },
+  });
+}
 
 export interface UpsertRecordInput {
   readonly workspaceId: string;
@@ -233,10 +299,8 @@ export async function recomputeKpi(
 ): Promise<KpiRecomputeResult> {
   const [kpi] = await tx
     .select({
-      direction: kpis.direction,
+      ...KPI_RULE_COLUMNS,
       targetDefault: kpis.targetDefault,
-      healthyPct: kpis.healthyPct,
-      watchPct: kpis.watchPct,
       recoveryGoalId: kpis.recoveryGoalId,
       recoveryStartedPct: kpis.recoveryStartedPct,
       recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
@@ -266,17 +330,16 @@ export async function recomputeKpi(
         ? Number(kpi.targetDefault)
         : null;
 
-  const achievement = kpiAchievement(
-    kpi.direction as KpiDirection,
-    actual,
-    target,
-  );
+  // By its own thresholds where it has them, by the ratio where it has not
+  // (§6.4, P9-T17a). The ratio is still kept for display and the projection.
+  const reading = readingOf(kpi, actual, target);
+  const achievement = {
+    pct: reading.achievementPct,
+    diagnostic: reading.diagnostic,
+  };
   const healthyPct = Number(kpi.healthyPct);
   const recovery = await loadRecovery(tx, workspaceId, kpi.recoveryGoalId);
-  const state = kpiState(achievement.pct, recovery.link, {
-    healthyPct,
-    watchPct: Number(kpi.watchPct),
-  });
+  const state = kpiStateOf(reading.band, recovery.link);
 
   // Effective health only exists while a recovery is open. A closed one leaves
   // the KPI reading whatever it actually reached, which is the honest outcome
@@ -301,6 +364,9 @@ export async function recomputeKpi(
     recovery: recovery.link,
     alreadyProposed: kpi.recoveryCloseProposedAt !== null,
     healthyPct,
+    // The real band decides where thresholds do: a KPI back inside its green
+    // boundary is healthy whatever its ratio to target says.
+    ...(reading.basis === "thresholds" ? { band: reading.band } : {}),
   });
 
   // openokr:allow-mutation: same transaction.
