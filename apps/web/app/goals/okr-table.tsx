@@ -48,6 +48,10 @@ import {
   type ShownVerdict,
   VerdictChips,
 } from "./okr-cells.tsx";
+import {
+  RestrictedWriting,
+  type WritingRefusal,
+} from "./restricted-writing.tsx";
 
 /**
  * The editable OKR list on S-13 (P8-G12).
@@ -116,6 +120,7 @@ export function OkrTable({
   progressMax,
   members,
   coach,
+  refusal,
   empty,
 }: {
   /** The server's render of the cycle's tree, or null with no cycle. */
@@ -134,6 +139,8 @@ export function OkrTable({
   /** People who may champion an objective or own a key result. */
   readonly members: readonly Person[];
   readonly coach: Coach;
+  /** Why a new objective may not be written here now, or null (P9-T07b-a). */
+  readonly refusal: WritingRefusal | null;
   /** What to say when the filters leave nothing. */
   readonly empty: React.ReactNode;
 }) {
@@ -157,6 +164,7 @@ export function OkrTable({
       progressMax={progressMax}
       members={members}
       coach={coach}
+      refusal={refusal}
       empty={empty}
     />
   );
@@ -185,6 +193,7 @@ function LiveOkrTable({
   progressMax,
   members,
   coach,
+  refusal,
   empty,
 }: {
   readonly initialTree: OkrTree;
@@ -198,6 +207,7 @@ function LiveOkrTable({
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
+  readonly refusal: WritingRefusal | null;
   readonly empty: React.ReactNode;
 }) {
   const { t } = useTranslations();
@@ -206,6 +216,8 @@ function LiveOkrTable({
   const [pending, start] = useTransition();
   const [failure, setFailure] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<readonly string[]>([]);
+  // The objective just added, whose key result draft opens under it.
+  const [draftUnder, setDraftUnder] = useState<string | null>(null);
   const tree = useOkrTree({
     cycleId,
     scope,
@@ -234,6 +246,21 @@ function LiveOkrTable({
       await queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
       router.refresh();
     });
+  };
+
+  // An add: the draft row keeps its title and shows the sentence on a
+  // refusal, and on success the page renders again for the same reason a
+  // structural change does.
+  const add = async (
+    work: () => Promise<{ error: string | null; id?: string | null }>,
+  ): Promise<string | null> => {
+    const result = await work();
+    if (result.error) {
+      return result.error;
+    }
+    await queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
+    router.refresh();
+    return null;
   };
 
   const toggle = (id: string) =>
@@ -336,8 +363,18 @@ function LiveOkrTable({
                       placeholder={t("goals.editor.keyResultPlaceholder")}
                       disabled={pending}
                       indented
+                      // An objective just added opens with one key result
+                      // draft under it (design §4.3).
+                      initiallyOpen={draftUnder === goal.id}
                       onAdd={(title) =>
-                        run(() => addKeyResult({ goalId: goal.id, title }))
+                        add(() =>
+                          addKeyResult({
+                            goalId: goal.id,
+                            title,
+                            ownerId: goal.champion.id,
+                            dueOn: tree.cycle.endsOn,
+                          }),
+                        )
                       }
                     />
                   ) : null}
@@ -352,14 +389,18 @@ function LiveOkrTable({
             label={t("goals.editor.addObjective")}
             placeholder={t("goals.editor.objectivePlaceholder")}
             disabled={pending}
+            refusal={refusal}
             onAdd={(title) =>
-              run(async () => {
+              add(async () => {
                 const created = await addObjective({
                   cycleId,
                   level,
                   title,
                 });
-                return { error: created.error };
+                if (created.id) {
+                  setDraftUnder(created.id);
+                }
+                return created;
               })
             }
           />
@@ -910,31 +951,66 @@ function RowActions({
 }
 
 /**
- * The add row under a set.
+ * A draft row under a set (design §4.3).
  *
- * It is a link-looking button until it is pressed, then a field with a save.
- * Nothing is written by pressing the plus, which is the difference between
- * this and the spreadsheet it is modelled on: an empty objective created by a
- * mis-click is a row somebody else has to clean up.
+ * It is a link-looking button until it is pressed, then a field held in the
+ * browser: **nothing is written until a title is committed**, and Escape on
+ * it removes the draft with nothing left behind, which is the difference
+ * between this and the spreadsheet it is modelled on.
+ *
+ * **A refusal keeps what was typed** (P9-T07b-a). The server's sentence sits
+ * under the field and the title stays in it, so a workspace that holds
+ * writing back costs the reader nothing they typed (UIUX-PLAN §1.7, "Never
+ * lose work").
  */
 function AddRow({
   label,
   placeholder,
   disabled,
   indented,
+  initiallyOpen,
+  refusal,
   onAdd,
 }: {
   readonly label: string;
   readonly placeholder: string;
   readonly disabled: boolean;
   readonly indented?: boolean;
-  readonly onAdd: (title: string) => void;
+  /** Open on arrival: the key result draft under an objective just added. */
+  readonly initiallyOpen?: boolean;
+  /** Where the workspace holds writing back, the reason instead of a field. */
+  readonly refusal?: WritingRefusal | null;
+  /** Resolves to the server's refusal, or null once it is saved. */
+  readonly onAdd: (title: string) => Promise<string | null>;
 }) {
   const { t } = useTranslations();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen === true);
   const [title, setTitle] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const padding = indented ? "pl-11" : "pl-3.5";
+
+  const close = () => {
+    setTitle("");
+    setProblem(null);
+    setOpen(false);
+  };
+
+  const commit = async () => {
+    const wanted = title.trim();
+    if (wanted === "" || saving) {
+      return;
+    }
+    setSaving(true);
+    const refused = await onAdd(wanted);
+    setSaving(false);
+    if (refused) {
+      setProblem(refused);
+      return;
+    }
+    close();
+  };
 
   if (!open) {
     return (
@@ -955,56 +1031,57 @@ function AddRow({
     );
   }
 
+  if (refusal) {
+    return (
+      <div className={`border-b border-line py-2 pr-3.5 ${padding}`}>
+        <RestrictedWriting refusal={refusal} onClose={close} />
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`flex items-center gap-2 border-b border-line py-2 pr-3.5 ${padding}`}
+      className={`flex flex-col gap-1 border-b border-line py-2 pr-3.5 ${padding}`}
     >
-      <input
-        // Focused through a ref rather than `autoFocus`: the field exists
-        // because somebody just pressed the control that creates it, so the
-        // caret belongs here, and the attribute that does it declaratively
-        // also steals focus when a page loads with one of these already open.
-        ref={(node) => node?.focus()}
-        value={title}
-        aria-label={label}
-        placeholder={placeholder}
-        disabled={disabled}
-        onChange={(event) => setTitle(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && title.trim() !== "") {
-            onAdd(title.trim());
-            setTitle("");
-            setOpen(false);
-          }
-          if (event.key === "Escape") {
-            setTitle("");
-            setOpen(false);
-          }
-        }}
-        className="min-w-0 flex-1 rounded-control border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-brand"
-      />
-      <Button
-        type="button"
-        size="sm"
-        disabled={disabled || title.trim() === ""}
-        onClick={() => {
-          onAdd(title.trim());
-          setTitle("");
-          setOpen(false);
-        }}
-      >
-        {t("common.save")}
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        onClick={() => {
-          setTitle("");
-          setOpen(false);
-        }}
-      >
-        {t("common.cancel")}
-      </Button>
+      <div className="flex items-center gap-2">
+        <input
+          // Focused through a ref rather than `autoFocus`: the field exists
+          // because somebody just pressed the control that creates it, so the
+          // caret belongs here, and the attribute that does it declaratively
+          // also steals focus when a page loads with one of these already open.
+          ref={(node) => node?.focus()}
+          value={title}
+          aria-label={label}
+          placeholder={placeholder}
+          disabled={saving}
+          onChange={(event) => setTitle(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              void commit();
+            }
+            if (event.key === "Escape") {
+              close();
+            }
+          }}
+          className="min-w-0 flex-1 rounded-control border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-brand"
+        />
+        <Button
+          type="button"
+          size="sm"
+          disabled={disabled || saving || title.trim() === ""}
+          onClick={() => void commit()}
+        >
+          {t("common.save")}
+        </Button>
+        <Button type="button" size="sm" onClick={close}>
+          {t("common.cancel")}
+        </Button>
+      </div>
+      {problem ? (
+        <span role="alert" className="text-xs text-bad">
+          {problem}
+        </span>
+      ) : null}
     </div>
   );
 }

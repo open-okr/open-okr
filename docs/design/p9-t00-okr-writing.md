@@ -115,6 +115,8 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 - **"+ Add objective"** does the same at the objective level, in the scope and cycle on screen, with the reader as champion and the kind defaulting per the workspace (decision D2). It opens with one empty key result draft row under it.
 - **Policy is asked on commit.** If the workspace has restricted writing, the server refuses with the reason. The draft row stays, showing the reason and the link that resolves it, so nothing typed is lost (UIUX-PLAN §1.7, "Never lose work").
 
+**As built at P9-T07b-a.** P8-G12's add rows already held a draft in the page and wrote on Enter; they now keep the typed title with the server's sentence on a refusal, and an objective just added opens one key result draft under it with the caret in it. A new key result is owned by the objective's champion and due on the cycle's last day; it is still a metric from 0 to 100 until P9-T12's kinds, and a key result saved without its target stays a draft only from P9-T13. Where writing is held back, "+ New objective" in the header and the add row at the foot of the list open the restricted-writing panel instead of a field: the policy's own sentences, read ahead of any write through `goals.creationPolicy`, with a link to the cycle where a phase or the window is the reason and to the practice for an administrator. The topbar's `+ New` links to the OKRs screen with "+ New objective" already open, and is not offered to a reader who cannot write.
+
 ### 4.4 Moving, deleting, checking in
 
 | Action | How |

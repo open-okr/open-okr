@@ -106,6 +106,12 @@ export async function addObjective(input: {
 export async function addKeyResult(input: {
   goalId: string;
   title: string;
+  /**
+   * The objective's champion and the cycle's last day (design §4.3), so the
+   * first commit needs only a title and KR-3 has an owner and a date to read.
+   */
+  ownerId?: string;
+  dueOn?: string;
 }): Promise<CreatedResult> {
   try {
     const created = await callAction(await context(), "goals.addKeyResult", {
@@ -116,6 +122,8 @@ export async function addKeyResult(input: {
       baselineValue: 0,
       targetValue: 100,
       weight: 1,
+      ...(input.ownerId ? { ownerId: input.ownerId } : {}),
+      ...(input.dueOn ? { dueOn: input.dueOn } : {}),
     });
     refresh();
     return { error: null, id: created.id };

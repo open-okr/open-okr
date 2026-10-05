@@ -389,3 +389,27 @@ describe("a conflict on the public surfaces", () => {
     expect(statusFor(error.code)).toBe(409);
   });
 });
+
+describe("goals.creationPolicy (P9-T07b-a)", () => {
+  it("allows a new objective by default, and says why not under a planning window", async () => {
+    const open = await call<{ allowed: boolean; reasons: string[] }>(
+      OWNER,
+      "goals.creationPolicy",
+      { cycleId: quarterId },
+    );
+    expect(open).toEqual({ allowed: true, reasons: [], rules: [] });
+
+    await call(OWNER, "practice.update", {
+      overrides: { "writing.when": "planningWindow" },
+    });
+    // The quarter two years out is outside its planning window today.
+    const held = await call<{
+      allowed: boolean;
+      reasons: string[];
+      rules: string[];
+    }>(OWNER, "goals.creationPolicy", { cycleId: quarterId });
+    expect(held.allowed).toBe(false);
+    expect(held.rules).toEqual(["writing.when"]);
+    expect(held.reasons[0]).toMatch(/in the planning window/);
+  });
+});

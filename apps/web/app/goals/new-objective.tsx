@@ -5,6 +5,10 @@ import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { addObjective } from "./editor-actions.ts";
+import {
+  RestrictedWriting,
+  type WritingRefusal,
+} from "./restricted-writing.tsx";
 
 /**
  * Starting an objective from the top of the screen (S-13).
@@ -23,14 +27,23 @@ import { addObjective } from "./editor-actions.ts";
 export function NewObjectiveButton({
   cycleId,
   level,
+  refusal,
+  initiallyOpen,
 }: {
   readonly cycleId: string;
   readonly level: GoalLevel;
+  /**
+   * Why the workspace holds writing back here now, or null when it does
+   * not (P9-T07b-a). The button then opens the reason instead of a field.
+   */
+  readonly refusal: WritingRefusal | null;
+  /** Open on arrival, for the topbar's `+ New`, which links here. */
+  readonly initiallyOpen?: boolean;
 }) {
   const { t } = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen === true);
   const [title, setTitle] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -57,6 +70,12 @@ export function NewObjectiveButton({
       <Button type="button" variant="primary" onClick={() => setOpen(true)}>
         {t("goals.editor.newObjective")}
       </Button>
+    );
+  }
+
+  if (refusal) {
+    return (
+      <RestrictedWriting refusal={refusal} onClose={() => setOpen(false)} />
     );
   }
 

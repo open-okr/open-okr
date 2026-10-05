@@ -6803,6 +6803,23 @@
       "pages": false
     },
     {
+      "name": "goals creationPolicy",
+      "action": "goals.creationPolicy",
+      "method": "GET",
+      "path": "/goals/creationPolicy",
+      "scope": "read",
+      "summary": "Whether a new objective may be written in a cycle now, with the practice's reasons and the settings behind them when it may not.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals patch",
       "action": "goals.patch",
       "method": "POST",

@@ -47,6 +47,7 @@ import {
   requireActiveMember,
 } from "../goals/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { policyDecisionInTx } from "../practice/policy.ts";
 import {
   recomputeGoalQualityInTx,
   recomputeUnitQualityInTx,
@@ -579,6 +580,55 @@ export const readGoalTree = defineReadAction({
             seenDependency.add(row.id);
             return drawn.has(row.fromGoalId) && drawn.has(row.toGoalId);
           }),
+        };
+      },
+    );
+  },
+});
+
+/**
+ * Whether a new objective may be written in a cycle now, and why not
+ * (P9-T07b-a, design §3 "+ New objective"). The same decision the write asks
+ * for, read ahead of it, so a screen opens a panel naming the reason rather
+ * than a field the server will refuse, and the button is never inert.
+ */
+export const readCreationPolicy = defineReadAction({
+  name: "goals.creationPolicy",
+  summary:
+    "Whether a new objective may be written in a cycle now, with the practice's reasons and the settings behind them when it may not.",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.object({
+    allowed: z.boolean(),
+    reasons: z.array(z.string()),
+    rules: z.array(z.string()),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await getAccessScoped(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "workspace",
+          resourceId: context.workspaceId,
+          requires: ACCESS_LEVELS.view,
+        });
+        const decision = await policyDecisionInTx(tx, context.workspaceId, {
+          kind: "objective.create",
+          cycleId: input.cycleId,
+        });
+        return {
+          allowed: decision.outcome === "allow",
+          reasons: [...decision.reasons],
+          rules: [...decision.rules],
         };
       },
     );

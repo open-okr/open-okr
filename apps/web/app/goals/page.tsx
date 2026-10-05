@@ -82,6 +82,8 @@ export default async function GoalsPage({
     /** One champion's objectives, and one space's. */
     champion?: string;
     space?: string;
+    /** `objective` when the topbar's `+ New` sent the reader here. */
+    new?: string;
     /**
      * Which of the three renderings is on screen (P8-G12).
      *
@@ -259,6 +261,42 @@ export default async function GoalsPage({
 
   const canEdit = accessLevel >= ACCESS_LEVELS.edit;
   const canAdminister = accessLevel >= ACCESS_LEVELS.full;
+
+  // Whether a new objective may be written in this cycle now, read before
+  // anybody presses "+ New objective", so the button opens the practice's
+  // reason and the place it is resolved rather than a field the server will
+  // refuse (P9-T07b-a, acceptance U8).
+  const creation =
+    cycleId && canEdit
+      ? await callAction(context, "goals.creationPolicy", { cycleId })
+      : null;
+  const refusal =
+    creation && !creation.allowed
+      ? {
+          reasons: creation.reasons,
+          links: [
+            ...(creation.rules.some(
+              (rule) =>
+                rule === "phases.enforcement" || rule === "writing.when",
+            )
+              ? [
+                  {
+                    href: `/cycle?cycle=${cycleId}`,
+                    label: t("okrList.seeTheCycle"),
+                  },
+                ]
+              : []),
+            ...(canAdminister
+              ? [
+                  {
+                    href: "/admin/practice",
+                    label: t("okrList.changeThePractice"),
+                  },
+                ]
+              : []),
+          ],
+        }
+      : null;
   const progressMax = await progressCeiling();
 
   const alignment = cycleId
@@ -371,7 +409,13 @@ export default async function GoalsPage({
                * The set also carries an add row under it, for the moment
                * somebody is already reading. */}
               {canEdit && cycleId ? (
-                <NewObjectiveButton cycleId={cycleId} level={levelForNew} />
+                <NewObjectiveButton
+                  cycleId={cycleId}
+                  level={levelForNew}
+                  refusal={refusal}
+                  // The topbar's `+ New` lands here (P9-T07b-a).
+                  initiallyOpen={query.new === "objective"}
+                />
               ) : null}
               {/* Check in's door now that it has left the sidebar
                * (P9-T07a-b, okr-entry-points.md §3.1). */}
@@ -423,6 +467,7 @@ export default async function GoalsPage({
           initialTree={okrTree}
           initialAt={treeReadAt}
           members={members}
+          refusal={refusal}
           coach={{
             thresholds: (rhythmRead?.thresholds ??
               defaultThresholds()) as ResolvedThresholds,

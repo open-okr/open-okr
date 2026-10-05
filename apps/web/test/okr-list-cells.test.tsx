@@ -137,6 +137,7 @@ async function render(options: {
               canAdminister={options.canEdit ?? true}
               progressMax={100}
               members={[PRIYA, MEI]}
+              refusal={null}
               coach={{
                 thresholds: canonThresholds(),
                 practice: options.practice ?? defaultPractice(),

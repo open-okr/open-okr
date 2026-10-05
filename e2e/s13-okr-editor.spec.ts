@@ -111,9 +111,12 @@ test("a key result is added under that objective", async () => {
     `input[aria-label="Key result title"][value="${KEY_RESULT}"]`,
   );
   if ((await added.count()) === 0) {
-    const addRows = page.getByRole("button", { name: "Add key result" });
-    await addRows.last().click();
+    // A new objective opens with one key result draft under it (P9-T07b-a);
+    // the add row is pressed only when that draft is not there.
     const field = page.getByRole("textbox", { name: "Add key result" });
+    if ((await field.count()) === 0) {
+      await page.getByRole("button", { name: "Add key result" }).last().click();
+    }
     await field.fill(KEY_RESULT);
     await field.press("Enter");
   }

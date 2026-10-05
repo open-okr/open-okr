@@ -9,6 +9,7 @@ import {
 import {
   AppShell,
   Button,
+  buttonVariants,
   Card,
   CardBody,
   CycleStrip,
@@ -344,6 +345,25 @@ export async function AppShellLayout({
             <Topbar
               breadcrumb={workspace.name}
               search={<TopbarSearch />}
+              // UIUX-PLAN §3's `+ New`, which opens "+ New objective" on the
+              // OKRs screen (P9-T07b-a). A link rather than a menu while an
+              // objective is the one thing it makes; somebody who cannot
+              // write is not offered it.
+              newAction={
+                level >= ACCESS_LEVELS.edit ? (
+                  <Link
+                    href="/goals?new=objective"
+                    aria-label={t("okrList.newObjectiveFromTopbar")}
+                    className={buttonVariants({
+                      variant: "primary",
+                      size: "sm",
+                    })}
+                  >
+                    <span aria-hidden="true">+</span>
+                    {t("okrList.newInTopbar")}
+                  </Link>
+                ) : undefined
+              }
               askAi={<CopilotPanel initialAvailability={copilot} />}
               avatarMenu={
                 <AvatarMenu

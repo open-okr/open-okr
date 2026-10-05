@@ -228,7 +228,12 @@ import {
   readTargetHistory,
   restoreKeyResult,
 } from "./goal-targets.ts";
-import { patchGoal, patchKeyResult, readGoalTree } from "./goal-tree.ts";
+import {
+  patchGoal,
+  patchKeyResult,
+  readCreationPolicy,
+  readGoalTree,
+} from "./goal-tree.ts";
 import {
   closeGoal,
   createGoal,
@@ -742,6 +747,7 @@ export const ACTION_MAP = {
   "goals.addKeyResult": createKeyResult,
   "goals.updateKeyResult": updateKeyResult,
   "goals.tree": readGoalTree,
+  "goals.creationPolicy": readCreationPolicy,
   "goals.patch": patchGoal,
   "goals.patchKeyResult": patchKeyResult,
   "goals.changeTarget": changeKeyResultTarget,
