@@ -45,6 +45,9 @@ import {
   okrTreeKey,
   patchGoalIn,
   patchKeyResultIn,
+  placeGoalIn,
+  placeKeyResultIn,
+  withoutGoal,
   withoutKeyResult,
 } from "./cache.ts";
 
@@ -103,8 +106,15 @@ function optimistic(tree: OkrTree, mutation: OkrMutation): OkrTree {
       });
     case "removeKeyResult":
       return withoutKeyResult(tree, mutation.id);
+    case "placeGoal":
+      return placeGoalIn(tree, mutation.id, mutation.afterId);
+    case "placeKeyResult":
+      return placeKeyResultIn(tree, mutation.id, mutation.afterId);
+    case "deleteGoal":
+      return withoutGoal(tree, mutation.id);
     case "restoreKeyResult":
-      // Nothing to guess: the row comes back with the server's node.
+    case "restoreGoal":
+      // Nothing to guess: the row comes back with the server's answer.
       return tree;
   }
 }
@@ -198,6 +208,17 @@ export function useOkrMutation(input: {
             label: t("okrTree.undo"),
             run: () =>
               mutation.mutate({ kind: "restoreKeyResult", id: change.id }),
+          },
+        });
+      }
+      if (change.kind === "deleteGoal") {
+        toast.show({
+          tone: "ok",
+          message: t("okrTree.objectiveDeleted"),
+          source: change.id,
+          action: {
+            label: t("okrTree.undo"),
+            run: () => mutation.mutate({ kind: "restoreGoal", id: change.id }),
           },
         });
       }

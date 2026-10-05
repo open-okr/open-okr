@@ -138,6 +138,75 @@ test("U1: an objective and two key results, with the keyboard alone", async () =
   }
 });
 
+/**
+ * P9-T07b-b's acceptance: the third key result moved to the top with Alt and
+ * the up arrow twice, saved, and in that order after a reload. The grip keeps
+ * the keyboard after each move, so the second press needs no hunting.
+ */
+test("a key result moved to the top with Alt and the up arrow stays there", async () => {
+  const THIRD = "Teams finishing setup in one sitting from 30% to 60%";
+  await goTo(page, "/goals");
+  const objectiveRow = main()
+    .locator(`input[aria-label="Objective title"][value="${OBJECTIVE}"]`)
+    .locator("xpath=ancestor::div[contains(@class, 'grid')][1]/..");
+  if (
+    (await main()
+      .locator(`input[aria-label="Key result title"][value="${THIRD}"]`)
+      .count()) === 0
+  ) {
+    await objectiveRow.getByRole("button", { name: "Add key result" }).click();
+    await page.keyboard.type(THIRD);
+    await page.keyboard.press("Enter");
+  }
+  const order = async () =>
+    (
+      await objectiveRow
+        .locator('input[aria-label="Key result title"]')
+        .evaluateAll((fields) =>
+          fields.map((field) => (field as HTMLInputElement).value),
+        )
+    ).filter((title) => [FIRST, SECOND, THIRD].includes(title));
+  await expect.poll(order, { timeout: 15_000 }).toEqual([FIRST, SECOND, THIRD]);
+
+  await main().getByRole("button", { name: `Move ${THIRD}: drag, or press Alt with an arrow key` }).focus();
+  await page.keyboard.press("Alt+ArrowUp");
+  await expect.poll(order).toEqual([FIRST, THIRD, SECOND]);
+  await page.keyboard.press("Alt+ArrowUp");
+  await expect.poll(order).toEqual([THIRD, FIRST, SECOND]);
+
+  await expect(main().getByTestId("okr-list")).toHaveAttribute(
+    "aria-busy",
+    "false",
+    { timeout: 15_000 },
+  );
+  await page.reload();
+  await expect.poll(order, { timeout: 15_000 }).toEqual([THIRD, FIRST, SECOND]);
+});
+
+test("an objective deleted from the list comes back with Undo", async () => {
+  await goTo(page, "/goals");
+  const title = main().locator(
+    `input[aria-label="Objective title"][value="${OBJECTIVE}"]`,
+  );
+  await expect(title).toBeVisible({ timeout: 15_000 });
+  const row = title.locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
+  await row.hover();
+  await row.getByRole("button", { name: "Delete this objective" }).click();
+  await row.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(title).toHaveCount(0);
+
+  const toast = page.getByTestId("toast").filter({ hasText: "Objective deleted" });
+  await toast.getByRole("button", { name: "Undo" }).click();
+  await expect(title).toBeVisible({ timeout: 15_000 });
+  await expect(main().getByTestId("okr-list")).toHaveAttribute(
+    "aria-busy",
+    "false",
+    { timeout: 15_000 },
+  );
+  await page.reload();
+  await expect(title).toBeVisible({ timeout: 15_000 });
+});
+
 test("U8: where writing is held back, + New objective names the reason and where it is resolved", async () => {
   const updated = await api.post("/api/v1/practice/update", {
     headers: authed(),

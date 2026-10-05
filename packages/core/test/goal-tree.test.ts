@@ -413,3 +413,45 @@ describe("goals.creationPolicy (P9-T07b-a)", () => {
     expect(held.reasons[0]).toMatch(/in the planning window/);
   });
 });
+
+describe("ordering (P9-T07b-b)", () => {
+  const order = async () =>
+    (await call<Tree>(OWNER, "goals.tree", { cycleId: quarterId })).goals.map(
+      (goal) => goal.title,
+    );
+
+  it("puts an objective first, and after another, renumbering the whole cycle", async () => {
+    await objective("A", quarterId);
+    await objective("B", quarterId);
+    const c = await objective("C", quarterId);
+    await call(OWNER, "goals.place", { id: c, afterId: null });
+    expect(await order()).toEqual(["C", "A", "B"]);
+  });
+
+  it("keeps a row a filter hid where it was: placing C after A leaves B after C", async () => {
+    // The screen showed only A and C, because a filter hid B; C dragged under
+    // A must not lose B's place in the order everybody else sees.
+    const a = await objective("A", quarterId);
+    await objective("B", quarterId);
+    const c = await objective("C", quarterId);
+    await call(OWNER, "goals.place", { id: c, afterId: a });
+    expect(await order()).toEqual(["A", "C", "B"]);
+  });
+
+  it("reorders an objective's key results, and hands back the node", async () => {
+    const id = await objective("Grow the trial base", quarterId);
+    await keyResult(id, "First");
+    await keyResult(id, "Second");
+    const third = await keyResult(id, "Third");
+    const placed = await call<{ goal: TreeGoal }>(
+      OWNER,
+      "goals.placeKeyResult",
+      { id: third, afterId: null },
+    );
+    expect(placed.goal.keyResults.map((row) => row.title)).toEqual([
+      "Third",
+      "First",
+      "Second",
+    ]);
+  });
+});

@@ -8,6 +8,9 @@ import {
   okrTreeKey,
   patchGoalIn,
   patchKeyResultIn,
+  placeGoalIn,
+  placeKeyResultIn,
+  withoutGoal,
   withoutKeyResult,
 } from "../lib/okr-tree/cache.ts";
 
@@ -146,5 +149,48 @@ describe("what a filter keeps", () => {
       "y",
     ]);
     expect(ids({ includeClosed: false, spaceIds: [] })).toEqual([]);
+  });
+});
+
+describe("moving and deleting before the server answers (P9-T07b-b)", () => {
+  it("places an objective first, or after another, as the server will", () => {
+    const three = { ...tree, goals: [goal("a"), goal("b"), goal("c")] };
+    expect(placeGoalIn(three, "c", null).goals.map((row) => row.id)).toEqual([
+      "c",
+      "a",
+      "b",
+    ]);
+    expect(placeGoalIn(three, "a", "b").goals.map((row) => row.id)).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
+  });
+
+  it("places a key result within its own objective only", () => {
+    const withThree = {
+      ...tree,
+      goals: [
+        goal("a", {
+          keyResults: [
+            keyResult("k1", "a"),
+            keyResult("k2", "a"),
+            keyResult("k3", "a"),
+          ],
+        }),
+        goal("b"),
+      ],
+    };
+    const moved = placeKeyResultIn(withThree, "k3", null);
+    expect(moved.goals[0]?.keyResults.map((row) => row.id)).toEqual([
+      "k3",
+      "k1",
+      "k2",
+    ]);
+    expect(moved.goals[1]).toBe(withThree.goals[1]);
+  });
+
+  it("takes an objective off the list", () => {
+    expect(withoutGoal(tree, "a").goals.map((row) => row.id)).toEqual(["b"]);
   });
 });

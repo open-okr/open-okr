@@ -105,6 +105,52 @@ export function withoutKeyResult(tree: OkrTree, keyResultId: string): OkrTree {
   };
 }
 
+/** Puts `id` after `afterId` in a list, or first; as the server does. */
+function placed<T extends { readonly id: string }>(
+  rows: readonly T[],
+  id: string,
+  afterId: string | null,
+): T[] {
+  const moving = rows.find((row) => row.id === id);
+  if (!moving) {
+    return [...rows];
+  }
+  const rest = rows.filter((row) => row.id !== id);
+  const at =
+    afterId === null ? -1 : rest.findIndex((row) => row.id === afterId);
+  return [...rest.slice(0, at + 1), moving, ...rest.slice(at + 1)];
+}
+
+/** An objective moved in its cycle's order (P9-T07b-b). */
+export function placeGoalIn(
+  tree: OkrTree,
+  id: string,
+  afterId: string | null,
+): OkrTree {
+  return { ...tree, goals: placed(tree.goals, id, afterId) };
+}
+
+/** A key result moved in its objective's order. */
+export function placeKeyResultIn(
+  tree: OkrTree,
+  id: string,
+  afterId: string | null,
+): OkrTree {
+  return {
+    ...tree,
+    goals: tree.goals.map((goal) =>
+      goal.keyResults.some((row) => row.id === id)
+        ? { ...goal, keyResults: placed(goal.keyResults, id, afterId) }
+        : goal,
+    ),
+  };
+}
+
+/** An objective taken off the list, for the moment before the server agrees. */
+export function withoutGoal(tree: OkrTree, id: string): OkrTree {
+  return { ...tree, goals: tree.goals.filter((goal) => goal.id !== id) };
+}
+
 /**
  * The server's own node for an objective, over whatever the cache guessed.
  * Its progress, health and verdicts are the recomputed ones, which is the

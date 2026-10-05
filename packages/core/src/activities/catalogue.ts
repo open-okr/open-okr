@@ -410,6 +410,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     eased: z.boolean(),
   }),
   "key_result.restored": z.object({ title: z.string() }),
+  // An order changed in the OKR list (P9-T07b-b). Which way is in the list.
+  "key_result.placed": z.object({
+    keyResultId: z.uuid(),
+    afterId: z.uuid().nullable(),
+  }),
+  "goal.placed": z.object({ afterId: z.uuid().nullable() }),
   "key_result.kpi_linked": z.object({ kpiId: z.uuid() }),
   "key_result.kpi_unlinked": z.object({}),
   // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing

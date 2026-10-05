@@ -4,7 +4,7 @@
  * The OKR tree's one read and its writes, for the client cache (P9-T06c).
  *
  * **An allow-list, as the delete path has.** A server action takes whatever
- * the browser sends, so the switch below over six named writes is what stops
+ * the browser sends, so the switch below over ten named writes is what stops
  * this becoming a way to call any action in the registry. Each write goes
  * through the action every other surface uses, so the cache can do nothing
  * the API cannot and is refused the same way.
@@ -74,7 +74,19 @@ export type OkrMutation =
       readonly reason?: string;
     }
   | { readonly kind: "removeKeyResult"; readonly id: string }
-  | { readonly kind: "restoreKeyResult"; readonly id: string };
+  | { readonly kind: "restoreKeyResult"; readonly id: string }
+  | {
+      readonly kind: "placeGoal";
+      readonly id: string;
+      readonly afterId: string | null;
+    }
+  | {
+      readonly kind: "placeKeyResult";
+      readonly id: string;
+      readonly afterId: string | null;
+    }
+  | { readonly kind: "deleteGoal"; readonly id: string }
+  | { readonly kind: "restoreGoal"; readonly id: string };
 
 export interface OkrConflict {
   readonly current: Readonly<Record<string, unknown>>;
@@ -133,6 +145,25 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
       return null;
     case "removeKeyResult":
       await callAction(ctx, "goals.removeKeyResult", { id: mutation.id });
+      return null;
+    case "placeKeyResult":
+      return (
+        await callAction(ctx, "goals.placeKeyResult", {
+          id: mutation.id,
+          afterId: mutation.afterId,
+        })
+      ).goal;
+    case "placeGoal":
+      await callAction(ctx, "goals.place", {
+        id: mutation.id,
+        afterId: mutation.afterId,
+      });
+      return null;
+    case "deleteGoal":
+      await callAction(ctx, "goals.delete", { id: mutation.id });
+      return null;
+    case "restoreGoal":
+      await callAction(ctx, "goals.restore", { id: mutation.id });
       return null;
   }
 }

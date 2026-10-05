@@ -32,7 +32,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -1010,6 +1010,207 @@ export const patchKeyResult = defineWriteAction({
           targetType: "key_result",
           targetId: input.id,
           payload: { keys },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Puts `id` straight after `afterId` in an ordered set, or first when
+ * `afterId` is null. A missing `afterId`, which a stale screen can send,
+ * also puts it first rather than refusing a move the reader can see worked.
+ */
+function placedOrder(
+  ids: readonly string[],
+  id: string,
+  afterId: string | null,
+): string[] {
+  const rest = ids.filter((entry) => entry !== id);
+  const at = afterId === null ? -1 : rest.indexOf(afterId);
+  return [...rest.slice(0, at + 1), id, ...rest.slice(at + 1)];
+}
+
+/**
+ * Writes a set's new positions in one statement, touching only the rows that
+ * moved. Renumbered from nought every time, so two members reordering one
+ * set never leave two rows on one position.
+ */
+async function writePositions(
+  tx: OperationTx,
+  workspaceId: string,
+  table: "goals" | "key_results",
+  order: readonly string[],
+): Promise<void> {
+  if (order.length === 0) {
+    return;
+  }
+  const ids = sql.join(
+    order.map((id) => sql`${id}`),
+    sql`, `,
+  );
+  // openokr:allow-mutation: inside the operation that called this.
+  await tx.execute(sql`
+    update ${sql.identifier(table)} as row
+       set position = moved.ordinal - 1, updated_at = now()
+      from unnest(array[${ids}]::uuid[]) with ordinality as moved(id, ordinal)
+     where row.id = moved.id
+       and row.workspace_id = ${workspaceId}
+       and row.position <> moved.ordinal - 1`);
+}
+
+export const placeGoal = defineWriteAction({
+  name: "goals.place",
+  // openokr:policy-exempt: reordering objectives that exist changes no objective, which stays open under every setting (METHOD.md §2.9).
+  summary:
+    "Puts an objective straight after another in its cycle, or first, and renumbers the cycle's whole order so a row a filter hides keeps its place.",
+  input: z.object({
+    id: z.uuid(),
+    /** The objective it goes after, or null to put it first. */
+    afterId: z.uuid().nullable(),
+  }),
+  output: z.object({ order: z.array(z.uuid()) }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    subject: { type: "goal", id: input.id },
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: input.id,
+        requires: ACCESS_LEVELS.edit,
+      });
+      const [moved] = await tx
+        .select({ cycleId: goals.cycleId })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!moved?.cycleId) {
+        throw new OperationError(
+          "not_found",
+          "No such objective in a cycle to order.",
+        );
+      }
+      // The whole cycle, closed objectives included, so the order a filter
+      // hides is the order it keeps.
+      const siblings = await tx
+        .select({ id: goals.id })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.cycleId, moved.cycleId),
+          ),
+        )
+        .orderBy(asc(goals.position), asc(goals.id));
+      const order = placedOrder(
+        siblings.map((row) => row.id),
+        input.id,
+        input.afterId,
+      );
+      await writePositions(tx, workspaceId, "goals", order);
+      return {
+        result: { order },
+        activity: {
+          kind: "goal.placed",
+          subjectType: "goal",
+          subjectId: input.id,
+          payload: { afterId: input.afterId },
+        },
+        audit: {
+          action: "goals.place",
+          targetType: "goal",
+          targetId: input.id,
+          payload: { afterId: input.afterId },
+        },
+      };
+    },
+  }),
+});
+
+export const placeKeyResult = defineWriteAction({
+  name: "goals.placeKeyResult",
+  // openokr:policy-exempt: reordering an objective's key results changes no key result, which stays open under every setting (METHOD.md §2.9).
+  summary:
+    "Puts a key result straight after another under its objective, or first, and renumbers the objective's key results.",
+  input: z.object({
+    id: z.uuid(),
+    /** The key result it goes after, or null to put it first. */
+    afterId: z.uuid().nullable(),
+  }),
+  output: z.object({ goal: treeGoal }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [row] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!row) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: row.goalId,
+        requires: ACCESS_LEVELS.edit,
+      });
+      const siblings = await tx
+        .select({ id: keyResults.id })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.goalId, row.goalId),
+          ),
+        )
+        .orderBy(asc(keyResults.position), asc(keyResults.id));
+      const order = placedOrder(
+        siblings.map((sibling) => sibling.id),
+        input.id,
+        input.afterId,
+      );
+      await writePositions(tx, workspaceId, "key_results", order);
+      return {
+        result: { goal: await treeNode(tx, workspaceId, row.goalId) },
+        activity: {
+          kind: "key_result.placed",
+          subjectType: "goal",
+          subjectId: row.goalId,
+          payload: { keyResultId: input.id, afterId: input.afterId },
+        },
+        audit: {
+          action: "goals.placeKeyResult",
+          targetType: "key_result",
+          targetId: input.id,
+          payload: { goalId: row.goalId, afterId: input.afterId },
         },
       };
     },

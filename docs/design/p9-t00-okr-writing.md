@@ -126,6 +126,8 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 | Stop an objective | More menu, then stop, with a one-line reason. It closes as abandoned (§2.9 of the method) |
 | Check in | The row's check-in action opens the drawer on its check-in tab |
 
+**As built at P9-T07b-b.** Reordering is `goals.place` and `goals.placeKeyResult`: one row put after another, or first, and the whole set renumbered on the server in one statement, which is how a row a filter hides keeps its place: the screen names only the new neighbour, never the order it can see. Alt and an arrow anywhere in a row move it, and the keyboard goes back to the row's grip after each move so the next press needs no hunting; the grip also drags onto another row of the same set, landing above or below it by which half it is dropped on. Deleting an objective joined the cache: the row goes at once and the toast offers Undo for six seconds, which restores it through `goals.restore`. **Stopping moved to P9-T13**, which builds the stop as a close-abandoned with a reason; the list's control comes with it.
+
 ### 4.5 States
 
 | State | Treatment |

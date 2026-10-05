@@ -3260,12 +3260,15 @@ Test plan: end-to-end U1, U2 and U8.
 Acceptance: Given the demo workspace, when Priya adds an objective with two key results from the list using only the keyboard, then both are saved and visible after a reload, and nothing was written before her first Enter.
 Scenario steps: NW-Q1-06.
 
-### P9-T07b-b: Reordering, deleting with undo, and stopping with a reason [M]
+### P9-T07b-b: Reordering, and deleting with undo [M]
 Depends on: P9-T07b-a
-Goal: a member reorders objectives and key results, deletes one with an undo, and stops an objective with its reason.
+Goal: a member reorders objectives and key results, and deletes an objective with an undo.
+
+Stopping an objective with its reason moved to P9-T13 on 5 October 2026, before any code: P9-T13 builds the stop as a close-abandoned with a reason, and the list's control belongs with the action it calls.
+
 Deliverables:
-- **Order.** `goals.reorder` and `goals.reorderKeyResults`, saving the whole order of a set rather than the visible rows; a grip to drag and Alt+↑ and Alt+↓ on the keyboard (§4.4).
-- **Removing.** Deleting an objective with the six-second undo; stopping one with a one-line reason, which closes it as abandoned (METHOD v2 §2.9).
+- **Order.** `goals.place` and `goals.placeKeyResult`, which put one row after another and renumber the whole set on the server, so a row a filter hides keeps its place; a grip to drag and Alt+↑ and Alt+↓ on the keyboard (§4.4).
+- **Removing.** Deleting an objective with the six-second undo.
 
 Test plan: a reorder spec that hides rows by filter and checks the saved order; undo and stop end to end.
 Acceptance: Given three key results under one objective, when the third is moved to the top with Alt+↑ twice, then the order is saved and shows after a reload.
@@ -3341,7 +3344,7 @@ Deliverables:
 - **Creation.** Live, owner-draft or reviewer-approval creation, with `goals.publishDraft` and `goals.approveDraft`. Under "Live", an addition is live once it passes the checks set to block, and a draft its space can see until it does.
 - **Reasons.** "Reason when adding mid-cycle" and "Reason when easing a target" are enforced through the policy, so the screen, the API and the CLI refuse alike.
 - **Annual revisions.** An annual objective, key result or not-doing item revised at a quarterly revalidation, with a written reason, under the same target rules as any other (METHOD v2 §2.1).
-- **Stopping.** Stop as close-abandoned with a reason.
+- **Stopping.** Stop as close-abandoned with a reason, with its control in the OKR list's more menu (moved here from P9-T07b-b, so the control arrives with the action it calls).
 - **Calibration retired.** No more writes to `cycle_calibrations`, and its index is dropped. The table goes one release later.
 - **Documents.** METHOD.md §2.1, §2.9 (the four moves, live or draft, changing a target) and §7.6 move in.
 Test plan: action tests for each creation setting and for each reason setting from the API; the window boundary; an annual revision; end-to-end acceptance A5.

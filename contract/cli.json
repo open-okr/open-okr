@@ -6820,6 +6820,52 @@
       "pages": false
     },
     {
+      "name": "goals place",
+      "action": "goals.place",
+      "method": "POST",
+      "path": "/goals/place",
+      "scope": "write",
+      "summary": "Puts an objective straight after another in its cycle, or first, and renumbers the cycle's whole order so a row a filter hides keeps its place.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "after-id",
+          "field": "afterId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals placeKeyResult",
+      "action": "goals.placeKeyResult",
+      "method": "POST",
+      "path": "/goals/placeKeyResult",
+      "scope": "write",
+      "summary": "Puts a key result straight after another under its objective, or first, and renumbers the objective's key results.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "after-id",
+          "field": "afterId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals patch",
       "action": "goals.patch",
       "method": "POST",

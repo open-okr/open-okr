@@ -11,8 +11,9 @@
  *
  * **Renames, values and removals moved to the OKR tree's cache at P9-T06c**
  * (`lib/okr-tree/actions.ts`), where they change the row at once and carry
- * the values they read. What stays here adds a row or deletes an objective,
- * which re-renders the page because its count and score move with them.
+ * the values they read, and deleting an objective joined them at P9-T07b-b.
+ * What stays here adds a row or a cycle, which re-renders the page because
+ * its count and score move with them.
  */
 
 import { callAction, OperationError } from "@openokr/core";
@@ -21,7 +22,7 @@ import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 
-export interface EditorResult {
+interface EditorResult {
   readonly error: string | null;
 }
 
@@ -130,16 +131,6 @@ export async function addKeyResult(input: {
   } catch (error) {
     return { ...refused(error), id: null };
   }
-}
-
-export async function removeGoal(input: { id: string }): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.delete", input);
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
 }
 
 /**

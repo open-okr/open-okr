@@ -17,7 +17,7 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   filterGoals,
   type OkrFilters,
@@ -31,12 +31,7 @@ import {
   useOkrMutation,
   useOkrTree,
 } from "../../lib/okr-tree/use-okr-tree.ts";
-import {
-  addKeyResult,
-  addObjective,
-  type EditorResult,
-  removeGoal,
-} from "./editor-actions.ts";
+import { addKeyResult, addObjective } from "./editor-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
   InlineDate,
@@ -106,7 +101,86 @@ export interface Coach {
   readonly practice: ResolvedPractice;
 }
 
-const GRID = "md:grid-cols-[1.5rem_minmax(0,1fr)_13rem_8rem_6.5rem_4rem]";
+const GRID = "md:grid-cols-[2.75rem_minmax(0,1fr)_13rem_8rem_6.5rem_4rem]";
+
+/**
+ * Moving one row of a set (P9-T07b-b, design §4.4): Alt with an arrow key
+ * anywhere in the row, or the grip dragged onto another row of the same set.
+ * Null for a reader who cannot edit, who gets no grip at all.
+ */
+interface Mover {
+  readonly label: string;
+  readonly move: (by: -1 | 1) => void;
+  readonly onDragStart: () => void;
+  /** Dropped on this row, in its lower half when `after`. */
+  readonly onDrop: (after: boolean) => void;
+}
+
+/** What the row does with Alt and an arrow, a drag over it and a drop. */
+function moverHandlers(mover: Mover | null) {
+  if (!mover) {
+    return {};
+  }
+  return {
+    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!event.altKey) {
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        mover.move(-1);
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        mover.move(1);
+      }
+    },
+    onDragOver: (event: React.DragEvent<HTMLDivElement>) =>
+      event.preventDefault(),
+    onDrop: (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const box = event.currentTarget.getBoundingClientRect();
+      mover.onDrop(event.clientY > box.top + box.height / 2);
+    },
+  };
+}
+
+/**
+ * The grip: dragged to move the row, and the place the keyboard is put back
+ * after a move so Alt and an arrow can be pressed again. Hidden until the
+ * row is hovered or the grip is focused, never removed, so a keyboard always
+ * reaches it.
+ */
+function Grip({ id, mover }: { readonly id: string; readonly mover: Mover }) {
+  return (
+    <button
+      type="button"
+      data-grip={id}
+      aria-label={mover.label}
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", id);
+        mover.onDragStart();
+      }}
+      className="flex size-5 cursor-grab items-center justify-center rounded-control text-ink-4 opacity-0 hover:bg-raised hover:text-ink-2 focus:opacity-100 group-hover:opacity-100"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+        className="size-3.5"
+      >
+        <circle cx="9" cy="6" r="1.5" />
+        <circle cx="15" cy="6" r="1.5" />
+        <circle cx="9" cy="12" r="1.5" />
+        <circle cx="15" cy="12" r="1.5" />
+        <circle cx="9" cy="18" r="1.5" />
+        <circle cx="15" cy="18" r="1.5" />
+      </svg>
+    </button>
+  );
+}
 
 export function OkrTable({
   initialTree,
@@ -213,11 +287,18 @@ function LiveOkrTable({
   const { t } = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [pending, start] = useTransition();
-  const [failure, setFailure] = useState<string | null>(null);
+  // An add in flight: its own row says so, and the others wait for it.
+  const [pending, setPending] = useState(false);
   const [collapsed, setCollapsed] = useState<readonly string[]>([]);
   // The objective just added, whose key result draft opens under it.
   const [draftUnder, setDraftUnder] = useState<string | null>(null);
+  // What is being dragged, and the grip the keyboard goes back to after a
+  // move, so Alt and an arrow can be pressed again without hunting for it.
+  const dragged = useRef<{
+    readonly id: string;
+    readonly parent: string | null;
+  } | null>(null);
+  const [regrip, setRegrip] = useState<{ id: string; at: number } | null>(null);
   const tree = useOkrTree({
     cycleId,
     scope,
@@ -231,21 +312,79 @@ function LiveOkrTable({
   // for the server rather than for the row, which moves before it answers.
   const saving = useIsMutating() > 0 || pending;
   const goals = filterGoals(tree.goals, filters);
-  const problem = failure ?? okr.problem;
+  const problem = okr.problem;
 
-  // A structural change: the page's own count and score move with it, so the
-  // server renders again, and the cache is told to re-read either way.
-  const run = (work: () => Promise<EditorResult>) => {
-    setFailure(null);
-    start(async () => {
-      const result = await work();
-      if (result.error) {
-        setFailure(result.error);
-        return;
-      }
-      await queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
-      router.refresh();
-    });
+  useEffect(() => {
+    if (!regrip) {
+      return;
+    }
+    const frame = requestAnimationFrame(() =>
+      document
+        .querySelector<HTMLElement>(`[data-grip="${regrip.id}"]`)
+        ?.focus(),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [regrip]);
+
+  /**
+   * A mover for one row of a set. `siblings` is the set as it is on screen:
+   * the server places the row after its new neighbour and renumbers the
+   * whole set, so a row a filter hides keeps its place there.
+   */
+  const moverFor = (
+    siblings: readonly { readonly id: string }[],
+    index: number,
+    parent: string | null,
+    label: string,
+  ): Mover | null => {
+    if (!canEdit) {
+      return null;
+    }
+    const id = siblings[index]?.id as string;
+    const place = (afterId: string | null) => {
+      okr.mutate(
+        parent === null
+          ? { kind: "placeGoal", id, afterId }
+          : { kind: "placeKeyResult", id, afterId },
+      );
+      setRegrip({ id, at: Date.now() });
+    };
+    return {
+      label,
+      move: (by) => {
+        if (by < 0 && index > 0) {
+          place(siblings[index - 2]?.id ?? null);
+        }
+        if (by > 0 && index < siblings.length - 1) {
+          place(siblings[index + 1]?.id ?? null);
+        }
+      },
+      onDragStart: () => {
+        dragged.current = { id, parent };
+      },
+      onDrop: (after) => {
+        const from = dragged.current;
+        dragged.current = null;
+        if (!from || from.parent !== parent || from.id === id) {
+          return;
+        }
+        const rest = siblings.filter((row) => row.id !== from.id);
+        const at = rest.findIndex((row) => row.id === id);
+        okr.mutate(
+          parent === null
+            ? {
+                kind: "placeGoal",
+                id: from.id,
+                afterId: after ? id : (rest[at - 1]?.id ?? null),
+              }
+            : {
+                kind: "placeKeyResult",
+                id: from.id,
+                afterId: after ? id : (rest[at - 1]?.id ?? null),
+              },
+        );
+      },
+    };
   };
 
   // An add: the draft row keeps its title and shows the sentence on a
@@ -254,13 +393,18 @@ function LiveOkrTable({
   const add = async (
     work: () => Promise<{ error: string | null; id?: string | null }>,
   ): Promise<string | null> => {
-    const result = await work();
-    if (result.error) {
-      return result.error;
+    setPending(true);
+    try {
+      const result = await work();
+      if (result.error) {
+        return result.error;
+      }
+      await queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
+      router.refresh();
+      return null;
+    } finally {
+      setPending(false);
     }
-    await queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
-    router.refresh();
-    return null;
   };
 
   const toggle = (id: string) =>
@@ -325,7 +469,7 @@ function LiveOkrTable({
           empty
         ) : null}
 
-        {goals.map((goal) => {
+        {goals.map((goal, goalIndex) => {
           const open = !collapsed.includes(goal.id);
           return (
             <div key={goal.id}>
@@ -340,13 +484,25 @@ function LiveOkrTable({
                 progressMax={progressMax}
                 members={members}
                 coach={coach}
-                onDelete={() => run(() => removeGoal({ id: goal.id }))}
+                mover={moverFor(
+                  goals,
+                  goalIndex,
+                  null,
+                  t("okrList.moveObjective", { title: goal.title }),
+                )}
+                onDelete={() => okr.mutate({ kind: "deleteGoal", id: goal.id })}
               />
               {open ? (
                 <>
-                  {goal.keyResults.map((keyResult) => (
+                  {goal.keyResults.map((keyResult, keyResultIndex) => (
                     <KeyResultRow
                       key={keyResult.id}
+                      mover={moverFor(
+                        goal.keyResults,
+                        keyResultIndex,
+                        goal.id,
+                        t("okrList.moveKeyResult", { title: keyResult.title }),
+                      )}
                       keyResult={keyResult}
                       goalHref={`/goals/${goal.id}`}
                       okr={okr}
@@ -530,6 +686,7 @@ function ObjectiveRow({
   progressMax,
   members,
   coach,
+  mover,
   onDelete,
 }: {
   readonly goal: OkrGoal;
@@ -542,6 +699,7 @@ function ObjectiveRow({
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
+  readonly mover: Mover | null;
   readonly onDelete: () => void;
 }) {
   const { t } = useTranslations();
@@ -559,17 +717,27 @@ function ObjectiveRow({
   return (
     <>
       <div
-        className={`group grid grid-cols-[1.5rem_1fr] items-center gap-2.5 border-b border-line px-3.5 py-2 hover:bg-bg ${GRID}`}
+        className={`group grid grid-cols-[2.75rem_1fr] items-center gap-2.5 border-b border-line px-3.5 py-2 hover:bg-bg ${GRID}`}
+        {...moverHandlers(mover)}
       >
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-label={t("goals.editor.toggleKeyResults", { title: goal.title })}
-          onClick={onToggle}
-          className="flex size-5 items-center justify-center rounded-control text-ink-4 hover:bg-raised hover:text-ink-2"
-        >
-          <Chevron open={open} />
-        </button>
+        <span className="flex items-center">
+          {mover ? (
+            <Grip id={goal.id} mover={mover} />
+          ) : (
+            <span className="size-5" />
+          )}
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-label={t("goals.editor.toggleKeyResults", {
+              title: goal.title,
+            })}
+            onClick={onToggle}
+            className="flex size-5 items-center justify-center rounded-control text-ink-4 hover:bg-raised hover:text-ink-2"
+          >
+            <Chevron open={open} />
+          </button>
+        </span>
 
         <div className="flex min-w-0 flex-col">
           <InlineText
@@ -662,6 +830,7 @@ function KeyResultRow({
   progressMax,
   members,
   coach,
+  mover,
 }: {
   readonly keyResult: OkrGoal["keyResults"][number];
   readonly goalHref: string;
@@ -671,6 +840,7 @@ function KeyResultRow({
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
+  readonly mover: Mover | null;
 }) {
   const { t } = useTranslations();
   const [draft, setDraft] = useState<string | null>(null);
@@ -698,9 +868,12 @@ function KeyResultRow({
   return (
     <>
       <div
-        className={`group grid grid-cols-[1.5rem_1fr] items-center gap-2.5 border-b border-line px-3.5 py-1.5 hover:bg-bg ${GRID}`}
+        className={`group grid grid-cols-[2.75rem_1fr] items-center gap-2.5 border-b border-line px-3.5 py-1.5 hover:bg-bg ${GRID}`}
+        {...moverHandlers(mover)}
       >
-        <span />
+        <span className="flex justify-end">
+          {mover ? <Grip id={keyResult.id} mover={mover} /> : null}
+        </span>
         <div className="flex min-w-0 flex-col pl-3">
           <InlineText
             value={keyResult.title}
