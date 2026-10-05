@@ -44,18 +44,29 @@ same as a product that says nothing.
 | `scoring.confidenceHigh` | 0.7 | §3.2 |
 | `scoring.confidenceLow` | 0.4 | §3.2 |
 | `scoring.confidenceCritical` | 0.3 | §3.2 |
+| `scoring.aspirationalDraftTarget` | 0.5 | §3.2 |
 | `scoring.draftSandbagging` | 0.9 | §3.2 |
-| `scoring.draftComfortable` | 0.75 | §3.2 |
-| `scoring.draftAmbitious` | 0.25 | §3.2 |
-| `scoring.closeSandbagging` | 0.85 | §8.3 |
-| `scoring.rootCauseThreshold` | 0.7 | §8.4 |
+| `scoring.draftComfortable` | 0.7 | §3.2 |
+| `scoring.draftAmbitious` | 0.3 | §3.2 |
+| `scoring.committedConfidenceFloor` | 0.7 | §3.2 |
+| `scoring.committedExpectedScore` | 1 | §2.8 |
+| `scoring.aspirationalExpectedAverage` | 0.7 | §2.8 |
+| `scoring.closeTooSafeShare` | 0.75 | §3.3 |
+| `scoring.rootCauseThreshold` | aspirational 0.6, committed 1 | §8.4 |
 | `scoring.progressSignalPass` | 75 | §3.7 |
 | `scoring.progressSignalFail` | 50 | §3.7 |
 
-**Confidence above 0.9 at drafting is sandbagging**, and the Coach says so. A
-goal everybody is already confident about was not worth setting as an OKR.
-Below 0.25 is ambitious, which is allowed and flagged so it is a choice rather
-than an accident.
+**Two kinds of promise, judged differently.** An aspirational objective is a
+stretch: about 5 in 10 confidence at drafting is the aim, an average above 0.9
+is near certain and the Coach says so, and below 0.3 is a moonshot, allowed
+and flagged so it is a choice rather than an accident. A committed objective
+is expected in full, so high confidence is right, and a committed key result
+below 0.7 is a risk to escalate now.
+
+**A pattern of 1.0 is the too-safe signal, not one score.** At the close, three
+quarters or more of the aspirational key results at 1.0 means the targets were
+too safe. A committed key result at 1.0 is a promise kept. One short of 1.0
+asks for a short explanation of the miss.
 
 **0.4 and 0.3 are where a goal becomes the session's business.** Below 0.4 it
 needs discussion; below 0.3 it needs a decision.

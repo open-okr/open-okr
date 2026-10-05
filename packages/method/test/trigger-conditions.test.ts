@@ -86,11 +86,65 @@ describe("quality.too_many_objectives", () => {
 });
 
 describe("the two sandbagging checks", () => {
-  it("fire above their §11 lines and ignore unanswered ones", () => {
-    expect(draftIsSandbagged([0.95, 0.92, null], thresholds)).toBe(true);
-    expect(draftIsSandbagged([0.9, 0.9], thresholds)).toBe(false);
-    expect(draftIsSandbagged([null], thresholds)).toBe(false);
-    expect(closeIsSandbagged([0.9, 0.95], thresholds)).toBe(true);
-    expect(closeIsSandbagged([0.7, 0.8], thresholds)).toBe(false);
+  const aspirational = (confidence: number | null) => ({
+    confidence,
+    kind: "aspirational" as const,
+  });
+  const committed = (confidence: number | null) => ({
+    confidence,
+    kind: "committed" as const,
+  });
+
+  it("fire above their §11 lines on aspirational key results and ignore unanswered ones", () => {
+    expect(
+      draftIsSandbagged(
+        [aspirational(0.95), aspirational(0.92), aspirational(null)],
+        thresholds,
+      ),
+    ).toBe(true);
+    expect(
+      draftIsSandbagged([aspirational(0.9), aspirational(0.9)], thresholds),
+    ).toBe(false);
+    expect(draftIsSandbagged([aspirational(null)], thresholds)).toBe(false);
+  });
+
+  it("leave committed key results out, where high confidence is right (P9-T11a)", () => {
+    expect(draftIsSandbagged([committed(0.95), committed(1)], thresholds)).toBe(
+      false,
+    );
+    expect(
+      draftIsSandbagged([committed(0.95), aspirational(0.5)], thresholds),
+    ).toBe(false);
+  });
+
+  it("at the close, three quarters or more of the aspirational key results at 1.0 is the pattern", () => {
+    const score = (value: number, kind: "aspirational" | "committed") => ({
+      score: value,
+      kind,
+    });
+    expect(
+      closeIsSandbagged(
+        [
+          score(1, "aspirational"),
+          score(1, "aspirational"),
+          score(1, "aspirational"),
+          score(0.6, "aspirational"),
+        ],
+        thresholds,
+      ),
+    ).toBe(true);
+    expect(
+      closeIsSandbagged(
+        [score(1, "aspirational"), score(0.7, "aspirational")],
+        thresholds,
+      ),
+    ).toBe(false);
+    // A row of commitments met is the point of them.
+    expect(
+      closeIsSandbagged(
+        [score(1, "committed"), score(1, "committed")],
+        thresholds,
+      ),
+    ).toBe(false);
   });
 });

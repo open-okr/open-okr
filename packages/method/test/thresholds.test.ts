@@ -111,9 +111,19 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
     expect(canon["scoring.confidenceHigh"]).toBe(0.7);
     expect(canon["scoring.confidenceLow"]).toBe(0.4);
     expect(canon["scoring.confidenceCritical"]).toBe(0.3);
+    // By kind since P9-T11a (METHOD v2 §3.2, §3.3, §3.4).
+    expect(canon["scoring.aspirationalDraftTarget"]).toBe(0.5);
     expect(canon["scoring.draftSandbagging"]).toBe(0.9);
-    expect(canon["scoring.draftComfortable"]).toBe(0.75);
-    expect(canon["scoring.draftAmbitious"]).toBe(0.25);
+    expect(canon["scoring.draftComfortable"]).toBe(0.7);
+    expect(canon["scoring.draftAmbitious"]).toBe(0.3);
+    expect(canon["scoring.committedConfidenceFloor"]).toBe(0.7);
+    expect(canon["scoring.committedExpectedScore"]).toBe(1);
+    expect(canon["scoring.aspirationalExpectedAverage"]).toBe(0.7);
+    expect(canon["scoring.closeTooSafeShare"]).toBe(0.75);
+    expect(canon["scoring.rootCauseThreshold"]).toEqual({
+      aspirational: 0.6,
+      committed: 1,
+    });
     expect(canon["scoring.scoreBands"]).toEqual({
       achieved: 0.9,
       strong: 0.7,

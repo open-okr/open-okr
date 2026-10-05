@@ -1,4 +1,4 @@
-import { type DraftVerdict, draftVerdict } from "./scoring.ts";
+import { type DraftVerdict, draftVerdict, type OkrKind } from "./scoring.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
 /**
@@ -387,11 +387,19 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
     group: "key_result",
     title: "Ambitious but honest",
     feedsStrengthScore: true,
-    // §3.2's own second column, one row per draft verdict. The status is not in
-    // METHOD: only the sweet spot reads as an answer rather than a question, so
-    // it is the pass and the other four are warns. None fails, because §3.2
-    // never refuses a set on its confidence and the publish gates are separate.
+    // §3.2's drafting table, one row per draft verdict, over the aspirational
+    // key results only (P9-T11a). The status is not in METHOD: only the sweet
+    // spot reads as an answer rather than a question, so it is the pass and
+    // the others are warns. None fails, because §3.2 never refuses a set on its
+    // confidence and the publish gates are separate. A set with nothing
+    // aspirational in it is §3.2's committed rule's business, not KR-6's.
     conditions: [
+      {
+        condition: "Nothing aspirational to judge",
+        status: "pass",
+        prompt:
+          "Committed key results are judged by the committed floor, not by stretch: high confidence is right for a promise.",
+      },
       {
         condition: "Nobody has set a confidence yet",
         status: "todo",
@@ -399,15 +407,15 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
           "No confidence set yet. Ask the owners how likely they think each one is, and judge the set rather than any single key result.",
       },
       {
-        condition: "Sandbagging",
+        condition: "Near certain",
         status: "warn",
         prompt:
-          "If you are near certain, this is business as usual, not an OKR. Raise the targets.",
+          "Near certain. If this must be delivered, mark it committed. If it is a stretch, raise the targets.",
       },
       {
         condition: "Comfortable",
         status: "warn",
-        prompt: "Stretch until it feels like a 6 or 7 out of 10.",
+        prompt: "Comfortable. A stretch usually feels like 5 in 10.",
       },
       {
         condition: "The sweet spot",
@@ -415,15 +423,10 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
         prompt: "A real stretch you still believe in.",
       },
       {
-        condition: "Ambitious",
-        status: "warn",
-        prompt: "Check that the team genuinely believes it is possible.",
-      },
-      {
         condition: "Moonshot",
         status: "warn",
         prompt:
-          "A moonshot bordering on fantasy. Make sure there is a credible path.",
+          "A moonshot. Make sure there is a credible path, and expect a low score.",
       },
     ],
   },
@@ -623,6 +626,11 @@ export interface KeyResultInput {
   readonly direction: "increase" | "reduce" | "maintain" | "move" | null;
   /** Null until somebody has answered. KR-6 stays `todo` while it is. */
   readonly confidence: number | null;
+  /**
+   * The kind of its objective's promise (METHOD.md §2.8). KR-6 judges the
+   * aspirational ones only; left out, a key result is aspirational.
+   */
+  readonly kind?: OkrKind;
 }
 
 export interface KeyResultSetInput {
@@ -816,19 +824,27 @@ export function evaluateKeyResults(
     }),
   );
 
-  // KR-6. The set average, never one key result: §3.2 says so in as many words.
+  // KR-6. The set average, never one key result: §3.2 says so in as many
+  // words. Over the aspirational key results only (P9-T11a).
   const kr6Check = check("KR-6");
-  const answered = set.filter((entry) => entry.confidence !== null);
+  const aspirational = set.filter(
+    (entry) => (entry.kind ?? "aspirational") === "aspirational",
+  );
+  const answered = aspirational.filter((entry) => entry.confidence !== null);
   const kr6Row =
-    answered.length === 0
-      ? "Nobody has set a confidence yet"
-      : DRAFT_VERDICT_CONDITIONS[
-          draftVerdict(
-            answered.reduce((sum, entry) => sum + (entry.confidence ?? 0), 0) /
-              answered.length,
-            thresholds,
-          )
-        ];
+    aspirational.length === 0
+      ? "Nothing aspirational to judge"
+      : answered.length === 0
+        ? "Nobody has set a confidence yet"
+        : DRAFT_VERDICT_CONDITIONS[
+            draftVerdict(
+              answered.reduce(
+                (sum, entry) => sum + (entry.confidence ?? 0),
+                0,
+              ) / answered.length,
+              thresholds,
+            )
+          ];
   const kr6: KeyResultVerdict = {
     ...verdictOf(kr6Check, kr6Row),
     keyResults: [],
@@ -846,12 +862,11 @@ export function evaluateKeyResults(
   return [kr1Verdict, kr2, kr3, kr4, kr5, kr6, kr7];
 }
 
-/** §3.2's five draft verdicts, named as KR-6's condition rows. */
+/** §3.2's four draft verdicts, named as KR-6's condition rows. */
 const DRAFT_VERDICT_CONDITIONS: Record<DraftVerdict, string> = {
-  sandbagging: "Sandbagging",
+  near_certain: "Near certain",
   comfortable: "Comfortable",
   sweet_spot: "The sweet spot",
-  ambitious: "Ambitious",
   moonshot: "Moonshot",
 };
 
@@ -1218,15 +1233,16 @@ export const CYCLE_CHECKS: readonly QualityCheck[] = [
     feedsStrengthScore: false,
     conditions: [
       {
-        condition: "Unchecked, or something still exceeds",
+        condition: "Unchecked, or a committed OKR still exceeds",
         status: "fail",
         prompt:
-          "Capacity is not settled. Check it and record the cuts, because a key result still marked as exceeding capacity has already told you how the cycle ends.",
+          "Capacity is not settled. Check it and record the cuts, because a committed key result still marked as exceeding capacity has already told you how the cycle ends.",
       },
       {
-        condition: "Checked and nothing exceeds",
+        condition: "Checked and nothing committed exceeds",
         status: "pass",
-        prompt: "Capacity is checked and nothing is left exceeding it.",
+        prompt:
+          "Capacity is checked and no committed OKR is left exceeding it. Aspirational work may exceed.",
       },
     ],
   },
@@ -1338,8 +1354,8 @@ export function evaluateCycle(
   const cy5 = input.notDoingWritten ? "Written" : "Not written";
 
   const cy6 = gate(5)?.passed
-    ? "Checked and nothing exceeds"
-    : "Unchecked, or something still exceeds";
+    ? "Checked and nothing committed exceeds"
+    : "Unchecked, or a committed OKR still exceeds";
 
   const cy7 = gate(4)?.passed
     ? "Every dependency confirmed or risk-owned"

@@ -33,6 +33,7 @@ import {
   type KeyResultVerdict,
   type QualityVerdict,
 } from "./quality.ts";
+import type { OkrKind } from "./scoring.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
 export type PredicateState = "pass" | "todo" | "not_applicable";
@@ -90,6 +91,12 @@ export interface KeyResultSnapshot {
   readonly title: string;
   readonly capacity: "fits" | "tight" | "exceeds" | null;
   /**
+   * The kind of its objective's promise (METHOD.md §2.8, §5.5). Only a
+   * committed key result left at "exceeds" holds gate 5 back; an aspirational
+   * one may exceed. Left out, a key result is aspirational.
+   */
+  readonly kind?: OkrKind;
+  /**
    * The §5.4 dependency register entries hanging off this key result.
    *
    * Undefined means the register does not exist yet (P3-T09), which is a
@@ -131,6 +138,8 @@ export interface InitiativeSnapshot {
   readonly id: string;
   readonly title: string;
   readonly capacity: "fits" | "tight" | "exceeds" | null;
+  /** The kind of the objective it serves; left out, aspirational (§5.5). */
+  readonly kind?: OkrKind;
 }
 
 /** One goal, as the gates need to see it. */
@@ -1035,7 +1044,8 @@ export function publishGates(
     results.push(gate(4, missing.length === 0, missing));
   }
 
-  // 5. Capacity is checked, nothing left at "exceeds", and the cuts recorded.
+  // 5. Capacity is checked, no committed OKR left at "exceeds", and the cuts
+  // recorded. An aspirational OKR may exceed (§5.5, P9-T11a).
   if (goals === undefined) {
     results.push(unevaluable(5, goalsBlocked));
   } else if (input.initiatives === undefined) {
@@ -1048,15 +1058,28 @@ export function publishGates(
   } else {
     const missing = goals.flatMap((goal) =>
       goal.keyResults
-        .filter((keyResult) => keyResult.capacity === "exceeds")
-        .map((keyResult) => `"${keyResult.title}" still exceeds capacity`),
+        .filter(
+          (keyResult) =>
+            keyResult.capacity === "exceeds" && keyResult.kind === "committed",
+        )
+        .map(
+          (keyResult) =>
+            `"${keyResult.title}" is committed and still exceeds capacity`,
+        ),
     );
     // Named, because "gate five is red" sends a facilitator hunting and "this
     // project is over-committed" does not.
     missing.push(
       ...input.initiatives
-        .filter((initiative) => initiative.capacity === "exceeds")
-        .map((initiative) => `"${initiative.title}" still exceeds capacity`),
+        .filter(
+          (initiative) =>
+            initiative.capacity === "exceeds" &&
+            initiative.kind === "committed",
+        )
+        .map(
+          (initiative) =>
+            `"${initiative.title}" serves a committed OKR and still exceeds capacity`,
+        ),
     );
     if (!input.hasCapacityNotes) {
       // §5.5: "The facilitator must record what was cut. If the answer is

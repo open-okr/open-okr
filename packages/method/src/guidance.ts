@@ -111,7 +111,7 @@ export const PHASE_GUIDANCE: readonly PhaseGuidance[] = [
     output: "Scores, learnings and the next cycle's inputs",
     guidance: [
       "Hold the review before drafting the next cycle, never in the same session",
-      "Scores near 1.0 across the board indicate sandbagging",
+      "A pattern of 1.0s on aspirational key results suggests sandbagging",
       "Name it and address stretch explicitly in the next Phase 4",
     ],
   },

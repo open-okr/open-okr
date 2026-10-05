@@ -213,6 +213,8 @@ export async function archiveCycleInTx(
               scope.scores.length,
           );
     const buckets = bucketsOf(scope.scores, thresholds);
+    // §3.4 judges the aspirational average; every objective is aspirational
+    // until P9-T11b stores the kind, so every score is in that set.
     const verdict =
       average === null ? null : portfolioVerdictOf(average, thresholds);
 

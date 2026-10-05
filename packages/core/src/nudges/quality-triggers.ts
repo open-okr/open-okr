@@ -129,9 +129,11 @@ export async function dueObjectiveQualityNudges(
     if (
       drafting &&
       draftIsSandbagged(
-        keyResultRows.map((row) =>
-          row.confidence === null ? null : Number(row.confidence),
-        ),
+        // Every objective is aspirational until P9-T11b stores the kind.
+        keyResultRows.map((row) => ({
+          confidence: row.confidence === null ? null : Number(row.confidence),
+          kind: "aspirational" as const,
+        })),
         input.thresholds,
       )
     ) {
@@ -303,7 +305,11 @@ export async function dueCycleQualityNudges(
         );
       if (
         closeIsSandbagged(
-          scored.map((keyResult) => Number(keyResult.score)),
+          // Every objective is aspirational until P9-T11b stores the kind.
+          scored.map((keyResult) => ({
+            score: Number(keyResult.score),
+            kind: "aspirational" as const,
+          })),
           input.thresholds,
         )
       ) {

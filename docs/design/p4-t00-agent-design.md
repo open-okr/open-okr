@@ -203,8 +203,8 @@ the build.
 | `quality.too_many_objectives` | Level exceeds cap | Facilitator | No | Yes |
 | `quality.all_lagging` | All KRs lagging | Champion | No | Yes |
 | `quality.no_baseline` | KR lacks baseline at Phase 4 exit | Champion | No | Yes |
-| `quality.sandbagging_draft` | Avg draft confidence > 0.9 | Champion + facilitator | No | Yes |
-| `quality.sandbagging_close` | Scores cluster > 0.85 at close | Sponsor | No | Yes |
+| `quality.sandbagging_draft` | Avg aspirational draft confidence > 0.9 | Champion + facilitator | No | Yes |
+| `quality.sandbagging_close` | 3/4 or more of aspirational KRs at 1.0 at close | Sponsor | No | Yes |
 | `quality.orphan_goal` | Goal below company has no parent | Champion | No | Yes |
 | `quality.level_skip` | Alignment skips a level | Champion | No | Yes |
 | `quality.silo` | Dept subtree has no horizontal dep | Department lead | No | Yes |

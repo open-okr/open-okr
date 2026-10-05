@@ -296,14 +296,14 @@ const QUALITY_ROWS = [
   {
     key: "quality.sandbagging_draft",
     title: "Draft targets look too safe",
-    fires: "Avg draft confidence > 0.9",
+    fires: "Avg aspirational draft confidence > 0.9",
     recipient: "Champion + facilitator",
     deterministic: true,
   },
   {
     key: "quality.sandbagging_close",
     title: "Closing scores look too safe",
-    fires: "Scores cluster > 0.85 at close",
+    fires: "3/4 or more of aspirational KRs at 1.0 at close",
     recipient: "Sponsor",
     deterministic: true,
   },

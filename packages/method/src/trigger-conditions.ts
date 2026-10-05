@@ -16,8 +16,8 @@
  * | `cycle.phase_blocked` | A planning phase's §2.4 window closes today and it is incomplete |
  * | `quality.no_not_doing` | Phase 3 is done and the frame has no not-doing list |
  * | `quality.too_many_objectives` | A level or a unit holds more objectives than its cap |
- * | `quality.sandbagging_draft` | An objective's average draft confidence is above `scoring.draftSandbagging` |
- * | `quality.sandbagging_close` | A cycle's scores average above `scoring.closeSandbagging` at the close |
+ * | `quality.sandbagging_draft` | An objective's average draft confidence on its aspirational key results is above `scoring.draftSandbagging` |
+ * | `quality.sandbagging_close` | Three quarters or more of a closed cycle's aspirational key results scored 1.0 (`scoring.closeTooSafeShare`) |
  * | `quality.no_cuts` | Capacity has verdicts and nothing is recorded as cut |
  * | `quality.trending_off` | A key result's stored forecast misses its target |
  * | `quality.process_health_low` | A quarterly review closed with process-health answers |
@@ -25,6 +25,7 @@
  * Dates are local `YYYY-MM-DD` strings in the workspace timezone.
  */
 import { SUGGESTED_TIMELINE } from "./guidance.ts";
+import { type KindedScore, type OkrKind, tooSafePattern } from "./scoring.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
 const DAY_MS = 86_400_000;
@@ -166,20 +167,33 @@ export function objectivesOverCap(
   return breaches;
 }
 
-/** §3.2: a set averaging above the draft threshold is business as usual. */
+/**
+ * §3.2: an aspirational set averaging above the near-certain threshold is
+ * business as usual. Committed key results are left out, because high
+ * confidence is right for a commitment (P9-T11a).
+ */
 export function draftIsSandbagged(
-  confidences: readonly (number | null)[],
+  keyResults: readonly {
+    readonly confidence: number | null;
+    readonly kind: OkrKind;
+  }[],
   thresholds: ResolvedThresholds,
 ): boolean {
-  const mean = average(confidences);
+  const mean = average(
+    keyResults
+      .filter((entry) => entry.kind === "aspirational")
+      .map((entry) => entry.confidence),
+  );
   return mean !== null && mean > thresholds["scoring.draftSandbagging"];
 }
 
-/** §3.4: scores clustering above the close threshold mean safe targets. */
+/**
+ * §3.3: three quarters or more of a closed cycle's aspirational key results
+ * at 1.0 means the targets were too safe. Committed ones are left out.
+ */
 export function closeIsSandbagged(
-  scores: readonly (number | null)[],
+  scored: readonly KindedScore[],
   thresholds: ResolvedThresholds,
 ): boolean {
-  const mean = average(scores);
-  return mean !== null && mean > thresholds["scoring.closeSandbagging"];
+  return tooSafePattern(scored, thresholds);
 }

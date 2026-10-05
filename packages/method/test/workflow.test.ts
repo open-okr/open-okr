@@ -527,24 +527,32 @@ describe("the six publish gates", () => {
     );
   });
 
-  it("gate 5 refuses anything left exceeding capacity", () => {
-    const exceeding = goal({
-      keyResults: [
-        {
-          id: "k1",
-          title: "Ship the migration",
-          capacity: "exceeds",
-          dependencies: [],
-        },
-      ],
-    });
-    const gate = publishGates(base({ goals: [exceeding] })).find(
-      (g) => g.gateKey === 5,
+  it("gate 5 warns on a committed key result left exceeding capacity, and lets an aspirational one exceed (P9-T11a)", () => {
+    const exceeding = (kind: "committed" | "aspirational") =>
+      goal({
+        keyResults: [
+          {
+            id: "k1",
+            title: "Ship the migration",
+            capacity: "exceeds",
+            kind,
+            dependencies: [],
+          },
+        ],
+      });
+    const gateFor = (kind: "committed" | "aspirational") =>
+      publishGates(base({ goals: [exceeding(kind)] })).find(
+        (g) => g.gateKey === 5,
+      );
+    expect(gateFor("committed")?.detail.missing.join(" ")).toMatch(
+      /committed and still exceeds capacity/,
     );
-    expect(gate?.detail.missing.join(" ")).toMatch(/still exceeds capacity/);
+    expect(gateFor("aspirational")?.detail.missing.join(" ")).not.toMatch(
+      /exceeds capacity/,
+    );
   });
 
-  it("gate 5 refuses an initiative left exceeding capacity, and names it", () => {
+  it("gate 5 refuses an initiative of a committed OKR left exceeding capacity, and names it", () => {
     // The other half of §5.5's one sentence (P5-T10a). Two different problems
     // with two different fixes, so the gate has to say which one it found.
     const gate = publishGates(
@@ -555,13 +563,14 @@ describe("the six publish gates", () => {
             id: "i1",
             title: "Rebuild the activation flow",
             capacity: "exceeds",
+            kind: "committed",
           },
         ],
       }),
     ).find((g) => g.gateKey === 5);
     expect(gate?.passed).toBe(false);
     expect(gate?.detail.missing).toContain(
-      '"Rebuild the activation flow" still exceeds capacity',
+      '"Rebuild the activation flow" serves a committed OKR and still exceeds capacity',
     );
   });
 

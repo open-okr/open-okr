@@ -115,7 +115,7 @@ describe("the demo builder", () => {
     expect(forecasts.rows[0]?.count).toBe("0");
   });
 
-  it("leaves publish gate 5 warning for one reason, and gate 2 green under a KR-5 warning", async () => {
+  it("passes every gate, with gate 2 green under a KR-5 warning", async () => {
     const wb = await workerDb();
     await seed();
     const ctx = { pool: wb.appPool, ...context() };
@@ -128,7 +128,7 @@ describe("the demo builder", () => {
     });
 
     const byKey = new Map(workflow.gates.map((gate) => [gate.gateKey, gate]));
-    for (const gateKey of [1, 2, 3, 4, 6]) {
+    for (const gateKey of [1, 2, 3, 4, 5, 6]) {
       expect(byKey.get(gateKey)?.passed).toBe(true);
     }
     // Gate 2 judges the set like any other workspace's. One key result is
@@ -137,13 +137,13 @@ describe("the demo builder", () => {
     // refuses (METHOD.md §4.2).
     expect(byKey.get(2)?.evaluable).toBe(true);
 
-    // Gate 5 warns by default since P9-T03b (METHOD.md §4.5): shown and
-    // coached, and not a reason the set cannot be published.
+    // Gate 5 warns by default since P9-T03b (METHOD.md §4.5). The story's one
+    // key result at "exceeds" no longer trips it: since P9-T11a an aspirational
+    // OKR may exceed capacity (§5.5), and every objective is aspirational until
+    // P9-T11b stores the kind and the demo marks that objective committed.
     const five = byKey.get(5);
     expect(five?.level).toBe("warn");
-    expect(five?.passed).toBe(false);
-    expect(five?.missing).toHaveLength(1);
-    expect(five?.missing[0]).toContain("exceeds capacity");
+    expect(five?.missing).toHaveLength(0);
 
     expect(workflow.publishable).toBe(true);
   });

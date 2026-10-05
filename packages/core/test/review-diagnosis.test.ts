@@ -210,8 +210,10 @@ describe("the root-cause list", () => {
   });
 
   it("lists every key result below the threshold and nothing above it", async () => {
-    const threshold = resolveThresholds()["scoring.rootCauseThreshold"];
-    expect(threshold).toBe(0.7);
+    // Every objective is aspirational until P9-T11b stores the kind.
+    const threshold =
+      resolveThresholds()["scoring.rootCauseThreshold"].aspirational;
+    expect(threshold).toBe(0.6);
 
     await call("sessions.scoreKeyResult", {
       sessionId,
@@ -236,13 +238,14 @@ describe("the root-cause list", () => {
   });
 
   it("puts a key result exactly on the threshold above the line", async () => {
-    // §8.4 says "below 0.7". A key result that scored exactly the threshold met
+    // §8.4 says "below 0.6" for an aspirational key result. One that scored
+    // exactly the threshold met
     // it, and asking a room to explain a result it did not miss is the kind of
     // boundary error that makes people stop trusting the stage.
     await call("sessions.scoreKeyResult", {
       sessionId,
       keyResultId: missedKeyResultId,
-      score: 0.7,
+      score: 0.6,
       reason: "Exactly the line.",
     });
     expect((await causes()).keyResults).toHaveLength(0);

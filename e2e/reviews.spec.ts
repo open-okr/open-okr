@@ -507,14 +507,14 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // slider's local state, which a `router.refresh()` does not reset.
   const rows = page.getByRole("listitem").filter({ has: page.getByRole("slider") });
   const firstRow = rows.first();
-  await firstRow.getByRole("slider").fill("0.6");
-  await firstRow.getByLabel("One line on why").fill("Landed 210 of 300.");
+  await firstRow.getByRole("slider").fill("0.4");
+  await firstRow.getByLabel("One line on why").fill("Landed 120 of 300.");
   await firstRow.getByRole("button", { name: "Save the grade" }).click();
   await expect(ungraded).toHaveCount(before - 1, { timeout: 10_000 });
-  // The grade the room agreed, back from the server. The row carries "0.6"
+  // The grade the room agreed, back from the server. The row carries "0.4"
   // twice, as the chip the server rendered and as the slider's own readout, and
   // the chip comes first in the row.
-  await expect(firstRow.getByText("0.6", { exact: true }).first()).toBeVisible({
+  await expect(firstRow.getByText("0.4", { exact: true }).first()).toBeVisible({
     timeout: 10_000,
   });
 
@@ -548,7 +548,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // in a row here, and it is the same mistake that made the monthly decision
   // assertion pass on the click instead of on the write.
   await expect(secondPage.getByLabel("One line on why").first()).toHaveValue(
-    "Landed 210 of 300.",
+    "Landed 120 of 300.",
   );
 
   // The reveal (METHOD.md section 8.3, P4-T10b-b).
@@ -562,24 +562,24 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // packages/core/test/review-scoring.test.ts.
   await page.getByRole("button", { name: "Reveal the score" }).first().click();
 
-  // Weighted over the graded key results alone: one at 0.6. Section 8.3 leaves
+  // Weighted over the graded key results alone: one at 0.4. Section 8.3 leaves
   // an ungraded key result out rather than counting it as a zero, so a
   // half-graded objective does not read as a failing one.
-  await expect(page.getByText("0.60").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("0.40").first()).toBeVisible({ timeout: 10_000 });
   await expect(hidden).toHaveCount(hiddenBefore - 1, { timeout: 10_000 });
 
-  // The running cycle score, and section 3.4's verdict on it. 0.6 is the floor
-  // of the healthy band, inclusive, which is the boundary most likely to be
+  // The running cycle score, and section 3.4's verdict on it. 0.4 is the floor
+  // of the partial band, inclusive, which is the boundary most likely to be
   // written the wrong way round.
   await expect(page.getByText("Cycle score so far")).toBeVisible();
-  await expect(page.getByText("healthy").first()).toBeVisible();
+  await expect(page.getByText("partial").first()).toBeVisible();
 
   // **The same number for the participant, from the same write.** Reloaded for
   // the reason every other assertion in this file is: it is about the server's
   // answer, not the push's timing. What this proves is that both clients read
   // one answer off the server rather than each computing their own.
   await secondPage.reload();
-  await expect(secondPage.getByText("0.60").first()).toBeVisible({
+  await expect(secondPage.getByText("0.40").first()).toBeVisible({
     timeout: 10_000,
   });
 
@@ -821,11 +821,12 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   const rootCause = page.getByRole("region", { name: "Root cause" });
   await expect(rootCause).toHaveCount(1, { timeout: 10_000 });
 
-  // The one key result graded earlier came in at 0.6, which is below the
-  // section 11 threshold of 0.7, so exactly one row is listed and the other
-  // graded-at-nothing key results are not.
+  // The one key result graded earlier came in at 0.4, which is below the
+  // section 11 aspirational threshold of 0.6, so exactly one row is listed and
+  // the other graded-at-nothing key results are not. Every objective is
+  // aspirational until P9-T11b stores the kind.
   await expect(rootCause).toContainText("0 of 1 named");
-  await expect(rootCause.getByText("0.6")).toBeVisible();
+  await expect(rootCause.getByText("0.4")).toBeVisible();
   // Eight causes, from the method package rather than from this screen.
   await expect(
     rootCause.getByRole("button", { name: "Ambition set too high" }),
@@ -1021,14 +1022,14 @@ test("a quarterly review runs its rail, and the second client follows", async ({
 
   const summary = page.getByRole("region", { name: "Executive summary" });
   await expect(summary).toHaveCount(1);
-  // Section 8.10's own list. The review above graded one key result at 0.6, so
-  // one key result was reviewed and one came in below 0.7.
+  // Section 8.10's own list. The review above graded one key result at 0.4, so
+  // one key result was reviewed and one came in below 0.6.
   await expect(summary).toContainText("Key results");
   await expect(summary).toContainText("Team pulse");
   await expect(summary).toContainText("Actions agreed");
 
   // Every stage that recorded something is in the document.
-  await expect(page.getByText("Landed 210 of 300.")).toBeVisible();
+  await expect(page.getByText("Landed 120 of 300.")).toBeVisible();
   await expect(page.getByText("Activation held. The funnel above it never did.")).toBeVisible();
   await expect(page.getByText("Blocked by a dependency")).toBeVisible();
   await expect(page.getByText("Adjust the target or wording")).toHaveCount(0);

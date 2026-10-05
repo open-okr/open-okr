@@ -412,7 +412,17 @@ export function progressSignal(
 }
 
 export type ScoreBand = "fully_achieved" | "strong" | "partial" | "little";
-export type ScoreAnnotation = "too_safe" | "intended" | "none" | "disconnected";
+
+/**
+ * The kind of promise an objective makes (METHOD.md §2.8, P9-T11a): committed,
+ * expected in full, or aspirational, a stretch. Every rule that judges
+ * ambition asks which. An objective nobody has called committed is
+ * aspirational, which is also the default for a new one.
+ */
+export type OkrKind = "committed" | "aspirational";
+
+/** What the coach says beside one scored key result (§3.3's notes). */
+export type ScoreNote = "explain_miss" | "root_cause" | "none";
 
 /** §3.3. Scored at the close, against the key result as written. */
 export function scoreBand(
@@ -433,24 +443,89 @@ export function scoreBand(
 }
 
 /**
- * §3.3's annotations, first match wins, which leaves 0.3 up to below 0.6
- * deliberately unannotated. The coach says nothing there on purpose.
+ * §3.3's notes on one key result, first match wins: a committed key result
+ * below what it promised asks for the short explanation of the miss, and
+ * little progress asks for its root cause. Nothing else gets a note. "Too
+ * safe" is no longer said of one key result: it is a pattern across a closed
+ * cycle's aspirational key results (`tooSafePattern`), and a committed key
+ * result at 1.0 is a promise kept, never a target set too low.
+ *
+ * "Little progress" is the score bands' own lowest boundary, so the note and
+ * the band say the same thing about the same score.
  */
-export function scoreAnnotation(
+export function scoreNote(
   score: number,
+  kind: OkrKind,
   thresholds: ResolvedThresholds,
-): ScoreAnnotation {
-  const bands = thresholds["scoring.scoreAnnotations"];
-  if (score >= bands.tooSafe) {
-    return "too_safe";
+): ScoreNote {
+  if (
+    kind === "committed" &&
+    score < thresholds["scoring.committedExpectedScore"]
+  ) {
+    return "explain_miss";
   }
-  if (score >= bands.intended) {
-    return "intended";
-  }
-  if (score < bands.disconnected) {
-    return "disconnected";
+  if (score < thresholds["scoring.scoreBands"].partial) {
+    return "root_cause";
   }
   return "none";
+}
+
+/** A scored key result and the kind of promise it was. */
+export interface KindedScore {
+  readonly score: number | null;
+  readonly kind: OkrKind;
+}
+
+/**
+ * §3.3's one pattern: across a closed cycle, three quarters or more of the
+ * aspirational key results at 1.0 means the targets were too safe. Committed
+ * key results are left out, because meeting a commitment is the point of it.
+ * False with nothing aspirational scored: no set, no pattern.
+ */
+export function tooSafePattern(
+  scored: readonly KindedScore[],
+  thresholds: ResolvedThresholds,
+): boolean {
+  const aspirational = scored.filter(
+    (entry): entry is KindedScore & { score: number } =>
+      entry.kind === "aspirational" && entry.score !== null,
+  );
+  if (aspirational.length === 0) {
+    return false;
+  }
+  const atFull = aspirational.filter((entry) => entry.score >= 1).length;
+  return (
+    atFull / aspirational.length >= thresholds["scoring.closeTooSafeShare"]
+  );
+}
+
+/**
+ * §3.4's committed half: the share of committed key results met, which is
+ * what a committed set is judged by instead of an average. Null with none
+ * scored.
+ */
+export function committedShareMet(
+  scores: readonly number[],
+  thresholds: ResolvedThresholds,
+): number | null {
+  if (scores.length === 0) {
+    return null;
+  }
+  const expected = thresholds["scoring.committedExpectedScore"];
+  return scores.filter((score) => score >= expected).length / scores.length;
+}
+
+/**
+ * Whether a scored key result needs a named root cause (§8.4): an
+ * aspirational one below its threshold, a committed one below its own,
+ * which by default is anything short of 1.0.
+ */
+export function needsRootCause(
+  score: number,
+  kind: OkrKind,
+  thresholds: ResolvedThresholds,
+): boolean {
+  return score < thresholds["scoring.rootCauseThreshold"][kind];
 }
 
 /** One key result's contribution to its objective's score. */
@@ -522,7 +597,9 @@ export type PortfolioVerdict =
   | "outran_capacity";
 
 /**
- * §3.4, the average across a scored set.
+ * §3.4, the average across a scored set of **aspirational** key results.
+ * Committed key results are judged by the share met (`committedShareMet`),
+ * because averaging the two hides both; callers pass the aspirational scores.
  *
  * Null for an empty set rather than a division by zero: the scorecard renders
  * "nothing scored yet", which is a different statement from a bad verdict.
@@ -582,46 +659,55 @@ export function confidenceBand(
 }
 
 export type DraftVerdict =
-  | "sandbagging"
+  | "near_certain"
   | "comfortable"
   | "sweet_spot"
-  | "ambitious"
   | "moonshot";
 
 /**
- * §3.2's second table, judged on the **set** average at drafting time and never
- * on one key result. A single cautious key result is not a sandbagged set.
+ * §3.2's drafting table, judged on the **set** average of the aspirational
+ * key results and never on one key result. A single cautious key result is
+ * not a near-certain set, and a committed key result is judged by the floor
+ * (`belowCommittedFloor`), where high confidence is right.
+ *
+ * Four bands and three boundaries, all in §11: 0.90, 0.70 and 0.30.
  */
 export function draftVerdict(
   average: number,
   thresholds: ResolvedThresholds,
 ): DraftVerdict {
-  const sandbagging = thresholds["scoring.draftSandbagging"];
+  const nearCertain = thresholds["scoring.draftSandbagging"];
   const comfortable = thresholds["scoring.draftComfortable"];
   const moonshot = thresholds["scoring.draftAmbitious"];
-  // §3.2's five bands need four boundaries and the §11 registry holds three:
-  // 0.90, 0.75 and 0.25. The fourth, the sweet spot's floor at 0.40, is the same
-  // number as the confidence low band's own boundary in the same section, so it
-  // is read from there rather than written down a second time. Recorded as an
-  // open question: if the two are ever meant to move apart, §11 needs a
-  // `scoring.draftSweetSpot` parameter, and that is a METHOD.md decision.
-  const sweetSpot = thresholds["scoring.confidenceLow"];
-  if (average > sandbagging) {
-    return "sandbagging";
+  // "Above 0.90" and "above 0.70, up to 0.90": both upper bands are worded
+  // as "above", so each excludes its own boundary, and 0.70 itself is the
+  // top of the sweet spot.
+  if (average > nearCertain) {
+    return "near_certain";
   }
-  // "Above 0.75, up to 0.90" is comfortable, so 0.75 itself is the top of the
-  // sweet spot. Both upper bands are worded as "above" and both exclude their
-  // own boundary.
   if (average > comfortable) {
     return "comfortable";
   }
-  if (average >= sweetSpot) {
+  if (average >= moonshot) {
     return "sweet_spot";
   }
-  if (average >= moonshot) {
-    return "ambitious";
-  }
   return "moonshot";
+}
+
+/**
+ * §3.2's committed rule: a committed key result below the floor, drafted
+ * there or falling there at any check-in, is a risk to escalate now or a
+ * sign it should be aspirational. Never true of an aspirational one.
+ */
+export function belowCommittedFloor(
+  confidence: number,
+  kind: OkrKind,
+  thresholds: ResolvedThresholds,
+): boolean {
+  return (
+    kind === "committed" &&
+    confidence < thresholds["scoring.committedConfidenceFloor"]
+  );
 }
 
 export interface ForecastPoint {

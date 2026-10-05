@@ -174,7 +174,10 @@ describe("what an initiative must not do", () => {
 });
 
 describe("publish gate five, which is the acceptance criterion", () => {
-  it("is red and names the initiative that exceeds capacity", async () => {
+  // METHOD.md §5.5 since P9-T11a: work serving an aspirational OKR may exceed
+  // capacity, and every objective is aspirational until P9-T11b stores the
+  // kind. That task brings back the red gate for a committed one.
+  it("lets an initiative serving an aspirational OKR exceed capacity", async () => {
     const created = await createInitiative({
       keyResultIds: [firstKeyResult, secondKeyResult],
       capacity: "exceeds",
@@ -182,10 +185,7 @@ describe("publish gate five, which is the acceptance criterion", () => {
 
     const five = await gateFive();
     expect(five.evaluable).toBe(true);
-    expect(five.passed).toBe(false);
-    expect(five.missing).toContain(
-      '"Rebuild the activation flow" still exceeds capacity',
-    );
+    expect(five.missing.join(" ")).not.toMatch(/exceeds capacity/);
     expect(created.title).toBe("Rebuild the activation flow");
   });
 

@@ -69,8 +69,12 @@ team meant.
 | 0.4 to 0.7 | Partial |
 | Below 0.4 | Missed |
 
-**Everything above 0.85 across the board is sandbagging**, and the product says
-so. A set where everything was achieved was a set of predictions.
+**Committed and aspirational are read apart.** A committed key result is
+expected at 1.0, and one short of it gets a short explanation of the miss. For
+aspirational key results, an average around 0.7 is healthy, above 0.85 the
+targets may not have been ambitious enough, and three quarters or more at 1.0
+is the pattern the product calls too safe. A set where every stretch was
+achieved was a set of predictions.
 
 ## The quarterly review
 

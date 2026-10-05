@@ -443,6 +443,39 @@ describe("the checks METHOD.md words but corpus entry 4 does not exercise", () =
     ).toBe("warn");
   });
 
+  it("judges KR-6 on the aspirational key results alone", () => {
+    // METHOD.md §3.2: high confidence is right for a committed key result, so
+    // a committed set near certain is not a near-certain stretch.
+    expect(
+      krVerdict(
+        "KR-6",
+        evaluateKeyResults(
+          {
+            keyResults: [
+              one({ confidence: 0.95, kind: "committed" }),
+              one({ confidence: 1, kind: "committed" }),
+            ],
+          },
+          thresholds,
+        ),
+      )?.status,
+    ).toBe("pass");
+    expect(
+      krVerdict(
+        "KR-6",
+        evaluateKeyResults(
+          {
+            keyResults: [
+              one({ confidence: 1, kind: "committed" }),
+              one({ confidence: 0.5, kind: "aspirational" }),
+            ],
+          },
+          thresholds,
+        ),
+      )?.status,
+    ).toBe("pass");
+  });
+
   it("leaves KR-6 as todo while nobody has set a confidence", () => {
     const result = evaluateKeyResults(
       { keyResults: [one({ confidence: null })] },

@@ -77,8 +77,15 @@ const MANIFEST: Record<
       minRows: 12,
     },
     "scoring.score-bands": {
-      columns: ["case", "score", "expected_band", "expected_annotation"],
-      minRows: 13,
+      // Notes by kind since P9-T11a (METHOD.md §3.3).
+      columns: [
+        "case",
+        "score",
+        "expected_band",
+        "aspirational_note",
+        "committed_note",
+      ],
+      minRows: 10,
     },
     "scoring.portfolio": {
       columns: ["case", "average", "expected"],
@@ -89,8 +96,9 @@ const MANIFEST: Record<
       minRows: 8,
     },
     "scoring.draft-confidence": {
+      // Four bands since P9-T11a (METHOD.md §3.2), so two fewer boundaries.
       columns: ["case", "average", "expected"],
-      minRows: 12,
+      minRows: 10,
     },
   },
   "p3-t00-cadence-engine.md": {

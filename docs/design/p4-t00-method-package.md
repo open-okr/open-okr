@@ -356,7 +356,7 @@ the rule they cite.
 | 17 | Reported health disagrees with data | Scoring engine | `quality.divergence` |
 | 18 | Trend forecast misses target | Scoring engine | `quality.trending_off` |
 | 19 | KPI drops out of corridor | KPI engine | `kpi.unhealthy` |
-| 20 | Scores near 1.0 at close | Scoring engine | `quality.sandbagging_close` |
+| 20 | A pattern of 1.0s on aspirational key results at close | Scoring engine | `quality.sandbagging_close` |
 
 Items 12, 15-20 are triggers from AI-NATIVE-PLAN.md SS6.4 rather than SS4
 quality checks. They fire at runtime, not at drafting time. Their rule keys

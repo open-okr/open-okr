@@ -836,7 +836,10 @@ describe("the workflow snapshot now that goals exist", () => {
     expect(gateThree?.missing[0]).toContain("Make mobile");
   });
 
-  it("reports gate 5 red while a key result still exceeds capacity", async () => {
+  // METHOD.md §5.5 since P9-T11a: an aspirational OKR may exceed capacity, and
+  // every objective is aspirational until P9-T11b stores the kind. That task
+  // brings back the red gate for a committed one.
+  it("lets an aspirational key result exceed capacity without a gate 5 warning", async () => {
     const wb = await workerDb();
     const created = await createGoal({
       contributionStatement: "Carries the annual mobile thrust",
@@ -859,8 +862,7 @@ describe("the workflow snapshot now that goals exist", () => {
     );
     const gateFive = read.gates.find((gate) => gate.gateKey === 5);
     expect(gateFive?.evaluable).toBe(true);
-    expect(gateFive?.passed).toBe(false);
-    expect(gateFive?.missing.join(" ")).toMatch(/exceeds capacity/);
+    expect(gateFive?.missing.join(" ")).not.toMatch(/exceeds capacity/);
 
     void keyResults;
   });

@@ -32,7 +32,7 @@ These are not preferences. Every rule below serves one of them.
 1. **Objectives are destinations, key results are the proof.** If the objective contains a number, it is a key result in disguise. If a key result has no baseline and target, it is an opinion.
 2. **Measure impact, not effort.** "Hold 12 interviews" is an output. "Raise activation from 41% to 60%" is an outcome. The output may be how you get there. It is never the goal.
 3. **Focus is a decision, not a wish.** A priority list that accommodates everything is a to-do list. The not-doing list is as valuable as the priority list, and it must be written down.
-4. **Stretch honestly.** Around 0.6 to 0.7 confidence at drafting is the target. Certainty means the target was too safe. Fantasy means nobody believes it.
+4. **Know what kind of promise you are making.** A committed OKR is expected to be delivered in full. An aspirational OKR is a stretch: about 5 in 10 confidence when drafted, and around 0.7 at the close, is healthy. *Source:* Google's OKR playbook; Wodtke.
 5. **The rhythm is the product.** OKRs reviewed only at quarter end are worse than no OKRs. Weekly check-ins, monthly reviews and a quarterly close are booked before the cycle starts.
 6. **Scores are planning data, never appraisal.** The moment a score feels like a performance review, candour dies and the numbers stop being useful.
 7. **Nothing carries over by default.** Every cycle starts with a blank sheet. An objective that survives should survive on purpose.
@@ -162,6 +162,23 @@ A workspace chooses the levels it uses (§12). A change applies to cycles that s
 
 Every objective carries 2 to 5 key results: block at none, warn at one or above five. A unit may contribute to another unit's OKRs instead of setting its own. Record which units do this. *Source:* Doerr: "A limit of three to five OKRs per cycle" and "five or fewer" key results; re:Work: "around three key results per objective"; Castro: "2 to 5 Key Results".
 
+### 2.8 Committed and aspirational OKRs
+
+Every objective is one of two kinds. The kind is chosen when it is written and can be changed, visibly, until the close.
+
+| Kind | Meaning | Expected score | When it misses |
+|---|---|---|---|
+| **Committed** | "OKRs that we agree will be achieved, and we will be willing to adjust schedules and resources to ensure that they are delivered" | 1.0 | "A score of less than 1.0 requires explanation for the miss." A short postmortem, not a punishment. Escalate early when it is at risk |
+| **Aspirational** | "OKRs express how we'd like the world to look, even though we have no clear idea how to get there and/or the resources necessary" | An average around 0.7, "with high variance" | Normal. It may carry forward until it is achieved |
+
+Rules that depend on the kind:
+
+- Stretch coaching (§3.2, KR-6), "too safe" notes (§3.3, §3.4), and capacity allowed to exceed (§5.5) apply to aspirational OKRs only.
+- A committed OKR should credibly consume most, but not all, of the team's resources. Committed and aspirational together may consume somewhat more.
+- New objectives are aspirational by default (§12). A workspace may use one kind only.
+
+*Source:* Google's OKR playbook, all quotations above. It names "Failing to differentiate between committed and aspirational OKRs" as its first trap.
+
 ### 2.9 Writing and changing OKRs at any time
 
 **Who may write, and when.** By default, any member who can edit a space may create, change, start or stop its objectives and key results at any time in the cycle. *Source:* Doerr; decided by Akmal on 1 October 2026. A workspace may restrict this in its practice settings (§12):
@@ -215,15 +232,18 @@ Equal baseline and target scores 0. A goal's progress is the weighted average of
 
 One further rule inside the low band: at 0.3 and below, the coordinator raises it with management the same day.
 
-At drafting time, judge the *set*, not each key result:
+**At drafting time, judge the set.** For aspirational key results, judge the average:
 
 | Average confidence at draft | Verdict |
 |---|---|
-| Above 0.90 | Sandbagging. If you are near certain, this is business as usual, not an OKR. Raise the targets |
-| Above 0.75, up to 0.90 | Comfortable. Stretch until it feels like a 6 or 7 out of 10 |
-| 0.40 to 0.75 | The sweet spot. A real stretch you still believe in |
-| 0.25 to below 0.40 | Ambitious. Check that the team genuinely believes it is possible |
-| Below 0.25 | A moonshot bordering on fantasy. Make sure there is a credible path |
+| Above 0.90 | Near certain. If this must be delivered, mark it committed. If it is a stretch, raise the targets |
+| Above 0.70, up to 0.90 | Comfortable. A stretch usually feels like 5 in 10 |
+| 0.30 to 0.70 | The sweet spot. A real stretch you still believe in |
+| Below 0.30 | A moonshot. Make sure there is a credible path, and expect a low score |
+
+*Source:* Wodtke: "you set a difficult number you have a 50% confidence in achieving"; "A confidence level of ten is also known as sandbagging."
+
+For committed key results, high confidence is right. A committed key result below 0.7, whether drafted there or falling there at any check-in, is a risk: escalate now to find the resources, or make it aspirational. *Source:* Google's OKR playbook: "Teams who cannot credibly promise to deliver a 1.0 on a committed OKR must escalate promptly."
 
 ### 3.3 Score bands
 
@@ -236,24 +256,32 @@ Scored at the close, against the key result as written. No partial credit for ef
 | 0.4 to below 0.7 | Partial progress. Examine what limited it |
 | Below 0.4 | Little progress. Examine the target, the capacity, or the tracking |
 
-Per key result, the coach annotates. First match wins; a score from 0.3 to below 0.6 gets no note:
+The coach annotates. First match wins; nothing else gets a note:
 
 | Score | Note |
 |---|---|
-| 1.0 | The target was too safe |
-| 0.6 to below 1.0 | On the intended level |
-| Below 0.3 | Disconnected from capacity |
+| A pattern of 1.0 | Across a closed cycle, when three quarters or more of the aspirational key results scored 1.0: "the targets were too safe" |
+| Committed, below 1.0 | "Write the short explanation of the miss" |
+| Below 0.4 | "Little progress. Pick its root cause" |
+
+*Source:* Klau: "if someone consistently gets 1.0, their OKRs aren't ambitious enough."
 
 ### 3.4 Portfolio verdict
 
-The average across a scored set.
+Committed and aspirational key results are reported separately, because averaging them hides both.
+
+**Committed:** the share met, and each miss with its explanation.
+
+**Aspirational:** the average across the scored set.
 
 | Average | Verdict |
 |---|---|
-| Above 0.85 | Targets were too safe |
+| Above 0.85 | The targets may not have been ambitious enough |
 | 0.60 to 0.85 | Healthy portfolio |
 | 0.40 to below 0.60 | Partial. Examine what limited it |
-| Below 0.40 | Targets outran capacity |
+| Below 0.40 | Investigate: the strategy, the capacity or the cadence (§8.6) |
+
+*Source:* Google's OKR playbook and re:Work: "Scoring higher may mean the aspirational goals are not being set high enough."
 
 ### 3.5 Health
 
@@ -390,7 +418,7 @@ The lower bound of four words was removed on 1 October 2026: whatmatters' own "A
 
 *Source:* Google's OKR playbook: key results "must describe outcomes, not activities"; Cagan on outcomes over output. Google's own sample "Launch xx feature to all users" and Intel's Operation Crush key results show outputs are sometimes the honest measure, which is why this warns.
 
-**KR-6 Ambitious but honest.** Judged on the set's average confidence, per §3.2.
+**KR-6 Ambitious but honest.** Aspirational key results only, judged on the set's average confidence (§3.2). For committed key results, see §3.2's committed rule.
 
 **KR-7 Direction set.** Fail unless the direction is one of increase, reduce, maintain, move.
 
@@ -446,6 +474,7 @@ The coach shows these beside the check that fired.
 | KR: Improve customer satisfaction | KR: Increase NPS from 32 to 50 (lagging). KR: Cut first-response time from 9h to 2h (leading) | No baseline, no target, no way to score it. The strong pair sets from and to, and combines lagging proof with a leading signal you can steer weekly |
 | KR: Hold 12 customer interviews | KR: Raise activation rate of new sign-ups from 41% to 60% (lagging). KR: Interview 12 churned customers by week 6 (leading) | Interviews alone are activity. Ask what they are for and measure that outcome; the interviews can stay as a tagged leading signal |
 | KR: Increase sales calls from 40 to 120 per week | KR: Grow qualified pipeline from $1.2M to $3.0M (lagging). KR: Lift call-to-meeting conversion from 8% to 15% (leading) | Measurable, but still an output. If 120 calls create no pipeline, the key result was achieved and the quarter was wasted |
+| Committed objective whose key results are all at 0.4 confidence | Either find the resources now, or mark it aspirational | A commitment nobody believes in is a risk to escalate, not a stretch |
 
 ---
 
@@ -493,7 +522,12 @@ Every dependency records: the key result that depends, the providing team, wheth
 
 ### 5.5 Capacity
 
-For every key result, record the main initiatives that will move it and one of three capacity verdicts: **fits**, **tight**, **exceeds**. Nothing may remain at "exceeds" when the set is published. The facilitator must record what was cut. If the answer is "nothing", capacity was not checked.
+For every key result, record the main initiatives that will move it and one of three capacity verdicts: **fits**, **tight**, **exceeds**.
+- **Committed OKRs:** a committed OKR left at "exceeds" is a warning at publish (gate 5).
+- **Aspirational OKRs:** they may exceed.
+- **What was cut:** the facilitator asks each team what it cut to make room, and records it. "Nothing" is worth a second question.
+
+*Source:* Google's OKR playbook: a team's committed OKRs should credibly consume most, but not all, of its resources, and its committed and aspirational OKRs together "somewhat more than their available resources".
 
 ---
 
@@ -669,7 +703,7 @@ The cycle score is a different question about a different set, and stays the pla
 
 ### 8.4 Root causes
 
-Every key result under 0.7 gets exactly one primary cause:
+Every aspirational key result below 0.6, and every committed key result below 1.0, gets exactly one primary cause:
 
 1. Ambition set too high
 2. Wrong key result. We measured the wrong thing
@@ -762,7 +796,7 @@ What a good coach says at each phase. The product surfaces these as notes to the
 | 4 Draft OKRs | The most frequent defect is the task-shaped key result. The tell is a leading verb like launch, complete or deliver. Ask "what changes if this succeeds?" and measure that. Missing baselines are second. If a baseline is unknown, establishing it can be the first key result. Run peer review between teams before leadership sees the drafts |
 | 5 Align and commit | Run alignment and dependencies as a joint session or a structured asynchronous review. Watch for silent overload. Teams rarely volunteer that the plan does not fit. Ask each team directly what they cut. If the answer is nothing, capacity was not checked |
 | 6 Run the cadence | Book every check-in and review for the whole cycle before it starts. Keep check-ins forward-looking. Status lives in the product, the meeting is for decisions |
-| 7 Review and learn | Hold the review before drafting the next cycle, never in the same session. Scores near 1.0 across the board indicate sandbagging. Name it and address stretch explicitly in the next Phase 4 |
+| 7 Review and learn | Hold the review before drafting the next cycle, never in the same session. A pattern of 1.0s on aspirational key results suggests sandbagging. Name it and address stretch explicitly in the next Phase 4 |
 
 ---
 
@@ -777,7 +811,7 @@ The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice beh
 | Key result has no baseline | Where are you today? If you do not know, establishing it can be the first key result |
 | Key result measures activity volume | More calls, to what end? Name that impact and make it the key result |
 | All key results are lagging | You will only find out at the end. Add a leading indicator you can act on weekly |
-| Average confidence above 0.9 at draft | That is sandbagging. If you are near certain, this is business as usual |
+| Aspirational set near certain at draft | If this must be delivered, mark it committed. If it is a stretch, raise the targets |
 | More than five company objectives | If everything is a priority, nothing can be chosen. Which two would you drop? |
 | Not-doing list empty at Phase 3 exit | A list that accommodates everything is a to-do list, not a strategy |
 | Goal with no parent | This OKR is an island. Name the priority it moves forward |
@@ -791,7 +825,7 @@ The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice beh
 | Reported health disagrees with the data | Reported on track, but this key result has not moved in four weeks |
 | Trend forecast misses the target | On current trajectory this misses. Better to say it now than at the close |
 | KPI drops out of its corridor | This KPI is unhealthy. Here is a recovery OKR drafted from its leading drivers |
-| Scores near 1.0 across a closed cycle | Targets were too safe. Address stretch explicitly when drafting the next cycle |
+| Pattern of 1.0s on aspirational key results at the close | Targets were too safe. Address stretch explicitly when drafting the next cycle |
 
 The coach never guesses at the situation. Every one of the twenty maps to a rule in this document, and every message cites the rule so the recipient can argue with it.
 
@@ -830,14 +864,17 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Confidence high boundary | 0.7 |
 | Confidence low boundary | 0.4 |
 | Critical confidence | 0.3 and below escalates the same day |
-| Draft sandbagging threshold | Average above 0.90 |
-| Draft comfortable boundary | 0.75 |
-| Draft ambitious boundary | 0.25 |
+| Aspirational draft target | About 0.5, shown as 5 in 10 |
+| Draft near-certain threshold | Average above 0.90 on aspirational key results |
+| Draft comfortable boundary | 0.70 |
+| Draft moonshot boundary | 0.30 |
+| Committed confidence floor | 0.7, at drafting and at every check-in |
 | Score band boundaries | 0.9, 0.7, 0.4 |
-| Score annotation boundaries | 1.0 too safe, 0.6 and above intended, below 0.3 disconnected |
-| Portfolio verdict boundaries | 0.85, 0.60, 0.40 |
-| Close sandbagging threshold | Scores clustering above 0.85 |
-| Root-cause threshold | Scores below 0.7 require a cause |
+| Committed expected score | 1.0 |
+| Aspirational expected average | 0.7 |
+| Portfolio verdict boundaries | 0.85, 0.60, 0.40, over aspirational key results |
+| Close too-safe pattern | Three quarters or more of a closed cycle's aspirational key results at 1.0 |
+| Root-cause threshold | Aspirational below 0.6, committed below 1.0 |
 | Progress ceiling | 100%, raisable to 200% |
 | Progress signal pass | 75% |
 | Progress signal fail | 50% |

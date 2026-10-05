@@ -6036,7 +6036,8 @@ export const setRootCause = defineWriteAction({
         tx,
         workspaceId,
         input.sessionId,
-        thresholds["scoring.rootCauseThreshold"],
+        // Every objective is aspirational until P9-T11b stores the kind.
+        thresholds["scoring.rootCauseThreshold"].aspirational,
       );
       const target = missed.find(
         (entry) => entry.keyResultId === input.keyResultId,
@@ -6181,7 +6182,9 @@ export const readRootCauses = defineReadAction({
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, context.workspaceId),
         );
-        const threshold = thresholds["scoring.rootCauseThreshold"];
+        // Every objective is aspirational until P9-T11b stores the kind, so
+        // the aspirational threshold is the one the screen states.
+        const threshold = thresholds["scoring.rootCauseThreshold"].aspirational;
         const missed = await missedKeyResultsInTx(
           tx,
           context.workspaceId,
@@ -7718,7 +7721,8 @@ export const readMinutes = defineReadAction({
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, workspaceId),
         );
-        const threshold = thresholds["scoring.rootCauseThreshold"];
+        // Every objective is aspirational until P9-T11b stores the kind.
+        const threshold = thresholds["scoring.rootCauseThreshold"].aspirational;
 
         // --- the scored key results, which most of the summary counts ---
         const scoreRows = await tx
@@ -8427,7 +8431,9 @@ export const readScoringStatus = defineReadAction({
           await readRhythmRow(tx, context.workspaceId),
         );
         // §8.6's own words: the §3.4 portfolio average over scored key results.
-        // A plain average over key results, not over objective scores.
+        // A plain average over key results, not over objective scores. §3.4
+        // averages the aspirational ones only, and every objective is
+        // aspirational until P9-T11b stores the kind.
         //
         // Over the revealed rows only, for the reason the output schema gives:
         // a running average that counted unrevealed grades would be the hidden

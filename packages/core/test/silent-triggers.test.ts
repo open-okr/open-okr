@@ -384,15 +384,17 @@ describe("the Coach's seven", () => {
     expect(said(nudges, "quality.no_cuts")).toEqual([ownerMemberId]);
   });
 
-  it("quality.sandbagging_close tells the sponsor when an ended cycle's scores cluster high", async () => {
+  it("quality.sandbagging_close tells the sponsor when an ended cycle's aspirational scores are mostly 1.0", async () => {
     const wb = await workerDb();
     const goalId = await goal({ cycleId: planningCycleId });
     const krs = [
       await keyResult(goalId),
       await keyResult(goalId, "Grow mobile revenue from 1.2m to 2m"),
     ];
+    // METHOD.md §3.3's pattern: three quarters or more at 1.0. Every
+    // objective is aspirational until P9-T11b stores the kind.
     await wb.admin.query(
-      "update key_results set score = 0.95 where id = any($1::uuid[])",
+      "update key_results set score = 1 where id = any($1::uuid[])",
       [krs],
     );
     const during = await read((tx) =>
