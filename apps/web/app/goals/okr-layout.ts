@@ -384,3 +384,102 @@ export function layoutOkrTree(
 
   return { nodes, edges, parentOf, childrenOf: visibleChildren };
 }
+
+/**
+ * Where an objective may be moved under (P9-T10b): the cycle itself, any
+ * objective, or any key result, except itself and whatever already hangs
+ * below it, which would make a loop the server refuses anyway. In the list's
+ * order, each objective followed by its key results.
+ */
+export function moveTargets(
+  tree: OkrTree,
+  goalId: string,
+): {
+  readonly value: string;
+  readonly kind: "cycle" | "objective" | "keyResult";
+  readonly title: string;
+  /** The objective a key result belongs to. */
+  readonly of?: string;
+}[] {
+  const owner = new Map<string, string>();
+  for (const goal of tree.goals) {
+    for (const keyResult of goal.keyResults) {
+      owner.set(keyResult.id, goal.id);
+    }
+  }
+  const children = new Map<string, string[]>();
+  for (const goal of tree.goals) {
+    const parent =
+      goal.parentGoalId ??
+      (goal.parentKeyResultId ? owner.get(goal.parentKeyResultId) : undefined);
+    if (parent) {
+      children.set(parent, [...(children.get(parent) ?? []), goal.id]);
+    }
+  }
+  const below = new Set<string>([goalId]);
+  const stack = [goalId];
+  while (stack.length > 0) {
+    for (const child of children.get(stack.pop() as string) ?? []) {
+      if (!below.has(child)) {
+        below.add(child);
+        stack.push(child);
+      }
+    }
+  }
+  const targets: ReturnType<typeof moveTargets> = [
+    { value: "cycle", kind: "cycle", title: tree.cycle.name },
+  ];
+  const parents = [
+    ...tree.context.map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      keyResults: entry.keyResults,
+    })),
+    ...tree.goals,
+  ];
+  for (const goal of parents) {
+    if (below.has(goal.id)) {
+      continue;
+    }
+    targets.push({
+      value: `goal:${goal.id}`,
+      kind: "objective",
+      title: goal.title,
+    });
+    for (const keyResult of goal.keyResults) {
+      targets.push({
+        value: `kr:${keyResult.id}`,
+        kind: "keyResult",
+        title: keyResult.title,
+        of: goal.title,
+      });
+    }
+  }
+  return targets;
+}
+
+/**
+ * Where a card moved among its siblings lands (P9-T10b), as the `afterId`
+ * `goals.place` takes: the objective it now follows in the cycle's whole
+ * order, or null for first. `slot` is its place among the other siblings.
+ * The order is the list's, so a sibling put first among its siblings goes
+ * just before the sibling that was first, whatever stands between them.
+ */
+export function afterForSlot(
+  order: readonly string[],
+  siblings: readonly string[],
+  id: string,
+  slot: number,
+): string | null {
+  const rest = siblings.filter((sibling) => sibling !== id);
+  if (slot > 0) {
+    return rest[Math.min(slot, rest.length) - 1] ?? null;
+  }
+  const first = rest[0];
+  if (first === undefined) {
+    return null;
+  }
+  const others = order.filter((entry) => entry !== id);
+  const at = others.indexOf(first);
+  return at > 0 ? (others[at - 1] ?? null) : null;
+}

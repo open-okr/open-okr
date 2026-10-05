@@ -12,7 +12,7 @@ import {
   useKeyResultCells,
   useObjectiveCells,
 } from "./okr-editing.ts";
-import { keyResultHandle } from "./okr-layout.ts";
+import { keyResultHandle, type moveTargets } from "./okr-layout.ts";
 
 /**
  * The diagram's cards (P9-T09a, edited in place since P9-T10a,
@@ -55,6 +55,13 @@ export interface DiagramShared {
   ) => Promise<string | null>;
   /** The objectives on screen, for a draft to name its parent. */
   readonly goalById: (id: string) => OkrGoal | undefined;
+  /** The card whose "Move under…" choice is open, or null (P9-T10b). */
+  readonly moving: string | null;
+  readonly setMoving: (goalId: string | null) => void;
+  /** Where a card may move under, as `moveTargets` lists them. */
+  readonly targetsFor: (goalId: string) => ReturnType<typeof moveTargets>;
+  /** "cycle", `goal:<id>` or `kr:<id>`, from either way of moving. */
+  readonly moveTo: (goalId: string, target: string) => void;
 }
 
 export const DiagramContext = createContext<DiagramShared | null>(null);
@@ -108,8 +115,23 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
         isConnectable={false}
         className={HIDDEN_HANDLE}
       />
+      {/* The way to move a card by pointer: dragged onto another card, a key
+       * result's row, the annual band or the cycle. "Move under…" below is
+       * the keyboard's way to the same move (P9-T10b). */}
+      {shared.canEdit ? (
+        <Handle
+          type="source"
+          position={Position.Top}
+          id="move"
+          isConnectable
+          title={t("okrDiagram.dragToMove")}
+          className="!left-2.5 !top-2.5 !h-3.5 !w-3.5 !translate-x-0 !translate-y-0 !rounded-sm !border !border-line-2 !bg-raised hover:!border-brand hover:!bg-brand-weak"
+        />
+      ) : null}
       <div className="flex flex-col gap-1 px-3 pt-2">
-        <span className="flex items-center gap-1.5 pr-10 text-[10px] font-bold uppercase tracking-wider text-ink-3">
+        <span
+          className={`flex items-center gap-1.5 pr-10 text-[10px] font-bold uppercase tracking-wider text-ink-3 ${shared.canEdit ? "pl-4" : ""}`}
+        >
           {goal.level}
           <span className="truncate font-normal normal-case tracking-normal">
             {goal.champion.name}
@@ -178,7 +200,9 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
       {/* On an open card only: adding to a folded one would open it anyway,
        * and leaving them off the folded cards is what keeps three hundred
        * objectives inside their budget on arrival (design §7). */}
-      {shared.canEdit && goal.closedAt === null && !collapsed ? (
+      {shared.canEdit && !collapsed && shared.moving === goal.id ? (
+        <MoveUnder goal={goal} />
+      ) : shared.canEdit && goal.closedAt === null && !collapsed ? (
         <span className="mt-auto flex items-center gap-1 border-t border-line px-2 py-1">
           <button
             type="button"
@@ -201,6 +225,17 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
             className="nodrag rounded-control px-1.5 py-0.5 text-[11px] font-semibold text-brand-text hover:bg-brand-weak"
           >
             {t("okrDiagram.addAligned")}
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              shared.setMoving(goal.id);
+            }}
+            aria-label={t("okrDiagram.moveUnderOf", { title: goal.title })}
+            className="nodrag ml-auto rounded-control px-1.5 py-0.5 text-[11px] font-semibold text-ink-3 hover:bg-raised hover:text-ink"
+          >
+            {t("okrDiagram.moveUnder")}
           </button>
         </span>
       ) : null}
@@ -295,7 +330,10 @@ function KeyResultRow({
   const title = keyResult.title;
 
   return (
-    <li className="relative flex h-[30px] items-center gap-1.5 border-b border-line px-3 text-[11px] text-ink-2 last:border-b-0">
+    <li
+      data-kr-id={keyResult.id}
+      className="relative flex h-[30px] items-center gap-1.5 border-b border-line px-3 text-[11px] text-ink-2 last:border-b-0"
+    >
       {cells.easing !== null ? (
         <EasingReason
           from={keyResult.targetValue}
@@ -335,6 +373,60 @@ function KeyResultRow({
         className={HIDDEN_HANDLE}
       />
     </li>
+  );
+}
+
+/**
+ * "Move under…", the keyboard's way to re-parent (§5.4): every place the
+ * card may hang from, chosen and saved at once, with the same six-second
+ * undo a drag gets. Escape leaves it where it was.
+ */
+function MoveUnder({ goal }: { readonly goal: OkrGoal }) {
+  const { t } = useTranslations();
+  const shared = useDiagram();
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    box.current?.querySelector<HTMLSelectElement>("select")?.focus();
+  }, []);
+  const current = goal.parentKeyResultId
+    ? `kr:${goal.parentKeyResultId}`
+    : goal.parentGoalId
+      ? `goal:${goal.parentGoalId}`
+      : "cycle";
+  return (
+    <span
+      ref={box}
+      className="nodrag mt-auto flex items-center gap-1 border-t border-line px-2 py-1"
+    >
+      <select
+        aria-label={t("okrDiagram.moveUnderOf", { title: goal.title })}
+        defaultValue={current}
+        onChange={(event) => {
+          shared.moveTo(goal.id, event.target.value);
+          shared.setMoving(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            shared.setMoving(null);
+          }
+        }}
+        onBlur={() => shared.setMoving(null)}
+        className="min-w-0 flex-1 rounded-control border border-line bg-surface px-1 py-0.5 text-[11px] text-ink"
+      >
+        {shared.targetsFor(goal.id).map((target) => (
+          <option key={target.value} value={target.value}>
+            {target.kind === "cycle"
+              ? t("okrDiagram.underTheCycle", { cycle: target.title })
+              : target.kind === "keyResult"
+                ? t("okrDiagram.underKeyResult", {
+                    title: target.title,
+                    objective: target.of ?? "",
+                  })
+                : target.title}
+          </option>
+        ))}
+      </select>
+    </span>
   );
 }
 
@@ -512,6 +604,7 @@ function ContextCard({ data }: NodeProps<Node<ContextData, "context">>) {
         {context.keyResults.map((keyResult) => (
           <li
             key={keyResult.id}
+            data-kr-id={keyResult.id}
             className="relative flex h-[22px] items-center px-3 text-[10px] text-ink-3"
           >
             <span className="truncate">{keyResult.title}</span>

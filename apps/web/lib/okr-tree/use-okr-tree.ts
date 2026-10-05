@@ -55,6 +55,7 @@ import {
   patchKeyResultIn,
   placeGoalIn,
   placeKeyResultIn,
+  reparentIn,
   withoutGoal,
   withoutKeyResult,
 } from "./cache.ts";
@@ -120,6 +121,8 @@ function optimistic(tree: OkrTree, mutation: OkrMutation): OkrTree {
       return placeKeyResultIn(tree, mutation.id, mutation.afterId);
     case "deleteGoal":
       return withoutGoal(tree, mutation.id);
+    case "reparent":
+      return reparentIn(tree, mutation.id, mutation);
     case "restoreKeyResult":
     case "restoreGoal":
     case "checkIn":
@@ -220,6 +223,28 @@ export function useOkrMutation(input: {
             label: t("okrTree.undo"),
             run: () =>
               mutation.mutate({ kind: "restoreKeyResult", id: change.id }),
+          },
+        });
+      }
+      if (change.kind === "reparent" && !change.undo) {
+        toast.show({
+          tone: "ok",
+          message: t("okrTree.objectiveMoved"),
+          source: change.id,
+          action: {
+            label: t("okrTree.undo"),
+            run: () =>
+              mutation.mutate({
+                kind: "reparent",
+                id: change.id,
+                parentGoalId: change.from.parentGoalId,
+                parentKeyResultId: change.from.parentKeyResultId,
+                from: {
+                  parentGoalId: change.parentGoalId,
+                  parentKeyResultId: change.parentKeyResultId,
+                },
+                undo: true,
+              }),
           },
         });
       }

@@ -170,6 +170,26 @@ export function withoutGoal(tree: OkrTree, id: string): OkrTree {
  * Its progress, health and verdicts are the recomputed ones, which is the
  * point of merging it rather than keeping the optimistic copy.
  */
+/**
+ * An objective hung under another parent (P9-T10b): an objective, one of its
+ * key results, or nothing. One pointer at most, as the server keeps it, so
+ * setting either clears the other.
+ */
+export function reparentIn(
+  tree: OkrTree,
+  goalId: string,
+  parent: {
+    readonly parentGoalId: string | null;
+    readonly parentKeyResultId: string | null;
+  },
+): OkrTree {
+  return onGoal(tree, goalId, (goal) => ({
+    ...goal,
+    parentGoalId: parent.parentKeyResultId ? null : parent.parentGoalId,
+    parentKeyResultId: parent.parentKeyResultId,
+  }));
+}
+
 export function mergeGoal(tree: OkrTree, node: OkrGoal): OkrTree {
   return tree.goals.some((goal) => goal.id === node.id)
     ? onGoal(tree, node.id, () => node)

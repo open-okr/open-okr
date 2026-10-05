@@ -286,6 +286,47 @@ describe("useOkrMutation", () => {
   });
 });
 
+describe("moving an objective (P9-T10b)", () => {
+  test("hangs it under its new parent at once, and the undo puts it back where it hung", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    runOkrMutation.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    act(() =>
+      okr.mutate({
+        kind: "reparent",
+        id: "g",
+        parentGoalId: "parent",
+        parentKeyResultId: null,
+        from: { parentGoalId: null, parentKeyResultId: null },
+      }),
+    );
+    await settle();
+    // The line moves before the server answers.
+    expect(cached()?.goals[0]?.parentGoalId).toBe("parent");
+    await act(async () => answer({ ok: true, goal: null }));
+    await settle();
+
+    const undo = document.querySelector<HTMLButtonElement>(
+      '[data-testid="toast-action"]',
+    );
+    expect(undo?.textContent).toBe("Undo");
+    runOkrMutation.mockResolvedValueOnce({ ok: true, goal: null });
+    await act(async () => undo?.click());
+    await settle();
+    expect(runOkrMutation).toHaveBeenLastCalledWith({
+      kind: "reparent",
+      id: "g",
+      parentGoalId: null,
+      parentKeyResultId: null,
+      from: { parentGoalId: "parent", parentKeyResultId: null },
+      undo: true,
+    });
+  });
+});
+
 describe("useOkrLive", () => {
   test("re-reads the cycle when another tab says it changed", async () => {
     const invalidate = vi.spyOn(client, "invalidateQueries");

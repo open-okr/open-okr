@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  afterForSlot,
   COLLAPSE_PAST,
   collapsedByDefault,
   contextNodeId,
@@ -7,6 +8,7 @@ import {
   type DiagramNode,
   keyResultHandle,
   layoutOkrTree,
+  moveTargets,
 } from "../app/goals/okr-layout.ts";
 import type { OkrTree } from "../lib/okr-tree/cache.ts";
 
@@ -341,4 +343,30 @@ test("a folded card carries no actions, so three hundred arrive lean", () => {
     "a",
   );
   expect(folded.height).toBe(bare.height);
+});
+
+/** Moving on the diagram (P9-T10b). */
+describe("moving", () => {
+  test("an objective may move under the cycle, anything else, or a key result, but not under itself or what hangs below it", () => {
+    const targets = moveTargets(
+      tree([
+        goal("a", { level: "company", keyResultIds: ["ka"] }),
+        goal("b", { level: "company" }),
+        goal("a1", { parentGoalId: "a", keyResultIds: ["ka1"] }),
+        goal("a11", { parentKeyResultId: "ka1" }),
+      ]),
+      "a1",
+    ).map((target) => target.value);
+    expect(targets).toEqual(["cycle", "goal:a", "kr:ka", "goal:b"]);
+  });
+
+  test("a card put among its siblings lands after the one to its left, or just before the first", () => {
+    const order = ["x", "a", "y", "b", "c"];
+    const siblings = ["a", "b", "c"];
+    expect(afterForSlot(order, siblings, "c", 1)).toBe("a");
+    expect(afterForSlot(order, siblings, "a", 2)).toBe("c");
+    // First among its siblings: just before "a", which "x" precedes.
+    expect(afterForSlot(order, siblings, "c", 0)).toBe("x");
+    expect(afterForSlot(["a", "b"], ["a", "b"], "b", 0)).toBeNull();
+  });
 });

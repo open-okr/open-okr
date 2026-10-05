@@ -10,6 +10,7 @@ import {
   patchKeyResultIn,
   placeGoalIn,
   placeKeyResultIn,
+  reparentIn,
   withoutGoal,
   withoutKeyResult,
 } from "../lib/okr-tree/cache.ts";
@@ -192,5 +193,39 @@ describe("moving and deleting before the server answers (P9-T07b-b)", () => {
 
   it("takes an objective off the list", () => {
     expect(withoutGoal(tree, "a").goals.map((row) => row.id)).toEqual(["b"]);
+  });
+});
+
+describe("reparentIn (P9-T10b)", () => {
+  const tree = (): OkrTree =>
+    ({
+      cycle: {
+        id: "c",
+        name: "Q1",
+        mode: "quarterly",
+        startsOn: "2027-01-01",
+        endsOn: "2027-03-31",
+      },
+      goals: [goal("a"), goal("b", { parentGoalId: "a" })],
+      context: [],
+      dependencies: [],
+    }) as OkrTree;
+
+  it("hangs an objective under a key result and clears its objective parent, one pointer at most", () => {
+    const moved = reparentIn(tree(), "b", {
+      parentGoalId: null,
+      parentKeyResultId: "k",
+    }).goals[1];
+    expect(moved?.parentGoalId).toBeNull();
+    expect(moved?.parentKeyResultId).toBe("k");
+  });
+
+  it("hangs it from the cycle when both are null, and touches nothing else", () => {
+    const next = reparentIn(tree(), "b", {
+      parentGoalId: null,
+      parentKeyResultId: null,
+    });
+    expect(next.goals[1]?.parentGoalId).toBeNull();
+    expect(next.goals[0]).toEqual(tree().goals[0]);
   });
 });

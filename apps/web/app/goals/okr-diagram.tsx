@@ -40,9 +40,11 @@ import {
 import { OkrDrawer, useDrawerAddress } from "./okr-drawer.tsx";
 import type { Coach } from "./okr-editing.ts";
 import {
+  afterForSlot,
   collapsedByDefault,
   type DiagramNode,
   layoutOkrTree,
+  moveTargets,
 } from "./okr-layout.ts";
 
 /**
@@ -168,6 +170,14 @@ function LiveDiagram({
     () => new Set(),
   );
   const [childDraft, setChildDraft] = useState<string | null>(null);
+  // Moving (P9-T10b): the card whose "Move under…" is open, and a card
+  // being dragged sideways, drawn where the pointer has it until let go.
+  const [moving, setMoving] = useState<string | null>(null);
+  const [dragged, setDragged] = useState<{
+    readonly id: string;
+    readonly x: number;
+    readonly y: number;
+  } | null>(null);
 
   // The filters narrow the diagram as they narrow the list; an objective
   // whose parent a filter hides hangs from the cycle.
@@ -206,11 +216,14 @@ function LiveDiagram({
       layout.nodes.map((entry): Node => {
         const base = {
           id: entry.id,
-          position: { x: entry.x, y: entry.y },
+          position:
+            dragged?.id === entry.id
+              ? { x: dragged.x, y: dragged.y }
+              : { x: entry.x, y: entry.y },
           width: entry.width,
           height: entry.height,
           style: { width: entry.width, height: entry.height },
-          draggable: false,
+          draggable: canEdit && entry.kind === "objective",
           connectable: false,
           domAttributes: { "data-node-id": entry.id } as never,
         };
@@ -261,7 +274,7 @@ function LiveDiagram({
           data: { name: entry.name },
         };
       }),
-    [layout, t],
+    [layout, t, dragged, canEdit],
   );
 
   const edges = useMemo(() => {
@@ -384,6 +397,22 @@ function LiveDiagram({
       return;
     }
     const id = focused.dataset.nodeId as string;
+    // Alt with an arrow moves the card among its siblings, as Alt with an
+    // arrow moves a row in the list (P9-T10b).
+    if (
+      event.altKey &&
+      canEdit &&
+      (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+      byId.get(id)?.kind === "objective"
+    ) {
+      event.preventDefault();
+      const above = layout.parentOf.get(id);
+      const row = above ? (layout.childrenOf.get(above) ?? []) : [];
+      const at = row.indexOf(id);
+      placeAmongSiblings(id, event.key === "ArrowLeft" ? at - 1 : at + 1);
+      requestAnimationFrame(() => focusNode(id));
+      return;
+    }
     const parent = layout.parentOf.get(id);
     const siblings = parent ? (layout.childrenOf.get(parent) ?? []) : [];
     const at = siblings.indexOf(id);
@@ -504,6 +533,38 @@ function LiveDiagram({
         );
       },
       goalById: (id) => treeRef.current.goals.find((goal) => goal.id === id),
+      moving,
+      setMoving,
+      targetsFor: (goalId) => moveTargets(treeRef.current, goalId),
+      moveTo: (goalId, target) => {
+        const goal = treeRef.current.goals.find((entry) => entry.id === goalId);
+        if (!goal) {
+          return;
+        }
+        const parentGoalId = target.startsWith("goal:")
+          ? target.slice("goal:".length)
+          : null;
+        const parentKeyResultId = target.startsWith("kr:")
+          ? target.slice("kr:".length)
+          : null;
+        if (
+          parentGoalId === goalId ||
+          (parentGoalId === goal.parentGoalId &&
+            parentKeyResultId === goal.parentKeyResultId)
+        ) {
+          return;
+        }
+        mutate({
+          kind: "reparent",
+          id: goalId,
+          parentGoalId,
+          parentKeyResultId,
+          from: {
+            parentGoalId: goal.parentGoalId,
+            parentKeyResultId: goal.parentKeyResultId,
+          },
+        });
+      },
     };
   }, [
     mutate,
@@ -517,7 +578,31 @@ function LiveDiagram({
     levels,
     queryClient,
     router,
+    moving,
   ]);
+
+  /**
+   * A card let go among its siblings (P9-T10b): it takes the place its
+   * centre is in, saved through the list's own reorder, so the list and the
+   * diagram keep one order.
+   */
+  const placeAmongSiblings = (id: string, slot: number) => {
+    const parent = layout.parentOf.get(id);
+    const siblings = (
+      parent ? (layout.childrenOf.get(parent) ?? []) : []
+    ).filter((sibling) => byId.get(sibling)?.kind === "objective");
+    const order = tree.goals.map((goal) => goal.id);
+    const rest = siblings.filter((sibling) => sibling !== id);
+    const current = siblings.indexOf(id);
+    if (current === slot || rest.length === 0 || slot < 0) {
+      return;
+    }
+    mutate({
+      kind: "placeGoal",
+      id,
+      afterId: afterForSlot(order, siblings, id, slot),
+    });
+  };
 
   const objectives = layout.nodes.filter((entry) => entry.kind === "objective");
 
@@ -577,6 +662,24 @@ function LiveDiagram({
               : t("okrDiagram.keyboardHint")}
         </span>
       </div>
+      {okr.failed ? (
+        <div
+          role="alert"
+          data-testid="okr-refused"
+          className="flex flex-wrap items-center gap-2 rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"
+        >
+          <span className="min-w-0 flex-1">
+            {t("okrList.notSaved", { error: okr.failed.error })}
+          </span>
+          <button
+            type="button"
+            onClick={okr.discard}
+            className="rounded-control px-2 py-0.5 text-ink-3"
+          >
+            {t("okrList.discard")}
+          </button>
+        </div>
+      ) : null}
       {linkProblem ? (
         <p
           role="alert"
@@ -617,8 +720,67 @@ function LiveDiagram({
               // so every card the budget opens with is drawn rather than cut off.
               minZoom={0.05}
               maxZoom={1.5}
-              nodesDraggable={false}
-              nodesConnectable={false}
+              nodesDraggable={canEdit}
+              nodesConnectable={canEdit}
+              // Re-parenting (P9-T10b): a card's move handle let go over another
+              // card, a key result's row, the annual band or the cycle. Read from
+              // what is under the pointer, so a drop anywhere on a card counts.
+              onConnectEnd={(event, state) => {
+                const from = state.fromNode?.id;
+                if (!from || !canEdit) {
+                  return;
+                }
+                const point =
+                  "changedTouches" in event ? event.changedTouches[0] : event;
+                if (!point) {
+                  return;
+                }
+                const under = document.elementFromPoint(
+                  point.clientX,
+                  point.clientY,
+                );
+                const keyResult =
+                  under?.closest<HTMLElement>("[data-kr-id]")?.dataset.krId;
+                const onto =
+                  under?.closest<HTMLElement>("[data-node-id]")?.dataset.nodeId;
+                if (!onto || onto === from) {
+                  return;
+                }
+                shared.moveTo(
+                  from,
+                  keyResult
+                    ? `kr:${keyResult}`
+                    : onto.startsWith("cycle:")
+                      ? "cycle"
+                      : `goal:${onto.replace(/^context:/, "")}`,
+                );
+              }}
+              // A card dragged sideways is drawn where the pointer has it, then put
+              // among its siblings by its centre when let go.
+              onNodesChange={(changes) => {
+                for (const change of changes) {
+                  if (
+                    change.type === "position" &&
+                    change.dragging &&
+                    change.position
+                  ) {
+                    setDragged({ id: change.id, ...change.position });
+                  }
+                }
+              }}
+              onNodeDragStop={(_event, node) => {
+                setDragged(null);
+                const parent = layout.parentOf.get(node.id);
+                const siblings = (
+                  parent ? (layout.childrenOf.get(parent) ?? []) : []
+                ).filter((sibling) => sibling !== node.id);
+                const centre = node.position.x + (node.width ?? 0) / 2;
+                const slot = siblings.filter((sibling) => {
+                  const box = byId.get(sibling);
+                  return box ? box.x + box.width / 2 < centre : false;
+                }).length;
+                placeAmongSiblings(node.id, slot);
+              }}
               // Only what is on screen is drawn, which is what keeps a cycle of
               // three hundred objectives quick to open (design §7).
               onlyRenderVisibleElements

@@ -5,7 +5,7 @@
  * and the drawer's read of what the tree does not carry (P9-T08a).
  *
  * **An allow-list, as the delete path has.** A server action takes whatever
- * the browser sends, so the switch below over eleven named writes is what stops
+ * the browser sends, so the switch below over twelve named writes is what stops
  * this becoming a way to call any action in the registry. Each write goes
  * through the action every other surface uses, so the cache can do nothing
  * the API cannot and is refused the same way.
@@ -193,6 +193,22 @@ export type OkrMutation =
   | { readonly kind: "restoreGoal"; readonly id: string }
   | {
       /**
+       * An objective hung under another parent from the diagram (P9-T10b).
+       * `from` is where it hung before, so the undo can put it back; an undo
+       * is marked so it offers no undo of its own.
+       */
+      readonly kind: "reparent";
+      readonly id: string;
+      readonly parentGoalId: string | null;
+      readonly parentKeyResultId: string | null;
+      readonly from: {
+        readonly parentGoalId: string | null;
+        readonly parentKeyResultId: string | null;
+      };
+      readonly undo?: boolean;
+    }
+  | {
+      /**
        * A check-in from the drawer (P9-T08b). `id` is the objective's, so a
        * refusal is shown where the other changes to it are.
        */
@@ -285,6 +301,16 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
       return null;
     case "restoreGoal":
       await callAction(ctx, "goals.restore", { id: mutation.id });
+      return null;
+    case "reparent":
+      // `goals.update` keeps the one-parent rule and refuses a loop, so the
+      // diagram can offer any card as a parent and let the server say no.
+      await callAction(ctx, "goals.update", {
+        id: mutation.id,
+        ...(mutation.parentKeyResultId
+          ? { parentKeyResultId: mutation.parentKeyResultId }
+          : { parentGoalId: mutation.parentGoalId }),
+      });
       return null;
     case "checkIn":
       // Opened and published in one action, so a drawer closed half way
