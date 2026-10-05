@@ -9,6 +9,9 @@ import {
   needsRootCause,
   objectiveScore,
   portfolioVerdictOf,
+  SCORE_BAND_TEXT,
+  scoreBand,
+  scoreBandsIn,
   scoreNote,
   shareInsideBand,
   tooSafePattern,
@@ -251,5 +254,44 @@ describe("progress and score by the key result's kind (METHOD.md §2.10, P9-T12a
     expect(shareInsideBand([{ at: 45, value: 99.5 }], band, 0, 90)).toBe(1);
     expect(shareInsideBand([], band, 0, 90)).toBeNull();
     expect(shareInsideBand(points, band, 90, 90)).toBeNull();
+  });
+});
+
+describe("§3.3's bands under each colouring (P9-T14a)", () => {
+  const thresholds = canonThresholds();
+  const google = { "scoring.colours": "google" } as const;
+  const doerr = { "scoring.colours": "doerr" } as const;
+
+  it("reads §11's 1.0, 0.6 and 0.3 under Google's colours, the default", () => {
+    expect(scoreBandsIn(thresholds)).toEqual({
+      achieved: 1,
+      strong: 0.6,
+      partial: 0.3,
+    });
+    expect(scoreBandsIn(thresholds, google)).toEqual(scoreBandsIn(thresholds));
+    expect(scoreBand(0.65, thresholds, google)).toBe("strong");
+  });
+
+  it("reads Doerr's 0.7 and 0.4 where the workspace chose them", () => {
+    expect(scoreBandsIn(thresholds, doerr)).toEqual({
+      achieved: 1,
+      strong: 0.7,
+      partial: 0.4,
+    });
+    expect(scoreBand(0.65, thresholds, doerr)).toBe("partial");
+    expect(scoreNote(0.35, "aspirational", thresholds, doerr)).toBe(
+      "root_cause",
+    );
+    expect(scoreNote(0.35, "aspirational", thresholds, google)).toBe("none");
+  });
+
+  it("means one thing for a stretch and another for a promise", () => {
+    expect(SCORE_BAND_TEXT.aspirational.strong).toBe(
+      "On target. The expected range for a stretch",
+    );
+    expect(SCORE_BAND_TEXT.committed.fully_achieved).toBe("Met");
+    for (const band of ["strong", "partial", "little"] as const) {
+      expect(SCORE_BAND_TEXT.committed[band]).toBe("Missed. Explain the miss");
+    }
   });
 });

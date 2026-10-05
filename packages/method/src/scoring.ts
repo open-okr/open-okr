@@ -533,12 +533,48 @@ export type OkrKind = "committed" | "aspirational";
 /** What the coach says beside one scored key result (§3.3's notes). */
 export type ScoreNote = "explain_miss" | "root_cause" | "none";
 
-/** §3.3. Scored at the close, against the key result as written. */
+/**
+ * Doerr's colours (METHOD.md §3.3, §12 "Score colours"): 0.7 and above
+ * green, 0.4 to 0.6 yellow, below 0.4 red. The Google colours are the §11
+ * bands themselves, so only this option needs numbers of its own.
+ */
+export const DOERR_SCORE_BANDS = { strong: 0.7, partial: 0.4 } as const;
+
+/** The practice this reads: which colours the workspace scores by. */
+export interface ScoreColoursPractice {
+  readonly "scoring.colours": "google" | "doerr";
+}
+
+/**
+ * The bands a score is read against (§3.3, P9-T14a): §11's boundaries under
+ * Google's colours, the default, or Doerr's 0.7 and 0.4 where the workspace
+ * chose them. "Achieved" stays §11's either way, because both colourings agree
+ * that a key result at its target is achieved.
+ */
+export function scoreBandsIn(
+  thresholds: ResolvedThresholds,
+  practice?: ScoreColoursPractice,
+): {
+  readonly achieved: number;
+  readonly strong: number;
+  readonly partial: number;
+} {
+  const bands = thresholds["scoring.scoreBands"];
+  return practice?.["scoring.colours"] === "doerr"
+    ? { achieved: bands.achieved, ...DOERR_SCORE_BANDS }
+    : bands;
+}
+
+/**
+ * §3.3. Scored at the close, against the key result as written. `practice`
+ * chooses the colours; left out, Google's, which are §11's bands.
+ */
 export function scoreBand(
   score: number,
   thresholds: ResolvedThresholds,
+  practice?: ScoreColoursPractice,
 ): ScoreBand {
-  const bands = thresholds["scoring.scoreBands"];
+  const bands = scoreBandsIn(thresholds, practice);
   if (score >= bands.achieved) {
     return "fully_achieved";
   }
@@ -566,6 +602,7 @@ export function scoreNote(
   score: number,
   kind: OkrKind,
   thresholds: ResolvedThresholds,
+  practice?: ScoreColoursPractice,
 ): ScoreNote {
   if (
     kind === "committed" &&
@@ -573,7 +610,7 @@ export function scoreNote(
   ) {
     return "explain_miss";
   }
-  if (score < thresholds["scoring.scoreBands"].partial) {
+  if (score < scoreBandsIn(thresholds, practice).partial) {
     return "root_cause";
   }
   return "none";
@@ -588,6 +625,29 @@ export const SCORE_NOTE_TEXT: Readonly<
 > = {
   explain_miss: "Write the short explanation of the miss",
   root_cause: "Little progress. Pick its root cause",
+};
+
+/**
+ * §3.3's table: what a score means, by the kind of promise (P9-T14a). An
+ * aspirational key result is read on four bands; a committed one is met at
+ * 1.0 and missed below it, whichever band the number falls in.
+ */
+export const SCORE_BAND_TEXT: Readonly<
+  Record<OkrKind, Readonly<Record<ScoreBand, string>>>
+> = {
+  aspirational: {
+    fully_achieved: "Achieved",
+    strong: "On target. The expected range for a stretch",
+    partial: "Partial progress. Examine what limited it",
+    little:
+      "Little progress. Examine the target, the capacity, the cadence or the tracking",
+  },
+  committed: {
+    fully_achieved: "Met",
+    strong: "Missed. Explain the miss",
+    partial: "Missed. Explain the miss",
+    little: "Missed. Explain the miss",
+  },
 };
 
 /** §3.3's pattern, said of a closed set of aspirational key results. */

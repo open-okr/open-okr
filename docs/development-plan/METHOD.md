@@ -281,14 +281,16 @@ For committed key results, high confidence is right. A committed key result belo
 
 ### 3.3 Score bands
 
-Scored at the close, against the key result as written. No partial credit for effort.
+Scored at the close, against the key result as written. The score is computed from progress at the close (§2.10). A person may adjust it with a written reason, and both numbers are kept (§12). No credit for activity alone. *Source:* Doerr: "unbiased scores should be looked at subjectively, in case there are extenuating circumstances"; Google's grading example: three of six features launched grades 0.5.
 
-| Score | Meaning |
-|---|---|
-| 0.9 and above | Fully achieved. Check whether the target was ambitious enough |
-| 0.7 to below 0.9 | Strong result. This is the intended level for a stretch target |
-| 0.4 to below 0.7 | Partial progress. Examine what limited it |
-| Below 0.4 | Little progress. Examine the target, the capacity, or the tracking |
+| Score | Aspirational | Committed |
+|---|---|---|
+| 1.0 | Achieved | Met |
+| 0.6 to below 1.0 | On target. The expected range for a stretch | Missed. Explain the miss |
+| 0.3 to below 0.6 | Partial progress. Examine what limited it | Missed. Explain the miss |
+| Below 0.3 | Little progress. Examine the target, the capacity, the cadence or the tracking | Missed. Explain the miss |
+
+*Source:* re:Work: "The sweet spot for OKRs is somewhere in the 60-70% range"; Google's OKR playbook: committed OKRs expect 1.0, aspirational average 0.7. Doerr colours 0.7 and above green, 0.4 to 0.6 yellow and below 0.4 red, which a workspace may choose instead.
 
 The coach annotates. First match wins; nothing else gets a note:
 
@@ -296,7 +298,7 @@ The coach annotates. First match wins; nothing else gets a note:
 |---|---|
 | A pattern of 1.0 | Across a closed cycle, when three quarters or more of the aspirational key results scored 1.0: "the targets were too safe" |
 | Committed, below 1.0 | "Write the short explanation of the miss" |
-| Below 0.4 | "Little progress. Pick its root cause" |
+| Below 0.3 | "Little progress. Pick its root cause" |
 
 *Source:* Klau: "if someone consistently gets 1.0, their OKRs aren't ambitious enough."
 
@@ -913,7 +915,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Draft comfortable boundary | 0.70 |
 | Draft moonshot boundary | 0.30 |
 | Committed confidence floor | 0.7, at drafting and at every check-in |
-| Score band boundaries | 0.9, 0.7, 0.4 |
+| Score band boundaries | 1.0, 0.6, 0.3 |
 | Committed expected score | 1.0 |
 | Aspirational expected average | 0.7 |
 | Portfolio verdict boundaries | 0.85, 0.60, 0.40, over aspirational key results |

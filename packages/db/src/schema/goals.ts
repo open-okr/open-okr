@@ -228,6 +228,12 @@ export const keyResults = pgTable("key_results", {
   confidence: numeric("confidence"),
   forecast: jsonb("forecast").$type<Record<string, unknown>>(),
   score: numeric("score"),
+  /**
+   * What §2.10 computed at the close, kept beside the review's `score`
+   * (METHOD.md §3.3, P9-T14a); `score_reason` is why they differ.
+   */
+  scoreComputed: numeric("score_computed"),
+  scoreReason: text("score_reason"),
   carryForward: boolean("carry_forward").notNull().default(false),
   qualityFlags: jsonb("quality_flags").$type<string[]>().notNull().default([]),
   position: integer("position").notNull().default(0),

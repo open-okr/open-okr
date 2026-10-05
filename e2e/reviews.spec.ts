@@ -511,10 +511,13 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await firstRow.getByLabel("One line on why").fill("Landed 120 of 300.");
   await firstRow.getByRole("button", { name: "Save the grade" }).click();
   await expect(ungraded).toHaveCount(before - 1, { timeout: 10_000 });
-  // The grade the room agreed, back from the server. The row carries "0.4"
+  // The grade the room agreed, back from the server. The row carries "0.40"
   // twice, as the chip the server rendered and as the slider's own readout, and
-  // the chip comes first in the row.
-  await expect(firstRow.getByText("0.4", { exact: true }).first()).toBeVisible({
+  // the chip comes first in the row. Hundredths since P9-T14a, so a computed
+  // score is a stop on the slider.
+  await expect(
+    firstRow.getByText("0.40", { exact: true }).first(),
+  ).toBeVisible({
     timeout: 10_000,
   });
 

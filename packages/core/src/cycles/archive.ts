@@ -22,10 +22,12 @@ import {
   type ResolvedThresholds,
   round2,
   type ScoreBand,
+  type ScoreColoursPractice,
   scoreBand,
 } from "@openokr/method";
 import { asc, count, desc, eq, gt, inArray, isNull, lt, ne } from "drizzle-orm";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { resolveRhythm } from "./rhythm.ts";
 import { readRhythmRow } from "./service.ts";
 import { evaluateWorkflow, loadCycleForWorkflow } from "./workflow.ts";
@@ -131,6 +133,7 @@ interface Buckets {
 function bucketsOf(
   scores: readonly number[],
   thresholds: ResolvedThresholds,
+  practice: ScoreColoursPractice,
 ): Buckets {
   const counts: Record<ScoreBand, number> = {
     fully_achieved: 0,
@@ -139,7 +142,7 @@ function bucketsOf(
     little: 0,
   };
   for (const score of scores) {
-    counts[scoreBand(score, thresholds)] += 1;
+    counts[scoreBand(score, thresholds, practice)] += 1;
   }
   return counts;
 }
@@ -246,6 +249,9 @@ export async function archiveCycleInTx(
     });
   }
 
+  // The colours the bands are counted in (METHOD.md §3.3, §12, P9-T14a).
+  const { practice } = practiceFromRow(await readRhythmRow(tx, workspaceId));
+
   let snapshots = 0;
   for (const scope of scopes) {
     const average =
@@ -255,7 +261,7 @@ export async function archiveCycleInTx(
             scope.scores.reduce((total, score) => total + score, 0) /
               scope.scores.length,
           );
-    const buckets = bucketsOf(scope.scores, thresholds);
+    const buckets = bucketsOf(scope.scores, thresholds, practice);
     // The result is the cycle score over every scored key result (§8.6);
     // the verdict is §3.4's, over the aspirational ones alone.
     const verdict = aspirationalVerdict(scope.rows, thresholds);

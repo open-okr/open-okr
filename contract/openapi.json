@@ -57929,6 +57929,41 @@
                                         "null"
                                       ]
                                     },
+                                    "computed": {
+                                      "type": [
+                                        "number",
+                                        "null"
+                                      ]
+                                    },
+                                    "band": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "key": {
+                                              "type": "string",
+                                              "enum": [
+                                                "fully_achieved",
+                                                "strong",
+                                                "partial",
+                                                "little"
+                                              ]
+                                            },
+                                            "text": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "key",
+                                            "text"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "kind": {
                                       "type": "string",
                                       "enum": [
@@ -57976,6 +58011,8 @@
                                     "unit",
                                     "score",
                                     "reason",
+                                    "computed",
+                                    "band",
                                     "kind",
                                     "note"
                                   ],
@@ -58059,6 +58096,13 @@
                         },
                         "complete": {
                           "type": "boolean"
+                        },
+                        "adjustment": {
+                          "type": "string",
+                          "enum": [
+                            "withReason",
+                            "notAllowed"
+                          ]
                         }
                       },
                       "required": [
@@ -58068,7 +58112,8 @@
                         "verdict",
                         "committed",
                         "tooSafe",
-                        "complete"
+                        "complete",
+                        "adjustment"
                       ],
                       "additionalProperties": false
                     }

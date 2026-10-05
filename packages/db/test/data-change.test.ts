@@ -20,6 +20,7 @@ import { carryStrategicIssueMinimum } from "../src/data-changes/0014_carry_strat
 import { carryObjectiveLengthLimit } from "../src/data-changes/0015_carry_objective_length_limit.ts";
 import { carryCoachStrictness } from "../src/data-changes/0016_carry_coach_strictness.ts";
 import { keyResultKindFromDirection } from "../src/data-changes/0017_key_result_kind_from_direction.ts";
+import { keyResultScoreComputed } from "../src/data-changes/0018_key_result_score_computed.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1046,6 +1047,61 @@ describe("0017: maintain key results from their direction", () => {
     await client.query("delete from _data_changes");
     const [again] = await runDataChanges(client, {
       scripts: [keyResultKindFromDirection],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0018: the computed score of key results scored before adjusting existed", () => {
+  it("copies a scored key result's score into its computed score, and leaves the unscored", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Owner', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe)
+         select gen_random_uuid(), m.workspace_id, 'Win mid-market',
+                'company', 'workspace', m.id, m.id,
+                '{"start": "2026-01-01", "end": "2026-03-31"}'::jsonb
+           from m
+         returning id, workspace_id
+       )
+       insert into key_results (id, workspace_id, goal_id, title, direction,
+                                indicator_type, baseline_value, target_value,
+                                current_value, score)
+       select gen_random_uuid(), g.workspace_id, g.id, d.title, 'increase',
+              'lagging', 0, 10, 0, d.score
+         from g,
+              (values ('Scored', 0.7::numeric), ('Unscored', null::numeric))
+                as d(title, score)`,
+    );
+    const computed = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{ title: string; score_computed: string | null }>(
+            "select title, score_computed from key_results",
+          )
+        ).rows.map((row) => [row.title, row.score_computed]),
+      );
+    expect(await computed()).toEqual({ Scored: null, Unscored: null });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [keyResultScoreComputed],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    expect(await computed()).toEqual({ Scored: "0.70", Unscored: null });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [keyResultScoreComputed],
     });
     expect(again?.rowsChanged).toBe(0);
   });

@@ -124,10 +124,11 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
       aspirational: 0.6,
       committed: 1,
     });
+    // METHOD v2's bands (P9-T14a): achieved only at the target.
     expect(canon["scoring.scoreBands"]).toEqual({
-      achieved: 0.9,
-      strong: 0.7,
-      partial: 0.4,
+      achieved: 1,
+      strong: 0.6,
+      partial: 0.3,
     });
     expect(canon["scoring.portfolioVerdicts"]).toEqual({
       tooSafe: 0.85,

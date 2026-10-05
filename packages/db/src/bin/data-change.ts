@@ -27,6 +27,7 @@ import { carryStrategicIssueMinimum } from "../data-changes/0014_carry_strategic
 import { carryObjectiveLengthLimit } from "../data-changes/0015_carry_objective_length_limit.ts";
 import { carryCoachStrictness } from "../data-changes/0016_carry_coach_strictness.ts";
 import { keyResultKindFromDirection } from "../data-changes/0017_key_result_kind_from_direction.ts";
+import { keyResultScoreComputed } from "../data-changes/0018_key_result_score_computed.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -61,6 +62,7 @@ try {
       carryObjectiveLengthLimit,
       carryCoachStrictness,
       keyResultKindFromDirection,
+      keyResultScoreComputed,
     ],
   });
   process.stdout.write(

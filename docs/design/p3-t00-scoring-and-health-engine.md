@@ -325,15 +325,17 @@ the bands' own, so it moves to 0.3 with them at P9-T14.
 | case | score | expected_band | aspirational_note | committed_note |
 |---|---|---|---|---|
 | perfect | 1 | fully_achieved | none | none |
-| nearly perfect | 0.95 | fully_achieved | none | explain_miss |
-| exactly at the achieved boundary | 0.9 | fully_achieved | none | explain_miss |
-| just below achieved | 0.89 | strong | none | explain_miss |
-| exactly at the strong boundary | 0.7 | strong | none | explain_miss |
-| just below strong | 0.69 | partial | none | explain_miss |
-| exactly at the partial boundary | 0.4 | partial | none | explain_miss |
-| just below partial | 0.39 | little | root_cause | explain_miss |
-| little progress | 0.29 | little | root_cause | explain_miss |
+| just short of the target | 0.99 | strong | none | explain_miss |
+| nearly perfect | 0.95 | strong | none | explain_miss |
+| Doerr's green under Google's colours | 0.7 | strong | none | explain_miss |
+| exactly at the strong boundary | 0.6 | strong | none | explain_miss |
+| just below strong | 0.59 | partial | none | explain_miss |
+| exactly at the partial boundary | 0.3 | partial | none | explain_miss |
+| just below partial | 0.29 | little | root_cause | explain_miss |
+| little progress | 0.1 | little | root_cause | explain_miss |
 | nothing achieved | 0 | little | root_cause | explain_miss |
+
+Rewritten at P9-T14a for METHOD v2's bands, 1.0, 0.6 and 0.3: a key result is achieved only at its target, and 0.6 to below 1.0 is the expected range for a stretch.
 
 ## 8. The portfolio verdict
 

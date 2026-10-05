@@ -50,6 +50,10 @@ interface ScoringKeyResult {
   readonly unit: string | null;
   readonly score: number | null;
   readonly reason: string | null;
+  /** What §2.10 computes from its progress now (§3.3, P9-T14a). */
+  readonly computed: number | null;
+  /** What the grade means for its kind, under the workspace's colours. */
+  readonly band: { readonly key: string; readonly text: string } | null;
   readonly kind: "committed" | "aspirational";
   /** §3.3's note on the grade, in the method's words (P9-T11b-b). */
   readonly note: { readonly key: string; readonly text: string } | null;
@@ -78,6 +82,8 @@ export interface ScoringStatus {
   /** §3.3's too-safe sentence, when the revealed set shows the pattern. */
   readonly tooSafe: string | null;
   readonly complete: boolean;
+  /** Whether a grade may differ from the computed score (§12, P9-T14a). */
+  readonly adjustment: "withReason" | "notAllowed";
 }
 
 type Translate = ReturnType<typeof useTranslations>["t"];
@@ -115,21 +121,32 @@ function ScoreRow({
   sessionId,
   keyResult,
   canScore,
+  adjustable,
   onProblem,
 }: {
   readonly sessionId: string;
   readonly keyResult: ScoringKeyResult;
   readonly canScore: boolean;
+  /**
+   * False where the workspace scores by the computed number alone (§12
+   * "Score adjustment at close"): the slider goes, and saving keeps it.
+   */
+  readonly adjustable: boolean;
   readonly onProblem: (message: string | null) => void;
 }) {
   const { t } = useTranslations();
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  // Nought when ungraded, because a slider has to sit somewhere. The stored
-  // score stays null until the room presses save, so an untouched slider is not
-  // a grade of zero.
-  const [score, setScore] = useState(keyResult.score ?? 0);
+  // The computed score when ungraded (§3.3, P9-T14a): the room starts from
+  // what the progress says and moves it only with a reason. The stored score
+  // stays null until the room presses save, so an untouched slider is not a
+  // grade.
+  const [chosen, setScore] = useState(
+    keyResult.score ?? keyResult.computed ?? 0,
+  );
+  const score =
+    adjustable || keyResult.computed === null ? chosen : keyResult.computed;
   const [reason, setReason] = useState(keyResult.reason ?? "");
 
   const save = useCallback(() => {
@@ -176,9 +193,27 @@ function ScoreRow({
         {keyResult.score === null ? (
           <Chip tone="warn">{t("session.detail.scoring.notGraded")}</Chip>
         ) : (
-          <Chip tone="ok">{keyResult.score.toFixed(1)}</Chip>
+          <Chip tone="ok">{keyResult.score.toFixed(2)}</Chip>
         )}
       </span>
+      {/* §3.3: the number §2.10 computed, and what the grade means for its
+       * kind, so an adjustment is seen as one. */}
+      {keyResult.computed !== null ? (
+        <span className="text-xs text-ink-3" data-testid="computed-score">
+          {t("session.detail.scoring.computed", {
+            computed: keyResult.computed.toFixed(2),
+          })}
+        </span>
+      ) : null}
+      {keyResult.band ? (
+        <span
+          className="text-xs text-ink-2"
+          data-testid="score-band"
+          data-band={keyResult.band.key}
+        >
+          {keyResult.band.text}
+        </span>
+      ) : null}
 
       {/* §8.3's evidence: grade against the key result as written. */}
       <span className="text-xs text-ink-3">{evidence(keyResult, t)}</span>
@@ -216,19 +251,27 @@ function ScoreRow({
             <span className="text-xs font-medium text-ink-3">
               {t("session.detail.scoring.score")}
             </span>
-            <input
-              id={`score-${keyResult.keyResultId}`}
-              type="range"
-              min={0}
-              max={1}
-              step={0.1}
-              value={score}
-              disabled={pending}
-              className="flex-1"
-              onChange={(event) => setScore(Number(event.target.value))}
-            />
-            <span className="w-8 text-sm tabular-nums text-ink">
-              {score.toFixed(1)}
+            {adjustable || keyResult.computed === null ? (
+              <input
+                id={`score-${keyResult.keyResultId}`}
+                type="range"
+                min={0}
+                max={1}
+                // Hundredths, so the computed score is a stop on the slider
+                // and accepting it is not an adjustment by rounding.
+                step={0.01}
+                value={score}
+                disabled={pending}
+                className="flex-1"
+                onChange={(event) => setScore(Number(event.target.value))}
+              />
+            ) : (
+              <span className="flex-1 text-xs text-ink-3">
+                {t("session.detail.scoring.notAdjustable")}
+              </span>
+            )}
+            <span className="w-10 text-sm tabular-nums text-ink">
+              {score.toFixed(2)}
             </span>
           </label>
           <label
@@ -403,6 +446,7 @@ export function Scoring({
                   sessionId={sessionId}
                   keyResult={keyResult}
                   canScore={canScore}
+                  adjustable={status.adjustment === "withReason"}
                   onProblem={setProblem}
                 />
               ))}

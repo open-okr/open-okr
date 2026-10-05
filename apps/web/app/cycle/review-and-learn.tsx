@@ -1,5 +1,5 @@
-import type { ResolvedThresholds } from "@openokr/method";
-import { scoreBand } from "@openokr/method";
+import type { ResolvedThresholds, ScoreColoursPractice } from "@openokr/method";
+import { scoreBand, scoreBandsIn } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
@@ -70,6 +70,7 @@ export async function ReviewAndLearn({
   waitingFor,
   canEdit,
   thresholds,
+  practice,
 }: {
   readonly keyResults: readonly ScoredKeyResult[];
   readonly cycleId: string;
@@ -93,6 +94,8 @@ export async function ReviewAndLearn({
    * exist, which is exactly the hardcoding the method rule forbids.
    */
   readonly thresholds: ResolvedThresholds;
+  /** Which colours the bands are read in (§12 "Score colours"). */
+  readonly practice: ScoreColoursPractice;
 }) {
   const { t } = await getTranslations();
 
@@ -105,8 +108,10 @@ export async function ReviewAndLearn({
 
   // The band the portfolio average falls in, decided by the method package
   // against this workspace's own thresholds.
-  const band = average === null ? null : scoreBand(average, thresholds);
-  const boundaries = thresholds["scoring.scoreBands"];
+  const band =
+    average === null ? null : scoreBand(average, thresholds, practice);
+  // In the workspace's score colours (§3.3, §12, P9-T14a).
+  const boundaries = scoreBandsIn(thresholds, practice);
   const table: readonly (readonly [string, string])[] = [
     [
       "fully_achieved",

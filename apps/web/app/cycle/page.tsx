@@ -224,6 +224,12 @@ export default async function CyclePage({
       ? ((await callAction(context, "rhythm.read", {}))
           .thresholds as unknown as ResolvedThresholds)
       : null;
+  // And the colours its bands are read in (METHOD.md §3.3, §12, P9-T14a).
+  const reviewPractice =
+    viewing === 7
+      ? ((await callAction(context, "practice.read", {}))
+          .practice as unknown as ResolvedPractice)
+      : null;
 
   const cadenceSpaces =
     viewing === 6 ? await callAction(context, "spaces.list", {}) : [];
@@ -687,6 +693,7 @@ export default async function CyclePage({
               // `full`, which is what `cycles.close` requires.
               canEdit={canPublish}
               thresholds={reviewThresholds}
+              practice={reviewPractice ?? defaultPractice()}
             />
           ) : null}
         </div>

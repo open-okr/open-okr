@@ -153,7 +153,7 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 | `goals` | `reviewer_id` drops `not null` | None |
 | `key_results` | `kind key_result_kind not null default 'metric'` (`metric`, `maintain`, `milestone`, `baseline`), `done_at timestamptz` | `maintain` where `direction = 'maintain'` |
 | `key_results` | `target_value` drops `not null` (migration 0116, P9-T13-b-a). Not in the original plan: §2.9's acceptance needs a metric key result saved before its target is known | None; every existing row has a target |
-| `key_results` | `score_computed numeric`, `score_reason text` | `score_computed = score` where scored |
+| `key_results` | `score_computed numeric`, `score_reason text` (migration 0120, P9-T14a) | `score_computed = score` where scored (data change 0018) |
 | New `key_result_target_changes` | `workspace_id`, `key_result_id`, `from_value`, `to_value`, `reason`, `actor`, `changed_at`, `mid_cycle` | None |
 | `cycles` | `practice_snapshot jsonb` | Closed cycles get today's canon |
 | `cycles` | `company_published_at timestamptz`, the first publish step (METHOD v2 §4.5, migration 0110). **Changed at P9-T03b** from a `teams_published_at` for the second step: `published_at` keeps meaning "the whole set is out" for every reader that relies on it, so a cycle published before the release needs no backfill | None |
@@ -230,7 +230,9 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T13-c-b | Targets that move under one rule | §2.9's changing a target, §7.6 | The four calibration sentences |
 | P9-T13-c-c | Annual revisions | §2.1, but its quarterly row's planning-open lead, which waits for P9-T19a | None (behaviour) |
 | P9-T13a | Moving an objective to another space (G-1) | §2.9's "When the organisation changes" | None (behaviour) |
-| P9-T14 | Adjustable scores and cycles that keep their rules | §3.3, §12 snapshot paragraph | Score band values |
+| P9-T14a | Score bands, and a computed score a person may adjust | §3.3 | Score band values |
+| P9-T14b | Cycles that keep their rules | §12 snapshot paragraph | None (behaviour) |
+| P9-T14c | The scorecard by cycle | none | None (behaviour) |
 | P9-T15 | A progress signal that knows the date | §3.5, §3.6, §3.7 | "Progress signal pace gaps", "Trend forecast minimum values", "Divergence window" |
 | P9-T16 | Alignment on ratios, over the levels in use (G-3) | §4.3, §5 | "Contribution minimum", "Alignment watch threshold"; retire "Alignment penalties" |
 | P9-T17 | KPI target types and their own thresholds | §6.1 to §6.4, §6.7 | None (behaviour) |
@@ -267,6 +269,8 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 **Annual revisions, as built at P9-T13-c-c.** An agreed frame may be revised within its year with a written reason; `frame.set` refuses one without, keeps each in `annual_frame_revisions` with which fields changed and what they held, and `frame.read` lists them. A draft frame keeps no history and a new year supersedes. Phase 0's form asks for the reason once the frame is agreed and lists the revisions beneath it. Building it found `frame.set` writing only the horizon and the agreement when it edited a frame in place, so a same-year edit to the mission or the not-doing list was answered as saved and dropped; the prose is written now. An annual key result's target already eased under §2.9's rule, so its 35 to 32 keeps its reason in the target history, and the close shows the original once P9-T20 brings the annual review to a session.
 
 **Moving an objective between spaces, as built at P9-T13a.** `goals.moveToSpace` changes one column, `goals.space_id`, because key results, check-ins, dependencies and the parent pointer all hang from the goal and every space-scoped read, the agents' sight included, finds a goal through that column. What follows it is computed per space: OBJ-5 in both units, and both spaces' alignment scores. It needs edit on the objective and on both spaces, and moves only an objective a space owns. The card asked for the control in the list's row menu; the row has no menu, so the space sits in the row's meta line as a picker, beside the kind and the champion, as it does in the drawer's details.
+
+**Score bands and an adjustable score, as built at P9-T14a.** §3.3's bands move to 1.0, 0.6 and 0.3 and are read by kind, in `SCORE_BAND_TEXT`: an aspirational key result on four bands, a committed one met at 1.0 and missed below. `scoreBandsIn` reads the workspace's colours: Google's are §11's bands, Doerr's are 0.7 and 0.4, and the coach's "little progress" note follows the same boundary. The quarterly review's scoring stage shows each key result's computed score, starts the slider there in hundredths so accepting it is not an adjustment by rounding, and reads each grade's band; under "Not allowed" the slider goes and a grade off the computed number is refused. Every grade already carried §8.3's one-line reason, so the close keeps `score_computed` beside `score` and the reason in `score_reason` only where they differ. A maintain key result's computed score is its share of the cycle inside its band, from its readings.
 
 **Four questions the build raised, for a human to answer** (5 October 2026):
 - **An OKR written into a set still unpublished after its window** (P9-T13-a). §2.9 says what is created before the team publication window closes is the plan; it does not say what an OKR written after it, into a set nobody has published, is. The build reads it as the plan, late, unmarked and facing the publish gates, because there is no plan yet to add to. If it should be marked instead, `isMidCycleAddition` drops its second condition.

@@ -158,9 +158,11 @@ describe("the archive", () => {
       (row) => row.owner_kind === "workspace",
     );
     expect(Number(workspaceRow?.result_value)).toBe(0.8);
-    // One at 1.00 is fully achieved, one at 0.60 is partial rather than strong.
+    // One at 1.00 is fully achieved, and one at 0.60 is on target, the
+    // "strong" band, under METHOD v2's 1.0, 0.6 and 0.3 (P9-T14a). It read
+    // partial under the old 0.9, 0.7 and 0.4.
     expect(workspaceRow?.fully_achieved_count).toBe(1);
-    expect(workspaceRow?.strong_count).toBe(0);
+    expect(workspaceRow?.strong_count).toBe(1);
     expect(workspaceRow?.verdict).toBe("healthy");
   });
 

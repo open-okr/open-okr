@@ -318,8 +318,8 @@ export const THRESHOLDS = {
     group: "scoring",
     label: "Score band boundaries",
     section: "§3.3",
-    why: "0.9 fully achieved, 0.7 strong, 0.4 partial. 0.7 to 0.9 is the intended level for a stretch target.",
-    default: { achieved: 0.9, strong: 0.7, partial: 0.4 },
+    why: "1.0 achieved or met, 0.6 on target, 0.3 partial. 0.6 to below 1.0 is the expected range for a stretch; for a committed key result anything below 1.0 is a miss.",
+    default: { achieved: 1, strong: 0.6, partial: 0.3 },
     schema: z.object({ achieved: unit, strong: unit, partial: unit }),
   }),
   "scoring.committedExpectedScore": param({

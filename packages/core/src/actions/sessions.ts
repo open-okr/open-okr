@@ -77,7 +77,10 @@ import {
   rhythmDiagnostic,
   rhythmScore,
   roomPulseRead,
+  SCORE_BAND_TEXT,
   SCORE_NOTE_TEXT,
+  type ScoreColoursPractice,
+  scoreBand,
   scoreNote,
   TOO_SAFE_TEXT,
   tooSafePattern,
@@ -117,9 +120,11 @@ import {
   workspaceTimeZone,
 } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
+import { computedScoresInTx } from "../scoring/computed.ts";
 import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
 import { sessionChannel } from "../sessions/live.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
@@ -1452,6 +1457,7 @@ export const closeSession = defineWriteAction({
           .select({
             keyResultId: reviewScores.keyResultId,
             score: reviewScores.score,
+            reason: reviewScores.reason,
           })
           .from(reviewScores)
           .where(
@@ -1462,13 +1468,31 @@ export const closeSession = defineWriteAction({
             ),
           );
 
+        // §3.3 (P9-T14a): the score §2.10 computes at the close is kept
+        // beside the room's, and the room's reason with it where they differ.
+        const computed = await computedScoresInTx(
+          tx,
+          workspaceId,
+          graded.map((grade) => grade.keyResultId),
+          now,
+        );
         for (const grade of graded) {
+          const scoreComputed = computed.get(grade.keyResultId);
+          const adjusted =
+            scoreComputed !== undefined &&
+            Math.abs(Number(grade.score) - scoreComputed) >= 0.005;
           // openokr:allow-mutation: runs on the transaction this Operation
           // opened, so the score, the close, the audit row and the outbox row
           // commit together or not at all.
           await tx
             .update(keyResults)
-            .set({ score: grade.score, updatedAt: now })
+            .set({
+              score: grade.score,
+              scoreComputed:
+                scoreComputed === undefined ? null : String(scoreComputed),
+              scoreReason: adjusted ? grade.reason : null,
+              updatedAt: now,
+            })
             .where(
               activeOnly(
                 keyResults,
@@ -4612,6 +4636,32 @@ export const scoreKeyResult = defineWriteAction({
         // the facilitator scoring at them.
         requires: ACCESS_LEVELS.view as never,
       });
+
+      // §3.3 (P9-T14a): the score is computed from progress at the close,
+      // and a workspace may forbid adjusting it. Where it does, a grade that
+      // is not the computed number is refused, citing the setting.
+      const { practice } = practiceFromRow(
+        await readRhythmRow(tx, workspaceId),
+      );
+      if (practice["scoring.adjustment"] === "notAllowed") {
+        const computed = (
+          await computedScoresInTx(
+            tx,
+            workspaceId,
+            [input.keyResultId],
+            new Date(),
+          )
+        ).get(input.keyResultId);
+        if (
+          computed !== undefined &&
+          Math.abs(input.score - computed) >= 0.005
+        ) {
+          throw new OperationError(
+            "forbidden",
+            `This workspace scores by the computed number, ${computed}, and does not allow adjusting it (Score adjustment at close).`,
+          );
+        }
+      }
 
       const [existing] = await tx
         .select({ id: reviewScores.id })
@@ -8318,11 +8368,12 @@ function noteFor(
   score: number | null,
   kind: "committed" | "aspirational",
   thresholds: ResolvedThresholds,
+  practice?: ScoreColoursPractice,
 ): { key: "explain_miss" | "root_cause"; text: string } | null {
   if (score === null) {
     return null;
   }
-  const key = scoreNote(score, kind, thresholds);
+  const key = scoreNote(score, kind, thresholds, practice);
   return key === "none" ? null : { key, text: SCORE_NOTE_TEXT[key] };
 }
 
@@ -8345,6 +8396,21 @@ const scoringKeyResult = z.object({
   unit: z.string().nullable(),
   score: z.number().nullable(),
   reason: z.string().nullable(),
+  /**
+   * What §2.10 computes from its progress now (METHOD.md §3.3, P9-T14a): the
+   * number the room starts from, and the one the close keeps beside theirs.
+   */
+  computed: z.number().nullable(),
+  /**
+   * What the grade means for its kind, in §3.3's words, under the workspace's
+   * score colours. Null while ungraded.
+   */
+  band: z
+    .object({
+      key: z.enum(["fully_achieved", "strong", "partial", "little"]),
+      text: z.string(),
+    })
+    .nullable(),
   /** Its objective's kind (METHOD.md §2.8, P9-T11b-b). */
   kind: z.enum(GOAL_KINDS),
   /**
@@ -8424,6 +8490,11 @@ export const readScoringStatus = defineReadAction({
     tooSafe: z.string().nullable(),
     /** Every key result graded. §8.1's completion condition for stage two. */
     complete: z.boolean(),
+    /**
+     * Whether a grade may differ from the computed score (§3.3, §12 "Score
+     * adjustment at close", P9-T14a), so the slider is offered or not.
+     */
+    adjustment: z.enum(["withReason", "notAllowed"]),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -8502,10 +8573,17 @@ export const readScoringStatus = defineReadAction({
           ]),
         );
 
-        const { thresholds } = resolveRhythm(
-          await readRhythmRow(tx, context.workspaceId),
-        );
+        const rhythmRow = await readRhythmRow(tx, context.workspaceId);
+        const { thresholds } = resolveRhythm(rhythmRow);
+        // The colours the bands are read in (§3.3, §12, P9-T14a).
+        const { practice } = practiceFromRow(rhythmRow);
         const kindOf = new Map(rows.map((row) => [row.keyResultId, row.kind]));
+        const computed = await computedScoresInTx(
+          tx,
+          context.workspaceId,
+          rows.map((row) => row.keyResultId),
+          new Date(),
+        );
 
         // Every target change, oldest first, so the first one names the
         // target the cycle began with and the last easing names its reason.
@@ -8600,8 +8678,16 @@ export const readScoringStatus = defineReadAction({
             unit: row.unit ?? null,
             score: grade?.score ?? null,
             reason: grade?.reason ?? null,
+            computed: computed.get(row.keyResultId) ?? null,
+            band:
+              grade === undefined
+                ? null
+                : (() => {
+                    const key = scoreBand(grade.score, thresholds, practice);
+                    return { key, text: SCORE_BAND_TEXT[row.kind][key] };
+                  })(),
             kind: row.kind,
-            note: noteFor(grade?.score ?? null, row.kind, thresholds),
+            note: noteFor(grade?.score ?? null, row.kind, thresholds, practice),
           });
         }
 
@@ -8670,6 +8756,7 @@ export const readScoringStatus = defineReadAction({
           complete:
             objectives.length > 0 &&
             objectives.every((entry) => entry.scored === entry.total),
+          adjustment: practice["scoring.adjustment"],
         };
       },
     );
