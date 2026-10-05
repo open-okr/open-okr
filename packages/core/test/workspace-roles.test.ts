@@ -244,6 +244,23 @@ describe("what a role does to a level", () => {
 });
 
 describe("what the Owner role refuses", () => {
+  it("refuses a name another role already holds, as a sentence", async () => {
+    const wb = await workerDb();
+    // Found by the end-to-end suite rather than by review: the unique index
+    // refused the second insert and the raw database error reached the
+    // screen, which fell to its error boundary. An administrator who types a
+    // name that exists should be told which name to change, not lose the
+    // page.
+    await callAction({ pool: wb.appPool, ...context() }, "roles.create", {
+      name: "Auditor",
+    });
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "roles.create", {
+        name: "auditor",
+      }),
+    ).rejects.toThrow(/already exists/i);
+  });
+
   it("refuses to have its permissions changed", async () => {
     const wb = await workerDb();
     const { roles } = await callAction(

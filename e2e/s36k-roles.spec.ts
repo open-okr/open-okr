@@ -111,6 +111,20 @@ async function removeRole(name: RegExp) {
 
 test("a role is added, held, refused removal, then removed", async () => {
   const added = new RegExp(ADDED_ROLE);
+  const assign = page.getByRole("combobox", { name: /^Role for / }).first();
+
+  // **Left over from a previous attempt, if there was one.** The file runs
+  // serial, so a failure replays all of it, and a role this test added and
+  // did not remove is still there on the replay. Clearing it first is what
+  // makes the replay mean the same thing as a first run.
+  if ((await page.getByRole("rowheader", { name: added }).count()) > 0) {
+    await assign.selectOption({ label: "No role" });
+    await expect(assign).toHaveValue("");
+    await removeRole(added);
+    await expect(page.getByRole("rowheader", { name: added })).toHaveCount(0, {
+      timeout: 15_000,
+    });
+  }
 
   await page.getByRole("button", { name: "Add role" }).click();
   const name = page.getByRole("textbox", { name: "Add role" });
@@ -122,7 +136,6 @@ test("a role is added, held, refused removal, then removed", async () => {
 
   // Give it to somebody, and the removal is refused with the action's own
   // sentence rather than failing silently.
-  const assign = page.getByRole("combobox", { name: /^Role for / }).first();
   await assign.selectOption({ label: ADDED_ROLE });
   await expect(assign).toHaveValue(/.+/);
 
@@ -132,8 +145,14 @@ test("a role is added, held, refused removal, then removed", async () => {
   });
   await expect(page.getByRole("rowheader", { name: added })).toBeVisible();
 
-  // Take it off them, and the removal goes through.
+  // **Wait for the unassignment to land before removing.** Selecting "No
+  // role" starts a transition; pressing Delete before it commits asks the
+  // server to remove a role somebody still holds, which is refused, and the
+  // test then reads a role that is still there. The empty value is what says
+  // the write came back.
   await assign.selectOption({ label: "No role" });
+  await expect(assign).toHaveValue("");
+
   await removeRole(added);
   await expect(page.getByRole("rowheader", { name: added })).toHaveCount(0, {
     timeout: 15_000,
