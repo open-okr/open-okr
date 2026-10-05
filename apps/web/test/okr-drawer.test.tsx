@@ -64,6 +64,8 @@ const keyResult = (overrides: Partial<TreeKeyResult> = {}): TreeKeyResult => ({
   goalId: "g",
   title: KR,
   unit: "%",
+  kind: "metric",
+  doneAt: null,
   direction: "increase",
   indicatorType: "lagging",
   baselineValue: 30,

@@ -38,6 +38,7 @@ import {
   goals,
   type IndicatorType,
   type KeyResultDirection,
+  type KeyResultKind,
   keyResults,
   keyResultValues,
   newId,
@@ -636,6 +637,11 @@ export interface CreateKeyResultInput {
   readonly goalId: string;
   readonly title: string;
   readonly unit?: string | null;
+  /**
+   * Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). Left
+   * out, the column's default, metric.
+   */
+  readonly kind?: KeyResultKind;
   readonly direction: KeyResultDirection;
   readonly indicatorType: IndicatorType;
   readonly baselineValue: number;
@@ -699,6 +705,7 @@ export async function createKeyResultInTx<
       goalId: input.goalId,
       title,
       unit: input.unit?.trim() || null,
+      ...(input.kind === undefined ? {} : { kind: input.kind }),
       direction: input.direction,
       indicatorType: input.indicatorType,
       baselineValue: String(input.baselineValue),
@@ -751,12 +758,23 @@ export interface RecordValueInput {
  * A KPI-linked key result refuses a manual value (§5.3): the value has one
  * source of truth, and letting somebody type over it would make the link a
  * suggestion.
+ *
+ * **A baseline key result is recorded by its first value** (METHOD.md §2.10,
+ * P9-T12b): the number nobody measured is now measured, so it becomes the
+ * baseline as well as the current value, and the key result is done. A later
+ * value moves the current value only; the baseline stays what was first
+ * found.
  */
 export async function recordValueInTx<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(tx: AnyTx<TSchema>, input: RecordValueInput): Promise<void> {
   const [keyResult] = await tx
-    .select({ id: keyResults.id, kpiId: keyResults.kpiId })
+    .select({
+      id: keyResults.id,
+      kpiId: keyResults.kpiId,
+      kind: keyResults.kind,
+      doneAt: keyResults.doneAt,
+    })
     .from(keyResults)
     .where(
       activeOnly(
@@ -790,10 +808,17 @@ export async function recordValueInTx<
     note: input.note?.trim() || null,
   });
 
+  const firstBaseline = keyResult.kind === "baseline" && !keyResult.doneAt;
   // openokr:allow-mutation: the calling Operation's own transaction.
   await tx
     .update(keyResults)
-    .set({ currentValue: String(input.value), updatedAt: now })
+    .set({
+      currentValue: String(input.value),
+      ...(firstBaseline
+        ? { baselineValue: String(input.value), doneAt: now }
+        : {}),
+      updatedAt: now,
+    })
     .where(activeOnly(keyResults, eq(keyResults.id, input.keyResultId)));
 }
 
@@ -919,4 +944,30 @@ export async function unlinkKpiInTx<
     source: "manual",
     note: "KPI unlinked. The value the KPI last reported is kept as a manual one",
   });
+}
+
+/**
+ * When a key result is done, after a write (METHOD.md §2.10, P9-T12b).
+ *
+ * Only a milestone or a baseline is ever done. Changing a key result to a
+ * metric or a maintain clears it, because those read their number. A done
+ * asked of one of them is refused, rather than stored where nothing reads it.
+ * Marking done again keeps the first moment, which is when it happened.
+ */
+export function doneAtFor(
+  kind: KeyResultKind,
+  stored: Date | null,
+  done: boolean | undefined,
+): Date | null {
+  const doneable = kind === "milestone" || kind === "baseline";
+  if (done === true && !doneable) {
+    throw new OperationError(
+      "forbidden",
+      "Only a milestone or a baseline key result is marked done. A metric or a maintain key result reads its number instead.",
+    );
+  }
+  if (!doneable || done === false) {
+    return null;
+  }
+  return done === true ? (stored ?? new Date()) : stored;
 }

@@ -27,6 +27,7 @@ import {
   INDICATOR_TYPES,
   includeDeleted,
   KEY_RESULT_DIRECTIONS,
+  KEY_RESULT_KINDS,
   keyResults,
   keyResultValues,
   okrSessions,
@@ -69,6 +70,7 @@ import {
   closeGoalInTx,
   createGoalInTx,
   createKeyResultInTx,
+  doneAtFor,
   type GoalRole,
   linkKpiInTx,
   reassignRoleInTx,
@@ -136,6 +138,10 @@ const keyResultOutput = z.object({
   goalId: z.uuid(),
   title: z.string(),
   unit: z.string().nullable(),
+  /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). */
+  kind: z.enum(KEY_RESULT_KINDS),
+  /** When a milestone was done or a baseline recorded, or null. */
+  doneAt: z.string().nullable(),
   direction: z.enum(KEY_RESULT_DIRECTIONS),
   indicatorType: z.enum(INDICATOR_TYPES),
   baselineValue: z.number(),
@@ -310,6 +316,8 @@ function keyResultRow(row: {
   goalId: string;
   title: string;
   unit: string | null;
+  kind: (typeof KEY_RESULT_KINDS)[number];
+  doneAt: Date | null;
   direction: (typeof KEY_RESULT_DIRECTIONS)[number];
   indicatorType: (typeof INDICATOR_TYPES)[number];
   baselineValue: string;
@@ -329,6 +337,7 @@ function keyResultRow(row: {
 }) {
   return {
     ...row,
+    doneAt: row.doneAt ? row.doneAt.toISOString() : null,
     baselineValue: asNumber(row.baselineValue) ?? 0,
     targetValue: asNumber(row.targetValue) ?? 0,
     currentValue: asNumber(row.currentValue) ?? 0,
@@ -373,6 +382,8 @@ const KEY_RESULT_COLUMNS = {
   goalId: keyResults.goalId,
   title: keyResults.title,
   unit: keyResults.unit,
+  kind: keyResults.kind,
+  doneAt: keyResults.doneAt,
   direction: keyResults.direction,
   indicatorType: keyResults.indicatorType,
   baselineValue: keyResults.baselineValue,
@@ -1894,25 +1905,48 @@ export const createKeyResult = defineWriteAction({
   name: "goals.addKeyResult",
   summary:
     "Adds a key result to a goal, with its baseline recorded as history.",
-  input: z.object({
-    goalId: z.uuid(),
-    title: z.string().trim().min(1).max(500),
-    unit: z.string().trim().max(60).optional(),
-    direction: z.enum(KEY_RESULT_DIRECTIONS),
-    indicatorType: z.enum(INDICATOR_TYPES),
-    baselineValue: z.number(),
-    targetValue: z.number(),
-    currentValue: z.number().optional(),
-    dueOn: localDate.optional(),
-    ownerId: z.uuid().optional(),
-    weight: z.number().default(1),
-    kpiId: z.uuid().optional(),
-    capacity: z.enum(CAPACITY_VERDICTS).optional(),
-    /** The source-system identity, when an import is creating this (P6-T01a). */
-    legacy: legacyKey.optional(),
-    /** Accepted and ignored since P9-T02, as on `goals.create`. */
-    guided: z.boolean().optional(),
-  }),
+  input: z
+    .object({
+      goalId: z.uuid(),
+      title: z.string().trim().min(1).max(500),
+      unit: z.string().trim().max(60).optional(),
+      /**
+       * Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b).
+       * Left out, a maintain where the direction says maintain and a metric
+       * otherwise, which is how every key result before kinds was read.
+       */
+      kind: z.enum(KEY_RESULT_KINDS).optional(),
+      /**
+       * Asked of a metric and a maintain key result. A milestone or a baseline
+       * reads its progress from being done, so it may leave all three out.
+       */
+      direction: z.enum(KEY_RESULT_DIRECTIONS).optional(),
+      indicatorType: z.enum(INDICATOR_TYPES),
+      baselineValue: z.number().optional(),
+      targetValue: z.number().optional(),
+      currentValue: z.number().optional(),
+      dueOn: localDate.optional(),
+      ownerId: z.uuid().optional(),
+      weight: z.number().default(1),
+      kpiId: z.uuid().optional(),
+      capacity: z.enum(CAPACITY_VERDICTS).optional(),
+      /** The source-system identity, when an import is creating this (P6-T01a). */
+      legacy: legacyKey.optional(),
+      /** Accepted and ignored since P9-T02, as on `goals.create`. */
+      guided: z.boolean().optional(),
+    })
+    .refine(
+      (value) =>
+        value.kind === "milestone" ||
+        value.kind === "baseline" ||
+        (value.direction !== undefined &&
+          value.baselineValue !== undefined &&
+          value.targetValue !== undefined),
+      {
+        message:
+          "A metric or a maintain key result needs its direction, its baseline and its target.",
+      },
+    ),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -1928,6 +1962,15 @@ export const createKeyResult = defineWriteAction({
         memberId,
         input.goalId,
         ACCESS_LEVELS.edit,
+      );
+      const kind =
+        input.kind ?? (input.direction === "maintain" ? "maintain" : "metric");
+      // §2.10: a kind the workspace has turned off is refused, from every
+      // surface alike (P9-T12b).
+      await requirePolicy(
+        tx,
+        { workspaceId, bulk: context.bulk },
+        { kind: "keyResult.kind", keyResultKind: kind },
       );
       const [goal] = await tx
         .select({ cycleId: goals.cycleId })
@@ -1957,15 +2000,19 @@ export const createKeyResult = defineWriteAction({
         : null;
       const currentValue = kpi?.reading ?? input.currentValue;
 
+      // A milestone or a baseline left without numbers is stored nought to
+      // one, increasing, so the columns stay filled; its progress is read
+      // from being done and never from these (§2.10).
       const created = await createKeyResultInTx(tx, {
         workspaceId,
         goalId: input.goalId,
         title: input.title,
         unit: input.unit ?? null,
-        direction: input.direction,
+        kind,
+        direction: input.direction ?? "increase",
         indicatorType: input.indicatorType,
-        baselineValue: input.baselineValue,
-        targetValue: input.targetValue,
+        baselineValue: input.baselineValue ?? 0,
+        targetValue: input.targetValue ?? 1,
         currentValue,
         dueOn: input.dueOn ?? null,
         ownerId: input.ownerId ?? null,
@@ -2019,13 +2066,20 @@ export const createKeyResult = defineWriteAction({
 
 export const updateKeyResult = defineWriteAction({
   name: "goals.updateKeyResult",
-  // openokr:policy-exempt: changing a key result that exists stays open under every setting (METHOD.md §2.9); a target it is given goes through changeTargetInTx, which asks the policy.
+  // openokr:policy-exempt: changing a key result that exists stays open under every setting (METHOD.md §2.9); a target it is given goes through changeTargetInTx, which asks the policy, and a kind it is given asks it here (P9-T12b).
   summary:
     "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
   input: z.object({
     id: z.uuid(),
     title: z.string().trim().min(1).max(500).optional(),
     unit: z.string().trim().max(60).nullable().optional(),
+    /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). */
+    kind: z.enum(KEY_RESULT_KINDS).optional(),
+    /**
+     * A milestone done, or a baseline recorded; false undoes it. Refused for
+     * a metric or a maintain key result, which reads its number instead.
+     */
+    done: z.boolean().optional(),
     direction: z.enum(KEY_RESULT_DIRECTIONS).optional(),
     indicatorType: z.enum(INDICATOR_TYPES).optional(),
     baselineValue: z.number().optional(),
@@ -2051,7 +2105,11 @@ export const updateKeyResult = defineWriteAction({
         context.actor.userId,
       );
       const [owner] = await tx
-        .select({ goalId: keyResults.goalId })
+        .select({
+          goalId: keyResults.goalId,
+          kind: keyResults.kind,
+          doneAt: keyResults.doneAt,
+        })
         .from(keyResults)
         .where(
           activeOnly(
@@ -2071,6 +2129,18 @@ export const updateKeyResult = defineWriteAction({
         owner.goalId,
         ACCESS_LEVELS.edit,
       );
+      if (input.kind !== undefined && input.kind !== owner.kind) {
+        await requirePolicy(
+          tx,
+          { workspaceId, bulk: context.bulk },
+          { kind: "keyResult.kind", keyResultKind: input.kind },
+        );
+      }
+      const doneAt = doneAtFor(
+        input.kind ?? owner.kind,
+        owner.doneAt,
+        input.done,
+      );
       if (input.ownerId) {
         await requireActiveMember(
           tx,
@@ -2086,6 +2156,12 @@ export const updateKeyResult = defineWriteAction({
       }
       if (input.unit !== undefined) {
         patch.unit = input.unit?.trim() || null;
+      }
+      if (input.kind !== undefined) {
+        patch.kind = input.kind;
+      }
+      if (doneAt !== owner.doneAt) {
+        patch.doneAt = doneAt;
       }
       if (input.direction !== undefined) {
         patch.direction = input.direction;
@@ -2785,6 +2861,7 @@ export const rewriteKeyResult = defineReadAction({
             indicatorType: keyResults.indicatorType,
             direction: keyResults.direction,
             confidence: keyResults.confidence,
+            keyResultKind: keyResults.kind,
           })
           .from(keyResults)
           .where(
@@ -2829,6 +2906,8 @@ export const rewriteKeyResult = defineReadAction({
           confidence: row.confidence === null ? null : Number(row.confidence),
           // KR-6 judges only aspirational key results (P9-T11b-b).
           ...(goal ? { kind: goal.kind } : {}),
+          // KR-2, KR-3 and KR-7 judge by its own kind (P9-T12b).
+          keyResultKind: row.keyResultKind,
         });
 
         const failingBefore = new Set(

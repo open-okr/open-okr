@@ -6585,10 +6585,22 @@
           "required": false
         },
         {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "metric",
+            "maintain",
+            "milestone",
+            "baseline"
+          ]
+        },
+        {
           "name": "direction",
           "field": "direction",
           "type": "string",
-          "required": true,
+          "required": false,
           "enum": [
             "increase",
             "reduce",
@@ -6610,13 +6622,13 @@
           "name": "baseline-value",
           "field": "baselineValue",
           "type": "number",
-          "required": true
+          "required": false
         },
         {
           "name": "target-value",
           "field": "targetValue",
           "type": "number",
-          "required": true
+          "required": false
         },
         {
           "name": "current-value",
@@ -6698,6 +6710,24 @@
           "name": "unit",
           "field": "unit",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "metric",
+            "maintain",
+            "milestone",
+            "baseline"
+          ]
+        },
+        {
+          "name": "done",
+          "field": "done",
+          "type": "boolean",
           "required": false
         },
         {

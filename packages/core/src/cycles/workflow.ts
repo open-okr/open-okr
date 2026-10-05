@@ -483,6 +483,7 @@ async function loadGoalSnapshots<
       goalId: keyResults.goalId,
       title: keyResults.title,
       capacity: keyResults.capacity,
+      keyResultKind: keyResults.kind,
       // Publish gate 2 judges the §4.2 checks over the whole set, so the fields
       // those checks read travel with the snapshot.
       baselineValue: keyResults.baselineValue,
@@ -561,6 +562,7 @@ async function loadGoalSnapshots<
           direction: child.direction,
           confidence:
             child.confidence === null ? null : Number(child.confidence),
+          keyResultKind: child.keyResultKind,
         },
       })),
   }));

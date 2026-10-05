@@ -19,6 +19,7 @@ import { sealAccountTokens } from "../src/data-changes/0011_seal_account_tokens.
 import { carryStrategicIssueMinimum } from "../src/data-changes/0014_carry_strategic_issue_minimum.ts";
 import { carryObjectiveLengthLimit } from "../src/data-changes/0015_carry_objective_length_limit.ts";
 import { carryCoachStrictness } from "../src/data-changes/0016_carry_coach_strictness.ts";
+import { keyResultKindFromDirection } from "../src/data-changes/0017_key_result_kind_from_direction.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -979,6 +980,67 @@ describe("0015: carrying a strict Coach onto strict mode", () => {
     await client.query("delete from _data_changes");
     const [again] = await runDataChanges(client, {
       scripts: [carryCoachStrictness],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0017: maintain key results from their direction", () => {
+  it("makes a key result written with a maintain direction a maintain key result, and leaves the rest", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const { rows } = await client.query<{ direction: string; id: string }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Owner', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe)
+         select gen_random_uuid(), m.workspace_id, 'Keep the service up',
+                'company', 'workspace', m.id, m.id,
+                '{"start": "2026-07-01", "end": "2026-09-30"}'::jsonb
+           from m
+         returning id, workspace_id
+       )
+       insert into key_results (id, workspace_id, goal_id, title, direction,
+                                indicator_type, baseline_value, target_value,
+                                current_value)
+       select gen_random_uuid(), g.workspace_id, g.id, d.title, d.direction,
+              'lagging', 0, 10, 0
+         from g,
+              (values ('Uptime', 'maintain'), ('Activation', 'increase'))
+                as d(title, direction)
+       returning direction, id`,
+    );
+    // Both arrive as metric, the column's default, before the script runs.
+    const kinds = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{ direction: string; kind: string }>(
+            "select direction, kind from key_results",
+          )
+        ).rows.map((row) => [row.direction, row.kind]),
+      );
+    expect(rows).toHaveLength(2);
+    expect(await kinds()).toEqual({ maintain: "metric", increase: "metric" });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [keyResultKindFromDirection],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    expect(await kinds()).toEqual({
+      maintain: "maintain",
+      increase: "metric",
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [keyResultKindFromDirection],
     });
     expect(again?.rowsChanged).toBe(0);
   });

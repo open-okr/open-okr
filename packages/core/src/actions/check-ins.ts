@@ -54,6 +54,11 @@ const composerValue = z.object({
   keyResultId: z.uuid(),
   value: z.number().optional(),
   confidence: z.number().min(0).max(1).optional(),
+  /**
+   * A milestone done, or a baseline recorded, with this check-in (METHOD.md
+   * §2.10, P9-T12b); false undoes it. Refused for a metric or a maintain.
+   */
+  done: z.boolean().optional(),
 });
 
 async function actingMember(

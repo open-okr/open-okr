@@ -69,6 +69,18 @@ export type GoalSuccessStatus = (typeof GOAL_SUCCESS_STATUSES)[number];
 export const GOAL_CLOSE_DECISIONS = ["keep", "modify", "abandon"] as const;
 export type GoalCloseDecision = (typeof GOAL_CLOSE_DECISIONS)[number];
 
+/**
+ * METHOD.md §2.10 (P9-T12b). The same four words as the method's
+ * `KEY_RESULT_KINDS`, spelled here for the reason `GOAL_KINDS` is.
+ */
+export const KEY_RESULT_KINDS = [
+  "metric",
+  "maintain",
+  "milestone",
+  "baseline",
+] as const;
+export type KeyResultKind = (typeof KEY_RESULT_KINDS)[number];
+
 export const KEY_RESULT_DIRECTIONS = [
   "increase",
   "reduce",
@@ -181,6 +193,10 @@ export const keyResults = pgTable("key_results", {
     .references(() => goals.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   unit: text("unit"),
+  /** Metric, maintain, milestone or baseline (METHOD.md §2.10). */
+  kind: text("kind", { enum: KEY_RESULT_KINDS }).notNull().default("metric"),
+  /** When a milestone was done or a baseline recorded; null until then. */
+  doneAt: timestamp("done_at", { withTimezone: true }),
   direction: text("direction", { enum: KEY_RESULT_DIRECTIONS }).notNull(),
   indicatorType: text("indicator_type", { enum: INDICATOR_TYPES }).notNull(),
   baselineValue: numeric("baseline_value").notNull(),

@@ -211,6 +211,7 @@ export async function evaluateGoalInTx(
       indicatorType: keyResults.indicatorType,
       direction: keyResults.direction,
       confidence: keyResults.confidence,
+      keyResultKind: keyResults.kind,
     })
     .from(keyResults)
     .where(activeOnly(keyResults, eq(keyResults.goalId, input.goalId)));
@@ -226,6 +227,8 @@ export async function evaluateGoalInTx(
     confidence: row.confidence === null ? null : Number(row.confidence),
     // KR-6 judges only aspirational key results (METHOD.md §3.2, P9-T11b-b).
     kind: goal.kind,
+    // KR-2, KR-3 and KR-7 judge by the key result's own kind (§2.10).
+    keyResultKind: row.keyResultKind,
   }));
 
   // A space's own strictness wins for its own goals, and nowhere else

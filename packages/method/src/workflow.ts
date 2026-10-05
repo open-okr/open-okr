@@ -25,6 +25,7 @@ import { applyEnforcement } from "./enforcement.ts";
 import {
   defaultPractice,
   type GateEnforcement,
+  type KeyResultKind,
   type ResolvedPractice,
 } from "./practice.ts";
 import {
@@ -123,6 +124,11 @@ export interface KeyResultSnapshot {
     readonly indicatorType: "leading" | "lagging";
     readonly direction: "increase" | "reduce" | "maintain" | "move";
     readonly confidence: number | null;
+    /**
+     * The key result's own kind (§2.10, P9-T12b), so gate 2's KR-3 and KR-7
+     * do not block a milestone for the target it was never asked for.
+     */
+    readonly keyResultKind?: KeyResultKind;
   };
 }
 

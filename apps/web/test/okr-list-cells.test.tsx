@@ -93,6 +93,8 @@ const tree = (): OkrTree => ({
           goalId: "g",
           title: "Activation from 30% to 45%",
           unit: "%",
+          kind: "metric",
+          doneAt: null,
           direction: "increase",
           indicatorType: "lagging",
           baselineValue: 30,

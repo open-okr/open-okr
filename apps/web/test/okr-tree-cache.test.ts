@@ -29,6 +29,8 @@ const keyResult = (id: string, goalId: string) => ({
   goalId,
   title: `Key result ${id}`,
   unit: null,
+  kind: "metric" as const,
+  doneAt: null,
   direction: "increase" as const,
   indicatorType: "lagging" as const,
   baselineValue: 0,

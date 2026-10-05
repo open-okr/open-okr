@@ -297,11 +297,20 @@ export interface CascadeResult {
  * A child aligned to a key result contributes to the goal that owns it and leaves
  * that key result's own measured progress alone (decision D-2). A measured 40%
  * key result must not display 80% because another team did well.
+ *
+ * **Whether children count at all is the workspace's** (§3.1, §12's
+ * "Progress roll-up from aligned goals", P9-T12b). Off, which is METHOD v2's
+ * default, an objective's progress is its own key results' alone, because a
+ * child's work usually also moves the parent's own key results and would be
+ * counted twice. Left out, `rollUp` is on, which is what every caller before
+ * the setting was read assumed.
  */
 export function cascadeProgress(
   goals: readonly CascadeGoal[],
   thresholds: ResolvedThresholds,
+  options: { readonly rollUp?: boolean } = {},
 ): CascadeResult {
+  const rollUp = options.rollUp ?? true;
   const byId = new Map(goals.map((goal) => [goal.id, goal]));
   const keyResultOwner = new Map<string, string>();
   for (const goal of goals) {
@@ -428,7 +437,7 @@ export function cascadeProgress(
       weight: keyResult.weight,
       progressPct: keyResult.progressPct,
     }));
-    for (const childId of childIds) {
+    for (const childId of rollUp ? childIds : []) {
       const child = byId.get(childId);
       if (!child) {
         continue;

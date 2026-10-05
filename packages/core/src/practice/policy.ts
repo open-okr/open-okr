@@ -19,6 +19,7 @@ import type { WorkspaceTx } from "@openokr/db";
 import {
   type CycleFacts,
   decide,
+  type KeyResultKind,
   levelsInUse,
   OKR_LEVELS,
   type OkrKind,
@@ -47,6 +48,8 @@ export type PolicyRequest =
     }
   /** Changing an objective's kind (P9-T11b-a). Needs no cycle. */
   | { readonly kind: "objective.kind"; readonly okrKind: OkrKind }
+  /** Writing a key result as one of §2.10's kinds (P9-T12b). Needs no cycle. */
+  | { readonly kind: "keyResult.kind"; readonly keyResultKind: KeyResultKind }
   /** Taking the reviewer off an objective (P9-T04). */
   | { readonly kind: "reviewer.remove" }
   | { readonly kind: "keyResult.create"; readonly cycleId: string | null }
@@ -80,7 +83,11 @@ export async function policyDecisionInTx<
   if (request.kind === "reviewer.remove") {
     return decide({ kind: "reviewer.remove" }, practice, thresholds);
   }
-  if (request.kind === "target.change" || request.kind === "objective.kind") {
+  if (
+    request.kind === "target.change" ||
+    request.kind === "objective.kind" ||
+    request.kind === "keyResult.kind"
+  ) {
     return decide(request, practice, thresholds);
   }
 

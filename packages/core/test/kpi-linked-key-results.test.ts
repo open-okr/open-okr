@@ -132,6 +132,9 @@ afterAll(async () => {
 
 describe("recording a KPI moves the key results that read it", () => {
   it("moves the key result, its goal and the goal above it", async () => {
+    // The goal above counts its child only where the workspace rolls aligned
+    // goals up, which is off by default since P9-T12b (METHOD.md §3.1).
+    await call("practice.update", { overrides: { "progress.rollUp": "on" } });
     const kpi = await makeKpi("Weekly active teams");
     const parent = await makeGoal("Teams make the product a weekly habit");
     const child = await makeGoal(

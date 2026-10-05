@@ -26,6 +26,7 @@ import { dropSpaceEditOnGoals } from "../data-changes/0013_drop_space_edit_on_go
 import { carryStrategicIssueMinimum } from "../data-changes/0014_carry_strategic_issue_minimum.ts";
 import { carryObjectiveLengthLimit } from "../data-changes/0015_carry_objective_length_limit.ts";
 import { carryCoachStrictness } from "../data-changes/0016_carry_coach_strictness.ts";
+import { keyResultKindFromDirection } from "../data-changes/0017_key_result_kind_from_direction.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -59,6 +60,7 @@ try {
       carryStrategicIssueMinimum,
       carryObjectiveLengthLimit,
       carryCoachStrictness,
+      keyResultKindFromDirection,
     ],
   });
   process.stdout.write(

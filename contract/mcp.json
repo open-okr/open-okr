@@ -9076,6 +9076,15 @@
             "type": "string",
             "maxLength": 60
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "metric",
+              "maintain",
+              "milestone",
+              "baseline"
+            ]
+          },
           "direction": {
             "type": "string",
             "enum": [
@@ -9155,10 +9164,7 @@
         "required": [
           "goalId",
           "title",
-          "direction",
-          "indicatorType",
-          "baselineValue",
-          "targetValue"
+          "indicatorType"
         ]
       },
       "scope": "write",
@@ -9170,10 +9176,7 @@
       "example": {
         "goalId": "00000000-0000-4000-8000-000000000000",
         "title": "…",
-        "direction": "increase",
-        "indicatorType": "leading",
-        "baselineValue": 0,
-        "targetValue": 0
+        "indicatorType": "leading"
       }
     },
     {
@@ -9202,6 +9205,18 @@
                 "type": "null"
               }
             ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "metric",
+              "maintain",
+              "milestone",
+              "baseline"
+            ]
+          },
+          "done": {
+            "type": "boolean"
           },
           "direction": {
             "type": "string",
@@ -9485,6 +9500,7 @@
               "type": [
                 "string",
                 "number",
+                "boolean",
                 "null"
               ]
             }
@@ -9566,6 +9582,18 @@
               },
               "weight": {
                 "type": "number"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "metric",
+                  "maintain",
+                  "milestone",
+                  "baseline"
+                ]
+              },
+              "done": {
+                "type": "boolean"
               }
             }
           },
@@ -9578,6 +9606,7 @@
               "type": [
                 "string",
                 "number",
+                "boolean",
                 "null"
               ]
             }
@@ -10206,6 +10235,9 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "done": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -10282,6 +10314,9 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "done": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -10391,6 +10426,9 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "done": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -10462,6 +10500,9 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "done": {
+                  "type": "boolean"
                 }
               },
               "required": [

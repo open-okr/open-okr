@@ -235,7 +235,7 @@ The ceiling does not touch scoring. A score is judged at the close against the k
 
 A metric key result whose baseline equals its target is not a metric. The coach asks whether it is a maintain or a milestone key result.
 
-A goal's progress is the weighted average of its key results' progress, including the weighted contribution of goals aligned beneath it.
+A goal's progress is the weighted average of its key results' progress. Including the progress of goals aligned beneath it is a practice setting, off by default, because a child's work usually also moves the parent's own key results and would be counted twice. *Source:* Perdoo (vendor): "By default, an Objective's progress is based on its Key Results only".
 
 ### 3.2 Confidence bands
 

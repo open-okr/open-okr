@@ -23,6 +23,7 @@ import {
   checkInSnapshots,
   checkIns,
   goals,
+  type KeyResultKind,
   keyResults,
   keyResultValues,
   newId,
@@ -35,6 +36,7 @@ import { desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { cadence, dueInstant, firstDue } from "../cadence/engine.ts";
 import { localDateIn } from "../cycles/generation.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { doneAtFor } from "../goals/service.ts";
 import { OperationError } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
@@ -55,6 +57,8 @@ interface ComposerValue {
   readonly keyResultId: string;
   readonly value?: number;
   readonly confidence?: number;
+  /** A milestone done or a baseline recorded with this check-in (P9-T12b). */
+  readonly done?: boolean;
 }
 
 export interface PublishInput {
@@ -120,6 +124,14 @@ async function buildSnapshot<
   });
 }
 
+/** What a key result held before this publication touched it. */
+interface Previous {
+  readonly value: number | null;
+  readonly confidence: number | null;
+  readonly kind: KeyResultKind;
+  readonly doneAt: Date | null;
+}
+
 /** What every key result held before this publication touched it. */
 async function readPrevious<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -127,12 +139,14 @@ async function readPrevious<
   tx: AnyTx<TSchema>,
   workspaceId: string,
   goalId: string,
-): Promise<Map<string, { value: number | null; confidence: number | null }>> {
+): Promise<Map<string, Previous>> {
   const rows = await tx
     .select({
       id: keyResults.id,
       currentValue: keyResults.currentValue,
       confidence: keyResults.confidence,
+      kind: keyResults.kind,
+      doneAt: keyResults.doneAt,
     })
     .from(keyResults)
     .where(
@@ -148,6 +162,8 @@ async function readPrevious<
       {
         value: asNumber(row.currentValue),
         confidence: asNumber(row.confidence),
+        kind: row.kind,
+        doneAt: row.doneAt,
       },
     ]),
   );
@@ -165,10 +181,7 @@ async function applyValues<
 >(
   tx: AnyTx<TSchema>,
   input: PublishInput,
-  previous: ReadonlyMap<
-    string,
-    { value: number | null; confidence: number | null }
-  >,
+  previous: ReadonlyMap<string, Previous>,
 ): Promise<number> {
   let written = 0;
   for (const entry of input.values) {
@@ -187,6 +200,19 @@ async function applyValues<
         .where(activeOnly(keyResults, eq(keyResults.id, entry.keyResultId)));
     }
 
+    // §2.10: a milestone is checked in as done or not done. The same rule
+    // as every other write, so a metric marked done is refused here too.
+    if (entry.done !== undefined) {
+      const doneAt = doneAtFor(before.kind, before.doneAt, entry.done);
+      if (doneAt !== before.doneAt) {
+        // openokr:allow-mutation: same transaction.
+        await tx
+          .update(keyResults)
+          .set({ doneAt, updatedAt: input.now })
+          .where(activeOnly(keyResults, eq(keyResults.id, entry.keyResultId)));
+      }
+    }
+
     if (entry.value === undefined || entry.value === before.value) {
       continue;
     }
@@ -201,10 +227,19 @@ async function applyValues<
       checkInId: input.checkInId,
       source: "check_in",
     });
+    // A baseline's first value is its baseline, and records it (§2.10), as
+    // `recordValueInTx` does for a value typed outside a check-in.
+    const firstBaseline = before.kind === "baseline" && !before.doneAt;
     // openokr:allow-mutation: same transaction.
     await tx
       .update(keyResults)
-      .set({ currentValue: String(entry.value), updatedAt: input.now })
+      .set({
+        currentValue: String(entry.value),
+        ...(firstBaseline
+          ? { baselineValue: String(entry.value), doneAt: input.now }
+          : {}),
+        updatedAt: input.now,
+      })
       .where(activeOnly(keyResults, eq(keyResults.id, entry.keyResultId)));
     written += 1;
   }

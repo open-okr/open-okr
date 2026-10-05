@@ -984,6 +984,11 @@ describe("the scoring cascade against real rows", () => {
 
   it("rolls a child's progress into its parent", async () => {
     const wb = await workerDb();
+    // Off by default since P9-T12b (METHOD.md §3.1); this is the workspace
+    // that turned it on.
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "progress.rollUp": "on" },
+    });
     const parent = await createGoal({ title: "Parent" });
     await callAction({ pool: wb.appPool, ...context() }, "goals.addKeyResult", {
       goalId: parent.id,

@@ -84,6 +84,8 @@ const node = (title: string): OkrGoal => ({
       goalId: "g",
       title: "Trials from 0 to 100",
       unit: null,
+      kind: "metric",
+      doneAt: null,
       direction: "increase",
       indicatorType: "lagging",
       baselineValue: 0,

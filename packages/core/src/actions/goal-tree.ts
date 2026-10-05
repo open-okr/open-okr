@@ -29,6 +29,7 @@ import {
   goals,
   INDICATOR_TYPES,
   KEY_RESULT_DIRECTIONS,
+  KEY_RESULT_KINDS,
   keyResults,
   withContext,
   workspaceMembers,
@@ -44,11 +45,12 @@ import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import {
   asNumber,
   clampWeight,
+  doneAtFor,
   reassignRoleInTx,
   requireActiveMember,
 } from "../goals/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
-import { policyDecisionInTx } from "../practice/policy.ts";
+import { policyDecisionInTx, requirePolicy } from "../practice/policy.ts";
 import {
   recomputeGoalQualityInTx,
   recomputeUnitQualityInTx,
@@ -69,6 +71,10 @@ const treeKeyResult = z.object({
   goalId: z.uuid(),
   title: z.string(),
   unit: z.string().nullable(),
+  /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). */
+  kind: z.enum(KEY_RESULT_KINDS),
+  /** When a milestone was done or a baseline recorded, or null. */
+  doneAt: z.string().nullable(),
   direction: z.enum(KEY_RESULT_DIRECTIONS),
   /** What KR-4 and KR-5 judge, so a screen can coach as the server does. */
   indicatorType: z.enum(INDICATOR_TYPES),
@@ -202,6 +208,8 @@ const KEY_RESULT_COLUMNS = {
   goalId: keyResults.goalId,
   title: keyResults.title,
   unit: keyResults.unit,
+  kind: keyResults.kind,
+  doneAt: keyResults.doneAt,
   direction: keyResults.direction,
   indicatorType: keyResults.indicatorType,
   baselineValue: keyResults.baselineValue,
@@ -304,6 +312,8 @@ async function treeNodes(
       goalId: child.goalId,
       title: child.title,
       unit: child.unit,
+      kind: child.kind,
+      doneAt: child.doneAt ? new Date(child.doneAt).toISOString() : null,
       direction: child.direction,
       indicatorType: child.indicatorType,
       baselineValue: asNumber(child.baselineValue) ?? 0,
@@ -669,7 +679,8 @@ async function lastChange(
   };
 }
 
-type Comparable = string | number | null;
+/** Boolean for a milestone's done (P9-T12b), compared as it is. */
+type Comparable = string | number | boolean | null;
 
 /** Equal as the screen means it: numbers by value, blank text as nothing. */
 function sameField(read: Comparable, stored: Comparable): boolean {
@@ -727,6 +738,10 @@ const keyResultFields = z.object({
   dueOn: localDate.nullable(),
   ownerId: z.uuid().nullable(),
   weight: z.number(),
+  /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). */
+  kind: z.enum(KEY_RESULT_KINDS),
+  /** A milestone done or a baseline recorded; false undoes it. */
+  done: z.boolean(),
 });
 
 /**
@@ -737,7 +752,7 @@ const keyResultFields = z.object({
  * must still be comparable.
  */
 function patchInput<T extends z.ZodRawShape>(fields: z.ZodObject<T>) {
-  const readable = z.union([z.string(), z.number(), z.null()]);
+  const readable = z.union([z.string(), z.number(), z.boolean(), z.null()]);
   return z
     .object({
       id: z.uuid(),
@@ -900,7 +915,7 @@ export const patchGoal = defineWriteAction({
 
 export const patchKeyResult = defineWriteAction({
   name: "goals.patchKeyResult",
-  // openokr:policy-exempt: changing a key result that exists stays open under every setting (METHOD.md §2.9); its target is not among these fields and goes through goals.changeTarget.
+  // openokr:policy-exempt: changing a key result that exists stays open under every setting (METHOD.md §2.9); its target is not among these fields and goes through goals.changeTarget, and a kind it is given asks the policy here (P9-T12b).
   summary:
     "Changes some of a key result's fields, refused with the current values if any of them changed since the caller read them. The target and the current value have their own actions.",
   input: patchInput(keyResultFields),
@@ -922,6 +937,8 @@ export const patchKeyResult = defineWriteAction({
           dueOn: keyResults.dueOn,
           ownerId: keyResults.ownerId,
           weight: keyResults.weight,
+          kind: keyResults.kind,
+          doneAt: keyResults.doneAt,
         })
         .from(keyResults)
         .where(
@@ -965,10 +982,30 @@ export const patchKeyResult = defineWriteAction({
           dueOn: row.dueOn,
           ownerId: row.ownerId,
           weight: asNumber(row.weight),
+          kind: row.kind,
+          done: row.doneAt !== null,
         },
+      );
+      if (input.set.kind !== undefined && input.set.kind !== row.kind) {
+        await requirePolicy(
+          tx,
+          { workspaceId, bulk: context.bulk },
+          { kind: "keyResult.kind", keyResultKind: input.set.kind },
+        );
+      }
+      const doneAt = doneAtFor(
+        input.set.kind ?? row.kind,
+        row.doneAt,
+        input.set.done,
       );
 
       const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.set.kind !== undefined) {
+        patch.kind = input.set.kind;
+      }
+      if (doneAt !== row.doneAt) {
+        patch.doneAt = doneAt;
+      }
       if (input.set.title !== undefined) {
         patch.title = input.set.title;
       }
