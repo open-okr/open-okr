@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   belowCommittedFloor,
   committedShareMet,
+  computedScore,
   cycleScore,
   draftVerdict,
+  keyResultProgress,
   needsRootCause,
   objectiveScore,
   portfolioVerdictOf,
   scoreNote,
+  shareInsideBand,
   tooSafePattern,
 } from "../src/scoring.ts";
 import { canonThresholds } from "../src/thresholds.ts";
@@ -159,5 +162,94 @@ describe("judging by kind (METHOD.md §2.8, §3.2, §3.3 and §3.4, P9-T11a)", (
     expect(draftVerdict(0.5, thresholds)).toBe("sweet_spot");
     expect(draftVerdict(0.3, thresholds)).toBe("sweet_spot");
     expect(draftVerdict(0.2, thresholds)).toBe("moonshot");
+  });
+});
+
+describe("progress and score by the key result's kind (METHOD.md §2.10, P9-T12a)", () => {
+  const numbers = {
+    direction: "increase" as const,
+    baseline: 0,
+    target: 100,
+    current: 40,
+  };
+
+  it("reads a milestone and a baseline as 0% until done and 100% after, whatever the numbers say", () => {
+    for (const kind of ["milestone", "baseline"] as const) {
+      expect(keyResultProgress({ ...numbers, kind }, thresholds)).toBe(0);
+      expect(
+        keyResultProgress({ ...numbers, kind, done: true }, thresholds),
+      ).toBe(100);
+    }
+  });
+
+  it("reads a maintain key result as its band, whatever its direction says", () => {
+    expect(
+      keyResultProgress(
+        {
+          kind: "maintain",
+          direction: "increase",
+          baseline: 99,
+          target: 99.9,
+          current: 99.5,
+        },
+        thresholds,
+      ),
+    ).toBe(100);
+  });
+
+  it("leaves a metric, and a key result with no kind, reading its direction", () => {
+    expect(keyResultProgress({ ...numbers, kind: "metric" }, thresholds)).toBe(
+      40,
+    );
+    expect(keyResultProgress(numbers, thresholds)).toBe(40);
+  });
+
+  it("scores a milestone and a baseline 1.0 when done and 0 when not", () => {
+    expect(
+      computedScore({ kind: "milestone", progressPct: 0, done: false }),
+    ).toBe(0);
+    expect(
+      computedScore({ kind: "baseline", progressPct: 100, done: true }),
+    ).toBe(1);
+  });
+
+  it("scores a metric from its progress, capped at 1.0", () => {
+    expect(
+      computedScore({ kind: "metric", progressPct: 70, done: false }),
+    ).toBe(0.7);
+    expect(
+      computedScore({ kind: "metric", progressPct: 150, done: false }),
+    ).toBe(1);
+  });
+
+  it("scores a maintain key result by its time inside the band, or where it stands without readings", () => {
+    expect(
+      computedScore({
+        kind: "maintain",
+        progressPct: 100,
+        done: false,
+        insideShare: 0.9,
+      }),
+    ).toBe(0.9);
+    expect(
+      computedScore({ kind: "maintain", progressPct: 100, done: false }),
+    ).toBe(1);
+  });
+
+  it("measures the share of the window a value spent inside the band", () => {
+    const band = { low: 99, high: 99.9 };
+    // Inside for days 0 to 60, outside for 60 to 70, inside again to 90.
+    const points = [
+      { at: 0, value: 99.5 },
+      { at: 60, value: 98.7 },
+      { at: 70, value: 99.6 },
+    ];
+    expect(shareInsideBand(points, band, 0, 90)).toBeCloseTo(0.89, 2);
+    // The reading in force before the window opens counts from its start.
+    expect(shareInsideBand([{ at: -5, value: 99.5 }], band, 0, 90)).toBe(1);
+    // Time before the first reading is not counted at all.
+    expect(shareInsideBand([{ at: 45, value: 99.5 }], band, 0, 90)).toBe(1);
+    expect(shareInsideBand([], band, 0, 90)).toBeNull();
+    expect(shareInsideBand(points, band, 90, 90)).toBeNull();
   });
 });

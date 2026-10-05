@@ -48,6 +48,7 @@ const objectiveVerdict = (title: string) =>
 const keyResultVerdicts = (
   text: string,
   indicatorType: KeyResultInput["indicatorType"] = null,
+  keyResultKind: KeyResultInput["keyResultKind"] = "metric",
 ) => {
   const verdicts = applyEnforcement(
     evaluateKeyResults(
@@ -62,6 +63,7 @@ const keyResultVerdicts = (
             indicatorType,
             direction: "increase",
             confidence: 0.5,
+            keyResultKind,
           },
         ],
       },
@@ -108,7 +110,31 @@ describe("OBJ-1 on published objectives (METHOD-REVIEW §3.4)", () => {
 });
 
 describe("KR-2 and KR-5 on published key results (METHOD-REVIEW §3.4)", () => {
-  it("warns rather than fails a done-or-not-done result, until milestones exist (P9-T12)", () => {
+  it("passes a done-or-not-done result written as the milestone it is (P9-T12a)", () => {
+    // The acceptance criterion: Grove's own example, which a metric could
+    // only warn on, is verifiable once it says what kind it is.
+    expect(
+      keyResultVerdicts(
+        "No one on the team experienced a major injury",
+        null,
+        "milestone",
+      ).kr2,
+    ).toBe("pass");
+    expect(
+      keyResultVerdicts(
+        "Establish the baseline for weekly active teams",
+        null,
+        "baseline",
+      ).kr2,
+    ).toBe("pass");
+    // Google's own output, as a milestone: verifiable, and KR-5 still asks
+    // whether it is the outcome or only the plan.
+    expect(
+      keyResultVerdicts("Launch xx feature to all users", null, "milestone"),
+    ).toEqual({ kr2: "pass", kr5: "warn" });
+  });
+
+  it("still warns on the same words written as a metric", () => {
     expect(
       keyResultVerdicts("No one on the team experienced a major injury").kr2,
     ).toBe("warn");
@@ -116,9 +142,6 @@ describe("KR-2 and KR-5 on published key results (METHOD-REVIEW §3.4)", () => {
       kr2: "warn",
       kr5: "warn",
     });
-    expect(
-      keyResultVerdicts("Establish the baseline for weekly active teams").kr2,
-    ).toBe("warn");
   });
 
   it("exempts whatmatters' leading indicator from KR-5 once it is tagged leading", () => {

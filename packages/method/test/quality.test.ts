@@ -484,12 +484,22 @@ describe("the checks METHOD.md words but corpus entry 4 does not exercise", () =
     expect(krVerdict("KR-6", result)?.status).toBe("todo");
   });
 
-  it("fails KR-7 on a key result with no direction", () => {
+  it("fails KR-7 on a metric with no direction and none to derive", () => {
+    // METHOD.md §4.2 since P9-T12a: a metric's direction is derived from its
+    // baseline and target, so only equal numbers leave nothing to derive.
+    const result = evaluateKeyResults(
+      { keyResults: [one({ direction: null, baseline: 60, target: 60 })] },
+      thresholds,
+    );
+    expect(krVerdict("KR-7", result)?.status).toBe("fail");
+  });
+
+  it("passes KR-7 on a metric whose direction its numbers give", () => {
     const result = evaluateKeyResults(
       { keyResults: [one({ direction: null })] },
       thresholds,
     );
-    expect(krVerdict("KR-7", result)?.status).toBe("fail");
+    expect(krVerdict("KR-7", result)?.status).toBe("pass");
   });
 });
 
@@ -978,5 +988,79 @@ describe("OBJ-1 reads its table top to bottom (completeness review M-27)", () =>
     expect(
       conditionFor("Grow revenue so that the team can breathe again"),
     ).toBe("Metric movement with a why");
+  });
+});
+
+/**
+ * §4.2's checks by the key result's kind (METHOD.md §2.10, P9-T12a).
+ */
+describe("KR-2, KR-3 and KR-7 by kind", () => {
+  const thresholdsHere = canonThresholds();
+  const keyResult = (over: Partial<KeyResultInput>): KeyResultInput => ({
+    text: "No one on the team experienced a major injury",
+    baseline: null,
+    target: null,
+    dueOn: "2027-03-31",
+    ownerId: "m1",
+    indicatorType: null,
+    direction: null,
+    confidence: 0.5,
+    ...over,
+  });
+  const verdictOf = (id: string, input: KeyResultInput) =>
+    evaluateKeyResults({ keyResults: [input] }, thresholdsHere).find(
+      (entry) => entry.id === id,
+    );
+
+  it("acceptance: a milestone with a due date passes KR-2, and the same words as a metric do not", () => {
+    expect(
+      verdictOf("KR-2", keyResult({ keyResultKind: "milestone" }))?.condition,
+    ).toBe("Milestone with a due date");
+    expect(
+      verdictOf("KR-2", keyResult({ keyResultKind: "milestone" }))?.status,
+    ).toBe("pass");
+    expect(verdictOf("KR-2", keyResult({}))?.status).toBe("warn");
+  });
+
+  it("passes KR-2 on a maintain and a baseline key result", () => {
+    expect(
+      verdictOf(
+        "KR-2",
+        keyResult({ keyResultKind: "maintain", baseline: 99, target: 99.9 }),
+      )?.condition,
+    ).toBe("Maintain with a band");
+    expect(
+      verdictOf("KR-2", keyResult({ keyResultKind: "baseline" }))?.condition,
+    ).toBe("Baseline");
+  });
+
+  it("asks KR-3 for a target of a metric and a maintain, and a baseline of a metric only", () => {
+    expect(
+      verdictOf("KR-3", keyResult({ keyResultKind: "milestone" }))?.condition,
+    ).toBe("Complete for its kind");
+    expect(
+      verdictOf("KR-3", keyResult({ keyResultKind: "maintain" }))?.status,
+    ).toBe("fail");
+    expect(
+      verdictOf(
+        "KR-3",
+        keyResult({ keyResultKind: "maintain", baseline: 99, target: 99.9 }),
+      )?.condition,
+    ).toBe("Complete for its kind");
+    expect(verdictOf("KR-3", keyResult({ target: 60 }))?.condition).toBe(
+      "Baseline missing",
+    );
+    expect(
+      verdictOf("KR-3", keyResult({ keyResultKind: "milestone", dueOn: null }))
+        ?.status,
+    ).toBe("fail");
+  });
+
+  it("does not ask KR-7 of any kind but a metric", () => {
+    for (const kind of ["maintain", "milestone", "baseline"] as const) {
+      expect(
+        verdictOf("KR-7", keyResult({ keyResultKind: kind }))?.condition,
+      ).toBe("Not asked of this kind");
+    }
   });
 });

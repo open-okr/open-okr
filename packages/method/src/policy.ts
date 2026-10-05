@@ -22,6 +22,7 @@
  * Pure. No database, no clock: the caller passes the date.
  */
 import {
+  type KeyResultKind,
   type OkrLevel,
   okrKindsInUse,
   type PracticeKey,
@@ -68,6 +69,10 @@ export type PolicyIntent =
     }
   /** Changing an objective's kind (§2.8, P9-T11b-a). */
   | { readonly kind: "objective.kind"; readonly okrKind: OkrKind }
+  /**
+   * Writing a key result as one of §2.10's kinds, new or changed (P9-T12a).
+   */
+  | { readonly kind: "keyResult.kind"; readonly keyResultKind: KeyResultKind }
   /** Taking the reviewer off an objective that has one (P9-T04). */
   | { readonly kind: "reviewer.remove" }
   /** A new key result on an objective that already exists. */
@@ -133,7 +138,8 @@ export function policyNeedsPhases(
   if (
     intent.kind === "reviewer.remove" ||
     intent.kind === "target.change" ||
-    intent.kind === "objective.kind"
+    intent.kind === "objective.kind" ||
+    intent.kind === "keyResult.kind"
   ) {
     return false;
   }
@@ -255,6 +261,20 @@ export function decide(
   }
   if (intent.kind === "objective.kind") {
     return ALLOW;
+  }
+  // §2.10: a workspace may turn any kind of key result off, and then one
+  // written as that kind would be judged by rules nobody here uses.
+  if (intent.kind === "keyResult.kind") {
+    const key = `keyResultKinds.${intent.keyResultKind}` as const;
+    return practice[key] === "off"
+      ? {
+          outcome: "block",
+          rules: [key],
+          reasons: [
+            `This workspace does not use ${intent.keyResultKind} key results. Choose another kind, or ask an admin to turn this one on.`,
+          ],
+        }
+      : ALLOW;
   }
   // §2.9: making a target harder never needs a reason; easing one does where
   // the workspace asks for it, and "it got hard" is not one.

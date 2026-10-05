@@ -446,7 +446,7 @@ Every rule below runs on every keystroke, returns pass, warn or fail, and carrie
 | **OBJ-4** Owned | A named champion and a named reviewer | Yes |
 | **OBJ-5** Counted | Warns above three objectives for a unit, fails above five at company level | |
 | **KR-1** Count | Two to five key results per objective | |
-| **KR-2** Measurable | Reads as "from X to Y". A target without a baseline cannot prove movement | Yes |
+| **KR-2** Verifiable | Judged by the key result's kind: a metric reads as "from X to Y", and a target without a baseline cannot prove movement; a maintain needs its band, a milestone its date | Yes |
 | **KR-3** Complete | Baseline, target, date and owner all present | Yes |
 | **KR-4** Leading and lagging mix | At least one of each. All-lagging means finding out at the end | |
 | **KR-5** Impact, not effort | Measures the impact, not the activity volume that produces it | Yes |

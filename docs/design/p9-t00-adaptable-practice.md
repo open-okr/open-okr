@@ -164,7 +164,7 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 | `kpis` | `target_type`, `green_value`, `red_value`, `band_low`, `band_high`; aggregate enum adds `last`, `first` | `target_type` from `direction` |
 | `cycle_calibrations` | Stop writing in this release. The unique one-per-cycle index is dropped. The table is removed one release later | None |
 
-DATABASE.md and the TECHNICAL-PLAN.md §7.2 importer mapping change in the same task as each migration. For FlowyTeam, its key result `metric_type` maps cleanly: `boolean` and `milestone` become milestone, and everything else becomes metric.
+DATABASE.md and the TECHNICAL-PLAN.md §7.2 importer mapping change in the same task as each migration. For FlowyTeam there is no key result type to map: corrected at P9-T12a, because neither its schema (`reference/flowyteam-okr-kpi-tasks-model.md`, "There is no KR 'type' enum") nor its API carries the `metric_type` this line once named. An imported key result is metric, or maintain where the importer already reads its equal baseline and target as one.
 
 ## 4. The contract
 
@@ -218,7 +218,9 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T11b-a | The kind stored and chosen | None of its own | None |
 | P9-T11b-b | The kind in the rules | None of its own | None |
 | P9-T11b-c | The committed floor | §10's committed row | None |
-| P9-T12 | Kinds of key result | §2.10, §3.1, §4.2's opening, KR-2, KR-3 and KR-7 | KR-2 condition table |
+| P9-T12a | Kinds of key result in the method | §2.10, §3.1 but its last paragraph, KR-2, KR-3 and KR-7 | KR-2 condition table |
+| P9-T12b | Kinds of key result in the data | §3.1's last paragraph, with the roll-up setting's consumer | None |
+| P9-T12c | Kinds of key result on screen and in the importers | None of its own | None |
 | P9-T13 | Changing OKRs mid-cycle: the added-mid-cycle mark, live or draft creation, stop with a reason, annual revisions, calibration retired. Builds on the target history and reason rule P9-T06 introduces | §2.1, §2.9 (the four moves, live or draft, changing a target), §7.6 | The four calibration sentences |
 | P9-T13a | Moving an objective to another space (G-1) | §2.9's "When the organisation changes" | None (behaviour) |
 | P9-T14 | Adjustable scores and cycles that keep their rules | §3.3, §12 snapshot paragraph | Score band values |

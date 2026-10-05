@@ -20,6 +20,7 @@
  * backward-looking 0 to 100, confidence is forward-looking 0.0 to 1.0, and score
  * is the final backward judgement 0.0 to 1.0.
  */
+import type { KeyResultKind } from "./practice.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
 export type KeyResultDirection = "increase" | "reduce" | "maintain" | "move";
@@ -46,6 +47,16 @@ const clampPercent = (value: number, ceilingPct: number): number =>
   Math.min(ceilingPct, Math.max(0, value));
 
 export interface KeyResultProgressInput {
+  /**
+   * What kind of key result this is (METHOD.md §2.10, P9-T12a). Left out, a
+   * metric, which is every key result written before kinds existed.
+   */
+  readonly kind?: KeyResultKind;
+  /**
+   * A milestone done, or a baseline recorded. Only those two kinds read it:
+   * their progress is 0% until then and 100% after.
+   */
+  readonly done?: boolean;
   readonly direction: KeyResultDirection;
   readonly baseline: number;
   readonly target: number;
@@ -59,7 +70,11 @@ export interface KeyResultProgressInput {
 }
 
 /**
- * §3.1, direction-aware and clamped.
+ * §3.1, direction-aware and clamped, and §2.10 by kind.
+ *
+ * A milestone and a baseline are 0% until done and 100% after, whatever the
+ * numbers say. A maintain key result is the band, whatever its direction
+ * says. A metric reads its direction.
  *
  * `move` shares `increase`'s formula on purpose: both terms invert when the
  * target sits below the baseline, so a downward move reads the same way up.
@@ -81,7 +96,11 @@ export function keyResultProgress(
     return round2(clampPercent(input.kpiAchievementPct, ceiling));
   }
 
-  if (direction === "maintain") {
+  if (input.kind === "milestone" || input.kind === "baseline") {
+    return input.done ? 100 : 0;
+  }
+
+  if (direction === "maintain" || input.kind === "maintain") {
     const low = Math.min(baseline, target);
     const high = Math.max(baseline, target);
     if (current >= low && current <= high) {
@@ -111,6 +130,87 @@ export function keyResultProgress(
   const travelled =
     direction === "reduce" ? baseline - current : current - baseline;
   return round2(clampPercent((travelled / span) * 100, ceiling));
+}
+
+/** A value at a moment, on any consistent numeric time axis. */
+export interface ValuePoint {
+  readonly at: number;
+  readonly value: number;
+}
+
+/**
+ * §2.10's maintain score: the share of the time from `from` to `to` that the
+ * value spent inside the band, 0 to 1.
+ *
+ * The value holds from one reading until the next, which is what a reading
+ * says. The time before the first reading is not counted at all, because
+ * nobody knows where the value stood then: counting it outside the band would
+ * punish a key result for being written before it was measured. Null with no
+ * reading inside the window, or no window.
+ */
+export function shareInsideBand(
+  points: readonly ValuePoint[],
+  band: { readonly low: number; readonly high: number },
+  from: number,
+  to: number,
+): number | null {
+  if (to <= from) {
+    return null;
+  }
+  const sorted = [...points].sort((a, b) => a.at - b.at);
+  // The reading in force when the window opens, if there is one.
+  const before = sorted.filter((point) => point.at <= from).at(-1);
+  const within = sorted.filter((point) => point.at > from && point.at < to);
+  const steps = before ? [{ ...before, at: from }, ...within] : within;
+  const first = steps[0];
+  if (!first) {
+    return null;
+  }
+  const low = Math.min(band.low, band.high);
+  const high = Math.max(band.low, band.high);
+  let inside = 0;
+  steps.forEach((step, index) => {
+    const end = steps[index + 1]?.at ?? to;
+    if (step.value >= low && step.value <= high) {
+      inside += end - step.at;
+    }
+  });
+  return round2(inside / (to - first.at));
+}
+
+export interface ComputedScoreInput {
+  readonly kind: KeyResultKind;
+  /** §3.1's progress at the close, 0 to the ceiling. */
+  readonly progressPct: number;
+  /** A milestone done, or a baseline recorded. */
+  readonly done: boolean;
+  /**
+   * A maintain key result's `shareInsideBand` over the cycle, when its
+   * readings are known. Without it the score falls back to where the value
+   * stands now, which is what the progress already says.
+   */
+  readonly insideShare?: number | null;
+}
+
+/**
+ * §2.10's computed score at the close, 0.0 to 1.0, before any person adjusts
+ * it with a reason (§3.3, P9-T14). A metric scores its progress, capped at
+ * 1.0 because a score past the target is a target that was set too low, not a
+ * better score. A maintain scores its time inside the band. A milestone and a
+ * baseline score 1.0 when done and 0 when not.
+ */
+export function computedScore(input: ComputedScoreInput): number {
+  if (input.kind === "milestone" || input.kind === "baseline") {
+    return input.done ? 1 : 0;
+  }
+  if (
+    input.kind === "maintain" &&
+    input.insideShare !== undefined &&
+    input.insideShare !== null
+  ) {
+    return input.insideShare;
+  }
+  return round2(Math.min(100, Math.max(0, input.progressPct)) / 100);
 }
 
 /** One weighted item in a goal's average: a key result or an aligned child. */

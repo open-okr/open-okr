@@ -1,3 +1,4 @@
+import type { KeyResultKind } from "./practice.ts";
 import { type DraftVerdict, draftVerdict, type OkrKind } from "./scoring.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
@@ -271,25 +272,45 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
   {
     id: "KR-2",
     group: "key_result",
-    title: "Measurable",
+    title: "Verifiable",
     feedsStrengthScore: true,
+    // Judged by the key result's kind since P9-T12a (METHOD.md §2.10, §4.2).
+    // A metric is still read from its words: the stored numbers start at
+    // nought and a hundred for a key result added from the list, so the
+    // words are where "Improve customer satisfaction" shows what it lacks.
     conditions: [
       {
-        condition: "No numbers",
-        status: "warn",
-        prompt: "What is the baseline today, and where must it land?",
+        condition: 'Metric with a baseline and a target, or "from X to Y"',
+        status: "pass",
+        prompt: "Measurable from where you are to where you must land.",
       },
       {
-        condition: "A single number",
+        condition: "Metric with a target but no baseline",
         status: "warn",
         prompt:
           "A target but no baseline. Without the from, you cannot prove movement.",
       },
       {
-        condition: "From X to Y, or two numbers",
+        condition: "Metric with no numbers",
+        status: "warn",
+        prompt:
+          "What is the number today, and where must it land? If it is done or not done, make it a milestone key result.",
+      },
+      {
+        condition: "Maintain with a band",
+        status: "pass",
+        prompt: "Clear: inside the band or not.",
+      },
+      {
+        condition: "Milestone with a due date",
         status: "pass",
         prompt:
-          "This carries both ends, so the movement between them is the thing being measured.",
+          "Verifiable: done or not done by the date. Check it proves the objective, not only the plan.",
+      },
+      {
+        condition: "Baseline",
+        status: "pass",
+        prompt: "Establishing the number is a fair first key result.",
       },
     ],
   },
@@ -299,6 +320,8 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
     title: "Complete",
     feedsStrengthScore: true,
     conditions: [
+      // By kind since P9-T12a (METHOD.md §4.2): a target is asked of a metric
+      // and a maintain key result, a baseline of a metric only.
       {
         condition: "Target, date or owner missing",
         status: "fail",
@@ -316,6 +339,12 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
         status: "pass",
         prompt:
           "Baseline, target, date and owner are all here, so this can be checked in on rather than argued about.",
+      },
+      {
+        condition: "Complete for its kind",
+        status: "pass",
+        prompt:
+          "Everything this kind of key result needs is here, so it can be checked in on rather than argued about.",
       },
     ],
   },
@@ -435,18 +464,28 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
     group: "key_result",
     title: "Direction set",
     feedsStrengthScore: true,
+    // By kind since P9-T12a (METHOD.md §4.2): a metric's direction can be
+    // derived from its two numbers, and no other kind is asked for one.
     conditions: [
       {
+        // §3.1: "A metric key result whose baseline equals its target is not
+        // a metric. The coach asks whether it is a maintain or a milestone."
         condition: "No direction",
         status: "fail",
         prompt:
-          "Set the direction: increase, reduce, maintain or move. Without it, nothing can say whether a number arriving is good news.",
+          "The baseline and the target are the same, so this metric moves nothing. Is it a maintain key result, holding a number inside a band, or a milestone, done or not done? Otherwise set its direction.",
       },
       {
         condition: "Direction set",
         status: "pass",
         prompt:
           "The direction is set, so progress can be read from the number itself.",
+      },
+      {
+        condition: "Not asked of this kind",
+        status: "pass",
+        prompt:
+          "A maintain, milestone or baseline key result reads its own progress, so it needs no direction.",
       },
     ],
   },
@@ -627,6 +666,12 @@ export interface KeyResultInput {
   /** Null until somebody has answered. KR-6 stays `todo` while it is. */
   readonly confidence: number | null;
   /**
+   * The key result's own kind (METHOD.md §2.10, P9-T12a): KR-2, KR-3 and KR-7
+   * judge by it. Left out, a metric. Not to be confused with `kind`, which is
+   * its objective's promise.
+   */
+  readonly keyResultKind?: KeyResultKind;
+  /**
    * The kind of its objective's promise (METHOD.md §2.8). KR-6 judges the
    * aspirational ones only; left out, a key result is aspirational.
    */
@@ -740,20 +785,34 @@ export function evaluateKeyResults(
     keyResults: [],
   };
 
-  // KR-2. "From X to Y" is two numbers with the words between them, so both
-  // arms of METHOD's pass condition reduce to the same count.
+  // KR-2, by kind. A metric is read from its words: "from X to Y" is two
+  // numbers with the words between them, so both arms of METHOD's pass
+  // condition reduce to the same count. A milestone's date is KR-3's to ask.
   const kr2 = rollUp(
     "KR-2",
     indexes.map((index) => {
-      const count = numbersIn(set[index]?.text ?? "");
+      const entry = set[index] as KeyResultInput;
+      const kind = entry.keyResultKind ?? "metric";
+      if (kind !== "metric") {
+        return {
+          index,
+          condition:
+            kind === "maintain"
+              ? "Maintain with a band"
+              : kind === "milestone"
+                ? "Milestone with a due date"
+                : "Baseline",
+        };
+      }
+      const count = numbersIn(entry.text);
       return {
         index,
         condition:
-          count === 0
-            ? "No numbers"
+          count >= 2
+            ? 'Metric with a baseline and a target, or "from X to Y"'
             : count === 1
-              ? "A single number"
-              : "From X to Y, or two numbers",
+              ? "Metric with a target but no baseline"
+              : "Metric with no numbers",
       };
     }),
   );
@@ -763,16 +822,20 @@ export function evaluateKeyResults(
     "KR-3",
     indexes.map((index) => {
       const entry = set[index] as KeyResultInput;
+      const kind = entry.keyResultKind ?? "metric";
+      const needsTarget = kind === "metric" || kind === "maintain";
       return {
         index,
         condition:
-          entry.target === null ||
+          (needsTarget && entry.target === null) ||
           entry.dueOn === null ||
           entry.ownerId === null
             ? "Target, date or owner missing"
-            : entry.baseline === null
+            : kind === "metric" && entry.baseline === null
               ? "Baseline missing"
-              : "All four present",
+              : kind === "metric"
+                ? "All four present"
+                : "Complete for its kind",
       };
     }),
   );
@@ -850,13 +913,25 @@ export function evaluateKeyResults(
     keyResults: [],
   };
 
-  // KR-7
+  // KR-7, by kind: a metric's direction is set or derived from two
+  // different numbers; no other kind is asked for one.
   const kr7 = rollUp(
     "KR-7",
-    indexes.map((index) => ({
-      index,
-      condition: set[index]?.direction ? "Direction set" : "No direction",
-    })),
+    indexes.map((index) => {
+      const entry = set[index] as KeyResultInput;
+      if ((entry.keyResultKind ?? "metric") !== "metric") {
+        return { index, condition: "Not asked of this kind" };
+      }
+      const derivable =
+        entry.baseline !== null &&
+        entry.target !== null &&
+        entry.baseline !== entry.target;
+      return {
+        index,
+        condition:
+          entry.direction || derivable ? "Direction set" : "No direction",
+      };
+    }),
   );
 
   return [kr1Verdict, kr2, kr3, kr4, kr5, kr6, kr7];

@@ -191,6 +191,17 @@ Rules that depend on the kind:
 
 Access still applies everywhere: a member writes only where they may edit. Quality checks run as they type.
 
+### 2.10 Kinds of key result
+
+| Kind | Written as | Progress | Scored |
+|---|---|---|---|
+| **Metric** | Move a number from a baseline to a target by a date (increase, reduce or move) | Linear from baseline to target (§3.1) | From progress at the close |
+| **Maintain** | Hold a number inside a band through the cycle | 100% while inside the band, otherwise the distance back | From the share of the cycle spent inside the band, by default |
+| **Milestone** | A verifiable thing done by a date | 0% until done, then 100% | 1.0 if done, 0 if not, unless a person adjusts it with a reason |
+| **Baseline** | Establish the number nobody measures yet | 0% until the baseline is recorded, then 100% | 1.0 once recorded |
+
+All four kinds are on by default, and a workspace may turn any off (§12). Prefer metric key results where an outcome can be measured. A set made only of milestones is usually a plan, not proof. *Source:* Lamorte names "metric, baseline, and milestone" key results; re:Work: "Sometimes key results are either 0 or 1"; Grove: "Did I do that or did I not do it? Yes/no."
+
 ---
 
 ## 3. Scoring, confidence and health
@@ -205,13 +216,15 @@ Three different numbers. They are never mixed. Every numeric boundary in this se
 
 ### 3.1 Progress
 
-Direction-aware linear interpolation, clamped to 0 and to the progress ceiling.
+Direction-aware linear interpolation, clamped to 0 and to the progress ceiling. Milestone, baseline and maintain key results follow §2.10.
 
-The ceiling is 100% by default, so a key result that reached its target reads as done and no further. A workspace may raise it as far as 200%, which is the ceiling §6.4 already applies to KPI achievement. Raising it makes over-achievement visible where it was earned: a key result that reached 150 of a 100 target reads 150%.
+The ceiling is 100% by default, so a key result that reached its target reads as done and no further. A workspace may raise it as far as 200%. Raising it makes over-achievement visible where it was earned: a key result that reached 150 of a 100 target reads 150%.
 
-Two consequences of raising it, and both are the workspace's to accept. A goal's progress is the weighted average of its key results, so a goal holding one key result at 150% and one at 50% reads 100% and looks complete while half the work was missed. And a *maintain* key result is never above 100%, because its value is either inside the stated band or on its way back and there is no notion of exceeding a band.
+Raising it has two consequences, and both are the workspace's to accept:
+- A goal's progress is the weighted average of its key results, so a goal holding one key result at 150% and one at 50% reads 100% and looks complete while half the work was missed.
+- A *maintain* key result is never above 100%, because its value is either inside the stated band or on its way back.
 
-The ceiling does not touch scoring. A score is judged at the close by a person against the key result as written, on the 0.0 to 1.0 scale in §3.3, and a key result that overshot is still a key result whose target was set too low.
+The ceiling does not touch scoring. A score is judged at the close against the key result as written, on the 0.0 to 1.0 scale in §3.3.
 
 | Direction | Formula |
 |---|---|
@@ -220,7 +233,9 @@ The ceiling does not touch scoring. A score is judged at the close by a person a
 | Maintain | 100% while the value stays inside the stated band, otherwise the distance back to the band |
 | Move | Treated as increase toward the target value |
 
-Equal baseline and target scores 0. A goal's progress is the weighted average of its key results' progress, including the weighted contribution of goals aligned beneath it.
+A metric key result whose baseline equals its target is not a metric. The coach asks whether it is a maintain or a milestone key result.
+
+A goal's progress is the weighted average of its key results' progress, including the weighted contribution of goals aligned beneath it.
 
 ### 3.2 Confidence bands
 
@@ -396,9 +411,18 @@ The lower bound of four words was removed on 1 October 2026: whatmatters' own "A
 
 **KR-1 Count.** Pass at 2 to 5. Fail at none, which blocks. Warn at 1 ("can a single measure prove this from every angle?"). Warn above 5 ("which would you drop if you had to?").
 
-**KR-2 Measurable.** Warn. Pass when the text reads "from X to Y" or carries two numbers. Warn on a single number ("a target but no baseline. Without the from, you cannot prove movement"). Warn with no numbers ("what is the baseline today, and where must it land?").
+**KR-2 Verifiable.** Judged by the key result's kind (§2.10).
 
-**KR-3 Complete.** Block when the target, the due date or the owner is missing. Warn when the baseline is missing. If a baseline is unknown, establishing it can be its own key result. *Source:* Doerr's own key results ("99% uptime") often carry no baseline.
+| Condition | Status | Prompt |
+|---|---|---|
+| Metric with a baseline and a target, or "from X to Y" | pass | "Measurable from where you are to where you must land." |
+| Metric with a target but no baseline | warn | "A target but no baseline. Without the from, you cannot prove movement." |
+| Metric with no numbers | warn | "What is the number today, and where must it land? If it is done or not done, make it a milestone key result." |
+| Maintain with a band | pass | "Clear: inside the band or not." |
+| Milestone with a due date | pass | "Verifiable: done or not done by the date. Check it proves the objective, not only the plan." |
+| Baseline | pass | "Establishing the number is a fair first key result." |
+
+**KR-3 Complete.** Block when the target (metric and maintain), the due date or the owner is missing. Warn when a metric key result has no baseline. If a baseline is unknown, establishing it can be its own key result (§2.10). *Source:* Doerr's own key results ("99% uptime") often carry no baseline.
 
 **KR-4 Leading and lagging.** Info. Tagging is optional. Where the set's key results are tagged: pass when the set holds at least one of each. Note when all are lagging ("you will only find out at the end whether it worked"). Note when all are leading ("which key result proves the outcome landed?"). *Source:* whatmatters: "The most effective way to go is often a mix."
 
@@ -420,7 +444,7 @@ The lower bound of four words was removed on 1 October 2026: whatmatters' own "A
 
 **KR-6 Ambitious but honest.** Aspirational key results only, judged on the set's average confidence (§3.2). For committed key results, see §3.2's committed rule.
 
-**KR-7 Direction set.** Fail unless the direction is one of increase, reduce, maintain, move.
+**KR-7 Direction set.** Derived from the baseline and the target for a metric key result. Fail, which blocks, only when a metric key result has none and none can be derived. Not asked of the other kinds.
 
 ### 4.3 Alignment checks
 

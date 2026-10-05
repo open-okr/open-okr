@@ -360,6 +360,36 @@ describe("the kinds in use (P9-T11b-a, METHOD.md §2.8)", () => {
   });
 });
 
+describe("the key result kinds in use (P9-T12a, METHOD.md §2.10)", () => {
+  it("allows every kind by default, and refuses one turned off, citing its setting", () => {
+    const all = resolvePractice("recommended");
+    expect(
+      decide(
+        { kind: "keyResult.kind", keyResultKind: "milestone" },
+        all,
+        thresholds,
+      ).outcome,
+    ).toBe("allow");
+    const noMilestones = resolvePractice("recommended", {
+      "keyResultKinds.milestone": "off",
+    });
+    const refused = decide(
+      { kind: "keyResult.kind", keyResultKind: "milestone" },
+      noMilestones,
+      thresholds,
+    );
+    expect(refused.outcome).toBe("block");
+    expect(refused.rules).toEqual(["keyResultKinds.milestone"]);
+    expect(
+      decide(
+        { kind: "keyResult.kind", keyResultKind: "metric" },
+        noMilestones,
+        thresholds,
+      ).outcome,
+    ).toBe("allow");
+  });
+});
+
 describe("changing a target (P9-T06b, METHOD v2 §2.9)", () => {
   const required = resolvePractice("recommended");
   const optional = resolvePractice("recommended", {
