@@ -78,6 +78,8 @@ export async function addObjective(input: {
   cycleId: string;
   level: GoalLevel;
   title: string;
+  /** The objective it aligns under, from the diagram's "+ aligned" (P9-T10a). */
+  parentGoalId?: string;
 }): Promise<CreatedResult> {
   const memberId = await actingMemberId();
   try {
@@ -89,6 +91,7 @@ export async function addObjective(input: {
       memberId,
       championId: memberId,
       weight: 1,
+      ...(input.parentGoalId ? { parentGoalId: input.parentGoalId } : {}),
     });
     refresh();
     return { error: null, id: created.id };

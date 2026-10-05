@@ -28,6 +28,10 @@ const CYCLE_HEIGHT = 52;
 const CARD_HEAD = 92;
 const KEY_RESULT_ROW = 30;
 const CARD_FOOT = 10;
+/** "+ KR" and "+ aligned" on an open card, for a reader who may add (P9-T10a). */
+const CARD_ACTIONS = 34;
+/** A new objective's card before its title is saved. */
+const DRAFT_HEIGHT = 72;
 const CONTEXT_HEAD = 56;
 const CONTEXT_ROW = 22;
 const GAP_X = 28;
@@ -63,6 +67,13 @@ export type DiagramNode =
       readonly collapsed: boolean;
       /** Objectives aligned below it that a collapse is hiding. */
       readonly hiddenBelow: number;
+      /** A key result draft row is open at the foot of its stack. */
+      readonly drafting: boolean;
+    })
+  | (Box & {
+      /** An aligned objective being added under `parentId` (P9-T10a). */
+      readonly kind: "draft";
+      readonly parentId: string;
     });
 
 interface DiagramEdge {
@@ -86,6 +97,7 @@ export const cycleNodeId = (cycleId: string): string => `cycle:${cycleId}`;
 export const contextNodeId = (goalId: string): string => `context:${goalId}`;
 export const keyResultHandle = (keyResultId: string): string =>
   `kr:${keyResultId}`;
+const draftNodeId = (parentId: string): string => `draft:${parentId}`;
 
 /** Collapsed on arrival: the company objectives, past the node budget. */
 export function collapsedByDefault(tree: OkrTree): string[] {
@@ -122,6 +134,12 @@ export function layoutOkrTree(
     readonly collapsed: ReadonlySet<string>;
     /** Dependencies are drawn dashed, and only when asked for. */
     readonly dependencies: boolean;
+    /** Cards carry "+ KR" and "+ aligned", for a reader who may add. */
+    readonly actions?: boolean;
+    /** Objectives with a key result draft row open in their stack. */
+    readonly drafts?: ReadonlySet<string>;
+    /** The objective an aligned objective is being added under, if any. */
+    readonly draftChildOf?: string | null;
   },
 ): DiagramLayout {
   const cycleId = cycleNodeId(tree.cycle.id);
@@ -177,6 +195,18 @@ export function layoutOkrTree(
       goal.id,
     ]);
   }
+  // A new aligned objective's draft stands last among its parent's children,
+  // where the saved one will appear.
+  const draftParent =
+    options.draftChildOf && goals.has(options.draftChildOf)
+      ? options.draftChildOf
+      : null;
+  if (draftParent) {
+    allChildren.set(draftParent, [
+      ...(allChildren.get(draftParent) ?? []),
+      draftNodeId(draftParent),
+    ]);
+  }
 
   const roots = [
     ...tree.context.map((entry) => contextNodeId(entry.id)),
@@ -208,12 +238,22 @@ export function layoutOkrTree(
     if (id === cycleId) {
       return { width: CYCLE_WIDTH, height: CYCLE_HEIGHT };
     }
+    if (draftParent && id === draftNodeId(draftParent)) {
+      return { width: OBJECTIVE_WIDTH, height: DRAFT_HEIGHT };
+    }
     const goal = goals.get(id);
     if (goal) {
-      const rows = options.collapsed.has(id) ? 0 : goal.keyResults.length;
+      const rows = options.collapsed.has(id)
+        ? 0
+        : goal.keyResults.length + (options.drafts?.has(id) ? 1 : 0);
       return {
         width: OBJECTIVE_WIDTH,
-        height: CARD_HEAD + rows * KEY_RESULT_ROW + CARD_FOOT,
+        height:
+          CARD_HEAD +
+          rows * KEY_RESULT_ROW +
+          (options.actions && !options.collapsed.has(id)
+            ? CARD_ACTIONS
+            : CARD_FOOT),
       };
     }
     const context = contexts.get(id.slice("context:".length));
@@ -283,6 +323,8 @@ export function layoutOkrTree(
     const goal = goals.get(id);
     if (id === cycleId) {
       nodes.push({ ...box, kind: "cycle", name: tree.cycle.name });
+    } else if (draftParent && id === draftNodeId(draftParent)) {
+      nodes.push({ ...box, kind: "draft", parentId: draftParent });
     } else if (goal) {
       const collapsed = options.collapsed.has(id);
       nodes.push({
@@ -291,6 +333,7 @@ export function layoutOkrTree(
         goal,
         collapsed,
         hiddenBelow: collapsed ? descendants(id, allChildren) : 0,
+        drafting: !collapsed && (options.drafts?.has(id) ?? false),
       });
     } else {
       const context = contexts.get(id.slice("context:".length));
@@ -313,6 +356,15 @@ export function layoutOkrTree(
       source: parent.node,
       target: goal.id,
       sourceHandle: parent.handle,
+      kind: "alignment",
+    });
+  }
+  if (draftParent && depthOf.has(draftNodeId(draftParent))) {
+    edges.push({
+      id: `align:${draftNodeId(draftParent)}`,
+      source: draftParent,
+      target: draftNodeId(draftParent),
+      sourceHandle: null,
       kind: "alignment",
     });
   }

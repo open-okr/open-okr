@@ -277,3 +277,68 @@ describe("dependencies", () => {
     expect(edges.map((edge) => edge.id)).toEqual(["dependency:d1"]);
   });
 });
+
+/** Editing and adding on a card (P9-T10a): room for what is being added. */
+describe("drafts and actions", () => {
+  test("a key result draft makes room for one more row, and the actions for their buttons", () => {
+    const goals = [goal("a", { keyResultIds: ["k1"] })];
+    const plain = node(layoutOkrTree(tree(goals), open).nodes, "a");
+    const acting = node(
+      layoutOkrTree(tree(goals), { ...open, actions: true }).nodes,
+      "a",
+    );
+    const drafting = node(
+      layoutOkrTree(tree(goals), {
+        ...open,
+        actions: true,
+        drafts: new Set(["a"]),
+      }).nodes,
+      "a",
+    );
+    expect(acting.height).toBeGreaterThan(plain.height);
+    expect(drafting.height).toBe(acting.height + 30);
+    expect(drafting.kind === "objective" && drafting.drafting).toBe(true);
+  });
+
+  test("an aligned objective's draft stands last under its parent, joined to it", () => {
+    const layout = layoutOkrTree(
+      tree([
+        goal("a", { level: "company" }),
+        goal("a1", { parentGoalId: "a" }),
+      ]),
+      { ...open, draftChildOf: "a" },
+    );
+    const draft = node(layout.nodes, "draft:a");
+    expect(draft.kind).toBe("draft");
+    expect(layout.childrenOf.get("a")).toEqual(["a1", "draft:a"]);
+    expect(draft.x).toBeGreaterThan(node(layout.nodes, "a1").x);
+    expect(layout.edges.map((edge) => edge.id)).toContain("align:draft:a");
+  });
+
+  test("a draft under an objective that is not drawn is not drawn either", () => {
+    const layout = layoutOkrTree(tree([goal("a")]), {
+      ...open,
+      draftChildOf: "elsewhere",
+    });
+    expect(layout.nodes.map((entry) => entry.id)).not.toContain(
+      "draft:elsewhere",
+    );
+  });
+});
+
+test("a folded card carries no actions, so three hundred arrive lean", () => {
+  const goals = [goal("a", { keyResultIds: ["k1"] })];
+  const folded = node(
+    layoutOkrTree(tree(goals), {
+      ...open,
+      actions: true,
+      collapsed: new Set(["a"]),
+    }).nodes,
+    "a",
+  );
+  const bare = node(
+    layoutOkrTree(tree(goals), { ...open, collapsed: new Set(["a"]) }).nodes,
+    "a",
+  );
+  expect(folded.height).toBe(bare.height);
+});

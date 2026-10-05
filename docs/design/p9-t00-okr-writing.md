@@ -197,6 +197,8 @@ The two are new runtime dependencies, so this needs Akmal's approval (decision D
 
 The studio's right-hand panel survives as a side panel of the diagram: alignment health with its gaps, and the coach's semantic findings with apply or dismiss.
 
+**As built at P9-T10a.** A card's title is edited with Enter on the focused card or with the small pencil beside it, rather than a double-click, which is two presses that each open the drawer; Space opens the drawer. A key result's value and target are typed into its row, and an eased target asks why in that same row. "+ KR" and "+ aligned" sit at the foot of an open card and draft in place, writing nothing before Enter; a new aligned objective takes the level below its parent where the cycle uses one, else its parent's own. The live verdict chips are the list's and the drawer's, not the card's, which has no room for them. Every card reads one memoised context rather than copies in its node data, and a folded card carries no add buttons: the footer on thirty folded cards cost about 150 ms on arrival, measured, and leaving it off kept three hundred objectives level with P9-T09b (947 and 1,035 ms against 923 and 932, run the same way). Re-parenting and sideways reordering are P9-T10b's.
+
 ### 5.4 Accessibility
 
 - **The list is the diagram's text equivalent.** The toggle is a real tab list, and both views share focus.
@@ -277,4 +279,5 @@ Full text in IMPLEMENTATION-PLAN.md, Phase 9.
 | P9-T08b | Checking in from the drawer, and the goal page | The drawer's check-in tab; S-14's add-key-result row; the confidence control wired |
 | P9-T09a | The diagram on the cache | React Flow and dagre, layout, nodes with key result stacks, toggle, collapse, keyboard, the context band, the performance measurement |
 | P9-T09b | The studio moves into the diagram | The studio's health and findings panel, the redirect, S-16 and mockup 05 |
-| P9-T10 | Editing on the diagram | §5.3: in-place edits, + KR, + aligned, re-parent by drag with undo, sibling reorder |
+| P9-T10a | Editing and adding on the diagram | §5.3: in-place edits on the card, + KR and + aligned drafts |
+| P9-T10b | Moving on the diagram | §5.3: re-parent by drag and by keyboard with undo, sibling reorder |

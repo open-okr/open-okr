@@ -24,6 +24,9 @@ test.describe.configure({ mode: "serial" });
 const COMPANY = "Make the mid-market our fastest-growing segment";
 const KEY_RESULT = "Mid-market accounts from 120 to 200";
 const TEAM = "Make onboarding something a mid-market team finishes alone";
+const RENAMED = "Make the mid-market our fastest-growing segment this year";
+const SECOND_KEY_RESULT = "Mid-market renewals from 70% to 85%";
+const ALIGNED = "Give mid-market teams a guided first week";
 /** A quarter four years out, which no other spec makes. */
 const FAR = `${new Date().getUTCFullYear() + 4}-05-15`;
 const LOAD = "Diagram load objective";
@@ -177,11 +180,12 @@ test("a card opens the drawer, by pointer and by keyboard", async () => {
   await page.keyboard.press("Escape");
   await expect(drawer()).toHaveCount(0);
 
-  // Up from the team objective is the objective it hangs from; Enter opens it.
+  // Up from the team objective is the objective it hangs from; Space opens
+  // it, since Enter edits its title (P9-T10a).
   await card(teamId).focus();
   await page.keyboard.press("ArrowUp");
   await expect(card(companyId)).toBeFocused();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Space");
   await expect(drawer().getByRole("heading", { name: COMPANY })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer()).toHaveCount(0);
@@ -201,6 +205,76 @@ test("a collapse hides what is aligned below, and says how much", async () => {
   const dependencies = page.getByRole("button", { name: "Dependencies" });
   await dependencies.click();
   await expect(dependencies).toHaveAttribute("aria-pressed", "true");
+});
+
+/** Every change on its way to the server has arrived. */
+const settled = () =>
+  expect(diagram()).toHaveAttribute("aria-busy", "false", { timeout: 15_000 });
+
+test("acceptance (P9-T10a): a title and a value edited on a card are the list's too", async () => {
+  // Enter on the focused card edits its title.
+  await card(companyId).focus();
+  await page.keyboard.press("Enter");
+  const title = card(companyId).getByLabel("Objective title");
+  await expect(title).toBeFocused();
+  await title.fill(RENAMED);
+  await page.keyboard.press("Enter");
+  await expect(card(companyId)).toContainText(RENAMED, { timeout: 15_000 });
+
+  const value = card(companyId).getByLabel(`Current value for ${KEY_RESULT}`);
+  await value.fill("150");
+  await value.press("Enter");
+  await expect(value).toHaveValue("150");
+  await settled();
+
+  await goTo(page, `/goals?cycle=${currentCycle}`);
+  const list = page.locator("#main-content");
+  await expect(
+    list.locator(`input[aria-label="Objective title"][value="${RENAMED}"]`),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(list.getByLabel(`Current value for ${KEY_RESULT}`)).toHaveValue(
+    "150",
+  );
+});
+
+test("U9's adding half: a key result and an aligned objective added from a card with the keyboard alone", async () => {
+  await goTo(page, `/goals?display=diagram&cycle=${currentCycle}`);
+  await card(companyId)
+    .getByRole("button", { name: `Add a key result to ${RENAMED}` })
+    .focus();
+  await page.keyboard.press("Enter");
+  const keyResultDraft = card(companyId).getByRole("textbox", {
+    name: `New key result for ${RENAMED}`,
+  });
+  await expect(keyResultDraft).toBeFocused();
+  await page.keyboard.type(SECOND_KEY_RESULT);
+  await page.keyboard.press("Enter");
+  await expect(card(companyId)).toContainText(SECOND_KEY_RESULT, {
+    timeout: 15_000,
+  });
+
+  await card(companyId)
+    .getByRole("button", { name: `Add an objective aligned under ${RENAMED}` })
+    .focus();
+  await page.keyboard.press("Enter");
+  const draft = page.getByRole("textbox", {
+    name: `New objective aligned under ${RENAMED}`,
+  });
+  await expect(draft).toBeFocused();
+  await page.keyboard.type(ALIGNED);
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("group", { name: new RegExp(`^${ALIGNED},`) }),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // Put away with the rest at the end.
+  const listed = await api.get("/api/v1/goals/list", { headers: authed() });
+  const aligned = ((await listed.json()).data.goals as {
+    id: string;
+    title: string;
+  }[]).find((row) => row.title === ALIGNED);
+  expect(aligned).toBeDefined();
+  madeChildren.push(aligned?.id as string);
 });
 
 test("U10: three hundred objectives open collapsed below company level, within the budget", async () => {
@@ -231,6 +305,7 @@ test("U10: three hundred objectives open collapsed below company level, within t
   await goTo(page, `/goals?display=diagram&cycle=${cycleId}`);
   const first = page.getByRole("group", { name: new RegExp(`^${LOAD} 0,`) });
   await expect(first).toBeVisible({ timeout: 30_000 });
+  const drawn = Date.now() - started;
   // Collapsed below company level on arrival: the thirty company cards, each
   // saying what it holds, and not one team card drawn.
   await expect(diagram().getByText("+9 below")).toHaveCount(30);
@@ -243,12 +318,15 @@ test("U10: three hundred objectives open collapsed below company level, within t
     page.getByRole("group", { name: new RegExp(`^${LOAD} 0\\.0,`) }),
   ).toBeVisible();
   const interactive = Date.now() - started;
+  const pressed = interactive - drawn;
   test.info().annotations.push({
     type: "diagram, 300 objectives",
     description: `interactive after ${interactive} ms, budget ${BUDGET_MS} ms on the reference machine`,
   });
   // Printed as well, so the number is in the run's own log.
-  console.log(`U10: interactive after ${interactive} ms`);
+  console.log(
+    `U10: interactive after ${interactive} ms (drawn after ${drawn} ms, a press answered ${pressed} ms later)`,
+  );
 
   // A ceiling for whatever machine runs this; the budget itself is measured
   // on the reference machine and recorded in the design (§7).

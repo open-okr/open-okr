@@ -510,6 +510,7 @@ export default async function GoalsPage({
           initialTree={okrTree}
           initialAt={treeReadAt}
           alignment={alignment}
+          levels={cycleLevels}
           scope={scope}
           filters={filters}
           cycleId={cycleId}

@@ -9,6 +9,14 @@ import {
 import { useMemo, useState } from "react";
 import type { KeyResultFields, OkrGoal } from "../../lib/okr-tree/cache.ts";
 import type { OkrHandle } from "../../lib/okr-tree/use-okr-tree.ts";
+
+/**
+ * All a cell sends through. Only `mutate`, which the query library keeps the
+ * same from render to render, so a surface can hand it down without every
+ * cell drawing again when anything else about the change state moves.
+ */
+export type OkrWrite = Pick<OkrHandle, "mutate">;
+
 import type { ShownVerdict } from "./okr-cells.tsx";
 
 /**
@@ -101,7 +109,7 @@ function storedVerdicts(flags: readonly string[]): ShownVerdict[] {
 }
 
 /** An objective's title, coached as it is typed and stored verdicts at rest. */
-export function useObjectiveCells(goal: OkrGoal, okr: OkrHandle, coach: Coach) {
+export function useObjectiveCells(goal: OkrGoal, okr: OkrWrite, coach: Coach) {
   const [draft, setDraft] = useState<string | null>(null);
   const verdicts = useMemo(
     () =>
@@ -144,7 +152,7 @@ type PatchableKeyResult = Omit<KeyResultFields, "currentValue" | "targetValue">;
  */
 export function useKeyResultCells(
   keyResult: OkrGoal["keyResults"][number],
-  okr: OkrHandle,
+  okr: OkrWrite,
   coach: Coach,
 ) {
   const [draft, setDraft] = useState<string | null>(null);
