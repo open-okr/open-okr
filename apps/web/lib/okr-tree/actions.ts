@@ -1,7 +1,8 @@
 "use server";
 
 /**
- * The OKR tree's one read and its writes, for the client cache (P9-T06c).
+ * The OKR tree's one read and its writes, for the client cache (P9-T06c),
+ * and the drawer's read of what the tree does not carry (P9-T08a).
  *
  * **An allow-list, as the delete path has.** A server action takes whatever
  * the browser sends, so the switch below over ten named writes is what stops
@@ -14,7 +15,7 @@
  * the hook can put the tree back and say why without guessing.
  */
 
-import { callAction, OperationError } from "@openokr/core";
+import { callAction, excerptRichText, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../auth";
 import { requireWorkspace } from "../workspace";
@@ -45,6 +46,102 @@ export async function readOkrTree(input: {
     scope: input.scope,
     includeClosed: true,
   });
+}
+
+/**
+ * What the drawer shows that the tree does not carry (P9-T08a): the
+ * check-ins, each key result's values and target changes, and the
+ * objective's neighbours in the alignment.
+ *
+ * Four reads the registry already had, each asking its own access, made
+ * together so the drawer's tabs land at once. The narrative is cut to an
+ * excerpt here, as plain text, so the browser never renders stored editor
+ * JSON it was not given a renderer for.
+ */
+export interface OkrDetail {
+  readonly relations: Awaited<ReturnType<typeof callAction<"goals.relations">>>;
+  readonly checkIns: readonly {
+    readonly id: string;
+    readonly author: string;
+    /** The day it was published, as stored. */
+    readonly on: string;
+    readonly status: "on_track" | "caution" | "off_track" | null;
+    readonly confidence: number | null;
+    readonly narrative: string;
+  }[];
+  readonly keyResults: Readonly<
+    Record<
+      string,
+      {
+        readonly values: readonly {
+          readonly id: string;
+          readonly value: number;
+          readonly at: string;
+        }[];
+        readonly targets: Awaited<
+          ReturnType<typeof callAction<"goals.targetHistory">>
+        >["changes"];
+      }
+    >
+  >;
+}
+
+/** The newest check-ins and values the drawer lists; the page has the rest. */
+const DETAIL_CHECK_INS = 10;
+const DETAIL_VALUES = 12;
+/** More key results than any objective should carry; the rest are not read. */
+const DETAIL_KEY_RESULTS = 25;
+
+export async function readOkrDetail(input: {
+  readonly goalId: string;
+  readonly keyResultIds: readonly string[];
+}): Promise<OkrDetail> {
+  const ctx = await context();
+  const ids = input.keyResultIds.slice(0, DETAIL_KEY_RESULTS);
+  const [relations, timeline, histories] = await Promise.all([
+    callAction(ctx, "goals.relations", { id: input.goalId }),
+    callAction(ctx, "goals.checkIns", {
+      goalId: input.goalId,
+      includeDrafts: false,
+    }),
+    Promise.all(
+      ids.map(async (id) => {
+        const [values, targets] = await Promise.all([
+          callAction(ctx, "goals.keyResultHistory", {
+            keyResultId: id,
+            limit: DETAIL_VALUES,
+          }),
+          callAction(ctx, "goals.targetHistory", { id }),
+        ]);
+        return [
+          id,
+          {
+            values: values.values.map((entry) => ({
+              id: entry.id,
+              value: entry.value,
+              at: entry.at,
+            })),
+            // Newest first, as the values are.
+            targets: [...targets.changes].reverse(),
+          },
+        ] as const;
+      }),
+    ),
+  ]);
+  return {
+    relations,
+    checkIns: timeline.checkIns.slice(0, DETAIL_CHECK_INS).map((checkIn) => ({
+      id: checkIn.id,
+      author: checkIn.author.name,
+      on: (checkIn.publishedAt ?? "").slice(0, 10),
+      status: checkIn.status,
+      confidence: checkIn.confidence,
+      narrative: checkIn.narrative
+        ? excerptRichText(checkIn.narrative as never, 280)
+        : "",
+    })),
+    keyResults: Object.fromEntries(histories),
+  };
 }
 
 type Readable = string | number | null;

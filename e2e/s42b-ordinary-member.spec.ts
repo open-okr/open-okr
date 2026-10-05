@@ -229,13 +229,22 @@ test("a goal detail opens for them, which had two separate causes", async () => 
   // chip it used to click is now on the `display=tree` table. Following the
   // control this screen actually offers is also the stronger test: it proves
   // an ordinary member can reach a goal from the screen they are given.
+  //
+  // **Through the drawer since P9-T08a.** A plain click on the row's open
+  // link puts the objective in the drawer beside the list, and the drawer
+  // links to the page, so the path is one press longer and still the
+  // screen's own.
   await memberPage.goto("/goals");
-  const link = memberPage
+  const open = memberPage
     .getByRole("link", { name: "Open this objective" })
     .first();
-  await expect(link).toBeVisible({ timeout: 20_000 });
+  await expect(open).toBeVisible({ timeout: 20_000 });
 
-  await link.click();
+  await open.click();
+  await memberPage
+    .getByTestId("okr-drawer")
+    .getByRole("link", { name: "Open the full page" })
+    .click();
   await memberPage.waitForURL(/\/goals\/[0-9a-f-]{20,}/, { timeout: 20_000 });
   await expect(memberPage.getByText(COULD_NOT_LOAD)).toHaveCount(0);
   await expect(

@@ -31,6 +31,7 @@ import type { OkrTree } from "../lib/okr-tree/cache.ts";
 
 const runOkrMutation = vi.fn();
 vi.mock("../lib/okr-tree/actions.ts", () => ({
+  readOkrDetail: vi.fn(),
   readOkrTree: vi.fn(),
   runOkrMutation: (...args: unknown[]) => runOkrMutation(...args),
 }));
@@ -41,6 +42,7 @@ vi.mock("../app/goals/editor-actions.ts", () => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => undefined, push: () => undefined }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 class Quiet {

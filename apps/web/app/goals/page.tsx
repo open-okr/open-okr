@@ -1,4 +1,4 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
 import {
   ALIGNMENT_LEVEL_ORDER,
   defaultPractice,
@@ -85,6 +85,12 @@ export default async function GoalsPage({
     /** `objective` when the topbar's `+ New` sent the reader here. */
     new?: string;
     /**
+     * The objective open in the drawer (P9-T08a). The drawer reads it, and
+     * the tab and key result beside it, in the browser; the page reads it
+     * only to choose the cycle a link names none of.
+     */
+    okr?: string;
+    /**
      * Which of the three renderings is on screen (P8-G12).
      *
      * Separate from `view`, which has meant the tree-or-flat ordering since
@@ -119,7 +125,12 @@ export default async function GoalsPage({
   const current = await callAction(context, "cycles.current", {
     mode: "quarterly",
   });
-  const cycleId = query.cycle ?? current?.id ?? cycles[0]?.id ?? null;
+  const cycleId =
+    query.cycle ??
+    (await drawerCycle(context, query.okr)) ??
+    current?.id ??
+    cycles[0]?.id ??
+    null;
 
   // The levels this cycle offers (METHOD v2 §2.7, P9-T07a-c): the ones it
   // began with, plus any its objectives already use. The chips offer only
@@ -579,6 +590,30 @@ export default async function GoalsPage({
  * said "9 goals, as a tree" while the editable list was on screen: the same
  * confusion between the rendering and the ordering that the toolbar had.
  */
+/**
+ * The cycle of the objective a drawer link names (P9-T08a), so a link to an
+ * objective in last quarter opens last quarter rather than a drawer that
+ * cannot find it. Null for anything the reader may not see or that is not
+ * there: the page then opens on the current cycle, and the drawer says it
+ * found nothing, which is the same answer a stranger's id gets everywhere.
+ */
+async function drawerCycle(
+  context: Parameters<typeof callAction>[0],
+  goalId: string | undefined,
+): Promise<string | null> {
+  if (!goalId || !/^[0-9a-f-]{36}$/i.test(goalId)) {
+    return null;
+  }
+  try {
+    return (await callAction(context, "goals.read", { id: goalId })).cycleId;
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 /**
  * The alignment score, as a figure with its denominator.
  *

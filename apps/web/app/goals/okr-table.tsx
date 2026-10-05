@@ -2,22 +2,15 @@
 
 import type { GoalLevel } from "@openokr/db";
 import {
-  applyEnforcement,
-  evaluateKeyResults,
-  evaluateObjective,
-  isEasing,
-  type ResolvedPractice,
-  type ResolvedThresholds,
-} from "@openokr/method";
-import {
   Bar,
   Button,
+  Chip,
   useIsMutating,
   useQueryClient,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   filterGoals,
   type OkrFilters,
@@ -27,6 +20,7 @@ import {
   okrCycleKey,
 } from "../../lib/okr-tree/cache.ts";
 import {
+  type OkrHandle,
   useOkrLive,
   useOkrMutation,
   useOkrTree,
@@ -40,9 +34,14 @@ import {
   MemberPicker,
   type Person,
   ReasonField,
-  type ShownVerdict,
   VerdictChips,
 } from "./okr-cells.tsx";
+import { OkrDrawer, useDrawerAddress } from "./okr-drawer.tsx";
+import {
+  type Coach,
+  useKeyResultCells,
+  useObjectiveCells,
+} from "./okr-editing.ts";
 import {
   RestrictedWriting,
   type WritingRefusal,
@@ -72,7 +71,8 @@ import {
  * **Every cell is edited where it is read since P9-T07a-a**: titles with the
  * checks that judge them coaching as the reader types, the champion and the
  * owner, the value, the target with its reason when it eases, the baseline,
- * the unit and the due date. The cells are in `okr-cells.tsx`.
+ * the unit and the due date. The cells are in `okr-cells.tsx`, and what each
+ * one sends is in `okr-editing.ts`, which the drawer shares (P9-T08a).
  */
 
 interface EditableKeyResult {
@@ -93,12 +93,6 @@ export interface EditableGoal {
   /** Null where the goal has no reviewer, which the practice allows (P9-T04). */
   readonly reviewer: string | null;
   readonly keyResults: readonly EditableKeyResult[];
-}
-
-/** What the coaching chips judge by: this workspace's numbers and practice. */
-export interface Coach {
-  readonly thresholds: ResolvedThresholds;
-  readonly practice: ResolvedPractice;
 }
 
 const GRID = "md:grid-cols-[2.75rem_minmax(0,1fr)_13rem_8rem_6.5rem_4rem]";
@@ -244,7 +238,7 @@ export function OkrTable({
   );
 }
 
-type Okr = ReturnType<typeof useOkrMutation>;
+type Okr = OkrHandle;
 
 /**
  * The table on the cache (P9-T06c, P9-T07a-a).
@@ -307,6 +301,7 @@ function LiveOkrTable({
   });
   useOkrLive(cycleId);
   const okr = useOkrMutation({ cycleId, scope });
+  const drawer = useDrawerAddress();
   // Any change still on its way to the server. Said on the list itself, so
   // a screen reader hears that a save is under way, and so a test can wait
   // for the server rather than for the row, which moves before it answers.
@@ -491,6 +486,7 @@ function LiveOkrTable({
                   t("okrList.moveObjective", { title: goal.title }),
                 )}
                 onDelete={() => okr.mutate({ kind: "deleteGoal", id: goal.id })}
+                onOpen={() => drawer.open(goal.id)}
               />
               {open ? (
                 <>
@@ -504,7 +500,9 @@ function LiveOkrTable({
                         t("okrList.moveKeyResult", { title: keyResult.title }),
                       )}
                       keyResult={keyResult}
-                      goalHref={`/goals/${goal.id}`}
+                      onOpen={() =>
+                        drawer.open(goal.id, { keyResultId: keyResult.id })
+                      }
                       okr={okr}
                       canEdit={canEdit}
                       canAdminister={canAdminister}
@@ -562,84 +560,20 @@ function LiveOkrTable({
           />
         ) : null}
       </div>
+
+      {/* The whole tree, not the filtered rows: a filter hides a row, and a
+       * link to an objective it hides still opens it. */}
+      <OkrDrawer
+        tree={tree}
+        okr={okr}
+        canEdit={canEdit}
+        canAdminister={canAdminister}
+        progressMax={progressMax}
+        members={members}
+        coach={coach}
+      />
     </div>
   );
-}
-
-/** Whether the strict mode the server judges by is on, for the coaching. */
-function strictFor(coach: Coach): boolean {
-  return (
-    coach.practice.strictMode === "on" ||
-    coach.thresholds["quality.coachStrictness"] === "strict"
-  );
-}
-
-/** The checks that judge an objective's wording, against a draft title. */
-function objectiveVerdicts(
-  title: string,
-  goal: OkrGoal,
-  coach: Coach,
-): ShownVerdict[] {
-  return applyEnforcement(
-    evaluateObjective(
-      {
-        title,
-        hasCycle: goal.cycleId !== null,
-        hasTimeframe: false,
-        championId: goal.champion.id,
-        reviewerId: goal.reviewer?.id ?? null,
-        reviewerRequired: coach.practice.reviewer === "required",
-        objectivesInUnit: 1,
-        level: goal.level,
-      },
-      coach.thresholds,
-    ),
-    coach.practice,
-    { strict: strictFor(coach) },
-  ).filter(
-    (verdict) =>
-      (verdict.id === "OBJ-1" || verdict.id === "OBJ-2") &&
-      verdict.status !== "pass",
-  );
-}
-
-/** The checks that judge one key result's wording, against a draft title. */
-function keyResultVerdicts(
-  text: string,
-  keyResult: OkrGoal["keyResults"][number],
-  coach: Coach,
-): ShownVerdict[] {
-  return applyEnforcement(
-    evaluateKeyResults(
-      {
-        keyResults: [
-          {
-            text,
-            baseline: keyResult.baselineValue,
-            target: keyResult.targetValue,
-            dueOn: keyResult.dueOn,
-            ownerId: keyResult.owner?.id ?? null,
-            indicatorType: keyResult.indicatorType,
-            direction: keyResult.direction,
-            confidence: keyResult.confidence,
-          },
-        ],
-      },
-      coach.thresholds,
-    ),
-    coach.practice,
-    { strict: strictFor(coach) },
-  ).filter(
-    (verdict) =>
-      (verdict.id === "KR-2" || verdict.id === "KR-5") &&
-      verdict.status !== "pass" &&
-      verdict.keyResults.includes(0),
-  );
-}
-
-/** The stored verdicts, at rest: the checks this row failed when last saved. */
-function storedVerdicts(flags: readonly string[]): ShownVerdict[] {
-  return flags.map((id) => ({ id, status: "fail", prompt: id }));
 }
 
 /** A refused change on this row: what was typed, why, and a second try. */
@@ -688,6 +622,7 @@ function ObjectiveRow({
   coach,
   mover,
   onDelete,
+  onOpen,
 }: {
   readonly goal: OkrGoal;
   readonly open: boolean;
@@ -701,18 +636,10 @@ function ObjectiveRow({
   readonly coach: Coach;
   readonly mover: Mover | null;
   readonly onDelete: () => void;
+  readonly onOpen: () => void;
 }) {
   const { t } = useTranslations();
-  const [draft, setDraft] = useState<string | null>(null);
-  const verdicts = useMemo(
-    () =>
-      draft === null
-        ? storedVerdicts(
-            goal.quality.flags.filter((id) => id.startsWith("OBJ-")),
-          )
-        : objectiveVerdicts(draft, goal, coach),
-    [draft, goal, coach],
-  );
+  const cells = useObjectiveCells(goal, okr, coach);
 
   return (
     <>
@@ -745,17 +672,10 @@ function ObjectiveRow({
             label={t("goals.editor.objectiveTitle")}
             readOnly={!canEdit}
             bold
-            onDraft={setDraft}
-            onSave={(title) =>
-              okr.mutate({
-                kind: "patchGoal",
-                id: goal.id,
-                set: { title },
-                read: { title: goal.title },
-              })
-            }
+            onDraft={cells.onDraft}
+            onSave={cells.saveTitle}
           />
-          <VerdictChips verdicts={verdicts} />
+          <VerdictChips verdicts={cells.verdicts} />
           <span className="flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3">
             <span className="flex items-center gap-1">
               {t("okrList.champion")}
@@ -765,16 +685,7 @@ function ObjectiveRow({
                 label={t("okrList.championOf", { title: goal.title })}
                 // Naming the champion is administering the goal (full).
                 readOnly={!canAdminister}
-                onSave={(championId) => {
-                  if (championId) {
-                    okr.mutate({
-                      kind: "patchGoal",
-                      id: goal.id,
-                      set: { championId },
-                      read: { championId: goal.champion.id },
-                    });
-                  }
-                }}
+                onSave={cells.saveChampion}
               />
             </span>
             <span>
@@ -810,6 +721,7 @@ function ObjectiveRow({
 
         <RowActions
           href={`/goals/${goal.id}`}
+          onOpen={onOpen}
           openLabel={t("goals.editor.openObjective")}
           deleteLabel={t("goals.editor.deleteObjective")}
           canDelete={canAdminister && !busy}
@@ -823,7 +735,7 @@ function ObjectiveRow({
 
 function KeyResultRow({
   keyResult,
-  goalHref,
+  onOpen,
   okr,
   canEdit,
   canAdminister,
@@ -833,7 +745,7 @@ function KeyResultRow({
   mover,
 }: {
   readonly keyResult: OkrGoal["keyResults"][number];
-  readonly goalHref: string;
+  readonly onOpen: () => void;
   readonly okr: Okr;
   readonly canEdit: boolean;
   readonly canAdminister: boolean;
@@ -843,27 +755,10 @@ function KeyResultRow({
   readonly mover: Mover | null;
 }) {
   const { t } = useTranslations();
-  const [draft, setDraft] = useState<string | null>(null);
-  // The eased target waiting for its reason, and a counter that puts the
-  // target cell back to the stored value when the reader thinks again.
-  const [easing, setEasing] = useState<number | null>(null);
-  const [targetCell, setTargetCell] = useState(0);
-  const verdicts = useMemo(
-    () =>
-      draft === null
-        ? storedVerdicts(keyResult.qualityFlags)
-        : keyResultVerdicts(draft, keyResult, coach),
-    [draft, keyResult, coach],
-  );
-  const reasonRequired = coach.practice["reasons.easingTarget"] === "required";
-  const patch = (
-    set: Parameters<Okr["mutate"]>[0] extends infer M
-      ? M extends { kind: "patchKeyResult"; set: infer S }
-        ? S
-        : never
-      : never,
-    read: Record<string, string | number | null>,
-  ) => okr.mutate({ kind: "patchKeyResult", id: keyResult.id, set, read });
+  const cells = useKeyResultCells(keyResult, okr, coach);
+  const patch = cells.patch;
+  // A value a KPI supplies is the KPI's to change, not this cell's (§4.2).
+  const fromKpi = keyResult.kpiId !== null;
 
   return (
     <>
@@ -879,10 +774,10 @@ function KeyResultRow({
             value={keyResult.title}
             label={t("goals.editor.keyResultTitle")}
             readOnly={!canEdit}
-            onDraft={setDraft}
+            onDraft={cells.onDraft}
             onSave={(title) => patch({ title }, { title: keyResult.title })}
           />
-          <VerdictChips verdicts={verdicts} />
+          <VerdictChips verdicts={cells.verdicts} />
           <span className="flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3">
             <span className="flex items-center gap-1">
               {t("okrList.owner")}
@@ -906,6 +801,7 @@ function KeyResultRow({
                 onSave={(dueOn) => patch({ dueOn }, { dueOn: keyResult.dueOn })}
               />
             </span>
+            {fromKpi ? <Chip tone="info">{t("common.fromAKpi")}</Chip> : null}
           </span>
         </div>
 
@@ -914,35 +810,16 @@ function KeyResultRow({
             <InlineNumber
               value={keyResult.currentValue}
               label={t("goals.editor.valueFor", { title: keyResult.title })}
-              readOnly={!canEdit}
-              onSave={(value) =>
-                okr.mutate({ kind: "recordValue", id: keyResult.id, value })
-              }
+              readOnly={!canEdit || fromKpi}
+              onSave={cells.saveValue}
             />
             <span className="text-ink-4">/</span>
             <InlineNumber
-              key={targetCell}
+              key={cells.targetCell}
               value={keyResult.targetValue}
               label={t("okrList.targetOf", { title: keyResult.title })}
               readOnly={!canEdit}
-              onSave={(targetValue) => {
-                if (
-                  reasonRequired &&
-                  isEasing({
-                    from: keyResult.targetValue,
-                    to: targetValue,
-                    baseline: keyResult.baselineValue,
-                  })
-                ) {
-                  setEasing(targetValue);
-                  return;
-                }
-                okr.mutate({
-                  kind: "changeTarget",
-                  id: keyResult.id,
-                  targetValue,
-                });
-              }}
+              onSave={cells.saveTarget}
             />
             <InlineText
               value={keyResult.unit ?? ""}
@@ -995,7 +872,8 @@ function KeyResultRow({
         </span>
 
         <RowActions
-          href={goalHref}
+          href={`/goals/${keyResult.goalId}#kr-${keyResult.id}`}
+          onOpen={onOpen}
           openLabel={t("goals.editor.openKeyResult")}
           deleteLabel={t("goals.editor.deleteKeyResult")}
           canDelete={canAdminister}
@@ -1004,23 +882,12 @@ function KeyResultRow({
           }
         />
       </div>
-      {easing !== null ? (
+      {cells.easing !== null ? (
         <ReasonField
           from={keyResult.targetValue}
-          to={easing}
-          onSave={(reason) => {
-            okr.mutate({
-              kind: "changeTarget",
-              id: keyResult.id,
-              targetValue: easing,
-              reason,
-            });
-            setEasing(null);
-          }}
-          onCancel={() => {
-            setEasing(null);
-            setTargetCell((count) => count + 1);
-          }}
+          to={cells.easing}
+          onSave={cells.saveReason}
+          onCancel={cells.cancelReason}
         />
       ) : null}
       <Refused okr={okr} id={keyResult.id} />
@@ -1049,15 +916,23 @@ function Chevron({ open }: { readonly open: boolean }) {
  * `opacity-0` with `focus-within:opacity-100`, never `hidden`: a control that
  * only a mouse can reveal is a control a keyboard cannot use, which is the
  * half of the accessibility gate a scan cannot answer.
+ *
+ * **Open puts the objective in the drawer** (P9-T08a) rather than leaving the
+ * list for its page, so the reader keeps their place; the drawer links to the
+ * page for everything it does not hold. It stays a link to that page, so a
+ * new tab, a middle click or a copied address still reaches the page itself,
+ * and only a plain click is taken over.
  */
 function RowActions({
   href,
+  onOpen,
   openLabel,
   deleteLabel,
   canDelete,
   onDelete,
 }: {
   readonly href: string;
+  readonly onOpen: () => void;
   readonly openLabel: string;
   readonly deleteLabel: string;
   readonly canDelete: boolean;
@@ -1083,6 +958,19 @@ function RowActions({
     <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 hover:opacity-100">
       <a
         href={href}
+        onClick={(event) => {
+          if (
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          ) {
+            return;
+          }
+          event.preventDefault();
+          onOpen();
+        }}
         className="flex size-6 items-center justify-center rounded-control text-ink-4 hover:bg-raised hover:text-ink-2"
       >
         {/* The name inside the link rather than on it: an `aria-label` on an

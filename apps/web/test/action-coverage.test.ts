@@ -168,13 +168,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     why: "the model catalogue changes a model by removing it and adding it again with `ai.addCustomModel`, so there is no edit form",
   },
 
-  // The METHOD.md §12 practice settings (P9-T01). The cycle screen reads
-  // them since P9-T03a; the admin screen that changes them is P9-T05, which
-  // removes these two entries when it calls them.
-  "goals.targetHistory": {
-    apiOnly: true,
-    why: "the OKR drawer's target history tab reads it from P9-T08",
-  },
   "workspace.overview": {
     apiOnly: true,
     why: "the Work Map composes its own reads for the map, the strip and the badges, and this answers a different shape for an API client",

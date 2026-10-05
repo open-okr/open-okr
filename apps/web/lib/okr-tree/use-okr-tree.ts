@@ -16,6 +16,9 @@
  * back and offers keep-mine or take-theirs, because somebody else changed the
  * field first and neither value should win silently.
  *
+ * **`useOkrDetail`** is the drawer's read of what the tree does not carry,
+ * read again after every write so its history is never behind the row.
+ *
  * **`useOkrLive`** keeps it fresh. Another tab in this browser hears a change
  * over a `BroadcastChannel`, because the live feed deliberately does not ping
  * a member about their own write. Another member's change arrives on the
@@ -32,16 +35,21 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type OkrConflict,
+  type OkrDetail,
   type OkrMutation,
   type OkrOutcome,
+  readOkrDetail,
   readOkrTree,
   runOkrMutation,
 } from "./actions.ts";
 import {
   mergeGoal,
+  OKR_DETAIL_ALL,
+  type OkrGoal,
   type OkrScope,
   type OkrTree,
   okrCycleKey,
+  okrDetailKey,
   okrTreeKey,
   patchGoalIn,
   patchKeyResultIn,
@@ -198,6 +206,8 @@ export function useOkrMutation(input: {
         // A write that returns no node: the recomputed numbers are re-read.
         void queryClient.invalidateQueries({ queryKey: key });
       }
+      // The drawer's history and alignment follow every write.
+      void queryClient.invalidateQueries({ queryKey: OKR_DETAIL_ALL });
       announce();
       if (change.kind === "removeKeyResult") {
         toast.show({
@@ -271,13 +281,33 @@ export function useOkrMutation(input: {
   };
 }
 
+/** What every surface that edits the tree is handed: the list, the drawer. */
+export type OkrHandle = ReturnType<typeof useOkrMutation>;
+
+/**
+ * The drawer's read of one objective (P9-T08a): check-ins, values, target
+ * changes and alignment. Memory only, like the tree, and only while a tab
+ * that shows it is open, so opening the details costs nothing extra.
+ */
+export function useOkrDetail(goal: OkrGoal, enabled: boolean) {
+  const keyResultIds = goal.keyResults.map((keyResult) => keyResult.id);
+  return useQuery<OkrDetail>({
+    queryKey: okrDetailKey(goal.id, keyResultIds),
+    queryFn: () => readOkrDetail({ goalId: goal.id, keyResultIds }),
+    enabled,
+    meta: { persist: false },
+  });
+}
+
 export function useOkrLive(cycleId: string): void {
   const queryClient = useQueryClient();
   const waiting = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const invalidate = () =>
+    const invalidate = () => {
       void queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
+      void queryClient.invalidateQueries({ queryKey: OKR_DETAIL_ALL });
+    };
 
     let channel: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {

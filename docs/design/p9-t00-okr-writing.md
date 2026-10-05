@@ -213,7 +213,7 @@ The flaw FlowyLMS has, two views drifting apart, is avoided by having one source
 | Undo | Deletes, stops, re-parents and reorders push an undo entry for six seconds (UIUX-PLAN §4) |
 | Concurrency | Every `goals.patch*` carries the token from the read; a stale write is refused with the current value (§4.5). **As built at P9-T06a, the token is the values read**: each patch sends `read` beside `set`, field by field, and is refused as a `conflict` (409) with `details.current`, `changedBy` and `changedAt` when a field it changes has moved. A revision column would need every write path to bump it, and `updated_at` moves with every roll-up, so a title edit would fail over a value somebody recorded. Comparing values conflicts only on the fields that moved |
 | Live updates | The existing realtime port invalidates the tree key when another member changes the same cycle. **As built at P9-T06c:** the workspace feed's stream does it, coalesced over 1.5 seconds as `FeedLive` coalesces it, because there is no channel per cycle. That stream deliberately never pings a member about their own write, so another tab of the same browser is told over a `BroadcastChannel` instead |
-| Drawer | Reads and writes through the same cache, so a change in the drawer shows in the row and the node the moment it saves |
+| Drawer | Reads and writes through the same cache, so a change in the drawer shows in the row and the node the moment it saves. **As built at P9-T08a:** a Base UI dialog that is not modal, beside the list rather than over it, so the list stays usable. It lives in the address as `okr`, `tab` (details, history, alignment) and `kr`, changed through the history API so opening it renders nothing again on the server; a link naming an objective in another cycle opens that cycle. The cells are the list's own, and what each sends is written once in `okr-editing.ts` for both. History and Alignment come from one server action over four reads the registry already had (`goals.checkIns`, `goals.keyResultHistory`, `goals.targetHistory`, `goals.relations`), kept in memory under `["okr-detail", goalId, keyResultIds]` and read again after every write. Escape in a field puts the field back; Escape anywhere else closes the drawer. Kind waits for P9-T11, re-parenting for P9-T10, and the check-in tab for P9-T08b |
 
 ## 7. Performance
 
@@ -263,6 +263,7 @@ Full text in IMPLEMENTATION-PLAN.md, Phase 9.
 | P9-T06c | The client cache and `useOkrMutation` | The TanStack Query cache, `useOkrMutation` with rollback, conflict and undo, live invalidation |
 | P9-T07a | The OKRs list, edited in place | §3, §4.1, §4.2, §4.5; sidebar regroup and rename; S-13 rewrite |
 | P9-T07b | Adding and reordering in the list | §4.3, §4.4; "+ New objective"; mockups 12 and 12b |
-| P9-T08 | The OKR drawer and the goal page | The shared drawer with edit, check-in, history and target changes; S-14's add-key-result row; the confidence control wired |
+| P9-T08a | The OKR drawer | The shared drawer with edit, history and target changes, alignment, in the address |
+| P9-T08b | Checking in from the drawer, and the goal page | The drawer's check-in tab; S-14's add-key-result row; the confidence control wired |
 | P9-T09 | The diagram view | React Flow and dagre, layout, nodes with key result stacks, toggle, collapse, the studio panel, keyboard, the performance measurement |
 | P9-T10 | Editing on the diagram | §5.3: in-place edits, + KR, + aligned, re-parent by drag with undo, sibling reorder |

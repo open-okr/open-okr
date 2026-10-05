@@ -283,11 +283,14 @@ export function MemberPicker({
 export function ReasonField({
   from,
   to,
+  inset = true,
   onSave,
   onCancel,
 }: {
   readonly from: number;
   readonly to: number;
+  /** Indented under the list's row; flush inside the drawer's card. */
+  readonly inset?: boolean;
   readonly onSave: (reason: string) => void;
   readonly onCancel: () => void;
 }) {
@@ -297,7 +300,10 @@ export function ReasonField({
   return (
     <div
       data-testid="target-reason"
-      className="flex flex-wrap items-center gap-2 border-b border-line bg-warn-bg px-3.5 py-1.5 pl-14 text-xs"
+      className={cn(
+        "flex flex-wrap items-center gap-2 bg-warn-bg py-1.5 text-xs",
+        inset ? "border-b border-line px-3.5 pl-14" : "rounded-control px-2",
+      )}
     >
       <label className="flex min-w-0 flex-1 items-center gap-2">
         <span className="text-ink-2">{label}</span>

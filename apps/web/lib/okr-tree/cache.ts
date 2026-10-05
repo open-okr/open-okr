@@ -26,6 +26,20 @@ export function okrCycleKey(cycleId: string): readonly ["okr-tree", string] {
   return ["okr-tree", cycleId];
 }
 
+/**
+ * The drawer's read of one objective (P9-T08a), keyed by its key results too,
+ * so adding one reads the history again without anybody asking.
+ */
+export function okrDetailKey(
+  goalId: string,
+  keyResultIds: readonly string[],
+): readonly ["okr-detail", string, string] {
+  return ["okr-detail", goalId, keyResultIds.join(",")];
+}
+
+/** Every drawer read, for invalidation after any write. */
+export const OKR_DETAIL_ALL = ["okr-detail"] as const;
+
 export interface GoalFields {
   readonly title?: string;
   readonly contributionStatement?: string | null;
