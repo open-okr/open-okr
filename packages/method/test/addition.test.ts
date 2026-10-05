@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { keyResultDraft, objectiveDraft } from "../src/addition.ts";
+import {
+  additionStartsAs,
+  draftOnPublish,
+  keyResultDraft,
+  objectiveDraft,
+} from "../src/addition.ts";
 import { defaultPractice, resolvePractice } from "../src/practice.ts";
 import type { KeyResultInput } from "../src/quality.ts";
 import { canonThresholds } from "../src/thresholds.ts";
@@ -163,5 +168,29 @@ describe("an objective added mid-cycle", () => {
         { strict: true },
       )?.failing ?? [],
     ).not.toContain("OBJ-5");
+  });
+});
+
+describe("how an objective added mid-cycle starts (P9-T13-b-b)", () => {
+  const as = (value: "live" | "ownerDraft" | "reviewerApproval") =>
+    resolvePractice("recommended", { "writing.midCycleAs": value });
+
+  it("starts live by default, and as a draft under either draft setting", () => {
+    expect(additionStartsAs(practice)).toBe("live");
+    expect(additionStartsAs(as("ownerDraft"))).toBe("draft");
+    expect(additionStartsAs(as("reviewerApproval"))).toBe("draft");
+  });
+
+  it("goes live when its owner publishes it, or to its reviewer where the reviewer approves", () => {
+    expect(draftOnPublish(as("ownerDraft"))).toBe("live");
+    expect(draftOnPublish(as("reviewerApproval"))).toBe("awaitingApproval");
+  });
+
+  it("goes live on its owner's publish where reviewers are off, since nobody could approve", () => {
+    const off = resolvePractice("recommended", {
+      "writing.midCycleAs": "reviewerApproval",
+      reviewer: "off",
+    });
+    expect(draftOnPublish(off)).toBe("live");
   });
 });

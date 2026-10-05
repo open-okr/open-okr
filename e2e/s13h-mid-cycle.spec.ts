@@ -8,6 +8,11 @@
  * And NW-Q2-13 on screen: with "Reason when adding mid-cycle" required, the
  * list's add row asks why before it saves, and the row carries the mark.
  *
+ * And drafts that wait for a person (P9-T13-b-b):
+ *   Given a workspace whose mid-cycle objectives start as drafts the reviewer
+ *   approves, when the owner publishes one, then it awaits approval, and
+ *   when its reviewer approves it, then it is live.
+ *
  * And live or draft (P9-T13-b-a, NW-Q3-11):
  *   Given a metric key result added mid-cycle without a target, when it is
  *   saved, then it is a draft its space can see, marked with what is
@@ -32,6 +37,7 @@ const REVIEWED = `Answer Brightline's onboarding in week five ${STAMP}`;
 const REASON = "Brightline entered the segment on 10 May";
 const GROWTH = `Make self-serve a second engine of growth ${STAMP}`;
 const CONVERSION = `Self-serve trial-to-paid conversion from 4.1% ${STAMP}`;
+const APPROVED = `Open a partner channel for self-serve ${STAMP}`;
 
 let context: BrowserContext;
 let page: Page;
@@ -93,7 +99,12 @@ test.afterAll(async () => {
     }
     await api.post("/api/v1/practice/update", {
       headers: authed(),
-      data: { overrides: { "reasons.midCycleAddition": null } },
+      data: {
+        overrides: {
+          "reasons.midCycleAddition": null,
+          "writing.midCycleAs": null,
+        },
+      },
     });
   }
   if (saved && cycleId) {
@@ -268,5 +279,48 @@ test("acceptance (P9-T13-b-a): a key result saved without its target is a draft 
   await expect(row.getByTestId("addition-draft")).toHaveCount(0, {
     timeout: 15_000,
   });
+  await expect(row.getByTestId("added-mid-cycle")).toBeVisible();
+});
+
+test("acceptance (P9-T13-b-b): a draft its owner publishes waits for its reviewer, and is live once approved", async () => {
+  await post("practice.update", {
+    overrides: { "writing.midCycleAs": "reviewerApproval" },
+  });
+  const directory = (await (
+    await api.get("/api/v1/people/directory", { headers: authed() })
+  ).json()).data as { id: string; name: string }[];
+  const me = directory.find((member) => member.name === INSTANCE_ACCOUNT.name);
+  // The one account is both its owner and its reviewer, so it meets both
+  // steps; who may take each is the policy's, proven in the action tests.
+  const goalId = (
+    await post<{ id: string }>("goals.create", {
+      title: APPROVED,
+      cycleId,
+      level: "company",
+      ownerKind: "workspace",
+      championId: me?.id,
+      reviewerId: me?.id,
+      reason: "A partner asked to resell self-serve seats",
+    })
+  ).id;
+  created.push(goalId);
+
+  await goTo(page, "/goals");
+  const row = main()
+    .locator(`input[aria-label="Objective title"][value="${APPROVED}"]`)
+    .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
+  const waiting = row.getByTestId("waiting-draft");
+  await expect(waiting).toContainText(
+    "Draft, waiting for its owner to publish",
+    { timeout: 15_000 },
+  );
+
+  await row.getByRole("button", { name: `Publish ${APPROVED}` }).click();
+  await expect(waiting).toContainText("Waiting for its reviewer's approval", {
+    timeout: 15_000,
+  });
+
+  await row.getByRole("button", { name: `Approve ${APPROVED}` }).click();
+  await expect(waiting).toHaveCount(0, { timeout: 15_000 });
   await expect(row.getByTestId("added-mid-cycle")).toBeVisible();
 });

@@ -21,6 +21,7 @@
  *
  * Pure. No database, no clock: the caller passes the date.
  */
+import { draftOnPublish } from "./addition.ts";
 import {
   type KeyResultKind,
   type OkrLevel,
@@ -96,6 +97,17 @@ export type PolicyIntent =
    */
   | { readonly kind: "set.publish"; readonly cycle: CycleFacts }
   /**
+   * Publishing an objective that waits as a draft (§2.9, P9-T13-b-b). Its
+   * owner publishes it; where its reviewer approves, it must name one.
+   */
+  | {
+      readonly kind: "draft.publish";
+      readonly actorIsOwner: boolean;
+      readonly hasReviewer: boolean;
+    }
+  /** Approving a published draft, which only its reviewer does (§2.9). */
+  | { readonly kind: "draft.approve"; readonly actorIsReviewer: boolean }
+  /**
    * Changing a key result's target (P9-T06b, METHOD v2 §2.9). Only easing
    * one, toward its baseline, can be refused, and only for want of a reason.
    */
@@ -152,7 +164,9 @@ export function policyNeedsPhases(
     intent.kind === "reviewer.remove" ||
     intent.kind === "target.change" ||
     intent.kind === "objective.kind" ||
-    intent.kind === "keyResult.kind"
+    intent.kind === "keyResult.kind" ||
+    intent.kind === "draft.publish" ||
+    intent.kind === "draft.approve"
   ) {
     return false;
   }
@@ -308,6 +322,43 @@ export function decide(
           ],
         }
       : ALLOW;
+  }
+  // §2.9: an objective that waits as a draft is published by its owner and,
+  // where the workspace asks for it, approved by its reviewer.
+  if (intent.kind === "draft.publish") {
+    if (!intent.actorIsOwner) {
+      return {
+        outcome: "block",
+        rules: ["writing.midCycleAs"],
+        reasons: [
+          "This workspace has an objective added mid-cycle published by its owner. Only its champion can publish it.",
+        ],
+      };
+    }
+    if (
+      draftOnPublish(practice) === "awaitingApproval" &&
+      !intent.hasReviewer
+    ) {
+      return {
+        outcome: "block",
+        rules: ["writing.midCycleAs"],
+        reasons: [
+          "This workspace has an objective added mid-cycle approved by its reviewer, and this one names none. Name a reviewer, then publish it.",
+        ],
+      };
+    }
+    return ALLOW;
+  }
+  if (intent.kind === "draft.approve") {
+    return intent.actorIsReviewer
+      ? ALLOW
+      : {
+          outcome: "block",
+          rules: ["writing.midCycleAs"],
+          reasons: [
+            "This workspace has an objective added mid-cycle approved by its reviewer. Only its reviewer can approve it.",
+          ],
+        };
   }
   // §2.9: making a target harder never needs a reason; easing one does where
   // the workspace asks for it, and "it got hard" is not one.

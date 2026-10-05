@@ -97,6 +97,7 @@ const goal = (
   kind: "aspirational",
   addedMidCycleAt: null,
   draft: null,
+  draftState: null,
   spaceId: null,
   champion: PRIYA,
   reviewer: null,
@@ -126,6 +127,7 @@ const tree = (
     endsOn: "2027-03-31",
     midCycle: false,
   },
+  viewerId: "00000000-0000-4000-8000-000000000001",
   goals: [
     {
       ...goal("g", "Make onboarding the reason teams stay", keyResults, "p"),

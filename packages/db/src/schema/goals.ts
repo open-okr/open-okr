@@ -62,6 +62,14 @@ export type GoalHealth = (typeof GOAL_HEALTH)[number];
 export const GOAL_KINDS = ["committed", "aspirational"] as const;
 export type GoalKind = (typeof GOAL_KINDS)[number];
 
+/**
+ * METHOD.md §2.9 (P9-T13-b-b): an objective added mid-cycle that waits for
+ * its owner to publish it, then for its reviewer to approve it where the
+ * workspace asks for that. Null follows its cycle.
+ */
+export const GOAL_DRAFT_STATES = ["draft", "awaiting_approval"] as const;
+export type GoalDraftState = (typeof GOAL_DRAFT_STATES)[number];
+
 export const GOAL_SUCCESS_STATUSES = ["achieved", "missed"] as const;
 export type GoalSuccessStatus = (typeof GOAL_SUCCESS_STATUSES)[number];
 
@@ -173,6 +181,8 @@ export const goals = pgTable("goals", {
   aiGenerated: boolean("ai_generated").notNull().default(false),
   /** When it was started mid-cycle (METHOD.md §2.9); null is the plan. */
   addedMidCycleAt: timestamp("added_mid_cycle_at", { withTimezone: true }),
+  /** Waiting for its owner or its reviewer (§2.9); null follows its cycle. */
+  draftState: text("draft_state", { enum: GOAL_DRAFT_STATES }),
   position: integer("position").notNull().default(0),
   legacyType: text("legacy_type"),
   legacyId: text("legacy_id"),

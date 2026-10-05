@@ -128,6 +128,8 @@ function optimistic(tree: OkrTree, mutation: OkrMutation): OkrTree {
       return kindIn(tree, mutation.id, mutation.okrKind);
     case "restoreKeyResult":
     case "restoreGoal":
+    case "publishDraft":
+    case "approveDraft":
     case "checkIn":
       // Nothing to guess: the row comes back with the server's answer, and a
       // check-in's health and next date are the server's to work out.

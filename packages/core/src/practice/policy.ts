@@ -63,6 +63,14 @@ export type PolicyRequest =
     }
   /** Publishing a set, or its company half (P9-T03b). */
   | { readonly kind: "set.publish"; readonly cycleId: string }
+  /** Publishing a waiting draft (P9-T13-b-b). Needs no cycle. */
+  | {
+      readonly kind: "draft.publish";
+      readonly actorIsOwner: boolean;
+      readonly hasReviewer: boolean;
+    }
+  /** Approving a published draft (P9-T13-b-b). Needs no cycle. */
+  | { readonly kind: "draft.approve"; readonly actorIsReviewer: boolean }
   /** Changing a key result's target (P9-T06b). Needs no cycle. */
   | {
       readonly kind: "target.change";
@@ -94,7 +102,9 @@ export async function policyDecisionInTx<
   if (
     request.kind === "target.change" ||
     request.kind === "objective.kind" ||
-    request.kind === "keyResult.kind"
+    request.kind === "keyResult.kind" ||
+    request.kind === "draft.publish" ||
+    request.kind === "draft.approve"
   ) {
     return decide(request, practice, thresholds);
   }

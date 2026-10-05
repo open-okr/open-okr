@@ -7038,6 +7038,40 @@
       "pages": false
     },
     {
+      "name": "goals publishDraft",
+      "action": "goals.publishDraft",
+      "method": "POST",
+      "path": "/goals/publishDraft",
+      "scope": "write",
+      "summary": "Publishes an objective that waits as a draft (METHOD.md §2.9). Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals approveDraft",
+      "action": "goals.approveDraft",
+      "method": "POST",
+      "path": "/goals/approveDraft",
+      "scope": "write",
+      "summary": "Approves a published draft, which only its reviewer does (METHOD.md §2.9). It goes live, and its check-in rhythm starts.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals targetHistory",
       "action": "goals.targetHistory",
       "method": "GET",

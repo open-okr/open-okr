@@ -549,6 +549,69 @@ export function AdditionDraftMark({
 }
 
 /**
+ * A draft that waits for a person (METHOD.md §2.9, P9-T13-b-b): which person,
+ * and the one step the person reading may take. Publish is offered to its
+ * owner and approve to its reviewer, because a button the write would refuse
+ * is a question nobody should be asked; the write asks the policy again.
+ */
+export function WaitingDraft({
+  state,
+  title,
+  canPublish,
+  canApprove,
+  busy,
+  onPublish,
+  onApprove,
+}: {
+  readonly state: "draft" | "awaiting_approval" | null;
+  readonly title: string;
+  readonly canPublish: boolean;
+  readonly canApprove: boolean;
+  readonly busy: boolean;
+  readonly onPublish: () => void;
+  readonly onApprove: () => void;
+}) {
+  const { t } = useTranslations();
+  if (state === null) {
+    return null;
+  }
+  const action =
+    state === "draft" && canPublish
+      ? {
+          label: t("waitingDraft.publish"),
+          name: t("waitingDraft.publishOf", { title }),
+          run: onPublish,
+        }
+      : state === "awaiting_approval" && canApprove
+        ? {
+            label: t("waitingDraft.approve"),
+            name: t("waitingDraft.approveOf", { title }),
+            run: onApprove,
+          }
+        : null;
+  return (
+    <span className="flex items-center gap-1" data-testid="waiting-draft">
+      <Chip className="h-4.5 bg-warn-bg text-[11px] text-warn">
+        {state === "draft"
+          ? t("waitingDraft.forOwner")
+          : t("waitingDraft.forReviewer")}
+      </Chip>
+      {action ? (
+        <button
+          type="button"
+          aria-label={action.name}
+          disabled={busy}
+          onClick={action.run}
+          className="rounded-control px-1.5 font-semibold text-brand-text disabled:text-ink-4"
+        >
+          {action.label}
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
+/**
  * A milestone's one question: done or not done (METHOD.md §2.10). A real
  * checkbox, so the keyboard and a screen reader meet it as what it is.
  */

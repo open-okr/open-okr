@@ -40,6 +40,7 @@ import {
   type Person,
   ReasonField,
   VerdictChips,
+  WaitingDraft,
 } from "./okr-cells.tsx";
 import { CheckInTab } from "./okr-check-in.tsx";
 import {
@@ -329,6 +330,15 @@ function DrawerBody({
           <VerdictChips verdicts={objective.verdicts} />
           <AddedMidCycle at={goal.addedMidCycleAt} />
           <AdditionDraftMark draft={goal.draft} />
+          <WaitingDraft
+            state={goal.draftState}
+            title={goal.title}
+            canPublish={canEdit && goal.champion.id === tree.viewerId}
+            canApprove={canEdit && goal.reviewer?.id === tree.viewerId}
+            busy={okr.pending}
+            onPublish={() => okr.mutate({ kind: "publishDraft", id: goal.id })}
+            onApprove={() => okr.mutate({ kind: "approveDraft", id: goal.id })}
+          />
           <div className="flex items-center gap-2">
             <Bar
               value={goal.progressPct}

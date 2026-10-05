@@ -329,8 +329,17 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     // Started mid-cycle, and why, where it was (P9-T13-a, METHOD.md §2.9).
     addedMidCycle: z.boolean().optional(),
     reason: z.string().nullable().optional(),
+    // Started as a draft that waits for a person (P9-T13-b-b).
+    draft: z.boolean().optional(),
   }),
   "goal.updated": z.object({ title: z.string() }),
+  // A draft published by its owner, live or now with its reviewer, and a
+  // draft approved by its reviewer (METHOD.md §2.9, P9-T13-b-b).
+  "goal.draft_published": z.object({
+    title: z.string(),
+    awaitingApproval: z.boolean(),
+  }),
+  "goal.draft_approved": z.object({ title: z.string() }),
   "goal.closed": z.object({
     successStatus: z.enum(["achieved", "missed"]),
     closeDecision: z.enum(["keep", "modify", "abandon"]),

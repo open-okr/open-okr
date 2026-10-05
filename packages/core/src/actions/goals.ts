@@ -37,6 +37,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
+  additionStartsAs,
   defaultOkrKind,
   evaluateKeyResults,
   KEY_RESULT_CHECKS,
@@ -1152,6 +1153,7 @@ export const createGoal = defineWriteAction({
       const addedMidCycle =
         !context.bulk &&
         (await midCycleInTx(tx, workspaceId, input.cycleId ?? null));
+      const waits = addedMidCycle && additionStartsAs(practice) === "draft";
 
       // A parent has to be one this writer can actually see, resolved through
       // the getter so an invisible parent reads as not found (§4.2).
@@ -1220,6 +1222,9 @@ export const createGoal = defineWriteAction({
         level: input.level,
         kind: input.kind ?? defaultOkrKind(practice),
         addedMidCycleAt: addedMidCycle ? new Date() : null,
+        // §2.9: where the workspace says so, an addition waits for a person
+        // rather than going live once complete (P9-T13-b-b).
+        draftState: waits ? "draft" : null,
         ownerKind: input.ownerKind,
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
@@ -1245,17 +1250,20 @@ export const createGoal = defineWriteAction({
       });
 
       // The rhythm starts at creation (§8 of the cadence design), and the
-      // recompute below reads the due date this stamps.
+      // recompute below reads the due date this stamps. A draft waiting for a
+      // person owes no check-in yet, so it starts when the draft goes live.
       const rhythmSettings = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
-      await stampFirstDue(
-        tx,
-        workspaceId,
-        created.id,
-        rhythmSettings.thresholds,
-        new Date(),
-      );
+      if (!waits) {
+        await stampFirstDue(
+          tx,
+          workspaceId,
+          created.id,
+          rhythmSettings.thresholds,
+          new Date(),
+        );
+      }
       await recompute(tx, workspaceId, created.id);
       await realign(tx, workspaceId, created.id);
       // The whole unit, not just this goal: OBJ-5 is a property of the set, so
@@ -1274,6 +1282,7 @@ export const createGoal = defineWriteAction({
             ...(addedMidCycle
               ? { addedMidCycle: true, reason: input.reason ?? null }
               : {}),
+            ...(waits ? { draft: true } : {}),
           },
         },
         audit: {

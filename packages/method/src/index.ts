@@ -5,6 +5,8 @@ export {
   type AdditionDraft,
   type AdditionField,
   type AdditionOptions,
+  additionStartsAs,
+  draftOnPublish,
   keyResultDraft,
   objectiveDraft,
 } from "./addition.ts";

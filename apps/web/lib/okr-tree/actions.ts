@@ -192,6 +192,12 @@ export type OkrMutation =
     }
   | { readonly kind: "deleteGoal"; readonly id: string }
   | { readonly kind: "restoreGoal"; readonly id: string }
+  /**
+   * A waiting draft published by its owner, or approved by its reviewer
+   * (METHOD.md §2.9, P9-T13-b-b). The server says where it goes.
+   */
+  | { readonly kind: "publishDraft"; readonly id: string }
+  | { readonly kind: "approveDraft"; readonly id: string }
   | {
       /** Committed or aspirational, with why (METHOD.md §2.8, P9-T11b-a). */
       readonly kind: "setKind";
@@ -320,6 +326,12 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
           ...(mutation.reason ? { reason: mutation.reason } : {}),
         })
       ).goal;
+    case "publishDraft":
+      return (await callAction(ctx, "goals.publishDraft", { id: mutation.id }))
+        .goal;
+    case "approveDraft":
+      return (await callAction(ctx, "goals.approveDraft", { id: mutation.id }))
+        .goal;
     case "reparent":
       // `goals.update` keeps the one-parent rule and refuses a loop, so the
       // diagram can offer any card as a parent and let the server say no.

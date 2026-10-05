@@ -113,6 +113,8 @@ export interface CreateGoalInput {
   readonly position?: number;
   /** When it was started mid-cycle (METHOD.md §2.9, P9-T13-a). */
   readonly addedMidCycleAt?: Date | null;
+  /** Waiting for its owner, when the workspace starts additions so (P9-T13-b-b). */
+  readonly draftState?: "draft" | null;
   /**
    * The source-system identity, when an import created this row (P6-T01a).
    *
@@ -283,6 +285,7 @@ export async function createGoalInTx<
       ...(input.addedMidCycleAt
         ? { addedMidCycleAt: input.addedMidCycleAt }
         : {}),
+      ...(input.draftState ? { draftState: input.draftState } : {}),
       ownerKind: input.ownerKind,
       spaceId,
       memberId: input.ownerKind === "member" ? (input.memberId ?? null) : null,

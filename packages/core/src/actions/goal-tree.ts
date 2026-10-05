@@ -22,6 +22,7 @@ import {
   activeOnly,
   activities,
   cycles,
+  GOAL_DRAFT_STATES,
   GOAL_HEALTH,
   GOAL_KINDS,
   GOAL_LEVELS,
@@ -153,6 +154,12 @@ export const treeGoal = z.object({
   }),
   /** As on a key result: only an objective added mid-cycle is a draft. */
   draft: additionDraft,
+  /**
+   * Waiting for its owner to publish it, or for its reviewer's approval,
+   * where the workspace starts additions so (§2.9, P9-T13-b-b). Null for
+   * every other objective.
+   */
+  draftState: z.enum(GOAL_DRAFT_STATES).nullable(),
   keyResults: z.array(treeKeyResult),
 });
 
@@ -226,6 +233,7 @@ const GOAL_COLUMNS = {
   level: goals.level,
   kind: goals.kind,
   addedMidCycleAt: goals.addedMidCycleAt,
+  draftState: goals.draftState,
   spaceId: goals.spaceId,
   championId: goals.championId,
   reviewerId: goals.reviewerId,
@@ -280,6 +288,7 @@ async function treeNodes(
     readonly level: (typeof GOAL_LEVELS)[number];
     readonly kind: (typeof GOAL_KINDS)[number];
     readonly addedMidCycleAt: Date | null;
+    readonly draftState: (typeof GOAL_DRAFT_STATES)[number] | null;
     readonly spaceId: string | null;
     readonly championId: string;
     readonly reviewerId: string | null;
@@ -335,6 +344,7 @@ async function treeNodes(
     addedMidCycleAt: row.addedMidCycleAt
       ? new Date(row.addedMidCycleAt).toISOString()
       : null,
+    draftState: row.draftState,
     spaceId: row.spaceId,
     champion: named(row.championId),
     reviewer: row.reviewerId ? named(row.reviewerId) : null,
@@ -543,6 +553,12 @@ export const readGoalTree = defineReadAction({
        */
       midCycle: z.boolean(),
     }),
+    /**
+     * The member reading, so a screen offers a waiting draft's publish to its
+     * owner and its approval to its reviewer (§2.9, P9-T13-b-b). The write
+     * decides again; this only saves offering a button that would refuse.
+     */
+    viewerId: z.uuid(),
     goals: z.array(treeGoal),
     context: z.array(contextGoal),
     dependencies: z.array(
@@ -743,6 +759,7 @@ export const readGoalTree = defineReadAction({
             ...cycle,
             midCycle: await midCycleInTx(tx, workspaceId, cycle.id),
           },
+          viewerId: memberId,
           goals: nodes,
           context: parents.map((row) => ({
             id: row.id,

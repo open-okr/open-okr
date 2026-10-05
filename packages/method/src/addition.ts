@@ -162,3 +162,32 @@ export function objectiveDraft(
   }
   return draftOrNull(missing, failing);
 }
+
+/**
+ * How an objective added mid-cycle starts (§2.9, §12 "New objectives
+ * mid-cycle start as", P9-T13-b-b). Under "Live" it is live once its checks
+ * set to block pass; under either draft setting it waits for a person.
+ *
+ * Only objectives. §2.9 gives the workspace this choice for "new objectives",
+ * so a key result added mid-cycle is live once complete under every setting.
+ */
+export function additionStartsAs(practice: ResolvedPractice): "live" | "draft" {
+  return practice["writing.midCycleAs"] === "live" ? "live" : "draft";
+}
+
+/**
+ * Where a draft goes when its owner publishes it: live, or to its reviewer
+ * where the workspace asks the reviewer to approve.
+ *
+ * A workspace with reviewers off has nobody to approve, so its owner's
+ * publish is the only person's step and the draft goes live. Refusing every
+ * publish instead would strand the draft on a pair of settings that disagree.
+ */
+export function draftOnPublish(
+  practice: ResolvedPractice,
+): "live" | "awaitingApproval" {
+  return practice["writing.midCycleAs"] === "reviewerApproval" &&
+    practice.reviewer !== "off"
+    ? "awaitingApproval"
+    : "live";
+}

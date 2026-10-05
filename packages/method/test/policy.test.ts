@@ -543,3 +543,70 @@ describe("the levels in use (P9-T07a-c, METHOD v2 §2.7)", () => {
     ).toBe("allow");
   });
 });
+
+describe("drafts that wait for a person (§2.9, P9-T13-b-b)", () => {
+  const owner = resolvePractice("recommended", {
+    "writing.midCycleAs": "ownerDraft",
+  });
+  const reviewer = resolvePractice("recommended", {
+    "writing.midCycleAs": "reviewerApproval",
+  });
+
+  it("lets only the owner publish, citing the setting", () => {
+    const refused = decide(
+      { kind: "draft.publish", actorIsOwner: false, hasReviewer: true },
+      owner,
+      thresholds,
+    );
+    expect(refused).toMatchObject({
+      outcome: "block",
+      rules: ["writing.midCycleAs"],
+    });
+    expect(
+      decide(
+        { kind: "draft.publish", actorIsOwner: true, hasReviewer: false },
+        owner,
+        thresholds,
+      ).outcome,
+    ).toBe("allow");
+  });
+
+  it("asks for a reviewer before publishing where the reviewer approves", () => {
+    const refused = decide(
+      { kind: "draft.publish", actorIsOwner: true, hasReviewer: false },
+      reviewer,
+      thresholds,
+    );
+    expect(refused.outcome).toBe("block");
+    expect(refused.reasons.join(" ")).toMatch(/Name a reviewer/);
+  });
+
+  it("lets only the reviewer approve", () => {
+    expect(
+      decide(
+        { kind: "draft.approve", actorIsReviewer: false },
+        reviewer,
+        thresholds,
+      ),
+    ).toMatchObject({ outcome: "block", rules: ["writing.midCycleAs"] });
+    expect(
+      decide(
+        { kind: "draft.approve", actorIsReviewer: true },
+        reviewer,
+        thresholds,
+      ).outcome,
+    ).toBe("allow");
+  });
+
+  it("never needs the phases", () => {
+    const binding = resolvePractice("recommended", {
+      "phases.enforcement": "binding",
+    });
+    expect(
+      policyNeedsPhases(
+        { kind: "draft.approve", actorIsReviewer: true },
+        binding,
+      ),
+    ).toBe(false);
+  });
+});

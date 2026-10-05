@@ -272,6 +272,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       ? `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was added mid-cycle`
       : `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was created`,
   "goal.updated": (p) => `Goal "${asString(p.title, "a goal")}" was edited`,
+  "goal.draft_published": (p) =>
+    p.awaitingApproval
+      ? `The draft "${asString(p.title, "a goal")}" was published, and waits for its reviewer's approval`
+      : `The draft "${asString(p.title, "a goal")}" was published and is live`,
+  "goal.draft_approved": (p) =>
+    `The draft "${asString(p.title, "a goal")}" was approved and is live`,
   "goal.closed": (p) =>
     `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
   "goal.reopened": () => "The goal was reopened",

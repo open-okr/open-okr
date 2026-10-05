@@ -41,6 +41,7 @@ import {
   type Person,
   ReasonField,
   VerdictChips,
+  WaitingDraft,
 } from "./okr-cells.tsx";
 import { OkrDrawer, useDrawerAddress } from "./okr-drawer.tsx";
 import {
@@ -470,6 +471,7 @@ function LiveOkrTable({
                 progressMax={progressMax}
                 members={members}
                 coach={coach}
+                viewerId={tree.viewerId}
                 mover={moverFor(
                   goals,
                   goalIndex,
@@ -608,6 +610,7 @@ function Refused({ okr, id }: { readonly okr: Okr; readonly id: string }) {
 function ObjectiveRow({
   goal,
   open,
+  viewerId,
   onToggle,
   okr,
   canEdit,
@@ -631,6 +634,8 @@ function ObjectiveRow({
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
+  /** Who is reading, so a waiting draft offers its step to the right person. */
+  readonly viewerId: string;
   readonly mover: Mover | null;
   readonly onDelete: () => void;
   readonly onOpen: () => void;
@@ -685,6 +690,19 @@ function ObjectiveRow({
             />
             <AddedMidCycle at={goal.addedMidCycleAt} />
             <AdditionDraftMark draft={goal.draft} />
+            <WaitingDraft
+              state={goal.draftState}
+              title={goal.title}
+              canPublish={canEdit && goal.champion.id === viewerId}
+              canApprove={canEdit && goal.reviewer?.id === viewerId}
+              busy={busy}
+              onPublish={() =>
+                okr.mutate({ kind: "publishDraft", id: goal.id })
+              }
+              onApprove={() =>
+                okr.mutate({ kind: "approveDraft", id: goal.id })
+              }
+            />
             <span className="flex items-center gap-1">
               {t("okrList.champion")}
               <MemberPicker

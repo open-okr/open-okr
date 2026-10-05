@@ -149,7 +149,7 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 |---|---|---|
 | `rhythm_settings` | `profile text not null default 'recommended'`, checked against the five profiles; `practice jsonb not null default '{}'`, checked to be an object (migration 0109, P9-T01) | None |
 | `goals` | `kind goal_kind not null default 'aspirational'` (`committed`, `aspirational`) | None; existing goals read aspirational |
-| `goals` | `added_mid_cycle_at timestamptz`, `standalone_reason text`, `draft_state goal_draft_state` (`draft`, `awaiting_approval`; null means it follows its cycle) | None |
+| `goals` | `added_mid_cycle_at timestamptz` (migration 0115, P9-T13-a), `standalone_reason text`, `draft_state` (`draft`, `awaiting_approval`; null means it follows its cycle). **As built at P9-T13-b-b**, `draft_state` is text with a check constraint (migration 0117), as every other enumerated goal column is | None |
 | `goals` | `reviewer_id` drops `not null` | None |
 | `key_results` | `kind key_result_kind not null default 'metric'` (`metric`, `maintain`, `milestone`, `baseline`), `done_at timestamptz` | `maintain` where `direction = 'maintain'` |
 | `key_results` | `target_value` drops `not null` (migration 0116, P9-T13-b-a). Not in the original plan: §2.9's acceptance needs a metric key result saved before its target is known | None; every existing row has a target |
@@ -248,6 +248,17 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | Stored or computed? | Computed on every `goals.tree` read, for additions only. A stored answer would go stale the moment an admin raised a check to block, and the plan reads nothing extra |
 | Who sees a draft? | Its goal's ordinary access. See the second question below |
 | A target that is not set yet | Null. KR-3 fails, progress reads 0% and nothing is forecast, and the first target asks for no reason and writes no history row, because it eases nothing |
+
+**Drafts that wait for a person, as built at P9-T13-b-b** ([`goal-drafts.ts`](../../packages/core/src/actions/goal-drafts.ts)):
+
+| Question | Answer |
+|---|---|
+| What starts as a draft? | An objective added mid-cycle, under "Draft published by its owner" or "Draft approved by the reviewer". Not a key result: §2.9 gives this choice for "new objectives", so a key result added mid-cycle is live once complete under every setting. Not the plan, and never an import |
+| Who publishes, who approves? | Its champion publishes; under reviewer approval it then waits for its reviewer, who alone approves. Both need `edit` on the objective first, then the policy decides, citing `writing.midCycleAs` |
+| A reviewer-approval draft with no reviewer | Publishing is refused until one is named. Where reviewers are off there is nobody to approve, so the owner's publish takes it live |
+| What does waiting change? | It owes no check-in: it is created without a due date, so no reminder and no staleness sweep reaches it, and its rhythm starts when it goes live. It keeps its goal's access, as a draft under "Live" does |
+| How does a screen know whom to offer the step? | `goals.tree` answers `viewerId`. Publish is offered to the champion and approve to the reviewer; the write asks the policy again |
+| A setting changed while drafts wait | Nothing is lost: a waiting draft still waits for its owner's publish or its reviewer's approval, as it was created to (§2.5) |
 
 **Four questions the build raised, for a human to answer** (5 October 2026):
 - **An OKR written into a set still unpublished after its window** (P9-T13-a). §2.9 says what is created before the team publication window closes is the plan; it does not say what an OKR written after it, into a set nobody has published, is. The build reads it as the plan, late, unmarked and facing the publish gates, because there is no plan yet to add to. If it should be marked instead, `isMidCycleAddition` drops its second condition.

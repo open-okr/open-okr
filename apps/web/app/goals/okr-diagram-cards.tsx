@@ -13,6 +13,7 @@ import {
   InlineNumber,
   InlineText,
   KindControl,
+  WaitingDraft,
 } from "./okr-cells.tsx";
 import {
   type Coach,
@@ -154,6 +155,16 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
           />
           <AddedMidCycle at={goal.addedMidCycleAt} />
           <AdditionDraftMark draft={goal.draft} />
+          {/* The state only: its publish and approve are in the drawer. */}
+          <WaitingDraft
+            state={goal.draftState}
+            title={goal.title}
+            canPublish={false}
+            canApprove={false}
+            busy={false}
+            onPublish={() => undefined}
+            onApprove={() => undefined}
+          />
         </span>
         {editing ? (
           <TitleEditor
