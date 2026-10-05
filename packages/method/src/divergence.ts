@@ -2,13 +2,12 @@
  * Divergence: where a champion's reported health disagrees with their own data
  * (AI-NATIVE-PLAN.md §6.1 item 3, §6.4's `quality.divergence`, P4-T06b-a).
  *
- * **No new §11 parameter, and that is deliberate.** METHOD.md defines no
- * divergence rule and §11 carries no threshold for one, so inventing either
- * would be changing practice, which CLAUDE.md puts on the ask-a-human list.
- * What §11 already carries is enough: §3.7's progress signal boundaries and
- * §3.2's confidence bands. Divergence is not a new judgement, it is the one a
- * reader already makes when §3.7 says the signal is "shown beside health and
- * never instead of it". This puts a name on noticing.
+ * **Two cases from what §11 already carried, and a third the method named
+ * later.** METHOD.md had no divergence rule when this was written, so the
+ * first two read §3.7's progress signal and §3.2's confidence bands rather
+ * than invent a threshold. METHOD v2 then named one in §3.5, a metric key
+ * result not moved within "Divergence window" while its goal reports on
+ * track, and `stalledWhileOnTrack` below is that rule (P9-T15b-b).
  *
  * **Two of §6.1's three cases, not three.** The third, "a forecast that misses
  * while the champion says caution", is not built: its wording is ambiguous (a
@@ -24,7 +23,8 @@ import type { ResolvedThresholds } from "./thresholds.ts";
 /** Which of §6.1's cases fired. The key both carry is `quality.divergence`. */
 export type DivergenceKind =
   | "progress_contradicts_health"
-  | "confidence_contradicts_health";
+  | "confidence_contradicts_health"
+  | "stalled_while_on_track";
 
 export interface Divergence {
   readonly kind: DivergenceKind;
@@ -121,6 +121,49 @@ export function divergences(
   }
 
   return found;
+}
+
+/** One metric key result's movement, for §3.5's divergence window. */
+export interface StalledInput {
+  /** The champion's reported health, as stored. */
+  readonly health: GoalHealth;
+  readonly keyResultTitle: string;
+  /** Only a metric key result is judged: the others move by being done. */
+  readonly keyResultKind: "metric" | "maintain" | "milestone" | "baseline";
+  /**
+   * When its value last moved, in milliseconds, or when it was written if it
+   * never has: a key result nobody has measured has not moved either.
+   */
+  readonly lastMovedAt: number;
+  readonly now: number;
+}
+
+/**
+ * METHOD.md §3.5's divergence (P9-T15b-b): "When a goal reports on track and
+ * one of its metric key results has not moved within the divergence window
+ * (§11), the coach says so (§10)."
+ *
+ * A third case beside the two above, and the one the method names. It is
+ * measured in days because the method says so: four weeks of a number not
+ * moving while the status says all is well is the thing nobody notices until
+ * the close.
+ */
+export function stalledWhileOnTrack(
+  input: StalledInput,
+  thresholds: ResolvedThresholds,
+): Divergence | null {
+  if (!CLAIMS_FINE(input.health) || input.keyResultKind !== "metric") {
+    return null;
+  }
+  const weeks = thresholds["quality.divergenceWindowWeeks"];
+  if (input.now - input.lastMovedAt <= weeks * 7 * 86_400_000) {
+    return null;
+  }
+  return {
+    kind: "stalled_while_on_track",
+    severity: "high",
+    reason: `Reported on track, but ${input.keyResultTitle} has not moved in ${weeks} weeks. One of the two is wrong, and only the champion can say which.`,
+  };
 }
 
 /**

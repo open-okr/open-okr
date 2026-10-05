@@ -32,15 +32,16 @@
  * comparison is between two facts the product already holds, and the message
  * cites `quality.divergence`, the rule §6.4 already defines.
  */
-import { activeOnly, goals, keyResults } from "@openokr/db";
+import { activeOnly, goals, keyResults, keyResultValues } from "@openokr/db";
 import {
   averageConfidence,
   divergences,
   linkedWorkDivergence,
   progressSignal,
   type ResolvedThresholds,
+  stalledWhileOnTrack,
 } from "@openokr/method";
-import { eq, isNull } from "drizzle-orm";
+import { asc, eq, inArray, isNull } from "drizzle-orm";
 import { type AgentScope, agentSeesGoal } from "../agents/scope.ts";
 import { paceInTx } from "../cycles/pace.ts";
 import type { OperationTx } from "../operations/operation.ts";
@@ -104,9 +105,11 @@ export async function sweepDivergenceInTx(
       .select({
         id: keyResults.id,
         title: keyResults.title,
+        kind: keyResults.kind,
         confidence: keyResults.confidence,
         currentValue: keyResults.currentValue,
         baselineValue: keyResults.baselineValue,
+        createdAt: keyResults.createdAt,
       })
       .from(keyResults)
       .where(activeOnly(keyResults, eq(keyResults.goalId, goal.id)));
@@ -138,6 +141,45 @@ export async function sweepDivergenceInTx(
           severity: found.severity,
           reason: found.reason,
         });
+      }
+    }
+
+    // §3.5 (P9-T15b-b): reported on track while a metric key result has not
+    // moved within the divergence window. One finding per key result, as the
+    // linked-work case above, and not a second one where that case already
+    // holds the key result: two rows about one measure need two dismissals.
+    if (goal.health === "on_track") {
+      const held = new Set(
+        wanted
+          .filter((entry) => entry.subjectGoalId === goal.id)
+          .map((entry) => entry.subjectKeyResultId),
+      );
+      const metrics = measures.filter(
+        (measure) => measure.kind === "metric" && !held.has(measure.id),
+      );
+      const moved = await lastMovedAtInTx(tx, input.workspaceId, metrics);
+      const now = Date.now();
+      for (const measure of metrics) {
+        const stalled = stalledWhileOnTrack(
+          {
+            health: goal.health,
+            keyResultTitle: measure.title,
+            keyResultKind: measure.kind,
+            lastMovedAt: moved.get(measure.id) ?? now,
+            now,
+          },
+          input.thresholds,
+        );
+        if (stalled) {
+          wanted.push({
+            ruleKey: "quality.divergence",
+            subjectGoalId: goal.id,
+            targetGoalId: null,
+            subjectKeyResultId: measure.id,
+            severity: stalled.severity,
+            reason: stalled.reason,
+          });
+        }
       }
     }
 
@@ -202,4 +244,59 @@ export async function sweepDivergenceInTx(
   });
 
   return { examined: open.length, found: wanted.length };
+}
+
+/**
+ * When each key result's value last moved (§3.5, P9-T15b-b): the latest
+ * reading that differs from the one before it, the first compared with the
+ * baseline. A key result with no reading that moved it last moved when it was
+ * written, because a number nobody measured has not moved either.
+ */
+async function lastMovedAtInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  measures: readonly {
+    readonly id: string;
+    readonly baselineValue: string;
+    readonly createdAt: Date;
+  }[],
+): Promise<Map<string, number>> {
+  const moved = new Map<string, number>(
+    measures.map((measure) => [
+      measure.id,
+      new Date(measure.createdAt).getTime(),
+    ]),
+  );
+  if (measures.length === 0) {
+    return moved;
+  }
+  const values = await tx
+    .select({
+      keyResultId: keyResultValues.keyResultId,
+      value: keyResultValues.value,
+      createdAt: keyResultValues.createdAt,
+    })
+    .from(keyResultValues)
+    .where(
+      activeOnly(
+        keyResultValues,
+        eq(keyResultValues.workspaceId, workspaceId),
+        inArray(
+          keyResultValues.keyResultId,
+          measures.map((measure) => measure.id),
+        ),
+      ),
+    )
+    .orderBy(asc(keyResultValues.createdAt));
+  const previous = new Map<string, number>(
+    measures.map((measure) => [measure.id, Number(measure.baselineValue)]),
+  );
+  for (const reading of values) {
+    const value = Number(reading.value);
+    if (value !== previous.get(reading.keyResultId)) {
+      moved.set(reading.keyResultId, new Date(reading.createdAt).getTime());
+    }
+    previous.set(reading.keyResultId, value);
+  }
+  return moved;
 }

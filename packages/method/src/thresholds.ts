@@ -391,6 +391,14 @@ export const THRESHOLDS = {
     default: 4,
     schema: z.number().int().min(2).max(52),
   }),
+  "quality.divergenceWindowWeeks": param({
+    group: "quality",
+    label: "Divergence window",
+    section: "§3.5",
+    why: "Four weeks with no movement in a metric key result while its goal is reported on track: long enough for a real number to have moved, short enough to say so before the close.",
+    default: 4,
+    schema: z.number().int().min(1).max(26),
+  }),
   "scoring.progressSignalPass": param({
     group: "scoring",
     label: "Progress signal pass",

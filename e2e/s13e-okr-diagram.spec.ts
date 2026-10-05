@@ -49,7 +49,13 @@ const drawer = () => page.getByTestId("okr-drawer");
 
 async function post<T>(path: string, data: unknown): Promise<T> {
   const response = await api.post(`/api/v1/${path}`, {
-    headers: authed(),
+    // **A fresh connection for every write.** U10's setup is three hundred of
+    // them, and as its unit grows one create can take longer than the
+    // server's five-second keep-alive; the next batch then reused a pooled
+    // socket the server had just closed and failed with ECONNRESET, here and
+    // in continuous integration. Closing after each answer leaves nothing
+    // stale to reuse.
+    headers: { ...authed(), connection: "close" },
     data,
   });
   expect(response.status(), `${path}: ${await response.text()}`).toBe(200);

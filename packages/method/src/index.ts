@@ -62,6 +62,8 @@ export {
   type DivergenceInput,
   type DivergenceKind,
   divergences,
+  type StalledInput,
+  stalledWhileOnTrack,
 } from "./divergence.ts";
 export {
   applyEnforcement,

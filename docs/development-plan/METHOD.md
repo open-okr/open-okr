@@ -330,6 +330,8 @@ Health is derived, never typed in. Precedence, first match wins:
 
 A goal that has never been checked in is `pending`, not `on track`. Silence is never green. *Source:* Perdoo (vendor) uses the same "no status" grey and an "outdated" flag.
 
+**Reported health against the data.** When a goal reports on track and one of its metric key results has not moved within the divergence window (§11), the coach says so (§10).
+
 ### 3.6 Trend forecast
 
 From a metric key result's value history, project the end-of-cycle value with a linear fit over the recent window, once there are enough values (§11). If the projection misses the target, flag `trending off track` before the human status changes. It is labelled a projection. Milestone, baseline and maintain key results get no forecast. *Source:* Lamorte: predictive progress "acts as an early warning system".
@@ -928,6 +930,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Progress signal pass | 75%, for the absolute signal |
 | Progress signal fail | 50%, for the absolute signal |
 | Trend forecast minimum values | 4 |
+| Divergence window | 4 weeks with no movement while reported on track |
 
 **Quality and planning**
 
