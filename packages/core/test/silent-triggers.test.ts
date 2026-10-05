@@ -69,6 +69,7 @@ const goal = async (input: {
   title?: string;
   level?: string;
   inSpace?: boolean;
+  kind?: "committed" | "aspirational";
 }) =>
   (
     (await call("goals.create", {
@@ -80,6 +81,7 @@ const goal = async (input: {
       championId: secondMemberId,
       reviewerId: ownerMemberId,
       weight: 1,
+      ...(input.kind ? { kind: input.kind } : {}),
     })) as { id: string }
   ).id;
 
@@ -308,6 +310,22 @@ describe("the Coach's seven", () => {
     );
   });
 
+  it("quality.sandbagging_draft says nothing of a committed objective drafted near certain", async () => {
+    // METHOD.md §3.2 (P9-T11b-b): high confidence is right for a commitment.
+    const wb = await workerDb();
+    const goalId = await goal({ cycleId: planningCycleId, kind: "committed" });
+    await keyResult(goalId);
+    await keyResult(goalId, "Grow mobile revenue from 1.2m to 2m");
+    await wb.admin.query(
+      "update key_results set confidence = 0.95 where goal_id = $1",
+      [goalId],
+    );
+    const nudges = await read((tx) =>
+      dueObjectiveQualityNudges(tx, { workspaceId, thresholds }),
+    );
+    expect(said(nudges, "quality.sandbagging_draft")).toEqual([]);
+  });
+
   it("quality.trending_off reads the stored forecast and tells the champion", async () => {
     const wb = await workerDb();
     const goalId = await goal({ cycleId: planningCycleId });
@@ -391,8 +409,8 @@ describe("the Coach's seven", () => {
       await keyResult(goalId),
       await keyResult(goalId, "Grow mobile revenue from 1.2m to 2m"),
     ];
-    // METHOD.md §3.3's pattern: three quarters or more at 1.0. Every
-    // objective is aspirational until P9-T11b stores the kind.
+    // METHOD.md §3.3's pattern: three quarters or more of the aspirational
+    // key results at 1.0. A new objective is aspirational by default.
     await wb.admin.query(
       "update key_results set score = 1 where id = any($1::uuid[])",
       [krs],
@@ -415,6 +433,30 @@ describe("the Coach's seven", () => {
       }),
     );
     expect(said(after, "quality.sandbagging_close")).toEqual([ownerMemberId]);
+  });
+
+  it("quality.sandbagging_close says nothing of committed key results met in full", async () => {
+    // METHOD.md §3.3 (P9-T11b-b): a commitment met is a promise kept, so a
+    // cycle of committed key results at 1.0 is not the too-safe pattern.
+    const wb = await workerDb();
+    const goalId = await goal({ cycleId: planningCycleId, kind: "committed" });
+    const krs = [
+      await keyResult(goalId),
+      await keyResult(goalId, "Grow mobile revenue from 1.2m to 2m"),
+    ];
+    await wb.admin.query(
+      "update key_results set score = 1 where id = any($1::uuid[])",
+      [krs],
+    );
+    const after = await read((tx) =>
+      dueCycleQualityNudges(tx, {
+        workspaceId,
+        now: new Date("2030-04-03T10:00:00Z"),
+        timeZone: "UTC",
+        thresholds,
+      }),
+    );
+    expect(said(after, "quality.sandbagging_close")).toEqual([]);
   });
 
   it("quality.process_health_low goes to the sponsor the night after the review closes", async () => {

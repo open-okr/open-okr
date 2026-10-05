@@ -470,6 +470,20 @@ export function scoreNote(
   return "none";
 }
 
+/**
+ * §3.3's notes in the coach's words, beside the key result they are about.
+ * "Too safe" is said of the set, so it has its own sentence below.
+ */
+export const SCORE_NOTE_TEXT: Readonly<
+  Record<Exclude<ScoreNote, "none">, string>
+> = {
+  explain_miss: "Write the short explanation of the miss",
+  root_cause: "Little progress. Pick its root cause",
+};
+
+/** §3.3's pattern, said of a closed set of aspirational key results. */
+export const TOO_SAFE_TEXT = "The targets were too safe";
+
 /** A scored key result and the kind of promise it was. */
 export interface KindedScore {
   readonly score: number | null;

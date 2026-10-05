@@ -174,10 +174,45 @@ describe("what an initiative must not do", () => {
 });
 
 describe("publish gate five, which is the acceptance criterion", () => {
-  // METHOD.md §5.5 since P9-T11a: work serving an aspirational OKR may exceed
-  // capacity, and every objective is aspirational until P9-T11b stores the
-  // kind. That task brings back the red gate for a committed one.
+  // Gate 5 holds back only work a commitment depends on (METHOD.md §5.5,
+  // P9-T11b-b), so the objective these initiatives serve is committed here
+  // unless a test says otherwise.
+  const OVER =
+    '"Rebuild the activation flow" serves a committed OKR and still exceeds capacity';
+  beforeEach(async () => {
+    await call("goals.setKind", { id: goalId, kind: "committed" });
+  });
+
+  // METHOD.md §5.5 (P9-T11a, P9-T11b-b): work a commitment depends on holds
+  // gate 5 back at "exceeds", and work serving an aspirational OKR may exceed.
+  it("is red and names the initiative that exceeds capacity behind a committed OKR", async () => {
+    const created = await createInitiative({
+      keyResultIds: [firstKeyResult, secondKeyResult],
+      capacity: "exceeds",
+    });
+
+    const five = await gateFive();
+    expect(five.evaluable).toBe(true);
+    expect(five.passed).toBe(false);
+    expect(five.missing).toContain(OVER);
+    expect(created.title).toBe("Rebuild the activation flow");
+
+    // The capacity read the cycle screen draws says the same.
+    const capacity = (await call("initiatives.capacity", { cycleId })) as {
+      exceeds: boolean;
+      initiatives: { title: string; committed: boolean }[];
+    };
+    expect(capacity.exceeds).toBe(true);
+    expect(capacity.initiatives).toEqual([
+      expect.objectContaining({
+        title: "Rebuild the activation flow",
+        committed: true,
+      }),
+    ]);
+  });
+
   it("lets an initiative serving an aspirational OKR exceed capacity", async () => {
+    await call("goals.setKind", { id: goalId, kind: "aspirational" });
     const created = await createInitiative({
       keyResultIds: [firstKeyResult, secondKeyResult],
       capacity: "exceeds",
@@ -187,6 +222,10 @@ describe("publish gate five, which is the acceptance criterion", () => {
     expect(five.evaluable).toBe(true);
     expect(five.missing.join(" ")).not.toMatch(/exceeds capacity/);
     expect(created.title).toBe("Rebuild the activation flow");
+    const capacity = (await call("initiatives.capacity", { cycleId })) as {
+      exceeds: boolean;
+    };
+    expect(capacity.exceeds).toBe(false);
   });
 
   it("goes quiet about the initiative once the verdict is changed", async () => {
@@ -197,9 +236,7 @@ describe("publish gate five, which is the acceptance criterion", () => {
     await call("initiatives.update", { id: created.id, capacity: "fits" });
 
     const five = await gateFive();
-    expect(five.missing).not.toContain(
-      '"Rebuild the activation flow" still exceeds capacity',
-    );
+    expect(five.missing).not.toContain(OVER);
   });
 
   it("ignores an initiative that serves no key result in this cycle", async () => {
@@ -208,9 +245,7 @@ describe("publish gate five, which is the acceptance criterion", () => {
     const five = await gateFive();
     // §5.5 is about the initiatives behind this cycle's measures. A project in
     // the same space that serves none of them is not this cycle's problem.
-    expect(five.missing).not.toContain(
-      '"Rebuild the activation flow" still exceeds capacity',
-    );
+    expect(five.missing).not.toContain(OVER);
   });
 
   it("stops counting one that was unlinked", async () => {
@@ -224,9 +259,7 @@ describe("publish gate five, which is the acceptance criterion", () => {
     });
 
     const five = await gateFive();
-    expect(five.missing).not.toContain(
-      '"Rebuild the activation flow" still exceeds capacity',
-    );
+    expect(five.missing).not.toContain(OVER);
   });
 
   it("stops counting one that was deleted", async () => {
@@ -237,9 +270,7 @@ describe("publish gate five, which is the acceptance criterion", () => {
     await call("initiatives.delete", { id: created.id });
 
     const five = await gateFive();
-    expect(five.missing).not.toContain(
-      '"Rebuild the activation flow" still exceeds capacity',
-    );
+    expect(five.missing).not.toContain(OVER);
   });
 });
 
@@ -295,6 +326,12 @@ describe("the link, which is what §5.5 asks a facilitator to record", () => {
 });
 
 describe("the capacity view the align-and-commit session reads", () => {
+  // `exceeds` is gate five's question, which only committed work answers
+  // (METHOD.md §5.5, P9-T11b-b); the objective here is committed.
+  beforeEach(async () => {
+    await call("goals.setKind", { id: goalId, kind: "committed" });
+  });
+
   it("answers every key result in the cycle with the initiatives behind it", async () => {
     const created = await createInitiative({
       keyResultIds: [firstKeyResult],

@@ -94,6 +94,7 @@ export async function dueObjectiveQualityNudges(
       goalId: goals.id,
       championId: goals.championId,
       cycleId: goals.cycleId,
+      kind: goals.kind,
       published: cycles.publishedAt,
       facilitatorId: cycles.facilitatorId,
       confidence: keyResults.confidence,
@@ -129,10 +130,11 @@ export async function dueObjectiveQualityNudges(
     if (
       drafting &&
       draftIsSandbagged(
-        // Every objective is aspirational until P9-T11b stores the kind.
+        // Only the aspirational key results are judged (METHOD.md §3.2):
+        // high confidence is right for a commitment.
         keyResultRows.map((row) => ({
           confidence: row.confidence === null ? null : Number(row.confidence),
-          kind: "aspirational" as const,
+          kind: row.kind,
         })),
         input.thresholds,
       )
@@ -230,6 +232,7 @@ export async function dueCycleQualityNudges(
       .select({
         id: goals.id,
         level: goals.level,
+        kind: goals.kind,
         spaceId: goals.spaceId,
         spaceName: spaces.name,
       })
@@ -289,8 +292,9 @@ export async function dueCycleQualityNudges(
     }
 
     if (row.endsOn < today && cycleGoals.length > 0) {
+      const kindOf = new Map(cycleGoals.map((goal) => [goal.id, goal.kind]));
       const scored = await tx
-        .select({ score: keyResults.score })
+        .select({ score: keyResults.score, goalId: keyResults.goalId })
         .from(keyResults)
         .where(
           activeOnly(
@@ -305,10 +309,11 @@ export async function dueCycleQualityNudges(
         );
       if (
         closeIsSandbagged(
-          // Every objective is aspirational until P9-T11b stores the kind.
+          // §3.3's pattern is over the aspirational key results: a
+          // commitment met in full is a promise kept, not a target set low.
           scored.map((keyResult) => ({
             score: Number(keyResult.score),
-            kind: "aspirational" as const,
+            kind: kindOf.get(keyResult.goalId) ?? "aspirational",
           })),
           input.thresholds,
         )

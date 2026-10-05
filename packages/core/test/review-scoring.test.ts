@@ -72,10 +72,15 @@ const scoring = async (userId = FACILITATOR) =>
         current: number | null;
         score: number | null;
         reason: string | null;
+        kind: string;
+        note: { key: string; text: string } | null;
       }[];
     }[];
     cycleScore: number | null;
+    aspirationalAverage: number | null;
     verdict: string | null;
+    committed: { met: number; scored: number } | null;
+    tooSafe: string | null;
     complete: boolean;
   };
 
@@ -675,5 +680,58 @@ describe("the reveal (P4-T10b-b)", () => {
     await expect(
       call("sessions.revealObjectiveScore", { sessionId, goalId: other.id }),
     ).rejects.toThrow(/graded/i);
+  });
+});
+
+describe("judged by kind (METHOD.md §3.3 and §3.4, P9-T11b-b)", () => {
+  const grade = async (keyResultId: string, score: number) =>
+    call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId,
+      score,
+      reason: "As it landed.",
+    });
+  const noteOf = async (keyResultId: string) =>
+    (await scoring()).objectives
+      .flatMap((objective) => objective.keyResults)
+      .find((entry) => entry.keyResultId === keyResultId)?.note ?? null;
+
+  it("acceptance A6: no too-safe note on a committed key result at 1.0, and a committed miss asks for its explanation", async () => {
+    await call("goals.setKind", { id: goalId, kind: "committed" });
+    await grade(heavyKeyResultId, 1);
+    await grade(lightKeyResultId, 0.8);
+    await call("sessions.revealObjectiveScore", { sessionId, goalId });
+
+    expect(await noteOf(heavyKeyResultId)).toBeNull();
+    expect(await noteOf(lightKeyResultId)).toEqual({
+      key: "explain_miss",
+      text: "Write the short explanation of the miss",
+    });
+    const status = await scoring();
+    expect(status.tooSafe).toBeNull();
+    // §3.4: committed work is the share met, and there is no aspirational
+    // average to give a verdict on.
+    expect(status.committed).toEqual({ met: 1, scored: 2 });
+    expect(status.aspirationalAverage).toBeNull();
+    expect(status.verdict).toBeNull();
+    expect(status.objectives[0]?.keyResults[0]?.kind).toBe("committed");
+  });
+
+  it("says the targets were too safe of an aspirational set at 1.0, and asks a root cause of little progress", async () => {
+    await grade(heavyKeyResultId, 1);
+    await grade(lightKeyResultId, 1);
+    await call("sessions.revealObjectiveScore", { sessionId, goalId });
+
+    const status = await scoring();
+    expect(status.tooSafe).toBe("The targets were too safe");
+    expect(status.aspirationalAverage).toBe(1);
+    expect(status.verdict).toBe("too_safe");
+    expect(status.committed).toBeNull();
+
+    await grade(lightKeyResultId, 0.2);
+    expect(await noteOf(lightKeyResultId)).toEqual({
+      key: "root_cause",
+      text: "Little progress. Pick its root cause",
+    });
   });
 });

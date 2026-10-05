@@ -16,6 +16,7 @@ import {
 } from "@openokr/db";
 import {
   lowestProcessHealthStatement,
+  type PortfolioVerdict,
   PROCESS_HEALTH_STATEMENTS,
   portfolioVerdictOf,
   type ResolvedThresholds,
@@ -54,6 +55,8 @@ interface Scored {
   readonly spaceId: string | null;
   readonly championId: string | null;
   readonly score: number;
+  /** Its objective's kind, which decides whether §3.4's verdict reads it. */
+  readonly kind: "committed" | "aspirational";
 }
 
 /** Every scored key result in the cycle, with the goal that owns it. */
@@ -68,6 +71,7 @@ async function loadScores(
       spaceId: goals.spaceId,
       championId: goals.championId,
       score: keyResults.score,
+      kind: goals.kind,
     })
     .from(keyResults)
     .innerJoin(goals, eq(goals.id, keyResults.goalId))
@@ -89,7 +93,32 @@ async function loadScores(
       spaceId: row.spaceId,
       championId: row.championId,
       score: Number(row.score),
+      kind: row.kind,
     }));
+}
+
+/**
+ * §3.4's verdict on a scope's aspirational scores (P9-T11b-b). Committed key
+ * results are judged by the share met rather than an average, because
+ * averaging the two hides both; null when nothing aspirational was scored.
+ */
+function aspirationalVerdict(
+  scored: readonly Scored[],
+  thresholds: ResolvedThresholds,
+): PortfolioVerdict | null {
+  const aspirational = scored
+    .filter((row) => row.kind === "aspirational")
+    .map((row) => row.score);
+  if (aspirational.length === 0) {
+    return null;
+  }
+  return portfolioVerdictOf(
+    round2(
+      aspirational.reduce((total, score) => total + score, 0) /
+        aspirational.length,
+    ),
+    thresholds,
+  );
 }
 
 interface Buckets {
@@ -166,41 +195,55 @@ export async function archiveCycleInTx(
     ownerKind: "workspace" | "space" | "member";
     spaceId: string | null;
     memberId: string | null;
+    rows: Scored[];
     scores: number[];
   }[] = [
     {
       ownerKind: "workspace",
       spaceId: null,
       memberId: null,
+      rows: scored,
       scores: scored.map((row) => row.score),
     },
   ];
 
-  const bySpace = new Map<string, number[]>();
-  const byMember = new Map<string, number[]>();
+  const bySpace = new Map<string, Scored[]>();
+  const byMember = new Map<string, Scored[]>();
   for (const row of scored) {
     if (row.spaceId) {
       const list = bySpace.get(row.spaceId);
       if (list) {
-        list.push(row.score);
+        list.push(row);
       } else {
-        bySpace.set(row.spaceId, [row.score]);
+        bySpace.set(row.spaceId, [row]);
       }
     }
     if (row.championId) {
       const list = byMember.get(row.championId);
       if (list) {
-        list.push(row.score);
+        list.push(row);
       } else {
-        byMember.set(row.championId, [row.score]);
+        byMember.set(row.championId, [row]);
       }
     }
   }
-  for (const [spaceId, scores] of bySpace) {
-    scopes.push({ ownerKind: "space", spaceId, memberId: null, scores });
+  for (const [spaceId, rows] of bySpace) {
+    scopes.push({
+      ownerKind: "space",
+      spaceId,
+      memberId: null,
+      rows,
+      scores: rows.map((row) => row.score),
+    });
   }
-  for (const [memberId, scores] of byMember) {
-    scopes.push({ ownerKind: "member", spaceId: null, memberId, scores });
+  for (const [memberId, rows] of byMember) {
+    scopes.push({
+      ownerKind: "member",
+      spaceId: null,
+      memberId,
+      rows,
+      scores: rows.map((row) => row.score),
+    });
   }
 
   let snapshots = 0;
@@ -213,10 +256,9 @@ export async function archiveCycleInTx(
               scope.scores.length,
           );
     const buckets = bucketsOf(scope.scores, thresholds);
-    // §3.4 judges the aspirational average; every objective is aspirational
-    // until P9-T11b stores the kind, so every score is in that set.
-    const verdict =
-      average === null ? null : portfolioVerdictOf(average, thresholds);
+    // The result is the cycle score over every scored key result (§8.6);
+    // the verdict is §3.4's, over the aspirational ones alone.
+    const verdict = aspirationalVerdict(scope.rows, thresholds);
 
     const figures = {
       resultValue: average === null ? null : String(average),
@@ -295,7 +337,7 @@ export async function archiveCycleInTx(
   return {
     snapshots,
     resultValue: average,
-    verdict: average === null ? null : portfolioVerdictOf(average, thresholds),
+    verdict: aspirationalVerdict(workspaceScope?.rows ?? [], thresholds),
   };
 }
 

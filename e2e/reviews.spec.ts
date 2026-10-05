@@ -823,8 +823,8 @@ test("a quarterly review runs its rail, and the second client follows", async ({
 
   // The one key result graded earlier came in at 0.4, which is below the
   // section 11 aspirational threshold of 0.6, so exactly one row is listed and
-  // the other graded-at-nothing key results are not. Every objective is
-  // aspirational until P9-T11b stores the kind.
+  // the other graded-at-nothing key results are not. The objective is
+  // aspirational, the default.
   await expect(rootCause).toContainText("0 of 1 named");
   await expect(rootCause.getByText("0.4")).toBeVisible();
   // Eight causes, from the method package rather than from this screen.

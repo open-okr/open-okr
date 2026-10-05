@@ -31076,6 +31076,13 @@
                                   }
                                 ]
                               },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "committed",
+                                  "aspirational"
+                                ]
+                              },
                               "initiativeIds": {
                                 "type": "array",
                                 "items": {
@@ -31091,6 +31098,7 @@
                               "goalTitle",
                               "title",
                               "capacity",
+                              "kind",
                               "initiativeIds"
                             ],
                             "additionalProperties": false
@@ -31123,12 +31131,16 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "committed": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
                               "id",
                               "title",
-                              "capacity"
+                              "capacity",
+                              "committed"
                             ],
                             "additionalProperties": false
                           }
@@ -55109,6 +55121,40 @@
                                         "string",
                                         "null"
                                       ]
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "committed",
+                                        "aspirational"
+                                      ]
+                                    },
+                                    "note": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "key": {
+                                              "type": "string",
+                                              "enum": [
+                                                "explain_miss",
+                                                "root_cause"
+                                              ]
+                                            },
+                                            "text": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "key",
+                                            "text"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -55120,7 +55166,9 @@
                                     "current",
                                     "unit",
                                     "score",
-                                    "reason"
+                                    "reason",
+                                    "kind",
+                                    "note"
                                   ],
                                   "additionalProperties": false
                                 }
@@ -55144,6 +55192,12 @@
                             "null"
                           ]
                         },
+                        "aspirationalAverage": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
                         "verdict": {
                           "anyOf": [
                             {
@@ -55160,6 +55214,39 @@
                             }
                           ]
                         },
+                        "committed": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "met": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "scored": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "met",
+                                "scored"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tooSafe": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "complete": {
                           "type": "boolean"
                         }
@@ -55167,7 +55254,10 @@
                       "required": [
                         "objectives",
                         "cycleScore",
+                        "aspirationalAverage",
                         "verdict",
+                        "committed",
+                        "tooSafe",
                         "complete"
                       ],
                       "additionalProperties": false

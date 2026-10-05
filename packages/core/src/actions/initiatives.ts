@@ -22,6 +22,7 @@
 import {
   activeOnly,
   CAPACITY_VERDICTS,
+  GOAL_KINDS,
   goals,
   INITIATIVE_STATUSES,
   includeDeleted,
@@ -1016,6 +1017,8 @@ export const readCapacity = defineReadAction({
         goalTitle: z.string(),
         title: z.string(),
         capacity: z.enum(CAPACITY_VERDICTS).nullable(),
+        /** Its objective's kind (METHOD.md §2.8, P9-T11b-b). */
+        kind: z.enum(GOAL_KINDS),
         initiativeIds: z.array(z.uuid()),
       }),
     ),
@@ -1024,9 +1027,14 @@ export const readCapacity = defineReadAction({
         id: z.uuid(),
         title: z.string(),
         capacity: z.enum(CAPACITY_VERDICTS).nullable(),
+        /** True when it serves a committed objective, which gate five reads. */
+        committed: z.boolean(),
       }),
     ),
-    /** True when anything on this cycle still reads `exceeds`. Gate five. */
+    /**
+     * True when committed work on this cycle still reads `exceeds`. Gate
+     * five. Aspirational work may exceed (METHOD.md §5.5, P9-T11b-b).
+     */
     exceeds: z.boolean(),
   }),
   access: ACCESS_LEVELS.view,
@@ -1050,6 +1058,7 @@ export const readCapacity = defineReadAction({
             goalTitle: goals.title,
             title: keyResults.title,
             capacity: keyResults.capacity,
+            kind: goals.kind,
           })
           .from(keyResults)
           .innerJoin(goals, eq(goals.id, keyResults.goalId))
@@ -1125,6 +1134,22 @@ export const readCapacity = defineReadAction({
                 )
                 .orderBy(asc(initiatives.title));
 
+        // An initiative is committed work when any key result it moves is
+        // under a committed objective: the commitment depends on it.
+        const committedKeyResults = new Set(
+          readable
+            .filter((row) => row.kind === "committed")
+            .map((row) => row.id),
+        );
+        const committedInitiatives = new Set(
+          links
+            .filter((link) => committedKeyResults.has(link.keyResultId))
+            .map((link) => link.initiativeId),
+        );
+        const initiativesOut = behind.map((row) => ({
+          ...row,
+          committed: committedInitiatives.has(row.id),
+        }));
         return {
           keyResults: readable.map((row) => ({
             id: row.id,
@@ -1132,14 +1157,19 @@ export const readCapacity = defineReadAction({
             goalTitle: row.goalTitle,
             title: row.title,
             capacity: row.capacity,
+            kind: row.kind,
             initiativeIds: links
               .filter((link) => link.keyResultId === row.id)
               .map((link) => link.initiativeId),
           })),
-          initiatives: behind,
+          initiatives: initiativesOut,
           exceeds:
-            readable.some((row) => row.capacity === "exceeds") ||
-            behind.some((row) => row.capacity === "exceeds"),
+            readable.some(
+              (row) => row.capacity === "exceeds" && row.kind === "committed",
+            ) ||
+            initiativesOut.some(
+              (row) => row.capacity === "exceeds" && row.committed,
+            ),
         };
       },
     );

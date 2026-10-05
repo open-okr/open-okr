@@ -387,6 +387,7 @@ async function loadInitiativeSnapshots<
       id: initiatives.id,
       title: initiatives.title,
       capacity: initiatives.capacity,
+      kind: goals.kind,
     })
     .from(initiatives)
     .innerJoin(
@@ -416,11 +417,22 @@ async function loadInitiativeSnapshots<
     )
     .where(activeOnly(initiatives, eq(initiatives.workspaceId, workspaceId)));
 
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    capacity: row.capacity,
-  }));
+  // One row per kind an initiative serves. It counts as committed when any
+  // objective it serves is (METHOD.md §5.5, P9-T11b-b): work a commitment
+  // depends on is part of the commitment, whatever else it also feeds.
+  const byId = new Map<string, InitiativeSnapshot>();
+  for (const row of rows) {
+    const seen = byId.get(row.id);
+    if (!seen || row.kind === "committed") {
+      byId.set(row.id, {
+        id: row.id,
+        title: row.title,
+        capacity: row.capacity,
+        kind: row.kind,
+      });
+    }
+  }
+  return [...byId.values()];
 }
 
 /**
@@ -450,6 +462,7 @@ async function loadGoalSnapshots<
       parentGoalId: goals.parentGoalId,
       parentKeyResultId: goals.parentKeyResultId,
       contributionStatement: goals.contributionStatement,
+      kind: goals.kind,
     })
     .from(goals)
     .where(
@@ -529,6 +542,8 @@ async function loadGoalSnapshots<
         id: child.id,
         title: child.title,
         capacity: child.capacity,
+        // Gate 5 holds back only committed work at "exceeds" (§5.5).
+        kind: row.kind,
         dependencies: dependencies
           .filter((dependency) => dependency.keyResultId === child.id)
           .map((dependency) => ({

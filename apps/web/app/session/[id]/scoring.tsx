@@ -46,6 +46,9 @@ interface ScoringKeyResult {
   readonly unit: string | null;
   readonly score: number | null;
   readonly reason: string | null;
+  readonly kind: "committed" | "aspirational";
+  /** §3.3's note on the grade, in the method's words (P9-T11b-b). */
+  readonly note: { readonly key: string; readonly text: string } | null;
 }
 
 interface ScoringObjective {
@@ -62,7 +65,12 @@ interface ScoringObjective {
 export interface ScoringStatus {
   readonly objectives: readonly ScoringObjective[];
   readonly cycleScore: number | null;
+  /** §3.4's verdict is over the aspirational key results alone (P9-T11b-b). */
+  readonly aspirationalAverage: number | null;
   readonly verdict: string | null;
+  readonly committed: { readonly met: number; readonly scored: number } | null;
+  /** §3.3's too-safe sentence, when the revealed set shows the pattern. */
+  readonly tooSafe: string | null;
   readonly complete: boolean;
 }
 
@@ -154,6 +162,11 @@ function ScoreRow({
             {t("session.detail.scoring.weight", { weight: keyResult.weight })}
           </Chip>
         )}
+        {/* Committed is marked; aspirational is the default and says
+            nothing, so the mark means something where it appears. */}
+        {keyResult.kind === "committed" ? (
+          <Chip tone="brand">{t("okrKind.committed")}</Chip>
+        ) : null}
         {keyResult.score === null ? (
           <Chip tone="warn">{t("session.detail.scoring.notGraded")}</Chip>
         ) : (
@@ -163,6 +176,16 @@ function ScoreRow({
 
       {/* §8.3's evidence: grade against the key result as written. */}
       <span className="text-xs text-ink-3">{evidence(keyResult, t)}</span>
+      {/* §3.3's note on the grade, in the coach's words. */}
+      {keyResult.note ? (
+        <span
+          data-testid="score-note"
+          data-note={keyResult.note.key}
+          className="text-xs font-medium text-warn"
+        >
+          {keyResult.note.text}
+        </span>
+      ) : null}
 
       {canScore ? (
         <>
@@ -388,11 +411,42 @@ export function Scoring({
               >
                 {status.cycleScore.toFixed(2)}
               </span>
-              <Chip tone={verdictTone(status.verdict)}>
-                {verdictLabel(status.verdict)}
-              </Chip>
+              {/* §3.4's verdict reads the aspirational key results alone, so
+                  their average is shown beside it wherever it differs. */}
+              {status.aspirationalAverage !== null &&
+              status.aspirationalAverage !== status.cycleScore ? (
+                <span className="text-xs text-ink-3">
+                  {t("session.detail.scoring.aspirationalAverage", {
+                    average: status.aspirationalAverage.toFixed(2),
+                  })}
+                </span>
+              ) : null}
+              {status.verdict === null ? null : (
+                <Chip tone={verdictTone(status.verdict)}>
+                  {verdictLabel(status.verdict)}
+                </Chip>
+              )}
+              {status.committed === null ? null : (
+                <Chip
+                  tone={
+                    status.committed.met === status.committed.scored
+                      ? "ok"
+                      : "warn"
+                  }
+                >
+                  {t("session.detail.scoring.committedMet", {
+                    met: status.committed.met,
+                    scored: status.committed.scored,
+                  })}
+                </Chip>
+              )}
             </p>
           )}
+          {status.tooSafe ? (
+            <p data-testid="too-safe" className="text-xs font-medium text-info">
+              {status.tooSafe}
+            </p>
+          ) : null}
           <p className="text-xs text-ink-4">
             {t("session.detail.scoring.gradesLandOnTheKey", {
               ends: status.complete

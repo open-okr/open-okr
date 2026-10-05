@@ -167,6 +167,7 @@ export async function evaluateGoalInTx(
       championId: goals.championId,
       reviewerId: goals.reviewerId,
       level: goals.level,
+      kind: goals.kind,
       ownerKind: goals.ownerKind,
       spaceId: goals.spaceId,
       memberId: goals.memberId,
@@ -223,6 +224,8 @@ export async function evaluateGoalInTx(
     indicatorType: row.indicatorType,
     direction: row.direction,
     confidence: row.confidence === null ? null : Number(row.confidence),
+    // KR-6 judges only aspirational key results (METHOD.md §3.2, P9-T11b-b).
+    kind: goal.kind,
   }));
 
   // A space's own strictness wins for its own goals, and nowhere else

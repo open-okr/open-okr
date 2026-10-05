@@ -2979,6 +2979,8 @@
   "session.detail.rootCause.rootCause": "Punca akar",
   "session.detail.rootCause.theSystemNotThe": "Sistemnya, bukan orangnya",
   "session.detail.saving": "Menyimpan…",
+  "session.detail.scoring.aspirationalAverage": "Purata aspirasi {average}",
+  "session.detail.scoring.committedMet": "Komited: {met} daripada {scored} dicapai",
   "session.detail.scoring.cycleScoreSoFar": "Skor kitaran setakat ini",
   "session.detail.scoring.everyKeyResultIsGraded": "Setiap keputusan utama sudah diberi gred. Peringkat ini boleh ditamatkan.",
   "session.detail.scoring.everyKeyResultNeedsAGrade": "Setiap keputusan utama memerlukan gred dan satu baris tentang sebabnya sebelum peringkat ini tamat.",

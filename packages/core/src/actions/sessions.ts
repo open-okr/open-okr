@@ -24,6 +24,7 @@ import {
   decisions,
   digests,
   GOAL_CLOSE_DECISIONS,
+  GOAL_KINDS,
   goals,
   keyResultDependencies,
   keyResults,
@@ -68,12 +69,17 @@ import {
   portfolioVerdictOf,
   progressSignal,
   REVIEW_STAGE_KEYS,
+  type ResolvedThresholds,
   RITUALS,
   type RitualWeekday,
   ROOT_CAUSES,
   rhythmDiagnostic,
   rhythmScore,
   roomPulseRead,
+  SCORE_NOTE_TEXT,
+  scoreNote,
+  TOO_SAFE_TEXT,
+  tooSafePattern,
   WEEKLY_STAGE_KEYS,
   weekStartOf,
 } from "@openokr/method";
@@ -6036,7 +6042,8 @@ export const setRootCause = defineWriteAction({
         tx,
         workspaceId,
         input.sessionId,
-        // Every objective is aspirational until P9-T11b stores the kind.
+        // The aspirational threshold for every key result until P9-T20 asks
+        // root causes by kind.
         thresholds["scoring.rootCauseThreshold"].aspirational,
       );
       const target = missed.find(
@@ -6182,8 +6189,8 @@ export const readRootCauses = defineReadAction({
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, context.workspaceId),
         );
-        // Every objective is aspirational until P9-T11b stores the kind, so
-        // the aspirational threshold is the one the screen states.
+        // The aspirational threshold for every key result, and the one the
+        // screen states, until P9-T20 asks root causes by kind.
         const threshold = thresholds["scoring.rootCauseThreshold"].aspirational;
         const missed = await missedKeyResultsInTx(
           tx,
@@ -7721,7 +7728,8 @@ export const readMinutes = defineReadAction({
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, workspaceId),
         );
-        // Every objective is aspirational until P9-T11b stores the kind.
+        // The aspirational threshold for every key result until P9-T20 asks
+        // root causes by kind.
         const threshold = thresholds["scoring.rootCauseThreshold"].aspirational;
 
         // --- the scored key results, which most of the summary counts ---
@@ -8224,6 +8232,19 @@ export const revealObjectiveScore = defineWriteAction({
   }),
 });
 
+/** §3.3's note on one grade, with the method's sentence for it. */
+function noteFor(
+  score: number | null,
+  kind: "committed" | "aspirational",
+  thresholds: ResolvedThresholds,
+): { key: "explain_miss" | "root_cause"; text: string } | null {
+  if (score === null) {
+    return null;
+  }
+  const key = scoreNote(score, kind, thresholds);
+  return key === "none" ? null : { key, text: SCORE_NOTE_TEXT[key] };
+}
+
 const scoringKeyResult = z.object({
   keyResultId: z.uuid(),
   title: z.string(),
@@ -8235,6 +8256,17 @@ const scoringKeyResult = z.object({
   unit: z.string().nullable(),
   score: z.number().nullable(),
   reason: z.string().nullable(),
+  /** Its objective's kind (METHOD.md §2.8, P9-T11b-b). */
+  kind: z.enum(GOAL_KINDS),
+  /**
+   * §3.3's note on its grade, in the coach's words from `packages/method`:
+   * a committed key result short of 1.0 asks for the explanation of its
+   * miss, and little progress asks for its root cause. Null when ungraded or
+   * when nothing needs saying.
+   */
+  note: z
+    .object({ key: z.enum(["explain_miss", "root_cause"]), text: z.string() })
+    .nullable(),
 });
 
 export const readScoringStatus = defineReadAction({
@@ -8276,10 +8308,26 @@ export const readScoringStatus = defineReadAction({
      * 26 August 2026, and p4-t00-session-design.md §4.3 is corrected to match.
      */
     cycleScore: z.number().nullable(),
-    /** §3.4's verdict on that average. */
+    /**
+     * §3.4's average over the revealed **aspirational** key results, and its
+     * verdict (P9-T11b-b). Committed key results are judged by the share met
+     * instead, because averaging the two hides both. Null with nothing
+     * aspirational revealed.
+     */
+    aspirationalAverage: z.number().nullable(),
     verdict: z
       .enum(["too_safe", "healthy", "partial", "outran_capacity"])
       .nullable(),
+    /** §3.4's committed half: how many revealed committed key results met it. */
+    committed: z
+      .object({ met: z.number().int(), scored: z.number().int() })
+      .nullable(),
+    /**
+     * §3.3's pattern, said out loud at the reveal (§8.3): three quarters or
+     * more of the revealed aspirational key results at 1.0. The method's
+     * sentence, or null.
+     */
+    tooSafe: z.string().nullable(),
     /** Every key result graded. §8.1's completion condition for stage two. */
     complete: z.boolean(),
   }),
@@ -8318,6 +8366,7 @@ export const readScoringStatus = defineReadAction({
             current: keyResults.currentValue,
             unit: keyResults.unit,
             position: keyResults.position,
+            kind: goals.kind,
           })
           .from(keyResults)
           .innerJoin(goals, eq(goals.id, keyResults.goalId))
@@ -8357,6 +8406,11 @@ export const readScoringStatus = defineReadAction({
             },
           ]),
         );
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const kindOf = new Map(rows.map((row) => [row.keyResultId, row.kind]));
 
         // Grouped in the order the rows came back, so the screen reads down the
         // cascade rather than in whatever order Postgres chose.
@@ -8406,6 +8460,8 @@ export const readScoringStatus = defineReadAction({
             unit: row.unit ?? null,
             score: grade?.score ?? null,
             reason: grade?.reason ?? null,
+            kind: row.kind,
+            note: noteFor(grade?.score ?? null, row.kind, thresholds),
           });
         }
 
@@ -8427,29 +8483,50 @@ export const readScoringStatus = defineReadAction({
             : null;
         }
 
-        const { thresholds } = resolveRhythm(
-          await readRhythmRow(tx, context.workspaceId),
-        );
         // §8.6's own words: the §3.4 portfolio average over scored key results.
-        // A plain average over key results, not over objective scores. §3.4
-        // averages the aspirational ones only, and every objective is
-        // aspirational until P9-T11b stores the kind.
+        // A plain average over key results, not over objective scores. It
+        // stays over every kind until P9-T20 moves §8 in; §3.4's verdict
+        // below already reads the aspirational ones alone.
         //
         // Over the revealed rows only, for the reason the output schema gives:
         // a running average that counted unrevealed grades would be the hidden
         // objective score wearing a different label on any review with one
         // objective and even weights.
-        const average = cycleScore(
-          [...byKeyResult.values()]
-            .filter((entry) => entry.revealed)
+        const revealed = [...byKeyResult.entries()]
+          .filter(([, entry]) => entry.revealed)
+          .map(([keyResultId, entry]) => ({
+            score: entry.score,
+            kind: kindOf.get(keyResultId) ?? ("aspirational" as const),
+          }));
+        const average = cycleScore(revealed.map((entry) => entry.score));
+        const aspirationalAverage = cycleScore(
+          revealed
+            .filter((entry) => entry.kind === "aspirational")
             .map((entry) => entry.score),
         );
+        const committedScores = revealed
+          .filter((entry) => entry.kind === "committed")
+          .map((entry) => entry.score);
 
         return {
           objectives,
           cycleScore: average,
+          aspirationalAverage,
           verdict:
-            average === null ? null : portfolioVerdictOf(average, thresholds),
+            aspirationalAverage === null
+              ? null
+              : portfolioVerdictOf(aspirationalAverage, thresholds),
+          committed:
+            committedScores.length === 0
+              ? null
+              : {
+                  met: committedScores.filter(
+                    (score) =>
+                      score >= thresholds["scoring.committedExpectedScore"],
+                  ).length,
+                  scored: committedScores.length,
+                },
+          tooSafe: tooSafePattern(revealed, thresholds) ? TOO_SAFE_TEXT : null,
           complete:
             objectives.length > 0 &&
             objectives.every((entry) => entry.scored === entry.total),

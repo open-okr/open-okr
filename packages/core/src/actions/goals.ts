@@ -2800,7 +2800,7 @@ export const rewriteKeyResult = defineReadAction({
         }
 
         const [goal] = await tx
-          .select({ title: goals.title })
+          .select({ title: goals.title, kind: goals.kind })
           .from(goals)
           .where(activeOnly(goals, eq(goals.id, row.goalId)))
           .limit(1);
@@ -2827,6 +2827,8 @@ export const rewriteKeyResult = defineReadAction({
           indicatorType: row.indicatorType,
           direction: row.direction,
           confidence: row.confidence === null ? null : Number(row.confidence),
+          // KR-6 judges only aspirational key results (P9-T11b-b).
+          ...(goal ? { kind: goal.kind } : {}),
         });
 
         const failingBefore = new Set(

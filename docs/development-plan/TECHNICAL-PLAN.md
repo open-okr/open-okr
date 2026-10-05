@@ -147,7 +147,7 @@ The snapshot is immutable and holds, for every key result at publish time: ident
 | `kpi_records` | `kpi_id`, `period_start date`, `target_value?`, `actual_value?`, `remark?`, `author_member_id` | Unique on `(workspace_id, kpi_id, period_start)`. Periods are normalised per frequency |
 | `kpi_dependencies` | `kpi_id`, `depends_on_kpi_id` | Formula edges. Drives cascade recomputation, cycle-checked |
 | `kpi_shares` | `kpi_id`, `member_id`, `access` (`read` / `update`) | Narrow sharing. Broad scoping uses normal bindings |
-| `performance_snapshots` | `owner_kind` with identifiers, `cycle_id`, `result_value`, bucket counts, `verdict` | Written by the archive job. Never trusted from an import |
+| `performance_snapshots` | `owner_kind` with identifiers, `cycle_id`, `result_value`, bucket counts, `verdict` | Written by the archive job. Never trusted from an import. The verdict reads the aspirational key results alone since P9-T11b-b (METHOD.md §3.4) |
 | `scorecard_settings` / `score_entries` | Points configuration and entries | Off by default. No rows exist unless enabled |
 
 The recovery rule (METHOD.md §6.5) is implemented as an Operation: it creates the recovery goal, links it back through `recovery_goal_id`, stores `recovery_started_pct`, and flips the KPI state to `recovering`. Effective health while recovering is `max(achievement, start + progress × (healthy − start))`.

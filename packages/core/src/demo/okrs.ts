@@ -10,8 +10,10 @@
  *   studio draws more than a fan-out and the cascade has depth to roll up.
  * - Leading and lagging key results side by side on the same objective, which
  *   is what METHOD.md §4.2 asks a set to have.
- * - One key result at `exceeds` capacity, so publish gate 5 is red for a reason
- *   a reader can act on rather than green because nothing was checked.
+ * - One key result at `exceeds` capacity, under the one committed objective,
+ *   so publish gate 5 is red for a reason a reader can act on rather than
+ *   green because nothing was checked. Since P9-T11b-b only committed work
+ *   holds the gate back (METHOD.md §5.5); the other six are aspirational.
  * - One key result reading a KPI instead of a typed value (§10), so the link
  *   between the metric layer and the OKR layer is visible.
  *
@@ -91,6 +93,8 @@ export interface DemoGoal {
   readonly title: string;
   readonly description: string;
   readonly level: "company" | "department" | "team" | "individual";
+  /** METHOD.md §2.8. Left out, the workspace's default: aspirational. */
+  readonly kind?: "committed" | "aspirational";
   readonly ownerKind: "workspace" | "space" | "member";
   readonly spaceKey?: SpaceKey;
   readonly memberKey?: CastKey;
@@ -180,6 +184,9 @@ export const GOALS: readonly DemoGoal[] = [
     description:
       "Support cost per account has grown faster than revenue per account for three quarters. Adding people would hide the cause. This objective takes the cause out of the product.",
     level: "company",
+    // The board's promise this quarter, so the over-capacity key result
+    // below holds publish gate 5 back (METHOD.md §5.5).
+    kind: "committed",
     ownerKind: "workspace",
     championKey: "admin",
     reviewerKey: "priya",

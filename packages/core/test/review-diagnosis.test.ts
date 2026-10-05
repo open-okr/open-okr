@@ -210,7 +210,8 @@ describe("the root-cause list", () => {
   });
 
   it("lists every key result below the threshold and nothing above it", async () => {
-    // Every objective is aspirational until P9-T11b stores the kind.
+    // The aspirational threshold for every key result until P9-T20 asks root
+    // causes by kind.
     const threshold =
       resolveThresholds()["scoring.rootCauseThreshold"].aspirational;
     expect(threshold).toBe(0.6);

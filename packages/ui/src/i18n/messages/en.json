@@ -2979,6 +2979,8 @@
   "session.detail.rootCause.rootCause": "Root cause",
   "session.detail.rootCause.theSystemNotThe": "The system, not the person",
   "session.detail.saving": "Saving…",
+  "session.detail.scoring.aspirationalAverage": "Aspirational average {average}",
+  "session.detail.scoring.committedMet": "Committed: {met} of {scored} met",
   "session.detail.scoring.cycleScoreSoFar": "Cycle score so far",
   "session.detail.scoring.everyKeyResultIsGraded": "Every key result is graded. The stage can end.",
   "session.detail.scoring.everyKeyResultNeedsAGrade": "Every key result needs a grade and one line on why before the stage ends.",

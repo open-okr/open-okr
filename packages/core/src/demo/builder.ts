@@ -636,6 +636,7 @@ async function createOkrs(
       description: richTextFromPlainText(goal.description),
       cycleId,
       level: goal.level,
+      ...(goal.kind ? { kind: goal.kind } : {}),
       ownerKind: goal.ownerKind,
       ...(spaceId ? { spaceId } : {}),
       ...(memberId ? { memberId } : {}),
