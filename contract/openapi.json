@@ -31315,6 +31315,12 @@
                                   "aspirational"
                                 ]
                               },
+                              "addedMidCycleAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "ownerKind": {
                                 "type": "string",
                                 "enum": [
@@ -31538,6 +31544,12 @@
                                         "null"
                                       ]
                                     },
+                                    "addedMidCycleAt": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
                                     "direction": {
                                       "type": "string",
                                       "enum": [
@@ -31643,6 +31655,7 @@
                                     "unit",
                                     "kind",
                                     "doneAt",
+                                    "addedMidCycleAt",
                                     "direction",
                                     "indicatorType",
                                     "baselineValue",
@@ -31720,6 +31733,7 @@
                               "timeframe",
                               "level",
                               "kind",
+                              "addedMidCycleAt",
                               "ownerKind",
                               "spaceId",
                               "memberId",
@@ -31999,6 +32013,12 @@
                             "aspirational"
                           ]
                         },
+                        "addedMidCycleAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "ownerKind": {
                           "type": "string",
                           "enum": [
@@ -32222,6 +32242,12 @@
                                   "null"
                                 ]
                               },
+                              "addedMidCycleAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "direction": {
                                 "type": "string",
                                 "enum": [
@@ -32327,6 +32353,7 @@
                               "unit",
                               "kind",
                               "doneAt",
+                              "addedMidCycleAt",
                               "direction",
                               "indicatorType",
                               "baselineValue",
@@ -32404,6 +32431,7 @@
                         "timeframe",
                         "level",
                         "kind",
+                        "addedMidCycleAt",
                         "ownerKind",
                         "spaceId",
                         "memberId",
@@ -32686,6 +32714,11 @@
                   },
                   "guided": {
                     "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
                   }
                 },
                 "required": [
@@ -33755,6 +33788,11 @@
                   },
                   "guided": {
                     "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
                   }
                 },
                 "required": [
@@ -33995,6 +34033,9 @@
                             },
                             "endsOn": {
                               "type": "string"
+                            },
+                            "midCycle": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -34002,7 +34043,8 @@
                             "name",
                             "mode",
                             "startsOn",
-                            "endsOn"
+                            "endsOn",
+                            "midCycle"
                           ],
                           "additionalProperties": false
                         },
@@ -34045,6 +34087,12 @@
                                 "enum": [
                                   "committed",
                                   "aspirational"
+                                ]
+                              },
+                              "addedMidCycleAt": {
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "spaceId": {
@@ -34240,6 +34288,12 @@
                                         "null"
                                       ]
                                     },
+                                    "addedMidCycleAt": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
                                     "direction": {
                                       "type": "string",
                                       "enum": [
@@ -34339,6 +34393,7 @@
                                     "unit",
                                     "kind",
                                     "doneAt",
+                                    "addedMidCycleAt",
                                     "direction",
                                     "indicatorType",
                                     "baselineValue",
@@ -34363,6 +34418,7 @@
                               "cycleId",
                               "level",
                               "kind",
+                              "addedMidCycleAt",
                               "spaceId",
                               "champion",
                               "reviewer",
@@ -34838,6 +34894,12 @@
                                 "aspirational"
                               ]
                             },
+                            "addedMidCycleAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "spaceId": {
                               "anyOf": [
                                 {
@@ -35031,6 +35093,12 @@
                                       "null"
                                     ]
                                   },
+                                  "addedMidCycleAt": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
                                   "direction": {
                                     "type": "string",
                                     "enum": [
@@ -35130,6 +35198,7 @@
                                   "unit",
                                   "kind",
                                   "doneAt",
+                                  "addedMidCycleAt",
                                   "direction",
                                   "indicatorType",
                                   "baselineValue",
@@ -35154,6 +35223,7 @@
                             "cycleId",
                             "level",
                             "kind",
+                            "addedMidCycleAt",
                             "spaceId",
                             "champion",
                             "reviewer",
@@ -35308,6 +35378,12 @@
                                 "aspirational"
                               ]
                             },
+                            "addedMidCycleAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "spaceId": {
                               "anyOf": [
                                 {
@@ -35501,6 +35577,12 @@
                                       "null"
                                     ]
                                   },
+                                  "addedMidCycleAt": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
                                   "direction": {
                                     "type": "string",
                                     "enum": [
@@ -35600,6 +35682,7 @@
                                   "unit",
                                   "kind",
                                   "doneAt",
+                                  "addedMidCycleAt",
                                   "direction",
                                   "indicatorType",
                                   "baselineValue",
@@ -35624,6 +35707,7 @@
                             "cycleId",
                             "level",
                             "kind",
+                            "addedMidCycleAt",
                             "spaceId",
                             "champion",
                             "reviewer",
@@ -35810,6 +35894,12 @@
                                 "aspirational"
                               ]
                             },
+                            "addedMidCycleAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "spaceId": {
                               "anyOf": [
                                 {
@@ -36003,6 +36093,12 @@
                                       "null"
                                     ]
                                   },
+                                  "addedMidCycleAt": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
                                   "direction": {
                                     "type": "string",
                                     "enum": [
@@ -36102,6 +36198,7 @@
                                   "unit",
                                   "kind",
                                   "doneAt",
+                                  "addedMidCycleAt",
                                   "direction",
                                   "indicatorType",
                                   "baselineValue",
@@ -36126,6 +36223,7 @@
                             "cycleId",
                             "level",
                             "kind",
+                            "addedMidCycleAt",
                             "spaceId",
                             "champion",
                             "reviewer",
@@ -36345,6 +36443,12 @@
                                 "aspirational"
                               ]
                             },
+                            "addedMidCycleAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "spaceId": {
                               "anyOf": [
                                 {
@@ -36538,6 +36642,12 @@
                                       "null"
                                     ]
                                   },
+                                  "addedMidCycleAt": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
                                   "direction": {
                                     "type": "string",
                                     "enum": [
@@ -36637,6 +36747,7 @@
                                   "unit",
                                   "kind",
                                   "doneAt",
+                                  "addedMidCycleAt",
                                   "direction",
                                   "indicatorType",
                                   "baselineValue",
@@ -36661,6 +36772,7 @@
                             "cycleId",
                             "level",
                             "kind",
+                            "addedMidCycleAt",
                             "spaceId",
                             "champion",
                             "reviewer",
@@ -36836,6 +36948,12 @@
                                 "aspirational"
                               ]
                             },
+                            "addedMidCycleAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "spaceId": {
                               "anyOf": [
                                 {
@@ -37029,6 +37147,12 @@
                                       "null"
                                     ]
                                   },
+                                  "addedMidCycleAt": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
                                   "direction": {
                                     "type": "string",
                                     "enum": [
@@ -37128,6 +37252,7 @@
                                   "unit",
                                   "kind",
                                   "doneAt",
+                                  "addedMidCycleAt",
                                   "direction",
                                   "indicatorType",
                                   "baselineValue",
@@ -37152,6 +37277,7 @@
                             "cycleId",
                             "level",
                             "kind",
+                            "addedMidCycleAt",
                             "spaceId",
                             "champion",
                             "reviewer",
@@ -37431,6 +37557,12 @@
                                 "aspirational"
                               ]
                             },
+                            "addedMidCycleAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "spaceId": {
                               "anyOf": [
                                 {
@@ -37624,6 +37756,12 @@
                                       "null"
                                     ]
                                   },
+                                  "addedMidCycleAt": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
                                   "direction": {
                                     "type": "string",
                                     "enum": [
@@ -37723,6 +37861,7 @@
                                   "unit",
                                   "kind",
                                   "doneAt",
+                                  "addedMidCycleAt",
                                   "direction",
                                   "indicatorType",
                                   "baselineValue",
@@ -37747,6 +37886,7 @@
                             "cycleId",
                             "level",
                             "kind",
+                            "addedMidCycleAt",
                             "spaceId",
                             "champion",
                             "reviewer",
@@ -55275,6 +55415,12 @@
                               "revealed": {
                                 "type": "boolean"
                               },
+                              "addedMidCycleAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "scored": {
                                 "type": "number"
                               },
@@ -55390,6 +55536,7 @@
                               "goalTitle",
                               "score",
                               "revealed",
+                              "addedMidCycleAt",
                               "scored",
                               "total",
                               "keyResults"
@@ -56183,6 +56330,51 @@
                             "additionalProperties": false
                           }
                         },
+                        "additions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "goalId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "goalTitle": {
+                                "type": "string"
+                              },
+                              "keyResultId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "keyResultTitle": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "addedAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "goalId",
+                              "goalTitle",
+                              "keyResultId",
+                              "keyResultTitle",
+                              "addedAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
                         "dependencies": {
                           "type": "array",
                           "items": {
@@ -56324,6 +56516,7 @@
                         "shifts",
                         "trends",
                         "untrended",
+                        "additions",
                         "dependencies",
                         "decisions"
                       ],

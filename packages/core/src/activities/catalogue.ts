@@ -323,7 +323,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // Goals and key results (P3-T04). A goal's title is snapshotted for the same
   // reason a member's name is: "closed Raise activation" has to keep reading that
   // way after the goal is renamed or erased.
-  "goal.created": z.object({ title: z.string(), level: z.string() }),
+  "goal.created": z.object({
+    title: z.string(),
+    level: z.string(),
+    // Started mid-cycle, and why, where it was (P9-T13-a, METHOD.md §2.9).
+    addedMidCycle: z.boolean().optional(),
+    reason: z.string().nullable().optional(),
+  }),
   "goal.updated": z.object({ title: z.string() }),
   "goal.closed": z.object({
     successStatus: z.enum(["achieved", "missed"]),
@@ -397,7 +403,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "task.checklist_changed": z.object({ change: z.string() }),
   "task.deleted": z.object({ title: z.string() }),
   "task.restored": z.object({ title: z.string() }),
-  "key_result.created": z.object({ title: z.string() }),
+  "key_result.created": z.object({
+    title: z.string(),
+    // Started mid-cycle, and why, where it was (P9-T13-a, METHOD.md §2.9).
+    addedMidCycle: z.boolean().optional(),
+    reason: z.string().nullable().optional(),
+  }),
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
   "key_result.removed": z.object({ title: z.string() }),

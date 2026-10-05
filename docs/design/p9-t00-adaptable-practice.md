@@ -222,7 +222,9 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T12b | Kinds of key result in the data | §3.1's last paragraph, with the roll-up setting's consumer | None |
 | P9-T12c-a | Kinds of key result on screen | None of its own | None |
 | P9-T12c-b | Kinds of key result in the importers | None of its own | None |
-| P9-T13 | Changing OKRs mid-cycle: the added-mid-cycle mark, live or draft creation, stop with a reason, annual revisions, calibration retired. Builds on the target history and reason rule P9-T06 introduces | §2.1, §2.9 (the four moves, live or draft, changing a target), §7.6 | The four calibration sentences |
+| P9-T13-a | Adding OKRs mid-cycle | §2.9's four moves | None (behaviour) |
+| P9-T13-b | Live or draft | §2.9's live or draft | None (behaviour) |
+| P9-T13-c | Stopping, and targets that move | §2.1, §2.9's changing a target, §7.6 | The four calibration sentences |
 | P9-T13a | Moving an objective to another space (G-1) | §2.9's "When the organisation changes" | None (behaviour) |
 | P9-T14 | Adjustable scores and cycles that keep their rules | §3.3, §12 snapshot paragraph | Score band values |
 | P9-T15 | A progress signal that knows the date | §3.5, §3.6, §3.7 | "Progress signal pace gaps", "Trend forecast minimum values", "Divergence window" |
@@ -234,6 +236,10 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T20 | The quarterly review, re-timed, and the annual review | §8 | Review stages and purposes; root causes; close decisions and meanings; rhythm diagnostic; "Diagnostic rhythm threshold"; retire "Diagnostic rhythm-score threshold" |
 | P9-T21 | The coach's voice, and METHOD.md fully landed | The preamble and terms, §1, §9, §10, §11 framing, §13 | Trigger catalogue (AI-NATIVE-PLAN.md §6.4) and the P4-T00 coach watch list; deletes `p9-t00-method-v2.md` and METHOD.md's banner |
 | P9-T22 | Release 0.2.0 and the demo story, placeable at any date of the Northwind year (G-4) | none | None |
+
+**Two questions the build raised, for a human to answer** (5 October 2026):
+- **An OKR written into a set still unpublished after its window** (P9-T13-a). §2.9 says what is created before the team publication window closes is the plan; it does not say what an OKR written after it, into a set nobody has published, is. The build reads it as the plan, late, unmarked and facing the publish gates, because there is no plan yet to add to. If it should be marked instead, `isMidCycleAddition` drops its second condition.
+- **Gap G-5: a dependency that knows the key result providing it** (P9-T12c-a). NW-Q1-20 wants a dependency shown as delivered once the milestone behind it is done, and the register records the providing space, not a key result. Unplanned until somebody places it.
 
 **The gaps the Northwind year found joined the plan at P9-T01**, as Akmal agreed on 2 October 2026: G-1 is P9-T13a, G-2 joins P9-T19b, G-3 is the level picker in P9-T07a and the levels in the alignment score in P9-T16, and G-4 extends P9-T22.
 

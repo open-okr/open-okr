@@ -171,6 +171,8 @@ export const goals = pgTable("goals", {
   qualityScore: smallint("quality_score"),
   qualityFlags: jsonb("quality_flags").$type<string[]>().notNull().default([]),
   aiGenerated: boolean("ai_generated").notNull().default(false),
+  /** When it was started mid-cycle (METHOD.md §2.9); null is the plan. */
+  addedMidCycleAt: timestamp("added_mid_cycle_at", { withTimezone: true }),
   position: integer("position").notNull().default(0),
   legacyType: text("legacy_type"),
   legacyId: text("legacy_id"),
@@ -214,6 +216,8 @@ export const keyResults = pgTable("key_results", {
   carryForward: boolean("carry_forward").notNull().default(false),
   qualityFlags: jsonb("quality_flags").$type<string[]>().notNull().default([]),
   position: integer("position").notNull().default(0),
+  /** When it was started mid-cycle (METHOD.md §2.9); null is the plan. */
+  addedMidCycleAt: timestamp("added_mid_cycle_at", { withTimezone: true }),
   legacyType: text("legacy_type"),
   legacyId: text("legacy_id"),
   createdAt: timestamp("created_at", { withTimezone: true })

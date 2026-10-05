@@ -50,7 +50,11 @@ import {
   requireActiveMember,
 } from "../goals/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
-import { policyDecisionInTx, requirePolicy } from "../practice/policy.ts";
+import {
+  midCycleInTx,
+  policyDecisionInTx,
+  requirePolicy,
+} from "../practice/policy.ts";
 import {
   recomputeGoalQualityInTx,
   recomputeUnitQualityInTx,
@@ -75,6 +79,8 @@ const treeKeyResult = z.object({
   kind: z.enum(KEY_RESULT_KINDS),
   /** When a milestone was done or a baseline recorded, or null. */
   doneAt: z.string().nullable(),
+  /** When it was started mid-cycle (§2.9, P9-T13-a), or null for the plan. */
+  addedMidCycleAt: z.string().nullable(),
   direction: z.enum(KEY_RESULT_DIRECTIONS),
   /** What KR-4 and KR-5 judge, so a screen can coach as the server does. */
   indicatorType: z.enum(INDICATOR_TYPES),
@@ -98,6 +104,8 @@ export const treeGoal = z.object({
   level: z.enum(GOAL_LEVELS),
   /** Committed or aspirational (METHOD.md §2.8, P9-T11b-a). */
   kind: z.enum(GOAL_KINDS),
+  /** When it was started mid-cycle (§2.9, P9-T13-a), or null for the plan. */
+  addedMidCycleAt: z.string().nullable(),
   spaceId: z.uuid().nullable(),
   champion: person,
   reviewer: person.nullable(),
@@ -187,6 +195,7 @@ const GOAL_COLUMNS = {
   cycleId: goals.cycleId,
   level: goals.level,
   kind: goals.kind,
+  addedMidCycleAt: goals.addedMidCycleAt,
   spaceId: goals.spaceId,
   championId: goals.championId,
   reviewerId: goals.reviewerId,
@@ -210,6 +219,7 @@ const KEY_RESULT_COLUMNS = {
   unit: keyResults.unit,
   kind: keyResults.kind,
   doneAt: keyResults.doneAt,
+  addedMidCycleAt: keyResults.addedMidCycleAt,
   direction: keyResults.direction,
   indicatorType: keyResults.indicatorType,
   baselineValue: keyResults.baselineValue,
@@ -239,6 +249,7 @@ async function treeNodes(
     readonly cycleId: string | null;
     readonly level: (typeof GOAL_LEVELS)[number];
     readonly kind: (typeof GOAL_KINDS)[number];
+    readonly addedMidCycleAt: Date | null;
     readonly spaceId: string | null;
     readonly championId: string;
     readonly reviewerId: string | null;
@@ -290,6 +301,9 @@ async function treeNodes(
     cycleId: row.cycleId,
     level: row.level,
     kind: row.kind,
+    addedMidCycleAt: row.addedMidCycleAt
+      ? new Date(row.addedMidCycleAt).toISOString()
+      : null,
     spaceId: row.spaceId,
     champion: named(row.championId),
     reviewer: row.reviewerId ? named(row.reviewerId) : null,
@@ -314,6 +328,9 @@ async function treeNodes(
       unit: child.unit,
       kind: child.kind,
       doneAt: child.doneAt ? new Date(child.doneAt).toISOString() : null,
+      addedMidCycleAt: child.addedMidCycleAt
+        ? new Date(child.addedMidCycleAt).toISOString()
+        : null,
       direction: child.direction,
       indicatorType: child.indicatorType,
       baselineValue: asNumber(child.baselineValue) ?? 0,
@@ -378,6 +395,12 @@ export const readGoalTree = defineReadAction({
       mode: z.string(),
       startsOn: z.string(),
       endsOn: z.string(),
+      /**
+       * Whether what is added now is started mid-cycle (METHOD.md §2.9,
+       * P9-T13-a), so a screen can ask why before the write rather than be
+       * refused after it.
+       */
+      midCycle: z.boolean(),
     }),
     goals: z.array(treeGoal),
     context: z.array(contextGoal),
@@ -575,7 +598,10 @@ export const readGoalTree = defineReadAction({
         const seenDependency = new Set<string>();
 
         return {
-          cycle,
+          cycle: {
+            ...cycle,
+            midCycle: await midCycleInTx(tx, workspaceId, cycle.id),
+          },
           goals: nodes,
           context: parents.map((row) => ({
             id: row.id,
@@ -640,6 +666,10 @@ export const readCreationPolicy = defineReadAction({
         const decision = await policyDecisionInTx(tx, context.workspaceId, {
           kind: "objective.create",
           cycleId: input.cycleId,
+          // A reason for adding mid-cycle is something the screen asks for
+          // beside the title (P9-T13-a), not a hold on writing, so this read
+          // answers as though it will be given; the write asks again.
+          hasReason: true,
         });
         return {
           allowed: decision.outcome === "allow",

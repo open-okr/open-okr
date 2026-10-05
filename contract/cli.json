@@ -6303,6 +6303,12 @@
           "field": "guided",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -6681,6 +6687,12 @@
           "name": "guided",
           "field": "guided",
           "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
           "required": false
         }
       ],

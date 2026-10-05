@@ -29,6 +29,7 @@ import {
 import { addKeyResult, addObjective } from "./editor-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
+  AddedMidCycle,
   DoneToggle,
   InlineDate,
   InlineNumber,
@@ -286,6 +287,11 @@ function LiveOkrTable({
   useOkrLive(cycleId);
   const okr = useOkrMutation({ cycleId, scope });
   const drawer = useDrawerAddress();
+  // §2.9: once the plan is set, an addition says why where the workspace
+  // asks it to, before the write rather than after a refusal.
+  const reasonSetting = coach.practice["reasons.midCycleAddition"];
+  const askReason =
+    tree?.cycle.midCycle && reasonSetting !== "off" ? reasonSetting : null;
   // Any change still on its way to the server. Said on the list itself, so
   // a screen reader hears that a save is under way, and so a test can wait
   // for the server rather than for the row, which moves before it answers.
@@ -505,13 +511,15 @@ function LiveOkrTable({
                       // An objective just added opens with one key result
                       // draft under it (design §4.3).
                       initiallyOpen={draftUnder === goal.id}
-                      onAdd={(title) =>
+                      askReason={askReason}
+                      onAdd={(title, reason) =>
                         add(() =>
                           addKeyResult({
                             goalId: goal.id,
                             title,
                             ownerId: goal.champion.id,
                             dueOn: tree.cycle.endsOn,
+                            ...(reason ? { reason } : {}),
                           }),
                         )
                       }
@@ -529,12 +537,14 @@ function LiveOkrTable({
             placeholder={t("goals.editor.objectivePlaceholder")}
             disabled={pending}
             refusal={refusal}
-            onAdd={(title) =>
+            askReason={askReason}
+            onAdd={(title, reason) =>
               add(async () => {
                 const created = await addObjective({
                   cycleId,
                   level,
                   title,
+                  ...(reason ? { reason } : {}),
                 });
                 if (created.id) {
                   setDraftUnder(created.id);
@@ -672,6 +682,7 @@ function ObjectiveRow({
               readOnly={!canEdit || goal.closedAt !== null}
               onSave={cells.saveKind}
             />
+            <AddedMidCycle at={goal.addedMidCycleAt} />
             <span className="flex items-center gap-1">
               {t("okrList.champion")}
               <MemberPicker
@@ -784,6 +795,7 @@ function KeyResultRow({
               readOnly={!canEdit || fromKpi}
               onSave={cells.saveKind}
             />
+            <AddedMidCycle at={keyResult.addedMidCycleAt} />
             <span className="flex items-center gap-1">
               {t("okrList.owner")}
               <MemberPicker
@@ -1086,6 +1098,7 @@ function AddRow({
   indented,
   initiallyOpen,
   refusal,
+  askReason,
   onAdd,
 }: {
   readonly label: string;
@@ -1096,12 +1109,19 @@ function AddRow({
   readonly initiallyOpen?: boolean;
   /** Where the workspace holds writing back, the reason instead of a field. */
   readonly refusal?: WritingRefusal | null;
+  /**
+   * Whether what is added now is started mid-cycle and the workspace asks
+   * why (METHOD.md §2.9, P9-T13-a): a second line, which a required reason
+   * must fill before Save.
+   */
+  readonly askReason?: "optional" | "required" | null;
   /** Resolves to the server's refusal, or null once it is saved. */
-  readonly onAdd: (title: string) => Promise<string | null>;
+  readonly onAdd: (title: string, reason?: string) => Promise<string | null>;
 }) {
   const { t } = useTranslations();
   const [open, setOpen] = useState(initiallyOpen === true);
   const [title, setTitle] = useState("");
+  const [reason, setReason] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -1109,17 +1129,22 @@ function AddRow({
 
   const close = () => {
     setTitle("");
+    setReason("");
     setProblem(null);
     setOpen(false);
   };
 
+  const needsReason = askReason === "required" && reason.trim() === "";
   const commit = async () => {
     const wanted = title.trim();
-    if (wanted === "" || saving) {
+    if (wanted === "" || saving || needsReason) {
       return;
     }
     setSaving(true);
-    const refused = await onAdd(wanted);
+    const refused = await onAdd(
+      wanted,
+      askReason && reason.trim() !== "" ? reason.trim() : undefined,
+    );
     setSaving(false);
     if (refused) {
       setProblem(refused);
@@ -1184,7 +1209,7 @@ function AddRow({
         <Button
           type="button"
           size="sm"
-          disabled={disabled || saving || title.trim() === ""}
+          disabled={disabled || saving || title.trim() === "" || needsReason}
           onClick={() => void commit()}
         >
           {t("common.save")}
@@ -1193,6 +1218,29 @@ function AddRow({
           {t("common.cancel")}
         </Button>
       </div>
+      {askReason ? (
+        // §2.9: after the plan is set, a start says why it starts now.
+        <input
+          value={reason}
+          aria-label={
+            askReason === "required"
+              ? t("midCycle.whyNowRequired")
+              : t("midCycle.whyNowOptional")
+          }
+          placeholder={t("midCycle.whyNowPlaceholder")}
+          disabled={saving}
+          onChange={(event) => setReason(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              void commit();
+            }
+            if (event.key === "Escape") {
+              close();
+            }
+          }}
+          className="min-w-0 rounded-control border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-brand"
+        />
+      ) : null}
       {problem ? (
         <span role="alert" className="text-xs text-bad">
           {problem}

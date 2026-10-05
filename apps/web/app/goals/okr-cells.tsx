@@ -474,6 +474,26 @@ export function KeyResultKindPicker({
 }
 
 /**
+ * The added-mid-cycle mark (METHOD.md §2.9, P9-T13-a): a start after the plan
+ * was set, with the day it started, so the list and the close can tell an
+ * addition from the plan. Nothing at all for the plan itself.
+ */
+export function AddedMidCycle({ at }: { readonly at: string | null }) {
+  const { t } = useTranslations();
+  if (at === null) {
+    return null;
+  }
+  return (
+    <Chip
+      className="h-4.5 bg-info-bg text-[11px] text-info"
+      data-testid="added-mid-cycle"
+    >
+      {t("midCycle.addedOn", { date: at.slice(0, 10) })}
+    </Chip>
+  );
+}
+
+/**
  * A milestone's one question: done or not done (METHOD.md §2.10). A real
  * checkbox, so the keyboard and a screen reader meet it as what it is.
  */

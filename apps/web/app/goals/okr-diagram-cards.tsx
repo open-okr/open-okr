@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
+  AddedMidCycle,
   DoneToggle,
   InlineNumber,
   InlineText,
@@ -150,6 +151,7 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
             floating
             onSave={cells.saveKind}
           />
+          <AddedMidCycle at={goal.addedMidCycleAt} />
         </span>
         {editing ? (
           <TitleEditor

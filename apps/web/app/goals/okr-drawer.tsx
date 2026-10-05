@@ -28,6 +28,7 @@ import {
 import { unlinkGoals } from "./alignment-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
+  AddedMidCycle,
   DoneToggle,
   InlineDate,
   InlineNumber,
@@ -325,6 +326,7 @@ function DrawerBody({
             onSave={objective.saveTitle}
           />
           <VerdictChips verdicts={objective.verdicts} />
+          <AddedMidCycle at={goal.addedMidCycleAt} />
           <div className="flex items-center gap-2">
             <Bar
               value={goal.progressPct}
@@ -597,6 +599,7 @@ function DrawerKeyResult({
         onSave={(next) => cells.patch({ title: next }, { title })}
       />
       <VerdictChips verdicts={cells.verdicts} />
+      <AddedMidCycle at={keyResult.addedMidCycleAt} />
       <div className="flex items-center gap-2">
         <Bar
           value={keyResult.progressPct}

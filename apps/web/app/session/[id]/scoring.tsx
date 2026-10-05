@@ -53,6 +53,8 @@ interface ScoringKeyResult {
 
 interface ScoringObjective {
   readonly goalId: string;
+  /** When it was started mid-cycle, or null for the plan (P9-T13-a). */
+  readonly addedMidCycleAt: string | null;
   /** Null until the room reveals it (§8.3). */
   readonly score: number | null;
   readonly goalTitle: string;
@@ -353,6 +355,15 @@ export function Scoring({
               <h2 className="flex-1 text-sm font-bold text-ink">
                 {objective.goalTitle}
               </h2>
+              {/* §2.9: an addition is evidence the close reads, not a
+                  failure, so it says when it started. */}
+              {objective.addedMidCycleAt ? (
+                <Chip tone="info" data-testid="added-mid-cycle">
+                  {t("midCycle.addedOn", {
+                    date: objective.addedMidCycleAt.slice(0, 10),
+                  })}
+                </Chip>
+              ) : null}
               <Chip
                 tone={objective.scored === objective.total ? "ok" : "neutral"}
               >

@@ -79,6 +79,15 @@ export interface MonthlyDecision {
   readonly keyResultTitle: string | null;
 }
 
+/** One start mid-cycle in the review's scope (METHOD.md §2.9, P9-T13-a). */
+export interface MonthlyAddition {
+  readonly goalId: string;
+  readonly goalTitle: string;
+  readonly keyResultId: string | null;
+  readonly keyResultTitle: string | null;
+  readonly addedAt: string;
+}
+
 export interface DecisionSubject {
   readonly kind: "goal" | "keyResult";
   readonly id: string;
@@ -90,6 +99,7 @@ export function MonthlyReview({
   shifts,
   trends,
   untrended,
+  additions,
   dependencies,
   decisions,
   subjects,
@@ -99,6 +109,8 @@ export function MonthlyReview({
   readonly shifts: string | null;
   readonly trends: readonly MonthlyTrend[];
   readonly untrended: readonly MonthlyUntrended[];
+  /** What was started mid-cycle, read beside the decisions that made it. */
+  readonly additions: readonly MonthlyAddition[];
   readonly dependencies: readonly MonthlyDependency[];
   readonly decisions: readonly MonthlyDecision[];
   readonly subjects: readonly DecisionSubject[];
@@ -288,6 +300,36 @@ export function MonthlyReview({
           ) : null}
         </CardBody>
       </Card>
+
+      {additions.length > 0 ? (
+        // §2.9: starts are evidence the review reads, beside the decisions
+        // that made them, not a failure it hides.
+        <Card data-testid="mid-cycle-additions">
+          <CardHeader>{t("midCycle.added")}</CardHeader>
+          <CardBody>
+            <ul className="flex flex-col gap-1.5">
+              {additions.map((addition) => (
+                <li
+                  key={addition.keyResultId ?? addition.goalId}
+                  className="flex flex-wrap items-center gap-2 text-sm text-ink"
+                >
+                  <span>{addition.keyResultTitle ?? addition.goalTitle}</span>
+                  {addition.keyResultTitle ? (
+                    <span className="text-xs text-ink-3">
+                      {addition.goalTitle}
+                    </span>
+                  ) : null}
+                  <Chip tone="info">
+                    {t("midCycle.addedOn", {
+                      date: addition.addedAt.slice(0, 10),
+                    })}
+                  </Chip>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>{t("common.decisions")}</CardHeader>

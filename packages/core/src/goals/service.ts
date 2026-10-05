@@ -111,6 +111,8 @@ export interface CreateGoalInput {
   /** True when a model wrote the words (P4-T15a). */
   readonly aiGenerated?: boolean;
   readonly position?: number;
+  /** When it was started mid-cycle (METHOD.md §2.9, P9-T13-a). */
+  readonly addedMidCycleAt?: Date | null;
   /**
    * The source-system identity, when an import created this row (P6-T01a).
    *
@@ -278,6 +280,9 @@ export async function createGoalInTx<
       timeframe: input.timeframe ?? null,
       level: input.level,
       ...(input.kind === undefined ? {} : { kind: input.kind }),
+      ...(input.addedMidCycleAt
+        ? { addedMidCycleAt: input.addedMidCycleAt }
+        : {}),
       ownerKind: input.ownerKind,
       spaceId,
       memberId: input.ownerKind === "member" ? (input.memberId ?? null) : null,
@@ -653,6 +658,8 @@ export interface CreateKeyResultInput {
   readonly kpiId?: string | null;
   readonly capacity?: CapacityVerdict | null;
   readonly authorMemberId?: string | null;
+  /** When it was started mid-cycle (METHOD.md §2.9, P9-T13-a). */
+  readonly addedMidCycleAt?: Date | null;
   /** The source-system identity, when an import created this row (P6-T01a). */
   readonly legacy?: LegacyKey;
 }
@@ -706,6 +713,9 @@ export async function createKeyResultInTx<
       title,
       unit: input.unit?.trim() || null,
       ...(input.kind === undefined ? {} : { kind: input.kind }),
+      ...(input.addedMidCycleAt
+        ? { addedMidCycleAt: input.addedMidCycleAt }
+        : {}),
       direction: input.direction,
       indicatorType: input.indicatorType,
       baselineValue: String(input.baselineValue),

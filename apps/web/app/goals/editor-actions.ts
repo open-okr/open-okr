@@ -82,6 +82,8 @@ export async function addObjective(input: {
   parentGoalId?: string;
   /** Committed or aspirational; left out, the workspace's default (§2.8). */
   kind?: "committed" | "aspirational";
+  /** Why it starts now, when added mid-cycle (METHOD.md §2.9). */
+  reason?: string;
 }): Promise<CreatedResult> {
   const memberId = await actingMemberId();
   try {
@@ -95,6 +97,7 @@ export async function addObjective(input: {
       weight: 1,
       ...(input.parentGoalId ? { parentGoalId: input.parentGoalId } : {}),
       ...(input.kind ? { kind: input.kind } : {}),
+      ...(input.reason ? { reason: input.reason } : {}),
     });
     refresh();
     return { error: null, id: created.id };
@@ -122,6 +125,8 @@ export async function addKeyResult(input: {
    */
   ownerId?: string;
   dueOn?: string;
+  /** Why it starts now, when added mid-cycle (METHOD.md §2.9). */
+  reason?: string;
 }): Promise<CreatedResult> {
   try {
     const created = await callAction(await context(), "goals.addKeyResult", {
@@ -134,6 +139,7 @@ export async function addKeyResult(input: {
       weight: 1,
       ...(input.ownerId ? { ownerId: input.ownerId } : {}),
       ...(input.dueOn ? { dueOn: input.dueOn } : {}),
+      ...(input.reason ? { reason: input.reason } : {}),
     });
     refresh();
     return { error: null, id: created.id };

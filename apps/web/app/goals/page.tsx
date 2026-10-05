@@ -441,6 +441,14 @@ export default async function GoalsPage({
                   defaultKind={defaultOkrKind(
                     practiceRead.practice as ResolvedPractice,
                   )}
+                  askReason={
+                    okrTree?.cycle.midCycle &&
+                    practiceRead.practice["reasons.midCycleAddition"] !== "off"
+                      ? (practiceRead.practice["reasons.midCycleAddition"] as
+                          | "optional"
+                          | "required")
+                      : null
+                  }
                 />
               ) : null}
               {/* Check in's door now that it has left the sidebar

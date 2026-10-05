@@ -32,6 +32,7 @@ export function NewObjectiveButton({
   initiallyOpen,
   kinds,
   defaultKind,
+  askReason,
 }: {
   readonly cycleId: string;
   readonly level: GoalLevel;
@@ -49,6 +50,11 @@ export function NewObjectiveButton({
    */
   readonly kinds: readonly OkrKind[];
   readonly defaultKind: OkrKind;
+  /**
+   * Whether an objective added now is started mid-cycle and the workspace
+   * asks why (METHOD.md §2.9, P9-T13-a).
+   */
+  readonly askReason?: "optional" | "required" | null;
 }) {
   const { t } = useTranslations();
   const router = useRouter();
@@ -56,11 +62,13 @@ export function NewObjectiveButton({
   const [open, setOpen] = useState(initiallyOpen === true);
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<OkrKind>(defaultKind);
+  const [reason, setReason] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  const needsReason = askReason === "required" && reason.trim() === "";
 
   const save = () => {
     const wanted = title.trim();
-    if (wanted === "") {
+    if (wanted === "" || needsReason) {
       return;
     }
     setProblem(null);
@@ -70,6 +78,7 @@ export function NewObjectiveButton({
         level,
         title: wanted,
         ...(kinds.length > 1 ? { kind } : {}),
+        ...(askReason && reason.trim() !== "" ? { reason: reason.trim() } : {}),
       });
       if (created.error) {
         setProblem(created.error);
@@ -133,7 +142,7 @@ export function NewObjectiveButton({
         <Button
           type="button"
           variant="primary"
-          disabled={pending || title.trim() === ""}
+          disabled={pending || title.trim() === "" || needsReason}
           onClick={save}
         >
           {t("common.save")}
@@ -149,6 +158,20 @@ export function NewObjectiveButton({
           {t("common.cancel")}
         </Button>
       </div>
+      {askReason ? (
+        <input
+          value={reason}
+          aria-label={
+            askReason === "required"
+              ? t("midCycle.whyNowRequired")
+              : t("midCycle.whyNowOptional")
+          }
+          placeholder={t("midCycle.whyNowPlaceholder")}
+          disabled={pending}
+          onChange={(event) => setReason(event.target.value)}
+          className="h-7.5 w-full min-w-0 rounded-control border border-line bg-surface px-2 text-xs text-ink outline-none focus:border-brand"
+        />
+      ) : null}
       {problem ? (
         <span role="alert" className="text-xs text-bad">
           {problem}

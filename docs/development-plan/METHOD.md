@@ -191,6 +191,15 @@ Rules that depend on the kind:
 
 Access still applies everywhere: a member writes only where they may edit. Quality checks run as they type.
 
+**Through the cycle**, every OKR can make one of four moves. *Source:* Doerr, *Measure What Matters*: continue, update, start, stop.
+
+| Move | Meaning | Recorded as |
+|---|---|---|
+| Continue | Still right as written | Nothing new |
+| Update | Change the wording, a key result, or a target | A dated change in the activity, with the previous value kept |
+| Start | Add a new objective or key result mid-cycle | Created and marked **added mid-cycle**, visible in lists and at the close. OKRs created before the team publication window closes (§11) are the cycle's plan, not additions, and carry no mark |
+| Stop | It no longer matters | Closed as abandoned with a one-line reason |
+
 ### 2.10 Kinds of key result
 
 | Kind | Written as | Progress | Scored |

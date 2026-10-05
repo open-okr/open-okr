@@ -19,6 +19,7 @@ import type { WorkspaceTx } from "@openokr/db";
 import {
   type CycleFacts,
   decide,
+  isMidCycleAddition,
   type KeyResultKind,
   levelsInUse,
   OKR_LEVELS,
@@ -45,6 +46,8 @@ export type PolicyRequest =
       readonly level?: string;
       /** The kind the writer chose, judged against the kinds in use (P9-T11b-a). */
       readonly okrKind?: OkrKind;
+      /** Whether the writer said why it starts now (P9-T13-a). */
+      readonly hasReason?: boolean;
     }
   /** Changing an objective's kind (P9-T11b-a). Needs no cycle. */
   | { readonly kind: "objective.kind"; readonly okrKind: OkrKind }
@@ -52,7 +55,12 @@ export type PolicyRequest =
   | { readonly kind: "keyResult.kind"; readonly keyResultKind: KeyResultKind }
   /** Taking the reviewer off an objective (P9-T04). */
   | { readonly kind: "reviewer.remove" }
-  | { readonly kind: "keyResult.create"; readonly cycleId: string | null }
+  | {
+      readonly kind: "keyResult.create";
+      readonly cycleId: string | null;
+      /** Whether the writer said why it starts now (P9-T13-a). */
+      readonly hasReason?: boolean;
+    }
   /** Publishing a set, or its company half (P9-T03b). */
   | { readonly kind: "set.publish"; readonly cycleId: string }
   /** Changing a key result's target (P9-T06b). Needs no cycle. */
@@ -104,6 +112,7 @@ export async function policyDecisionInTx<
         mode: loaded.mode,
         startsOn: loaded.startsOn,
         today,
+        published: loaded.publishedAt !== null,
       };
       cycle = policyNeedsPhases(
         request.kind === "set.publish"
@@ -149,12 +158,59 @@ export async function policyDecisionInTx<
           ? {}
           : { level, levelsInUse: levels }),
         ...(request.okrKind === undefined ? {} : { okrKind: request.okrKind }),
+        ...(request.hasReason === undefined
+          ? {}
+          : { hasReason: request.hasReason }),
       },
       practice,
       thresholds,
     );
   }
-  return decide({ kind: request.kind, cycle }, practice, thresholds);
+  return decide(
+    {
+      kind: request.kind,
+      cycle,
+      ...(request.hasReason === undefined
+        ? {}
+        : { hasReason: request.hasReason }),
+    },
+    practice,
+    thresholds,
+  );
+}
+
+/**
+ * Whether something written into this cycle now is started mid-cycle
+ * (METHOD.md §2.9, P9-T13-a): its team publication window has closed and its
+ * set is published. Read by the create actions, which stamp the moment.
+ */
+export async function midCycleInTx<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: WorkspaceTx<TSchema>,
+  workspaceId: string,
+  cycleId: string | null,
+): Promise<boolean> {
+  if (cycleId === null) {
+    return false;
+  }
+  const loaded = await loadCycleForWorkflow(tx, workspaceId, cycleId);
+  if (!loaded) {
+    return false;
+  }
+  const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
+  const today = formatLocalDate(
+    localDateIn(new Date(), await workspaceTimeZone(tx, workspaceId)),
+  );
+  return isMidCycleAddition(
+    {
+      mode: loaded.mode,
+      startsOn: loaded.startsOn,
+      today,
+      published: loaded.publishedAt !== null,
+    },
+    thresholds,
+  );
 }
 
 /**

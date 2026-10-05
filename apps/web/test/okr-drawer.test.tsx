@@ -66,6 +66,7 @@ const keyResult = (overrides: Partial<TreeKeyResult> = {}): TreeKeyResult => ({
   unit: "%",
   kind: "metric",
   doneAt: null,
+  addedMidCycleAt: null,
   direction: "increase",
   indicatorType: "lagging",
   baselineValue: 30,
@@ -93,6 +94,7 @@ const goal = (
   cycleId: "c",
   level: "team",
   kind: "aspirational",
+  addedMidCycleAt: null,
   spaceId: null,
   champion: PRIYA,
   reviewer: null,
@@ -120,6 +122,7 @@ const tree = (
     mode: "quarterly",
     startsOn: "2027-01-01",
     endsOn: "2027-03-31",
+    midCycle: false,
   },
   goals: [
     {

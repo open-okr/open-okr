@@ -40,6 +40,12 @@ export interface CycleFacts {
   /** Today, in the workspace's timezone, as a local `YYYY-MM-DD`. */
   readonly today: string;
   /**
+   * Whether the cycle's set has been published (§4.5). An addition is an
+   * addition to a published plan; before that, whatever is written, however
+   * late, is the plan (P9-T13-a). Left out, not published.
+   */
+  readonly published?: boolean;
+  /**
    * The phases as `phaseCompletion` computes them. Needed only when drafting
    * waits for the phases, so a caller may leave it out otherwise and save the
    * reads; `policyNeedsPhases` says when.
@@ -66,6 +72,8 @@ export type PolicyIntent =
       readonly levelsInUse?: readonly OkrLevel[];
       /** The kind it is written as, when the writer chose one (§2.8). */
       readonly okrKind?: OkrKind;
+      /** Whether the writer said why it starts now (§2.9, P9-T13-a). */
+      readonly hasReason?: boolean;
     }
   /** Changing an objective's kind (§2.8, P9-T11b-a). */
   | { readonly kind: "objective.kind"; readonly okrKind: OkrKind }
@@ -76,7 +84,12 @@ export type PolicyIntent =
   /** Taking the reviewer off an objective that has one (P9-T04). */
   | { readonly kind: "reviewer.remove" }
   /** A new key result on an objective that already exists. */
-  | { readonly kind: "keyResult.create"; readonly cycle: CycleFacts | null }
+  | {
+      readonly kind: "keyResult.create";
+      readonly cycle: CycleFacts | null;
+      /** Whether the writer said why it starts now (§2.9, P9-T13-a). */
+      readonly hasReason?: boolean;
+    }
   /**
    * Publishing a set, or the company half of one (P9-T03b). The gates judge
    * what is published; this decides only whether publishing may happen yet.
@@ -203,6 +216,26 @@ function phaseRules(practice: ResolvedPractice): PracticeKey[] {
     rules.push("writing.when");
   }
   return rules;
+}
+
+/**
+ * Whether something written now is started mid-cycle (§2.9, P9-T13-a): the
+ * team publication window has closed and the cycle's set is published.
+ *
+ * "OKRs created before the team publication window closes are the cycle's
+ * plan, not additions." The second condition is this package's reading of a
+ * case §2.9 does not name, a set still unpublished after its window: there is
+ * no plan to add to yet, so what is written is the plan, late, and it faces
+ * the publish gates like the rest of it.
+ */
+export function isMidCycleAddition(
+  cycle: Pick<CycleFacts, "mode" | "startsOn" | "today" | "published">,
+  thresholds: ResolvedThresholds,
+): boolean {
+  return (
+    cycle.published === true &&
+    cycle.today > planningWindow(cycle, thresholds).closesOn
+  );
 }
 
 /**
@@ -364,6 +397,24 @@ export function decide(
         ],
       };
     }
+  }
+
+  // §2.9: a start mid-cycle says why where the workspace asks it to, from
+  // every surface alike.
+  if (
+    (intent.kind === "objective.create" ||
+      intent.kind === "keyResult.create") &&
+    intent.hasReason !== true &&
+    practice["reasons.midCycleAddition"] === "required" &&
+    isMidCycleAddition(cycle, thresholds)
+  ) {
+    return {
+      outcome: "block",
+      rules: ["reasons.midCycleAddition"],
+      reasons: [
+        "This workspace asks why anything is added mid-cycle. Say in a line why it starts now.",
+      ],
+    };
   }
 
   // "Changes to existing ones stay open" (§2.9): a key result added to an

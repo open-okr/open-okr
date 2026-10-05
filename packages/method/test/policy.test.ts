@@ -4,6 +4,7 @@ import {
   decide,
   draftingWaitsForPhases,
   isEasing,
+  isMidCycleAddition,
   type PolicyIntent,
   planningWindow,
   policyNeedsPhases,
@@ -357,6 +358,61 @@ describe("the kinds in use (P9-T11b-a, METHOD.md §2.8)", () => {
       "committed",
       "aspirational",
     ]);
+  });
+});
+
+describe("adding mid-cycle (P9-T13-a, METHOD.md §2.9)", () => {
+  // Q1 2027 starts on 1 January; the team publication window closes two
+  // weeks later, on 14 January (§11).
+  const published = (today: string): CycleFacts => ({
+    mode: "quarterly",
+    startsOn: "2027-01-01",
+    today,
+    published: true,
+  });
+
+  it("is an addition only after the window closes, into a published set", () => {
+    expect(isMidCycleAddition(published("2027-01-14"), thresholds)).toBe(false);
+    expect(isMidCycleAddition(published("2027-01-15"), thresholds)).toBe(true);
+    // A set nobody has published yet is still the plan, however late.
+    expect(
+      isMidCycleAddition(
+        { ...published("2027-02-01"), published: false },
+        thresholds,
+      ),
+    ).toBe(false);
+  });
+
+  it("asks why only where the workspace requires it, and only of an addition", () => {
+    const required = resolvePractice("recommended", {
+      "reasons.midCycleAddition": "required",
+    });
+    const optional = resolvePractice("recommended");
+    const objective = (today: string, hasReason?: boolean): PolicyIntent => ({
+      kind: "objective.create",
+      cycle: published(today),
+      ...(hasReason === undefined ? {} : { hasReason }),
+    });
+    const keyResult = (today: string): PolicyIntent => ({
+      kind: "keyResult.create",
+      cycle: published(today),
+    });
+
+    const refused = decide(objective("2027-02-01"), required, thresholds);
+    expect(refused.outcome).toBe("block");
+    expect(refused.rules).toEqual(["reasons.midCycleAddition"]);
+    expect(decide(keyResult("2027-02-01"), required, thresholds).outcome).toBe(
+      "block",
+    );
+    expect(
+      decide(objective("2027-02-01", true), required, thresholds).outcome,
+    ).toBe("allow");
+    expect(decide(objective("2027-01-10"), required, thresholds).outcome).toBe(
+      "allow",
+    );
+    expect(decide(objective("2027-02-01"), optional, thresholds).outcome).toBe(
+      "allow",
+    );
   });
 });
 

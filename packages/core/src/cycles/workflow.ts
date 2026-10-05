@@ -470,6 +470,9 @@ async function loadGoalSnapshots<
         goals,
         eq(goals.workspaceId, workspaceId),
         eq(goals.cycleId, cycleId),
+        // An objective started mid-cycle faces the checks set to block when
+        // it is written, never the set-level gates (METHOD.md §4.5, §2.9).
+        isNull(goals.addedMidCycleAt),
       ),
     );
 
@@ -503,6 +506,8 @@ async function loadGoalSnapshots<
           keyResults.goalId,
           rows.map((row) => row.id),
         ),
+        // And a key result started mid-cycle under a planned objective.
+        isNull(keyResults.addedMidCycleAt),
       ),
     );
 

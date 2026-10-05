@@ -90,9 +90,11 @@ import {
   desc,
   eq,
   inArray,
+  isNotNull,
   isNull,
   lt,
   ne,
+  or,
   sql,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -3733,6 +3735,21 @@ export const readMonthlyRecord = defineReadAction({
     ),
     /** Objectives in the review's scope with no trend recorded yet. */
     untrended: z.array(z.object({ goalId: z.uuid(), goalTitle: z.string() })),
+    /**
+     * What was started mid-cycle in the review's scope, oldest first, so the
+     * review reads additions beside the decisions that made them (METHOD.md
+     * §2.9, §7.5, P9-T13-a).
+     */
+    additions: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        /** Null when the objective itself was added. */
+        keyResultId: z.uuid().nullable(),
+        keyResultTitle: z.string().nullable(),
+        addedAt: z.string(),
+      }),
+    ),
     dependencies: z.array(
       z.object({
         id: z.uuid(),
@@ -3839,6 +3856,68 @@ export const readMonthlyRecord = defineReadAction({
           .filter((goal) => !byGoal.has(goal.id))
           .map((goal) => ({ goalId: goal.id, goalTitle: goal.title }));
 
+        // §2.9's starts, objectives and key results alike, in the scope the
+        // trends read.
+        const addedRows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            goalAddedAt: goals.addedMidCycleAt,
+            keyResultId: keyResults.id,
+            keyResultTitle: keyResults.title,
+            keyResultAddedAt: keyResults.addedMidCycleAt,
+          })
+          .from(goals)
+          .leftJoin(
+            keyResults,
+            and(
+              eq(keyResults.goalId, goals.id),
+              isNull(keyResults.deletedAt),
+              isNotNull(keyResults.addedMidCycleAt),
+            ),
+          )
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+              or(
+                isNotNull(goals.addedMidCycleAt),
+                isNotNull(keyResults.addedMidCycleAt),
+              ),
+            ),
+          );
+        const additions = [
+          ...new Map(
+            addedRows
+              .filter((row) => row.goalAddedAt !== null)
+              .map((row) => [
+                row.goalId,
+                {
+                  goalId: row.goalId,
+                  goalTitle: row.goalTitle,
+                  keyResultId: null,
+                  keyResultTitle: null,
+                  addedAt: new Date(row.goalAddedAt as Date).toISOString(),
+                },
+              ]),
+          ).values(),
+          ...addedRows.flatMap((row) =>
+            row.keyResultId && row.keyResultAddedAt
+              ? [
+                  {
+                    goalId: row.goalId,
+                    goalTitle: row.goalTitle,
+                    keyResultId: row.keyResultId,
+                    keyResultTitle: row.keyResultTitle,
+                    addedAt: new Date(row.keyResultAddedAt).toISOString(),
+                  },
+                ]
+              : [],
+          ),
+        ].sort((a, b) => a.addedAt.localeCompare(b.addedAt));
+
         // §7.5's dependency and risk log, read from P3-T09's register rather
         // than stored a second time here.
         const dependencyRows = await tx
@@ -3888,6 +3967,7 @@ export const readMonthlyRecord = defineReadAction({
           shifts: session.shifts,
           trends,
           untrended,
+          additions,
           dependencies: dependencyRows.map((row) => ({
             id: row.id,
             keyResultId: row.keyResultId,
@@ -8291,6 +8371,11 @@ export const readScoringStatus = defineReadAction({
         score: z.number().nullable(),
         /** Whether the room has revealed this objective's score. */
         revealed: z.boolean(),
+        /**
+         * When it was started mid-cycle, or null for the plan (METHOD.md
+         * §2.9, P9-T13-a), so the close can read additions as evidence.
+         */
+        addedMidCycleAt: z.string().nullable(),
         scored: z.number(),
         total: z.number(),
         keyResults: z.array(scoringKeyResult),
@@ -8358,6 +8443,7 @@ export const readScoringStatus = defineReadAction({
             goalId: goals.id,
             goalTitle: goals.title,
             goalPosition: goals.position,
+            goalAddedMidCycleAt: goals.addedMidCycleAt,
             keyResultId: keyResults.id,
             title: keyResults.title,
             weight: keyResults.weight,
@@ -8419,6 +8505,7 @@ export const readScoringStatus = defineReadAction({
           goalTitle: string;
           score: number | null;
           revealed: boolean;
+          addedMidCycleAt: string | null;
           scored: number;
           total: number;
           keyResults: z.infer<typeof scoringKeyResult>[];
@@ -8433,6 +8520,9 @@ export const readScoringStatus = defineReadAction({
               goalTitle: row.goalTitle,
               score: null,
               revealed: false,
+              addedMidCycleAt: row.goalAddedMidCycleAt
+                ? new Date(row.goalAddedMidCycleAt).toISOString()
+                : null,
               scored: 0,
               total: 0,
               keyResults: [],

@@ -84,7 +84,7 @@ import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { readLinkableKpi } from "../kpis/linked.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
-import { requirePolicy } from "../practice/policy.ts";
+import { midCycleInTx, requirePolicy } from "../practice/policy.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import {
   recomputeGoalQualityInTx,
@@ -142,6 +142,8 @@ const keyResultOutput = z.object({
   kind: z.enum(KEY_RESULT_KINDS),
   /** When a milestone was done or a baseline recorded, or null. */
   doneAt: z.string().nullable(),
+  /** When it was started mid-cycle (§2.9, P9-T13-a), or null for the plan. */
+  addedMidCycleAt: z.string().nullable(),
   direction: z.enum(KEY_RESULT_DIRECTIONS),
   indicatorType: z.enum(INDICATOR_TYPES),
   baselineValue: z.number(),
@@ -168,6 +170,8 @@ const goalOutput = z.object({
   level: z.enum(GOAL_LEVELS),
   /** Committed or aspirational (METHOD.md §2.8, P9-T11b-a). */
   kind: z.enum(GOAL_KINDS),
+  /** When it was started mid-cycle (§2.9, P9-T13-a), or null for the plan. */
+  addedMidCycleAt: z.string().nullable(),
   ownerKind: z.enum(GOAL_OWNER_KINDS),
   spaceId: z.uuid().nullable(),
   memberId: z.uuid().nullable(),
@@ -318,6 +322,7 @@ function keyResultRow(row: {
   unit: string | null;
   kind: (typeof KEY_RESULT_KINDS)[number];
   doneAt: Date | null;
+  addedMidCycleAt: Date | null;
   direction: (typeof KEY_RESULT_DIRECTIONS)[number];
   indicatorType: (typeof INDICATOR_TYPES)[number];
   baselineValue: string;
@@ -338,6 +343,9 @@ function keyResultRow(row: {
   return {
     ...row,
     doneAt: row.doneAt ? row.doneAt.toISOString() : null,
+    addedMidCycleAt: row.addedMidCycleAt
+      ? row.addedMidCycleAt.toISOString()
+      : null,
     baselineValue: asNumber(row.baselineValue) ?? 0,
     targetValue: asNumber(row.targetValue) ?? 0,
     currentValue: asNumber(row.currentValue) ?? 0,
@@ -356,6 +364,7 @@ const GOAL_COLUMNS = {
   timeframe: goals.timeframe,
   level: goals.level,
   kind: goals.kind,
+  addedMidCycleAt: goals.addedMidCycleAt,
   ownerKind: goals.ownerKind,
   spaceId: goals.spaceId,
   memberId: goals.memberId,
@@ -384,6 +393,7 @@ const KEY_RESULT_COLUMNS = {
   unit: keyResults.unit,
   kind: keyResults.kind,
   doneAt: keyResults.doneAt,
+  addedMidCycleAt: keyResults.addedMidCycleAt,
   direction: keyResults.direction,
   indicatorType: keyResults.indicatorType,
   baselineValue: keyResults.baselineValue,
@@ -626,6 +636,9 @@ export const listGoals = defineReadAction({
             closedAt: row.closedAt
               ? new Date(row.closedAt).toISOString()
               : null,
+            addedMidCycleAt: row.addedMidCycleAt
+              ? new Date(row.addedMidCycleAt).toISOString()
+              : null,
             nextCheckInOn: dueLocalDate(row.nextCheckInAt, timeZone),
             daysPastDue: daysPastDue(row.nextCheckInAt, now, timeZone),
             champion: {
@@ -738,6 +751,9 @@ export const readGoal = defineReadAction({
           weight: asNumber(row.weight) ?? 0,
           progressPct: asNumber(row.progressPct) ?? 0,
           closedAt: row.closedAt ? new Date(row.closedAt).toISOString() : null,
+          addedMidCycleAt: row.addedMidCycleAt
+            ? new Date(row.addedMidCycleAt).toISOString()
+            : null,
           nextCheckInOn: dueLocalDate(row.nextCheckInAt, timeZone),
           daysPastDue: daysPastDue(row.nextCheckInAt, now, timeZone),
           champion: {
@@ -1079,6 +1095,12 @@ export const createGoal = defineWriteAction({
        * the workspace's practice, decided by `requirePolicy` for every caller.
        */
       guided: z.boolean().optional(),
+      /**
+       * Why it starts now, when it is added mid-cycle (METHOD.md §2.9,
+       * P9-T13-a). Required where the workspace asks for it; kept in the
+       * activity either way.
+       */
+      reason: z.string().trim().min(1).max(500).optional(),
     })
     // OBJ-3 as a boundary check, so the refusal is a sentence rather than a
     // constraint violation. The database enforces the same thing underneath.
@@ -1121,8 +1143,14 @@ export const createGoal = defineWriteAction({
           level: input.level,
           // §2.8: only a kind the workspace uses (P9-T11b-a).
           ...(input.kind === undefined ? {} : { okrKind: input.kind }),
+          // §2.9: a start mid-cycle says why where it must (P9-T13-a).
+          hasReason: input.reason !== undefined,
         },
       );
+      // An import records history, so it never starts anything now.
+      const addedMidCycle =
+        !context.bulk &&
+        (await midCycleInTx(tx, workspaceId, input.cycleId ?? null));
 
       // A parent has to be one this writer can actually see, resolved through
       // the getter so an invisible parent reads as not found (§4.2).
@@ -1190,6 +1218,7 @@ export const createGoal = defineWriteAction({
         timeframe: input.timeframe ?? null,
         level: input.level,
         kind: input.kind ?? defaultOkrKind(practice),
+        addedMidCycleAt: addedMidCycle ? new Date() : null,
         ownerKind: input.ownerKind,
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
@@ -1238,7 +1267,13 @@ export const createGoal = defineWriteAction({
           kind: "goal.created",
           subjectType: "goal",
           subjectId: created.id,
-          payload: { title: created.title, level: input.level },
+          payload: {
+            title: created.title,
+            level: input.level,
+            ...(addedMidCycle
+              ? { addedMidCycle: true, reason: input.reason ?? null }
+              : {}),
+          },
         },
         audit: {
           action: "goals.create",
@@ -1934,6 +1969,8 @@ export const createKeyResult = defineWriteAction({
       legacy: legacyKey.optional(),
       /** Accepted and ignored since P9-T02, as on `goals.create`. */
       guided: z.boolean().optional(),
+      /** Why it starts now, when added mid-cycle (§2.9), as on `goals.create`. */
+      reason: z.string().trim().min(1).max(500).optional(),
     })
     .refine(
       (value) =>
@@ -1980,8 +2017,16 @@ export const createKeyResult = defineWriteAction({
       await requirePolicy(
         tx,
         { workspaceId, bulk: context.bulk },
-        { kind: "keyResult.create", cycleId: goal?.cycleId ?? null },
+        {
+          kind: "keyResult.create",
+          cycleId: goal?.cycleId ?? null,
+          hasReason: input.reason !== undefined,
+        },
       );
+      // An import records history, so it never starts anything now.
+      const addedMidCycle =
+        !context.bulk &&
+        (await midCycleInTx(tx, workspaceId, goal?.cycleId ?? null));
 
       await assertLegacyKeyFree(
         tx,
@@ -2014,6 +2059,7 @@ export const createKeyResult = defineWriteAction({
         baselineValue: input.baselineValue ?? 0,
         targetValue: input.targetValue ?? 1,
         currentValue,
+        addedMidCycleAt: addedMidCycle ? new Date() : null,
         dueOn: input.dueOn ?? null,
         ownerId: input.ownerId ?? null,
         weight: input.weight,
@@ -2051,7 +2097,12 @@ export const createKeyResult = defineWriteAction({
           kind: "key_result.created",
           subjectType: "goal",
           subjectId: input.goalId,
-          payload: { title: input.title },
+          payload: {
+            title: input.title,
+            ...(addedMidCycle
+              ? { addedMidCycle: true, reason: input.reason ?? null }
+              : {}),
+          },
         },
         audit: {
           action: "goals.addKeyResult",

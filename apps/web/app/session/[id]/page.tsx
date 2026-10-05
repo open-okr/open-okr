@@ -67,6 +67,7 @@ import { type Forward, ForwardPanel } from "./forward";
 import { type ManagementRetro, ManagementRetroPanel } from "./management-retro";
 import {
   type DecisionSubject,
+  type MonthlyAddition,
   type MonthlyDecision,
   type MonthlyDependency,
   MonthlyReview,
@@ -420,6 +421,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
     shifts: string | null;
     trends: MonthlyTrend[];
     untrended: MonthlyUntrended[];
+    additions: MonthlyAddition[];
     dependencies: MonthlyDependency[];
     decisions: MonthlyDecision[];
   }
@@ -1007,6 +1009,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           shifts={monthly.shifts}
           trends={monthly.trends}
           untrended={monthly.untrended}
+          additions={monthly.additions}
           dependencies={monthly.dependencies}
           decisions={monthly.decisions}
           subjects={decisionSubjects}

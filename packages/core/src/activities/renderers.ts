@@ -268,7 +268,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
   "goal.created": (p) =>
-    `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was created`,
+    p.addedMidCycle
+      ? `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was added mid-cycle`
+      : `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was created`,
   "goal.updated": (p) => `Goal "${asString(p.title, "a goal")}" was edited`,
   "goal.closed": (p) =>
     `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
@@ -335,7 +337,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "task.deleted": (p) => `Task "${asString(p.title, "a task")}" was removed`,
   "task.restored": (p) => `Task "${asString(p.title, "a task")}" was restored`,
   "key_result.created": (p) =>
-    `Key result "${asString(p.title, "a key result")}" was added`,
+    p.addedMidCycle
+      ? `Key result "${asString(p.title, "a key result")}" was added mid-cycle`
+      : `Key result "${asString(p.title, "a key result")}" was added`,
   "key_result.updated": () => "A key result was edited",
   "key_result.value_recorded": (p) =>
     `A key result moved to ${Number(p.value ?? 0)}`,

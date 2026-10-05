@@ -141,6 +141,7 @@ export {
   decide,
   draftingWaitsForPhases,
   isEasing,
+  isMidCycleAddition,
   type PolicyDecision,
   type PolicyIntent,
   planningWindow,
