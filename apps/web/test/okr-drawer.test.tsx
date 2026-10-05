@@ -106,6 +106,7 @@ const goal = (
   parentKeyResultId: null,
   weight: 1,
   contributionStatement: null,
+  standaloneReason: null,
   progressPct: 20,
   health: "on_track",
   closedAt: null,

@@ -1,3 +1,4 @@
+import { AL1_SHORT_CONTRIBUTION, AL1_UNALIGNED } from "./alignment.ts";
 import type { KeyResultKind } from "./practice.ts";
 import { type DraftVerdict, draftVerdict, type OkrKind } from "./scoring.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
@@ -993,22 +994,22 @@ export const ALIGNMENT_CHECKS: readonly QualityCheck[] = [
     feedsStrengthScore: true,
     conditions: [
       {
-        condition: "No parent and no stated contribution",
-        status: "fail",
+        condition: AL1_UNALIGNED,
+        status: "warn",
         prompt:
-          "What bigger priority does this support? If nothing comes to mind, that is the biggest red flag on this page.",
+          "Which priority does this move forward? Align it to one, or say why it stands alone.",
       },
       {
-        condition: "Stated contribution under three words",
+        condition: AL1_SHORT_CONTRIBUTION,
         status: "warn",
         prompt:
           "Growth is not a priority, it is a word. Which growth goal, whose?",
       },
       {
-        condition: "Parent or a stated contribution",
+        condition: "A parent, a stated contribution or a standalone reason",
         status: "pass",
         prompt:
-          "This says what it supports, so somebody above it can see why it exists.",
+          "This says what it supports, or why it stands alone, so somebody above it can see why it exists.",
       },
     ],
   },
@@ -1036,7 +1037,7 @@ export const ALIGNMENT_CHECKS: readonly QualityCheck[] = [
         condition: "Skips a level",
         status: "warn",
         prompt:
-          "This skips a level. A team goal aligns to a department goal, not straight to a company one, or the department in between cannot see what it owns.",
+          "This skips a level the cycle uses, so the level in between cannot see what it owns. Is that the cascade you want?",
       },
       {
         condition: "Aligned one level up",
@@ -1053,7 +1054,7 @@ export const ALIGNMENT_CHECKS: readonly QualityCheck[] = [
     conditions: [
       {
         condition: "No company-level objective",
-        status: "fail",
+        status: "warn",
         prompt:
           "Nothing anchors this tree. At least one company-level objective has to sit at the top, or every alignment below it points at nothing.",
       },
@@ -1108,7 +1109,11 @@ export const ALIGNMENT_CHECKS: readonly QualityCheck[] = [
 
 export interface AlignmentCheckInput {
   /** Straight from `alignmentScore`. The engine decides; this reports. */
-  readonly findings: readonly { readonly ruleKey: string }[];
+  readonly findings: readonly {
+    readonly ruleKey: string;
+    /** The row that matched, where a check has more than one way to object. */
+    readonly condition?: string;
+  }[];
   /**
    * AL-5's answer, which lives in the dependency register rather than in the
    * alignment graph. Null while nobody has been asked, which is a `todo`
@@ -1119,7 +1124,7 @@ export interface AlignmentCheckInput {
 
 /** The condition each engine finding maps to, by rule key. */
 const ALIGNMENT_FINDING_CONDITIONS: Record<string, string> = {
-  "AL-1": "No parent and no stated contribution",
+  "AL-1": AL1_UNALIGNED,
   "AL-3": "Skips a level",
   "AL-4": "No company-level objective",
   "AL-6": "A department subtree with no horizontal dependency",
@@ -1136,7 +1141,9 @@ const ALIGNMENT_FINDING_CONDITIONS: Record<string, string> = {
 export function evaluateAlignment(
   input: AlignmentCheckInput,
 ): readonly QualityVerdict[] {
-  const raised = new Set(input.findings.map((finding) => finding.ruleKey));
+  const raised = new Map(
+    input.findings.map((finding) => [finding.ruleKey, finding.condition]),
+  );
   return ALIGNMENT_CHECKS.map((entry) => {
     if (entry.id === "AL-2") {
       return verdictOf(entry, "Enforced in the schema");
@@ -1161,7 +1168,7 @@ export function evaluateAlignment(
     }
     const failing = ALIGNMENT_FINDING_CONDITIONS[entry.id];
     if (failing && raised.has(entry.id)) {
-      return verdictOf(entry, failing);
+      return verdictOf(entry, raised.get(entry.id) ?? failing);
     }
     // The passing row is the last one in every alignment check.
     const passing = entry.conditions[entry.conditions.length - 1];

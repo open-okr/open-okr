@@ -143,6 +143,8 @@ export const treeGoal = z.object({
   parentKeyResultId: z.uuid().nullable(),
   weight: z.number(),
   contributionStatement: z.string().nullable(),
+  /** Why it stands alone, when it does (METHOD.md §5.2, P9-T16a). */
+  standaloneReason: z.string().nullable(),
   progressPct: z.number(),
   health: z.enum(GOAL_HEALTH),
   /**
@@ -248,6 +250,7 @@ const GOAL_COLUMNS = {
   parentKeyResultId: goals.parentKeyResultId,
   weight: goals.weight,
   contributionStatement: goals.contributionStatement,
+  standaloneReason: goals.standaloneReason,
   progressPct: goals.progressPct,
   health: goals.health,
   lastCheckInId: goals.lastCheckInId,
@@ -304,6 +307,7 @@ async function treeNodes(
     readonly parentKeyResultId: string | null;
     readonly weight: string;
     readonly contributionStatement: string | null;
+    readonly standaloneReason: string | null;
     readonly progressPct: string;
     readonly health: (typeof GOAL_HEALTH)[number];
     readonly lastCheckInId: string | null;
@@ -383,6 +387,7 @@ async function treeNodes(
     parentKeyResultId: row.parentKeyResultId,
     weight: asNumber(row.weight) ?? 0,
     contributionStatement: row.contributionStatement,
+    standaloneReason: row.standaloneReason,
     progressPct: asNumber(row.progressPct) ?? 0,
     health: row.health,
     reportedStatus:

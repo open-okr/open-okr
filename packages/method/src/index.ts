@@ -24,6 +24,7 @@ export {
   type AlignmentThresholds,
   alignmentBand,
   alignmentScore,
+  enforceAlignment,
 } from "./alignment.ts";
 export {
   type BlockerEscalation,

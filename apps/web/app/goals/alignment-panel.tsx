@@ -36,6 +36,11 @@ export interface AlignmentReading {
   readonly anchored: boolean;
   readonly measured: number;
   readonly counted: number;
+  /** What the share did not count, cited by a check or not (P9-T16b-a). */
+  readonly uncounted: readonly {
+    readonly id: string;
+    readonly title: string;
+  }[];
   readonly findings: readonly AlignmentFinding[];
 }
 
@@ -71,6 +76,10 @@ export function AlignmentPanel({
 }) {
   const { t } = useTranslations();
   const [all, setAll] = useState(false);
+  const [allUncounted, setAllUncounted] = useState(false);
+  const uncounted = allUncounted
+    ? alignment.uncounted
+    : alignment.uncounted.slice(0, FIRST_FINDINGS);
   const structural = alignment.findings.filter(
     (finding) => finding.source === "engine",
   );
@@ -137,6 +146,44 @@ export function AlignmentPanel({
               </p>
             </>
           )}
+          {alignment.uncounted.length > 0 ? (
+            <section
+              data-testid="alignment-uncounted"
+              className="flex flex-col gap-1"
+            >
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+                {t("okrDiagram.notCounted", {
+                  count: String(alignment.uncounted.length),
+                })}
+              </h3>
+              <ul className="flex flex-col gap-0.5">
+                {uncounted.map((goal) => (
+                  <li key={goal.id}>
+                    <button
+                      type="button"
+                      onClick={() => onOpen(goal.id)}
+                      className="text-left text-xs text-brand-text underline"
+                    >
+                      {goal.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {alignment.uncounted.length > FIRST_FINDINGS ? (
+                <button
+                  type="button"
+                  onClick={() => setAllUncounted((current) => !current)}
+                  className="self-start text-xs font-semibold text-brand-text hover:underline"
+                >
+                  {allUncounted
+                    ? t("okrDiagram.showFewerFindings")
+                    : t("okrDiagram.showAllNotCounted", {
+                        count: String(alignment.uncounted.length),
+                      })}
+                </button>
+              ) : null}
+            </section>
+          ) : null}
           {structural.length === 0 ? (
             <p className="text-xs text-ink-3">
               {t("goals.studio.studio.noStructuralGaps")}

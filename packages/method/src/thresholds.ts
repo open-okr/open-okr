@@ -489,6 +489,14 @@ export const THRESHOLDS = {
     default: 3,
     schema: z.number().int().min(1).max(50),
   }),
+  "quality.contributionMinimum": param({
+    group: "quality",
+    label: "Contribution minimum",
+    section: "§4.3",
+    why: "Three words. A stated contribution shorter than that names a theme rather than a goal: growth is not a priority, it is a word.",
+    default: 3,
+    schema: z.number().int().min(1).max(20),
+  }),
   "quality.strategicIssueMinimum": param({
     group: "quality",
     label: "Strategic issue minimum",

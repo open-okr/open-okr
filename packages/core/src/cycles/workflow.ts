@@ -462,6 +462,7 @@ async function loadGoalSnapshots<
       parentGoalId: goals.parentGoalId,
       parentKeyResultId: goals.parentKeyResultId,
       contributionStatement: goals.contributionStatement,
+      standaloneReason: goals.standaloneReason,
       kind: goals.kind,
     })
     .from(goals)
@@ -542,6 +543,7 @@ async function loadGoalSnapshots<
     reviewerId: row.reviewerId,
     hasParent: Boolean(row.parentGoalId ?? row.parentKeyResultId),
     contributionStatement: row.contributionStatement,
+    standaloneReason: row.standaloneReason,
     keyResults: children
       .filter((child) => child.goalId === row.id)
       .map((child) => ({

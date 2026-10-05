@@ -467,7 +467,7 @@ describe("the six publish gates", () => {
 
   it("gate 3 accepts a stated contribution in place of a parent", () => {
     // §4.3's AL-1 and §4.5's gate 3 both accept a contribution statement, which
-    // is what makes them different from §5.2's structural orphan penalty.
+    // is what makes them different from §5.2's share, which does not.
     const gates = publishGates(
       base({
         goals: [
@@ -487,6 +487,23 @@ describe("the six publish gates", () => {
     const gate = gates.find((entry) => entry.gateKey === 3);
     expect(gate?.passed).toBe(false);
     expect(gate?.detail.missing.join(" ")).toMatch(/states no contribution/);
+  });
+
+  it("gate 3 accepts a reason to stand alone (P9-T16b-a)", () => {
+    // §4.5: "Each objective states what it contributes to, or why it stands
+    // alone." Finance's month-end close supports no strategy on purpose.
+    const gates = publishGates(
+      base({
+        goals: [
+          goal({
+            hasParent: false,
+            contributionStatement: null,
+            standaloneReason: "Finance operating cadence the board relies on",
+          }),
+        ],
+      }),
+    );
+    expect(gates.find((entry) => entry.gateKey === 3)?.passed).toBe(true);
   });
 
   it("gate 4 accepts a risk owner where confirmation is missing", () => {

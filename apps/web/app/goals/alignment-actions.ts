@@ -65,6 +65,23 @@ export async function unlinkGoals(dependencyId: string): Promise<WriteState> {
   );
 }
 
+/**
+ * Why an objective stands alone, or blank to take the reason away (METHOD.md
+ * §5.2, P9-T16b-a). `goals.update` clears the parent when it sets a reason,
+ * and the drawer offers this only on an objective with no parent.
+ */
+export async function setStandaloneReason(
+  goalId: string,
+  reason: string,
+): Promise<WriteState> {
+  return run((context) =>
+    callAction(context, "goals.update", {
+      id: goalId,
+      standaloneReason: reason.trim() === "" ? null : reason,
+    }),
+  );
+}
+
 export async function dismissFinding(
   _previous: WriteState,
   formData: FormData,

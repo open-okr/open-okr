@@ -107,16 +107,21 @@ arbitrary goal that is not responsible for it. If you would rather keep the
 column not-null, the alternative is a separate scope-level findings table, which
 is more schema for one row.
 
-### 3.2 Unaligned, per goal
+### 3.2 AL-1, per goal, and the goals the share leaves out
 
-Fires when `level` is not `company`, neither parent pointer reaches a live goal
-or key result, and there is no standalone reason. Each one is a goal the share
-does not count.
+Since P9-T16b-a the share and AL-1 are two answers, because METHOD v2 gives
+them different tests:
 
-The `contribution_statement` does **not** excuse it, for the reason §1 gives.
-A standalone reason does, which is the change METHOD v2 made: a team that
-inherits no objective is not unimportant, and Finance's month-end close
-supports no strategy and is not a mistake.
+| Goal below company level | In the share | AL-1 |
+|---|---|---|
+| A parent, or a standalone reason | Counted | Pass, unless its contribution is short |
+| No parent, no reason, a contribution of at least "Contribution minimum" words | Not counted, and listed | Pass: it says what it supports |
+| No parent, no reason, no contribution | Not counted, and listed | Warn: "which priority does this move forward?" |
+| Any, with a contribution under "Contribution minimum" words | As above | Warn: "growth is not a priority, it is a word" |
+
+Rows are first match wins, as every §4 table is. `uncounted` lists every goal
+the share left out whether or not AL-1 is raised, because §5.2 says the coach
+lists every unaligned goal and AL-1 may be off.
 
 ### 3.3 No key results, per goal
 
@@ -124,6 +129,10 @@ Fires when a goal has zero non-deleted key results. Applies at every level,
 including company.
 
 ### 3.4 Level skip, per goal
+
+Measured over the levels the cycle uses (G-3, P9-T16b-a): the levels it began
+with, plus the two being compared, in this order. A cycle without departments
+reads a team goal under a company one as one level, not two.
 
 Levels are ordered `company` 0, `department` 1, `team` 2, `individual` 3. A skip
 fires when `childIndex − parentIndex > 1`.
@@ -167,6 +176,17 @@ horizontal dependency "two-way by meaning". A department that three other teams
 depend on is the least siloed department in the organisation, and flagging it
 because it happened to be the provider rather than the consumer would be
 absurd.
+
+### 3.6 Which findings are said
+
+The engine reports what it sees; `enforceAlignment` then drops the findings of
+any check the cycle's practice turned off, as `applyEnforcement` does for the
+other checks. AL-3 and AL-6 are off by default, so by default nothing is said
+about a skip or a silo, and no nudge goes out for either. The share never
+moves with a check's level. Two readers apply the same rule to stored rows,
+because a practice change recomputes nothing: `alignment.read` shows a stored
+structural finding only while the live answer still raises it, and the
+nudge reader skips a finding whose check is off.
 
 ## 4. The score matrix
 

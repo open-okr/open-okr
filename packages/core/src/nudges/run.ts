@@ -381,8 +381,8 @@ export async function runDueNudgesInTx(
   // every read, and a nudge to somebody who cannot open the product is an email
   // to a former colleague.
   const active = await activeMemberIds(tx, workspaceId);
-  const deliverable = due.filter((entry) =>
-    active.has(entry.recipientMemberId),
+  const deliverable = onePerSubject(
+    due.filter((entry) => active.has(entry.recipientMemberId)),
   );
 
   // Suppression decided before anything is written, so a swallowed nudge is a
@@ -576,4 +576,34 @@ export async function runAgentNudgesInTx(
     throw new Error("The sandboxed run produced no result.");
   }
   return simulated;
+}
+
+/**
+ * One due nudge per recipient, subject and rule within a run, at the highest
+ * escalation step any source asked for (P9-T16b-a).
+ *
+ * Suppression is decided for the whole batch before anything is written, so
+ * the deduplication window cannot see a twin raised in the same run. One was:
+ * an alignment finding is stored once per scope, workspace and space, and the
+ * reader turned each row into a nudge, so a level skip reached its champion
+ * twice in the same minute.
+ */
+function onePerSubject<
+  T extends {
+    readonly ruleKey: string;
+    readonly subjectType: string;
+    readonly subjectId: string;
+    readonly recipientMemberId: string;
+    readonly escalationStep: number;
+  },
+>(due: readonly T[]): T[] {
+  const kept = new Map<string, T>();
+  for (const entry of due) {
+    const key = `${entry.recipientMemberId} ${entry.subjectType} ${entry.subjectId} ${entry.ruleKey}`;
+    const seen = kept.get(key);
+    if (!seen || entry.escalationStep > seen.escalationStep) {
+      kept.set(key, entry);
+    }
+  }
+  return [...kept.values()];
 }

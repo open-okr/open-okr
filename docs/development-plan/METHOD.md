@@ -473,17 +473,17 @@ The lower bound of four words was removed on 1 October 2026: whatmatters' own "A
 
 ### 4.3 Alignment checks
 
-**AL-1 Supports a bigger priority.** Fail with no parent and no stated contribution ("if nothing comes to mind, that is the biggest red flag on this page"). Warn when the stated contribution is fewer than three words ("growth is not a priority, it is a word. Which growth goal, whose?"). Pass otherwise.
+**AL-1 Supports a bigger priority.** Warn when a goal has no parent, no stated contribution and no standalone reason ("which priority does this move forward?"). Warn when the stated contribution is fewer than three words ("growth is not a priority, it is a word. Which growth goal, whose?"). Pass otherwise. A goal may stand alone with a stated reason. *Source:* Perdoo (vendor): "Alignment is not mandatory, but best practice"; whatmatters: a team that inherits no objective is not unimportant.
 
-**AL-2 One parent only.** A goal aligns under exactly one parent goal or one parent key result, or neither. Never both.
+**AL-2 One parent only.** Block. A goal aligns under exactly one parent goal or one parent key result, or neither. Never both. A data rule of this product.
 
-**AL-3 No level skip.** A team goal aligns to a department goal, not straight to a company goal. Skips are recorded and flagged.
+**AL-3 No level skip.** Off by default. A workspace that wants a strict cascade may turn it on, and then a team goal aligned straight to a company goal is flagged. *Source:* whatmatters: "A team can ladder to any other team's priority in the organization – vertically, horizontally, even diagonally."
 
-**AL-4 Company anchor.** At least one company-level objective anchors the tree.
+**AL-4 Company anchor.** Warn. At least one company-level objective anchors the tree. *Source:* re:Work: "it can be helpful to commit first to organizational objectives".
 
 **AL-5 Dependencies declared.** Every cross-team dependency is either confirmed by the providing team, or logged as a risk with a named risk owner.
 
-**AL-6 Not siloed.** A department whose whole subtree has no horizontal dependency with any other department is flagged as a possible silo.
+**AL-6 Not siloed.** Off by default. Where on, a department whose whole subtree has no horizontal dependency with any other department is noted as a possible silo. Finance, legal and platform teams are often legitimately self-contained. *Source:* OpenOKR default.
 
 ### 4.4 Cycle checks
 
@@ -942,6 +942,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Objective length limit | 18 words, warn above |
 | Company objective cap | 5 |
 | Objectives per unit cap | 3 |
+| Contribution minimum | 3 words |
 | Strategic issue minimum | 3, ranked |
 | Priority bounds | 3 to 5, each with a 12-month success statement |
 | Annual strategy bounds | 2 to 5 |

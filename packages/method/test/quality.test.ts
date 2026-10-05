@@ -594,9 +594,27 @@ describe("corpus entry 5: alignment gaps", () => {
     expect(at("AL-2")?.status).toBe("pass");
   });
 
-  it("warns AL-3 on the skip and fails AL-4 on the missing anchor", () => {
+  it("warns AL-3 on the skip and AL-4 on the missing anchor", () => {
     expect(at("AL-3")?.status).toBe("warn");
-    expect(at("AL-4")?.status).toBe("fail");
+    // METHOD v2 §4.3: "AL-4 Company anchor. Warn." (P9-T16b-a).
+    expect(at("AL-4")?.status).toBe("warn");
+  });
+
+  it("reads AL-1's short contribution from the row the engine matched", () => {
+    const short = evaluateAlignment({
+      findings: [
+        {
+          ruleKey: "AL-1",
+          condition: "Stated contribution under the contribution minimum",
+        },
+      ],
+      everyDependencyResolved: true,
+    });
+    expect(short.find((entry) => entry.id === "AL-1")).toMatchObject({
+      status: "warn",
+      prompt:
+        "Growth is not a priority, it is a word. Which growth goal, whose?",
+    });
   });
 
   it("warns AL-6 on the silo", () => {

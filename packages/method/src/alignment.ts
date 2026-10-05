@@ -19,7 +19,13 @@
  * reads or writes one.
  */
 
-/** METHOD.md §4.3 AL-3's ordering. The index is what a level skip is measured in. */
+import { enforcementLevel } from "./enforcement.ts";
+import type { ResolvedPractice } from "./practice.ts";
+
+/**
+ * METHOD.md §4.3 AL-3's ordering. A level skip is measured over the levels a
+ * cycle uses, taken in this order (§2.7, G-3).
+ */
 export const ALIGNMENT_LEVEL_ORDER = [
   "company",
   "department",
@@ -67,6 +73,11 @@ export interface AlignmentGoal {
   readonly outsideParentLevel?: string | null;
   /** Why this goal stands alone, when it does (§5.2). Counts as aligned. */
   readonly standaloneReason?: string | null;
+  /**
+   * What it says it contributes to (§4.3, AL-1). Enough for AL-1 to pass and
+   * not enough for the share, which asks for a parent or a reason.
+   */
+  readonly contributionStatement?: string | null;
   readonly spaceId: string | null;
   readonly keyResultCount: number;
   /** Closed goals still count (decision D-11). Carried for the caller's clarity. */
@@ -93,6 +104,11 @@ export type AlignmentScope =
 
 export interface AlignmentFinding {
   readonly ruleKey: AlignmentRuleKey;
+  /**
+   * The §4.3 condition row that matched, where the check has more than one
+   * way to object (AL-1's missing alignment and its short contribution).
+   */
+  readonly condition?: string;
   readonly severity: AlignmentSeverity;
   /** Null only for the anchor finding, which no goal caused (decision D-16). */
   readonly subjectGoalId: string | null;
@@ -112,8 +128,31 @@ export interface AlignmentResult {
   readonly measured: number;
   /** Of those, the ones aligned or standing alone with a reason. */
   readonly counted: number;
+  /**
+   * The goals the share did not count, sorted. §5.2 lists every one, whether
+   * or not a check is raised against it: a goal that states a contribution
+   * passes AL-1 and is still not counted, and AL-1 may be off.
+   */
+  readonly uncounted: readonly string[];
   readonly findings: readonly AlignmentFinding[];
 }
+
+/** How the engine reads a cycle (§2.7, §4.3). */
+export interface AlignmentOptions {
+  /**
+   * The levels the cycle uses, which AL-3 measures a skip over (G-3). A level
+   * a workspace turned off is not counted as skipped. All four by default.
+   */
+  readonly levels?: readonly string[];
+  /** §11's "Contribution minimum", in words. 3 by default. */
+  readonly contributionMinimum?: number;
+}
+
+/** §4.3's AL-1 rows, as `ALIGNMENT_CHECKS` words them. */
+export const AL1_UNALIGNED =
+  "No parent, no stated contribution and no standalone reason";
+export const AL1_SHORT_CONTRIBUTION =
+  "Stated contribution under the contribution minimum";
 
 /**
  * How each finding is presented. Fixed per rule since P9-T16a, when the
@@ -127,10 +166,6 @@ const SEVERITY: Readonly<Record<AlignmentRuleKey, AlignmentSeverity>> = {
   "AL-6": "medium",
   "AL-3": "low",
 };
-
-function levelIndex(level: string): number {
-  return (ALIGNMENT_LEVEL_ORDER as readonly string[]).indexOf(level);
-}
 
 /**
  * The department a goal belongs to, keyed for grouping.
@@ -158,14 +193,24 @@ export function alignmentScore(
   graph: AlignmentGraph,
   scope: AlignmentScope,
   thresholds: AlignmentThresholds,
+  options: AlignmentOptions = {},
 ): AlignmentResult {
   const goals = graph.goals;
   if (goals.length === 0) {
     // An empty scope has no score, not 100 and not 0. A workspace with no
     // goals has nothing to align, and an anchor finding would be scolding
     // somebody for not having started.
-    return { score: null, band: null, measured: 0, counted: 0, findings: [] };
+    return {
+      score: null,
+      band: null,
+      measured: 0,
+      counted: 0,
+      uncounted: [],
+      findings: [],
+    };
   }
+  const levels = options.levels ?? ALIGNMENT_LEVEL_ORDER;
+  const contributionMinimum = options.contributionMinimum ?? 3;
 
   const findings: AlignmentFinding[] = [];
   const byId = new Map(goals.map((goal) => [goal.id, goal]));
@@ -191,27 +236,45 @@ export function alignmentScore(
 
   let measured = 0;
   let counted = 0;
+  const uncounted: string[] = [];
   for (const goal of goals) {
     const parentLevel = goal.parentGoalId
       ? (byId.get(goal.parentGoalId)?.level ?? null)
       : (goal.outsideParentLevel ?? null);
+    const aligned = parentLevel !== null || hasReason(goal.standaloneReason);
+    const contribution = wordCount(goal.contributionStatement);
 
     if (goal.level !== "company") {
       measured += 1;
-      // AL-1, per goal. A reason to stand alone counts as aligned (§5.2); a
+      // The share. A reason to stand alone counts as aligned (§5.2); a
       // contribution statement does not, because it says what the goal
-      // supports without pointing at it, and publish gate 3 is where a written
-      // contribution counts.
-      if (parentLevel !== null || hasReason(goal.standaloneReason)) {
+      // supports without pointing at it.
+      if (aligned) {
         counted += 1;
       } else {
-        findings.push({
-          ruleKey: "AL-1",
-          severity: SEVERITY["AL-1"],
-          subjectGoalId: goal.id,
-          reason: `This ${goal.level} goal neither aligns to a parent nor says why it stands alone.`,
-        });
+        uncounted.push(goal.id);
       }
+    }
+
+    // AL-1, per goal, first match wins (§4.3). A stated contribution is
+    // enough for the check, which coaches the writer, though not for the
+    // share, which measures the structure.
+    if (goal.level !== "company" && !aligned && contribution === 0) {
+      findings.push({
+        ruleKey: "AL-1",
+        condition: AL1_UNALIGNED,
+        severity: SEVERITY["AL-1"],
+        subjectGoalId: goal.id,
+        reason: `This ${goal.level} goal has no parent, states no contribution and gives no reason to stand alone.`,
+      });
+    } else if (contribution > 0 && contribution < contributionMinimum) {
+      findings.push({
+        ruleKey: "AL-1",
+        condition: AL1_SHORT_CONTRIBUTION,
+        severity: SEVERITY["AL-1"],
+        subjectGoalId: goal.id,
+        reason: `Its stated contribution is under ${contributionMinimum} words, which names a theme rather than a goal.`,
+      });
     }
 
     // KR-1, per goal, at every level including company.
@@ -224,11 +287,14 @@ export function alignmentScore(
       });
     }
 
-    // AL-3, per goal. Only a forward skip of more than one level counts. A
-    // same-level or inverted parent may be worth coaching, and that belongs to
-    // the quality canon rather than to the score.
+    // AL-3, per goal. Only a forward skip of more than one level counts, over
+    // the levels this cycle uses: with no department level, a team goal under
+    // a company one skips nothing (G-3). A same-level or inverted parent may
+    // be worth coaching, and that belongs to the quality canon rather than to
+    // the score.
     if (parentLevel !== null) {
-      const gap = levelIndex(goal.level) - levelIndex(parentLevel);
+      const order = levelsBetween(levels, goal.level, parentLevel);
+      const gap = order.indexOf(goal.level) - order.indexOf(parentLevel);
       if (gap > 1) {
         findings.push({
           ruleKey: "AL-3",
@@ -258,12 +324,56 @@ export function alignmentScore(
     band: score === null ? null : alignmentBand(score, thresholds, anchored),
     measured,
     counted,
+    uncounted: uncounted.sort((left, right) => left.localeCompare(right)),
     findings: sortFindings(findings),
+  };
+}
+
+/**
+ * Drops the findings of a check this practice turned off (§4, §12, P9-T16b-a).
+ *
+ * A separate step, as `applyEnforcement` is for the other checks: the engine
+ * reports what it sees and the practice decides what is said. AL-3 and AL-6
+ * are off by default, so their findings, and the nudges keyed on them, stop
+ * by default too. The share is §5.2's and does not move: a workspace that
+ * turns AL-1 off still sees every goal the share did not count.
+ */
+export function enforceAlignment(
+  result: AlignmentResult,
+  practice: ResolvedPractice,
+): AlignmentResult {
+  return {
+    ...result,
+    findings: result.findings.filter(
+      (finding) => enforcementLevel(finding.ruleKey, practice) !== "off",
+    ),
   };
 }
 
 function hasReason(reason: string | null | undefined): boolean {
   return typeof reason === "string" && reason.trim().length > 0;
+}
+
+function wordCount(text: string | null | undefined): number {
+  return (text ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word !== "").length;
+}
+
+/**
+ * The cycle's levels in §4.3's order, plus the two levels being compared, so
+ * a goal at a level the cycle did not begin with is still measured from where
+ * it sits.
+ */
+function levelsBetween(
+  levels: readonly string[],
+  child: string,
+  parent: string,
+): readonly string[] {
+  return ALIGNMENT_LEVEL_ORDER.filter(
+    (level) => levels.includes(level) || level === child || level === parent,
+  );
 }
 
 /**

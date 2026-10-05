@@ -809,8 +809,11 @@ async function launchRecovery(
   });
   await callAction(context, "goals.update", {
     id: launched.goalId,
-    contributionStatement:
-      "Recovers Operating margin to its corridor. It contributes to the annual thrust on cost rather than to a quarterly objective, which is why it has no parent.",
+    // Why it stands alone, which METHOD v2 §5.2 counts as aligned
+    // (P9-T16b-a). It was a contribution statement until the field existed,
+    // and it always said why the objective has no parent.
+    standaloneReason:
+      "Recovers Operating margin to its corridor. It serves the annual thrust on cost rather than a quarterly objective, which is why it has no parent.",
     // **A second defect, and the same shape as the first.**
     // `launchRecoveryInTx` calls `createGoalInTx` without `stampFirstDue`, so a
     // launched recovery objective has no next check-in date at all: it never

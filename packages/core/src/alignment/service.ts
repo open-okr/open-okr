@@ -2,6 +2,7 @@ import {
   type AlignmentFindingKind,
   activeOnly,
   alignmentFindings,
+  cycles,
   goalDependencies,
   goals,
   keyResultDependencies,
@@ -15,10 +16,12 @@ import {
   type AlignmentSeverity,
   type AlignmentThresholds,
   alignmentScore,
+  enforceAlignment,
   type ResolvedThresholds,
 } from "@openokr/method";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { selectInChunks } from "../actions/chunk.ts";
+import { cycleRulesInTx } from "../cycles/rules.ts";
 import type { OperationTx } from "../operations/operation.ts";
 
 /**
@@ -41,13 +44,53 @@ import type { OperationTx } from "../operations/operation.ts";
  */
 
 /** §11's two alignment thresholds, out of a workspace's resolved registry. */
-export function alignmentThresholdsOf(
+function alignmentThresholdsOf(
   thresholds: ResolvedThresholds,
 ): AlignmentThresholds {
   return {
     healthy: thresholds["alignment.healthyThreshold"],
     watch: thresholds["alignment.watchThreshold"],
   };
+}
+
+/**
+ * One scope's score, read the way its cycle is read (P9-T16b-a).
+ *
+ * The cycle's own rules, so a closed cycle keeps the thresholds and check
+ * levels it closed under (P9-T14b), and the levels it began with, so AL-3
+ * measures a skip over the levels it uses (G-3). The practice then drops the
+ * findings of every check it turned off; the share does not move.
+ */
+export async function alignmentInTx(
+  tx: OperationTx,
+  input: AlignmentScopeInput,
+): Promise<{
+  readonly graph: AlignmentGraph;
+  readonly result: AlignmentResult;
+  readonly thresholds: AlignmentThresholds;
+}> {
+  const rules = await cycleRulesInTx(tx, input.workspaceId, input.cycleId);
+  const [cycle] = await tx
+    .select({ levels: cycles.levels })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, input.workspaceId),
+        eq(cycles.id, input.cycleId),
+      ),
+    )
+    .limit(1);
+  const graph = await loadAlignmentGraph(tx, input);
+  const thresholds = alignmentThresholdsOf(rules.thresholds);
+  const result = enforceAlignment(
+    alignmentScore(graph, input.scope, thresholds, {
+      ...(cycle ? { levels: cycle.levels } : {}),
+      contributionMinimum: rules.thresholds["quality.contributionMinimum"],
+    }),
+    rules.practice,
+  );
+  return { graph, result, thresholds };
 }
 
 export interface AlignmentScopeInput {
@@ -63,7 +106,7 @@ export interface AlignmentScopeInput {
  * key result parent takes the level of the goal that owns it. Resolving here is
  * what lets the engine stay ignorant of which kind of pointer it was.
  */
-export async function loadAlignmentGraph(
+async function loadAlignmentGraph(
   tx: OperationTx,
   input: AlignmentScopeInput,
 ): Promise<AlignmentGraph> {
@@ -79,6 +122,7 @@ export async function loadAlignmentGraph(
       parentGoalId: goals.parentGoalId,
       parentKeyResultId: goals.parentKeyResultId,
       standaloneReason: goals.standaloneReason,
+      contributionStatement: goals.contributionStatement,
       spaceId: goals.spaceId,
       closedAt: goals.closedAt,
     })
@@ -175,6 +219,7 @@ export async function loadAlignmentGraph(
       // it by level rather than as no parent.
       outsideParentLevel: outside.get(row.id) ?? null,
       standaloneReason: row.standaloneReason,
+      contributionStatement: row.contributionStatement,
       spaceId: row.spaceId,
       keyResultCount: countByGoal.get(row.id) ?? 0,
       closed: row.closedAt !== null,
@@ -339,10 +384,8 @@ const identityOf = (finding: FindingIdentity): string =>
 export async function recomputeAlignment(
   tx: OperationTx,
   input: AlignmentScopeInput,
-  thresholds: AlignmentThresholds,
 ): Promise<AlignmentResult> {
-  const graph = await loadAlignmentGraph(tx, input);
-  const result = alignmentScore(graph, input.scope, thresholds);
+  const { result } = await alignmentInTx(tx, input);
 
   const scopeId = input.scope.kind === "space" ? input.scope.spaceId : null;
 

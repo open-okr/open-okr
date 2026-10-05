@@ -65,6 +65,7 @@ const goal = (id: string, extra: Partial<OkrGoal> = {}): OkrGoal => ({
   parentKeyResultId: null,
   weight: 1,
   contributionStatement: null,
+  standaloneReason: null,
   progressPct: 10,
   health: "on_track",
   closedAt: null,

@@ -129,9 +129,9 @@ Then open *Onboarding runs without us in the room* to show the other side: a dep
 
 Go to `/goals/studio`.
 
-The alignment health score is **83%**: five of the six goals below company level align to a parent or say why they stand alone. That is watch, between 80% and the 90% that is healthy, and the panel lists the one goal it did not count, at high severity.
+The alignment health score is **100%**: all six goals below company level align to a parent or say why they stand alone. Open the recovery objective for operating margin in the drawer: it has no parent, and its alignment tab says why it stands alone.
 
-> "The score is a share, not a grade. The goal it lists is the recovery objective for operating margin, which has no parent and no reason to stand alone. Give it either and the set reads healthy. The score does not hide it: it is a prompt."
+> "The score is a share, not a grade. A goal with no parent is not a mistake when somebody has said why: this one serves the annual thrust on cost rather than any quarterly objective. Clear that reason and the share drops to 83%, watch, with the goal listed as not counted. The level skips in this set are there and unsaid, because a strict cascade is a choice a workspace makes, not the default."
 
 ### Beat 6 — KPIs, and an objective the product wrote (4 min)
 

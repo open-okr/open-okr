@@ -158,6 +158,8 @@ export interface GoalSnapshot {
   readonly reviewerId: string | null;
   readonly hasParent: boolean;
   readonly contributionStatement: string | null;
+  /** Why it stands alone, which gate 3 accepts as mapped (§4.5, P9-T16b-a). */
+  readonly standaloneReason?: string | null;
   readonly keyResults: readonly KeyResultSnapshot[];
 }
 
@@ -1012,14 +1014,21 @@ export function publishGates(
     }
   }
 
-  // 3. Alignment is mapped: each objective states what it contributes to.
+  // 3. Alignment is mapped: each objective states what it contributes to,
+  // or why it stands alone.
   if (goals === undefined) {
     results.push(unevaluable(3, goalsBlocked));
   } else {
     const missing = goals
-      .filter((goal) => !goal.hasParent && isBlank(goal.contributionStatement))
+      .filter(
+        (goal) =>
+          !goal.hasParent &&
+          isBlank(goal.contributionStatement) &&
+          isBlank(goal.standaloneReason),
+      )
       .map(
-        (goal) => `"${goal.title}" has no parent and states no contribution`,
+        (goal) =>
+          `"${goal.title}" has no parent, states no contribution and gives no reason to stand alone`,
       );
     results.push(gate(3, missing.length === 0, missing));
   }

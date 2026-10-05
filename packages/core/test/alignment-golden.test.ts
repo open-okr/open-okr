@@ -5,6 +5,8 @@ import {
   alignmentBand,
   alignmentScore,
   canonThresholds,
+  defaultPractice,
+  enforceAlignment,
 } from "@openokr/method";
 import {
   cellJson,
@@ -321,5 +323,129 @@ describe("every finding carries what a surface needs", () => {
       canon,
     );
     expect(result.score).not.toBeNull();
+  });
+});
+
+describe("the checks at their levels (P9-T16b-a)", () => {
+  const skip = toGraph({
+    goals: [
+      { id: "c", level: "company", krs: 2 },
+      { id: "t", level: "team", parent: "c", space: "s1", krs: 2 },
+      { id: "d", level: "department", parent: "c", space: "s2", krs: 2 },
+    ],
+  });
+  const rules = (graph: AlignmentGraph, levels?: readonly string[]) =>
+    alignmentScore(
+      graph,
+      { kind: "workspace" },
+      canon,
+      levels ? { levels } : {},
+    ).findings.map((finding) => `${finding.ruleKey}:${finding.subjectGoalId}`);
+
+  it("measures a skip over the levels the cycle uses (G-3)", () => {
+    expect(rules(skip)).toContain("AL-3:t");
+    expect(rules(skip, ["company", "team"])).not.toContain("AL-3:t");
+    // A level the cycle never began with still counts where a goal sits on
+    // it: the department goal is measured from where it is.
+    expect(
+      rules(
+        toGraph({
+          goals: [
+            { id: "c", level: "company", krs: 2 },
+            { id: "i", level: "individual", parent: "c", space: "s1", krs: 2 },
+          ],
+        }),
+        ["company", "team", "individual"],
+      ),
+    ).toContain("AL-3:i");
+  });
+
+  it("drops the findings of a check the practice turned off, and keeps the share", () => {
+    const raw = alignmentScore(skip, { kind: "workspace" }, canon);
+    const byDefault = enforceAlignment(raw, defaultPractice());
+    // The skip, and the one department, which links to nobody.
+    expect(raw.findings.map((finding) => finding.ruleKey)).toEqual([
+      "AL-3",
+      "AL-6",
+    ]);
+    expect(byDefault.findings).toEqual([]);
+    expect(byDefault.score).toBe(raw.score);
+
+    const strictCascade = enforceAlignment(raw, {
+      ...defaultPractice(),
+      "checks.AL-3": "warn",
+    });
+    expect(strictCascade.findings.map((finding) => finding.ruleKey)).toEqual([
+      "AL-3",
+    ]);
+  });
+
+  it("lets a contribution pass AL-1 while the share leaves the goal out", () => {
+    const result = alignmentScore(
+      {
+        goals: [
+          {
+            id: "c",
+            level: "company",
+            parentGoalId: null,
+            spaceId: null,
+            keyResultCount: 2,
+          },
+          {
+            id: "t",
+            level: "team",
+            parentGoalId: null,
+            contributionStatement: "The supplier priority, through retail",
+            spaceId: "s1",
+            keyResultCount: 2,
+          },
+        ],
+        goalDependencies: [],
+        keyResultDependencies: [],
+      },
+      { kind: "workspace" },
+      canon,
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.uncounted).toEqual(["t"]);
+    expect(result.score).toBe(0);
+  });
+
+  it("warns AL-1 on a contribution under the minimum, parent or not", () => {
+    const short = (contributionMinimum: number) =>
+      alignmentScore(
+        {
+          goals: [
+            {
+              id: "c",
+              level: "company",
+              parentGoalId: null,
+              spaceId: null,
+              keyResultCount: 2,
+            },
+            {
+              id: "t",
+              level: "team",
+              parentGoalId: "c",
+              contributionStatement: "Grow revenue",
+              spaceId: "s1",
+              keyResultCount: 2,
+            },
+          ],
+          goalDependencies: [],
+          keyResultDependencies: [],
+        },
+        { kind: "workspace" },
+        canon,
+        { contributionMinimum, levels: ["company", "team"] },
+      ).findings;
+    expect(short(3)).toEqual([
+      expect.objectContaining({
+        ruleKey: "AL-1",
+        condition: "Stated contribution under the contribution minimum",
+        subjectGoalId: "t",
+      }),
+    ]);
+    expect(short(2)).toEqual([]);
   });
 });

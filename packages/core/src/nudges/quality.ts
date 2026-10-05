@@ -31,6 +31,7 @@ import {
   type WorkspaceTx,
 } from "@openokr/db";
 import {
+  enforcementLevel,
   isTriggerKey,
   type ResolvedThresholds,
   type TriggerKey,
@@ -38,7 +39,9 @@ import {
 } from "@openokr/method";
 import { and, eq, isNull } from "drizzle-orm";
 import { type AgentScope, agentSeesGoal } from "../agents/scope.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError } from "../operations/errors.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { evaluateGoalInTx } from "../quality/service.ts";
 import { resolveManagers } from "../spaces/roles.ts";
 import { spaceRoleHolders } from "./rituals.ts";
@@ -349,11 +352,18 @@ async function findingNudges(
     );
 
   const byId = new Map(open.map((goal) => [goal.id, goal]));
+  // A check the practice turned off says nothing, and a stored finding may
+  // predate the change, because a practice change recomputes nothing
+  // (P9-T16b-a). AL-3 and AL-6 are off by default, so their nudges are too.
+  const { practice } = practiceFromRow(await readRhythmRow(tx, workspaceId));
   const due: DueNudge[] = [];
   for (const finding of rows) {
     if (!finding.ruleKey || !finding.subjectGoalId) {
       // The anchor finding has no subject because no goal caused it (decision
       // D-16), and §6.4 names no trigger for it.
+      continue;
+    }
+    if (enforcementLevel(finding.ruleKey, practice) === "off") {
       continue;
     }
     const ruleKey = TRIGGER_FOR_FINDING[finding.ruleKey];

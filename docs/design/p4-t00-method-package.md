@@ -83,12 +83,12 @@ Condition tables use first-match-wins evaluation.
 
 | ID | Title | Conditions |
 |---|---|---|
-| AL-1 | Supports a bigger priority | 3 rows: fail no parent and no contribution, warn contribution < 3 words, pass |
+| AL-1 | Supports a bigger priority | 3 rows: warn with no parent, no contribution and no standalone reason; warn with a contribution under "Contribution minimum"; pass. The first row failed, and the second read "< 3 words", until P9-T16b-a |
 | AL-2 | One parent only | 1 row: fail if both parent goal and parent key result set |
-| AL-3 | No level skip | 1 row: flag when a team goal aligns straight to company |
-| AL-4 | Company anchor | 1 row: fail if no company-level objective anchors the tree |
+| AL-3 | No level skip | 1 row: flag a skip over the levels the cycle uses. Off by default since METHOD v2 (P9-T03a set the level, P9-T16b-a made the engine honour it) |
+| AL-4 | Company anchor | 1 row: warn if no company-level objective anchors the tree (fail until P9-T16b-a) |
 | AL-5 | Dependencies declared | 1 row: fail if any cross-team dependency is neither confirmed nor risk-owned |
-| AL-6 | Not siloed | 1 row: flag a department whose subtree has no horizontal dependency |
+| AL-6 | Not siloed | 1 row: flag a department whose subtree has no horizontal dependency. Off by default since METHOD v2 |
 
 #### Cycle checks (8)
 
@@ -504,10 +504,10 @@ to company level, one department with no horizontal dependencies.
 
 | Check | Verdict | Reason |
 |---|---|---|
-| AL-1 | fail (for orphaned goal) | No parent and no stated contribution |
+| AL-1 | warn (for orphaned goal) | No parent, no stated contribution and no standalone reason. Read fail until P9-T16b-a |
 | AL-2 | pass | Single parent on all |
 | AL-3 | fail (for team goal) | Team goal aligned straight to company |
-| AL-4 | fail | No company-level objective anchors the tree |
+| AL-4 | warn | No company-level objective anchors the tree. Read fail until P9-T16b-a, when METHOD v2's "Warn" moved in |
 | AL-5 | pass | All dependencies confirmed |
 | AL-6 | fail (for isolated dept) | Department subtree has no horizontal dependency |
 

@@ -190,20 +190,18 @@ describe("the demo builder", () => {
       expect(entry.blocksPublish).toBe(false);
     }
     expect(alignment.register.some((entry) => entry.confirmed)).toBe(true);
-    // The share DEMO-SCRIPT.md beat 5 quotes (P9-T16a): five of the six goals
-    // below company level align, and the recovery objective is the one that
-    // does not, which is the high-severity finding the script points at.
+    // The share DEMO-SCRIPT.md beat 5 quotes (P9-T16b-a): every goal below
+    // company level counts, the recovery objective because it says why it
+    // stands alone.
     expect(alignment).toMatchObject({
-      score: 83,
-      band: "watch",
+      score: 100,
+      band: "healthy",
       measured: 6,
-      counted: 5,
+      counted: 6,
+      uncounted: [],
     });
-    expect(
-      alignment.findings
-        .filter((finding) => finding.ruleKey === "AL-1")
-        .map((finding) => finding.subjectGoalTitle),
-    ).toEqual(["Bring Operating margin back to 15"]);
+    // The level skips are there and unsaid, because AL-3 is off by default.
+    expect(alignment.findings).toEqual([]);
   });
 
   it("puts every KPI state on the grid, including one nobody has measured", async () => {

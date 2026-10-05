@@ -278,6 +278,81 @@ async function warnOnKr4(): Promise<void> {
   });
 }
 
+/**
+ * A team objective hung straight under a company one: a level skip whenever
+ * the cycle uses departments, which a new workspace's cycle does.
+ */
+async function skipALevel(): Promise<{ readonly team: string }> {
+  const wb = await workerDb();
+  const company = (await callAction(
+    { pool: wb.appPool, ...context() },
+    "goals.create",
+    {
+      title: "Become the preferred platform for teams",
+      cycleId,
+      level: "company",
+      ownerKind: "workspace",
+      championId: ownerMemberId,
+      reviewerId: secondMemberId,
+      weight: 1,
+    },
+  )) as { id: string };
+  const team = (await callAction(
+    { pool: wb.appPool, ...context() },
+    "goals.create",
+    {
+      title: "Make onboarding something customers finish without us",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      parentGoalId: company.id,
+      championId: ownerMemberId,
+      reviewerId: secondMemberId,
+      weight: 1,
+    },
+  )) as { id: string };
+  return { team: team.id };
+}
+
+const setCheck = async (check: string, level: string) => {
+  const wb = await workerDb();
+  await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+    overrides: { [`checks.${check}`]: level },
+  });
+};
+
+describe("the level-skip nudge (P9-T16b-a)", () => {
+  const skips = async () =>
+    (await sentNudges()).filter((row) => row.rule_key === "quality.level_skip");
+
+  it("is not sent by default, because AL-3 is off (NW-Q1-10)", async () => {
+    await skipALevel();
+    await runCoach();
+    expect(await skips()).toEqual([]);
+  });
+
+  it("is sent to the champion where a workspace turned AL-3 on", async () => {
+    await setCheck("AL-3", "warn");
+    const { team } = await skipALevel();
+    await runCoach();
+    expect(await skips()).toEqual([
+      expect.objectContaining({
+        subject_id: team,
+        recipient_member_id: ownerMemberId,
+      }),
+    ]);
+  });
+
+  it("stops the moment AL-3 is turned off again, though the finding was stored", async () => {
+    await setCheck("AL-3", "warn");
+    await skipALevel();
+    await setCheck("AL-3", "off");
+    await runCoach();
+    expect(await skips()).toEqual([]);
+  });
+});
+
 describe("the quality pass, with no provider configured", () => {
   it("sends no all-lagging nudge by default, because KR-4 is a note", async () => {
     const goal = await createGoal("Become the preferred platform for teams");

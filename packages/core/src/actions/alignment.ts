@@ -26,22 +26,19 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { ALIGNMENT_BANDS, alignmentScore } from "@openokr/method";
+import { ALIGNMENT_BANDS } from "@openokr/method";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import {
-  alignmentThresholdsOf,
+  alignmentInTx,
   blocksPublish,
-  loadAlignmentGraph,
   loadDependencyRegister,
   recomputeAlignment,
   scopesForGoal,
 } from "../alignment/service.ts";
-import { resolveRhythm } from "../cycles/rhythm.ts";
-import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -147,9 +144,6 @@ export async function recomputeAlignmentFor(
   workspaceId: string,
   touched: readonly { cycleId: string | null; spaceId: string | null }[],
 ): Promise<void> {
-  const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
-  const thresholds = alignmentThresholdsOf(rhythm.thresholds);
-
   const done = new Set<string>();
   for (const goal of touched) {
     if (!goal.cycleId) {
@@ -165,11 +159,11 @@ export async function recomputeAlignmentFor(
         continue;
       }
       done.add(key);
-      await recomputeAlignment(
-        tx,
-        { workspaceId, cycleId: goal.cycleId, scope },
-        thresholds,
-      );
+      await recomputeAlignment(tx, {
+        workspaceId,
+        cycleId: goal.cycleId,
+        scope,
+      });
     }
   }
 }
@@ -1063,6 +1057,13 @@ export const readAlignment = defineReadAction({
     /** Goals below company level in scope, and how many of them count. */
     measured: z.number().int(),
     counted: z.number().int(),
+    /**
+     * The goals the share did not count, that this reader can see (§5.2:
+     * "The coach lists every unaligned goal"). Listed whether or not a check
+     * is raised against them: one that states a contribution passes AL-1 and
+     * is still not counted (P9-T16b-a).
+     */
+    uncounted: z.array(z.object({ id: z.uuid(), title: z.string() })),
     goalCount: z.number().int(),
     findings: z.array(
       z.object({
@@ -1108,10 +1109,6 @@ export const readAlignment = defineReadAction({
       async (rawTx) => {
         const tx = rawTx as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
-        const rhythm = resolveRhythm(
-          await readRhythmRow(tx, context.workspaceId),
-        );
-        const thresholds = alignmentThresholdsOf(rhythm.thresholds);
         const scope = input.spaceId
           ? ({ kind: "space", spaceId: input.spaceId } as const)
           : ({ kind: "workspace" } as const);
@@ -1120,12 +1117,24 @@ export const readAlignment = defineReadAction({
         // this recomputes the score from the graph so the number on the screen
         // cannot lag a write that forgot to trigger one, and says so if the two
         // ever disagree by simply being the live answer.
-        const graph = await loadAlignmentGraph(tx, {
+        const {
+          graph,
+          result: live,
+          thresholds,
+        } = await alignmentInTx(tx, {
           workspaceId: context.workspaceId,
           cycleId: input.cycleId,
           scope,
         });
-        const live = alignmentScore(graph, scope, thresholds);
+        // A stored structural finding is shown only while the live answer
+        // still raises it (P9-T16b-a). A practice change recomputes nothing,
+        // so without this a workspace that turned AL-3 off would go on seeing
+        // the skips it found before.
+        const raisedNow = new Set(
+          live.findings.map(
+            (finding) => `${finding.ruleKey} ${finding.subjectGoalId ?? ""}`,
+          ),
+        );
 
         const stateFilter = input.includeDismissed
           ? undefined
@@ -1185,7 +1194,11 @@ export const readAlignment = defineReadAction({
         });
         const visible = rows.filter(
           (row) =>
-            !row.subjectGoalId || allowedFindingGoals.has(row.subjectGoalId),
+            (!row.subjectGoalId ||
+              allowedFindingGoals.has(row.subjectGoalId)) &&
+            (row.source !== "engine" ||
+              row.kind !== "structure" ||
+              raisedNow.has(`${row.ruleKey} ${row.subjectGoalId ?? ""}`)),
         );
 
         // The register, for the goals this reader can see. §5.4's four columns:
@@ -1291,6 +1304,26 @@ export const readAlignment = defineReadAction({
           ];
         });
 
+        const uncountedVisible = live.uncounted.filter((id) =>
+          allowedGraphGoals.has(id),
+        );
+        const uncountedTitles = new Map(
+          (
+            await selectInChunks(uncountedVisible, (batch) =>
+              tx
+                .select({ id: goals.id, title: goals.title })
+                .from(goals)
+                .where(
+                  activeOnly(
+                    goals,
+                    eq(goals.workspaceId, context.workspaceId),
+                    inArray(goals.id, batch),
+                  ),
+                ),
+            )
+          ).map((row) => [row.id, row.title]),
+        );
+
         return {
           score: live.score,
           band: live.band,
@@ -1302,6 +1335,10 @@ export const readAlignment = defineReadAction({
           ),
           measured: live.measured,
           counted: live.counted,
+          uncounted: uncountedVisible.flatMap((id) => {
+            const title = uncountedTitles.get(id);
+            return title === undefined ? [] : [{ id, title }];
+          }),
           goalCount: graph.goals.length,
           findings: visible,
           register,

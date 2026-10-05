@@ -72,6 +72,20 @@ async function makeGoal(input: {
   return goal.id;
 }
 
+/**
+ * AL-3 and AL-6 are off by default since METHOD v2 (P9-T16b-a), so a test of
+ * either turns it on first, before any goal is written: a practice change
+ * recomputes nothing, and the findings are stored by the writes that follow.
+ */
+async function turnOn(...checks: string[]): Promise<void> {
+  const wb = await workerDb();
+  await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+    overrides: Object.fromEntries(
+      checks.map((check) => [`checks.${check}`, "warn"]),
+    ),
+  });
+}
+
 const read = async (spaceId?: string) => {
   const wb = await workerDb();
   return callAction({ pool: wb.appPool, ...context() }, "alignment.read", {
@@ -153,6 +167,7 @@ afterAll(async () => {
 describe("the score against real rows", () => {
   /** The design document's acceptance criterion, read as a share (P9-T16a). */
   it("reads 75 with one unaligned goal in four, and lists the silo beside it", async () => {
+    await turnOn("AL-6");
     const company = await makeGoal({
       title: "Become the default supplier for mid-market retail",
       level: "company",
@@ -441,7 +456,168 @@ describe("the score against real rows", () => {
   });
 });
 
+describe("the checks at their levels (P9-T16b-a)", () => {
+  it("says nothing about a skip or a silo by default, and the share does not move", async () => {
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    // A skip: team straight under company. A silo: the only department.
+    await makeGoal({
+      title: "Rebuild the trial flow",
+      level: "team",
+      spaceId: spaceA,
+      parentGoalId: company,
+    });
+    await makeGoal({
+      title: "Win two logos a quarter",
+      level: "department",
+      spaceId: spaceB,
+      parentGoalId: company,
+    });
+    const result = await read();
+    expect(result.findings).toEqual([]);
+    expect(result.score).toBe(100);
+  });
+
+  it("hides a stored skip the moment AL-3 is turned off", async () => {
+    await turnOn("AL-3");
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    await makeGoal({
+      title: "Rebuild the trial flow",
+      level: "team",
+      spaceId: spaceA,
+      parentGoalId: company,
+    });
+    expect((await read()).findings.map((finding) => finding.ruleKey)).toEqual([
+      "AL-3",
+    ]);
+
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "checks.AL-3": "off" },
+    });
+    // Nothing was recomputed: the stored row is still there, and not shown.
+    expect((await read()).findings).toEqual([]);
+  });
+
+  it("acceptance: with no department level, a team under the company skips nothing (G-3)", async () => {
+    await turnOn("AL-3");
+    const wb = await workerDb();
+    const call = (name: string, input: object) =>
+      callAction({ pool: wb.appPool, ...context() }, name as never, input);
+    await call("practice.update", {
+      overrides: { "levels.department": "off" },
+    });
+    // A cycle that begins after the change begins without the level (§2.7).
+    const next = (await call("cycles.create", {
+      on: `${new Date().getUTCFullYear() + 1}-02-15`,
+    })) as { id: string };
+    const goal = async (
+      title: string,
+      level: "company" | "team",
+      parentGoalId?: string,
+    ) =>
+      (
+        (await call("goals.create", {
+          title,
+          cycleId: next.id,
+          level,
+          ownerKind: level === "company" ? "workspace" : "space",
+          ...(level === "company" ? {} : { spaceId: spaceA }),
+          ...(parentGoalId ? { parentGoalId } : {}),
+          championId: ownerMemberId,
+          reviewerId: ownerMemberId,
+          weight: 1,
+        })) as { id: string }
+      ).id;
+    const company = await goal("Become the default supplier", "company");
+    await goal("Rebuild the trial flow", "team", company);
+
+    const later = (await call("alignment.read", {
+      cycleId: next.id,
+      includeDismissed: false,
+    })) as { findings: { ruleKey: string | null }[] };
+    expect(later.findings.filter((f) => f.ruleKey === "AL-3")).toEqual([]);
+
+    // The cycle that began with departments still counts the same skip.
+    const company2 = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    await makeGoal({
+      title: "Rebuild the trial flow",
+      level: "team",
+      spaceId: spaceA,
+      parentGoalId: company2,
+    });
+    expect(
+      (await read()).findings.filter((f) => f.ruleKey === "AL-3"),
+    ).toHaveLength(1);
+  });
+
+  it("lets a stated contribution pass AL-1, and still lists the goal as not counted", async () => {
+    await makeGoal({ title: "Become the default supplier", level: "company" });
+    const growth = await makeGoal({
+      title: "Grow the mid-market book",
+      level: "team",
+      spaceId: spaceA,
+    });
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+      id: growth,
+      contributionStatement: "The supplier priority, through mid-market retail",
+    });
+
+    const result = await read();
+    expect(result.findings.filter((f) => f.ruleKey === "AL-1")).toEqual([]);
+    expect(result.score).toBe(0);
+    expect(result.uncounted).toEqual([
+      { id: growth, title: "Grow the mid-market book" },
+    ]);
+  });
+
+  it("warns AL-1 on a contribution under the minimum, even with a parent", async () => {
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    const growth = await makeGoal({
+      title: "Grow the mid-market book",
+      level: "department",
+      spaceId: spaceA,
+      parentGoalId: company,
+    });
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+      id: growth,
+      contributionStatement: "Growth",
+    });
+
+    const result = await read();
+    expect(result.score).toBe(100);
+    expect(result.uncounted).toEqual([]);
+    expect(
+      result.findings
+        .filter((f) => f.ruleKey === "AL-1")
+        .map((f) => [f.subjectGoalId, f.reason]),
+    ).toEqual([
+      [
+        growth,
+        "Its stated contribution is under 3 words, which names a theme rather than a goal.",
+      ],
+    ]);
+  });
+});
+
 describe("the silo finding", () => {
+  beforeEach(async () => {
+    await turnOn("AL-6");
+  });
+
   it("is gone on the next recompute once the subtree gains a dependency", async () => {
     const company = await makeGoal({
       title: "Become the default supplier",
@@ -868,6 +1044,7 @@ describe("horizontal links", () => {
   });
 
   it("bring the silo finding back when removed", async () => {
+    await turnOn("AL-6");
     const first = await makeGoal({
       title: "Win two logos a quarter",
       level: "department",

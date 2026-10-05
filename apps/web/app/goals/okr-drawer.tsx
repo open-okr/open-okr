@@ -25,7 +25,7 @@ import {
   type OkrHandle,
   useOkrDetail,
 } from "../../lib/okr-tree/use-okr-tree.ts";
-import { unlinkGoals } from "./alignment-actions.ts";
+import { setStandaloneReason, unlinkGoals } from "./alignment-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
   AddedMidCycle,
@@ -983,20 +983,28 @@ function Alignment({
   const [problem, setProblem] = useState<string | null>(null);
   // Taking a dependency apart (completeness review M-35), here since the
   // studio's details panel became this tab (P9-T09b). Either end may.
+  const settle = async (write: Promise<{ error: string | null }>) => {
+    const result = await write;
+    if (result.error) {
+      setProblem(result.error);
+      return;
+    }
+    await queryClient.invalidateQueries({ queryKey: OKR_DETAIL_ALL });
+    await queryClient.invalidateQueries({
+      queryKey: okrCycleKey(tree.cycle.id),
+    });
+    router.refresh();
+  };
   const remove = (dependencyId: string) => {
     setProblem(null);
-    startRemoving(async () => {
-      const result = await unlinkGoals(dependencyId);
-      if (result.error) {
-        setProblem(result.error);
-        return;
-      }
-      await queryClient.invalidateQueries({ queryKey: OKR_DETAIL_ALL });
-      await queryClient.invalidateQueries({
-        queryKey: okrCycleKey(tree.cycle.id),
-      });
-      router.refresh();
-    });
+    startRemoving(() => settle(unlinkGoals(dependencyId)));
+  };
+  // Why an objective with no parent stands alone (METHOD.md §5.2,
+  // P9-T16b-a). The share counts it once it says why, and blank takes the
+  // reason away.
+  const explain = (reason: string) => {
+    setProblem(null);
+    startRemoving(() => settle(setStandaloneReason(goal.id, reason)));
   };
   const inTree = (id: string) => tree.goals.some((entry) => entry.id === id);
   // The key result this objective aligns to, named where the tree holds it.
@@ -1043,7 +1051,29 @@ function Alignment({
             ) : null}
           </>
         ) : (
-          <p className="text-xs text-ink-3">{t("okrDrawer.noParent")}</p>
+          <>
+            <p className="text-xs text-ink-3">{t("okrDrawer.noParent")}</p>
+            {goal.level === "company" ? null : (
+              <div className="mt-1 flex flex-col gap-0.5">
+                <span className="text-xs font-semibold text-ink-2">
+                  {t("okrDrawer.standsAloneBecause")}
+                </span>
+                <InlineText
+                  value={goal.standaloneReason ?? ""}
+                  label={t("okrDrawer.standsAloneBecause")}
+                  readOnly={!canEdit}
+                  allowEmpty
+                  placeholder={t("okrDrawer.standsAlonePlaceholder")}
+                  onSave={explain}
+                />
+                <span className="text-xs text-ink-3">
+                  {goal.standaloneReason
+                    ? t("okrDrawer.standsAloneCounted")
+                    : t("okrDrawer.standsAloneNotCounted")}
+                </span>
+              </div>
+            )}
+          </>
         )}
       </section>
 

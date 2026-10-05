@@ -34551,6 +34551,12 @@
                                   "null"
                                 ]
                               },
+                              "standaloneReason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "progressPct": {
                                 "type": "number"
                               },
@@ -34902,6 +34908,7 @@
                               "parentKeyResultId",
                               "weight",
                               "contributionStatement",
+                              "standaloneReason",
                               "progressPct",
                               "health",
                               "reportedStatus",
@@ -35468,6 +35475,12 @@
                                 "null"
                               ]
                             },
+                            "standaloneReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "progressPct": {
                               "type": "number"
                             },
@@ -35819,6 +35832,7 @@
                             "parentKeyResultId",
                             "weight",
                             "contributionStatement",
+                            "standaloneReason",
                             "progressPct",
                             "health",
                             "reportedStatus",
@@ -36063,6 +36077,12 @@
                                 "null"
                               ]
                             },
+                            "standaloneReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "progressPct": {
                               "type": "number"
                             },
@@ -36414,6 +36434,7 @@
                             "parentKeyResultId",
                             "weight",
                             "contributionStatement",
+                            "standaloneReason",
                             "progressPct",
                             "health",
                             "reportedStatus",
@@ -36690,6 +36711,12 @@
                                 "null"
                               ]
                             },
+                            "standaloneReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "progressPct": {
                               "type": "number"
                             },
@@ -37041,6 +37068,7 @@
                             "parentKeyResultId",
                             "weight",
                             "contributionStatement",
+                            "standaloneReason",
                             "progressPct",
                             "health",
                             "reportedStatus",
@@ -37350,6 +37378,12 @@
                                 "null"
                               ]
                             },
+                            "standaloneReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "progressPct": {
                               "type": "number"
                             },
@@ -37701,6 +37735,7 @@
                             "parentKeyResultId",
                             "weight",
                             "contributionStatement",
+                            "standaloneReason",
                             "progressPct",
                             "health",
                             "reportedStatus",
@@ -37969,6 +38004,12 @@
                                 "null"
                               ]
                             },
+                            "standaloneReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "progressPct": {
                               "type": "number"
                             },
@@ -38320,6 +38361,7 @@
                             "parentKeyResultId",
                             "weight",
                             "contributionStatement",
+                            "standaloneReason",
                             "progressPct",
                             "health",
                             "reportedStatus",
@@ -38568,6 +38610,12 @@
                                 "null"
                               ]
                             },
+                            "standaloneReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "progressPct": {
                               "type": "number"
                             },
@@ -38919,6 +38967,7 @@
                             "parentKeyResultId",
                             "weight",
                             "contributionStatement",
+                            "standaloneReason",
                             "progressPct",
                             "health",
                             "reportedStatus",
@@ -39156,6 +39205,12 @@
                                 "null"
                               ]
                             },
+                            "standaloneReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "progressPct": {
                               "type": "number"
                             },
@@ -39507,6 +39562,7 @@
                             "parentKeyResultId",
                             "weight",
                             "contributionStatement",
+                            "standaloneReason",
                             "progressPct",
                             "health",
                             "reportedStatus",
@@ -39742,6 +39798,12 @@
                                 "null"
                               ]
                             },
+                            "standaloneReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "progressPct": {
                               "type": "number"
                             },
@@ -40093,6 +40155,7 @@
                             "parentKeyResultId",
                             "weight",
                             "contributionStatement",
+                            "standaloneReason",
                             "progressPct",
                             "health",
                             "reportedStatus",
@@ -40445,6 +40508,12 @@
                                 "null"
                               ]
                             },
+                            "standaloneReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "progressPct": {
                               "type": "number"
                             },
@@ -40796,6 +40865,7 @@
                             "parentKeyResultId",
                             "weight",
                             "contributionStatement",
+                            "standaloneReason",
                             "progressPct",
                             "health",
                             "reportedStatus",
@@ -44439,6 +44509,27 @@
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
                         },
+                        "uncounted": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
                         "goalCount": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -44600,6 +44691,7 @@
                         "anchored",
                         "measured",
                         "counted",
+                        "uncounted",
                         "goalCount",
                         "findings",
                         "register"

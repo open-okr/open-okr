@@ -150,6 +150,7 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
     expect(canon["quality.strengthScoreWarnWeight"]).toBe(0.5);
     expect(canon["quality.companyObjectiveCap"]).toBe(5);
     expect(canon["quality.objectivesPerUnitCap"]).toBe(3);
+    expect(canon["quality.contributionMinimum"]).toBe(3);
     expect(canon["quality.strategicIssueMinimum"]).toBe(3);
     expect(canon["cadence.teamPublicationWindowWeeks"]).toBe(2);
     expect(canon["quality.priorityBounds"]).toEqual({ low: 3, high: 5 });
