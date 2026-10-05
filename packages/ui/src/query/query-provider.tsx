@@ -35,6 +35,7 @@ function persistable(query: {
 export {
   QueryClient,
   QueryClientProvider,
+  useIsMutating,
   useMutation,
   useQuery,
   useQueryClient,

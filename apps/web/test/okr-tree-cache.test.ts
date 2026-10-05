@@ -129,4 +129,22 @@ describe("what a filter keeps", () => {
       filterGoals(tree.goals, { includeClosed: true, health: "off_track" }),
     ).toEqual([]);
   });
+
+  it("narrows by champion, by space, and to the reader's own spaces", () => {
+    const spaced = [
+      goal("x", { spaceId: "s1" }),
+      goal("y", { spaceId: "s2", champion: { id: "p", name: "Priya" } }),
+      goal("z", { spaceId: null }),
+    ];
+    const ids = (filters: Parameters<typeof filterGoals>[1]) =>
+      filterGoals(spaced, filters).map((row) => row.id);
+    expect(ids({ includeClosed: false, championId: "p" })).toEqual(["y"]);
+    expect(ids({ includeClosed: false, spaceId: "s1" })).toEqual(["x"]);
+    // An objective in no space is nobody's team's.
+    expect(ids({ includeClosed: false, spaceIds: ["s1", "s2"] })).toEqual([
+      "x",
+      "y",
+    ]);
+    expect(ids({ includeClosed: false, spaceIds: [] })).toEqual([]);
+  });
 });

@@ -57,6 +57,17 @@ export const KPI_TABS = [
   { href: "/kpis/recovery", labelKey: "kpis.recovery.recoveryBoard" },
 ] as const;
 
+/**
+ * The cycle module's screens (P9-T07a-b). Sessions and Scorecard left the
+ * sidebar for here, per okr-entry-points.md §3.1: sessions are the cycle's
+ * cadence, phase 6, and the scorecard is how its cycles ended.
+ */
+export const CYCLE_TABS = [
+  { href: "/cycle", labelKey: "lib.sectionTabs.cycle" },
+  { href: "/sessions", labelKey: "common.sessions" },
+  { href: "/scorecard", labelKey: "scorecard.scorecard" },
+] as const;
+
 /** The goal module's screens. The detail page is a leaf and has no tab. */
 export const GOAL_TABS = [
   { href: "/goals", labelKey: "lib.sectionTabs.explorer" },

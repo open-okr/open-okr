@@ -7,6 +7,7 @@ import {
   CardHeader,
   Chip,
 } from "@openokr/ui";
+import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -99,6 +100,12 @@ export default async function ReviewPage() {
             <Count label="Overdue" value={inbox.counts.overdue} urgent />
             <Count label="Today" value={inbox.counts.today} />
             <Count label="This week" value={inbox.counts.thisWeek} />
+            {/* The walker through every check-in owed, which this screen
+             * already lists one by one (P9-T07a-b). Named apart from each
+             * row's own "Check in", which opens that one goal. */}
+            <Link href="/check-in" className={buttonVariants({ size: "sm" })}>
+              {t("okrList.checkInAll")}
+            </Link>
           </div>
         </CardHeader>
       </Card>

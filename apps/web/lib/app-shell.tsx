@@ -182,6 +182,9 @@ export async function AppShellLayout({
 
   const sidebarItems = navigationFor("sidebar", level);
   const adminItems = navigationFor("admin", level);
+  // Screens reached from inside a module (P9-T07a-b): not drawn in the
+  // sidebar, still offered by the palette, and lighting their parent's row.
+  const insideItems = navigationFor("inside", level);
   const accountItems = sidebarItems.filter((item) => item.group === "account");
 
   const { t } = await getTranslations();
@@ -215,6 +218,10 @@ export async function AppShellLayout({
   const path = (await headers()).get("x-openokr-path") ?? "/";
   const active = activeItemId(path, [
     ...sidebarItems,
+    ...insideItems.map((item) => ({
+      id: item.parent ?? item.id,
+      href: item.href,
+    })),
     { id: "admin", href: "/admin" },
   ]);
 
@@ -261,6 +268,12 @@ export async function AppShellLayout({
       label: navLabel(item, renamed),
       href: item.href,
       area: item.group === "account" ? ("account" as const) : ("page" as const),
+    })),
+    ...insideItems.map((item) => ({
+      id: item.id,
+      label: navLabel(item, renamed),
+      href: item.href,
+      area: "page" as const,
     })),
     ...adminItems
       .filter((item) => cloud || !item.cloudOnly)

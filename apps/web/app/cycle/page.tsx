@@ -14,6 +14,7 @@ import { workspaceReaderLevel } from "../../lib/access";
 import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
+import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import {
@@ -112,6 +113,7 @@ export default async function CyclePage({
   if (!cycle) {
     return (
       <div className="flex flex-col gap-4.5">
+        <SectionTabs items={CYCLE_TABS} active="/cycle" />
         <Card>
           <CardHeader className="justify-between">
             <h1 className="text-lg font-bold text-ink">
@@ -401,380 +403,388 @@ export default async function CyclePage({
   ]);
 
   return (
-    <div className="flex flex-col gap-4.5 xl:flex-row">
-      <div className="w-full flex-none xl:w-72">
-        <PhaseRail
-          phases={workflow.phases}
-          currentPhase={viewing}
-          pinnedCycleId={pinnedCycleId}
-        />
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col gap-4.5">
-        <Card>
-          <CardHeader className="justify-between">
-            <div className="flex flex-col">
-              <h1 className="text-base font-bold text-ink">
-                {t("common.phase", {
-                  viewing,
-                  viewing2: PHASE_TITLES[viewing] ?? "",
-                })}
-              </h1>
-              <p className="text-xs text-ink-3">
-                {t("cycle.completionIsComputedNeverSelf", {
-                  name: workflow.name,
-                })}
-              </p>
-            </div>
-            <CycleSwitcher
-              mode={workflow.mode}
-              cycles={everyCycle}
-              currentId={cycle.id}
-            />
-          </CardHeader>
-          {draftingBlocked || showGaps ? (
-            <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">
-              <p className="text-sm font-bold text-warn">
-                {draftingBlocked
-                  ? t("cycle.thisPhaseIsBlocked")
-                  : t("cycle.earlierPhasesHaveGaps")}
-              </p>
-              {draftingBlocked ? null : (
-                <p className="text-xs text-warn">
-                  {t("cycle.thePhasesGuideNothingWaits")}
-                </p>
-              )}
-              <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-warn">
-                {work.because.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-              <p className="text-xs text-warn">
-                <a className="underline" href={phaseHref(1, pinnedCycleId)}>
-                  {t("cycle.goAndGatherWhat")}
-                </a>
-              </p>
-            </CardBody>
-          ) : null}
-          {phase && phase.blocked.length > 0 ? (
-            <CardBody className="border-line border-t">
-              <ul className="flex flex-col gap-0.5 text-xs text-ink-3">
-                {phase.blocked.map((reason) => (
-                  <li key={reason}>{t("cycle.notYetCheckable", { reason })}</li>
-                ))}
-              </ul>
-            </CardBody>
-          ) : null}
-          {phase && phase.missing.length > 0 ? (
-            <CardBody className="border-line border-t">
-              <p className="mb-1 text-xs font-bold tracking-wide text-ink-3 uppercase">
-                {t("cycle.stillNeededHere")}
-              </p>
-              <ul className="flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-2">
-                {phase.missing.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            </CardBody>
-          ) : null}
-        </Card>
-
-        {viewing === 1 ? (
-          <InputPack
-            cycleId={workflow.cycleId}
-            mode={workflow.mode}
-            items={workflow.packItems}
-            distributedAt={workflow.packDistributedAt}
-            sponsor={workflow.sponsor}
-            facilitator={workflow.facilitator}
-            canEdit={canEdit}
-          />
-        ) : null}
-
-        {viewing === 1 && canPublish ? (
-          <CycleSetup
-            cycleId={workflow.cycleId}
-            people={people}
-            sponsorId={workflow.sponsor?.id ?? null}
-            facilitatorId={workflow.facilitator?.id ?? null}
-            firstCycle={workflow.firstCycle}
-            sessionDates={workflow.sessionDates}
-          />
-        ) : null}
-
-        {viewing === 2 ? (
-          <BaselineHealth
-            cycleId={workflow.cycleId}
-            saved={workflow.baselineHealth}
-            canEdit={canEdit}
-          />
-        ) : null}
-
-        {viewing === 2 ? (
-          <Diagnose
-            cycleId={workflow.cycleId}
-            issues={workflow.issues}
-            minimum={workflow.asks.strategicIssues}
-            canEdit={canEdit}
-          />
-        ) : null}
-
-        {viewing === 3 && workflow.mode === "quarterly" ? (
-          <Revalidation
-            cycleId={workflow.cycleId}
-            saved={workflow.revalidation}
-            focus={workflow.focus}
-            canEdit={canEdit}
-          />
-        ) : null}
-
-        {viewing === 3 ? (
-          <Direction
-            cycleId={workflow.cycleId}
-            mode={workflow.mode}
-            priorities={workflow.priorities}
-            issues={workflow.issues}
-            bounds={workflow.asks.priorities}
-            canEdit={canEdit}
-          />
-        ) : null}
-
-        {/* Before the capacity check, because §5.4 comes before §5.5 in the
-            method and because the two answer the same conversation in order:
-            who are we waiting on, and can we carry what is left. */}
-        {register && registerMembers && registerSpaces && capacity ? (
-          <DependencyRegister
-            entries={register.register}
-            keyResults={capacity.keyResults.map((keyResult) => ({
-              id: keyResult.id,
-              title: keyResult.title,
-              goalTitle: keyResult.goalTitle,
-            }))}
-            members={registerMembers}
-            spaces={registerSpaces.map((space) => ({
-              id: space.id,
-              name: space.name,
-            }))}
-            canEdit={canEdit}
-          />
-        ) : null}
-
-        {capacity ? (
-          <Capacity
-            keyResults={capacity.keyResults}
-            initiatives={capacity.initiatives}
-          />
-        ) : null}
-
-        {viewing === 5 ? (
-          <CapacityCuts
-            cycleId={workflow.cycleId}
-            saved={workflow.capacityCuts}
-            canEdit={canEdit}
-          />
-        ) : null}
-
-        {viewing === 5 ? (
-          <Gates
-            cycleId={workflow.cycleId}
-            gates={workflow.gates}
-            publishable={workflow.publishable}
-            publishedAt={workflow.publishedAt}
-            companyPublishedAt={workflow.companyPublishedAt}
-            canPublish={canPublish}
+    <div className="flex flex-col gap-4.5">
+      <SectionTabs items={CYCLE_TABS} active="/cycle" />
+      <div className="flex flex-col gap-4.5 xl:flex-row">
+        <div className="w-full flex-none xl:w-72">
+          <PhaseRail
+            phases={workflow.phases}
+            currentPhase={viewing}
             pinnedCycleId={pinnedCycleId}
           />
-        ) : null}
+        </div>
 
-        {viewing === 4 ? (
-          <Drafting
-            cycleId={workflow.cycleId}
-            endsOn={workflow.endsOn}
-            draftingAllowed={workflow.drafting.allowed}
-            draftingReasons={workflow.drafting.reasons}
-            goals={draft.goals}
-            members={draft.members}
-            kpis={draft.kpis}
-            canEdit={canEdit}
-            thresholds={draft.thresholds}
-            practice={draft.practice}
-            checkTitles={draft.checkTitles}
-            memberId={workspace.memberId}
-            assistsAvailable={await assistsAvailableAction()}
-          />
-        ) : null}
-
-        {viewing === 0 ? (
-          <AnnualFrame frame={frame} canEdit={canPublish} />
-        ) : null}
-
-        {viewing === 0 ? (
-          <AnnualObjectives
-            strategies={frame?.strategies ?? []}
-            objectives={annualObjectives}
-            canEdit={canPublish}
-            // The reader champions and reviews what they send forward. A
-            // picker here would be a second drafting form on a phase that
-            // is not the drafting phase; the goal page is where either is
-            // changed.
-            championId={workspace.memberId}
-            reviewerId={workspace.memberId}
-            frameAgreed={frame?.agreed ?? false}
-          />
-        ) : null}
-
-        {viewing === 6 && cadence ? (
-          <RunningCadence
-            cycleId={workflow.cycleId}
-            sessions={cadence.sessions}
-            blockers={cadence.blockers}
-            decisions={cycleDecisions.map((decision) => ({
-              id: decision.id,
-              summary: decision.text,
-              at: decision.at,
-            }))}
-            confidence={cycleGoals.flatMap((goal) =>
-              goal.keyResults.map((keyResult) => ({
-                id: keyResult.id,
-                title: keyResult.title,
-                goalTitle: goal.title,
-                confidence: keyResult.confidence,
-                // The trend needs the previous check-in's figure, which
-                // `goals.list` does not carry. Left null rather than
-                // guessed: the card renders "no trend yet" and says so,
-                // which is honest, and P6-G19 is where the confidence
-                // history arrives for the session screen anyway.
-                previousConfidence: null,
-              })),
-            )}
-            streak={cadence.streak}
-            calibration={workflow.calibration}
-            // `workflow.calibrate` is declared at full, the same as publishing.
-            canCalibrate={canPublish}
-            closed={workflow.status === "closed"}
-          />
-        ) : null}
-
-        {viewing === 7 && reviewThresholds ? (
-          <ReviewAndLearn
-            keyResults={cycleGoals.flatMap((goal) =>
-              goal.keyResults.map((keyResult) => ({
-                id: keyResult.id,
-                title: keyResult.title,
-                goalTitle: goal.title,
-                score: keyResult.score,
-                carryForward: keyResult.carryForward,
-              })),
-            )}
-            cycleId={workflow.cycleId}
-            cycleName={workflow.name}
-            closure={workflow.closure}
-            // The same evaluation `cycles.close` refuses on, so the control
-            // is disabled for exactly the reasons the server would give.
-            waitingFor={[...(phase?.missing ?? []), ...(phase?.blocked ?? [])]}
-            // `full`, which is what `cycles.close` requires.
-            canEdit={canPublish}
-            thresholds={reviewThresholds}
-          />
-        ) : null}
-      </div>
-
-      <div className="flex w-full flex-none flex-col gap-4.5 xl:w-80">
-        {viewing === 4 ? (
-          <QualityPanel
-            set={draft.goals.map((goal) => ({
-              objective: {
-                id: goal.id,
-                title: goal.title,
-                hasCycle: true,
-                hasTimeframe: false,
-                championId: goal.champion.id,
-                reviewerId: goal.reviewer?.id ?? null,
-                objectivesInUnit: draft.goals.filter(
-                  (other) => other.level === goal.level,
-                ).length,
-                level: goal.level,
-              },
-              keyResults: goal.keyResults.map((keyResult) => ({
-                id: keyResult.id,
-                title: keyResult.title,
-                baseline: keyResult.baselineValue,
-                target: keyResult.targetValue,
-                dueOn: keyResult.dueOn,
-                ownerId: keyResult.ownerId,
-                indicatorType: keyResult.indicatorType,
-                direction: keyResult.direction,
-                confidence: keyResult.confidence,
-              })),
-            }))}
-            thresholds={draft.thresholds}
-            practice={draft.practice}
-            checkTitles={draft.checkTitles}
-          />
-        ) : null}
-        {cycleDecisions.length === 0 ? null : (
+        <div className="flex min-w-0 flex-1 flex-col gap-4.5">
           <Card>
-            <CardHeader>
-              <h2 className="text-sm font-bold text-ink">
-                {t("cycle.decisionsThisCycle")}
-              </h2>
+            <CardHeader className="justify-between">
+              <div className="flex flex-col">
+                <h1 className="text-base font-bold text-ink">
+                  {t("common.phase", {
+                    viewing,
+                    viewing2: PHASE_TITLES[viewing] ?? "",
+                  })}
+                </h1>
+                <p className="text-xs text-ink-3">
+                  {t("cycle.completionIsComputedNeverSelf", {
+                    name: workflow.name,
+                  })}
+                </p>
+              </div>
+              <CycleSwitcher
+                mode={workflow.mode}
+                cycles={everyCycle}
+                currentId={cycle.id}
+              />
             </CardHeader>
-            <CardBody className="flex flex-col gap-2">
-              <ul className="flex flex-col gap-2">
-                {cycleDecisions.map((decision) => (
-                  <li key={decision.id} className="flex flex-col gap-0.5">
-                    <span className="text-sm text-ink">{decision.text}</span>
-                    <span className="text-xs text-ink-3">
-                      {decision.goalId ? (
-                        <a
-                          className="underline"
-                          href={`/goals/${decision.goalId}`}
-                        >
-                          {decision.keyResultTitle ?? decision.goalTitle}
-                        </a>
-                      ) : (
-                        (decision.keyResultTitle ?? decision.goalTitle)
-                      )}{" "}
-                      · {new Date(decision.at).toLocaleDateString()} ·{" "}
-                      {decision.authorName}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-ink-4">
-                {t("cycle.recordedInTheMonthly")}
-              </p>
-            </CardBody>
+            {draftingBlocked || showGaps ? (
+              <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">
+                <p className="text-sm font-bold text-warn">
+                  {draftingBlocked
+                    ? t("cycle.thisPhaseIsBlocked")
+                    : t("cycle.earlierPhasesHaveGaps")}
+                </p>
+                {draftingBlocked ? null : (
+                  <p className="text-xs text-warn">
+                    {t("cycle.thePhasesGuideNothingWaits")}
+                  </p>
+                )}
+                <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-warn">
+                  {work.because.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-warn">
+                  <a className="underline" href={phaseHref(1, pinnedCycleId)}>
+                    {t("cycle.goAndGatherWhat")}
+                  </a>
+                </p>
+              </CardBody>
+            ) : null}
+            {phase && phase.blocked.length > 0 ? (
+              <CardBody className="border-line border-t">
+                <ul className="flex flex-col gap-0.5 text-xs text-ink-3">
+                  {phase.blocked.map((reason) => (
+                    <li key={reason}>
+                      {t("cycle.notYetCheckable", { reason })}
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            ) : null}
+            {phase && phase.missing.length > 0 ? (
+              <CardBody className="border-line border-t">
+                <p className="mb-1 text-xs font-bold tracking-wide text-ink-3 uppercase">
+                  {t("cycle.stillNeededHere")}
+                </p>
+                <ul className="flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-2">
+                  {phase.missing.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              </CardBody>
+            ) : null}
           </Card>
-        )}
-        <GuidanceRail phase={viewing} mode={workflow.mode} />
-        <SubjectDocuments
-          subjectType="cycle"
-          subjectId={cycle.id}
-          documents={cycleDocuments}
-          canEdit={canEdit}
-        />
-        <Attachments
-          subjectType="cycle"
-          subjectId={cycle.id}
-          attachments={cycleFiles}
-          canEdit={canEdit}
-        />
-        {/*
-         * **Inside the rail, not beside it.** The row above is
-         * `xl:flex-row` with exactly two children: the content column and
-         * this rail. A third child takes its intrinsic width and overlaps
-         * the column beside it, which is the defect P6-G11b shipped on the
-         * goal page and P6-G24b's own suite caught here within the hour.
-         */}
-        {canPublish ? (
-          <CycleAdmin
-            mode={workflow.mode}
-            currentCycleId={cycle.id}
-            currentName={cycle.name}
-            publicationDeadline={cycle.publicationDeadline ?? null}
+
+          {viewing === 1 ? (
+            <InputPack
+              cycleId={workflow.cycleId}
+              mode={workflow.mode}
+              items={workflow.packItems}
+              distributedAt={workflow.packDistributedAt}
+              sponsor={workflow.sponsor}
+              facilitator={workflow.facilitator}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {viewing === 1 && canPublish ? (
+            <CycleSetup
+              cycleId={workflow.cycleId}
+              people={people}
+              sponsorId={workflow.sponsor?.id ?? null}
+              facilitatorId={workflow.facilitator?.id ?? null}
+              firstCycle={workflow.firstCycle}
+              sessionDates={workflow.sessionDates}
+            />
+          ) : null}
+
+          {viewing === 2 ? (
+            <BaselineHealth
+              cycleId={workflow.cycleId}
+              saved={workflow.baselineHealth}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {viewing === 2 ? (
+            <Diagnose
+              cycleId={workflow.cycleId}
+              issues={workflow.issues}
+              minimum={workflow.asks.strategicIssues}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {viewing === 3 && workflow.mode === "quarterly" ? (
+            <Revalidation
+              cycleId={workflow.cycleId}
+              saved={workflow.revalidation}
+              focus={workflow.focus}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {viewing === 3 ? (
+            <Direction
+              cycleId={workflow.cycleId}
+              mode={workflow.mode}
+              priorities={workflow.priorities}
+              issues={workflow.issues}
+              bounds={workflow.asks.priorities}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {/* Before the capacity check, because §5.4 comes before §5.5 in the
+              method and because the two answer the same conversation in order:
+              who are we waiting on, and can we carry what is left. */}
+          {register && registerMembers && registerSpaces && capacity ? (
+            <DependencyRegister
+              entries={register.register}
+              keyResults={capacity.keyResults.map((keyResult) => ({
+                id: keyResult.id,
+                title: keyResult.title,
+                goalTitle: keyResult.goalTitle,
+              }))}
+              members={registerMembers}
+              spaces={registerSpaces.map((space) => ({
+                id: space.id,
+                name: space.name,
+              }))}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {capacity ? (
+            <Capacity
+              keyResults={capacity.keyResults}
+              initiatives={capacity.initiatives}
+            />
+          ) : null}
+
+          {viewing === 5 ? (
+            <CapacityCuts
+              cycleId={workflow.cycleId}
+              saved={workflow.capacityCuts}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {viewing === 5 ? (
+            <Gates
+              cycleId={workflow.cycleId}
+              gates={workflow.gates}
+              publishable={workflow.publishable}
+              publishedAt={workflow.publishedAt}
+              companyPublishedAt={workflow.companyPublishedAt}
+              canPublish={canPublish}
+              pinnedCycleId={pinnedCycleId}
+            />
+          ) : null}
+
+          {viewing === 4 ? (
+            <Drafting
+              cycleId={workflow.cycleId}
+              endsOn={workflow.endsOn}
+              draftingAllowed={workflow.drafting.allowed}
+              draftingReasons={workflow.drafting.reasons}
+              goals={draft.goals}
+              members={draft.members}
+              kpis={draft.kpis}
+              canEdit={canEdit}
+              thresholds={draft.thresholds}
+              practice={draft.practice}
+              checkTitles={draft.checkTitles}
+              memberId={workspace.memberId}
+              assistsAvailable={await assistsAvailableAction()}
+            />
+          ) : null}
+
+          {viewing === 0 ? (
+            <AnnualFrame frame={frame} canEdit={canPublish} />
+          ) : null}
+
+          {viewing === 0 ? (
+            <AnnualObjectives
+              strategies={frame?.strategies ?? []}
+              objectives={annualObjectives}
+              canEdit={canPublish}
+              // The reader champions and reviews what they send forward. A
+              // picker here would be a second drafting form on a phase that
+              // is not the drafting phase; the goal page is where either is
+              // changed.
+              championId={workspace.memberId}
+              reviewerId={workspace.memberId}
+              frameAgreed={frame?.agreed ?? false}
+            />
+          ) : null}
+
+          {viewing === 6 && cadence ? (
+            <RunningCadence
+              cycleId={workflow.cycleId}
+              sessions={cadence.sessions}
+              blockers={cadence.blockers}
+              decisions={cycleDecisions.map((decision) => ({
+                id: decision.id,
+                summary: decision.text,
+                at: decision.at,
+              }))}
+              confidence={cycleGoals.flatMap((goal) =>
+                goal.keyResults.map((keyResult) => ({
+                  id: keyResult.id,
+                  title: keyResult.title,
+                  goalTitle: goal.title,
+                  confidence: keyResult.confidence,
+                  // The trend needs the previous check-in's figure, which
+                  // `goals.list` does not carry. Left null rather than
+                  // guessed: the card renders "no trend yet" and says so,
+                  // which is honest, and P6-G19 is where the confidence
+                  // history arrives for the session screen anyway.
+                  previousConfidence: null,
+                })),
+              )}
+              streak={cadence.streak}
+              calibration={workflow.calibration}
+              // `workflow.calibrate` is declared at full, the same as publishing.
+              canCalibrate={canPublish}
+              closed={workflow.status === "closed"}
+            />
+          ) : null}
+
+          {viewing === 7 && reviewThresholds ? (
+            <ReviewAndLearn
+              keyResults={cycleGoals.flatMap((goal) =>
+                goal.keyResults.map((keyResult) => ({
+                  id: keyResult.id,
+                  title: keyResult.title,
+                  goalTitle: goal.title,
+                  score: keyResult.score,
+                  carryForward: keyResult.carryForward,
+                })),
+              )}
+              cycleId={workflow.cycleId}
+              cycleName={workflow.name}
+              closure={workflow.closure}
+              // The same evaluation `cycles.close` refuses on, so the control
+              // is disabled for exactly the reasons the server would give.
+              waitingFor={[
+                ...(phase?.missing ?? []),
+                ...(phase?.blocked ?? []),
+              ]}
+              // `full`, which is what `cycles.close` requires.
+              canEdit={canPublish}
+              thresholds={reviewThresholds}
+            />
+          ) : null}
+        </div>
+
+        <div className="flex w-full flex-none flex-col gap-4.5 xl:w-80">
+          {viewing === 4 ? (
+            <QualityPanel
+              set={draft.goals.map((goal) => ({
+                objective: {
+                  id: goal.id,
+                  title: goal.title,
+                  hasCycle: true,
+                  hasTimeframe: false,
+                  championId: goal.champion.id,
+                  reviewerId: goal.reviewer?.id ?? null,
+                  objectivesInUnit: draft.goals.filter(
+                    (other) => other.level === goal.level,
+                  ).length,
+                  level: goal.level,
+                },
+                keyResults: goal.keyResults.map((keyResult) => ({
+                  id: keyResult.id,
+                  title: keyResult.title,
+                  baseline: keyResult.baselineValue,
+                  target: keyResult.targetValue,
+                  dueOn: keyResult.dueOn,
+                  ownerId: keyResult.ownerId,
+                  indicatorType: keyResult.indicatorType,
+                  direction: keyResult.direction,
+                  confidence: keyResult.confidence,
+                })),
+              }))}
+              thresholds={draft.thresholds}
+              practice={draft.practice}
+              checkTitles={draft.checkTitles}
+            />
+          ) : null}
+          {cycleDecisions.length === 0 ? null : (
+            <Card>
+              <CardHeader>
+                <h2 className="text-sm font-bold text-ink">
+                  {t("cycle.decisionsThisCycle")}
+                </h2>
+              </CardHeader>
+              <CardBody className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-2">
+                  {cycleDecisions.map((decision) => (
+                    <li key={decision.id} className="flex flex-col gap-0.5">
+                      <span className="text-sm text-ink">{decision.text}</span>
+                      <span className="text-xs text-ink-3">
+                        {decision.goalId ? (
+                          <a
+                            className="underline"
+                            href={`/goals/${decision.goalId}`}
+                          >
+                            {decision.keyResultTitle ?? decision.goalTitle}
+                          </a>
+                        ) : (
+                          (decision.keyResultTitle ?? decision.goalTitle)
+                        )}{" "}
+                        · {new Date(decision.at).toLocaleDateString()} ·{" "}
+                        {decision.authorName}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-ink-4">
+                  {t("cycle.recordedInTheMonthly")}
+                </p>
+              </CardBody>
+            </Card>
+          )}
+          <GuidanceRail phase={viewing} mode={workflow.mode} />
+          <SubjectDocuments
+            subjectType="cycle"
+            subjectId={cycle.id}
+            documents={cycleDocuments}
+            canEdit={canEdit}
           />
-        ) : null}
+          <Attachments
+            subjectType="cycle"
+            subjectId={cycle.id}
+            attachments={cycleFiles}
+            canEdit={canEdit}
+          />
+          {/*
+           * **Inside the rail, not beside it.** The row above is
+           * `xl:flex-row` with exactly two children: the content column and
+           * this rail. A third child takes its intrinsic width and overlaps
+           * the column beside it, which is the defect P6-G11b shipped on the
+           * goal page and P6-G24b's own suite caught here within the hour.
+           */}
+          {canPublish ? (
+            <CycleAdmin
+              mode={workflow.mode}
+              currentCycleId={cycle.id}
+              currentName={cycle.name}
+              publicationDeadline={cycle.publicationDeadline ?? null}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   );

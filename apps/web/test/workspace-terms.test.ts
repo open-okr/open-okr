@@ -137,7 +137,7 @@ describe("the sidebar", () => {
     expect(labels.kpis).toBe("Metrics");
     expect(labels.cycle).toBe("Quarter");
     // An entry named after no term keeps its registry label.
-    expect(labels.goals).toBe("Goals");
+    expect(labels.goals).toBe("OKRs");
   });
 
   it("heads the Spaces block with the same word", () => {
@@ -153,7 +153,8 @@ describe("the sidebar", () => {
     }
     expect(navBlocks(items).map((block) => block.label)).toEqual([
       undefined,
-      "Practice",
+      "OKR",
+      "Work",
       "Spaces",
       "Account",
     ]);

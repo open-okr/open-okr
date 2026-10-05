@@ -19,12 +19,20 @@
  */
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 
-export type NavigationSection = "sidebar" | "admin";
+/**
+ * Which surface an item belongs to. `inside` is a screen reached from within
+ * another module rather than from the sidebar (P9-T07a-b): Check in is a
+ * button on the OKRs screen, the goal page and Review; Sessions and Scorecard
+ * are tabs inside Cycle. The palette still offers them, and `parent` says
+ * which sidebar row is lit while one is open.
+ */
+export type NavigationSection = "sidebar" | "admin" | "inside";
 
 /**
  * Which of the sidebar's separated blocks an item sits in (UIUX-PLAN.md §3:
- * "Home, Review, Inbox, then Cycle, Goals, KPIs, Work, then Spaces, then
- * Admin").
+ * "Home, Review, Inbox, then Cycle, OKRs, KPIs, then Initiatives and Board,
+ * then Spaces, then Admin", regrouped at P9-T07a-b per okr-entry-points.md
+ * §3.1).
  *
  * `section` says which surface an item belongs to. This says where inside it.
  * Without the distinction the sidebar could only draw one flat list, which is
@@ -35,7 +43,8 @@ export type NavigationSection = "sidebar" | "admin";
  */
 export const NAVIGATION_GROUPS = [
   "primary",
-  "practice",
+  "okr",
+  "work",
   "spaces",
   "account",
 ] as const;
@@ -65,6 +74,11 @@ export interface NavigationItem {
    * the caller that already knows whether this is a cloud passes the answer.
    */
   readonly cloudOnly?: boolean;
+  /**
+   * For an `inside` item, the sidebar row it lives under, which is lit while
+   * it is open: Sessions and Scorecard light Cycle, Check in lights OKRs.
+   */
+  readonly parent?: string;
 }
 
 export interface ModuleDefinition {
@@ -127,7 +141,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Cycle",
         href: "/cycle",
         section: "sidebar",
-        group: "practice",
+        group: "okr",
         // Every member can watch the cycle being planned. The writes on the
         // screen each ask for edit access of their own, so a reader sees the
         // workflow without being handed a control they cannot use (P3-T03).
@@ -140,10 +154,12 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     navigation: [
       {
         id: "goals",
-        label: "Goals",
+        // "OKRs" since P9-T07a-b, decision D5: the screen holds objectives and
+        // their key results together, and that is what the practice calls them.
+        label: "OKRs",
         href: "/goals",
         section: "sidebar",
-        group: "practice",
+        group: "okr",
         // Every member can read the set. An OKR set nobody can read is not one,
         // which is the same reason a goal's context binds `workspace_standard`
         // at view (P3-T04). The writes on each row ask for their own access.
@@ -159,7 +175,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "KPIs",
         href: "/kpis",
         section: "sidebar",
-        group: "practice",
+        group: "okr",
         // Every member reads the grid. A measure nobody can see is not a
         // shared measure, which is the same reason a company objective binds
         // workspace_standard at view (P3-T12).
@@ -175,7 +191,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Initiatives",
         href: "/initiatives",
         section: "sidebar",
-        group: "practice",
+        group: "work",
         // Every member reads the work behind the measures. An initiative binds
         // `workspace_standard` at view for the same reason a goal does:
         // alignment reads across spaces, and a key result whose work is
@@ -192,7 +208,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Board",
         href: "/board",
         section: "sidebar",
-        group: "practice",
+        group: "work",
         // Every member reads the board. A shared record of what a team is
         // doing is the same kind of thing as its goals, and each card asks for
         // its own access before it can be changed (P5-T11).
@@ -223,8 +239,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         id: "scorecard",
         label: "Scorecard",
         href: "/scorecard",
-        section: "sidebar",
-        group: "practice",
+        section: "inside",
+        parent: "cycle",
         // The result of every closed cycle, which is a shared record rather
         // than a private one: a team that cannot see how the last quarter went
         // cannot learn from it (P3-T15).
@@ -239,8 +255,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         id: "check-in",
         label: "Check in",
         href: "/check-in",
-        section: "sidebar",
-        group: "practice",
+        section: "inside",
+        parent: "goals",
         // Every member can reach it. The walker only ever lists the goals they
         // champion, so a member with nothing due sees an empty list rather than
         // somebody else's obligations (P3-T07).
@@ -255,8 +271,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         id: "sessions",
         label: "Sessions",
         href: "/sessions",
-        section: "sidebar",
-        group: "practice",
+        section: "inside",
+        parent: "cycle",
         // Every member reaches it, and every member sees a different list: it
         // is scoped by the same access filter the space list uses, so a
         // session in a space somebody cannot read is not in it. S-22 to S-25

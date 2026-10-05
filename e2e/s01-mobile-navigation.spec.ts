@@ -26,13 +26,16 @@ test("the More tab reaches every screen the hidden sidebar would", async ({
 
   await more.click();
   await expect(more).toHaveAttribute("aria-expanded", "true");
+  // Sessions and Scorecard are tabs inside Cycle since P9-T07a-b, and Check
+  // in a button on the screens that owe one, so the sheet carries the module
+  // rows rather than them (okr-entry-points.md §3.1).
   for (const name of [
+    "Cycle",
+    "OKRs",
     "KPIs",
     "Spaces",
     "Board",
     "Initiatives",
-    "Sessions",
-    "Scorecard",
     "Admin",
   ]) {
     await expect(bar.getByRole("link", { name, exact: true })).toBeVisible();

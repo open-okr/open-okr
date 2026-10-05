@@ -70,6 +70,8 @@ One screen replaces S-13, the goals explorer, and absorbs S-16, the alignment st
 | Summary line | Counts, average progress, at risk and outdated |
 | Filters | Champion, space, health, kind, added mid-cycle. Kept in the address |
 
+**As built at P9-T07a-b.** The cycle switcher is P8-G12's picker, whose links carried no cycle until this task: its template was built on the server from a constant exported by a client component, which reaches the server as a reference rather than a string, so both placeholders now live in a plain module. Mine keeps `mine=1`, which the filter assist has always written; My team and Company are `scope=team` and `scope=company`, and Company is the company level whatever the level chips say. Mine follows the tree's own meaning (champion, reviewer or key result owner); following has no data yet. The view toggle is P8-G12's display group, `display=diagram` rather than `view=diagram`, because `view` already meant the Tree display's ordering. The champion and space filters are selects that navigate; kind and added mid-cycle arrive with P9-T11 and P9-T13. The summary counts caution and off track as at risk. "+ New objective" is P8-G12's button; its restricted-writing panel is P9-T07b's. The list says `aria-busy` while any change is on its way to the server.
+
 ## 4. The list view
 
 ### 4.1 Rows

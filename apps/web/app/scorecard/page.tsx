@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
 import { requireWorkspace } from "../../lib/workspace";
@@ -86,6 +87,7 @@ export default async function ScorecardPage() {
 
   return (
     <div className="flex w-full flex-col gap-3.5">
+      <SectionTabs items={CYCLE_TABS} active="/scorecard" />
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">

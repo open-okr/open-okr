@@ -120,6 +120,12 @@ export interface OkrFilters {
   readonly level?: string | undefined;
   readonly health?: string | undefined;
   readonly includeClosed: boolean;
+  /** One champion's objectives (P9-T07a-b). */
+  readonly championId?: string | undefined;
+  /** One space's objectives. */
+  readonly spaceId?: string | undefined;
+  /** "My team": the objectives of the spaces the reader belongs to. */
+  readonly spaceIds?: readonly string[] | undefined;
 }
 
 /** What a filter keeps, the same on the server's first render and in the cache. */
@@ -127,10 +133,17 @@ export function filterGoals(
   goals: readonly OkrGoal[],
   filters: OkrFilters,
 ): OkrGoal[] {
+  const mySpaces =
+    filters.spaceIds === undefined ? null : new Set(filters.spaceIds);
   return goals.filter(
     (goal) =>
       (filters.includeClosed || goal.closedAt === null) &&
       (filters.level === undefined || goal.level === filters.level) &&
-      (filters.health === undefined || goal.health === filters.health),
+      (filters.health === undefined || goal.health === filters.health) &&
+      (filters.championId === undefined ||
+        goal.champion.id === filters.championId) &&
+      (filters.spaceId === undefined || goal.spaceId === filters.spaceId) &&
+      (mySpaces === null ||
+        (goal.spaceId !== null && mySpaces.has(goal.spaceId))),
   );
 }

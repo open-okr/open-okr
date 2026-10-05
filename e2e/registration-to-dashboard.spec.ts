@@ -855,8 +855,10 @@ test("the review inbox lists what this member owes, with an action on each", asy
   // Scoped to `main`: the sidebar's own nav item is also called "Check in", and
   // an unscoped role locator matches both. Worth keeping as a named collision
   // rather than renaming either, because both labels are the right words.
+  // Exact, because the header's own walker is "Check in on your objectives"
+  // since P9-T07a-b, and this is about each row's action.
   await expect(
-    page.getByRole("main").getByRole("link", { name: "Check in" }),
+    page.getByRole("main").getByRole("link", { name: "Check in", exact: true }),
   ).toBeVisible();
 
   // The same promise this spec has always made, now that it reads the other
@@ -872,7 +874,7 @@ test("the review action opens the composer for that goal", async () => {
   await page.goto("/review");
   await page
     .getByRole("main")
-    .getByRole("link", { name: "Check in" })
+    .getByRole("link", { name: "Check in", exact: true })
     .first()
     .click();
   // The goal id, not the bare walker: the row's action opens the goal it names.

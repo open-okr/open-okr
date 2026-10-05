@@ -9,7 +9,13 @@ import {
   type ResolvedPractice,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { Bar, Button, useQueryClient, useTranslations } from "@openokr/ui";
+import {
+  Bar,
+  Button,
+  useIsMutating,
+  useQueryClient,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
@@ -208,6 +214,10 @@ function LiveOkrTable({
   });
   useOkrLive(cycleId);
   const okr = useOkrMutation({ cycleId, scope });
+  // Any change still on its way to the server. Said on the list itself, so
+  // a screen reader hears that a save is under way, and so a test can wait
+  // for the server rather than for the row, which moves before it answers.
+  const saving = useIsMutating() > 0 || pending;
   const goals = filterGoals(tree.goals, filters);
   const problem = failure ?? okr.problem;
 
@@ -234,7 +244,11 @@ function LiveOkrTable({
     );
 
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      className="flex flex-col gap-2"
+      data-testid="okr-list"
+      aria-busy={saving}
+    >
       {problem ? (
         <p role="alert" className="text-xs text-bad">
           {problem}

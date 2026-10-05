@@ -7,12 +7,14 @@ import {
   type ResolvedThresholds,
 } from "@openokr/method";
 import {
+  buttonVariants,
   Card,
   CardBody,
   CardHeader,
   Chip,
   type MessageValues,
 } from "@openokr/ui";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
@@ -26,12 +28,14 @@ import { exportListAction } from "../search/actions.ts";
 import { ExportButton } from "../search/export-button.tsx";
 import { MyExports } from "../search/my-exports.tsx";
 import { GoalTable } from "../work-map.tsx";
-import { CYCLE_PLACEHOLDER, CyclePicker } from "./cycle-picker.tsx";
+import { CyclePicker } from "./cycle-picker.tsx";
 import { filterAssistAvailableAction } from "./filter-actions.ts";
 import { FilterAssist } from "./filter-assist.tsx";
+import { FilterSelect } from "./filter-select.tsx";
 import { NewObjectiveButton } from "./new-objective.tsx";
 import { OkrDiagram } from "./okr-diagram.tsx";
 import { OkrTable } from "./okr-table.tsx";
+import { CYCLE_PLACEHOLDER, FILTER_PLACEHOLDER } from "./placeholders.ts";
 
 /**
  * The goals explorer (UIUX-PLAN.md §4 S-13, P3-T10).
@@ -69,6 +73,15 @@ export default async function GoalsPage({
      */
     health?: string;
     mine?: string;
+    /**
+     * The scope tabs (P9-T07a-b): `team` is the spaces the reader belongs to
+     * and `company` the company level. Mine keeps `mine=1`, which is what the
+     * filter assist has always written, and All is neither.
+     */
+    scope?: string;
+    /** One champion's objectives, and one space's. */
+    champion?: string;
+    space?: string;
     /**
      * Which of the three renderings is on screen (P8-G12).
      *
@@ -111,6 +124,13 @@ export default async function GoalsPage({
   // URL cannot ask for a band the product does not have.
   const health = GOAL_HEALTH_BANDS.find((entry) => entry === query.health);
   const mine = query.mine === "1";
+  const scopeTab: "all" | "mine" | "team" | "company" = mine
+    ? "mine"
+    : query.scope === "team"
+      ? "team"
+      : query.scope === "company"
+        ? "company"
+        : "all";
   const includeClosed = query.closed === "1";
   const tree = query.view !== "list";
   const display =
@@ -123,8 +143,32 @@ export default async function GoalsPage({
   // time: the difference between "this cycle has no goals" and "your filters
   // left nothing" is knowable from the query alone, and getting it wrong is
   // what made the header claim an empty cycle that held two goals.
+  // The champion and space choices are checked against the directory and the
+  // spaces this reader can see, so a hand-edited address filters by nothing
+  // rather than by an id the reader cannot see.
+  const [directory, spaceRows] = await Promise.all([
+    callAction(context, "people.directory", {}),
+    callAction(context, "spaces.list", {}),
+  ]);
+  // People only: an agent or an unclaimed placeholder cannot champion an
+  // objective or own a key result (H-09).
+  const members = directory
+    .filter((member) => member.kind === "human" || member.kind === "guest")
+    .map((member) => ({ id: member.id, name: member.name }));
+  const spaces = spaceRows.map((space) => ({ id: space.id, name: space.name }));
+  const mySpaceIds = spaceRows
+    .filter((space) => space.ownRole !== null)
+    .map((space) => space.id);
+  const champion = members.find((member) => member.id === query.champion)?.id;
+  const space = spaces.find((entry) => entry.id === query.space)?.id;
+
   const filtered =
-    level !== undefined || health !== undefined || mine || includeClosed;
+    level !== undefined ||
+    health !== undefined ||
+    scopeTab !== "all" ||
+    includeClosed ||
+    champion !== undefined ||
+    space !== undefined;
 
   // The list and the diagram draw from one tree, which the table's cache then
   // owns (P9-T06c); the indented tree view still reads `goals.list`. Only the
@@ -140,37 +184,63 @@ export default async function GoalsPage({
         })
       : null;
   const treeReadAt = Date.now();
-  const filters = { level, health, includeClosed };
+  // Company is the company level, whatever the level chips say; My team is
+  // the reader's spaces. Both narrow the tree the same way the cache does.
+  const levelInForce = scopeTab === "company" ? "company" : level;
+  const filters = {
+    level: levelInForce,
+    health,
+    includeClosed,
+    championId: champion,
+    spaceId: space,
+    spaceIds: scopeTab === "team" ? mySpaceIds : undefined,
+  };
   const treeGoals = okrTree ? filterGoals(okrTree.goals, filters) : [];
 
-  const { goals } =
+  const listed =
     cycleId && display === "tree"
       ? await callAction(context, "goals.list", {
           cycleId,
           includeClosed,
-          ...(level ? { level } : {}),
+          ...(levelInForce ? { level: levelInForce } : {}),
           ...(health ? { health } : {}),
           ...(mine ? { mine } : {}),
+          ...(space ? { spaceId: space } : {}),
         })
       : { goals: [] };
+  // `goals.list` has no champion or "my spaces" filter of its own, so those
+  // two narrow its answer here, as the cache narrows the tree.
+  const goals = listed.goals.filter(
+    (goal) =>
+      (champion === undefined || goal.champion.id === champion) &&
+      (scopeTab !== "team" ||
+        (goal.spaceId !== null && mySpaceIds.includes(goal.spaceId))),
+  );
   const shownCount = display === "tree" ? goals.length : treeGoals.length;
+  const summary = summarise(
+    display === "tree"
+      ? goals.map((goal) => ({
+          progressPct: goal.progressPct,
+          health: goal.health,
+          keyResults: goal.keyResults.length,
+        }))
+      : treeGoals.map((goal) => ({
+          progressPct: goal.progressPct,
+          health: goal.health,
+          keyResults: goal.keyResults.length,
+        })),
+  );
 
   // What the editable list needs beyond the tree: who can champion or own,
   // and the numbers and practice its coaching chips judge by, which the
   // browser cannot read for itself (P9-T07a-a). Only read for the list.
   const editing = display === "editor" && okrTree !== null;
-  const [directory, practiceRead, rhythmRead] = editing
+  const [practiceRead, rhythmRead] = editing
     ? await Promise.all([
-        callAction(context, "people.directory", {}),
         callAction(context, "practice.read", {}),
         callAction(context, "rhythm.read", {}),
       ])
-    : [[], null, null];
-  // People only: an agent or an unclaimed placeholder cannot champion an
-  // objective or own a key result (H-09).
-  const members = directory
-    .filter((member) => member.kind === "human" || member.kind === "guest")
-    .map((member) => ({ id: member.id, name: member.name }));
+    : [null, null];
 
   const canEdit = accessLevel >= ACCESS_LEVELS.edit;
   const canAdminister = accessLevel >= ACCESS_LEVELS.full;
@@ -194,6 +264,9 @@ export default async function GoalsPage({
       level: level ?? null,
       health: health ?? null,
       mine: mine ? "1" : null,
+      scope: scopeTab === "team" || scopeTab === "company" ? scopeTab : null,
+      champion: champion ?? null,
+      space: space ?? null,
       view: tree ? null : "list",
       closed: includeClosed ? "1" : null,
       display: display === "editor" ? null : display,
@@ -226,7 +299,7 @@ export default async function GoalsPage({
              * the empty state and its suggestion. */}
             <div className="flex min-w-0 items-center gap-2.5">
               <h1 className="flex-none text-lg font-bold text-ink">
-                {t("goals.goals")}
+                {t("okrList.title")}
               </h1>
               <Chip tone={filtered ? "brand" : "neutral"}>
                 {/* Never "nothing in this cycle" from a filtered count. The
@@ -254,6 +327,17 @@ export default async function GoalsPage({
               />
             ) : null}
           </div>
+          {summary.objectives > 0 ? (
+            <p data-testid="okr-summary" className="text-xs text-ink-3">
+              {t("okrList.summary", {
+                objectives: summary.objectives,
+                keyResults: summary.keyResults,
+                average: summary.average,
+                atRisk: summary.atRisk,
+                outdated: summary.outdated,
+              })}
+            </p>
+          ) : null}
 
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
             {/* Which cycle is on screen, and the way another one is made.
@@ -273,6 +357,16 @@ export default async function GoalsPage({
                * somebody is already reading. */}
               {canEdit && cycleId ? (
                 <NewObjectiveButton cycleId={cycleId} level={level ?? "team"} />
+              ) : null}
+              {/* Check in's door now that it has left the sidebar
+               * (P9-T07a-b, okr-entry-points.md §3.1). */}
+              {canEdit ? (
+                <Link
+                  href="/check-in"
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  {t("okrList.checkInAll")}
+                </Link>
               ) : null}
             </div>
             {/*
@@ -294,7 +388,11 @@ export default async function GoalsPage({
           <Filters
             level={level ?? null}
             health={health ?? null}
-            mine={mine}
+            scope={scopeTab}
+            members={members}
+            spaces={spaces}
+            champion={champion ?? null}
+            space={space ?? null}
             filterAssist={filterAssistAvailable ? <FilterAssist /> : undefined}
             tree={tree}
             display={display}
@@ -488,6 +586,42 @@ function countChip(
   return goals;
 }
 
+interface Summary {
+  readonly objectives: number;
+  readonly keyResults: number;
+  readonly average: number;
+  readonly atRisk: number;
+  readonly outdated: number;
+}
+
+/**
+ * The summary line under the header (design §3): how many, how far on
+ * average, and how many need a look. Counted over what is on screen, so a
+ * filter narrows the summary with the list.
+ */
+function summarise(
+  rows: readonly {
+    readonly progressPct: number;
+    readonly health: string;
+    readonly keyResults: number;
+  }[],
+): Summary {
+  return {
+    objectives: rows.length,
+    keyResults: rows.reduce((sum, row) => sum + row.keyResults, 0),
+    average:
+      rows.length === 0
+        ? 0
+        : Math.round(
+            rows.reduce((sum, row) => sum + row.progressPct, 0) / rows.length,
+          ),
+    atRisk: rows.filter(
+      (row) => row.health === "caution" || row.health === "off_track",
+    ).length,
+    outdated: rows.filter((row) => row.health === "outdated").length,
+  };
+}
+
 /** §3.2's bands, in the order the explorer offers them. */
 const GOAL_HEALTH_BANDS = [
   "pending",
@@ -502,7 +636,11 @@ const GOAL_HEALTH_BANDS = [
 async function Filters({
   level,
   health,
-  mine,
+  scope,
+  members,
+  spaces,
+  champion,
+  space,
   tree,
   display,
   includeClosed,
@@ -511,7 +649,11 @@ async function Filters({
 }: {
   readonly level: string | null;
   readonly health: string | null;
-  readonly mine: boolean;
+  readonly scope: "all" | "mine" | "team" | "company";
+  readonly members: readonly { readonly id: string; readonly name: string }[];
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
+  readonly champion: string | null;
+  readonly space: string | null;
   readonly tree: boolean;
   readonly display: "editor" | "diagram" | "tree";
   readonly includeClosed: boolean;
@@ -614,10 +756,49 @@ async function Filters({
          * of options each needed a label to say which pair it was; a single
          * chip says it in the word on the chip. `aria-pressed` is what tells
          * somebody who cannot see the fill which way it is set. */}
-        <Toggle
-          href={href({ mine: mine ? null : "1" })}
-          on={mine}
-          label={t("goals.mine")}
+        {/* The scope tabs (design §3): whose objectives these are. Mine
+         * keeps the `mine=1` the filter assist writes. */}
+        <Group label={t("okrList.scope")}>
+          <Tab
+            href={href({ mine: null, scope: null })}
+            active={scope === "all"}
+          >
+            {t("goals.all")}
+          </Tab>
+          <Tab
+            href={href({ mine: "1", scope: null })}
+            active={scope === "mine"}
+          >
+            {t("goals.mine")}
+          </Tab>
+          <Tab
+            href={href({ mine: null, scope: "team" })}
+            active={scope === "team"}
+          >
+            {t("okrList.myTeam")}
+          </Tab>
+          <Tab
+            href={href({ mine: null, scope: "company" })}
+            active={scope === "company"}
+          >
+            {t("okrList.company")}
+          </Tab>
+        </Group>
+        <FilterSelect
+          label={t("okrList.champion")}
+          value={champion}
+          options={members}
+          anyLabel={t("common.any")}
+          hrefTemplate={href({ champion: FILTER_PLACEHOLDER })}
+          anyHref={href({ champion: null })}
+        />
+        <FilterSelect
+          label={t("okrList.space")}
+          value={space}
+          options={spaces}
+          anyLabel={t("common.any")}
+          hrefTemplate={href({ space: FILTER_PLACEHOLDER })}
+          anyHref={href({ space: null })}
         />
         <Toggle
           href={href({ closed: includeClosed ? null : "1" })}

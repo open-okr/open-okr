@@ -55,10 +55,21 @@ const KEY_RESULT = "Accounts reaching first value within seven days";
  * it failed in continuous integration once the list became optimistic.
  */
 async function persisted(check: () => Promise<void>): Promise<void> {
+  await settled();
   await expect(async () => {
     await page.reload();
     await check();
   }).toPass({ timeout: 20_000 });
+}
+
+/**
+ * Waits until no change is on its way to the server. A reload while one is
+ * aborts it, and the next check then reads a value that was never saved.
+ */
+async function settled(): Promise<void> {
+  await expect(
+    page.locator("#main-content").getByTestId("okr-list"),
+  ).toHaveAttribute("aria-busy", "false", { timeout: 15_000 });
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -119,8 +130,13 @@ test("a key result is added under that objective", async () => {
 test("a title changed in one tab shows in another without a reload", async () => {
   const other = await context.newPage();
   await goTo(other, "/goals");
+  // Scoped to the page's own content: a screen being replaced can still be
+  // in the document, hidden, while the new one renders, and an unscoped
+  // locator then finds the title twice.
   const titled = (where: typeof page, value: string) =>
-    where.locator(`input[aria-label="Objective title"][value="${value}"]`);
+    where
+      .locator("#main-content")
+      .locator(`input[aria-label="Objective title"][value="${value}"]`);
   await expect(titled(other, OBJECTIVE)).toBeVisible({ timeout: 15_000 });
 
   const renamed = `${OBJECTIVE}, from the first tab`;
@@ -185,6 +201,7 @@ test("a key result's title, value and due date change with the keyboard alone, a
   await due.fill("2030-03-31");
   await page.keyboard.press("Enter");
 
+  await settled();
   await expect(async () => {
     await page.reload();
     await expect(
@@ -235,6 +252,7 @@ test("easing a target asks why, and saves with the reason", async () => {
   await page.keyboard.press("Enter");
   await expect(reason).toHaveCount(0);
 
+  await settled();
   await expect(async () => {
     await page.reload();
     await expect(
@@ -305,6 +323,77 @@ test("a title changed since it was read is not overwritten", async ({
   } finally {
     await api.dispose();
   }
+});
+
+/**
+ * The scope tabs and the filters, each kept in the address (P9-T07a-b). The
+ * objective this file added is the reader's own and sits in no space, so My
+ * team and Company leave it out and Mine and its champion keep it.
+ */
+test("the scope tabs and filters narrow the list, and the address keeps them", async () => {
+  await goTo(page, "/goals");
+  const ours = page.locator(
+    `input[aria-label="Objective title"][value="${OBJECTIVE}"]`,
+  );
+  await expect(ours).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("okr-summary")).toContainText("Objectives:");
+  const scope = page.getByRole("group", { name: "Scope" });
+
+  await scope.getByRole("link", { name: "My team" }).click();
+  await expect(page).toHaveURL(/scope=team/);
+  await expect(ours).toHaveCount(0, { timeout: 15_000 });
+
+  await scope.getByRole("link", { name: "Company" }).click();
+  await expect(page).toHaveURL(/scope=company/);
+  await expect(ours).toHaveCount(0, { timeout: 15_000 });
+
+  await scope.getByRole("link", { name: "Mine" }).click();
+  await expect(page).toHaveURL(/mine=1/);
+  await expect(page).not.toHaveURL(/scope=/);
+  await expect(ours).toBeVisible({ timeout: 15_000 });
+
+  // A champion is a select, and choosing one is a navigation like a tab.
+  await scope.getByRole("link", { name: "All" }).click();
+  // Scoped to the page's own content: the screen just left can still be in
+  // the document, hidden, while the next one renders.
+  const champion = page
+    .locator("#main-content")
+    .getByLabel("Champion", { exact: true });
+  const me = await page
+    .locator(`input[aria-label="Objective title"][value="${OBJECTIVE}"]`)
+    .first()
+    .locator("xpath=ancestor::div[contains(@class, 'grid')][1]")
+    .getByLabel(`Champion of ${OBJECTIVE}`)
+    .evaluate((select) => (select as HTMLSelectElement).value);
+  await champion.selectOption(me);
+  await expect(page).toHaveURL(new RegExp(`champion=${me}`));
+  await expect(ours).toBeVisible({ timeout: 15_000 });
+
+  await goTo(page, "/goals");
+});
+
+/**
+ * The cycle picker's links carry a cycle (P9-T07a-b). Its address template
+ * was built on the server from a constant exported by a client component,
+ * which reaches the server as a reference rather than a string, so since
+ * P8-G12 every cycle it listed linked to an address with a stringified
+ * function where the cycle should be.
+ */
+test("the cycle picker lists cycles that open", async () => {
+  await goTo(page, "/goals");
+  await page
+    .locator("#main-content")
+    .locator('button[aria-haspopup="listbox"]')
+    .click();
+  const first = page.locator('#main-content ul a[href*="cycle="]').first();
+  await expect(first).toHaveAttribute(
+    "href",
+    /\/goals\?cycle=[0-9a-f-]{36}(&|$)/,
+  );
+  await first.click();
+  await expect(page).toHaveURL(/\/goals\?cycle=[0-9a-f-]{36}/);
+  // The first cycle listed need not be the one this file wrote into.
+  await goTo(page, "/goals");
 });
 
 test("the diagram draws the same cycle", async () => {

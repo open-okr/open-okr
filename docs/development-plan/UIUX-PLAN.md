@@ -47,11 +47,14 @@ The stance: the product's edge is **installed opinion and an active coach**, not
 │  Home      ├──────────────────────────────────────────────┤
 │  Review ●  │                                              │
 │  Inbox     │                Content area                  │
-│  ────────  │      (Work Map / list / detail / session)    │
+│  Search    │      (Work Map / list / detail / session)    │
+│  ── OKR ── │                                              │
 │  Cycle     │                                              │
-│  Goals     │                                              │
+│  OKRs      │                                              │
 │  KPIs      │                                              │
-│  Work      │                                              │
+│  ── Work ─ │                                              │
+│  Initiatives                                              │
+│  Board     │                                              │
 │  ────────  │                                              │
 │  Spaces    │                                              │
 │   ▸ Space  │                                              │
@@ -60,7 +63,7 @@ The stance: the product's edge is **installed opinion and an active coach**, not
 └────────────┴──────────────────────────────────────────────┘
 ```
 
-- **Sidebar.** Home (the Work Map), Review (what I owe, with a live overdue badge), Inbox (notifications), then Cycle (the guided workflow and its phase), Goals, KPIs, Work, then Spaces, then Admin. A workspace switcher sits at the top for members of more than one workspace.
+- **Sidebar.** Home (the Work Map), Review (what I owe, with a live overdue badge), Inbox (notifications) and Search, then an OKR block (Cycle, the guided workflow and its phase; OKRs; KPIs), then a Work block (Initiatives, Board), then Spaces, then Admin. A workspace switcher sits at the top for members of more than one workspace. **Regrouped at P9-T07a-b** per [okr-entry-points.md](../design/okr-entry-points.md) §3.1 (decision D5): "Goals" became "OKRs"; Sessions and Scorecard became tabs inside Cycle, because sessions are the cycle's cadence and the scorecard is how its cycles ended; Check in became a button on the OKRs screen, the goal page and Review, which already lists every check-in owed. The command palette still offers all three, and opening one lights its parent row.
 - **Topbar.** Breadcrumb, global search (`/` focuses, ⌘K opens the palette), `+ New`, Ask AI (⌘J), the live notification bell, the avatar menu.
 - **The cycle strip.** When a cycle is in planning, a slim persistent strip sits under the topbar: the phase name, what is blocking it, and the days until the publication deadline. It disappears once the cycle is published and running.
 - **Command palette.** Actions, entity jump by short identifier or title, recent items, all permission-filtered.
@@ -137,7 +140,7 @@ Format: purpose, layout, primary actions, states.
 
 ### Goals and alignment
 
-**S-13 Goals explorer.** Scope tabs, cycle switcher and filters over a virtualised list or tree: title, champion and reviewer chips, weight, progress and RAG, health and staleness badge, confidence band, key result count, strength score. Inline weight and confidence editing, a quick check-in, and a new-goal action. Tree mode shows alignment indentation.
+**S-13 OKRs.** Rewritten at P9-T07a for [p9-t00-okr-writing.md](../design/p9-t00-okr-writing.md) §3 and §4, renamed from "Goals explorer" (decision D5). The header holds the cycle switcher, "+ New objective" and "Check in on your objectives", with the alignment score beside the title and a summary line under it: objectives, key results, average progress, at risk and outdated, counted over what the filters keep. The toolbar holds the display (List, Diagram or Tree), the scope tabs (All, Mine, My team for the reader's spaces, Company for the company level), the level and health chips, a champion and a space select, and Closed; every one of them is kept in the address. The list shows each objective with its key results under it, and every cell is edited where it is read (§4.2 of that design): titles coach as they are typed, the champion and owner are pickers, the value, target, unit, baseline and due date are fields, and easing a target asks why under the row. A refused change keeps what was typed with Retry, a stale one offers keep-mine or take-theirs, and a reader who cannot edit sees plain text. The Tree display keeps the alignment indentation.
 
 **S-14 Goal detail.** Header: title inline, champion, reviewer, cycle or timeframe, progress ring, health and staleness pill, strength chip, and an overflow menu (watch, align, close with retrospective, reopen, delete with undo). Left body: description, key results (each with inline value and confidence editing, unit, direction hint, weight, indicator type, progress bar, sparkline with forecast, KPI-backed badge, linked work count, and its rule verdicts), the check-in history as cards with value differences and acknowledgement state, and a discussion. Right rail: champion and reviewer with reassignment, cycle and timeframe, weight, alignment parent, horizontal dependencies, rolled-up child goals, linked initiatives, open blockers, watchers, documents. A coach strip at the top appears when the Coach has an open finding on this goal.
 

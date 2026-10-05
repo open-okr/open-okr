@@ -11,12 +11,14 @@ import type { ResolvedThresholds } from "@openokr/method";
 import {
   Bar,
   Button,
+  buttonVariants,
   Card,
   CardBody,
   CardHeader,
   Chip,
   formatMeasure,
 } from "@openokr/ui";
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -295,6 +297,16 @@ export default async function GoalPage({
                 : goal.health.replace("_", " ")}
             </Chip>
             <WatchControl subjectType="goal" subjectId={id} initial={watch} />
+            {/* Check in's door on the goal itself, now that it has left the
+             * sidebar (P9-T07a-b, okr-entry-points.md §3.1). */}
+            {open ? (
+              <Link
+                href={`/check-in?goal=${id}`}
+                className={buttonVariants({ size: "sm" })}
+              >
+                {t("common.checkIn")}
+              </Link>
+            ) : null}
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">

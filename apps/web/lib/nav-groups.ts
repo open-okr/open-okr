@@ -21,7 +21,11 @@ import type { TerminologyOverrides, TermKey } from "@openokr/method";
  */
 const LABELS: Readonly<Record<NavigationGroup, string | undefined>> = {
   primary: undefined,
-  practice: "Practice",
+  // OKR and Work since P9-T07a-b (okr-entry-points.md §3.1, decision D5):
+  // the practice's own objects in one block, the work that serves them in
+  // the next, where "Practice" had held both and three screens besides.
+  okr: "OKR",
+  work: "Work",
   spaces: "Spaces",
   account: "Account",
 };
