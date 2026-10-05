@@ -23,6 +23,7 @@ import {
   activities,
   cycles,
   GOAL_HEALTH,
+  GOAL_KINDS,
   GOAL_LEVELS,
   goalDependencies,
   goals,
@@ -89,6 +90,8 @@ export const treeGoal = z.object({
   title: z.string(),
   cycleId: z.uuid().nullable(),
   level: z.enum(GOAL_LEVELS),
+  /** Committed or aspirational (METHOD.md §2.8, P9-T11b-a). */
+  kind: z.enum(GOAL_KINDS),
   spaceId: z.uuid().nullable(),
   champion: person,
   reviewer: person.nullable(),
@@ -177,6 +180,7 @@ const GOAL_COLUMNS = {
   title: goals.title,
   cycleId: goals.cycleId,
   level: goals.level,
+  kind: goals.kind,
   spaceId: goals.spaceId,
   championId: goals.championId,
   reviewerId: goals.reviewerId,
@@ -226,6 +230,7 @@ async function treeNodes(
     readonly title: string;
     readonly cycleId: string | null;
     readonly level: (typeof GOAL_LEVELS)[number];
+    readonly kind: (typeof GOAL_KINDS)[number];
     readonly spaceId: string | null;
     readonly championId: string;
     readonly reviewerId: string | null;
@@ -276,6 +281,7 @@ async function treeNodes(
     title: row.title,
     cycleId: row.cycleId,
     level: row.level,
+    kind: row.kind,
     spaceId: row.spaceId,
     champion: named(row.championId),
     reviewer: row.reviewerId ? named(row.reviewerId) : null,

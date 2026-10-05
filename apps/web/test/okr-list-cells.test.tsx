@@ -72,6 +72,7 @@ const tree = (): OkrTree => ({
       title: "Make onboarding the reason teams stay",
       cycleId: "c",
       level: "team",
+      kind: "aspirational",
       spaceId: null,
       champion: PRIYA,
       reviewer: null,
@@ -219,6 +220,87 @@ describe("a title", () => {
     const chips = container.querySelector('[data-testid="live-verdicts"]');
     expect(chips?.textContent).toContain("OBJ-1");
     expect(runOkrMutation).not.toHaveBeenCalled();
+  });
+});
+
+describe("the kind (METHOD.md §2.8, P9-T11b-a)", () => {
+  const LABEL = "Kind of Make onboarding the reason teams stay";
+
+  async function choose(value: string) {
+    const select = field(LABEL) as HTMLSelectElement;
+    await act(async () => {
+      select.value = value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  test("asks why before it sends a change, and sends the answer with it", async () => {
+    await render({});
+    await choose("committed");
+    expect(runOkrMutation).not.toHaveBeenCalled();
+    const reason = await type(
+      "Marking it committed. Why?",
+      "The board made it a promise",
+    );
+    await act(async () => {
+      reason.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+    expect(runOkrMutation).toHaveBeenCalledWith({
+      kind: "setKind",
+      id: "g",
+      okrKind: "committed",
+      reason: "The board made it a promise",
+    });
+  });
+
+  test("sends a change with no reason, because one is asked for and not required", async () => {
+    await render({});
+    await choose("committed");
+    const save = [...container.querySelectorAll("button")].find(
+      (button) =>
+        button.closest('[data-testid="kind-reason"]') &&
+        button.textContent === "Save",
+    );
+    await act(async () => save?.click());
+    expect(runOkrMutation).toHaveBeenCalledWith({
+      kind: "setKind",
+      id: "g",
+      okrKind: "committed",
+    });
+  });
+
+  test("keeps the kind it had on Escape", async () => {
+    await render({});
+    await choose("committed");
+    const reason = field("Marking it committed. Why?") as HTMLInputElement;
+    await act(async () => {
+      reason.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    expect(runOkrMutation).not.toHaveBeenCalled();
+    expect((field(LABEL) as HTMLSelectElement).value).toBe("aspirational");
+    expect(container.querySelector('[data-testid="kind-reason"]')).toBeNull();
+  });
+
+  test("is a chip, not a control, for a reader who cannot edit", async () => {
+    await render({ canEdit: false });
+    expect(field(LABEL)).toBeNull();
+    expect(
+      container.querySelector('[data-kind="aspirational"]')?.textContent,
+    ).toBe("Aspirational");
+  });
+
+  test("is not shown at all where the workspace uses one kind", async () => {
+    await render({
+      practice: resolvePractice("recommended", {
+        "okr.kinds": "aspirationalOnly",
+      }),
+    });
+    expect(field(LABEL)).toBeNull();
+    expect(container.querySelector("[data-kind]")).toBeNull();
   });
 });
 

@@ -160,6 +160,15 @@ export function placeKeyResultIn(
   };
 }
 
+/** An objective promised as the other kind (METHOD.md §2.8, P9-T11b-a). */
+export function kindIn(
+  tree: OkrTree,
+  goalId: string,
+  kind: OkrGoal["kind"],
+): OkrTree {
+  return onGoal(tree, goalId, (goal) => ({ ...goal, kind }));
+}
+
 /** An objective taken off the list, for the moment before the server agrees. */
 export function withoutGoal(tree: OkrTree, id: string): OkrTree {
   return { ...tree, goals: tree.goals.filter((goal) => goal.id !== id) };
@@ -206,6 +215,8 @@ export interface OkrFilters {
   readonly spaceId?: string | undefined;
   /** "My team": the objectives of the spaces the reader belongs to. */
   readonly spaceIds?: readonly string[] | undefined;
+  /** Committed or aspirational objectives only (P9-T11b-a). */
+  readonly kind?: OkrGoal["kind"] | undefined;
 }
 
 /** What a filter keeps, the same on the server's first render and in the cache. */
@@ -223,6 +234,7 @@ export function filterGoals(
       (filters.championId === undefined ||
         goal.champion.id === filters.championId) &&
       (filters.spaceId === undefined || goal.spaceId === filters.spaceId) &&
+      (filters.kind === undefined || goal.kind === filters.kind) &&
       (mySpaces === null ||
         (goal.spaceId !== null && mySpaces.has(goal.spaceId))),
   );

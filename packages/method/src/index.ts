@@ -149,6 +149,7 @@ export {
 export {
   CHECK_ENFORCEMENT,
   type CheckEnforcement,
+  defaultOkrKind,
   defaultPractice,
   describe as describePracticeSetting,
   differencesFromProfile,
@@ -163,6 +164,7 @@ export {
   levelsInUse,
   OKR_LEVELS,
   type OkrLevel,
+  okrKindsInUse,
   PRACTICE,
   PRACTICE_CHECK_IDS,
   PRACTICE_KEYS,

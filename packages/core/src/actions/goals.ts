@@ -18,6 +18,7 @@ import {
   cycles,
   GOAL_CLOSE_DECISIONS,
   GOAL_HEALTH,
+  GOAL_KINDS,
   GOAL_LEVELS,
   GOAL_OWNER_KINDS,
   GOAL_SUCCESS_STATUSES,
@@ -35,6 +36,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
+  defaultOkrKind,
   evaluateKeyResults,
   KEY_RESULT_CHECKS,
   type KeyResultInput,
@@ -158,6 +160,8 @@ const goalOutput = z.object({
   cycleId: z.uuid().nullable(),
   timeframe: timeframe.nullable(),
   level: z.enum(GOAL_LEVELS),
+  /** Committed or aspirational (METHOD.md §2.8, P9-T11b-a). */
+  kind: z.enum(GOAL_KINDS),
   ownerKind: z.enum(GOAL_OWNER_KINDS),
   spaceId: z.uuid().nullable(),
   memberId: z.uuid().nullable(),
@@ -342,6 +346,7 @@ const GOAL_COLUMNS = {
   cycleId: goals.cycleId,
   timeframe: goals.timeframe,
   level: goals.level,
+  kind: goals.kind,
   ownerKind: goals.ownerKind,
   spaceId: goals.spaceId,
   memberId: goals.memberId,
@@ -993,6 +998,13 @@ export const createGoal = defineWriteAction({
       cycleId: z.uuid().optional(),
       timeframe: timeframe.optional(),
       level: z.enum(GOAL_LEVELS),
+      /**
+       * Committed or aspirational (METHOD.md §2.8, P9-T11b-a). Left out, the
+       * workspace's default: aspirational, or committed where it uses
+       * committed OKRs only (decision D2). A kind it has turned off is
+       * refused through the policy.
+       */
+      kind: z.enum(GOAL_KINDS).optional(),
       ownerKind: z.enum(GOAL_OWNER_KINDS).default("workspace"),
       spaceId: z.uuid().optional(),
       memberId: z.uuid().optional(),
@@ -1077,12 +1089,14 @@ export const createGoal = defineWriteAction({
       );
 
       await assertLegacyKeyFree(tx, workspaceId, goals, input.legacy, "goal");
+      const { practice } = practiceFromRow(
+        await readRhythmRow(tx, workspaceId),
+      );
       // Where P8-G13d's default meets P9-T04's setting (STATUS, P9-T04).
       const reviewerId =
         input.reviewerId !== undefined
           ? input.reviewerId
-          : practiceFromRow(await readRhythmRow(tx, workspaceId)).practice
-                .reviewer === "required"
+          : practice.reviewer === "required"
             ? memberId
             : null;
       await requirePolicy(
@@ -1094,6 +1108,8 @@ export const createGoal = defineWriteAction({
           hasReviewer: reviewerId !== null,
           // §2.7: only a level the cycle uses (P9-T07a-c).
           level: input.level,
+          // §2.8: only a kind the workspace uses (P9-T11b-a).
+          ...(input.kind === undefined ? {} : { okrKind: input.kind }),
         },
       );
 
@@ -1162,6 +1178,7 @@ export const createGoal = defineWriteAction({
         cycleId: input.cycleId ?? null,
         timeframe: input.timeframe ?? null,
         level: input.level,
+        kind: input.kind ?? defaultOkrKind(practice),
         ownerKind: input.ownerKind,
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,

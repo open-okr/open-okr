@@ -1,6 +1,7 @@
 "use client";
 
 import type { GoalLevel } from "@openokr/db";
+import { okrKindsInUse } from "@openokr/method";
 import {
   Bar,
   Button,
@@ -31,6 +32,7 @@ import {
   InlineDate,
   InlineNumber,
   InlineText,
+  KindControl,
   MemberPicker,
   type Person,
   ReasonField,
@@ -660,6 +662,14 @@ function ObjectiveRow({
           />
           <VerdictChips verdicts={cells.verdicts} />
           <span className="flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3">
+            <KindControl
+              kind={goal.kind}
+              title={goal.title}
+              kinds={okrKindsInUse(coach.practice)}
+              // A closed objective keeps the kind it was closed as.
+              readOnly={!canEdit || goal.closedAt !== null}
+              onSave={cells.saveKind}
+            />
             <span className="flex items-center gap-1">
               {t("okrList.champion")}
               <MemberPicker

@@ -215,7 +215,9 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 | P9-T05 | The practice settings screen | none | New: §12.1's option words against `optionLabels` |
 | P9-T06 to P9-T10 | OKR writing, list and diagram | none ([p9-t00-okr-writing.md](p9-t00-okr-writing.md)), except P9-T07a, which carries §2.7's first sentence with the level picker that reads the levels in use (G-3) | None |
 | P9-T11a | The method by kind | §1 principle 4, §2.8, §3.2, §3.3's notes, §3.4, §4.2's KR-6, §4.4's CY-6, §4.5's gate 5, §4.6's committed pair, §5.5, and the sentences that quote the numbers it moves: §8.4's threshold, §9's phase 7 sandbagging line and §10's two rows on stretch. §3.3's root-cause note reads "Below 0.4", the bands' own lowest boundary, until P9-T14 moves the bands to 0.3 | The new scoring thresholds; retire the sandbagging and annotation parameters |
-| P9-T11b | The kind in the product | None of its own | None |
+| P9-T11b-a | The kind stored and chosen | None of its own | None |
+| P9-T11b-b | The kind in the rules | None of its own | None |
+| P9-T11b-c | The committed floor | §10's committed row | None |
 | P9-T12 | Kinds of key result | §2.10, §3.1, §4.2's opening, KR-2, KR-3 and KR-7 | KR-2 condition table |
 | P9-T13 | Changing OKRs mid-cycle: the added-mid-cycle mark, live or draft creation, stop with a reason, annual revisions, calibration retired. Builds on the target history and reason rule P9-T06 introduces | §2.1, §2.9 (the four moves, live or draft, changing a target), §7.6 | The four calibration sentences |
 | P9-T13a | Moving an objective to another space (G-1) | §2.9's "When the organisation changes" | None (behaviour) |

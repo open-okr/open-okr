@@ -29,6 +29,7 @@
  * Pure. No database, no clock, no network, no framework.
  */
 import { z } from "zod";
+import type { OkrKind } from "./scoring.ts";
 import {
   canonThresholds,
   isThresholdKey,
@@ -520,6 +521,30 @@ export function defaultPractice(): ResolvedPractice {
  */
 export function levelsInUse(practice: ResolvedPractice): OkrLevel[] {
   return OKR_LEVELS.filter((level) => practice[`levels.${level}`] === "on");
+}
+
+/**
+ * The kinds of OKR a practice uses (§2.8, P9-T11b-a): both by default, or
+ * one where the workspace has chosen to work with one kind only.
+ */
+export function okrKindsInUse(practice: ResolvedPractice): OkrKind[] {
+  const kinds = practice["okr.kinds"];
+  return kinds === "committedOnly"
+    ? ["committed"]
+    : kinds === "aspirationalOnly"
+      ? ["aspirational"]
+      : ["committed", "aspirational"];
+}
+
+/**
+ * The kind a new objective starts as when nobody says (§2.8, decision D2):
+ * aspirational, because a commitment is a promise somebody makes on purpose,
+ * unless the workspace uses committed OKRs only.
+ */
+export function defaultOkrKind(practice: ResolvedPractice): OkrKind {
+  return practice["okr.kinds"] === "committedOnly"
+    ? "committed"
+    : "aspirational";
 }
 
 /** Every setting in one group, for the admin card that renders them together. */

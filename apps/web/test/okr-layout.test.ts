@@ -54,6 +54,7 @@ const goal = (
     title: `Objective ${id}`,
     cycleId: "c",
     level: "team",
+    kind: "aspirational",
     spaceId: null,
     champion: { id: "m", name: "Mei" },
     reviewer: null,

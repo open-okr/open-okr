@@ -54,6 +54,14 @@ export const GOAL_HEALTH = [
 ] as const;
 export type GoalHealth = (typeof GOAL_HEALTH)[number];
 
+/**
+ * METHOD.md §2.8 (P9-T11b-a). The same two words as the method's `OkrKind`,
+ * spelled here because this package does not depend on `packages/method`,
+ * and the column's check constraint names them too.
+ */
+export const GOAL_KINDS = ["committed", "aspirational"] as const;
+export type GoalKind = (typeof GOAL_KINDS)[number];
+
 export const GOAL_SUCCESS_STATUSES = ["achieved", "missed"] as const;
 export type GoalSuccessStatus = (typeof GOAL_SUCCESS_STATUSES)[number];
 
@@ -105,6 +113,8 @@ export const goals = pgTable("goals", {
   }),
   timeframe: jsonb("timeframe").$type<GoalTimeframe>(),
   level: text("level", { enum: GOAL_LEVELS }).notNull(),
+  /** Committed or aspirational (METHOD.md §2.8). Aspirational by default. */
+  kind: text("kind", { enum: GOAL_KINDS }).notNull().default("aspirational"),
   ownerKind: text("owner_kind", { enum: GOAL_OWNER_KINDS }).notNull(),
   spaceId: uuid("space_id").references(() => spaces.id, {
     onDelete: "set null",

@@ -1,6 +1,7 @@
 "use client";
 
 import type { GoalLevel } from "@openokr/db";
+import type { OkrKind } from "@openokr/method";
 import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -29,6 +30,8 @@ export function NewObjectiveButton({
   level,
   refusal,
   initiallyOpen,
+  kinds,
+  defaultKind,
 }: {
   readonly cycleId: string;
   readonly level: GoalLevel;
@@ -39,12 +42,20 @@ export function NewObjectiveButton({
   readonly refusal: WritingRefusal | null;
   /** Open on arrival, for the topbar's `+ New`, which links here. */
   readonly initiallyOpen?: boolean;
+  /**
+   * The kinds the workspace uses, and the one a new objective starts as
+   * (METHOD.md §2.8, decision D2). The choice is offered only where there
+   * are two.
+   */
+  readonly kinds: readonly OkrKind[];
+  readonly defaultKind: OkrKind;
 }) {
   const { t } = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(initiallyOpen === true);
   const [title, setTitle] = useState("");
+  const [kind, setKind] = useState<OkrKind>(defaultKind);
   const [problem, setProblem] = useState<string | null>(null);
 
   const save = () => {
@@ -54,7 +65,12 @@ export function NewObjectiveButton({
     }
     setProblem(null);
     start(async () => {
-      const created = await addObjective({ cycleId, level, title: wanted });
+      const created = await addObjective({
+        cycleId,
+        level,
+        title: wanted,
+        ...(kinds.length > 1 ? { kind } : {}),
+      });
       if (created.error) {
         setProblem(created.error);
         return;
@@ -82,6 +98,18 @@ export function NewObjectiveButton({
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <div className="flex min-w-0 items-center gap-2">
+        {kinds.length > 1 ? (
+          <select
+            aria-label={t("okrKind.label")}
+            value={kind}
+            disabled={pending}
+            onChange={(event) => setKind(event.target.value as OkrKind)}
+            className="h-7.5 rounded-control border border-line bg-surface px-1.5 text-xs text-ink outline-none focus:border-brand"
+          >
+            <option value="aspirational">{t("okrKind.aspirational")}</option>
+            <option value="committed">{t("okrKind.committed")}</option>
+          </select>
+        ) : null}
         <input
           // Focused through a ref rather than `autoFocus`, which also steals
           // focus when a page loads with one of these already open.

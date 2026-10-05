@@ -63,6 +63,7 @@ const node = (title: string): OkrGoal => ({
   title,
   cycleId: "c",
   level: "team",
+  kind: "aspirational",
   spaceId: null,
   champion: { id: "m", name: "Priya" },
   reviewer: null,

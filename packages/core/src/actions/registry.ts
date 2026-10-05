@@ -222,6 +222,7 @@ import {
   suggestMeasure,
   suggestParent,
 } from "./goal-assists.ts";
+import { setGoalKind } from "./goal-kind.ts";
 import { readGoalRelations } from "./goal-relations.ts";
 import {
   changeKeyResultTarget,
@@ -755,6 +756,7 @@ export const ACTION_MAP = {
   "goals.patch": patchGoal,
   "goals.patchKeyResult": patchKeyResult,
   "goals.changeTarget": changeKeyResultTarget,
+  "goals.setKind": setGoalKind,
   "goals.targetHistory": readTargetHistory,
   "goals.restoreKeyResult": restoreKeyResult,
   "goals.recordValue": recordKeyResultValue,

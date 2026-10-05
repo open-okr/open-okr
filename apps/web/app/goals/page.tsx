@@ -1,8 +1,9 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
 import {
   ALIGNMENT_LEVEL_ORDER,
-  defaultPractice,
+  defaultOkrKind,
   resolveThresholds as defaultThresholds,
+  okrKindsInUse,
   type ResolvedPractice,
   type ResolvedThresholds,
 } from "@openokr/method";
@@ -81,6 +82,8 @@ export default async function GoalsPage({
     /** One champion's objectives, and one space's. */
     champion?: string;
     space?: string;
+    /** Committed or aspirational objectives only (METHOD.md §2.8, P9-T11b-a). */
+    kind?: string;
     /** `objective` when the topbar's `+ New` sent the reader here. */
     new?: string;
     /**
@@ -188,6 +191,14 @@ export default async function GoalsPage({
     .map((space) => space.id);
   const champion = members.find((member) => member.id === query.champion)?.id;
   const space = spaces.find((entry) => entry.id === query.space)?.id;
+  // Read whatever the display: the kind filter is offered only where the
+  // workspace uses both kinds (METHOD.md §2.8).
+  const practiceRead = await callAction(context, "practice.read", {});
+  const kindsInUse = okrKindsInUse(practiceRead.practice as ResolvedPractice);
+  const kind =
+    kindsInUse.length > 1
+      ? kindsInUse.find((entry) => entry === query.kind)
+      : undefined;
 
   const filtered =
     level !== undefined ||
@@ -195,7 +206,8 @@ export default async function GoalsPage({
     scopeTab !== "all" ||
     includeClosed ||
     champion !== undefined ||
-    space !== undefined;
+    space !== undefined ||
+    kind !== undefined;
 
   // The list and the diagram draw from one tree, which the table's cache then
   // owns (P9-T06c); the indented tree view still reads `goals.list`. Only the
@@ -221,6 +233,7 @@ export default async function GoalsPage({
     championId: champion,
     spaceId: space,
     spaceIds: scopeTab === "team" ? mySpaceIds : undefined,
+    kind,
   };
   const treeGoals = okrTree ? filterGoals(okrTree.goals, filters) : [];
 
@@ -240,6 +253,7 @@ export default async function GoalsPage({
   const goals = listed.goals.filter(
     (goal) =>
       (champion === undefined || goal.champion.id === champion) &&
+      (kind === undefined || goal.kind === kind) &&
       (scopeTab !== "team" ||
         (goal.spaceId !== null && mySpaceIds.includes(goal.spaceId))),
   );
@@ -263,12 +277,9 @@ export default async function GoalsPage({
   // browser cannot read for itself (P9-T07a-a). Read for the list and for
   // the diagram, whose drawer edits with the same coaching (P9-T09a).
   const editing = display !== "tree" && okrTree !== null;
-  const [practiceRead, rhythmRead] = editing
-    ? await Promise.all([
-        callAction(context, "practice.read", {}),
-        callAction(context, "rhythm.read", {}),
-      ])
-    : [null, null];
+  const rhythmRead = editing
+    ? await callAction(context, "rhythm.read", {})
+    : null;
 
   const canEdit = accessLevel >= ACCESS_LEVELS.edit;
   const canAdminister = accessLevel >= ACCESS_LEVELS.full;
@@ -331,6 +342,7 @@ export default async function GoalsPage({
       scope: scopeTab === "team" || scopeTab === "company" ? scopeTab : null,
       champion: champion ?? null,
       space: space ?? null,
+      kind: kind ?? null,
       view: tree ? null : "list",
       closed: includeClosed ? "1" : null,
       display: display === "editor" ? null : display,
@@ -425,6 +437,10 @@ export default async function GoalsPage({
                   refusal={refusal}
                   // The topbar's `+ New` lands here (P9-T07b-a).
                   initiallyOpen={query.new === "objective"}
+                  kinds={kindsInUse}
+                  defaultKind={defaultOkrKind(
+                    practiceRead.practice as ResolvedPractice,
+                  )}
                 />
               ) : null}
               {/* Check in's door now that it has left the sidebar
@@ -463,6 +479,7 @@ export default async function GoalsPage({
             spaces={spaces}
             champion={champion ?? null}
             space={space ?? null}
+            kind={kindsInUse.length > 1 ? (kind ?? null) : undefined}
             filterAssist={filterAssistAvailable ? <FilterAssist /> : undefined}
             tree={tree}
             display={display}
@@ -481,8 +498,7 @@ export default async function GoalsPage({
           coach={{
             thresholds: (rhythmRead?.thresholds ??
               defaultThresholds()) as ResolvedThresholds,
-            practice: (practiceRead?.practice ??
-              defaultPractice()) as ResolvedPractice,
+            practice: practiceRead.practice as ResolvedPractice,
           }}
           scope={scope}
           filters={filters}
@@ -521,8 +537,7 @@ export default async function GoalsPage({
           coach={{
             thresholds: (rhythmRead?.thresholds ??
               defaultThresholds()) as ResolvedThresholds,
-            practice: (practiceRead?.practice ??
-              defaultPractice()) as ResolvedPractice,
+            practice: practiceRead.practice as ResolvedPractice,
           }}
           empty={
             <div className="flex flex-col gap-1.5 p-3">
@@ -740,6 +755,7 @@ async function Filters({
   spaces,
   champion,
   space,
+  kind,
   tree,
   display,
   includeClosed,
@@ -755,6 +771,11 @@ async function Filters({
   readonly spaces: readonly { readonly id: string; readonly name: string }[];
   readonly champion: string | null;
   readonly space: string | null;
+  /**
+   * The kind chosen, or null for either. Undefined where the workspace uses
+   * one kind, which hides the group: every objective is then that kind.
+   */
+  readonly kind: "committed" | "aspirational" | null | undefined;
   readonly tree: boolean;
   readonly display: "editor" | "diagram" | "tree";
   readonly includeClosed: boolean;
@@ -854,6 +875,26 @@ async function Filters({
             </Tab>
           ))}
         </Group>
+
+        {kind !== undefined ? (
+          <Group label={t("okrKind.label")}>
+            <Tab href={href({ kind: null })} active={kind === null}>
+              {t("common.any")}
+            </Tab>
+            <Tab
+              href={href({ kind: "committed" })}
+              active={kind === "committed"}
+            >
+              {t("okrKind.committed")}
+            </Tab>
+            <Tab
+              href={href({ kind: "aspirational" })}
+              active={kind === "aspirational"}
+            >
+              {t("okrKind.aspirational")}
+            </Tab>
+          </Group>
+        ) : null}
 
         {/* Two filters that are a yes or a no, drawn as a yes or a no. A pair
          * of options each needed a label to say which pair it was; a single

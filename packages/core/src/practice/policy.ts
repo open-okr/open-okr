@@ -21,6 +21,7 @@ import {
   decide,
   levelsInUse,
   OKR_LEVELS,
+  type OkrKind,
   type PolicyDecision,
   policyNeedsPhases,
 } from "@openokr/method";
@@ -41,7 +42,11 @@ export type PolicyRequest =
       readonly hasReviewer?: boolean;
       /** The level it is written at, judged against the levels in use (P9-T07a-c). */
       readonly level?: string;
+      /** The kind the writer chose, judged against the kinds in use (P9-T11b-a). */
+      readonly okrKind?: OkrKind;
     }
+  /** Changing an objective's kind (P9-T11b-a). Needs no cycle. */
+  | { readonly kind: "objective.kind"; readonly okrKind: OkrKind }
   /** Taking the reviewer off an objective (P9-T04). */
   | { readonly kind: "reviewer.remove" }
   | { readonly kind: "keyResult.create"; readonly cycleId: string | null }
@@ -75,7 +80,7 @@ export async function policyDecisionInTx<
   if (request.kind === "reviewer.remove") {
     return decide({ kind: "reviewer.remove" }, practice, thresholds);
   }
-  if (request.kind === "target.change") {
+  if (request.kind === "target.change" || request.kind === "objective.kind") {
     return decide(request, practice, thresholds);
   }
 
@@ -136,6 +141,7 @@ export async function policyDecisionInTx<
         ...(level === undefined || levels === undefined
           ? {}
           : { level, levelsInUse: levels }),
+        ...(request.okrKind === undefined ? {} : { okrKind: request.okrKind }),
       },
       practice,
       thresholds,

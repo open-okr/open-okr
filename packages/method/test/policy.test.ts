@@ -9,6 +9,8 @@ import {
   policyNeedsPhases,
 } from "../src/policy.ts";
 import {
+  defaultOkrKind,
+  okrKindsInUse,
   PROFILE_KEYS,
   type ProfileKey,
   resolvePractice,
@@ -306,6 +308,55 @@ describe("the reviewer setting", () => {
     expect(
       decide({ kind: "reviewer.remove" }, optional, thresholds).outcome,
     ).toBe("allow");
+  });
+});
+
+describe("the kinds in use (P9-T11b-a, METHOD.md §2.8)", () => {
+  it("allows either kind where the workspace uses both", () => {
+    const both = resolvePractice("recommended");
+    for (const okrKind of ["committed", "aspirational"] as const) {
+      expect(
+        decide({ kind: "objective.kind", okrKind }, both, thresholds).outcome,
+      ).toBe("allow");
+    }
+  });
+
+  it("refuses the kind a workspace has turned off, citing the setting", () => {
+    const committedOnly = resolvePractice("recommended", {
+      "okr.kinds": "committedOnly",
+    });
+    const refused = decide(
+      { kind: "objective.kind", okrKind: "aspirational" },
+      committedOnly,
+      thresholds,
+    );
+    expect(refused.outcome).toBe("block");
+    expect(refused.rules).toEqual(["okr.kinds"]);
+    expect(refused.reasons[0]).toContain("committed OKRs only");
+    expect(
+      decide(
+        {
+          kind: "objective.create",
+          cycle: null,
+          okrKind: "committed",
+        },
+        resolvePractice("recommended", { "okr.kinds": "aspirationalOnly" }),
+        thresholds,
+      ).outcome,
+    ).toBe("block");
+  });
+
+  it("starts a new objective aspirational unless the workspace commits only", () => {
+    expect(defaultOkrKind(resolvePractice("recommended"))).toBe("aspirational");
+    expect(
+      defaultOkrKind(
+        resolvePractice("recommended", { "okr.kinds": "committedOnly" }),
+      ),
+    ).toBe("committed");
+    expect(okrKindsInUse(resolvePractice("recommended"))).toEqual([
+      "committed",
+      "aspirational",
+    ]);
   });
 });
 

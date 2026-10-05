@@ -1,11 +1,12 @@
 "use client";
 
+import { okrKindsInUse } from "@openokr/method";
 import { Bar, useTranslations } from "@openokr/ui";
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
 import { HealthChip } from "./health-chip.tsx";
-import { InlineNumber, InlineText } from "./okr-cells.tsx";
+import { InlineNumber, InlineText, KindControl } from "./okr-cells.tsx";
 import {
   type Coach,
   type OkrWrite,
@@ -136,6 +137,14 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
           <span className="truncate font-normal normal-case tracking-normal">
             {goal.champion.name}
           </span>
+          <KindControl
+            kind={goal.kind}
+            title={goal.title}
+            kinds={okrKindsInUse(shared.coach.practice)}
+            readOnly={!shared.canEdit || goal.closedAt !== null}
+            floating
+            onSave={cells.saveKind}
+          />
         </span>
         {editing ? (
           <TitleEditor

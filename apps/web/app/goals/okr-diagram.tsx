@@ -233,6 +233,10 @@ function LiveDiagram({
             type: "objective",
             ariaLabel: t("okrDiagram.objectiveLabel", {
               title: entry.goal.title,
+              kind: (entry.goal.kind === "committed"
+                ? t("okrKind.committed")
+                : t("okrKind.aspirational")
+              ).toLowerCase(),
               level: entry.goal.level,
               progress: String(Math.round(entry.goal.progressPct)),
               health: entry.goal.health.replace("_", " "),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterGoals,
+  kindIn,
   mergeGoal,
   type OkrGoal,
   type OkrTree,
@@ -48,6 +49,7 @@ const goal = (id: string, extra: Partial<OkrGoal> = {}): OkrGoal => ({
   title: `Objective ${id}`,
   cycleId: "c",
   level: "team",
+  kind: "aspirational",
   spaceId: null,
   champion: { id: "m", name: "Mei" },
   reviewer: null,
@@ -227,5 +229,27 @@ describe("reparentIn (P9-T10b)", () => {
     });
     expect(next.goals[1]?.parentGoalId).toBeNull();
     expect(next.goals[0]).toEqual(tree().goals[0]);
+  });
+});
+
+describe("the kind (P9-T11b-a)", () => {
+  it("changes one objective's kind before the server answers", () => {
+    const changed = kindIn(tree, "a", "committed");
+    expect(changed.goals.map((entry) => entry.kind)).toEqual([
+      "committed",
+      "aspirational",
+    ]);
+    // The tree it came from is left as it was, for a refusal to put back.
+    expect(tree.goals[0]?.kind).toBe("aspirational");
+  });
+
+  it("keeps one kind when the filter asks for it", () => {
+    const mixed = kindIn(tree, "b", "committed");
+    expect(
+      filterGoals(mixed.goals, {
+        includeClosed: true,
+        kind: "committed",
+      }).map((entry) => entry.id),
+    ).toEqual(["b"]);
   });
 });

@@ -2,6 +2,7 @@
 
 import { Dialog } from "@base-ui-components/react/dialog";
 import { Tabs } from "@base-ui-components/react/tabs";
+import { okrKindsInUse } from "@openokr/method";
 import {
   Bar,
   Chip,
@@ -30,6 +31,7 @@ import {
   InlineDate,
   InlineNumber,
   InlineText,
+  KindControl,
   MemberPicker,
   type Person,
   ReasonField,
@@ -350,6 +352,21 @@ function DrawerBody({
             </dd>
             <dt className="text-ink-3">{t("okrDrawer.level")}</dt>
             <dd className="px-1 text-ink-2">{goal.level}</dd>
+            {/* §2.8. Absent where the workspace uses one kind. */}
+            {okrKindsInUse(coach.practice).length > 1 ? (
+              <>
+                <dt className="text-ink-3">{t("okrKind.label")}</dt>
+                <dd className="px-1">
+                  <KindControl
+                    kind={goal.kind}
+                    title={goal.title}
+                    kinds={okrKindsInUse(coach.practice)}
+                    readOnly={!canEdit || goal.closedAt !== null}
+                    onSave={objective.saveKind}
+                  />
+                </dd>
+              </>
+            ) : null}
             <dt className="text-ink-3">{t("okrDrawer.nextCheckIn")}</dt>
             <dd className="px-1 text-ink-2">
               {goal.nextCheckInOn ?? t("okrDrawer.noCheckInDue")}

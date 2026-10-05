@@ -6212,6 +6212,16 @@
           ]
         },
         {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "committed",
+            "aspirational"
+          ]
+        },
+        {
           "name": "owner-kind",
           "field": "ownerKind",
           "type": "string",
@@ -6942,6 +6952,39 @@
           "field": "targetValue",
           "type": "number",
           "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals setKind",
+      "action": "goals.setKind",
+      "method": "POST",
+      "path": "/goals/setKind",
+      "scope": "write",
+      "summary": "Marks an objective committed or aspirational (METHOD.md §2.8), recording the change and its reason in the objective's activity.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "committed",
+            "aspirational"
+          ]
         },
         {
           "name": "reason",

@@ -5,7 +5,7 @@
  * and the drawer's read of what the tree does not carry (P9-T08a).
  *
  * **An allow-list, as the delete path has.** A server action takes whatever
- * the browser sends, so the switch below over twelve named writes is what stops
+ * the browser sends, so the switch below over thirteen named writes is what stops
  * this becoming a way to call any action in the registry. Each write goes
  * through the action every other surface uses, so the cache can do nothing
  * the API cannot and is refused the same way.
@@ -192,6 +192,13 @@ export type OkrMutation =
   | { readonly kind: "deleteGoal"; readonly id: string }
   | { readonly kind: "restoreGoal"; readonly id: string }
   | {
+      /** Committed or aspirational, with why (METHOD.md §2.8, P9-T11b-a). */
+      readonly kind: "setKind";
+      readonly id: string;
+      readonly okrKind: "committed" | "aspirational";
+      readonly reason?: string;
+    }
+  | {
       /**
        * An objective hung under another parent from the diagram (P9-T10b).
        * `from` is where it hung before, so the undo can put it back; an undo
@@ -302,6 +309,14 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
     case "restoreGoal":
       await callAction(ctx, "goals.restore", { id: mutation.id });
       return null;
+    case "setKind":
+      return (
+        await callAction(ctx, "goals.setKind", {
+          id: mutation.id,
+          kind: mutation.okrKind,
+          ...(mutation.reason ? { reason: mutation.reason } : {}),
+        })
+      ).goal;
     case "reparent":
       // `goals.update` keeps the one-parent rule and refuses a loop, so the
       // diagram can offer any card as a parent and let the server say no.

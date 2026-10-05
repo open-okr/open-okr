@@ -130,6 +130,14 @@ export function useObjectiveCells(goal: OkrGoal, okr: OkrWrite, coach: Coach) {
         set: { title },
         read: { title: goal.title },
       }),
+    /** Committed or aspirational, with why (METHOD.md §2.8, P9-T11b-a). */
+    saveKind: (okrKind: OkrGoal["kind"], reason: string | undefined) =>
+      okr.mutate({
+        kind: "setKind",
+        id: goal.id,
+        okrKind,
+        ...(reason ? { reason } : {}),
+      }),
     saveChampion: (championId: string | null) => {
       if (championId) {
         okr.mutate({

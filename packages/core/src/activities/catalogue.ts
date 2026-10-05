@@ -416,6 +416,14 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     afterId: z.uuid().nullable(),
   }),
   "goal.placed": z.object({ afterId: z.uuid().nullable() }),
+  // The kind of promise changed (METHOD.md §2.8, P9-T11b-a). The reason is
+  // kept here, because the close reads what an objective was promised as and
+  // why that changed, and there is no other record of it.
+  "goal.kind_changed": z.object({
+    from: z.enum(["committed", "aspirational"]),
+    to: z.enum(["committed", "aspirational"]),
+    reason: z.string().nullable(),
+  }),
   "key_result.kpi_linked": z.object({ kpiId: z.uuid() }),
   "key_result.kpi_unlinked": z.object({}),
   // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing

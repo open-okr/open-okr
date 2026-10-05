@@ -29,6 +29,7 @@ import {
   type CapacityVerdict,
   checkIns,
   type GoalCloseDecision,
+  type GoalKind,
   type GoalLevel,
   type GoalOwnerKind,
   type GoalSuccessStatus,
@@ -88,6 +89,12 @@ export interface CreateGoalInput {
   readonly cycleId?: string | null;
   readonly timeframe?: GoalTimeframe | null;
   readonly level: GoalLevel;
+  /**
+   * Committed or aspirational (METHOD.md §2.8, P9-T11b-a). Left out, the
+   * column's default, aspirational: `goals.create` resolves the workspace's
+   * own default before it gets here.
+   */
+  readonly kind?: GoalKind;
   readonly ownerKind: GoalOwnerKind;
   readonly spaceId?: string | null;
   readonly memberId?: string | null;
@@ -269,6 +276,7 @@ export async function createGoalInTx<
       cycleId: input.cycleId ?? null,
       timeframe: input.timeframe ?? null,
       level: input.level,
+      ...(input.kind === undefined ? {} : { kind: input.kind }),
       ownerKind: input.ownerKind,
       spaceId,
       memberId: input.ownerKind === "member" ? (input.memberId ?? null) : null,

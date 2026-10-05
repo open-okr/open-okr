@@ -1,4 +1,9 @@
-import type { ResolvedPractice, ResolvedThresholds } from "@openokr/method";
+import {
+  defaultOkrKind,
+  okrKindsInUse,
+  type ResolvedPractice,
+  type ResolvedThresholds,
+} from "@openokr/method";
 import {
   Bar,
   Button,
@@ -641,6 +646,29 @@ export async function Drafting({
                     </option>
                   ))}
                 </select>
+                {/* The kind of promise (METHOD.md §2.8, P9-T11b-a), offered
+                 * only where the workspace uses both, and starting at its
+                 * default (decision D2). */}
+                {okrKindsInUse(practice).length > 1 ? (
+                  <>
+                    <label className="sr-only" htmlFor="goal-kind">
+                      {t("okrKind.label")}
+                    </label>
+                    <select
+                      id="goal-kind"
+                      name="kind"
+                      defaultValue={defaultOkrKind(practice)}
+                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    >
+                      <option value="aspirational">
+                        {t("okrKind.aspirational")}
+                      </option>
+                      <option value="committed">
+                        {t("okrKind.committed")}
+                      </option>
+                    </select>
+                  </>
+                ) : null}
                 {/* The reviewer follows the practice (METHOD.md §2.5, P9-T04):
                  * off asks for none, so there is no picker; optional offers
                  * "No reviewer" after the members; required offers members

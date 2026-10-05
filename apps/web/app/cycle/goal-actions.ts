@@ -50,6 +50,9 @@ export async function createGoal(
   const level = String(formData.get("level") ?? "company");
   const championId = String(formData.get("championId") ?? "");
   const reviewerId = String(formData.get("reviewerId") ?? "");
+  // Absent where the workspace uses one kind; `goals.create` then uses its
+  // default. Anything but the two words is left to that default too.
+  const kind = String(formData.get("kind") ?? "");
 
   if (title === "") {
     const { t } = await getTranslations();
@@ -71,6 +74,7 @@ export async function createGoal(
       reviewerId: reviewerId === "" ? null : reviewerId,
       weight: 1,
       ...(contributionStatement === "" ? {} : { contributionStatement }),
+      ...(kind === "committed" || kind === "aspirational" ? { kind } : {}),
     }),
   );
 }

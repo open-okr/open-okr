@@ -80,6 +80,8 @@ export async function addObjective(input: {
   title: string;
   /** The objective it aligns under, from the diagram's "+ aligned" (P9-T10a). */
   parentGoalId?: string;
+  /** Committed or aspirational; left out, the workspace's default (§2.8). */
+  kind?: "committed" | "aspirational";
 }): Promise<CreatedResult> {
   const memberId = await actingMemberId();
   try {
@@ -92,6 +94,7 @@ export async function addObjective(input: {
       championId: memberId,
       weight: 1,
       ...(input.parentGoalId ? { parentGoalId: input.parentGoalId } : {}),
+      ...(input.kind ? { kind: input.kind } : {}),
     });
     refresh();
     return { error: null, id: created.id };

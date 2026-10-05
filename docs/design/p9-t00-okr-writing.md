@@ -105,6 +105,8 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 | Milestone done | Checkbox | `goals.patchKeyResult {doneAt}` | |
 | Confidence | 0 to 10 stepper, shown as "x in 10" | Recorded with the next check-in, or as a quick confidence update | |
 
+**As built at P9-T11b-a, the kind.** A chip-coloured select rather than a two-state toggle, so the keyboard and a screen reader meet a named control ("Kind of …"). Choosing the other kind opens one line beside it asking why; Enter or Save sends it **with or without an answer**, because METHOD.md §2.8 asks for the change to be visible rather than justified, and Escape keeps the kind it had. The same control sits in the list's row, the drawer's details and the diagram card's header, where the question floats over the card because the layout has fixed its height. **Where the workspace uses one kind there is no chip, no picker and no filter**: every objective is that kind, and saying so on every row is noise. "+ New objective" and the cycle screen's drafting form offer the kind, starting at the workspace's default (D2); the list's add rows take the default and the chip changes it after. A closed objective shows its kind and does not offer a change.
+
 ### 4.3 Adding
 
 - **No placeholder records.** "+ Add key result" inserts a client-side draft row with the cursor in its title.

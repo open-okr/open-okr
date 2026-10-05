@@ -1,6 +1,6 @@
 "use client";
 
-import type { QualityStatus } from "@openokr/method";
+import type { OkrKind, QualityStatus } from "@openokr/method";
 import { Chip, cn, useTranslations } from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
 
@@ -273,6 +273,143 @@ export function MemberPicker({
         </option>
       ))}
     </select>
+  );
+}
+
+/** Committed reads as a promise, aspirational as the quieter default. */
+const KIND_TONE: Record<OkrKind, string> = {
+  committed: "bg-brand-weak text-brand-text",
+  aspirational: "bg-info-bg text-info",
+};
+
+/**
+ * The kind of promise an objective makes (METHOD.md §2.8, P9-T11b-a), as a
+ * chip a writer can change. Choosing the other kind asks why, beside the
+ * chip, and Enter or Save sends it with or without an answer: the method asks
+ * for the change to be visible, and the reason goes into the activity where
+ * the close reads it. Escape or Cancel keeps the kind it had.
+ *
+ * **Nothing at all where the workspace uses one kind.** Every objective is
+ * then the same kind, and a chip saying so on every row is noise.
+ */
+export function KindControl({
+  kind,
+  title,
+  kinds,
+  readOnly,
+  floating = false,
+  onSave,
+}: {
+  readonly kind: OkrKind;
+  readonly title: string;
+  /** The kinds this workspace uses, from its practice. */
+  readonly kinds: readonly OkrKind[];
+  readonly readOnly: boolean;
+  /**
+   * The question laid over what is below rather than pushing it down, for a
+   * diagram card, whose height the layout has already fixed.
+   */
+  readonly floating?: boolean;
+  readonly onSave: (kind: OkrKind, reason: string | undefined) => void;
+}) {
+  const { t } = useTranslations();
+  const [pending, setPending] = useState<OkrKind | null>(null);
+  const [reason, setReason] = useState("");
+  if (kinds.length < 2) {
+    return null;
+  }
+  const name = (entry: OkrKind) =>
+    entry === "committed" ? t("okrKind.committed") : t("okrKind.aspirational");
+  if (readOnly) {
+    return (
+      <Chip
+        className={cn("h-4.5 text-[11px]", KIND_TONE[kind])}
+        data-kind={kind}
+      >
+        {name(kind)}
+      </Chip>
+    );
+  }
+  const shown = pending ?? kind;
+  const cancel = () => {
+    setPending(null);
+    setReason("");
+  };
+  const save = () => {
+    if (pending) {
+      onSave(pending, reason.trim() === "" ? undefined : reason.trim());
+    }
+    cancel();
+  };
+  return (
+    <span
+      className={cn(
+        "inline-flex flex-wrap items-center gap-1.5",
+        floating && "nodrag relative normal-case tracking-normal",
+      )}
+    >
+      <select
+        aria-label={t("okrKind.kindOf", { title })}
+        data-kind={kind}
+        value={shown}
+        onChange={(event) => {
+          const next = event.target.value as OkrKind;
+          setPending(next === kind ? null : next);
+        }}
+        className={cn(
+          "h-4.5 rounded-full border-0 px-2 text-[11px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand",
+          KIND_TONE[shown],
+        )}
+      >
+        {(["committed", "aspirational"] as const).map((entry) => (
+          <option key={entry} value={entry}>
+            {name(entry)}
+          </option>
+        ))}
+      </select>
+      {pending ? (
+        <span
+          data-testid="kind-reason"
+          className={cn(
+            "inline-flex flex-wrap items-center gap-1.5 rounded-control bg-warn-bg px-2 py-1 text-xs",
+            floating && "absolute top-full left-0 z-10 mt-1 w-64 shadow-md",
+          )}
+        >
+          <input
+            ref={(node) => node?.focus()}
+            value={reason}
+            aria-label={t("okrKind.why", {
+              kind: name(pending).toLowerCase(),
+            })}
+            placeholder={t("okrKind.whyPlaceholder")}
+            onChange={(event) => setReason(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                save();
+              }
+              if (event.key === "Escape") {
+                cancel();
+              }
+            }}
+            className="min-w-40 flex-1 rounded-control border border-line bg-surface px-2 py-0.5 text-ink outline-none focus:border-brand"
+          />
+          <button
+            type="button"
+            onClick={save}
+            className="rounded-control px-1.5 font-semibold text-brand-text"
+          >
+            {t("common.save")}
+          </button>
+          <button
+            type="button"
+            onClick={cancel}
+            className="rounded-control px-1.5 text-ink-3"
+          >
+            {t("common.cancel")}
+          </button>
+        </span>
+      ) : null}
+    </span>
   );
 }
 

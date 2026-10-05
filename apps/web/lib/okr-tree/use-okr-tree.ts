@@ -43,6 +43,7 @@ import {
   runOkrMutation,
 } from "./actions.ts";
 import {
+  kindIn,
   mergeGoal,
   OKR_DETAIL_ALL,
   type OkrGoal,
@@ -123,6 +124,8 @@ function optimistic(tree: OkrTree, mutation: OkrMutation): OkrTree {
       return withoutGoal(tree, mutation.id);
     case "reparent":
       return reparentIn(tree, mutation.id, mutation);
+    case "setKind":
+      return kindIn(tree, mutation.id, mutation.okrKind);
     case "restoreKeyResult":
     case "restoreGoal":
     case "checkIn":

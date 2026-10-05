@@ -21,7 +21,13 @@
  *
  * Pure. No database, no clock: the caller passes the date.
  */
-import type { OkrLevel, PracticeKey, ResolvedPractice } from "./practice.ts";
+import {
+  type OkrLevel,
+  okrKindsInUse,
+  type PracticeKey,
+  type ResolvedPractice,
+} from "./practice.ts";
+import type { OkrKind } from "./scoring.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 import type { PhaseResult } from "./workflow.ts";
 
@@ -57,7 +63,11 @@ export type PolicyIntent =
        */
       readonly level?: OkrLevel;
       readonly levelsInUse?: readonly OkrLevel[];
+      /** The kind it is written as, when the writer chose one (§2.8). */
+      readonly okrKind?: OkrKind;
     }
+  /** Changing an objective's kind (§2.8, P9-T11b-a). */
+  | { readonly kind: "objective.kind"; readonly okrKind: OkrKind }
   /** Taking the reviewer off an objective that has one (P9-T04). */
   | { readonly kind: "reviewer.remove" }
   /** A new key result on an objective that already exists. */
@@ -120,7 +130,11 @@ export function policyNeedsPhases(
   intent: PolicyIntent,
   practice: ResolvedPractice,
 ): boolean {
-  if (intent.kind === "reviewer.remove" || intent.kind === "target.change") {
+  if (
+    intent.kind === "reviewer.remove" ||
+    intent.kind === "target.change" ||
+    intent.kind === "objective.kind"
+  ) {
     return false;
   }
   if (intent.kind === "set.publish") {
@@ -223,6 +237,24 @@ export function decide(
   const reviewerRequired = practice.reviewer === "required";
   if (intent.kind === "reviewer.remove") {
     return reviewerRequired ? REVIEWER_REQUIRED : ALLOW;
+  }
+  // §2.8: a workspace may work with one kind only, and then an objective
+  // promised as the other would be judged by rules nobody uses here.
+  if (
+    (intent.kind === "objective.kind" || intent.kind === "objective.create") &&
+    intent.okrKind !== undefined &&
+    !okrKindsInUse(practice).includes(intent.okrKind)
+  ) {
+    return {
+      outcome: "block",
+      rules: ["okr.kinds"],
+      reasons: [
+        `This workspace uses ${okrKindsInUse(practice)[0]} OKRs only, so an objective cannot be ${intent.okrKind}.`,
+      ],
+    };
+  }
+  if (intent.kind === "objective.kind") {
+    return ALLOW;
   }
   // §2.9: making a target harder never needs a reason; easing one does where
   // the workspace asks for it, and "it got hard" is not one.

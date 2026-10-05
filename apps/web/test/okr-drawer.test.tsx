@@ -90,6 +90,7 @@ const goal = (
   title,
   cycleId: "c",
   level: "team",
+  kind: "aspirational",
   spaceId: null,
   champion: PRIYA,
   reviewer: null,
