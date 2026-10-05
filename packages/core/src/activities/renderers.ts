@@ -283,6 +283,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "goal.closed": (p) =>
     `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
   "goal.reopened": () => "The goal was reopened",
+  "goal.moved_space": (p) =>
+    `The goal moved from ${asString(p.fromSpace, "one space")} to ${asString(p.toSpace, "another")}`,
   "goal.stopped": (p) =>
     `The goal was stopped, as it no longer matters: ${asString(p.reason, "no reason given")}`,
   "goal.deleted": (p) => `Removed the goal "${p.title}"`,

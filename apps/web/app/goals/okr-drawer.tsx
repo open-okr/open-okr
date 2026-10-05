@@ -39,6 +39,7 @@ import {
   MemberPicker,
   type Person,
   ReasonField,
+  SpacePicker,
   VerdictChips,
   WaitingDraft,
 } from "./okr-cells.tsx";
@@ -152,6 +153,7 @@ export function OkrDrawer({
   canAdminister,
   progressMax,
   members,
+  spaces,
   coach,
 }: {
   /** The cycle's whole tree, unfiltered: a filter hides rows, not objectives. */
@@ -161,6 +163,8 @@ export function OkrDrawer({
   readonly canAdminister: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
+  /** The spaces an objective can move to (P9-T13a). */
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
   readonly coach: Coach;
 }) {
   const { t } = useTranslations();
@@ -229,6 +233,7 @@ export function OkrDrawer({
               canAdminister={canAdminister}
               progressMax={progressMax}
               members={members}
+              spaces={spaces}
               coach={coach}
             />
           ) : (
@@ -257,6 +262,7 @@ function DrawerBody({
   canAdminister,
   progressMax,
   members,
+  spaces,
   coach,
 }: {
   readonly goal: OkrGoal;
@@ -270,6 +276,8 @@ function DrawerBody({
   readonly canAdminister: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
+  /** The spaces an objective can move to (P9-T13a). */
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
   readonly coach: Coach;
 }) {
   const { t } = useTranslations();
@@ -368,6 +376,19 @@ function DrawerBody({
             </dd>
             <dt className="text-ink-3">{t("okrDrawer.level")}</dt>
             <dd className="px-1 text-ink-2">{goal.level}</dd>
+            {/* §2.9: a team that merges or splits takes its OKRs with it. */}
+            <dt className="text-ink-3">{t("okrDrawer.space")}</dt>
+            <dd>
+              <SpacePicker
+                value={goal.spaceId}
+                spaces={spaces}
+                label={t("okrList.spaceOf", { title: goal.title })}
+                readOnly={!canEdit || goal.closedAt !== null}
+                onSave={(spaceId) =>
+                  okr.mutate({ kind: "moveToSpace", id: goal.id, spaceId })
+                }
+              />
+            </dd>
             {/* §2.8. Absent where the workspace uses one kind. */}
             {okrKindsInUse(coach.practice).length > 1 ? (
               <>

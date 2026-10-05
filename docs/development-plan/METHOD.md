@@ -208,6 +208,8 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 - "It got hard" is not a reason. *Source:* whatmatters: "Never change your OKRs because you're afraid you'll fall short."
 - There is no limit on how many times by default.
 
+**When the organisation changes.** A team that merges, splits or is renamed takes its OKRs with it. An objective can move to another space at any time: its key results, check-ins, dependencies and alignment move with it, and the move is recorded as a dated change. A merged team writes its own objectives at the next cycle rather than carrying both teams' sets; until then, both sets run in the merged space. *Source:* whatmatters: "A new team doesn't automatically inherit old OKRs"; resetting after a reorganisation is "very similar to the end of a cycle".
+
 ### 2.10 Kinds of key result
 
 | Kind | Written as | Progress | Scored |

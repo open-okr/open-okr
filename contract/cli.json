@@ -7044,6 +7044,29 @@
       "pages": false
     },
     {
+      "name": "goals moveToSpace",
+      "action": "goals.moveToSpace",
+      "method": "POST",
+      "path": "/goals/moveToSpace",
+      "scope": "write",
+      "summary": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals publishDraft",
       "action": "goals.publishDraft",
       "method": "POST",

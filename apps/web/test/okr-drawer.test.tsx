@@ -210,6 +210,7 @@ async function render(options: {
               initialAt={Date.now()}
               scope="all"
               filters={{ includeClosed: false }}
+              spaces={[]}
               cycleId="c"
               level="team"
               canEdit={options.canEdit ?? true}

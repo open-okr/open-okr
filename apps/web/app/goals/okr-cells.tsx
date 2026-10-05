@@ -286,6 +286,60 @@ export function MemberPicker({
   );
 }
 
+/**
+ * The space an objective belongs to, and the move to another (METHOD.md §2.9,
+ * P9-T13a). Choosing a space moves it there with its key results, check-ins,
+ * dependencies and alignment; the write asks for edit on both spaces, so a
+ * space the reader cannot add to is refused in words rather than hidden here.
+ *
+ * Only an objective a space owns can move. One the company or a person owns
+ * shows where it belongs and offers nothing.
+ */
+export function SpacePicker({
+  value,
+  spaces,
+  label,
+  readOnly,
+  onSave,
+}: {
+  readonly value: string | null;
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
+  readonly label: string;
+  readonly readOnly: boolean;
+  readonly onSave: (spaceId: string) => void;
+}) {
+  const { t } = useTranslations();
+  const current =
+    value === null
+      ? t("okrDrawer.noSpace")
+      : (spaces.find((space) => space.id === value)?.name ??
+        t("okrDrawer.unknownSpace"));
+  if (readOnly || value === null || spaces.length < 2) {
+    return <span className="truncate px-1 text-xs text-ink-2">{current}</span>;
+  }
+  return (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(event) => {
+        if (event.target.value !== value) {
+          onSave(event.target.value);
+        }
+      }}
+      className={cn("max-w-36 truncate text-xs", FIELD)}
+    >
+      {spaces.some((space) => space.id === value) ? null : (
+        <option value={value}>{current}</option>
+      )}
+      {spaces.map((space) => (
+        <option key={space.id} value={space.id}>
+          {space.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /** Committed reads as a promise, aspirational as the quieter default. */
 const KIND_TONE: Record<OkrKind, string> = {
   committed: "bg-brand-weak text-brand-text",

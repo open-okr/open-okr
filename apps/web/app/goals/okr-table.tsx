@@ -40,6 +40,7 @@ import {
   MemberPicker,
   type Person,
   ReasonField,
+  SpacePicker,
   VerdictChips,
   WaitingDraft,
 } from "./okr-cells.tsx";
@@ -174,6 +175,7 @@ export function OkrTable({
   canAdminister,
   progressMax,
   members,
+  spaces,
   coach,
   refusal,
   empty,
@@ -193,6 +195,8 @@ export function OkrTable({
   readonly progressMax: number;
   /** People who may champion an objective or own a key result. */
   readonly members: readonly Person[];
+  /** The spaces an objective can move to (P9-T13a). */
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
   readonly coach: Coach;
   /** Why a new objective may not be written here now, or null (P9-T07b-a). */
   readonly refusal: WritingRefusal | null;
@@ -218,6 +222,7 @@ export function OkrTable({
       canAdminister={canAdminister}
       progressMax={progressMax}
       members={members}
+      spaces={spaces}
       coach={coach}
       refusal={refusal}
       empty={empty}
@@ -247,6 +252,7 @@ function LiveOkrTable({
   canAdminister,
   progressMax,
   members,
+  spaces,
   coach,
   refusal,
   empty,
@@ -261,6 +267,8 @@ function LiveOkrTable({
   readonly canAdminister: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
+  /** The spaces an objective can move to (P9-T13a). */
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
   readonly coach: Coach;
   readonly refusal: WritingRefusal | null;
   readonly empty: React.ReactNode;
@@ -471,6 +479,7 @@ function LiveOkrTable({
                 progressMax={progressMax}
                 members={members}
                 coach={coach}
+                spaces={spaces}
                 viewerId={tree.viewerId}
                 mover={moverFor(
                   goals,
@@ -568,6 +577,7 @@ function LiveOkrTable({
         canAdminister={canAdminister}
         progressMax={progressMax}
         members={members}
+        spaces={spaces}
         coach={coach}
       />
     </div>
@@ -610,6 +620,7 @@ function Refused({ okr, id }: { readonly okr: Okr; readonly id: string }) {
 function ObjectiveRow({
   goal,
   open,
+  spaces,
   viewerId,
   onToggle,
   okr,
@@ -634,6 +645,8 @@ function ObjectiveRow({
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
+  /** The spaces an objective can move to (P9-T13a). */
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
   /** Who is reading, so a waiting draft offers its step to the right person. */
   readonly viewerId: string;
   readonly mover: Mover | null;
@@ -703,6 +716,21 @@ function ObjectiveRow({
                 okr.mutate({ kind: "approveDraft", id: goal.id })
               }
             />
+            {/* §2.9: the space it belongs to, and the move to another. */}
+            {goal.spaceId !== null ? (
+              <span className="flex items-center gap-1">
+                {t("okrDrawer.space")}
+                <SpacePicker
+                  value={goal.spaceId}
+                  spaces={spaces}
+                  label={t("okrList.spaceOf", { title: goal.title })}
+                  readOnly={!canEdit || goal.closedAt !== null || busy}
+                  onSave={(spaceId) =>
+                    okr.mutate({ kind: "moveToSpace", id: goal.id, spaceId })
+                  }
+                />
+              </span>
+            ) : null}
             <span className="flex items-center gap-1">
               {t("okrList.champion")}
               <MemberPicker

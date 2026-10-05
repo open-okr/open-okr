@@ -502,6 +502,7 @@ export default async function GoalsPage({
           initialTree={okrTree}
           initialAt={treeReadAt}
           members={members}
+          spaces={spaces}
           refusal={refusal}
           coach={{
             thresholds: (rhythmRead?.thresholds ??
@@ -542,6 +543,7 @@ export default async function GoalsPage({
           canAdminister={canAdminister}
           progressMax={progressMax}
           members={members}
+          spaces={spaces}
           coach={{
             thresholds: (rhythmRead?.thresholds ??
               defaultThresholds()) as ResolvedThresholds,

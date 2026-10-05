@@ -9722,6 +9722,39 @@
       }
     },
     {
+      "name": "goals.moveToSpace",
+      "description": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id",
+          "spaceId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "spaceId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "goals.publishDraft",
       "description": "Publishes an objective that waits as a draft (METHOD.md §2.9). Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
       "inputSchema": {

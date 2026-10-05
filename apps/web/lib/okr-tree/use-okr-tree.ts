@@ -132,6 +132,8 @@ function optimistic(tree: OkrTree, mutation: OkrMutation): OkrTree {
     case "publishDraft":
     case "approveDraft":
     case "reopenGoal":
+    // The server says where it went, and the row follows its answer.
+    case "moveToSpace":
     case "checkIn":
       // Nothing to guess: the row comes back with the server's answer, and a
       // check-in's health and next date are the server's to work out.

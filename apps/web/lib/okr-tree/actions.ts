@@ -203,6 +203,12 @@ export type OkrMutation =
    */
   | { readonly kind: "stopGoal"; readonly id: string; readonly reason: string }
   | { readonly kind: "reopenGoal"; readonly id: string }
+  /** To another space, with everything that hangs from it (P9-T13a). */
+  | {
+      readonly kind: "moveToSpace";
+      readonly id: string;
+      readonly spaceId: string;
+    }
   | { readonly kind: "approveDraft"; readonly id: string }
   | {
       /** Committed or aspirational, with why (METHOD.md §2.8, P9-T11b-a). */
@@ -341,6 +347,13 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
     case "reopenGoal":
       await callAction(ctx, "goals.reopen", { id: mutation.id });
       return null;
+    case "moveToSpace":
+      return (
+        await callAction(ctx, "goals.moveToSpace", {
+          id: mutation.id,
+          spaceId: mutation.spaceId,
+        })
+      ).goal;
     case "publishDraft":
       return (await callAction(ctx, "goals.publishDraft", { id: mutation.id }))
         .goal;

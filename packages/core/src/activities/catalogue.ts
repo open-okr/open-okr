@@ -351,6 +351,14 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     closeDecision: z.enum(["keep", "modify", "abandon"]),
   }),
   "goal.reopened": z.object({}),
+  // A move between spaces, both named (P9-T13a, METHOD.md §2.9).
+  "goal.moved_space": z.object({
+    title: z.string(),
+    fromSpaceId: z.uuid(),
+    fromSpace: z.string(),
+    toSpaceId: z.uuid(),
+    toSpace: z.string(),
+  }),
   // §2.9's stop, closed as abandoned with its one-line reason (P9-T13-c-a).
   "goal.stopped": z.object({ title: z.string(), reason: z.string() }),
   // The title, because a feed entry about a goal being removed has to read as

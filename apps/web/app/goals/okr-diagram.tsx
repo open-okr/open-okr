@@ -87,6 +87,8 @@ export function OkrDiagram(props: {
   readonly canAdminister: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
+  /** The spaces an objective can move to (P9-T13a). */
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
   readonly coach: Coach;
   /** The cycle's alignment score and findings, for the panel beside it. */
   readonly alignment: AlignmentReading | null;
@@ -122,6 +124,7 @@ function LiveDiagram({
   canAdminister,
   progressMax,
   members,
+  spaces,
   coach,
   alignment,
   levels,
@@ -135,6 +138,8 @@ function LiveDiagram({
   readonly canAdminister: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
+  /** The spaces an objective can move to (P9-T13a). */
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
   readonly coach: Coach;
   readonly alignment: AlignmentReading | null;
   readonly levels: readonly string[];
@@ -826,6 +831,7 @@ function LiveDiagram({
         canAdminister={canAdminister}
         progressMax={progressMax}
         members={members}
+        spaces={spaces}
         coach={coach}
       />
     </div>

@@ -223,6 +223,7 @@ import {
 } from "./goal-assists.ts";
 import { approveDraft, publishDraft } from "./goal-drafts.ts";
 import { setGoalKind } from "./goal-kind.ts";
+import { moveGoalToSpace } from "./goal-move.ts";
 import { readGoalRelations } from "./goal-relations.ts";
 import {
   changeKeyResultTarget,
@@ -758,6 +759,7 @@ export const ACTION_MAP = {
   "goals.patchKeyResult": patchKeyResult,
   "goals.changeTarget": changeKeyResultTarget,
   "goals.setKind": setGoalKind,
+  "goals.moveToSpace": moveGoalToSpace,
   "goals.publishDraft": publishDraft,
   "goals.approveDraft": approveDraft,
   "goals.targetHistory": readTargetHistory,
