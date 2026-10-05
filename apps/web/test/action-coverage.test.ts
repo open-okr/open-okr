@@ -121,10 +121,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     caller: "packages/core/src/copilot/proposals.ts",
     why: "the pipeline calls it, when the copilot proposes a change the person then confirms",
   },
-  "goals.publishDraftedCheckIn": {
-    caller: "packages/core/src/review/proposals.ts",
-    why: "the pipeline calls it, when the person a drafted check-in is for applies it from the review inbox (M-08)",
-  },
   // M-05. A person records the result by closing the cycle, which runs the
   // same function inside `cycles.close`.
   "cycles.snapshot": {

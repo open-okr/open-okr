@@ -452,3 +452,109 @@ describe("what a reader may do", () => {
     expect(inDrawer(`Target for ${KR}`)).not.toBeNull();
   });
 });
+
+/**
+ * Checking in from the drawer (P9-T08b). The form is the drawer's own until
+ * Publish, and what it sends is only what moved.
+ */
+describe("checking in", () => {
+  const form = () =>
+    drawer()?.querySelector<HTMLFormElement>('[data-testid="drawer-check-in"]');
+
+  async function fill(
+    element: HTMLInputElement | HTMLTextAreaElement,
+    value: string,
+  ) {
+    const setter = Object.getOwnPropertyDescriptor(
+      element instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    await act(async () => {
+      setter?.call(element, value);
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  async function submit() {
+    await act(async () => {
+      form()?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    });
+    await act(async () => new Promise((done) => setTimeout(done)));
+  }
+
+  test("the row's check-in action opens the drawer on its check-in tab", async () => {
+    await render({ address: "" });
+    const action = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Check in on this objective"]',
+    );
+    await act(async () => action?.click());
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("okr")).toBe("g");
+    expect(params.get("tab")).toBe("check-in");
+  });
+
+  test("publishes only what moved, with the last status carried forward, and then shows the history", async () => {
+    await render({ address: "?okr=g&tab=check-in" });
+    // The last check-in said caution, so that is where the status starts.
+    expect(form()?.querySelector("select")?.value).toBe("caution");
+    await fill(
+      inDrawer(`Value for ${KR} in this check-in`) as HTMLInputElement,
+      "40",
+    );
+    await fill(
+      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      "7",
+    );
+    await fill(
+      form()?.querySelector("textarea") as HTMLTextAreaElement,
+      "The guide is back and activation moved again.",
+    );
+    await submit();
+    expect(runOkrMutation).toHaveBeenCalledWith({
+      kind: "checkIn",
+      id: "g",
+      status: "caution",
+      confidence: 0.5,
+      narrative: "The guide is back and activation moved again.",
+      values: [{ keyResultId: "k", value: 40, confidence: 0.7 }],
+    });
+    expect(new URLSearchParams(window.location.search).get("tab")).toBe(
+      "history",
+    );
+  });
+
+  test("with no check-in yet the status is the reader's to choose, and an empty narrative is said before anything is sent", async () => {
+    readOkrDetail.mockResolvedValue({ ...detail(), checkIns: [] });
+    await render({ address: "?okr=g&tab=check-in" });
+    expect(form()?.querySelector("select")?.value).toBe("");
+    await submit();
+    expect(drawer()?.textContent).toContain("Choose a status");
+
+    const select = form()?.querySelector("select") as HTMLSelectElement;
+    await act(async () => {
+      select.value = "on_track";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await submit();
+    expect(drawer()?.textContent).toContain("A check-in needs a narrative.");
+    expect(runOkrMutation).not.toHaveBeenCalled();
+  });
+
+  test("a reader who cannot edit has no check-in tab, even from a link", async () => {
+    await render({ address: "?okr=g&tab=check-in", canEdit: false });
+    expect(form()).toBeNull();
+    const tabs = [...(drawer()?.querySelectorAll('[role="tab"]') ?? [])].map(
+      (tab) => tab.textContent,
+    );
+    expect(tabs).not.toContain("Check in");
+    expect(
+      container.querySelector(
+        'button[aria-label="Check in on this objective"]',
+      ),
+    ).toBeNull();
+  });
+});

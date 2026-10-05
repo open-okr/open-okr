@@ -5,7 +5,7 @@
  * and the drawer's read of what the tree does not carry (P9-T08a).
  *
  * **An allow-list, as the delete path has.** A server action takes whatever
- * the browser sends, so the switch below over ten named writes is what stops
+ * the browser sends, so the switch below over eleven named writes is what stops
  * this becoming a way to call any action in the registry. Each write goes
  * through the action every other surface uses, so the cache can do nothing
  * the API cannot and is refused the same way.
@@ -15,9 +15,16 @@
  * the hook can put the tree back and say why without guessing.
  */
 
-import { callAction, excerptRichText, OperationError } from "@openokr/core";
+import {
+  callAction,
+  excerptRichText,
+  isBlankText,
+  OperationError,
+  richTextFromPlainText,
+} from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../auth";
+import { getTranslations } from "../translations";
 import { requireWorkspace } from "../workspace";
 import type {
   GoalFields,
@@ -183,7 +190,24 @@ export type OkrMutation =
       readonly afterId: string | null;
     }
   | { readonly kind: "deleteGoal"; readonly id: string }
-  | { readonly kind: "restoreGoal"; readonly id: string };
+  | { readonly kind: "restoreGoal"; readonly id: string }
+  | {
+      /**
+       * A check-in from the drawer (P9-T08b). `id` is the objective's, so a
+       * refusal is shown where the other changes to it are.
+       */
+      readonly kind: "checkIn";
+      readonly id: string;
+      readonly status: "on_track" | "caution" | "off_track";
+      /** §3.2's own scale, nought to one. */
+      readonly confidence: number;
+      readonly narrative: string;
+      readonly values: readonly {
+        readonly keyResultId: string;
+        readonly value?: number;
+        readonly confidence?: number;
+      }[];
+    };
 
 export interface OkrConflict {
   readonly current: Readonly<Record<string, unknown>>;
@@ -262,12 +286,30 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
     case "restoreGoal":
       await callAction(ctx, "goals.restore", { id: mutation.id });
       return null;
+    case "checkIn":
+      // Opened and published in one action, so a drawer closed half way
+      // leaves no draft behind (METHOD.md §7.2).
+      await callAction(ctx, "goals.publishDraftedCheckIn", {
+        goalId: mutation.id,
+        status: mutation.status,
+        confidence: mutation.confidence,
+        narrative: richTextFromPlainText(mutation.narrative),
+        values: [...mutation.values],
+      });
+      return null;
   }
 }
 
 export async function runOkrMutation(
   mutation: OkrMutation,
 ): Promise<OkrOutcome> {
+  if (mutation.kind === "checkIn" && isBlankText(mutation.narrative)) {
+    // The action stores an empty narrative as readily as a full one, so the
+    // rule a check-in needs is said here, before the round trip, in the
+    // composer's own words.
+    const { t } = await getTranslations();
+    return { ok: false, error: t("checkIn.actions.needsANarrative") };
+  }
   try {
     const goal = await write(mutation);
     // Every screen that names an objective or a value counts on the next

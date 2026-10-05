@@ -135,32 +135,77 @@ export async function reassignRole(
 }
 
 /**
- * Records a new value and confidence for one key result (S-14, P3-T10).
+ * A key result's value, and its confidence as a check-in (S-14, P3-T10,
+ * P9-T08b).
  *
- * The one write on this page that moves a number, and it goes through
- * `goals.recordValue` so the value history, the cascade and the goal's health
- * all follow from it. §5.2 measures structure, so the alignment score
- * deliberately does not move.
+ * The value goes through `goals.recordValue`, so the value history, the
+ * cascade and the goal's health all follow from it. §5.2 measures structure,
+ * so the alignment score deliberately does not move.
  *
- * **Confidence is not settable here, and that is the method rather than a
- * missing parameter.** §3.2 puts confidence on the check-in, where it arrives
- * with a narrative and a status. An input that let somebody drop a key result to
- * 0.2 with no sentence attached would be the one number in the product that can
- * change without anybody saying why.
+ * **A changed confidence is a check-in**, because METHOD.md §3.2 puts
+ * confidence there, with a sentence and a status. Until P9-T08b this page
+ * offered a confidence slider its action ignored, for exactly that reason:
+ * a number that could change with nobody saying why. Now the change carries
+ * the line and the status the reader gave, and is published through
+ * `goals.publishDraftedCheckIn`, which also moves the objective's next
+ * check-in on (§7.2). The check-in's own confidence, the objective's, is what
+ * its last check-in said, because only one key result's moved here; with no
+ * check-in yet, it is the one number the reader gave.
  */
-export async function recordValue(
-  _previous: WriteState,
-  formData: FormData,
-): Promise<WriteState> {
-  const goalId = String(formData.get("goalId") ?? "");
-  const keyResultId = String(formData.get("keyResultId") ?? "");
-  const value = Number(formData.get("value"));
-  if (!Number.isFinite(value)) {
-    const { t } = await getTranslations();
+export async function updateKeyResult(input: {
+  readonly goalId: string;
+  readonly keyResultId: string;
+  /** Absent when the value was left alone. */
+  readonly value?: number;
+  readonly confidence?: number;
+  readonly status?: "on_track" | "caution" | "off_track" | null;
+  readonly note?: string;
+}): Promise<WriteState> {
+  const { t } = await getTranslations();
+  if (input.value !== undefined && !Number.isFinite(input.value)) {
     return { error: t("cycle.actions.valueHasToBeANumber") };
   }
-  return run(goalId, async (context) => {
-    await callAction(context, "goals.recordValue", { id: keyResultId, value });
+  if (input.confidence === undefined) {
+    if (input.value === undefined) {
+      return NO_ERROR;
+    }
+    const value = input.value;
+    return run(input.goalId, async (context) => {
+      await callAction(context, "goals.recordValue", {
+        id: input.keyResultId,
+        value,
+      });
+    });
+  }
+  if (!input.status) {
+    return { error: t("goals.detail.actions.chooseAStatus") };
+  }
+  if (isBlankText(input.note ?? "")) {
+    return { error: t("goals.detail.actions.confidenceNeedsALine") };
+  }
+  const status = input.status;
+  const confidence = input.confidence;
+  return run(input.goalId, async (context) => {
+    const { checkIns } = await callAction(context, "goals.checkIns", {
+      goalId: input.goalId,
+      includeDrafts: false,
+    });
+    await callAction(context, "goals.publishDraftedCheckIn", {
+      goalId: input.goalId,
+      status,
+      confidence: checkIns[0]?.confidence ?? confidence,
+      narrative: richTextFromPlainText(input.note ?? ""),
+      values: [
+        {
+          keyResultId: input.keyResultId,
+          confidence,
+          ...(input.value === undefined ? {} : { value: input.value }),
+        },
+      ],
+    });
+    // A check-in moves an obligation and the walker as well as the goal.
+    revalidatePath("/review");
+    revalidatePath("/check-in");
   });
 }
 

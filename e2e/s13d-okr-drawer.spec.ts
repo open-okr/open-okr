@@ -9,6 +9,12 @@
  *   the field back, and Escape elsewhere closes the drawer.
  *   Given a link naming an objective in another cycle and no cycle, when it
  *   is opened, then the page opens that cycle with the objective in the drawer.
+ *   Given an objective in the list, when its champion checks in from the row,
+ *   then the row's health becomes the status published and the drawer's
+ *   history shows the check-in (P9-T08b).
+ *   Given the goal page, when a key result is added there and a confidence
+ *   is changed with its line, then the key result is on the page and the
+ *   confidence is a check-in in the history (P9-T08b).
  *
  * **It leaves what it found.** Both objectives it adds are deleted at the end,
  * whatever happened. The far quarter it may make is the one
@@ -23,6 +29,9 @@ test.describe.configure({ mode: "serial" });
 const OBJECTIVE = "Make the first week the reason teams stay";
 const KEY_RESULT = "Teams active in week two from 35% to 60%";
 const ELSEWHERE = "Plan the far quarter before it starts";
+const SECOND_KEY_RESULT = "Teams inviting a colleague in week one from 20% to 45%";
+const NARRATIVE = "Week two activity moved once the guide came back.";
+const LINE = "The partner channel closed, so fewer teams arrive in week one.";
 /** The far quarter s13c uses, so neither spec leaves a second one. */
 const ON = `${new Date().getUTCFullYear() + 3}-08-15`;
 
@@ -206,4 +215,64 @@ test("a link to an objective in another cycle opens that cycle", async () => {
   await expect(
     main().locator(`input[aria-label="Objective title"][value="${ELSEWHERE}"]`),
   ).toBeVisible();
+});
+
+test("acceptance: checking in from the row moves its health, and the history shows the check-in", async () => {
+  await goTo(page, "/goals");
+  const title = main().locator(
+    `input[aria-label="Objective title"][value="${OBJECTIVE}"]`,
+  );
+  await expect(title).toBeVisible({ timeout: 15_000 });
+  const row = title.locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
+  // Never checked in, so pending: silence is never green (METHOD.md §3.5).
+  await expect(row).toContainText("pending");
+  await row.hover();
+  await row.getByRole("button", { name: "Check in on this objective" }).click();
+
+  const form = drawer().getByTestId("drawer-check-in");
+  await expect(form).toBeVisible({ timeout: 15_000 });
+  await form.getByLabel("Status", { exact: true }).selectOption("caution");
+  await form.getByLabel(`Confidence in ${KEY_RESULT}, out of 10`).fill("6");
+  await form
+    .getByLabel("What moved, what is in the way, what happens next")
+    .fill(NARRATIVE);
+  await form.getByRole("button", { name: "Publish the check-in" }).click();
+
+  await expect(drawer().getByRole("tab", { name: "History" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+    { timeout: 15_000 },
+  );
+  await expect(drawer()).toContainText(NARRATIVE, { timeout: 15_000 });
+  // The row behind it, without a reload.
+  await expect(row).toContainText("caution", { timeout: 15_000 });
+});
+
+test("the goal page adds a key result, and a changed confidence there is a check-in", async () => {
+  const id = await goalId(OBJECTIVE);
+  await goTo(page, `/goals/${id}`);
+  if ((await main().getByText(SECOND_KEY_RESULT).count()) === 0) {
+    await main().getByRole("button", { name: "Add key result" }).click();
+    await page.keyboard.type(SECOND_KEY_RESULT);
+    await page.keyboard.press("Enter");
+  }
+  await expect(main().getByText(SECOND_KEY_RESULT).first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const confidence = main().getByLabel(`Confidence for ${KEY_RESULT}`);
+  await confidence.fill("4");
+  // The status starts at what the last check-in said.
+  await expect(
+    main().getByLabel(`Status for the check-in on ${KEY_RESULT}`),
+  ).toHaveValue("caution");
+  await main().getByLabel(`Why the confidence in ${KEY_RESULT} moved`).fill(LINE);
+  await confidence.press("Enter");
+  await expect(
+    main().getByTestId("confidence-check-in"),
+  ).toHaveCount(0, { timeout: 15_000 });
+
+  // Published as a check-in, so the history has its line.
+  await goTo(page, `/goals?okr=${id}&tab=history`);
+  await expect(drawer()).toContainText(LINE, { timeout: 15_000 });
 });

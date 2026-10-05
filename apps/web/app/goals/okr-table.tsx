@@ -95,7 +95,7 @@ export interface EditableGoal {
   readonly keyResults: readonly EditableKeyResult[];
 }
 
-const GRID = "md:grid-cols-[2.75rem_minmax(0,1fr)_13rem_8rem_6.5rem_4rem]";
+const GRID = "md:grid-cols-[2.75rem_minmax(0,1fr)_13rem_8rem_6.5rem_5rem]";
 
 /**
  * Moving one row of a set (P9-T07b-b, design §4.4): Alt with an arrow key
@@ -487,6 +487,7 @@ function LiveOkrTable({
                 )}
                 onDelete={() => okr.mutate({ kind: "deleteGoal", id: goal.id })}
                 onOpen={() => drawer.open(goal.id)}
+                onCheckIn={() => drawer.open(goal.id, { tab: "check-in" })}
               />
               {open ? (
                 <>
@@ -623,6 +624,7 @@ function ObjectiveRow({
   mover,
   onDelete,
   onOpen,
+  onCheckIn,
 }: {
   readonly goal: OkrGoal;
   readonly open: boolean;
@@ -637,6 +639,7 @@ function ObjectiveRow({
   readonly mover: Mover | null;
   readonly onDelete: () => void;
   readonly onOpen: () => void;
+  readonly onCheckIn: () => void;
 }) {
   const { t } = useTranslations();
   const cells = useObjectiveCells(goal, okr, coach);
@@ -722,6 +725,9 @@ function ObjectiveRow({
         <RowActions
           href={`/goals/${goal.id}`}
           onOpen={onOpen}
+          // The row's check-in opens the drawer on its check-in tab (§4.4),
+          // for somebody who may change the objective, while it is open.
+          onCheckIn={canEdit && goal.closedAt === null ? onCheckIn : null}
           openLabel={t("goals.editor.openObjective")}
           deleteLabel={t("goals.editor.deleteObjective")}
           canDelete={canAdminister && !busy}
@@ -926,6 +932,7 @@ function Chevron({ open }: { readonly open: boolean }) {
 function RowActions({
   href,
   onOpen,
+  onCheckIn = null,
   openLabel,
   deleteLabel,
   canDelete,
@@ -933,6 +940,8 @@ function RowActions({
 }: {
   readonly href: string;
   readonly onOpen: () => void;
+  /** Objectives only; null where the reader may not check in. */
+  readonly onCheckIn?: (() => void) | null;
   readonly openLabel: string;
   readonly deleteLabel: string;
   readonly canDelete: boolean;
@@ -956,6 +965,25 @@ function RowActions({
 
   return (
     <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 hover:opacity-100">
+      {onCheckIn ? (
+        <button
+          type="button"
+          aria-label={t("okrList.checkInOn")}
+          onClick={onCheckIn}
+          className="flex size-6 items-center justify-center rounded-control text-ink-4 hover:bg-raised hover:text-ink-2"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+            className="size-3.5"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </button>
+      ) : null}
       <a
         href={href}
         onClick={(event) => {

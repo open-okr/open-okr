@@ -38,16 +38,11 @@ import {
   readSubjectDocuments,
   SubjectDocuments,
 } from "../../documents/subject-documents.tsx";
-import {
-  closeGoal,
-  editGoal,
-  reassignRole,
-  recordValue,
-  reopenGoal,
-} from "./actions.ts";
+import { closeGoal, editGoal, reassignRole, reopenGoal } from "./actions.ts";
 import { CoachStrip } from "./coach-strip";
 import { DecomposeKeyResult } from "./decompose.tsx";
 import { GoalWrites } from "./goal-writes.tsx";
+import { AddKeyResult, KeyResultUpdate } from "./key-result-update.tsx";
 import { Rail } from "./rail.tsx";
 import { RetrospectiveField } from "./retrospective-field.tsx";
 import { Sparkline } from "./sparkline.tsx";
@@ -259,6 +254,17 @@ export default async function GoalPage({
       }))
     : [];
 
+  // What the last check-in said, which a confidence changed here carries
+  // forward as its status unless the reader changes it (P9-T08b).
+  const lastStatus = open
+    ? ((
+        await callAction(context, "goals.checkIns", {
+          goalId: id,
+          includeDrafts: false,
+        })
+      ).checkIns[0]?.status ?? null)
+    : null;
+
   const cycles = await callAction(context, "cycles.list", {});
   const cycleEndsOn =
     cycles.find((cycle) => cycle.id === goal.cycleId)?.endsOn ?? null;
@@ -442,63 +448,17 @@ export default async function GoalPage({
                       >
                         {t("goals.detail.workBoard")}
                       </Link>
-                      {canEdit && !closed && keyResult.kpiId === null ? (
-                        <ActionForm
-                          action={recordValue}
-                          className="flex items-center gap-1"
-                        >
-                          {/* The goal, so the write knows which page to
-                              revalidate. The key result alone would leave the
-                              action guessing. */}
-                          <input type="hidden" name="goalId" value={goal.id} />
-                          <input
-                            type="hidden"
-                            name="keyResultId"
-                            value={keyResult.id}
-                          />
-                          <label
-                            className="sr-only"
-                            htmlFor={`value-${keyResult.id}`}
-                          >
-                            {t("common.newValueFor4", {
-                              title: keyResult.title,
-                            })}
-                          </label>
-                          <input
-                            id={`value-${keyResult.id}`}
-                            name="value"
-                            type="number"
-                            step="any"
-                            defaultValue={keyResult.currentValue}
-                            // `w-20` held five digits. A key result measuring
-                            // rupiah or impressions runs to nine, and a person
-                            // cannot check what they typed if the field hides
-                            // half of it. No `max`: the ceiling on a measure is
-                            // the unit's, not the product's.
-                            className="w-32 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
-                          />
-                          <label
-                            className="sr-only"
-                            htmlFor={`confidence-${keyResult.id}`}
-                          >
-                            {t("goals.detail.confidenceFor", {
-                              title: keyResult.title,
-                            })}
-                          </label>
-                          <input
-                            id={`confidence-${keyResult.id}`}
-                            name="confidence"
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            defaultValue={keyResult.confidence ?? 0.5}
-                            className="w-20"
-                          />
-                          <Button type="submit" size="sm">
-                            {t("common.save")}
-                          </Button>
-                        </ActionForm>
+                      {open && keyResult.kpiId === null ? (
+                        <KeyResultUpdate
+                          goalId={goal.id}
+                          keyResult={{
+                            id: keyResult.id,
+                            title: keyResult.title,
+                            currentValue: keyResult.currentValue,
+                            confidence: keyResult.confidence,
+                          }}
+                          lastStatus={lastStatus}
+                        />
                       ) : keyResult.kpiId ? (
                         <Chip tone="info">{t("common.fromAKpi")}</Chip>
                       ) : null}
@@ -507,13 +467,15 @@ export default async function GoalPage({
                 ))}
               </ul>
             )}
-            <p className="text-xs text-ink-4">
-              {t("goals.detail.keyResultsAreAdded")}{" "}
-              <a className="underline" href="/cycle?phase=4">
-                {t("goals.detail.phase4OfThe")}
-              </a>
-              .
-            </p>
+            {/* S-14's "+ Add key result" (P9-T08b), owned by the champion and
+             * due at the cycle's end, as a row added from the list is. */}
+            {open ? (
+              <AddKeyResult
+                goalId={goal.id}
+                ownerId={goal.champion.id}
+                dueOn={cycleEndsOn}
+              />
+            ) : null}
           </CardBody>
         </Card>
 

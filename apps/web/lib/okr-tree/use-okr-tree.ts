@@ -122,7 +122,9 @@ function optimistic(tree: OkrTree, mutation: OkrMutation): OkrTree {
       return withoutGoal(tree, mutation.id);
     case "restoreKeyResult":
     case "restoreGoal":
-      // Nothing to guess: the row comes back with the server's answer.
+    case "checkIn":
+      // Nothing to guess: the row comes back with the server's answer, and a
+      // check-in's health and next date are the server's to work out.
       return tree;
   }
 }

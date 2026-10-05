@@ -2,7 +2,13 @@
 
 import { Dialog } from "@base-ui-components/react/dialog";
 import { Tabs } from "@base-ui-components/react/tabs";
-import { Bar, Chip, formatMeasure, useTranslations } from "@openokr/ui";
+import {
+  Bar,
+  Chip,
+  formatMeasure,
+  useToast,
+  useTranslations,
+} from "@openokr/ui";
 import { X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
@@ -22,6 +28,7 @@ import {
   ReasonField,
   VerdictChips,
 } from "./okr-cells.tsx";
+import { CheckInTab } from "./okr-check-in.tsx";
 import {
   type Coach,
   useKeyResultCells,
@@ -50,12 +57,13 @@ import {
  * puts the field back and the drawer stays.
  */
 
-const DRAWER_TABS = ["details", "history", "alignment"] as const;
+const DRAWER_TABS = ["details", "check-in", "history", "alignment"] as const;
 export type DrawerTab = (typeof DRAWER_TABS)[number];
 
 /** Each tab's name, spelled out so the catalogue check can find every key. */
 const TAB_LABEL: Readonly<Record<DrawerTab, string>> = {
   details: "okrDrawer.tab.details",
+  "check-in": "okrDrawer.tab.checkIn",
   history: "okrDrawer.tab.history",
   alignment: "okrDrawer.tab.alignment",
 };
@@ -251,8 +259,16 @@ function DrawerBody({
   readonly coach: Coach;
 }) {
   const { t } = useTranslations();
+  const toast = useToast();
+  // Checking in is for somebody who may change the objective, while it is
+  // open; anybody else asked for that tab by a link gets the details.
+  const canCheckIn = canEdit && goal.closedAt === null;
+  const shown: DrawerTab = tab === "check-in" && !canCheckIn ? "details" : tab;
+  const tabs = DRAWER_TABS.filter(
+    (entry) => entry !== "check-in" || canCheckIn,
+  );
   // Read only for the tabs that show it: the details are the cache's.
-  const detail = useOkrDetail(goal, tab !== "details");
+  const detail = useOkrDetail(goal, shown !== "details");
   const objective = useObjectiveCells(goal, okr, coach);
 
   // A key result named in the address is brought into view once it is drawn.
@@ -266,12 +282,12 @@ function DrawerBody({
 
   return (
     <Tabs.Root
-      value={tab}
+      value={shown}
       onValueChange={(value) => onTab(value as DrawerTab)}
       className="flex min-h-0 flex-1 flex-col"
     >
       <Tabs.List className="flex flex-none gap-1 border-b border-line px-4">
-        {DRAWER_TABS.map((entry) => (
+        {tabs.map((entry) => (
           <Tabs.Tab
             key={entry}
             value={entry}
@@ -395,6 +411,27 @@ function DrawerBody({
           )}
         </section>
       </Tabs.Panel>
+
+      {canCheckIn ? (
+        <Tabs.Panel
+          value="check-in"
+          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
+        >
+          <Loaded detail={detail}>
+            {(loaded) => (
+              <CheckInTab
+                goal={goal}
+                detail={loaded}
+                okr={okr}
+                onPublished={() => {
+                  toast.show({ tone: "ok", message: t("okrDrawer.checkedIn") });
+                  onTab("history");
+                }}
+              />
+            )}
+          </Loaded>
+        </Tabs.Panel>
+      ) : null}
 
       <Tabs.Panel
         value="history"

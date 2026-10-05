@@ -3311,7 +3311,9 @@ Deliverables:
 - **The goal page.** S-14's "+ Add key result" row, and the confidence control wired to a real save: a changed confidence is a check-in with its one line, because METHOD.md §3.2 puts confidence on the check-in.
 - **Documents.** The S-14 text.
 Test plan: end-to-end, a check-in from the drawer advancing the next check-in on the row; the goal page's add row and confidence.
-Acceptance: Given an objective in the list, when its champion checks in from the drawer, then the row's next check-in moves and the drawer's history shows the check-in.
+Acceptance: Given an objective in the list, when its champion checks in from the drawer, then the row's health becomes the status published and the drawer's history shows the check-in.
+
+The acceptance named the next check-in moving until P9-T08b was built. A new objective's first due date and the one after a check-in made the same day can be the same day, so health, which a first check-in always moves off pending (METHOD.md §3.5), is the change a reader can rely on seeing.
 Scenario steps: none of its own.
 
 ### P9-T09: The diagram view [M]
