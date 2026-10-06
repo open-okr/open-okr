@@ -21,7 +21,6 @@ export interface Minutes {
     readonly objectivesReviewed: number;
     readonly keyResultsReviewed: number;
     readonly belowThreshold: number;
-    readonly threshold: number;
     readonly teamPulse: number | null;
     readonly learningsCarried: number;
     readonly actionsAgreed: number;
@@ -122,7 +121,7 @@ export function minutesToMarkdown(minutes: Minutes): string {
     `- Diagnostic: ${summary.verdict === null ? "not read yet" : (VERDICTS[summary.verdict] ?? summary.verdict)}`,
     `- Objectives reviewed: ${summary.objectivesReviewed}`,
     `- Key results reviewed: ${summary.keyResultsReviewed}`,
-    `- Key results below ${summary.threshold.toFixed(1)}: ${summary.belowThreshold}`,
+    `- Key results below their root-cause threshold: ${summary.belowThreshold}`,
     `- Team pulse: ${summary.teamPulse === null ? "none given" : `${summary.teamPulse.toFixed(1)} of 5`}`,
     `- Learnings carried: ${summary.learningsCarried}`,
     `- Actions agreed: ${summary.actionsAgreed}`,

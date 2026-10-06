@@ -14488,7 +14488,7 @@
     },
     {
       "name": "sessions.setRootCause",
-      "description": "Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4).",
+      "description": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -14505,7 +14505,19 @@
           "causeKey": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 8
+            "maximum": 9
+          },
+          "secondaryCauseKey": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "detail": {
             "type": "string",
@@ -14532,7 +14544,7 @@
     },
     {
       "name": "sessions.rootCauses",
-      "description": "Every key result this review graded below the threshold, with its cause (METHOD.md §8.4).",
+      "description": "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
       "inputSchema": {
         "type": "object",
         "properties": {

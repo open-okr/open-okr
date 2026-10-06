@@ -55,7 +55,7 @@ const minutes = async (userId = FACILITATOR) =>
       objectivesReviewed: number;
       keyResultsReviewed: number;
       belowThreshold: number;
-      threshold: number;
+      thresholds: { aspirational: number; committed: number };
       teamPulse: number | null;
       learningsCarried: number;
       actionsAgreed: number;
@@ -275,15 +275,18 @@ describe("§8.10's executive summary", () => {
     const record = await minutes();
     // §8.10's own list: cycle score, objectives and key results reviewed, key
     // results below their root-cause threshold, team pulse, learnings carried,
-    // actions agreed. The threshold is the aspirational 0.6, the one every
-    // key result is asked against until P9-T20 asks root causes by kind.
+    // actions agreed. Each key result against its own kind's threshold since
+    // P9-T20c: 0.6 for an aspirational one, 1.0 for a committed one.
     expect(record.summary.cycleScore).toBeCloseTo(0.65, 10);
     // 0.65 is below §11's 0.7 cycle floor and the rhythm is 5.0, so §8.6's
     // second row applies: the team ran the rhythm and still missed.
     expect(record.summary.verdict).toBe("strategy_or_quality");
     expect(record.summary.objectivesReviewed).toBe(1);
     expect(record.summary.keyResultsReviewed).toBe(2);
-    expect(record.summary.threshold).toBe(0.6);
+    expect(record.summary.thresholds).toEqual({
+      aspirational: 0.6,
+      committed: 1,
+    });
     expect(record.summary.belowThreshold).toBe(1);
     expect(record.summary.teamPulse).toBeCloseTo(4, 10);
     expect(record.summary.learningsCarried).toBe(1);

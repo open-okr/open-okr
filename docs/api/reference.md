@@ -561,7 +561,7 @@ the machine-readable document.
 | `sessions.revealObjectiveScore`<br/>Reveals one objective's score to the whole room in a single write (METHOD.md §8.3). | `POST /api/v1/sessions/revealObjectiveScore` | writes |
 | `sessions.revealVotes`<br/>Reveals every vote on a key result in one session, atomically. | `POST /api/v1/sessions/revealVotes` | writes |
 | `sessions.roomPulse`<br/>§8.2's read of the room for the facilitator, and the caller's own pulse for everybody. | `GET /api/v1/sessions/roomPulse` | reads |
-| `sessions.rootCauses`<br/>Every key result this review graded below the threshold, with its cause (METHOD.md §8.4). | `GET /api/v1/sessions/rootCauses` | reads |
+| `sessions.rootCauses`<br/>Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4). | `GET /api/v1/sessions/rootCauses` | reads |
 | `sessions.scoreKeyResult`<br/>Grades one key result 0.0 to 1.0 with the one-line reason §8.3 asks for. | `POST /api/v1/sessions/scoreKeyResult` | writes |
 | `sessions.scoringStatus`<br/>Stage two's state: the evidence, the grades so far, and the scores of the objectives the room has revealed. | `GET /api/v1/sessions/scoringStatus` | reads |
 | `sessions.setCommitments`<br/>Sets this week's commitments (2-3 actions, each with owner and optional KR link). | `POST /api/v1/sessions/setCommitments` | writes |
@@ -569,7 +569,7 @@ the machine-readable document.
 | `sessions.setManagementAnswer`<br/>Records leadership's answer to one of §8.7's four questions (METHOD.md §8.1 stage 6). | `POST /api/v1/sessions/setManagementAnswer` | writes |
 | `sessions.setNarrative`<br/>Writes what the number does not show for one objective (METHOD.md §8.1 stage 3). | `POST /api/v1/sessions/setNarrative` | writes |
 | `sessions.setNextAction`<br/>Names the next action for a key result scored in this session, with its owner, due by the goal's next check-in. | `POST /api/v1/sessions/setNextAction` | writes |
-| `sessions.setRootCause`<br/>Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4). | `POST /api/v1/sessions/setRootCause` | writes |
+| `sessions.setRootCause`<br/>Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4). | `POST /api/v1/sessions/setRootCause` | writes |
 | `sessions.setShifts`<br/>Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5). | `POST /api/v1/sessions/setShifts` | writes |
 | `sessions.setStageNote`<br/>Writes the facilitator's private note for the running stage (METHOD.md §8.1). | `POST /api/v1/sessions/setStageNote` | writes |
 | `sessions.setTrend`<br/>Records the room's trend for one objective in a monthly review (METHOD.md §7.5). | `POST /api/v1/sessions/setTrend` | writes |

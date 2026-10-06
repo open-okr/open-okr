@@ -786,15 +786,15 @@ Each participant gives a 1 to 5 pulse and one word. The average is read back:
 
 ### 8.3 Scoring reveal
 
-Score each key result 0.0 to 1.0 against the key result as written, with baseline, target and actual on screen as evidence, plus a one-line reason. The objective score is hidden until the team reveals it together. Facts, not feelings. A row of 1.0s usually means the ambition was too safe, and that gets said out loud now, not next quarter.
+Score each key result 0.0 to 1.0 against the key result as written, with baseline, target, actual and any mid-cycle changes on screen as evidence, plus a one-line reason. The objective score is hidden until the team reveals it together. Facts, not feelings. A row of 1.0s on aspirational key results usually means the ambition was too safe, and that gets said out loud now, not next quarter. A committed key result below 1.0 gets its short explanation, and the scoring stage does not close until every one has it.
 
-An objective's score is the weighted average of its key results' scores, using the same weights §3.2 uses for progress. A team that said one key result matters three times as much should see that in the score, exactly as it sees it in the progress. An unscored key result is left out rather than counted as zero, so a half-graded objective does not read as a failing one.
+An objective's score is the weighted average of its key results' scores, using the same weights §3.1 uses for progress. A team that said one key result matters three times as much should see that in the score, exactly as it sees it in the progress. An unscored key result is left out rather than counted as zero, so a half-graded objective does not read as a failing one.
 
 The cycle score is a different question about a different set, and stays the plain §3.4 average over every scored key result in the cycle (§8.6). Averaging the objective scores instead would weight an objective with two key results the same as one with eight.
 
 ### 8.4 Root causes
 
-Every aspirational key result below 0.6, and every committed key result below 1.0, gets exactly one primary cause:
+Every aspirational key result below 0.6, and every committed key result below 1.0, gets one primary cause, and may name a second:
 
 1. Ambition set too high
 2. Wrong key result. We measured the wrong thing
@@ -804,8 +804,9 @@ Every aspirational key result below 0.6, and every committed key result below 1.
 6. External or market change
 7. Lack of focus. Too many OKRs
 8. No clear owner or cadence
+9. Other, described in a line
 
-Look for the system, not the person. Ask why until it stops being a symptom.
+Look for the system, not the person. Ask why until it stops being a symptom. *Source:* Google's OKR playbook: a missed committed OKR gets a postmortem "not intended to punish teams"; Doerr: "If not, what obstacles did I encounter?"
 
 ### 8.5 Process health
 

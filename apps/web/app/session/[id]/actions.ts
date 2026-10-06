@@ -436,6 +436,7 @@ export async function setRootCauseAction(
   sessionId: string,
   keyResultId: string,
   causeKey: number,
+  secondaryCauseKey: number | null,
   detail: string,
 ) {
   const { session, workspace } = await requireWorkspace();
@@ -450,6 +451,7 @@ export async function setRootCauseAction(
       sessionId,
       keyResultId,
       causeKey,
+      secondaryCauseKey,
       ...(detail.length === 0 ? {} : { detail }),
     },
   );

@@ -12,6 +12,7 @@ import {
   REVIEW_STAGES,
   RHYTHM_STATEMENTS,
   RITUALS,
+  ROOT_CAUSE_OTHER,
   ROOT_CAUSES,
   reviewStageKey,
   reviewStageKeysFor,
@@ -197,11 +198,14 @@ describe("§8.8's close decisions", () => {
 });
 
 describe("§8.4's root causes", () => {
-  it("are the document's eight, word for word", () => {
+  it("are the document's nine, word for word", () => {
     // Read back out of METHOD.md rather than restated here, so editing either
     // one without the other fails the build. Same shape as the §8.5 statements
-    // and the §8.7 questions below.
-    expect(ROOT_CAUSES).toHaveLength(8);
+    // and the §8.7 questions below. Nine since P9-T20c, "Other" the last.
+    expect(ROOT_CAUSES).toHaveLength(9);
+    expect(ROOT_CAUSES[ROOT_CAUSE_OTHER - 1]).toBe(
+      "Other, described in a line",
+    );
     for (const cause of ROOT_CAUSES) {
       expect(method).toContain(cause);
     }

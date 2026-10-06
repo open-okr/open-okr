@@ -541,7 +541,7 @@ compare(
   "the root causes",
   numberedItems(section(method, "### 8.4 Root causes", "### 8.5")),
   ROOT_CAUSES,
-  8,
+  9,
 );
 
 // §7.3. The seven a blocker must be one of. A type in the document and not in

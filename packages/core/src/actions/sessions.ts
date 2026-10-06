@@ -64,6 +64,7 @@ import {
   cycleScore,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
+  needsRootCause,
   objectiveScore,
   PROCESS_HEALTH_STATEMENTS,
   planCycleCadence,
@@ -74,6 +75,7 @@ import {
   type ReviewPart,
   RITUALS,
   type RitualWeekday,
+  ROOT_CAUSE_OTHER,
   ROOT_CAUSES,
   reviewStageKeysFor,
   rhythmDiagnostic,
@@ -99,7 +101,6 @@ import {
   inArray,
   isNotNull,
   isNull,
-  lt,
   ne,
   or,
   sql,
@@ -1282,6 +1283,30 @@ export const advanceStage = defineWriteAction({
                 `Cannot advance: at least ${MIN_COMMITMENTS} commitments are required, but only ${commitmentCount?.count ?? 0} were set.`,
               );
             }
+          }
+        }
+
+        // Stage completion gate: scoring closes on explanations (§8.3,
+        // P9-T20c). "A committed key result below 1.0 gets its short
+        // explanation, and the scoring stage does not close until every one
+        // has it." A grade carries its one line on why, so a committed key
+        // result graded below 1.0 is explained; one not graded is a miss
+        // nobody has explained unless §2.10's score says it was met.
+        if (
+          session.kind === "quarterly" &&
+          session.stageKey === "score" &&
+          nextStageKey === "narratives"
+        ) {
+          const unexplained = await unexplainedCommittedMissesInTx(
+            tx,
+            workspaceId,
+            session,
+          );
+          if (unexplained.length > 0) {
+            throw new OperationError(
+              "not_found",
+              `Cannot close scoring: ${unexplained.join(", ")} ${unexplained.length === 1 ? "is a committed key result" : "are committed key results"} below 1.0 with no explanation yet. Grade ${unexplained.length === 1 ? "it" : "each"} with a line on why.`,
+            );
           }
         }
       }
@@ -5451,6 +5476,72 @@ const narrativeBody = z
  * exactly the fail-open shape, so every caller spells `activeOnly(goals, ...)`
  * out loud and this only holds the three conditions that are easy to forget.
  */
+/**
+ * The committed key results in a review's scope that came in below 1.0 and
+ * have no explanation yet (§8.3, P9-T20c), by title.
+ *
+ * Graded is explained: a grade carries its one line on why. Ungraded is a
+ * miss unless §2.10's computed score already says it met the promise, which
+ * is the one case the room does not have to stop for.
+ */
+async function unexplainedCommittedMissesInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: {
+    id: string;
+    spaceId: string | null;
+    cycleId: string | null;
+  },
+): Promise<string[]> {
+  const committed = await tx
+    .select({ id: keyResults.id, title: keyResults.title })
+    .from(keyResults)
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        keyResults,
+        isNull(goals.deletedAt),
+        eq(goals.kind, "committed"),
+        ...reviewObjectiveConditions(workspaceId, session),
+      ),
+    )
+    .orderBy(goals.position, keyResults.position);
+  if (committed.length === 0) {
+    return [];
+  }
+  const graded = await tx
+    .select({
+      keyResultId: reviewScores.keyResultId,
+      score: reviewScores.score,
+      reason: reviewScores.reason,
+    })
+    .from(reviewScores)
+    .where(
+      activeOnly(
+        reviewScores,
+        eq(reviewScores.workspaceId, workspaceId),
+        eq(reviewScores.sessionId, session.id),
+      ),
+    );
+  const byKeyResult = new Map(graded.map((row) => [row.keyResultId, row]));
+  const ungraded = committed.filter((row) => !byKeyResult.has(row.id));
+  const computed = await computedScoresInTx(
+    tx,
+    workspaceId,
+    ungraded.map((row) => row.id),
+    new Date(),
+  );
+  return committed
+    .filter((row) => {
+      const grade = byKeyResult.get(row.id);
+      if (grade) {
+        return Number(grade.score) < 1 && grade.reason.trim() === "";
+      }
+      return (computed.get(row.id) ?? 0) < 1;
+    })
+    .map((row) => row.title);
+}
+
 function reviewObjectiveConditions(
   workspaceId: string,
   session: { spaceId: string | null; cycleId: string | null },
@@ -6790,29 +6881,32 @@ export const readManagementRetro = defineReadAction({
 // ---------------------------------------------------------------------------
 
 /**
- * Every key result this review graded below the threshold.
+ * Every key result this review graded below its root-cause threshold.
  *
  * Read from `review_scores` rather than from `key_results.score`, because the
  * grades do not land on the key results until the session closes (P4-T10b-a) and
- * stage seven runs before that. Strictly below: §8.4 says "below 0.7", so a key
- * result that scored exactly the threshold met it, and asking a room to explain
- * a result it did not miss is how a stage loses its credibility.
+ * stage seven runs before that. Strictly below, and by kind since P9-T20c:
+ * §8.4 asks it of "every aspirational key result below 0.6, and every
+ * committed key result below 1.0". It held every key result to the
+ * aspirational line until then, so a committed one at 0.8 was never asked
+ * why it missed what it promised.
  */
 async function missedKeyResultsInTx(
   tx: OperationTx,
   workspaceId: string,
   sessionId: string,
-  threshold: number,
+  thresholds: ResolvedThresholds,
 ) {
   // The grades live where the scoring stage ran (§8, P9-T20b-a).
   const { review } = await reviewHalvesInTx(tx, workspaceId, sessionId);
-  return tx
+  const graded = await tx
     .select({
       keyResultId: keyResults.id,
       title: keyResults.title,
       goalTitle: goals.title,
       score: reviewScores.score,
       position: keyResults.position,
+      kind: goals.kind,
     })
     .from(reviewScores)
     .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
@@ -6824,25 +6918,49 @@ async function missedKeyResultsInTx(
         eq(reviewScores.sessionId, review),
         isNull(keyResults.deletedAt),
         isNull(goals.deletedAt),
-        lt(reviewScores.score, String(threshold)),
       ),
     )
     .orderBy(goals.position, keyResults.position);
+  return graded.filter((row) =>
+    needsRootCause(Number(row.score), row.kind, thresholds),
+  );
 }
 
 export const setRootCause = defineWriteAction({
   name: "sessions.setRootCause",
   summary:
-    "Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4).",
-  input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
-    // 1 to 8, indexing §8.4's taxonomy. The text is canon in
-    // `packages/method`; §11 lists the root-cause taxonomy among the structures
-    // a workspace cannot change.
-    causeKey: z.number().int().min(1).max(8),
-    detail: z.string().trim().max(1000).optional(),
-  }),
+    "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
+  input: z
+    .object({
+      sessionId: z.uuid(),
+      keyResultId: z.uuid(),
+      // 1 to 9, indexing §8.4's taxonomy. The text is canon in
+      // `packages/method`; §11 lists the root-cause taxonomy among the
+      // structures a workspace cannot change.
+      causeKey: z.number().int().min(1).max(ROOT_CAUSES.length),
+      /** §8.4: "and may name a second" (P9-T20c). Never the primary again. */
+      secondaryCauseKey: z
+        .number()
+        .int()
+        .min(1)
+        .max(ROOT_CAUSES.length)
+        .nullable()
+        .optional(),
+      detail: z.string().trim().max(1000).optional(),
+    })
+    .refine(
+      (value) =>
+        value.secondaryCauseKey == null ||
+        value.secondaryCauseKey !== value.causeKey,
+      { message: "A second cause is a different cause from the first." },
+    )
+    .refine(
+      (value) =>
+        (value.causeKey !== ROOT_CAUSE_OTHER &&
+          value.secondaryCauseKey !== ROOT_CAUSE_OTHER) ||
+        (value.detail ?? "").length > 0,
+      { message: "Other is described in a line. Say what it was." },
+    ),
   output: z.object({ keyResultId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -6865,13 +6983,12 @@ export const setRootCause = defineWriteAction({
       const { thresholds } = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
+      // Below its own kind's threshold (§8.4, P9-T20c).
       const missed = await missedKeyResultsInTx(
         tx,
         workspaceId,
         input.sessionId,
-        // The aspirational threshold for every key result until P9-T20 asks
-        // root causes by kind.
-        thresholds["scoring.rootCauseThreshold"].aspirational,
+        thresholds,
       );
       const target = missed.find(
         (entry) => entry.keyResultId === input.keyResultId,
@@ -6882,7 +6999,7 @@ export const setRootCause = defineWriteAction({
         // something that needs none.
         throw new OperationError(
           "not_found",
-          "That key result did not come in under the threshold in this review.",
+          "That key result did not come in under its root-cause threshold in this review.",
         );
       }
 
@@ -6921,13 +7038,14 @@ export const setRootCause = defineWriteAction({
         .limit(1);
 
       if (existing) {
-        // Replaces rather than adding. §8.4's own word is "primary", and a key
-        // result with two causes has had the question dodged rather than
-        // answered.
+        // Replaces rather than adding: one primary, as §8.4 says, and the
+        // second is its own column rather than another row, so a key result
+        // never carries two primaries (P9-T20c).
         await tx
           .update(rootCauses)
           .set({
             causeKey: input.causeKey,
+            secondaryCauseKey: input.secondaryCauseKey ?? null,
             detail: input.detail ?? null,
             namedById: memberId,
             updatedAt: now,
@@ -6939,6 +7057,7 @@ export const setRootCause = defineWriteAction({
           sessionId: input.sessionId,
           keyResultId: input.keyResultId,
           causeKey: input.causeKey,
+          secondaryCauseKey: input.secondaryCauseKey ?? null,
           detail: input.detail ?? null,
           namedById: memberId,
         });
@@ -6970,26 +7089,39 @@ export const setRootCause = defineWriteAction({
 export const readRootCauses = defineReadAction({
   name: "sessions.rootCauses",
   summary:
-    "Every key result this review graded below the threshold, with its cause (METHOD.md §8.4).",
+    "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
-    /** §11's `scoring.rootCauseThreshold`, so the screen never states its own. */
-    threshold: z.number(),
+    /**
+     * §11's `scoring.rootCauseThreshold` for each kind, so the screen never
+     * states its own (P9-T20c): aspirational below 0.6, committed below 1.0.
+     */
+    thresholds: z.object({ aspirational: z.number(), committed: z.number() }),
     keyResults: z.array(
       z.object({
         keyResultId: z.uuid(),
         title: z.string(),
         goalTitle: z.string(),
+        /** Its objective's kind, which decides its threshold. */
+        kind: z.enum(GOAL_KINDS),
         score: z.number(),
         causeKey: z.number().int().nullable(),
         /** The canon label, from `packages/method`. Never stored on the row. */
         causeLabel: z.string().nullable(),
+        /** §8.4's optional second cause (P9-T20c). */
+        secondaryCauseKey: z.number().int().nullable(),
+        secondaryCauseLabel: z.string().nullable(),
         detail: z.string().nullable(),
       }),
     ),
     named: z.number().int(),
     /** Every missed key result has a cause. §8.1's condition for the stage. */
     complete: z.boolean(),
+    /**
+     * Whether this workspace asks for them (§12's "Root causes at the
+     * review", P9-T20c). Optional, the room may leave a miss without one.
+     */
+    required: z.boolean(),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -7013,23 +7145,23 @@ export const readRootCauses = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const { thresholds } = resolveRhythm(
-          await readRhythmRow(tx, context.workspaceId),
-        );
-        // The aspirational threshold for every key result, and the one the
-        // screen states, until P9-T20 asks root causes by kind.
-        const threshold = thresholds["scoring.rootCauseThreshold"].aspirational;
+        const rhythmRow = await readRhythmRow(tx, context.workspaceId);
+        const { thresholds } = resolveRhythm(rhythmRow);
         const missed = await missedKeyResultsInTx(
           tx,
           context.workspaceId,
           input.sessionId,
-          threshold,
+          thresholds,
         );
+        const required =
+          practiceFromRow(rhythmRow).practice["review.rootCauses"] !==
+          "optional";
 
         const named = await tx
           .select({
             keyResultId: rootCauses.keyResultId,
             causeKey: rootCauses.causeKey,
+            secondaryCauseKey: rootCauses.secondaryCauseKey,
             detail: rootCauses.detail,
           })
           .from(rootCauses)
@@ -7044,16 +7176,21 @@ export const readRootCauses = defineReadAction({
 
         const keyResultRows = missed.map((entry) => {
           const cause = byKeyResult.get(entry.keyResultId);
+          const secondary = cause?.secondaryCauseKey ?? null;
           return {
             keyResultId: entry.keyResultId,
             title: entry.title,
             goalTitle: entry.goalTitle,
+            kind: entry.kind,
             score: Number(entry.score),
             causeKey: cause?.causeKey ?? null,
             causeLabel:
               cause === undefined
                 ? null
                 : (ROOT_CAUSES[cause.causeKey - 1] ?? null),
+            secondaryCauseKey: secondary,
+            secondaryCauseLabel:
+              secondary === null ? null : (ROOT_CAUSES[secondary - 1] ?? null),
             detail: cause?.detail ?? null,
           };
         });
@@ -7062,11 +7199,12 @@ export const readRootCauses = defineReadAction({
         ).length;
 
         return {
-          threshold,
+          thresholds: thresholds["scoring.rootCauseThreshold"],
           keyResults: keyResultRows,
           named: withCause,
           complete:
             keyResultRows.length > 0 && withCause === keyResultRows.length,
+          required,
         };
       },
     );
@@ -8476,9 +8614,16 @@ export const readMinutes = defineReadAction({
       verdict: z.string().nullable(),
       objectivesReviewed: z.number().int(),
       keyResultsReviewed: z.number().int(),
-      /** §8.4's threshold, so the count says what it counted. */
+      /**
+       * Key results below their root-cause threshold, each against its own
+       * kind's (§8.4, P9-T20c), with both thresholds so the count says what
+       * it counted.
+       */
       belowThreshold: z.number().int(),
-      threshold: z.number(),
+      thresholds: z.object({
+        aspirational: z.number(),
+        committed: z.number(),
+      }),
       teamPulse: z.number().nullable(),
       learningsCarried: z.number().int(),
       actionsAgreed: z.number().int(),
@@ -8569,9 +8714,8 @@ export const readMinutes = defineReadAction({
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, workspaceId),
         );
-        // The aspirational threshold for every key result until P9-T20 asks
-        // root causes by kind.
-        const threshold = thresholds["scoring.rootCauseThreshold"].aspirational;
+        // Each key result against its own kind's threshold (§8.4, P9-T20c).
+        const causeThresholds = thresholds["scoring.rootCauseThreshold"];
 
         // --- the scored key results, which most of the summary counts ---
         const scoreRows = await tx
@@ -8582,6 +8726,7 @@ export const readMinutes = defineReadAction({
             score: reviewScores.score,
             reason: reviewScores.reason,
             position: goals.position,
+            kind: goals.kind,
           })
           .from(reviewScores)
           .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
@@ -8853,9 +8998,10 @@ export const readMinutes = defineReadAction({
             objectivesReviewed: new Set(scoreRows.map((row) => row.goalId))
               .size,
             keyResultsReviewed: scores.length,
-            belowThreshold: scores.filter((row) => row.score < threshold)
-              .length,
-            threshold,
+            belowThreshold: scoreRows.filter((row) =>
+              needsRootCause(Number(row.score), row.kind, thresholds),
+            ).length,
+            thresholds: causeThresholds,
             teamPulse: pulseAverage,
             learningsCarried: learningRows.filter((row) => row.carryForward)
               .length,

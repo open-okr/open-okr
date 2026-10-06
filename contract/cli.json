@@ -10404,7 +10404,7 @@
       "method": "POST",
       "path": "/sessions/setRootCause",
       "scope": "write",
-      "summary": "Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4).",
+      "summary": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
       "flags": [
         {
           "name": "session-id",
@@ -10425,6 +10425,12 @@
           "required": true
         },
         {
+          "name": "secondary-cause-key",
+          "field": "secondaryCauseKey",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "detail",
           "field": "detail",
           "type": "string",
@@ -10439,7 +10445,7 @@
       "method": "GET",
       "path": "/sessions/rootCauses",
       "scope": "read",
-      "summary": "Every key result this review graded below the threshold, with its cause (METHOD.md §8.4).",
+      "summary": "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
       "flags": [
         {
           "name": "session-id",

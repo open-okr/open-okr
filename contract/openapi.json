@@ -57506,7 +57506,7 @@
     "/sessions/setRootCause": {
       "post": {
         "operationId": "sessions.setRootCause",
-        "summary": "Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4).",
+        "summary": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
         "tags": [
           "sessions"
         ],
@@ -57590,7 +57590,19 @@
                   "causeKey": {
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 8
+                    "maximum": 9
+                  },
+                  "secondaryCauseKey": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "detail": {
                     "type": "string",
@@ -57611,7 +57623,7 @@
     "/sessions/rootCauses": {
       "get": {
         "operationId": "sessions.rootCauses",
-        "summary": "Every key result this review graded below the threshold, with its cause (METHOD.md §8.4).",
+        "summary": "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
         "tags": [
           "sessions"
         ],
@@ -57628,8 +57640,21 @@
                     "data": {
                       "type": "object",
                       "properties": {
-                        "threshold": {
-                          "type": "number"
+                        "thresholds": {
+                          "type": "object",
+                          "properties": {
+                            "aspirational": {
+                              "type": "number"
+                            },
+                            "committed": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "aspirational",
+                            "committed"
+                          ],
+                          "additionalProperties": false
                         },
                         "keyResults": {
                           "type": "array",
@@ -57646,6 +57671,13 @@
                               },
                               "goalTitle": {
                                 "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "committed",
+                                  "aspirational"
+                                ]
                               },
                               "score": {
                                 "type": "number"
@@ -57668,6 +57700,24 @@
                                   "null"
                                 ]
                               },
+                              "secondaryCauseKey": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "secondaryCauseLabel": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "detail": {
                                 "type": [
                                   "string",
@@ -57679,9 +57729,12 @@
                               "keyResultId",
                               "title",
                               "goalTitle",
+                              "kind",
                               "score",
                               "causeKey",
                               "causeLabel",
+                              "secondaryCauseKey",
+                              "secondaryCauseLabel",
                               "detail"
                             ],
                             "additionalProperties": false
@@ -57694,13 +57747,17 @@
                         },
                         "complete": {
                           "type": "boolean"
+                        },
+                        "required": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
-                        "threshold",
+                        "thresholds",
                         "keyResults",
                         "named",
-                        "complete"
+                        "complete",
+                        "required"
                       ],
                       "additionalProperties": false
                     }
@@ -59718,8 +59775,21 @@
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991
                             },
-                            "threshold": {
-                              "type": "number"
+                            "thresholds": {
+                              "type": "object",
+                              "properties": {
+                                "aspirational": {
+                                  "type": "number"
+                                },
+                                "committed": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "aspirational",
+                                "committed"
+                              ],
+                              "additionalProperties": false
                             },
                             "teamPulse": {
                               "type": [
@@ -59744,7 +59814,7 @@
                             "objectivesReviewed",
                             "keyResultsReviewed",
                             "belowThreshold",
-                            "threshold",
+                            "thresholds",
                             "teamPulse",
                             "learningsCarried",
                             "actionsAgreed"

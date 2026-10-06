@@ -3,10 +3,13 @@
 /**
  * Stage seven: root causes (UIUX-PLAN.md S-24, METHOD.md §8.4, P4-T11b).
  *
- * Every key result the room graded below the threshold gets exactly one primary
- * cause, and a detail line for the "ask why until it stops being a symptom" part.
+ * Every key result the room graded below its root-cause threshold gets one
+ * primary cause and may name a second, and a detail line for the "ask why
+ * until it stops being a symptom" part. Since P9-T20c the threshold is its
+ * kind's: aspirational below 0.6, committed below 1.0, and "Other" is named
+ * with its line or not at all.
  *
- * **The eight causes and the threshold both come from the read.** The taxonomy
+ * **The nine causes and the thresholds all come from the read.** The taxonomy
  * is canon in `packages/method` and `scoring.rootCauseThreshold` is a §11
  * parameter, so nothing here states either: a screen with its own copy of a
  * taxonomy is a screen that will disagree with the method eventually.
@@ -32,31 +35,43 @@ interface MissedKeyResult {
   readonly keyResultId: string;
   readonly title: string;
   readonly goalTitle: string;
+  readonly kind: "aspirational" | "committed";
   readonly score: number;
   readonly causeKey: number | null;
   readonly causeLabel: string | null;
+  readonly secondaryCauseKey: number | null;
+  readonly secondaryCauseLabel: string | null;
   readonly detail: string | null;
 }
 
 export interface RootCauses {
-  readonly threshold: number;
+  readonly thresholds: {
+    readonly aspirational: number;
+    readonly committed: number;
+  };
   readonly keyResults: readonly MissedKeyResult[];
   readonly named: number;
   readonly complete: boolean;
-  /** §8.4's eight, in the document's order, from `packages/method`. */
+  /** Whether this workspace asks for them, or leaves them optional. */
+  readonly required: boolean;
+  /** §8.4's nine, in the document's order, from `packages/method`. */
   readonly causes: readonly string[];
+  /** The key of "Other, described in a line", which needs its line. */
+  readonly otherKey: number;
 }
 
 function MissedRow({
   sessionId,
   keyResult,
   causes,
+  otherKey,
   canName,
   onProblem,
 }: {
   readonly sessionId: string;
   readonly keyResult: MissedKeyResult;
   readonly causes: readonly string[];
+  readonly otherKey: number;
   readonly canName: boolean;
   readonly onProblem: (message: string | null) => void;
 }) {
@@ -65,18 +80,34 @@ function MissedRow({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [chosen, setChosen] = useState<number | null>(keyResult.causeKey);
+  const [second, setSecond] = useState<number | null>(
+    keyResult.secondaryCauseKey,
+  );
   const [detail, setDetail] = useState(keyResult.detail ?? "");
+  const needsLine = (primary: number | null, secondary: number | null) =>
+    (primary === otherKey || secondary === otherKey) &&
+    detail.trim().length === 0;
 
   const save = useCallback(
-    (causeKey: number) => {
+    (causeKey: number, secondaryCauseKey: number | null) => {
       onProblem(null);
       setChosen(causeKey);
+      setSecond(secondaryCauseKey);
+      // "Other" is named with its line or not at all: held here until the
+      // line is written, and saved when it is.
+      if (
+        (causeKey === otherKey || secondaryCauseKey === otherKey) &&
+        detail.trim().length === 0
+      ) {
+        return;
+      }
       startTransition(async () => {
         try {
           await setRootCauseAction(
             sessionId,
             keyResult.keyResultId,
             causeKey,
+            secondaryCauseKey,
             detail.trim(),
           );
           router.refresh();
@@ -87,7 +118,7 @@ function MissedRow({
         }
       });
     },
-    [detail, keyResult.keyResultId, onProblem, router, sessionId],
+    [detail, keyResult.keyResultId, onProblem, otherKey, router, sessionId],
   );
 
   return (
@@ -115,13 +146,52 @@ function MissedRow({
                   size="sm"
                   variant={chosen === causeKey ? "default" : "ghost"}
                   disabled={pending}
-                  onClick={() => save(causeKey)}
+                  onClick={() =>
+                    save(causeKey, second === causeKey ? null : second)
+                  }
                 >
                   {cause}
                 </Button>
               );
             })}
           </span>
+          {chosen === null ? null : (
+            // §8.4: "and may name a second". Never the first again.
+            <span className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-ink-3">
+                {t("session.detail.rootCause.aSecondCause")}
+              </span>
+              <span className="flex flex-wrap gap-1.5">
+                {causes.map((cause, index) => {
+                  const causeKey = index + 1;
+                  if (causeKey === chosen) {
+                    return null;
+                  }
+                  return (
+                    <Button
+                      key={cause}
+                      type="button"
+                      size="sm"
+                      variant={second === causeKey ? "default" : "ghost"}
+                      disabled={pending}
+                      aria-pressed={second === causeKey}
+                      // Its own name, so a picker reading two rows of the
+                      // same nine never hears one name twice.
+                      aria-label={t(
+                        "session.detail.rootCause.secondCauseNamed",
+                        { cause },
+                      )}
+                      onClick={() =>
+                        save(chosen, second === causeKey ? null : causeKey)
+                      }
+                    >
+                      {cause}
+                    </Button>
+                  );
+                })}
+              </span>
+            </span>
+          )}
           <label
             className="flex flex-col gap-1"
             htmlFor={`detail-${keyResult.keyResultId}`}
@@ -144,16 +214,24 @@ function MissedRow({
                   chosen !== null &&
                   detail.trim() !== (keyResult.detail ?? "")
                 ) {
-                  save(chosen);
+                  save(chosen, second);
                 }
               }}
             />
           </label>
+          {needsLine(chosen, second) ? (
+            <span role="alert" className="text-xs text-warn">
+              {t("session.detail.rootCause.otherNeedsItsLine")}
+            </span>
+          ) : null}
         </>
       ) : keyResult.causeLabel === null ? null : (
         <span className="text-xs text-ink-3">
           {keyResult.causeLabel}
-          {keyResult.detail ? ` — ${keyResult.detail}` : ""}
+          {keyResult.secondaryCauseLabel
+            ? `; ${keyResult.secondaryCauseLabel}`
+            : ""}
+          {keyResult.detail ? `. ${keyResult.detail}` : ""}
         </span>
       )}
     </li>
@@ -196,7 +274,8 @@ export function RootCausePanel({
           <p className="text-sm text-ink-3">
             {/* Two different empty states, and they mean opposite things. */}
             {t("session.detail.rootCause.nothingCameInBelowEither", {
-              threshold: rootCauses.threshold.toFixed(1),
+              aspirational: rootCauses.thresholds.aspirational.toFixed(1),
+              committed: rootCauses.thresholds.committed.toFixed(1),
             })}
           </p>
         ) : (
@@ -207,6 +286,7 @@ export function RootCausePanel({
                 sessionId={sessionId}
                 keyResult={keyResult}
                 causes={rootCauses.causes}
+                otherKey={rootCauses.otherKey}
                 canName={canName}
                 onProblem={setProblem}
               />
@@ -220,9 +300,15 @@ export function RootCausePanel({
 
         {rootCauses.keyResults.length === 0 ? null : (
           <p className="text-xs text-ink-4">
-            {t("session.detail.rootCause.onePrimaryCauseEachBelow", {
-              threshold: rootCauses.threshold.toFixed(1),
-            })}
+            {t(
+              rootCauses.required
+                ? "session.detail.rootCause.onePrimaryCauseEachBelow"
+                : "session.detail.rootCause.causesAreOptionalHere",
+              {
+                aspirational: rootCauses.thresholds.aspirational.toFixed(1),
+                committed: rootCauses.thresholds.committed.toFixed(1),
+              },
+            )}
           </p>
         )}
       </CardBody>

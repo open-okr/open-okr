@@ -31,6 +31,7 @@ import {
   canonThresholds,
   REVIEW_STAGE_KEYS,
   type ResolvedThresholds,
+  ROOT_CAUSE_OTHER,
   ROOT_CAUSES,
   reviewStageKeysFor,
   reviewStages,
@@ -574,8 +575,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[6]) {
     const read = (await callAction(context, "sessions.rootCauses", {
       sessionId: id,
-    })) as Omit<RootCauses, "causes">;
-    rootCauses = { ...read, causes: ROOT_CAUSES };
+    })) as Omit<RootCauses, "causes" | "otherKey">;
+    rootCauses = { ...read, causes: ROOT_CAUSES, otherKey: ROOT_CAUSE_OTHER };
   }
 
   // Stage seven's second half: the diagnostic (METHOD.md §8.6, P4-T11c-a).

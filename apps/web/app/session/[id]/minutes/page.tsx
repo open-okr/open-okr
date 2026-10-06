@@ -189,9 +189,7 @@ export default async function MinutesPage({
                 String(summary.keyResultsReviewed),
               ],
               [
-                t("session.detail.minutes.below", {
-                  threshold: summary.threshold.toFixed(1),
-                }),
+                t("session.detail.minutes.belowTheirRootCauseThreshold"),
                 String(summary.belowThreshold),
               ],
               [

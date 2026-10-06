@@ -329,6 +329,7 @@ export {
   RITUALS,
   type Ritual,
   type RitualKind,
+  ROOT_CAUSE_OTHER,
   ROOT_CAUSES,
   type RoomPulseBand,
   type RoomPulseRead,

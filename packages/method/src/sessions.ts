@@ -475,7 +475,14 @@ export const ROOT_CAUSES: readonly string[] = [
   "External or market change",
   "Lack of focus. Too many OKRs",
   "No clear owner or cadence",
+  "Other, described in a line",
 ];
+
+/**
+ * §8.4's ninth cause, which is named with its line or not at all (P9-T20c).
+ * The key is its place in the list, as every cause's is.
+ */
+export const ROOT_CAUSE_OTHER = ROOT_CAUSES.length;
 
 export const PROCESS_HEALTH_STATEMENTS: readonly string[] = [
   "Our OKRs stayed visible and were genuinely used to make decisions this cycle.",

@@ -100,10 +100,15 @@ year is graded before anybody writes next year's OKRs.
 | **Retro** | 5. Team retro, silent writing then dot voting. 6. Management retro, the four questions leadership owes the team. 7. Root cause and the diagnostic. 8. OKR process health, scored anonymously |
 | **Reset** | 9. Keep, modify or abandon each objective. 10. Learnings and next drafts. 11. Decisions and actions |
 
-**Stage 7 is the point of the whole thing.** Every key result under 0.7 gets
-one honest cause from a fixed list of eight, and then the diagnostic reads the
-cycle score against the rhythm score and answers the question every executive
-asks: was this a strategy problem or a cadence problem?
+**Stage 7 is the point of the whole thing.** Every aspirational key result
+below 0.6, and every committed one below 1.0, gets one honest cause from a
+fixed list of nine, and may name a second. The ninth is "Other", which needs a
+line saying what it was. Then the diagnostic reads the cycle score against the
+rhythm score and answers the question every executive asks: was this a
+strategy problem or a cadence problem?
+
+Scoring cannot close while a committed key result is below 1.0 with no
+explanation: grade it, with a line on why, and the stage moves on.
 
 The eight causes are deliberately a closed list. "We were busy" is not a cause,
 and an open text box collects it every time.

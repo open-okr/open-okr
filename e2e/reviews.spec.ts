@@ -587,6 +587,39 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     timeout: 10_000,
   });
 
+  // **Scoring closes on explanations (METHOD.md section 8.3, P9-T20c).** A
+  // committed key result below 1.0 needs its line before the stage closes.
+  // Earlier specs leave committed objectives in this cycle (the recovery
+  // objective the registration spec launches), so whatever is committed and
+  // ungraded in the review's scope is graded here at 1.0, met, with its line,
+  // which asks no root cause of it and leaves stage seven's count alone. The
+  // refusal itself is proved in packages/core/test/review-diagnosis.test.ts.
+  const committedOpen = (
+    await pool.query<{ title: string }>(
+      `select k.title
+         from key_results k
+         join goals g on g.id = k.goal_id
+        where g.workspace_id = $1 and g.cycle_id = $2
+          and ($3::uuid is null or g.space_id = $3)
+          and g.kind = 'committed' and g.closed_at is null
+          and g.deleted_at is null and k.deleted_at is null
+          and not exists (
+            select 1 from review_scores r
+             where r.session_id = $4 and r.key_result_id = k.id
+               and r.deleted_at is null)`,
+      [member.workspace_id, scope.cycle_id, scope.space_id, reviewId],
+    )
+  ).rows;
+  for (const { title } of committedOpen) {
+    const row = rows.filter({ hasText: title });
+    await row.getByRole("slider").fill("1");
+    await row.getByLabel("One line on why").fill("Met in full.");
+    await row.getByRole("button", { name: "Save the grade" }).click();
+    await expect(row.getByText("1.00", { exact: true }).first()).toBeVisible({
+      timeout: 10_000,
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Stage three: objective narratives (METHOD.md section 8.1 stage 3, P4-T10c)
   // ---------------------------------------------------------------------------
@@ -831,9 +864,13 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // aspirational, the default.
   await expect(rootCause).toContainText("0 of 1 named");
   await expect(rootCause.getByText("0.4")).toBeVisible();
-  // Eight causes, from the method package rather than from this screen.
+  // Nine causes since P9-T20c, from the method package rather than from this
+  // screen, the ninth "Other" with its line.
   await expect(
     rootCause.getByRole("button", { name: "Ambition set too high" }),
+  ).toBeVisible();
+  await expect(
+    rootCause.getByRole("button", { name: "Other, described in a line" }),
   ).toBeVisible();
   await expect(
     rootCause.getByRole("button", { name: "No clear owner or cadence" }),
@@ -843,6 +880,15 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     .getByRole("button", { name: "Blocked by a dependency" })
     .click();
   await expect(rootCause).toContainText("1 of 1 named", { timeout: 10_000 });
+  // A second cause is offered once there is a first, and never the first again.
+  await expect(
+    rootCause.getByRole("button", { name: "Second cause: Capacity or resourcing" }),
+  ).toBeVisible();
+  await expect(
+    rootCause.getByRole("button", {
+      name: "Second cause: Blocked by a dependency",
+    }),
+  ).toHaveCount(0);
 
   // The diagnostic shares this stage: section 8.4 names the causes and section
   // 8.6 reads what they add up to. It cannot be read yet, because the survey is
