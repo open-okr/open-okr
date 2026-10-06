@@ -408,7 +408,7 @@ export async function recordDiagnosticAction(sessionId: string) {
 export async function decideObjectiveAction(
   sessionId: string,
   goalId: string,
-  decision: "keep" | "modify" | "abandon",
+  decision: "achieved" | "keep" | "modify" | "defer" | "abandon",
   why: string,
 ) {
   const { session, workspace } = await requireWorkspace();

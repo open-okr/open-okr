@@ -82,7 +82,14 @@ export const GOAL_SUCCESS_STATUSES = [
 export type GoalSuccessStatus = (typeof GOAL_SUCCESS_STATUSES)[number];
 
 /** METHOD.md §8.8, on every closed goal. */
-export const GOAL_CLOSE_DECISIONS = ["keep", "modify", "abandon"] as const;
+/** §8.8's five, in its order; achieved and defer since P9-T20e-a. */
+export const GOAL_CLOSE_DECISIONS = [
+  "achieved",
+  "keep",
+  "modify",
+  "defer",
+  "abandon",
+] as const;
 export type GoalCloseDecision = (typeof GOAL_CLOSE_DECISIONS)[number];
 
 /**

@@ -98,8 +98,10 @@ export async function closeGoal(
         | "achieved"
         | "missed",
       closeDecision: String(formData.get("closeDecision") ?? "keep") as
+        | "achieved"
         | "keep"
         | "modify"
+        | "defer"
         | "abandon",
       closeReason:
         String(formData.get("closeReason") ?? "").trim() || undefined,

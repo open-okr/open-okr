@@ -768,7 +768,7 @@ Ninety minutes by default, four acts, eleven timed stages, held about two weeks 
 | 6 | Management retro | Retro | 8 | The four questions leadership owes the team |
 | 7 | Root cause and diagnostic | Retro | 8 | Every key result below its root-cause threshold gets one honest cause. Then read the diagnostic |
 | 8 | OKR process health | Retro | 4 | Score the practice, not the results. Anonymous |
-| 9 | Keep, modify or abandon | Reset | 8 | Close every objective deliberately |
+| 9 | Keep, modify, abandon or defer | Reset | 8 | Close every objective deliberately |
 | 10 | Learnings and next drafts | Reset | 5 | Turn what happened into what you now know |
 | 11 | Decisions and actions | Reset | 5 | Every action has a name and a date, or it is a wish |
 
@@ -843,17 +843,19 @@ The four questions leadership answers out loud, before anyone drafts a next cycl
 3. Did we change how we work, or reinforce old habits?
 4. Where did alignment break down?
 
-### 8.8 Keep, modify, abandon
+### 8.8 Keep, modify, abandon or defer
 
 Every objective is closed deliberately with one decision and a one-line why:
 
 | Decision | Meaning |
 |---|---|
-| Keep | Still relevant. Carry forward deliberately |
-| Modify | Adjust the target or wording from what we learned |
+| Achieved | Done. Close it |
+| Keep | Still relevant. It pre-fills next cycle's draft, and still passes next cycle's checks |
+| Modify | Adjust the target or wording from what we learned, then keep it |
+| Defer | Still worth doing, not next cycle. It goes to the issue list |
 | Abandon | Priority shifted. End it cleanly |
 
-Nothing carries over by default.
+Nothing carries over silently. An unfinished aspirational objective is proposed as Keep by default (§12). *Source:* Lamorte: "keep, modify, abandon, or defer"; Google's OKR playbook on carrying aspirational OKRs forward; Doerr: rolling over automatically "then these OKRs aren't serving you".
 
 ### 8.9 Learnings and feed-forward
 

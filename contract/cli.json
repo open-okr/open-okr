@@ -6525,8 +6525,10 @@
           "type": "string",
           "required": true,
           "enum": [
+            "achieved",
             "keep",
             "modify",
+            "defer",
             "abandon"
           ]
         },
@@ -10641,8 +10643,10 @@
           "type": "string",
           "required": true,
           "enum": [
+            "achieved",
             "keep",
             "modify",
+            "defer",
             "abandon"
           ]
         },

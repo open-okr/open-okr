@@ -7983,6 +7983,12 @@ export const readReset = defineReadAction({
         /** §8.8's meaning for the chosen decision, from `packages/method`. */
         meaning: z.string().nullable(),
         why: z.string().nullable(),
+        /**
+         * What the practice proposes, never what it chooses (§8.8, §12,
+         * P9-T20e-a): "An unfinished aspirational objective is proposed as
+         * Keep by default." Null where nothing is proposed.
+         */
+        proposed: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
       }),
     ),
     decided: z.number().int(),
@@ -8012,7 +8018,11 @@ export const readReset = defineReadAction({
         );
 
         const rows = await tx
-          .select({ goalId: goals.id, goalTitle: goals.title })
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            kind: goals.kind,
+          })
           .from(goals)
           .where(
             activeOnly(
@@ -8061,20 +8071,30 @@ export const readReset = defineReadAction({
             ),
           );
 
+        const proposesKeep =
+          practiceFromRow(await readRhythmRow(tx, context.workspaceId))
+            .practice["close.carryForward"] !== "notProposed";
         const objectives = rows.map((row) => {
           const decided = byGoal.get(row.goalId);
           const forGoal = graded.filter((entry) => entry.goalId === row.goalId);
+          // §3.2's weighting, from `packages/method`. Shown here as evidence
+          // beside the decision, which is what §8.8 asks a room to decide on.
+          const score = objectiveScore(
+            forGoal.map((entry) => ({
+              score: Number(entry.score),
+              weight: Number(entry.weight),
+            })),
+          );
           return {
             goalId: row.goalId,
             goalTitle: row.goalTitle,
-            // §3.2's weighting, from `packages/method`. Shown here as evidence
-            // beside the decision, which is what §8.8 asks a room to decide on.
-            score: objectiveScore(
-              forGoal.map((entry) => ({
-                score: Number(entry.score),
-                weight: Number(entry.weight),
-              })),
-            ),
+            score,
+            proposed:
+              proposesKeep &&
+              row.kind === "aspirational" &&
+              (score === null || score < 1)
+                ? ("keep" as const)
+                : null,
             decision: decided?.decision ?? null,
             meaning:
               decided === undefined

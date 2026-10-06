@@ -182,9 +182,12 @@ describe("§8.8's close decisions", () => {
     // themselves live in `packages/db` as GOAL_CLOSE_DECISIONS because a goal
     // stores which one it ended on; what belongs to the method is what each one
     // means, and a screen writing its own gloss on "modify" is drift.
+    // §8.8's five since P9-T20e-a, in its order.
     expect(Object.keys(CLOSE_DECISION_MEANINGS)).toEqual([
+      "achieved",
       "keep",
       "modify",
+      "defer",
       "abandon",
     ]);
     for (const meaning of Object.values(CLOSE_DECISION_MEANINGS)) {

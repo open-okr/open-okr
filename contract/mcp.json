@@ -9069,8 +9069,10 @@
           "closeDecision": {
             "type": "string",
             "enum": [
+              "achieved",
               "keep",
               "modify",
+              "defer",
               "abandon"
             ]
           },
@@ -9096,7 +9098,7 @@
       "example": {
         "id": "00000000-0000-4000-8000-000000000000",
         "successStatus": "achieved",
-        "closeDecision": "keep",
+        "closeDecision": "achieved",
         "retrospectiveBody": {}
       }
     },
@@ -14847,8 +14849,10 @@
           "decision": {
             "type": "string",
             "enum": [
+              "achieved",
               "keep",
               "modify",
+              "defer",
               "abandon"
             ]
           },
@@ -14874,7 +14878,7 @@
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
         "goalId": "00000000-0000-4000-8000-000000000000",
-        "decision": "keep",
+        "decision": "achieved",
         "why": "…"
       }
     },

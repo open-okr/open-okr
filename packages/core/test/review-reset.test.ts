@@ -76,6 +76,7 @@ const reset = async (userId = FACILITATOR) =>
       decision: string | null;
       meaning: string | null;
       why: string | null;
+      proposed: string | null;
     }[];
     decided: number;
     total: number;
@@ -433,7 +434,45 @@ describe("keep, modify or abandon", () => {
     }
   });
 
-  it("refuses a decision outside the three", async () => {
+  it("records achieved and defer with §8.8's meanings (P9-T20e-a)", async () => {
+    await call("sessions.decideObjective", {
+      sessionId,
+      goalId,
+      decision: "achieved",
+      why: "Every key result landed.",
+    });
+    expect((await reset()).objectives[0]?.meaning).toBe("Done. Close it");
+    await call("sessions.decideObjective", {
+      sessionId,
+      goalId,
+      decision: "defer",
+      why: "Still worth it, not next quarter.",
+    });
+    expect((await reset()).objectives[0]?.meaning).toContain(
+      "It goes to the issue list",
+    );
+  });
+
+  it("proposes Keep for an unfinished aspirational objective, and chooses nothing (acceptance)", async () => {
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: firstKeyResultId,
+      score: 0.4,
+      reason: "Missed.",
+    });
+    const [row] = (await reset()).objectives;
+    expect(row?.proposed).toBe("keep");
+    expect(row?.decision).toBeNull();
+  });
+
+  it("proposes nothing where the workspace does not carry forward", async () => {
+    await call("practice.update", {
+      overrides: { "close.carryForward": "notProposed" },
+    });
+    expect((await reset()).objectives[0]?.proposed).toBeNull();
+  });
+
+  it("refuses a decision outside the five", async () => {
     await expect(
       call("sessions.decideObjective", {
         sessionId,

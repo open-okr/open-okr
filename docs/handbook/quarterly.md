@@ -98,7 +98,7 @@ year is graded before anybody writes next year's OKRs.
 | **Open** | 1. Open and check in. Before the numbers, the people |
 | **Review** | 2. Score the key results. 3. Objective narratives. 4. Recognition and wins |
 | **Retro** | 5. Team retro, silent writing then dot voting. 6. Management retro, the four questions leadership owes the team. 7. Root cause and the diagnostic. 8. OKR process health, scored anonymously |
-| **Reset** | 9. Keep, modify or abandon each objective. 10. Learnings and next drafts. 11. Decisions and actions |
+| **Reset** | 9. Keep, modify, abandon or defer each objective, or close it as achieved. 10. Learnings and next drafts. 11. Decisions and actions |
 
 **Stage 7 is the point of the whole thing.** Every aspirational key result
 below 0.6, and every committed one below 1.0, gets one honest cause from a

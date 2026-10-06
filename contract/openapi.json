@@ -32236,8 +32236,10 @@
                                   {
                                     "type": "string",
                                     "enum": [
+                                      "achieved",
                                       "keep",
                                       "modify",
+                                      "defer",
                                       "abandon"
                                     ]
                                   },
@@ -32946,8 +32948,10 @@
                             {
                               "type": "string",
                               "enum": [
+                                "achieved",
                                 "keep",
                                 "modify",
+                                "defer",
                                 "abandon"
                               ]
                             },
@@ -33804,8 +33808,10 @@
                   "closeDecision": {
                     "type": "string",
                     "enum": [
+                      "achieved",
                       "keep",
                       "modify",
+                      "defer",
                       "abandon"
                     ]
                   },
@@ -34036,8 +34042,10 @@
                             {
                               "type": "string",
                               "enum": [
+                                "achieved",
                                 "keep",
                                 "modify",
+                                "defer",
                                 "abandon"
                               ]
                             },
@@ -58937,8 +58945,10 @@
                   "decision": {
                     "type": "string",
                     "enum": [
+                      "achieved",
                       "keep",
                       "modify",
+                      "defer",
                       "abandon"
                     ]
                   },
@@ -59004,8 +59014,10 @@
                                   {
                                     "type": "string",
                                     "enum": [
+                                      "achieved",
                                       "keep",
                                       "modify",
+                                      "defer",
                                       "abandon"
                                     ]
                                   },
@@ -59025,6 +59037,23 @@
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "proposed": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "achieved",
+                                      "keep",
+                                      "modify",
+                                      "defer",
+                                      "abandon"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -59033,7 +59062,8 @@
                               "score",
                               "decision",
                               "meaning",
-                              "why"
+                              "why",
+                              "proposed"
                             ],
                             "additionalProperties": false
                           }

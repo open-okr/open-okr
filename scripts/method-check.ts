@@ -687,13 +687,13 @@ compare(
   "the close decisions",
   tableColumn(closeRows, 0).map((label) => label.toLowerCase()),
   Object.keys(CLOSE_DECISION_MEANINGS),
-  3,
+  5,
 );
 compare(
   "the close decision meanings",
   tableColumn(closeRows, 1),
   Object.values(CLOSE_DECISION_MEANINGS),
-  3,
+  5,
 );
 
 // §8.6. **The diagnostic METHOD.md calls the most valuable output of the

@@ -977,17 +977,29 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // database by packages/core/test/review-reset.test.ts.
 
   // ---------------------------------------------------------------------------
-  // Stage nine: keep, modify or abandon (METHOD.md section 8.8, P4-T11c-a)
+  // Stage nine: keep, modify, abandon or defer (METHOD.md section 8.8,
+  // P4-T11c-a; achieved and defer since P9-T20e-a)
   // ---------------------------------------------------------------------------
 
   await page.getByRole("button", { name: "Continue to next step" }).click();
-  const reset = page.getByRole("region", { name: "Keep, modify or abandon" });
+  const reset = page.getByRole("region", {
+    name: "Keep, modify, abandon or defer",
+  });
   await expect(reset).toHaveCount(1, { timeout: 10_000 });
   await expect(reset).toContainText("0 of 2 decided");
   // Nothing pre-selected: section 8.8's closing line is that nothing carries
   // over by default, and a screen arriving with keep chosen is that carry-over
   // wearing a decision's clothes.
   await expect(reset.getByText("undecided").first()).toBeVisible();
+  // An unfinished aspirational objective is proposed as Keep, beside the
+  // controls and never chosen (section 8.8, P9-T20e-a). The first objective
+  // came in at 0.4.
+  await expect(reset.getByText("Proposed: Keep").first()).toBeVisible();
+  for (const label of ["Achieved, close it", "Defer"]) {
+    await expect(
+      reset.getByRole("button", { name: label }).first(),
+    ).toBeVisible();
+  }
 
   const firstObjective = reset.getByRole("listitem").first();
   // A decision with no why is refused on the screen before it reaches the

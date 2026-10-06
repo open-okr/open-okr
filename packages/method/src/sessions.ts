@@ -312,7 +312,7 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
   },
   {
     stage: 9,
-    title: "Keep, modify or abandon",
+    title: "Keep, modify, abandon or defer",
     act: "reset",
     purpose: "Close every objective deliberately",
   },
@@ -450,8 +450,11 @@ export function roomPulseRead(
  * default.
  */
 export const CLOSE_DECISION_MEANINGS: Readonly<Record<string, string>> = {
-  keep: "Still relevant. Carry forward deliberately",
-  modify: "Adjust the target or wording from what we learned",
+  // Achieved and defer since P9-T20e-a, in §8.8's own order.
+  achieved: "Done. Close it",
+  keep: "Still relevant. It pre-fills next cycle's draft, and still passes next cycle's checks",
+  modify: "Adjust the target or wording from what we learned, then keep it",
+  defer: "Still worth doing, not next cycle. It goes to the issue list",
   abandon: "Priority shifted. End it cleanly",
 };
 

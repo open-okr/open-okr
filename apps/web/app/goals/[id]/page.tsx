@@ -713,8 +713,13 @@ export default async function GoalPage({
                       defaultValue="keep"
                       className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
                     >
+                      {/* §8.8's five, in its order (P9-T20e-a). */}
+                      <option value="achieved">
+                        {t("goals.detail.decisionAchieved")}
+                      </option>
                       <option value="keep">{t("goals.detail.keep")}</option>
                       <option value="modify">{t("goals.detail.modify")}</option>
+                      <option value="defer">{t("goals.detail.defer")}</option>
                       <option value="abandon">
                         {t("goals.detail.abandon")}
                       </option>

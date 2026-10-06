@@ -13,6 +13,7 @@ import {
   okrSessions,
   performanceSnapshots,
   processHealthResponses,
+  reviewDecisions,
 } from "@openokr/db";
 import {
   lowestProcessHealthStatement,
@@ -647,6 +648,54 @@ export async function feedForwardInTx(
       workspaceId,
       cycleId: toCycleId,
       text: learning.text,
+      impact: carriedImpact,
+      source: "carry_forward",
+    });
+    issues += 1;
+  }
+
+  // --- a deferred objective joins them (§8.8, P9-T20e-a) ---
+  //
+  // "Defer: still worth doing, not next cycle. It goes to the issue list."
+  // At the carry-forward impact, like every other carried item, so it has to
+  // survive the next prioritisation on its merits.
+  const deferred = review
+    ? await tx
+        .select({ text: goals.title })
+        .from(reviewDecisions)
+        .innerJoin(goals, eq(goals.id, reviewDecisions.goalId))
+        .where(
+          activeOnly(
+            reviewDecisions,
+            eq(reviewDecisions.workspaceId, workspaceId),
+            eq(reviewDecisions.sessionId, review.id),
+            eq(reviewDecisions.decision, "defer"),
+          ),
+        )
+    : [];
+  for (const objective of deferred) {
+    const [duplicate] = await tx
+      .select({ id: cycleIssues.id })
+      .from(cycleIssues)
+      .where(
+        activeOnly(
+          cycleIssues,
+          eq(cycleIssues.workspaceId, workspaceId),
+          eq(cycleIssues.cycleId, toCycleId),
+          eq(cycleIssues.source, "carry_forward"),
+          eq(cycleIssues.text, objective.text),
+        ),
+      )
+      .limit(1);
+    if (duplicate) {
+      continue;
+    }
+    // openokr:allow-mutation: same transaction.
+    await tx.insert(cycleIssues).values({
+      id: newId(),
+      workspaceId,
+      cycleId: toCycleId,
+      text: objective.text,
       impact: carriedImpact,
       source: "carry_forward",
     });

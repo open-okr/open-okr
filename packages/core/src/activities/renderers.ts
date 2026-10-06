@@ -14,6 +14,15 @@ export type ActivityRenderer = (payload: Record<string, unknown>) => string;
 const asString = (value: unknown, fallback = ""): string =>
   typeof value === "string" ? value : fallback;
 
+/** §8.8's five decisions as a feed line says them (P9-T20e-a). */
+const CLOSE_DECISION_PHRASE: Readonly<Record<string, string>> = {
+  achieved: "nothing left to carry",
+  keep: "a decision to keep it",
+  modify: "a decision to modify it",
+  defer: "a decision to defer it to the issue list",
+  abandon: "a decision to abandon it",
+};
+
 export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "workspace.provisioned": (p) => `Workspace "${asString(p.name)}" created`,
   "workspace.renamed": (p) =>
@@ -293,7 +302,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "goal.draft_approved": (p) =>
     `The draft "${asString(p.title, "a goal")}" was approved and is live`,
   "goal.closed": (p) =>
-    `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
+    `The goal was closed as ${asString(p.successStatus, "closed")}, with ${CLOSE_DECISION_PHRASE[asString(p.closeDecision, "keep")] ?? "a decision to keep it"}`,
   "goal.reopened": () => "The goal was reopened",
   "goal.moved_space": (p) =>
     `The goal moved from ${asString(p.fromSpace, "one space")} to ${asString(p.toSpace, "another")}`,

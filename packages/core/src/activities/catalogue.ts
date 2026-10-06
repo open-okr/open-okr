@@ -352,7 +352,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "goal.draft_approved": z.object({ title: z.string() }),
   "goal.closed": z.object({
     successStatus: z.enum(["achieved", "missed"]),
-    closeDecision: z.enum(["keep", "modify", "abandon"]),
+    closeDecision: z.enum(["achieved", "keep", "modify", "defer", "abandon"]),
   }),
   "goal.reopened": z.object({}),
   // A move between spaces, both named (P9-T13a, METHOD.md §2.9).
