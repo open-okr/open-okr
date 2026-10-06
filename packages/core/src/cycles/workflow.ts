@@ -288,7 +288,12 @@ export async function loadWorkflowInput<
     cadence: await loadCycleCadence(
       tx,
       workspaceId,
-      { id: cycleId, startsOn: cycle.startsOn, endsOn: cycle.endsOn },
+      {
+        id: cycleId,
+        startsOn: cycle.startsOn,
+        endsOn: cycle.endsOn,
+        mode: cycle.mode,
+      },
       await workspaceTimeZone(tx, workspaceId),
     ),
   };

@@ -24,6 +24,7 @@
  * Dates are local `YYYY-MM-DD` strings in the workspace timezone, like every
  * other cycle bound. Pure: no clock, no database.
  */
+import { SUGGESTED_TIMELINE } from "./guidance.ts";
 import type { ReviewPart, RitualKind } from "./sessions.ts";
 import { type Holiday, isHolidayPeriod, periodStartOf } from "./streak.ts";
 import { type CheckInFrequency, canonThresholds } from "./thresholds.ts";
@@ -58,6 +59,8 @@ export interface CadenceCoverageOptions {
   readonly reviewLeadWeeks?: number;
   /** Whether the review is held as one session or two (P9-T20b-a). */
   readonly reviewFormat?: ReviewFormat;
+  /** An annual cycle owes its closing review and nothing else (P9-T20b-b). */
+  readonly cycleMode?: CycleMode;
 }
 
 export interface CadenceCoverage {
@@ -99,7 +102,15 @@ export interface CadencePlanOptions {
    * retrospective (§12, P9-T20b-a). One session where not given.
    */
   readonly reviewFormat?: ReviewFormat;
+  /**
+   * An annual cycle books its closing review and nothing else: its weeks and
+   * months belong to its quarters (§8, P9-T20b-b). Quarterly where not given.
+   */
+  readonly cycleMode?: CycleMode;
 }
+
+/** Which kind of cycle the window is. */
+type CycleMode = "annual" | "quarterly";
 
 interface Span {
   readonly from: string;
@@ -224,6 +235,52 @@ function reviewWeekOf(window: CadenceWindow, leadWeeks: number): Span {
   return { from, to: later(addDays(aim, 3), from) };
 }
 
+/**
+ * How many weeks before a new annual cycle its drafting opens: §2.4's Phase 4
+ * row, read from the suggested timeline rather than written out again.
+ */
+const ANNUAL_DRAFTING_WEEKS = Math.max(
+  ...(
+    SUGGESTED_TIMELINE.annual
+      .find((row) => row.activity.startsWith("Phase 4"))
+      ?.weeksBefore.match(/\d+/g) ?? []
+  ).map(Number),
+);
+
+/**
+ * Where a cycle's review is aimed and where one counts (§8).
+ *
+ * A quarter's is about two weeks before it ends (P9-T20a). A year's is "held
+ * before any of the next year's drafting" (P9-T20b-b): aimed at the week
+ * before the next year's Phase 4 opens, and counted from four weeks before
+ * that, because a review held after the drafting began is the review the
+ * method says drafting pressure distorts.
+ */
+function reviewSpansOf(
+  window: CadenceWindow,
+  leadWeeks: number,
+  mode: CycleMode,
+): { readonly aim: Span; readonly accept: Span } {
+  if (mode === "annual") {
+    const draftingOpens = addDays(window.endsOn, 1 - 7 * ANNUAL_DRAFTING_WEEKS);
+    const last = addDays(draftingOpens, -1);
+    return {
+      aim: {
+        from: later(addDays(draftingOpens, -7), window.startsOn),
+        to: last,
+      },
+      accept: {
+        from: later(addDays(draftingOpens, -28), window.startsOn),
+        to: last,
+      },
+    };
+  }
+  return {
+    aim: reviewWeekOf(window, leadWeeks),
+    accept: closeOf(window, leadWeeks),
+  };
+}
+
 /** §11's review preparation lead, where the caller does not pass its own. */
 const CANON_REVIEW_LEAD = canonThresholds()[
   "cadence.reviewPreparationLeadWeeks"
@@ -262,10 +319,13 @@ export function cadenceCoverage(
 ): CadenceCoverage {
   const frequency = options.frequency ?? "weekly";
   const holidays = options.holidays ?? [];
-  const reviewLeadWeeks = options.reviewLeadWeeks ?? CANON_REVIEW_LEAD;
+  const mode = options.cycleMode ?? "quarterly";
   const missing: string[] = [];
   const of = (kinds: readonly RitualKind[]) =>
     sessions.filter((session) => kinds.includes(session.kind));
+  if (mode === "annual") {
+    return reviewCoverage(window, of(["quarterly"]), options, missing);
+  }
 
   const weekly = of(["weekly"]);
   const openWeeks = checkInPeriodsOf(window, frequency)
@@ -291,15 +351,33 @@ export function cadenceCoverage(
     );
   }
 
-  const close = closeOf(window, reviewLeadWeeks);
-  const atClose = of(["quarterly"]).filter((session) =>
-    within(session.on, close),
+  return reviewCoverage(window, of(["quarterly"]), options, missing);
+}
+
+/**
+ * Whether the review that closes the cycle is booked, and both halves where
+ * the workspace holds them apart (§8, P9-T20a, P9-T20b-a, P9-T20b-b).
+ */
+function reviewCoverage(
+  window: CadenceWindow,
+  reviews: readonly BookedRitual[],
+  options: CadenceCoverageOptions,
+  missing: string[],
+): CadenceCoverage {
+  const mode = options.cycleMode ?? "quarterly";
+  const { accept: close } = reviewSpansOf(
+    window,
+    options.reviewLeadWeeks ?? CANON_REVIEW_LEAD,
+    mode,
   );
+  const atClose = reviews.filter((session) => within(session.on, close));
   const holds = (part: ReviewPart) =>
     atClose.some((session) => !session.part || session.part === part);
   if (!holds("review")) {
     missing.push(
-      `No quarterly review is booked for the cycle's close, between ${close.from} and ${close.to}`,
+      mode === "annual"
+        ? `No annual review is booked before the next year's drafting opens, between ${close.from} and ${close.to}`
+        : `No quarterly review is booked for the cycle's close, between ${close.from} and ${close.to}`,
     );
   }
   // Split, the retrospective is a session of its own and can be missing on
@@ -313,7 +391,6 @@ export function cadenceCoverage(
       `No retrospective is booked after the review, between ${close.from} and ${close.to}`,
     );
   }
-
   return { booked: missing.length === 0, missing };
 }
 
@@ -371,7 +448,8 @@ export function planCycleCadence(
   // In the lead's week, about two weeks before the end (§8, P9-T20a), or as
   // near to it as the cycle still allows.
   const lead = options.reviewLeadWeeks ?? CANON_REVIEW_LEAD;
-  const close = closeOf(window, lead);
+  const mode = options.cycleMode ?? "quarterly";
+  const { aim, accept: close } = reviewSpansOf(window, lead, mode);
   const atClose = existing.filter(
     (session) => session.kind === "quarterly" && within(session.on, close),
   );
@@ -382,8 +460,13 @@ export function planCycleCadence(
     atClose.find((session) => session.part !== "retrospective")?.on ?? null;
   if (!holds("review")) {
     reviewOn =
-      pick(reviewWeekOf(window, lead), weekday, from, true) ??
-      pick({ from: close.from, to: window.endsOn }, weekday, from, false) ??
+      pick(aim, weekday, from, true) ??
+      pick(
+        { from: close.from, to: earlier(close.to, window.endsOn) },
+        weekday,
+        from,
+        false,
+      ) ??
       pick(close, weekday, from, false);
     if (reviewOn) {
       plan.push(
@@ -402,6 +485,12 @@ export function planCycleCadence(
       on: workingDaysAfter(reviewOn, 2),
       part: "retrospective",
     });
+  }
+
+  // A year's weeks and months are run in its quarters, each booked on its
+  // own; the annual cycle owes only the review that closes it.
+  if (mode === "annual") {
+    return plan;
   }
 
   for (const month of monthsOf(window)) {

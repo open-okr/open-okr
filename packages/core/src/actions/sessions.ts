@@ -603,6 +603,7 @@ async function requireOpenCycle(
       startsOn: cycles.startsOn,
       endsOn: cycles.endsOn,
       status: cycles.status,
+      mode: cycles.mode,
     })
     .from(cycles)
     .where(
@@ -848,7 +849,10 @@ export const bookCycleSessions = defineWriteAction({
         // About two weeks before the end, at the workspace's own lead (§8).
         reviewLeadWeeks: bookThresholds["cadence.reviewPreparationLeadWeeks"],
         reviewFormat,
+        // A year books its closing review and nothing else (§8, P9-T20b-b).
+        cycleMode: cycle.mode,
       });
+      const annual = cycle.mode === "annual";
 
       const sessionIds: string[] = [];
       // The retrospective names the review session it reads its scores from:
@@ -870,10 +874,15 @@ export const bookCycleSessions = defineWriteAction({
           spaceId: input.spaceId,
           cycleId: cycle.id,
           kind: ritual.kind,
-          title: retrospective
-            ? RETROSPECTIVE_TITLE
-            : (RITUALS.find((entry) => entry.kind === ritual.kind)?.name ??
-              ritual.kind),
+          title:
+            ritual.kind === "quarterly" && annual
+              ? retrospective
+                ? ANNUAL_RETROSPECTIVE_TITLE
+                : ANNUAL_REVIEW_TITLE
+              : retrospective
+                ? RETROSPECTIVE_TITLE
+                : (RITUALS.find((entry) => entry.kind === ritual.kind)?.name ??
+                  ritual.kind),
           scheduledFor: at(ritual.on),
           facilitatorId: input.facilitatorId,
           state: "scheduled",
@@ -891,6 +900,7 @@ export const bookCycleSessions = defineWriteAction({
         holidays,
         reviewLeadWeeks: bookThresholds["cadence.reviewPreparationLeadWeeks"],
         reviewFormat,
+        cycleMode: cycle.mode,
       });
       return {
         result: {
@@ -922,6 +932,13 @@ export const bookCycleSessions = defineWriteAction({
  * half keep §7.1's "Quarterly review".
  */
 const RETROSPECTIVE_TITLE = "Quarterly retrospective";
+
+/**
+ * An annual cycle's closing review (§8, P9-T20b-b): "the same review" over
+ * the annual OKRs, so the same session kind under the year's own name.
+ */
+const ANNUAL_REVIEW_TITLE = "Annual review";
+const ANNUAL_RETROSPECTIVE_TITLE = "Annual retrospective";
 
 /** The review half already booked for a cycle in a space, if any. */
 async function bookedReviewSessionIdInTx(

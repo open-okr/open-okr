@@ -88,6 +88,11 @@ quarter then gives you two sessions: the review, with stages 1 to 4, and two
 working days later the retrospective, with stages 5 to 11, which reads the
 scores the review recorded.
 
+A year closes the same way. Booking an annual cycle books its **Annual
+review** and nothing else, because its weeks and months are run in its
+quarters. It lands in the week before the next year's drafting opens, so the
+year is graded before anybody writes next year's OKRs.
+
 | Act | Stages |
 |---|---|
 | **Open** | 1. Open and check in. Before the numbers, the people |

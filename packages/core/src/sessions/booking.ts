@@ -51,6 +51,8 @@ export function localDateOf(instant: Date, timeZone: string): string {
 
 export interface CycleBounds extends CadenceWindow {
   readonly id: string;
+  /** An annual cycle owes its closing review and nothing else (P9-T20b-b). */
+  readonly mode?: "annual" | "quarterly";
 }
 
 /**
@@ -219,6 +221,7 @@ export async function loadCycleCadence<
         holidays: await spaceHolidaysInTx(tx, workspaceId, space.id),
         reviewLeadWeeks: thresholds["cadence.reviewPreparationLeadWeeks"],
         reviewFormat,
+        cycleMode: cycle.mode ?? "quarterly",
       }).missing.map((line) => `${space.name}: ${line}`),
     );
   }

@@ -296,3 +296,51 @@ describe("the review and the retrospective apart", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * §8: "An annual cycle closes with the same review over its annual OKRs,
+ * held before any of the next year's drafting" (P9-T20b-b, NW-Q4-06). The
+ * next year's Phase 4 opens three weeks before it starts, §2.4's own row:
+ * 11 December 2027 for 2028.
+ */
+describe("the annual review", () => {
+  const YEAR = { startsOn: "2027-01-01", endsOn: "2027-12-31" } as const;
+  const plan = planCycleCadence(YEAR, {
+    weekday: 3,
+    from: YEAR.startsOn,
+    existing: [],
+    cycleMode: "annual",
+  });
+
+  it("books the closing review the week before the next year's drafting, and nothing else (acceptance)", () => {
+    expect(plan).toEqual([{ kind: "quarterly", on: "2027-12-08" }]);
+    expect(cadenceCoverage(YEAR, plan, { cycleMode: "annual" })).toEqual({
+      booked: true,
+      missing: [],
+    });
+  });
+
+  it("does not count a review held after the drafting opened", () => {
+    expect(
+      cadenceCoverage(YEAR, [{ kind: "quarterly", on: "2027-12-15" }], {
+        cycleMode: "annual",
+      }).missing,
+    ).toEqual([
+      "No annual review is booked before the next year's drafting opens, between 2027-11-13 and 2027-12-10",
+    ]);
+  });
+
+  it("splits the same way a quarter's does", () => {
+    const split = planCycleCadence(YEAR, {
+      weekday: 3,
+      from: YEAR.startsOn,
+      existing: [],
+      cycleMode: "annual",
+      reviewFormat: "split",
+    });
+    expect(split).toEqual([
+      { kind: "quarterly", on: "2027-12-08", part: "review" },
+      { kind: "quarterly", on: "2027-12-10", part: "retrospective" },
+    ]);
+  });
+});

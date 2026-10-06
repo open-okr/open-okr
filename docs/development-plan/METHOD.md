@@ -745,7 +745,7 @@ A target may be changed at any time in the cycle, as §2.9 says. Making a target
 
 ## 8. The quarterly review
 
-Ninety minutes by default, four acts, eleven timed stages, held about two weeks before the cycle ends. A workspace may split it into a review session and a separate retrospective (§12). When split, the review session holds the Open and Review acts (stages 1 to 4) and the retrospective holds the Retro and Reset acts (stages 5 to 11). Each act asks one question.
+Ninety minutes by default, four acts, eleven timed stages, held about two weeks before the cycle ends. A workspace may split it into a review session and a separate retrospective (§12). When split, the review session holds the Open and Review acts (stages 1 to 4) and the retrospective holds the Retro and Reset acts (stages 5 to 11). An annual cycle closes with the same review over its annual OKRs, held before any of the next year's drafting. Each act asks one question.
 
 | Act | Question |
 |---|---|
