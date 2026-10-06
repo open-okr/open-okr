@@ -180,8 +180,9 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
       high: 4,
     });
     expect(canon["sessions.roomPulseBands"]).toEqual({ high: 4, low: 3 });
-    expect(canon["sessions.diagnosticCycleScore"]).toBe(0.7);
-    expect(canon["sessions.diagnosticRhythmScore"]).toBe(3.5);
+    // Measured since P9-T20d: 0.6 and 75% of due check-ins on time.
+    expect(canon["sessions.diagnosticCycleScore"]).toBe(0.6);
+    expect(canon["sessions.diagnosticRhythm"]).toBe(0.75);
   });
 });
 

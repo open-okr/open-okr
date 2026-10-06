@@ -43,11 +43,12 @@
  *   the quarterly review is P4-T10. There is nothing to seed yet, and seeding
  *   invented scores would put a number on a screen that no review agreed.
  */
-import { newId, workspaceMembers } from "@openokr/db";
+import { checkIns, newId, workspaceMembers } from "@openokr/db";
 import type { Pool } from "pg";
 import { callAction } from "../actions/registry.ts";
 import { runOperation } from "../operations/operation.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import {
   BASELINE_HEALTH,
   CAPACITY_CUTS,
@@ -137,6 +138,9 @@ const EMPTY: BuildDemoResult = {
 
 /** `YYYY-MM-DD` in UTC. Good enough for a seed; the product reads timezones. */
 const isoDate = (date: Date): string => date.toISOString().slice(0, 10);
+
+/** What each of last quarter's recorded check-ins says. */
+const LAST_QUARTER_CHECK_IN = "On track for the week. Nothing new in the way.";
 
 const addDays = (from: string, days: number): string => {
   const date = new Date(`${from}T00:00:00Z`);
@@ -893,6 +897,7 @@ async function seedDiscussion(
  * Writing any of it directly would seed a state the product cannot reach.
  */
 async function runLastQuarter(
+  demo: DemoContext,
   context: Ctx,
   cast: Map<CastKey, string>,
   spaces: Map<SpaceKey, string>,
@@ -959,6 +964,77 @@ async function runLastQuarter(
       keyResultIds.push(added.id);
     }
   }
+
+  // The quarter's check-ins, on the Mondays they fell due (§8.6, P9-T20d).
+  // The diagnostic reads the rhythm a team kept from its check-ins rather
+  // than from a survey, and a quarter written after the fact has none: its
+  // review would read "a rhythm problem" for a team the story says met every
+  // week. So the history is recorded with its own dates, through an operation
+  // of the builder's own the way its invented members are, and audited as
+  // demo history. One week in four is missed by one objective, so the rhythm
+  // reads as kept and not as perfect.
+  await runOperation(
+    { pool: demo.pool },
+    {
+      action: "demo.recordLastQuarterCheckIns",
+      workspaceId: demo.workspaceId,
+      actor: { kind: "human", userId: demo.adminUserId },
+      async execute({ tx, workspaceId }) {
+        let recorded = 0;
+        let monday = cycle.startsOn;
+        while (new Date(`${monday}T00:00:00Z`).getUTCDay() !== 1) {
+          monday = addDays(monday, 1);
+        }
+        const mondays: string[] = [];
+        for (let on = monday; on <= cycle.endsOn; on = addDays(on, 7)) {
+          mondays.push(on);
+        }
+        for (const [position, goalId] of goalIds.entries()) {
+          const objective = LAST_QUARTER[position];
+          const authorId = objective
+            ? cast.get(objective.championKey)
+            : undefined;
+          if (!authorId) {
+            continue;
+          }
+          for (const [week, on] of mondays.entries()) {
+            if (position === 1 && week % 4 === 3) {
+              continue;
+            }
+            // openokr:allow-mutation: the builder's own audited operation.
+            await tx.insert(checkIns).values({
+              workspaceId,
+              subjectType: "goal",
+              subjectId: goalId,
+              authorMemberId: authorId,
+              state: "published",
+              publishedAt: new Date(`${on}T10:00:00.000Z`),
+              status: "on_track",
+              confidence: "0.6",
+              narrative: richTextFromPlainText(LAST_QUARTER_CHECK_IN),
+              narrativeVersion: RICH_TEXT_SCHEMA_VERSION,
+            });
+            recorded += 1;
+          }
+        }
+        return {
+          result: recorded,
+          activity: {
+            kind: "cycle.updated" as const,
+            subjectType: "cycle" as const,
+            subjectId: cycle.id,
+            payload: { name: LAST_QUARTER_REVIEW_TITLE },
+          },
+          audit: {
+            action: "demo.recordLastQuarterCheckIns",
+            targetType: "cycle",
+            targetId: cycle.id,
+            payload: { checkIns: recorded },
+          },
+        };
+      },
+    },
+  );
 
   // The review itself. Scheduled on the last day of the quarter, which is
   // where a quarterly review belongs and is in the past by definition.
@@ -1027,7 +1103,7 @@ async function runLastQuarter(
     keyResultsScored: keyResultIds.length,
     verdict: diagnostic.verdict,
     cycleScore: diagnostic.cycleScore,
-    rhythmScore: diagnostic.rhythmScore,
+    onTimeShare: diagnostic.onTimeShare,
     portfolioVerdict: snapshot.verdict,
   };
 }
@@ -1039,7 +1115,8 @@ interface LastQuarterResult {
   readonly keyResultsScored: number;
   readonly verdict: string;
   readonly cycleScore: number;
-  readonly rhythmScore: number;
+  /** The measured rhythm the verdict was read on (§8.6, P9-T20d). */
+  readonly onTimeShare: number | null;
   readonly portfolioVerdict: string | null;
 }
 
@@ -1082,7 +1159,7 @@ export async function buildDemoWorkspace(
   // The quarter that is already over (P8-T13b), after the current one, so
   // `cycles.current` in the workflow above still resolves to this quarter
   // rather than to the one being backfilled behind it.
-  const lastQuarter = await runLastQuarter(context, cast, spaces, now);
+  const lastQuarter = await runLastQuarter(demo, context, cast, spaces, now);
   // No longer the first cycle: there is a scored quarter behind it now.
   await callAction(context, "cycles.update", {
     id: cycle.id,
@@ -1105,7 +1182,7 @@ export async function buildDemoWorkspace(
     "Key result history is stamped now; the note on each value carries the week it belongs to. KPI readings are real month starts, so the KPI charts are genuine six-month trends.",
     "The set is not published yet, and publish gate 5 warns: one key result is still marked as exceeding capacity. Gate 5 warns rather than blocks by default, so the set can be published as it is; change the key result to tight on the goal page and watch the warning clear.",
     "The Draft Coach warns on one key result: the cohort key result is worded as the activity rather than the outcome it is there to prove. §4.2's KR-5 asks for impact, not effort. It is a warning rather than a refusal, so publish gate 2 stays green; reword it on the goal page and watch the warning clear.",
-    `The scorecard has last quarter on it, and the closing diagnostic reads "${lastQuarter.verdict}" from a cycle score of ${lastQuarter.cycleScore.toFixed(2)} against a rhythm score of ${lastQuarter.rhythmScore.toFixed(1)}. Both numbers came from the review: five key results graded with their reasons, and the five process-health statements answered. The verdict is derived by packages/method, so changing either threshold changes what the demo says.`,
+    `The scorecard has last quarter on it, and the closing diagnostic reads "${lastQuarter.verdict}" from a cycle score of ${lastQuarter.cycleScore.toFixed(2)} against ${lastQuarter.onTimeShare === null ? "no measured rhythm" : `${Math.round(lastQuarter.onTimeShare * 100)}% of due check-ins published on time`}. The cycle score came from the review, five key results graded with their reasons; the rhythm was measured from the quarter's check-ins, and the five process-health statements answered beside it are the cross-check. The verdict is derived by packages/method, so changing either threshold changes what the demo says.`,
     "The rhythm score is one respondent's, because every write in this seed is authored by whoever ran it and the survey is anonymous per member. Submitting four more would be putting words in the mouths of people who have no accounts.",
   ];
   if (recoveryLaunched) {

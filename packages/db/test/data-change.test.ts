@@ -26,6 +26,7 @@ import { kpiTargetTypeFromDirection } from "../src/data-changes/0020_kpi_target_
 import { kpiRecoveringToBand } from "../src/data-changes/0021_kpi_recovering_to_band.ts";
 import { kpiNamedOwner } from "../src/data-changes/0022_kpi_named_owner.ts";
 import { blockerClockToCheckIn } from "../src/data-changes/0023_blocker_clock_to_check_in.ts";
+import { retireRhythmScoreThreshold } from "../src/data-changes/0024_retire_rhythm_score_threshold.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1424,5 +1425,35 @@ describe("0023: blockers on the check-in's clock", () => {
       ).rows.map((row) => [row.next_action, row.on_check_in]),
     );
     expect(dues).toEqual({ Moves: true, Resolved: false, Stays: false });
+  });
+});
+
+describe("0024: the survey rhythm threshold retired", () => {
+  it("removes the five-point threshold and keeps every other override", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const { rows } = await client.query<{ workspace_id: string }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       )
+       insert into rhythm_settings (workspace_id, overrides)
+       select w.id, '{"sessions.diagnosticRhythmScore": 3,
+                      "sessions.diagnosticCycleScore": 0.65}'::jsonb
+         from w
+       returning workspace_id`,
+    );
+    const [result] = await runDataChanges(client, {
+      scripts: [retireRhythmScoreThreshold],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    const overrides = (
+      await client.query<{ overrides: object }>(
+        "select overrides from rhythm_settings where workspace_id = $1",
+        [rows[0]?.workspace_id],
+      )
+    ).rows[0]?.overrides;
+    expect(overrides).toEqual({ "sessions.diagnosticCycleScore": 0.65 });
   });
 });

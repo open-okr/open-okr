@@ -33,6 +33,7 @@ import { kpiTargetTypeFromDirection } from "../data-changes/0020_kpi_target_type
 import { kpiRecoveringToBand } from "../data-changes/0021_kpi_recovering_to_band.ts";
 import { kpiNamedOwner } from "../data-changes/0022_kpi_named_owner.ts";
 import { blockerClockToCheckIn } from "../data-changes/0023_blocker_clock_to_check_in.ts";
+import { retireRhythmScoreThreshold } from "../data-changes/0024_retire_rhythm_score_threshold.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -73,6 +74,7 @@ try {
       kpiRecoveringToBand,
       kpiNamedOwner,
       blockerClockToCheckIn,
+      retireRhythmScoreThreshold,
     ],
   });
   process.stdout.write(

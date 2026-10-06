@@ -643,17 +643,17 @@ export const THRESHOLDS = {
     group: "sessions",
     label: "Diagnostic cycle-score threshold",
     section: "§8.6",
-    why: "0.7. Below it the cycle missed, and the rhythm score decides whether that is a strategy problem or a cadence one (principle 10).",
-    default: 0.7,
+    why: "0.6, the aspirational average §3.4 calls healthy. Below it the cycle missed, and the measured rhythm decides whether that is a strategy problem or a cadence one (principle 10).",
+    default: 0.6,
     schema: unit,
   }),
-  "sessions.diagnosticRhythmScore": param({
+  "sessions.diagnosticRhythm": param({
     group: "sessions",
-    label: "Diagnostic rhythm-score threshold",
+    label: "Diagnostic rhythm threshold",
     section: "§8.6",
-    why: "3.5 on a five-point read. A missed cycle with a strong rhythm and a missed cycle with a weak one need opposite fixes.",
-    default: 3.5,
-    schema: z.number().min(1).max(5),
+    why: "75% of due check-ins published on time, measured rather than asked. A missed cycle with a strong rhythm and a missed cycle with a weak one need opposite fixes.",
+    default: 0.75,
+    schema: unit,
   }),
 } as const;
 

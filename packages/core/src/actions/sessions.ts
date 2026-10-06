@@ -60,8 +60,10 @@ import {
   afterCheckIn,
   CLOSE_DECISION_MEANINGS,
   cadenceCoverage,
+  committedShareMet,
   currentStreakOn,
   cycleScore,
+  diagnosisFor,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   needsRootCause,
@@ -137,6 +139,7 @@ import { isValidRichText } from "../rich-text/validate.ts";
 import { computedScoresInTx } from "../scoring/computed.ts";
 import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
 import { sessionChannel } from "../sessions/live.ts";
+import { measuredRhythmInTx } from "../sessions/measured-rhythm.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -7492,17 +7495,30 @@ export const readProcessHealth = defineReadAction({
  * (P4-T10b-b); by stage seven the room has seen everything, and a diagnostic
  * that ignored unrevealed grades would diagnose a quarter that did not happen.
  */
+/**
+ * What §8.6 combines (P9-T20d): the cycle score over the scored aspirational
+ * key results, the committed ones as the share met, the measured rhythm, and
+ * process-health statements 2 and 5 as the cross-check.
+ */
 async function diagnosticInputsInTx(
   tx: OperationTx,
   workspaceId: string,
-  sessionId: string,
+  session: { id: string; spaceId: string | null; cycleId: string | null },
+  thresholds: ResolvedThresholds,
 ) {
+  const sessionId = session.id;
   // The grades from the review half, and process health from the session
   // reading it, which is the retrospective where they are apart (P9-T20b-a).
   const { review } = await reviewHalvesInTx(tx, workspaceId, sessionId);
   const graded = await tx
-    .select({ score: reviewScores.score })
+    .select({
+      score: reviewScores.score,
+      kind: goals.kind,
+      goalId: goals.id,
+    })
     .from(reviewScores)
+    .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
     .where(
       activeOnly(
         reviewScores,
@@ -7510,7 +7526,26 @@ async function diagnosticInputsInTx(
         eq(reviewScores.sessionId, review),
       ),
     );
-  const cycle = cycleScore(graded.map((row) => Number(row.score)));
+  // §8.6: "the §3.4 average over every scored aspirational key result", with
+  // committed ones judged by the share met instead, because averaging the two
+  // hides both.
+  const cycle = cycleScore(
+    graded
+      .filter((row) => row.kind === "aspirational")
+      .map((row) => Number(row.score)),
+  );
+  const committedScores = graded
+    .filter((row) => row.kind === "committed")
+    .map((row) => Number(row.score));
+  const committed = committedShareMet(committedScores, thresholds);
+  const measured = await measuredRhythmInTx(tx, {
+    workspaceId,
+    spaceId: session.spaceId,
+    cycleId: session.cycleId,
+    asOf: new Date(),
+    thresholds,
+    gradedGoalIds: [...new Set(graded.map((row) => row.goalId))],
+  });
 
   const responses = await tx
     .select({
@@ -7535,7 +7570,7 @@ async function diagnosticInputsInTx(
           forStatement.length;
   });
 
-  return { cycle, rhythm: rhythmScore(averages) };
+  return { cycle, committed, measured, survey: rhythmScore(averages) };
 }
 
 export const recordDiagnostic = defineWriteAction({
@@ -7546,7 +7581,11 @@ export const recordDiagnostic = defineWriteAction({
   output: z.object({
     verdict: z.enum(DIAGNOSIS_VERDICTS),
     cycleScore: z.number(),
-    rhythmScore: z.number(),
+    /**
+     * The measured share of due check-ins published on time (P9-T20d), or
+     * null for a delivered cycle read before anything fell due.
+     */
+    onTimeShare: z.number().nullable(),
   }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -7564,28 +7603,42 @@ export const recordDiagnostic = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
-      const { cycle, rhythm } = await diagnosticInputsInTx(
-        tx,
-        workspaceId,
-        input.sessionId,
-      );
-      if (cycle === null || rhythm === null) {
-        // §8.6 combines two numbers and neither is optional. A diagnostic built
-        // on a missing answer is worse than no diagnostic, because it reads as
-        // evidence.
-        throw new OperationError(
-          "not_found",
-          "The diagnostic needs both a cycle score and a rhythm score. Grade the key results and run the survey first.",
-        );
-      }
-
       const { thresholds } = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
+      const { cycle, measured, survey } = await diagnosticInputsInTx(
+        tx,
+        workspaceId,
+        session,
+        thresholds,
+      );
+      // §8.6 combines two numbers. The first row needs only the cycle score:
+      // a delivered cycle consults no rhythm. Below it, the measured rhythm
+      // decides, and with nothing fallen due there is no rhythm to read. A
+      // diagnostic built on a missing answer is worse than no diagnostic,
+      // because it reads as evidence.
+      if (cycle === null) {
+        throw new OperationError(
+          "not_found",
+          "The diagnostic needs a cycle score. Grade the aspirational key results first.",
+        );
+      }
+      const delivered = cycle >= thresholds["sessions.diagnosticCycleScore"];
+      if (!delivered && measured.share === null) {
+        throw new OperationError(
+          "not_found",
+          "The diagnostic needs a measured rhythm, and no check-in has fallen due in this cycle yet.",
+        );
+      }
+
       // The verdict, the diagnosis and the prescription all come from
       // `packages/method`. Nothing about which of the three cases applies is
       // decided here.
-      const diagnosis = rhythmDiagnostic(cycle, rhythm, thresholds);
+      const diagnosis = rhythmDiagnostic(
+        cycle,
+        measured.share ?? 0,
+        thresholds,
+      );
 
       const now = new Date();
       const [existing] = await tx
@@ -7602,7 +7655,12 @@ export const recordDiagnostic = defineWriteAction({
 
       const values = {
         cycleScore: String(cycle),
-        rhythmScore: String(rhythm),
+        // The two statements, kept as the cross-check, or null where the room
+        // has not answered them yet (P9-T20d).
+        rhythmScore: survey === null ? null : String(survey),
+        onTimeShare: measured.share === null ? null : String(measured.share),
+        dueCheckIns: measured.share === null ? null : measured.due,
+        onTimeCheckIns: measured.share === null ? null : measured.onTime,
         verdict: diagnosis.kind,
         narrative: diagnosis.prescription,
         recordedById: memberId,
@@ -7634,7 +7692,7 @@ export const recordDiagnostic = defineWriteAction({
         result: {
           verdict: diagnosis.kind,
           cycleScore: cycle,
-          rhythmScore: rhythm,
+          onTimeShare: measured.share,
         },
         activity: {
           kind: "session.diagnosticRead",
@@ -7666,13 +7724,24 @@ export const readDiagnostic = defineReadAction({
   output: z.object({
     /** The stored numbers when recorded, else what the room has so far. */
     cycleScore: z.number().nullable(),
+    /** §3.4's committed half: the share of committed key results met. */
+    committedMet: z.number().nullable(),
+    /**
+     * The measured rhythm (§8.6, P9-T20d): the share of due check-ins
+     * published within tolerance, and the two counts it comes from. Null on
+     * a diagnostic read before it, which was read on the survey.
+     */
+    onTimeShare: z.number().nullable(),
+    dueCheckIns: z.number().int().nullable(),
+    onTimeCheckIns: z.number().int().nullable(),
+    /** Process-health statements 2 and 5, shown beside it as a cross-check. */
     rhythmScore: z.number().nullable(),
     verdict: z.enum(DIAGNOSIS_VERDICTS).nullable(),
     /** §8.6's sentences, from `packages/method`. Never stored as the verdict's meaning. */
     diagnosis: z.string().nullable(),
     prescription: z.string().nullable(),
     recorded: z.boolean(),
-    /** Both numbers exist, so the room can read it. */
+    /** A cycle score and a measured rhythm both exist, so the room can read it. */
     readable: z.boolean(),
   }),
   access: ACCESS_LEVELS.view,
@@ -7689,7 +7758,7 @@ export const readDiagnostic = defineReadAction({
       async (rawTx) => {
         const tx = rawTx as unknown as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
-        await requireQuarterly(
+        const session = await requireQuarterly(
           tx,
           context.workspaceId,
           memberId,
@@ -7700,10 +7769,19 @@ export const readDiagnostic = defineReadAction({
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, context.workspaceId),
         );
+        const inputs = await diagnosticInputsInTx(
+          tx,
+          context.workspaceId,
+          session,
+          thresholds,
+        );
         const [stored] = await tx
           .select({
             cycleScore: reviewDiagnostics.cycleScore,
             rhythmScore: reviewDiagnostics.rhythmScore,
+            onTimeShare: reviewDiagnostics.onTimeShare,
+            dueCheckIns: reviewDiagnostics.dueCheckIns,
+            onTimeCheckIns: reviewDiagnostics.onTimeCheckIns,
             verdict: reviewDiagnostics.verdict,
           })
           .from(reviewDiagnostics)
@@ -7717,17 +7795,20 @@ export const readDiagnostic = defineReadAction({
           .limit(1);
 
         if (stored) {
-          // The sentences are recomputed from the stored numbers rather than
-          // stored twice, so a wording correction in METHOD.md reaches old
-          // records while the verdict they were read at does not move.
-          const diagnosis = rhythmDiagnostic(
-            Number(stored.cycleScore),
-            Number(stored.rhythmScore),
-            thresholds,
-          );
+          // The sentences come from the verdict the room was given, not from
+          // the numbers again (P9-T20d): a diagnostic read before then stored
+          // a survey rhythm out of five, which today's share threshold would
+          // misread, and a wording correction in METHOD.md still reaches it.
+          const diagnosis = diagnosisFor(stored.verdict);
+          const asNumber = (value: string | null) =>
+            value === null ? null : Number(value);
           return {
             cycleScore: Number(stored.cycleScore),
-            rhythmScore: Number(stored.rhythmScore),
+            committedMet: inputs.committed,
+            onTimeShare: asNumber(stored.onTimeShare),
+            dueCheckIns: stored.dueCheckIns,
+            onTimeCheckIns: stored.onTimeCheckIns,
+            rhythmScore: asNumber(stored.rhythmScore),
             verdict: stored.verdict,
             diagnosis: diagnosis.diagnosis,
             prescription: diagnosis.prescription,
@@ -7736,19 +7817,25 @@ export const readDiagnostic = defineReadAction({
           };
         }
 
-        const { cycle, rhythm } = await diagnosticInputsInTx(
-          tx,
-          context.workspaceId,
-          input.sessionId,
-        );
         return {
-          cycleScore: cycle,
-          rhythmScore: rhythm,
+          cycleScore: inputs.cycle,
+          committedMet: inputs.committed,
+          onTimeShare: inputs.measured.share,
+          dueCheckIns:
+            inputs.measured.share === null ? null : inputs.measured.due,
+          onTimeCheckIns:
+            inputs.measured.share === null ? null : inputs.measured.onTime,
+          rhythmScore: inputs.survey,
           verdict: null,
           diagnosis: null,
           prescription: null,
           recorded: false,
-          readable: cycle !== null && rhythm !== null,
+          // Readable on the cycle score alone when it was delivered (§8.6's
+          // first row), and otherwise once something has fallen due.
+          readable:
+            inputs.cycle !== null &&
+            (inputs.cycle >= thresholds["sessions.diagnosticCycleScore"] ||
+              inputs.measured.share !== null),
         };
       },
     );

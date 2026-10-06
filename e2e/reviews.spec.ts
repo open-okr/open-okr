@@ -891,14 +891,16 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   ).toHaveCount(0);
 
   // The diagnostic shares this stage: section 8.4 names the causes and section
-  // 8.6 reads what they add up to. It cannot be read yet, because the survey is
-  // stage eight and section 8.6 needs both numbers.
+  // 8.6 reads what they add up to. Since P9-T20d its rhythm is measured from
+  // the check-ins that have fallen due rather than asked of the survey, so
+  // whether it can be read already depends on the day the suite runs: early
+  // in a quarter nothing has fallen due yet. Either way it says which.
   const diagnosticPanel = page.getByRole("region", {
     name: "The diagnostic",
   });
   await expect(diagnosticPanel).toHaveCount(1);
   await expect(diagnosticPanel).toContainText(
-    "needs a cycle score and a rhythm score",
+    /The numbers are in|needs a cycle score/,
   );
   // Exact, because the header chip reads "1 of 1 named" and the row's own chip
   // reads "named": unscoped, that is two matches.
@@ -952,9 +954,20 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(
     processHealth.locator("p").filter({ hasText: "Rhythm score" }),
   ).toContainText("3.0");
-  // Section 8.5's closing rule: the lowest becomes next cycle's process OKR.
-  // Statement 5 scored 2, the lowest of the five.
+  // Section 8.5's closing rule: the lowest becomes an improvement action for
+  // the next cycle, with an owner and a date (P9-T20d). Statement 5 scored 2,
+  // the lowest of the five.
   await expect(processHealth).toContainText("Lowest: statement 5");
+  const makeIt = processHealth.getByRole("button", {
+    name: "Make it an action",
+  });
+  await expect(makeIt).toBeDisabled();
+  await processHealth.getByLabel("Who owns it").selectOption({ index: 1 });
+  await processHealth.getByLabel("By when").fill("2026-12-15");
+  await makeIt.click();
+  await expect(processHealth).toContainText("Added to the actions", {
+    timeout: 10_000,
+  });
 
   // **Not asserted here: reading the diagnostic once both numbers exist.** The
   // rail advances forward only, so a browser cannot return to stage seven after
@@ -1039,7 +1052,9 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     name: "Learnings and what happens next",
   });
   await expect(actions).toHaveCount(1, { timeout: 10_000 });
-  await expect(actions).toContainText("0 actions");
+  // The improvement action stage eight made is already here.
+  await expect(actions).toContainText("1 action");
+  await expect(actions).toContainText("Improve:");
 
   // An action with no owner and no date is refused on the screen. Section 8.1:
   // every action has a name and a date, or it is a wish.
@@ -1052,11 +1067,14 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await actions.getByLabel("Owner").selectOption({ index: 1 });
   await actions.getByLabel("By", { exact: true }).fill("2026-12-31");
   await actions.getByRole("button", { name: "Agree it" }).click();
-  await expect(actions).toContainText("1 action", { timeout: 10_000 });
+  await expect(actions).toContainText("2 actions", { timeout: 10_000 });
   await expect(actions).toContainText("2026-12-31");
 
   // Ticking is reversible, because a room ticking by mistake is normal.
-  await actions.getByRole("button", { name: "Done", exact: true }).click();
+  await actions
+    .getByRole("button", { name: "Done", exact: true })
+    .first()
+    .click();
   await expect(
     actions.getByRole("button", { name: "Reopen it" }),
   ).toBeVisible({ timeout: 10_000 });

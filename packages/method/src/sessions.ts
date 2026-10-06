@@ -518,9 +518,12 @@ export interface Diagnosis {
  * §8.6's rhythm diagnostic, which METHOD.md calls the most valuable output of
  * the review.
  *
- * Two numbers in, one verdict out. The cycle score is the §3.4 portfolio
- * average over every scored key result; the rhythm score is the average of the
- * two §8.5 statements about cadence and candour.
+ * Two numbers in, one verdict out. The cycle score is the §3.4 average over
+ * the scored aspirational key results; the rhythm is the share of due
+ * check-ins published within tolerance, measured by the product with holiday
+ * periods left out (P9-T20d). It was the average of two §8.5 statements until
+ * then, which asked a room how well it kept a rhythm the product had watched
+ * it keep; those two are shown beside the measured share as a cross-check.
  *
  * The first row is the whole answer when it holds: at or above the cycle
  * threshold the rhythm score is not consulted at all, because a delivered cycle
@@ -531,34 +534,105 @@ export interface Diagnosis {
  */
 export function rhythmDiagnostic(
   cycleScore: number,
-  rhythmScore: number,
+  rhythm: number,
   thresholds: ResolvedThresholds,
 ): Diagnosis {
   const cycleFloor = thresholds["sessions.diagnosticCycleScore"];
-  const rhythmFloor = thresholds["sessions.diagnosticRhythmScore"];
+  const rhythmFloor = thresholds["sessions.diagnosticRhythm"];
 
   if (cycleScore >= cycleFloor) {
-    return {
-      kind: "results_delivered",
-      diagnosis: "Results delivered",
-      prescription:
-        "The question is not effort. It is whether the ambition was set high enough to be worth the quarter",
-    };
+    return diagnosisFor("results_delivered");
   }
-  if (rhythmScore >= rhythmFloor) {
-    return {
-      kind: "strategy_or_quality",
-      diagnosis: "Strategy or OKR-quality problem",
-      prescription:
-        "The team ran the rhythm and still missed. The OKRs themselves, or the strategy behind them, were wrong. Fix the key results before you push the team",
-    };
+  // "Likely": a hypothesis for the room to test, not a verdict (§8.6).
+  return diagnosisFor(rhythm >= rhythmFloor ? "strategy_or_quality" : "rhythm");
+}
+
+/**
+ * §8.6's sentences for a verdict already read. A stored diagnostic is shown
+ * by its verdict, not recomputed from its numbers: a review read before
+ * P9-T20d stored a survey rhythm out of five, which the measured threshold
+ * would misread, and the verdict the room heard is the record.
+ */
+export function diagnosisFor(kind: DiagnosisKind): Diagnosis {
+  switch (kind) {
+    case "results_delivered":
+      return {
+        kind,
+        diagnosis: "Results delivered",
+        prescription:
+          "The question is not effort. It is whether the ambition was set high enough to be worth the quarter",
+      };
+    case "strategy_or_quality":
+      return {
+        kind,
+        diagnosis: "Likely a strategy or OKR-quality problem",
+        prescription:
+          "The team ran the rhythm and still missed. Look first at the OKRs themselves, or the strategy behind them, before you push the team",
+      };
+    default:
+      return {
+        kind: "rhythm",
+        diagnosis: "Likely a rhythm problem",
+        prescription:
+          "This looks like a cadence problem, not an ambition problem. Restore the weekly check-in before you rewrite a single objective",
+      };
   }
-  return {
-    kind: "rhythm",
-    diagnosis: "Rhythm problem",
-    prescription:
-      "This is a cadence problem, not an ambition problem. Restore the weekly check-in before you rewrite a single objective",
-  };
+}
+
+/** One goal's check-in record across the period a review reads. */
+export interface CheckInRecord {
+  /** Every date a check-in fell due, holiday periods already left out. */
+  readonly dueOn: readonly string[];
+  /** The local date of every check-in published on it. */
+  readonly publishedOn: readonly string[];
+}
+
+/**
+ * §8.6's rhythm, measured (P9-T20d): "the share of due check-ins published
+ * within tolerance". A due date is kept when a check-in was published after
+ * the one before it fell due and no later than the tolerance after it, so an
+ * early check-in counts for the period it was meant for and a late one past
+ * the tolerance counts for nothing. Null when nothing fell due, because a
+ * share of nothing is not a rhythm.
+ */
+export function onTimeShare(
+  records: readonly CheckInRecord[],
+  toleranceDays: number,
+): {
+  readonly due: number;
+  readonly onTime: number;
+  readonly share: number | null;
+} {
+  const DAY_MS = 86_400_000;
+  const shift = (on: string, days: number) =>
+    new Date(Date.parse(`${on}T00:00:00Z`) + days * DAY_MS)
+      .toISOString()
+      .slice(0, 10);
+  let due = 0;
+  let onTime = 0;
+  for (const record of records) {
+    const dues = [...record.dueOn].sort();
+    const published = [...record.publishedOn].sort();
+    // Each check-in answers one period: the first it can, so one published
+    // late is not counted again for the period after.
+    const used = new Set<number>();
+    let previous: string | null = null;
+    for (const on of dues) {
+      due += 1;
+      const latest = shift(on, toleranceDays);
+      const after = previous;
+      const index = published.findIndex(
+        (when, at) =>
+          !used.has(at) && (after === null || when > after) && when <= latest,
+      );
+      if (index >= 0) {
+        used.add(index);
+        onTime += 1;
+      }
+      previous = on;
+    }
+  }
+  return { due, onTime, share: due === 0 ? null : onTime / due };
 }
 
 /**

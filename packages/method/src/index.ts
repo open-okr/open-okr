@@ -309,14 +309,17 @@ export {
 } from "./scoring.ts";
 export {
   BLOCKER_TYPE_DEFINITIONS,
+  type CheckInRecord,
   CLOSE_DECISION_MEANINGS,
   type Diagnosis,
   type DiagnosisKind,
+  diagnosisFor,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   MID_CYCLE_CALIBRATION,
   MONTHLY_REVIEW_ITEMS,
   type MonthlyReviewItem,
+  onTimeShare,
   PROCESS_HEALTH_STATEMENTS,
   REVIEW_PARTS,
   REVIEW_STAGE_KEYS,

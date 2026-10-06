@@ -58110,14 +58110,17 @@
                         "cycleScore": {
                           "type": "number"
                         },
-                        "rhythmScore": {
-                          "type": "number"
+                        "onTimeShare": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
                         "verdict",
                         "cycleScore",
-                        "rhythmScore"
+                        "onTimeShare"
                       ],
                       "additionalProperties": false
                     }
@@ -58205,6 +58208,42 @@
                             "null"
                           ]
                         },
+                        "committedMet": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "onTimeShare": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "dueCheckIns": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "onTimeCheckIns": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "rhythmScore": {
                           "type": [
                             "number",
@@ -58247,6 +58286,10 @@
                       },
                       "required": [
                         "cycleScore",
+                        "committedMet",
+                        "onTimeShare",
+                        "dueCheckIns",
+                        "onTimeCheckIns",
                         "rhythmScore",
                         "verdict",
                         "diagnosis",

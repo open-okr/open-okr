@@ -627,10 +627,22 @@ export default async function SessionPage({ params }: SessionPageProps) {
 
   // Stage eight: the process-health survey (METHOD.md §8.5, P4-T11b).
   let processHealth: ProcessHealth | null = null;
+  // Who can own the improvement action the lowest statement becomes (§8.5,
+  // P9-T20d): the same people stage 11 offers for any action.
+  let improvementOwners: Array<{ id: string; label: string }> = [];
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[7]) {
     processHealth = (await callAction(context, "sessions.processHealth", {
       sessionId: id,
     })) as ProcessHealth;
+    const candidates = (
+      (await callAction(context, "sessions.forward", { sessionId: id })) as {
+        owners: Array<{ memberId: string; name: string }>;
+      }
+    ).owners;
+    improvementOwners = candidates.map((one) => ({
+      id: one.memberId,
+      label: one.name,
+    }));
   }
 
   if (isMonthly) {
@@ -1052,6 +1064,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           sessionId={id}
           health={processHealth}
           canAnswer={isRunning}
+          owners={improvementOwners}
         />
       ) : null}
 

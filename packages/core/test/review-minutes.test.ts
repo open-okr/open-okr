@@ -278,9 +278,9 @@ describe("§8.10's executive summary", () => {
     // actions agreed. Each key result against its own kind's threshold since
     // P9-T20c: 0.6 for an aspirational one, 1.0 for a committed one.
     expect(record.summary.cycleScore).toBeCloseTo(0.65, 10);
-    // 0.65 is below §11's 0.7 cycle floor and the rhythm is 5.0, so §8.6's
-    // second row applies: the team ran the rhythm and still missed.
-    expect(record.summary.verdict).toBe("strategy_or_quality");
+    // 0.65 is at or above §11's 0.6 cycle floor since P9-T20d, so §8.6's
+    // first row applies and no rhythm is consulted: results delivered.
+    expect(record.summary.verdict).toBe("results_delivered");
     expect(record.summary.objectivesReviewed).toBe(1);
     expect(record.summary.keyResultsReviewed).toBe(2);
     expect(record.summary.thresholds).toEqual({

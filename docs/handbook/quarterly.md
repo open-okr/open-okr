@@ -103,20 +103,32 @@ year is graded before anybody writes next year's OKRs.
 **Stage 7 is the point of the whole thing.** Every aspirational key result
 below 0.6, and every committed one below 1.0, gets one honest cause from a
 fixed list of nine, and may name a second. The ninth is "Other", which needs a
-line saying what it was. Then the diagnostic reads the cycle score against the
-rhythm score and answers the question every executive asks: was this a
-strategy problem or a cadence problem?
+line saying what it was. Then the diagnostic reads the cycle score, over the
+aspirational key results, against the rhythm the team actually kept: the share
+of due check-ins published on time, measured from the check-ins themselves,
+with holiday weeks left out. It answers the question every executive asks, as
+a hypothesis for the room to test: was this a strategy problem or a cadence
+problem?
+
+| Cycle score | Rhythm | Reads |
+|---|---|---|
+| 0.6 or above | Not consulted | Results delivered |
+| Below 0.6 | 75% on time or above | Likely a strategy or OKR-quality problem |
+| Below 0.6 | Below 75% on time | Likely a rhythm problem |
 
 Scoring cannot close while a committed key result is below 1.0 with no
 explanation: grade it, with a line on why, and the stage moves on.
 
-The eight causes are deliberately a closed list. "We were busy" is not a cause,
-and an open text box collects it every time.
+The nine causes are deliberately a closed list, and "Other" has to say what it
+was. "We were busy" is not a cause, and an open text box collects it every
+time.
 
 **Stage 8 scores the practice rather than the results, and it is anonymous.**
 A team that scored badly and kept the rhythm has a different problem from a
 team that scored badly and stopped meeting in week four, and only one of those
-is fixed by better objectives.
+is fixed by better objectives. Statements 2 and 5 sit beside the measured
+rhythm as a cross-check, and the lowest-scoring statement becomes an
+improvement action for the next cycle, with an owner and a date.
 
 **Stage 11 has a rule.** Every action has a name and a date, or it is a wish.
 

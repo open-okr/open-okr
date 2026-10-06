@@ -710,11 +710,11 @@ const diagnosticRows = section(
 );
 const canon = canonThresholds();
 const cycleFloor = canon["sessions.diagnosticCycleScore"];
-const rhythmFloor = canon["sessions.diagnosticRhythmScore"];
+const rhythmFloor = canon["sessions.diagnosticRhythm"];
 const producedDiagnoses = [
-  // Above the cycle floor, the rhythm score is not consulted at all. The
-  // second argument is deliberately the failing one, to prove it is ignored.
-  rhythmDiagnostic(cycleFloor, rhythmFloor - 1, canon),
+  // Above the cycle floor, the rhythm is not consulted at all. The second
+  // argument is deliberately the failing one, to prove it is ignored.
+  rhythmDiagnostic(cycleFloor, rhythmFloor / 2, canon),
   rhythmDiagnostic(cycleFloor - 0.01, rhythmFloor, canon),
   rhythmDiagnostic(cycleFloor - 0.01, rhythmFloor - 0.01, canon),
 ];

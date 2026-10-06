@@ -58,6 +58,8 @@ const diagnostic = async (userId = FACILITATOR) =>
   (await call("sessions.diagnostic", { sessionId }, userId)) as {
     cycleScore: number | null;
     rhythmScore: number | null;
+    onTimeShare: number | null;
+    dueCheckIns: number | null;
     verdict: string | null;
     diagnosis: string | null;
     prescription: string | null;
@@ -113,6 +115,66 @@ const gradeAndSurvey = async (
       score,
     })),
   });
+};
+
+/**
+ * The review moved to a quarter that has ended, so its check-ins have fallen
+ * due (§8.6, P9-T20d). The rhythm is measured from them now, not asked of the
+ * room: "kept" records a check-in on every Monday of the quarter, through the
+ * action an import uses to keep a check-in's own date, and "missed" records
+ * none. The objective moves with its key results, and the review is opened
+ * again in that quarter.
+ */
+const inAPastQuarter = async (rhythm: "kept" | "missed") => {
+  const ago = new Date(Date.now() - 120 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const past = (await call("cycles.create", {
+    on: ago,
+    mode: "quarterly",
+  })) as {
+    id: string;
+    startsOn: string;
+    endsOn: string;
+  };
+  await call("goals.moveToCycle", { id: goalId, cycleId: past.id });
+  if (rhythm === "kept") {
+    let on = past.startsOn;
+    while (new Date(`${on}T00:00:00Z`).getUTCDay() !== 1) {
+      on = new Date(Date.parse(`${on}T00:00:00Z`) + 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+    }
+    for (let week = 0; on <= past.endsOn; week += 1) {
+      await call("goals.importCheckIn", {
+        goalId,
+        authorMemberId: facilitatorMemberId,
+        status: "on_track",
+        confidence: 0.6,
+        narrative: {
+          type: "doc",
+          content: [
+            { type: "paragraph", content: [{ type: "text", text: "Held." }] },
+          ],
+        },
+        publishedAt: `${on}T10:00:00.000Z`,
+        legacy: { type: "csv", id: `rhythm-${week}` },
+      });
+      on = new Date(Date.parse(`${on}T00:00:00Z`) + 7 * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+    }
+  }
+  const session = (await call("sessions.create", {
+    spaceId,
+    cycleId: past.id,
+    kind: "quarterly",
+    title: "Last quarter's review",
+    scheduledFor: new Date(`${past.endsOn}T09:00:00.000Z`).toISOString(),
+    facilitatorId: facilitatorMemberId,
+  })) as { id: string };
+  sessionId = session.id;
+  await call("sessions.open", { id: sessionId });
 };
 
 beforeEach(async () => {
@@ -227,8 +289,9 @@ describe("the rhythm diagnostic", () => {
     expect(before.readable).toBe(false);
     expect(before.verdict).toBeNull();
 
-    // Graded but not surveyed: §8.6 needs the rhythm score too, and a
-    // diagnostic built on a missing answer reads as evidence.
+    // Graded below the cycle floor in a quarter where nothing has fallen due
+    // yet: §8.6 needs the measured rhythm too, and a diagnostic built on a
+    // missing answer reads as evidence.
     await call("sessions.scoreKeyResult", {
       sessionId,
       keyResultId: firstKeyResultId,
@@ -251,40 +314,48 @@ describe("the rhythm diagnostic", () => {
     expect(status.prescription).toContain("ambition was set high enough");
   });
 
-  it("reads a strategy or quality problem when the rhythm held and the cycle missed", async () => {
-    // Statements 2 and 5 are the rhythm, both at 5, so the rhythm score is 5.0
-    // and the cycle score is 0.35.
-    await gradeAndSurvey([0.2, 0.5], [1, 5, 1, 1, 5]);
-    await call("sessions.recordDiagnostic", { sessionId });
-
-    const status = await diagnostic();
-    expect(status.verdict).toBe("strategy_or_quality");
-    expect(status.prescription).toContain(
-      "Fix the key results before you push the team",
-    );
-  });
-
-  it("reads a rhythm problem when both are low", async () => {
+  it("reads a strategy or quality problem when the rhythm was kept and the cycle missed", async () => {
+    // Every check-in published on the day it fell due, and a cycle score of
+    // 0.35. The survey says the opposite of the record, and the record wins:
+    // statements 2 and 5 are the cross-check now (P9-T20d).
+    await inAPastQuarter("kept");
     await gradeAndSurvey([0.2, 0.5], [1, 1, 1, 1, 1]);
     await call("sessions.recordDiagnostic", { sessionId });
 
     const status = await diagnostic();
-    expect(status.verdict).toBe("rhythm");
-    expect(status.prescription).toContain("Restore the weekly check-in");
+    expect(status.verdict).toBe("strategy_or_quality");
+    expect(status.onTimeShare).toBe(1);
+    expect(status.rhythmScore).toBe(1);
+    expect(status.diagnosis).toBe("Likely a strategy or OKR-quality problem");
+    expect(status.prescription).toContain("before you push the team");
   });
 
-  it("stores exactly what the method package said, rather than a second opinion", async () => {
+  it("reads a rhythm problem when nothing was published on time", async () => {
+    await inAPastQuarter("missed");
     await gradeAndSurvey([0.2, 0.5], [1, 5, 1, 1, 5]);
     await call("sessions.recordDiagnostic", { sessionId });
 
     const status = await diagnostic();
-    const expected = rhythmDiagnostic(0.35, 5, resolveThresholds() as never);
+    expect(status.verdict).toBe("rhythm");
+    expect(status.onTimeShare).toBe(0);
+    expect(status.dueCheckIns).toBeGreaterThan(0);
+    expect(status.prescription).toContain("Restore the weekly check-in");
+  });
+
+  it("stores exactly what the method package said, rather than a second opinion", async () => {
+    await inAPastQuarter("kept");
+    await gradeAndSurvey([0.2, 0.5], [1, 5, 1, 1, 5]);
+    await call("sessions.recordDiagnostic", { sessionId });
+
+    const status = await diagnostic();
+    const expected = rhythmDiagnostic(0.35, 1, resolveThresholds() as never);
     expect(status.verdict).toBe(expected.kind);
     expect(status.diagnosis).toBe(expected.diagnosis);
     expect(status.prescription).toBe(expected.prescription);
   });
 
   it("keeps the numbers it was read against, rather than recomputing later", async () => {
+    await inAPastQuarter("kept");
     await gradeAndSurvey([0.2, 0.5], [1, 5, 1, 1, 5]);
     await call("sessions.recordDiagnostic", { sessionId });
 

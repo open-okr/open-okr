@@ -784,13 +784,15 @@ Each participant gives a 1 to 5 pulse and one word. The average is read back:
 | 3.0 to 3.9 | Steady, not euphoric. Watch for polite scoring later. Steady rooms round their numbers up |
 | Below 3.0 | The cycle cost something. Name it early or it leaks into every score in the next ten minutes |
 
+The reads are coaching for the facilitator. *Source:* OpenOKR default; a one-word check-in is a common retrospective opener.
+
 ### 8.3 Scoring reveal
 
 Score each key result 0.0 to 1.0 against the key result as written, with baseline, target, actual and any mid-cycle changes on screen as evidence, plus a one-line reason. The objective score is hidden until the team reveals it together. Facts, not feelings. A row of 1.0s on aspirational key results usually means the ambition was too safe, and that gets said out loud now, not next quarter. A committed key result below 1.0 gets its short explanation, and the scoring stage does not close until every one has it.
 
 An objective's score is the weighted average of its key results' scores, using the same weights §3.1 uses for progress. A team that said one key result matters three times as much should see that in the score, exactly as it sees it in the progress. An unscored key result is left out rather than counted as zero, so a half-graded objective does not read as a failing one.
 
-The cycle score is a different question about a different set, and stays the plain §3.4 average over every scored key result in the cycle (§8.6). Averaging the objective scores instead would weight an objective with two key results the same as one with eight.
+The cycle score is a different question about a different set: the §3.4 average over every scored aspirational key result in the cycle (§8.6), with committed key results reported as the share met. Averaging the objective scores instead would weight an objective with two key results the same as one with eight.
 
 ### 8.4 Root causes
 
@@ -818,17 +820,19 @@ Five statements, anonymous, 1 (not true for us) to 5 (consistently true):
 4. We had few enough OKRs that focus was possible.
 5. When something went off track, we said so early rather than at the end.
 
-The lowest-scoring statement becomes next cycle's process OKR.
+The lowest-scoring statement becomes an improvement action for the next cycle, with an owner and a date. *Source:* OpenOKR default.
 
 ### 8.6 The rhythm diagnostic
 
-This is the most valuable output of the review. Combine the cycle score (the §3.4 portfolio average over every scored key result in the cycle) with the rhythm score (the average of process-health statements 2 and 5).
+Combine the cycle score (the §3.4 average over every scored aspirational key result in the cycle) with the rhythm score: the share of due check-ins published within tolerance, measured by the product. Holiday periods (§7.4) are not due, so they are not counted. Process-health statements 2 and 5 are shown beside it as a cross-check. The diagnosis is a hypothesis for the room to test, not a verdict.
 
 | Condition | Diagnosis | Prescription |
 |---|---|---|
-| Cycle score 0.7 or above | Results delivered | The question is not effort. It is whether the ambition was set high enough to be worth the quarter |
-| Cycle score below 0.7, rhythm 3.5 or above | Strategy or OKR-quality problem | The team ran the rhythm and still missed. The OKRs themselves, or the strategy behind them, were wrong. Fix the key results before you push the team |
-| Cycle score below 0.7, rhythm below 3.5 | Rhythm problem | This is a cadence problem, not an ambition problem. Restore the weekly check-in before you rewrite a single objective |
+| Cycle score 0.6 or above | Results delivered | The question is not effort. It is whether the ambition was set high enough to be worth the quarter |
+| Cycle score below 0.6, rhythm 75% or above | Likely a strategy or OKR-quality problem | The team ran the rhythm and still missed. Look first at the OKRs themselves, or the strategy behind them, before you push the team |
+| Cycle score below 0.6, rhythm below 75% | Likely a rhythm problem | This looks like a cadence problem, not an ambition problem. Restore the weekly check-in before you rewrite a single objective |
+
+*Source:* OpenOKR default. Thresholds are in §11.
 
 ### 8.7 Management retro
 
@@ -1022,8 +1026,8 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Quarterly stage minutes | The §8.1 durations |
 | Retro dots per member | 3 |
 | Room pulse read boundaries | 4.0 and 3.0 |
-| Diagnostic cycle-score threshold | 0.7 |
-| Diagnostic rhythm-score threshold | 3.5 |
+| Diagnostic cycle-score threshold | 0.6 |
+| Diagnostic rhythm threshold | 75% of due check-ins published on time |
 
 The registry's keys, types, valid ranges and defaults are data in `packages/method`. The workspace rhythm settings store only deviations, validated against that schema; an unset key reads the default. The conformance suite compares the defaults against this document.
 
