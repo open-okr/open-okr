@@ -117,6 +117,17 @@ export const sessions = pgTable("okr_sessions", {
    * the instance secret would not.
    */
   processHealthSalt: text("process_health_salt"),
+  /**
+   * Which half of a review this session is, where the workspace holds the
+   * review and the retrospective apart (METHOD.md §8, §12, P9-T20b-a). Null
+   * is the whole review in one session.
+   */
+  reviewPart: text("review_part", { enum: ["review", "retrospective"] }),
+  /**
+   * The review session a retrospective reads its scores from (P9-T20b-a).
+   * Every stage after the fourth reads what the scoring recorded there.
+   */
+  reviewSessionId: uuid("review_session_id"),
   state: text("state", { enum: SESSION_STATES }).notNull().default("scheduled"),
   /** FK to the digest row once P4-T08 adds the digests table. */
   digestId: uuid("digest_id"),

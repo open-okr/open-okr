@@ -389,7 +389,7 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 ## 10. The rhythm (domain G)
 
 ### sessions *(short_id)*
-`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c).
+`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c), `review_part?` (`review` / `retrospective`; null is the whole review in one session) and `review_session_id?` to sessions (the review session a retrospective reads its scores from), both 0133, P9-T20b-a, checked so only a quarterly session has a part and only a retrospective names a review.
 
 `shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes.
 

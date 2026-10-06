@@ -1,6 +1,10 @@
 "use client";
 
-import type { ReviewAct, TimedReviewStage } from "@openokr/method";
+import {
+  REVIEW_STAGES,
+  type ReviewAct,
+  type TimedReviewStage,
+} from "@openokr/method";
 /**
  * The quarterly review's shell (UIUX-PLAN.md S-24, METHOD.md §8.1, P4-T10a-a).
  *
@@ -161,7 +165,9 @@ export function QuarterlyReview({
           <Chip tone="info">
             {t("session.detail.quarterlyReview.stageOf", {
               stage: current.stage,
-              length: stages.length,
+              // Of the whole review, so a retrospective held apart still reads
+              // "Stage 5 of 11" (P9-T20b-a).
+              length: REVIEW_STAGES.length,
               title: current.title,
             })}
           </Chip>
@@ -203,7 +209,7 @@ export function QuarterlyReview({
           current
             ? t("session.detail.quarterlyReview.stageOfLength", {
                 stage: current.stage,
-                length: stages.length,
+                length: REVIEW_STAGES.length,
               })
             : t("session.detail.quarterlyReview.theReviewHasNotStarted")
         }

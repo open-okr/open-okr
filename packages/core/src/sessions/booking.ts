@@ -36,6 +36,7 @@ import { ritualFrequencyOf } from "../cadence/space-frequency.ts";
 import { localDateIn } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -80,6 +81,7 @@ export async function bookedRitualsBySpace<
       spaceId: sessions.spaceId,
       kind: sessions.kind,
       scheduledFor: sessions.scheduledFor,
+      reviewPart: sessions.reviewPart,
     })
     .from(sessions)
     .where(
@@ -107,6 +109,7 @@ export async function bookedRitualsBySpace<
     list.push({
       kind: row.kind as BookedRitual["kind"],
       on: localDateOf(row.scheduledFor, timeZone),
+      ...(row.reviewPart ? { part: row.reviewPart } : {}),
     });
     bySpace.set(spaceId, list);
   }
@@ -195,7 +198,13 @@ export async function loadCycleCadence<
 
   // Each space judged at its own frequency (P9-T19a-d-b): a team on every
   // two weeks is short of nothing in the week between.
-  const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
+  const rhythmRow = await readRhythmRow(tx, workspaceId);
+  const { thresholds } = resolveRhythm(rhythmRow);
+  // Held apart, the retrospective is owed as well (§8, P9-T20b-a).
+  const reviewFormat =
+    practiceFromRow(rhythmRow).practice["review.format"] === "split"
+      ? ("split" as const)
+      : ("oneSession" as const);
   const gaps: string[] = [];
   for (const space of required.sort((a, b) => a.name.localeCompare(b.name))) {
     const frequency = await ritualFrequencyOf(
@@ -205,13 +214,12 @@ export async function loadCycleCadence<
       thresholds,
     );
     gaps.push(
-      ...cadenceCoverage(
-        cycle,
-        booked.get(space.id) ?? [],
+      ...cadenceCoverage(cycle, booked.get(space.id) ?? [], {
         frequency,
-        await spaceHolidaysInTx(tx, workspaceId, space.id),
-        thresholds["cadence.reviewPreparationLeadWeeks"],
-      ).missing.map((line) => `${space.name}: ${line}`),
+        holidays: await spaceHolidaysInTx(tx, workspaceId, space.id),
+        reviewLeadWeeks: thresholds["cadence.reviewPreparationLeadWeeks"],
+        reviewFormat,
+      }).missing.map((line) => `${space.name}: ${line}`),
     );
   }
   return { bookedForWholeCycle: gaps.length === 0, decisionCount, gaps };

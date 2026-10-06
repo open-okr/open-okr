@@ -69,11 +69,13 @@ import {
   planCycleCadence,
   portfolioVerdictOf,
   progressSignal,
-  REVIEW_STAGE_KEYS,
+  REVIEW_PARTS,
   type ResolvedThresholds,
+  type ReviewPart,
   RITUALS,
   type RitualWeekday,
   ROOT_CAUSES,
+  reviewStageKeysFor,
   rhythmDiagnostic,
   rhythmScore,
   roomPulseRead,
@@ -176,15 +178,68 @@ async function actingMember(
  * a rail they advance. A `switch` here means adding a fifth ritual is one
  * change rather than a hunt.
  */
-function stageKeysFor(kind: string): readonly string[] | null {
+function stageKeysFor(
+  kind: string,
+  part: ReviewPart | null = null,
+): readonly string[] | null {
   switch (kind) {
     case "weekly":
       return WEEKLY_STAGE_KEYS;
     case "quarterly":
-      return REVIEW_STAGE_KEYS;
+      // A review held apart walks its own half (§8, P9-T20b-a).
+      return reviewStageKeysFor(part);
     default:
       return null;
   }
+}
+
+/**
+ * The two sessions a review's records live in (METHOD.md §8, P9-T20b-a).
+ *
+ * One session holds both halves. Held apart, stages 1 to 4 are recorded in
+ * the review session and 5 to 11 in the retrospective, which names its
+ * review session. Every read that crosses the boundary asks this rather than
+ * assuming one id: the root causes and the diagnostic read the scores, and
+ * the minutes read every stage. A review whose retrospective is not booked
+ * yet answers with its own id for both, so the later stages read as empty.
+ */
+async function reviewHalvesInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+): Promise<{ readonly review: string; readonly retrospective: string }> {
+  const [row] = await tx
+    .select({
+      reviewPart: sessions.reviewPart,
+      reviewSessionId: sessions.reviewSessionId,
+    })
+    .from(sessions)
+    .where(
+      activeOnly(
+        sessions,
+        eq(sessions.workspaceId, workspaceId),
+        eq(sessions.id, sessionId),
+      ),
+    )
+    .limit(1);
+  if (row?.reviewPart === "retrospective" && row.reviewSessionId) {
+    return { review: row.reviewSessionId, retrospective: sessionId };
+  }
+  if (row?.reviewPart === "review") {
+    const [retro] = await tx
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(
+        activeOnly(
+          sessions,
+          eq(sessions.workspaceId, workspaceId),
+          eq(sessions.reviewSessionId, sessionId),
+        ),
+      )
+      .limit(1);
+    return { review: sessionId, retrospective: retro?.id ?? sessionId };
+  }
+  return { review: sessionId, retrospective: sessionId };
 }
 
 /**
@@ -445,6 +500,13 @@ const sessionOutput = z.object({
   addedMinutes: z.record(z.string(), z.number()),
   /** The week's wins a weekly session named (§7.2 step 3, P9-T19a-d-c). */
   wins: z.array(z.string()),
+  /**
+   * Which half of a review this is, where the workspace holds them apart,
+   * or null for the whole review (§8, P9-T20b-a).
+   */
+  reviewPart: z.enum(REVIEW_PARTS).nullable(),
+  /** The review session a retrospective reads its scores from. */
+  reviewSessionId: z.uuid().nullable(),
   state: z.enum(SESSION_STATES),
   digestId: z.uuid().nullable(),
   createdAt: z.string(),
@@ -482,6 +544,8 @@ function toOutput(
     notes: isFacilitator ? ((row.notes ?? {}) as Record<string, unknown>) : {},
     addedMinutes: (row.addedMinutes ?? {}) as Record<string, number>,
     wins: (row.wins ?? []) as string[],
+    reviewPart: row.reviewPart ?? null,
+    reviewSessionId: row.reviewSessionId ?? null,
     state: row.state,
     digestId: row.digestId ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -760,9 +824,13 @@ export const bookCycleSessions = defineWriteAction({
           ])
         ).get(input.spaceId) ?? [];
       // One check-in per period of the space's own frequency (P9-T19a-d-b).
-      const { thresholds: bookThresholds } = resolveRhythm(
-        await readRhythmRow(tx, workspaceId),
-      );
+      const rhythmRow = await readRhythmRow(tx, workspaceId);
+      const { thresholds: bookThresholds } = resolveRhythm(rhythmRow);
+      // One review, or the review and the retrospective (§8, §12, P9-T20b-a).
+      const reviewFormat =
+        practiceFromRow(rhythmRow).practice["review.format"] === "split"
+          ? ("split" as const)
+          : ("oneSession" as const);
       const frequency = await ritualFrequencyOf(
         tx,
         workspaceId,
@@ -779,34 +847,51 @@ export const bookCycleSessions = defineWriteAction({
         holidays,
         // About two weeks before the end, at the workspace's own lead (§8).
         reviewLeadWeeks: bookThresholds["cadence.reviewPreparationLeadWeeks"],
+        reviewFormat,
       });
 
       const sessionIds: string[] = [];
+      // The retrospective names the review session it reads its scores from:
+      // the one booked just before it, or one already booked for this cycle.
+      let reviewSessionId: string | null = null;
       for (const ritual of plan) {
         const id = crypto.randomUUID();
+        const retrospective = ritual.part === "retrospective";
+        if (retrospective && !reviewSessionId) {
+          reviewSessionId = await bookedReviewSessionIdInTx(tx, {
+            workspaceId,
+            spaceId: input.spaceId,
+            cycleId: cycle.id,
+          });
+        }
         await tx.insert(sessions).values({
           id,
           workspaceId,
           spaceId: input.spaceId,
           cycleId: cycle.id,
           kind: ritual.kind,
-          title:
-            RITUALS.find((entry) => entry.kind === ritual.kind)?.name ??
-            ritual.kind,
+          title: retrospective
+            ? RETROSPECTIVE_TITLE
+            : (RITUALS.find((entry) => entry.kind === ritual.kind)?.name ??
+              ritual.kind),
           scheduledFor: at(ritual.on),
           facilitatorId: input.facilitatorId,
           state: "scheduled",
+          reviewPart: ritual.part ?? null,
+          reviewSessionId: retrospective ? reviewSessionId : null,
         });
+        if (ritual.part === "review") {
+          reviewSessionId = id;
+        }
         sessionIds.push(id);
       }
 
-      const coverage = cadenceCoverage(
-        bounds,
-        [...existing, ...plan],
+      const coverage = cadenceCoverage(bounds, [...existing, ...plan], {
         frequency,
         holidays,
-        bookThresholds["cadence.reviewPreparationLeadWeeks"],
-      );
+        reviewLeadWeeks: bookThresholds["cadence.reviewPreparationLeadWeeks"],
+        reviewFormat,
+      });
       return {
         result: {
           cycleId: cycle.id,
@@ -831,6 +916,39 @@ export const bookCycleSessions = defineWriteAction({
     },
   }),
 });
+
+/**
+ * A retrospective's title (§8, P9-T20b-a). The whole review and the review
+ * half keep §7.1's "Quarterly review".
+ */
+const RETROSPECTIVE_TITLE = "Quarterly retrospective";
+
+/** The review half already booked for a cycle in a space, if any. */
+async function bookedReviewSessionIdInTx(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly spaceId: string;
+    readonly cycleId: string;
+  },
+): Promise<string | null> {
+  const [row] = await tx
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(
+      activeOnly(
+        sessions,
+        eq(sessions.workspaceId, input.workspaceId),
+        eq(sessions.spaceId, input.spaceId),
+        eq(sessions.cycleId, input.cycleId),
+        eq(sessions.kind, "quarterly"),
+        eq(sessions.reviewPart, "review"),
+      ),
+    )
+    .orderBy(desc(sessions.scheduledFor))
+    .limit(1);
+  return row?.id ?? null;
+}
 
 export const openSession = defineWriteAction({
   name: "sessions.open",
@@ -860,7 +978,8 @@ export const openSession = defineWriteAction({
         );
       }
 
-      const firstStage = stageKeysFor(session.kind)?.[0] ?? null;
+      const firstStage =
+        stageKeysFor(session.kind, session.reviewPart)?.[0] ?? null;
       const now = new Date();
 
       await tx
@@ -939,7 +1058,7 @@ export const advanceStage = defineWriteAction({
       }
 
       let nextStageKey: string | null = null;
-      const stageKeys = stageKeysFor(session.kind);
+      const stageKeys = stageKeysFor(session.kind, session.reviewPart);
       if (stageKeys) {
         const stageIndex = session.stageKey
           ? stageKeys.indexOf(session.stageKey)
@@ -6668,6 +6787,8 @@ async function missedKeyResultsInTx(
   sessionId: string,
   threshold: number,
 ) {
+  // The grades live where the scoring stage ran (§8, P9-T20b-a).
+  const { review } = await reviewHalvesInTx(tx, workspaceId, sessionId);
   return tx
     .select({
       keyResultId: keyResults.id,
@@ -6683,7 +6804,7 @@ async function missedKeyResultsInTx(
       activeOnly(
         reviewScores,
         eq(reviewScores.workspaceId, workspaceId),
-        eq(reviewScores.sessionId, sessionId),
+        eq(reviewScores.sessionId, review),
         isNull(keyResults.deletedAt),
         isNull(goals.deletedAt),
         lt(reviewScores.score, String(threshold)),
@@ -7221,6 +7342,9 @@ async function diagnosticInputsInTx(
   workspaceId: string,
   sessionId: string,
 ) {
+  // The grades from the review half, and process health from the session
+  // reading it, which is the retrospective where they are apart (P9-T20b-a).
+  const { review } = await reviewHalvesInTx(tx, workspaceId, sessionId);
   const graded = await tx
     .select({ score: reviewScores.score })
     .from(reviewScores)
@@ -7228,7 +7352,7 @@ async function diagnosticInputsInTx(
       activeOnly(
         reviewScores,
         eq(reviewScores.workspaceId, workspaceId),
-        eq(reviewScores.sessionId, sessionId),
+        eq(reviewScores.sessionId, review),
       ),
     );
   const cycle = cycleScore(graded.map((row) => Number(row.score)));
@@ -7672,6 +7796,12 @@ export const readReset = defineReadAction({
           );
         const byGoal = new Map(decisions.map((row) => [row.goalId, row]));
 
+        // The grades from the review half (§8, P9-T20b-a).
+        const { review } = await reviewHalvesInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
         const graded = await tx
           .select({
             goalId: keyResults.goalId,
@@ -7684,7 +7814,7 @@ export const readReset = defineReadAction({
             activeOnly(
               reviewScores,
               eq(reviewScores.workspaceId, context.workspaceId),
-              eq(reviewScores.sessionId, input.sessionId),
+              eq(reviewScores.sessionId, review),
               isNull(keyResults.deletedAt),
             ),
           );
@@ -8413,6 +8543,11 @@ export const readMinutes = defineReadAction({
           input.sessionId,
           ACCESS_LEVELS.view,
         );
+        // Stages 1 to 4 from the review half and 5 to 11 from the
+        // retrospective, which are one session unless the workspace holds
+        // them apart (§8, P9-T20b-a). Either half's minutes are the whole
+        // review's.
+        const halves = await reviewHalvesInTx(tx, workspaceId, input.sessionId);
 
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, workspaceId),
@@ -8438,7 +8573,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewScores,
               eq(reviewScores.workspaceId, workspaceId),
-              eq(reviewScores.sessionId, input.sessionId),
+              eq(reviewScores.sessionId, halves.review),
               isNull(keyResults.deletedAt),
               isNull(goals.deletedAt),
             ),
@@ -8455,7 +8590,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewDiagnostics,
               eq(reviewDiagnostics.workspaceId, workspaceId),
-              eq(reviewDiagnostics.sessionId, input.sessionId),
+              eq(reviewDiagnostics.sessionId, halves.retrospective),
             ),
           )
           .limit(1);
@@ -8467,7 +8602,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               sessionParticipants,
               eq(sessionParticipants.workspaceId, workspaceId),
-              eq(sessionParticipants.sessionId, input.sessionId),
+              eq(sessionParticipants.sessionId, halves.review),
             ),
           );
 
@@ -8484,7 +8619,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewNarratives,
               eq(reviewNarratives.workspaceId, workspaceId),
-              eq(reviewNarratives.sessionId, input.sessionId),
+              eq(reviewNarratives.sessionId, halves.review),
               isNull(goals.deletedAt),
             ),
           )
@@ -8506,7 +8641,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               kudos,
               eq(kudos.workspaceId, workspaceId),
-              eq(kudos.sessionId, input.sessionId),
+              eq(kudos.sessionId, halves.review),
             ),
           )
           .orderBy(kudos.createdAt);
@@ -8523,7 +8658,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               retroNotes,
               eq(retroNotes.workspaceId, workspaceId),
-              eq(retroNotes.sessionId, input.sessionId),
+              eq(retroNotes.sessionId, halves.retrospective),
             ),
           )
           .orderBy(desc(retroNotes.votes), retroNotes.createdAt);
@@ -8562,7 +8697,7 @@ export const readMinutes = defineReadAction({
               activeOnly(
                 managementAnswers,
                 eq(managementAnswers.workspaceId, workspaceId),
-                eq(managementAnswers.sessionId, input.sessionId),
+                eq(managementAnswers.sessionId, halves.retrospective),
               ),
             )
             .orderBy(managementAnswers.questionKey);
@@ -8587,7 +8722,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               rootCauses,
               eq(rootCauses.workspaceId, workspaceId),
-              eq(rootCauses.sessionId, input.sessionId),
+              eq(rootCauses.sessionId, halves.retrospective),
               isNull(keyResults.deletedAt),
             ),
           );
@@ -8603,7 +8738,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               processHealthResponses,
               eq(processHealthResponses.workspaceId, workspaceId),
-              eq(processHealthResponses.sessionId, input.sessionId),
+              eq(processHealthResponses.sessionId, halves.retrospective),
             ),
           );
 
@@ -8620,7 +8755,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewDecisions,
               eq(reviewDecisions.workspaceId, workspaceId),
-              eq(reviewDecisions.sessionId, input.sessionId),
+              eq(reviewDecisions.sessionId, halves.retrospective),
               isNull(goals.deletedAt),
             ),
           )
@@ -8637,7 +8772,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               learnings,
               eq(learnings.workspaceId, workspaceId),
-              eq(learnings.sessionId, input.sessionId),
+              eq(learnings.sessionId, halves.retrospective),
             ),
           )
           .orderBy(learnings.createdAt);
@@ -8652,7 +8787,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               nextCycleDrafts,
               eq(nextCycleDrafts.workspaceId, workspaceId),
-              eq(nextCycleDrafts.sessionId, input.sessionId),
+              eq(nextCycleDrafts.sessionId, halves.retrospective),
             ),
           )
           .orderBy(nextCycleDrafts.createdAt);
@@ -8671,7 +8806,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewActions,
               eq(reviewActions.workspaceId, workspaceId),
-              eq(reviewActions.sessionId, input.sessionId),
+              eq(reviewActions.sessionId, halves.retrospective),
             ),
           )
           .orderBy(reviewActions.dueOn);

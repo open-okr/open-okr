@@ -24,7 +24,7 @@
  * Dates are local `YYYY-MM-DD` strings in the workspace timezone, like every
  * other cycle bound. Pure: no clock, no database.
  */
-import type { RitualKind } from "./sessions.ts";
+import type { ReviewPart, RitualKind } from "./sessions.ts";
 import { type Holiday, isHolidayPeriod, periodStartOf } from "./streak.ts";
 import { type CheckInFrequency, canonThresholds } from "./thresholds.ts";
 
@@ -38,6 +38,26 @@ export interface CadenceWindow {
 export interface BookedRitual {
   readonly kind: RitualKind;
   readonly on: string;
+  /**
+   * Which half of a review this is, where the workspace holds them apart
+   * (§8, P9-T20b-a). Absent is the whole review, which stands for both.
+   */
+  readonly part?: ReviewPart;
+}
+
+/** §12's "Quarterly review format". */
+type ReviewFormat = "oneSession" | "split";
+
+/** What a coverage reading needs beyond the window and the sessions. */
+export interface CadenceCoverageOptions {
+  /** The space's check-in frequency (P9-T19a-d-b). Weekly where not given. */
+  readonly frequency?: CheckInFrequency;
+  /** The space's marked holidays, whose periods owe no check-in (P9-T19b-a). */
+  readonly holidays?: readonly Holiday[];
+  /** §11's review preparation lead, in weeks (P9-T20a). */
+  readonly reviewLeadWeeks?: number;
+  /** Whether the review is held as one session or two (P9-T20b-a). */
+  readonly reviewFormat?: ReviewFormat;
 }
 
 export interface CadenceCoverage {
@@ -74,6 +94,11 @@ export interface CadencePlanOptions {
    * that far before the cycle ends. The canon's where not given.
    */
   readonly reviewLeadWeeks?: number;
+  /**
+   * One session, or the review and, two working days later, the
+   * retrospective (§12, P9-T20b-a). One session where not given.
+   */
+  readonly reviewFormat?: ReviewFormat;
 }
 
 interface Span {
@@ -206,6 +231,18 @@ const CANON_REVIEW_LEAD = canonThresholds()[
 
 const hasWorkingDay = (span: Span): boolean => daysOf(span).some(isWorkingDay);
 
+/** The working day `count` working days after a date. */
+function workingDaysAfter(on: string, count: number): string {
+  let day = on;
+  for (let left = count; left > 0; ) {
+    day = addDays(day, 1);
+    if (isWorkingDay(day)) {
+      left -= 1;
+    }
+  }
+  return day;
+}
+
 /** Up to three dates, then a count, so a year of gaps stays one sentence. */
 function listOf(dates: readonly string[]): string {
   const shown = dates.slice(0, 3).join(", ");
@@ -221,13 +258,11 @@ function listOf(dates: readonly string[]): string {
 export function cadenceCoverage(
   window: CadenceWindow,
   sessions: readonly BookedRitual[],
-  /** The space's check-in frequency (P9-T19a-d-b). Weekly where not given. */
-  frequency: CheckInFrequency = "weekly",
-  /** The space's marked holidays, whose periods owe no check-in (P9-T19b-a). */
-  holidays: readonly Holiday[] = [],
-  /** §11's review preparation lead, in weeks (P9-T20a). */
-  reviewLeadWeeks: number = CANON_REVIEW_LEAD,
+  options: CadenceCoverageOptions = {},
 ): CadenceCoverage {
+  const frequency = options.frequency ?? "weekly";
+  const holidays = options.holidays ?? [];
+  const reviewLeadWeeks = options.reviewLeadWeeks ?? CANON_REVIEW_LEAD;
   const missing: string[] = [];
   const of = (kinds: readonly RitualKind[]) =>
     sessions.filter((session) => kinds.includes(session.kind));
@@ -257,9 +292,25 @@ export function cadenceCoverage(
   }
 
   const close = closeOf(window, reviewLeadWeeks);
-  if (!of(["quarterly"]).some((session) => within(session.on, close))) {
+  const atClose = of(["quarterly"]).filter((session) =>
+    within(session.on, close),
+  );
+  const holds = (part: ReviewPart) =>
+    atClose.some((session) => !session.part || session.part === part);
+  if (!holds("review")) {
     missing.push(
       `No quarterly review is booked for the cycle's close, between ${close.from} and ${close.to}`,
+    );
+  }
+  // Split, the retrospective is a session of its own and can be missing on
+  // its own (P9-T20b-a).
+  if (
+    options.reviewFormat === "split" &&
+    holds("review") &&
+    !holds("retrospective")
+  ) {
+    missing.push(
+      `No retrospective is booked after the review, between ${close.from} and ${close.to}`,
     );
   }
 
@@ -321,14 +372,36 @@ export function planCycleCadence(
   // near to it as the cycle still allows.
   const lead = options.reviewLeadWeeks ?? CANON_REVIEW_LEAD;
   const close = closeOf(window, lead);
-  if (!has(["quarterly"], close)) {
-    const on =
+  const atClose = existing.filter(
+    (session) => session.kind === "quarterly" && within(session.on, close),
+  );
+  const holds = (part: ReviewPart) =>
+    atClose.some((session) => !session.part || session.part === part);
+  const split = options.reviewFormat === "split";
+  let reviewOn =
+    atClose.find((session) => session.part !== "retrospective")?.on ?? null;
+  if (!holds("review")) {
+    reviewOn =
       pick(reviewWeekOf(window, lead), weekday, from, true) ??
       pick({ from: close.from, to: window.endsOn }, weekday, from, false) ??
       pick(close, weekday, from, false);
-    if (on) {
-      plan.push({ kind: "quarterly", on });
+    if (reviewOn) {
+      plan.push(
+        split
+          ? { kind: "quarterly", on: reviewOn, part: "review" }
+          : { kind: "quarterly", on: reviewOn },
+      );
     }
+  }
+  // Two working days after the review, the retrospective (§8, P9-T20b-a):
+  // long enough for the scores to settle, short enough that the room still
+  // remembers them.
+  if (split && reviewOn && !holds("retrospective")) {
+    plan.push({
+      kind: "quarterly",
+      on: workingDaysAfter(reviewOn, 2),
+      part: "retrospective",
+    });
   }
 
   for (const month of monthsOf(window)) {

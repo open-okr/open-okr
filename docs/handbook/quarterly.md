@@ -82,6 +82,12 @@ Ninety minutes, four acts, eleven timed stages, held about two weeks before
 the cycle ends so there is time to act on what it decides. The clock is part
 of the method: a review that runs long stops happening.
 
+If ninety minutes in one sitting is too long, set **Quarterly review format**
+to "Review and retrospective separately" in the practice settings. Booking the
+quarter then gives you two sessions: the review, with stages 1 to 4, and two
+working days later the retrospective, with stages 5 to 11, which reads the
+scores the review recorded.
+
 | Act | Stages |
 |---|---|
 | **Open** | 1. Open and check in. Before the numbers, the people |

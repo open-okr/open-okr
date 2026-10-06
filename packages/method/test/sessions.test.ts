@@ -14,6 +14,7 @@ import {
   RITUALS,
   ROOT_CAUSES,
   reviewStageKey,
+  reviewStageKeysFor,
   reviewStages,
   rhythmDiagnostic,
   rhythmScore,
@@ -57,6 +58,21 @@ describe("§7.5's monthly review", () => {
     expect(RITUALS.find((r) => r.kind === "monthly")?.purpose).toContain(
       "continue, update, start or stop",
     );
+  });
+});
+
+describe("the review and the retrospective apart (§8, P9-T20b-a)", () => {
+  it("gives the review stages 1 to 4 and the retrospective 5 to 11", () => {
+    expect(reviewStageKeysFor("review")).toEqual([
+      "open",
+      "score",
+      "narratives",
+      "recognition",
+    ]);
+    expect(reviewStageKeysFor("retrospective")).toEqual(
+      REVIEW_STAGE_KEYS.slice(4),
+    );
+    expect(reviewStageKeysFor(null)).toEqual(REVIEW_STAGE_KEYS);
   });
 });
 

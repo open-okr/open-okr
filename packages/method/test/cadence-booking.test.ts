@@ -177,12 +177,14 @@ describe("a space at its own frequency", () => {
       "2026-10-05",
       "2026-10-19",
     ]);
-    expect(cadenceCoverage(Q4, plan, "biweekly")).toEqual({
+    expect(cadenceCoverage(Q4, plan, { frequency: "biweekly" })).toEqual({
       booked: true,
       missing: [],
     });
     // The same plan read weekly is short of every week between.
-    expect(cadenceCoverage(Q4, plan, "weekly").booked).toBe(false);
+    expect(cadenceCoverage(Q4, plan, { frequency: "weekly" }).booked).toBe(
+      false,
+    );
   });
 
   it("books one check-in a month for a monthly space, and names a missing month", () => {
@@ -196,7 +198,9 @@ describe("a space at its own frequency", () => {
     const withoutNovember = plan.filter(
       (row) => !(row.kind === "weekly" && row.on.startsWith("2026-11")),
     );
-    expect(cadenceCoverage(Q4, withoutNovember, "monthly").missing).toContain(
+    expect(
+      cadenceCoverage(Q4, withoutNovember, { frequency: "monthly" }).missing,
+    ).toContain(
       "No check-in is booked in 1 month(s): the periods from 2026-11-01",
     );
   });
@@ -219,11 +223,76 @@ describe("a holiday in the booking", () => {
     const weekly = plan.filter((ritual) => ritual.kind === "weekly");
     expect(weekly.map((ritual) => ritual.on)).not.toContain("2026-11-09");
     expect(weekly.map((ritual) => ritual.on)).toContain("2026-11-16");
-    expect(cadenceCoverage(Q4, plan, "weekly", NOVEMBER)).toEqual({
+    expect(
+      cadenceCoverage(Q4, plan, { frequency: "weekly", holidays: NOVEMBER }),
+    ).toEqual({
       booked: true,
       missing: [],
     });
     // Without the holiday, the same plan has a week missing.
     expect(cadenceCoverage(Q4, plan).booked).toBe(false);
+  });
+});
+
+/**
+ * §8: "A workspace may split it into a review session and a separate
+ * retrospective" (P9-T20b-a, NW-Q2-18).
+ */
+describe("the review and the retrospective apart", () => {
+  const split = planCycleCadence(Q4, {
+    weekday: 1,
+    from: Q4.startsOn,
+    existing: [],
+    reviewFormat: "split",
+  });
+  const reviews = split.filter((ritual) => ritual.kind === "quarterly");
+
+  it("books the review, and the retrospective two working days later", () => {
+    expect(reviews).toEqual([
+      { kind: "quarterly", on: "2026-12-14", part: "review" },
+      { kind: "quarterly", on: "2026-12-16", part: "retrospective" },
+    ]);
+    expect(cadenceCoverage(Q4, split, { reviewFormat: "split" })).toEqual({
+      booked: true,
+      missing: [],
+    });
+  });
+
+  it("names a missing retrospective on its own", () => {
+    const withoutRetro = split.filter(
+      (ritual) => ritual.part !== "retrospective",
+    );
+    expect(
+      cadenceCoverage(Q4, withoutRetro, { reviewFormat: "split" }).missing,
+    ).toEqual([
+      "No retrospective is booked after the review, between 2026-12-14 and 2027-01-07",
+    ]);
+  });
+
+  it("books only the retrospective beside a review already booked", () => {
+    const more = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [{ kind: "quarterly", on: "2026-12-15", part: "review" }],
+      reviewFormat: "split",
+    });
+    expect(more.filter((ritual) => ritual.kind === "quarterly")).toEqual([
+      { kind: "quarterly", on: "2026-12-17", part: "retrospective" },
+    ]);
+  });
+
+  it("counts a whole review as both halves", () => {
+    expect(
+      cadenceCoverage(
+        Q4,
+        [
+          ...split.filter((ritual) => !ritual.part),
+          { kind: "quarterly", on: "2026-12-14" },
+        ],
+        {
+          reviewFormat: "split",
+        },
+      ).missing,
+    ).toEqual([]);
   });
 });

@@ -346,6 +346,36 @@ export function reviewStages(
 }
 
 /**
+ * The two halves of a review a workspace holds apart (§8, §12's "Quarterly
+ * review format", P9-T20b-a): "the review session holds the Open and Review
+ * acts (stages 1 to 4) and the retrospective holds the Retro and Reset acts
+ * (stages 5 to 11)".
+ */
+export const REVIEW_PARTS = ["review", "retrospective"] as const;
+export type ReviewPart = (typeof REVIEW_PARTS)[number];
+
+const PART_ACTS: Record<ReviewPart, readonly ReviewAct[]> = {
+  review: ["open", "review"],
+  retrospective: ["retro", "reset"],
+};
+
+/**
+ * The stages a review session walks, in order: all eleven for one session,
+ * or its half's. Read from the acts, so the split cannot drift from the
+ * stage list it splits.
+ */
+export function reviewStageKeysFor(
+  part: ReviewPart | null,
+): readonly ReviewStageKey[] {
+  if (part === null) {
+    return REVIEW_STAGE_KEYS;
+  }
+  return REVIEW_STAGES.filter((entry) =>
+    PART_ACTS[part].includes(entry.act),
+  ).map((entry) => REVIEW_STAGE_KEYS[entry.stage - 1] as ReviewStageKey);
+}
+
+/**
  * §8.5's five statements, anonymous, scored 1 to 5.
  *
  * The order is the document's, and it is load-bearing: the rhythm score is the

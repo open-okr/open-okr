@@ -32,6 +32,7 @@ import {
   REVIEW_STAGE_KEYS,
   type ResolvedThresholds,
   ROOT_CAUSES,
+  reviewStageKeysFor,
   reviewStages,
   WEEKLY_STAGE_KEYS,
   WEEKLY_STEPS,
@@ -136,6 +137,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
     notes: Record<string, unknown>;
     /** The week's wins a weekly session named (P9-T19a-d-c). */
     wins: string[];
+    /** Which half of a review held apart this is, or null (P9-T20b-a). */
+    reviewPart: "review" | "retrospective" | null;
   };
 
   try {
@@ -437,10 +440,17 @@ export default async function SessionPage({ params }: SessionPageProps) {
 
   // §8.1's eleven stages with the durations §11 gives this workspace, so a
   // workspace that tuned its agenda is paced by its own numbers.
+  // A review held apart walks its own half (§8, P9-T20b-a): the review
+  // stages 1 to 4, the retrospective 5 to 11.
+  const reviewKeys = reviewStageKeysFor(sessionRow.reviewPart);
   const reviewAgenda = isQuarterly
     ? reviewStages(
         (await callAction(context, "rhythm.read", {}))
           .thresholds as unknown as Parameters<typeof reviewStages>[0],
+      ).filter((stage) =>
+        (reviewKeys as readonly string[]).includes(
+          REVIEW_STAGE_KEYS[stage.stage - 1] ?? "",
+        ),
       )
     : [];
 
@@ -668,7 +678,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
     sessionRow.kind === "weekly"
       ? WEEKLY_STAGE_KEYS
       : isQuarterly
-        ? REVIEW_STAGE_KEYS
+        ? reviewKeys
         : [];
   const currentStageIndex = sessionRow.stageKey
     ? stageKeys.indexOf(sessionRow.stageKey)
@@ -912,7 +922,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
             reset !== null ||
             forward !== null
           }
-          stageKeys={REVIEW_STAGE_KEYS}
+          stageKeys={reviewKeys}
           currentStageKey={sessionRow.stageKey}
           stageStartedAt={sessionRow.stageStartedAt}
           elapsed={sessionRow.elapsed}
