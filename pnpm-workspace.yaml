@@ -28,8 +28,8 @@ catalog:
   # tree read it from 5.9 under this name, so nothing else can pick it up by
   # accident. Same package, same licence.
   typescript5: npm:typescript@5.9.3
-  vitest: 5.0.2
-  "@types/node": 26.6.2
+  vitest: 5.0.3
+  "@types/node": 26.6.4
   # 0.45.2 is the first release past GHSA-gpj5-g38j-94v9 (SQL injection via
   # improperly escaped identifiers).
   drizzle-orm: ^0.45.3
