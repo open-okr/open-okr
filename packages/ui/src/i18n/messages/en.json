@@ -3292,7 +3292,7 @@
   "spaces.detail.spaceMembership.leave": "Leave",
   "spaces.detail.spaceMembership.youAreInThisSpace": "You are in this space as {ownRole}.{leave}",
   "spaces.detail.spaceMembership.youAreNotIn": "You are not in this space.",
-  "spaces.detail.spaceSettings.aTeamShippingDaily": "A team shipping daily and a team shipping quarterly are the same\n              workspace.",
+  "spaces.detail.spaceSettings.aTeamShippingDaily": "The space's goals check in at this frequency. Changing it moves the open goals that follow it, and a goal set to a frequency of its own keeps it.",
   "spaces.detail.spaceSettings.appliesToThisSpace": "Applies to this space's goals and to no others. The six publish\n              gates stay hard whatever this says.",
   "spaces.detail.spaceSettings.changingTheseIsThe": "Changing these is the space manager's.",
   "spaces.detail.spaceSettings.channelHint": "The {termCoordinatorLower} can post each closed week's digest here. Paste the channel's ID rather than its name, and add the bot to the channel. Leave it empty to post nowhere.",

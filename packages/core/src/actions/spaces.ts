@@ -27,7 +27,11 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
+import {
+  CHECK_IN_FREQUENCIES,
+  type CheckInFrequency,
+  COACH_STRICTNESS,
+} from "@openokr/method";
 import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -37,6 +41,9 @@ import {
   accessScopeFilter,
   getAccessScoped,
 } from "../access/reads.ts";
+import { followSpaceFrequencyInTx } from "../cadence/space-frequency.ts";
+import { resolveRhythm } from "../cycles/rhythm.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
@@ -445,6 +452,13 @@ export const updateSpaceSettings = defineWriteAction({
       if (input.coachStrictness !== undefined) {
         merged.coachStrictness = input.coachStrictness;
       }
+      // The frequency the space's goals were asked at until now, so the ones
+      // following it can move with it below (P9-T19a-d-a).
+      const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
+      const before =
+        ((existing.settings as { defaultCheckInFrequency?: string })
+          .defaultCheckInFrequency as CheckInFrequency | undefined) ??
+        rhythm.thresholds["cadence.checkInFrequency"];
       if (input.defaultCheckInFrequency !== undefined) {
         merged.defaultCheckInFrequency = input.defaultCheckInFrequency;
       }
@@ -468,6 +482,25 @@ export const updateSpaceSettings = defineWriteAction({
         .returning({ id: spaces.id, name: spaces.name });
       if (!updated) {
         throw new OperationError("not_found", "No such space.");
+      }
+
+      // A space's frequency is read by its goals, not stored beside them
+      // (§7.1, P9-T19a-d-a): the open goals that were following it move with
+      // it, and take their next due date from the new one.
+      const after =
+        input.defaultCheckInFrequency === undefined
+          ? before
+          : (input.defaultCheckInFrequency ??
+            rhythm.thresholds["cadence.checkInFrequency"]);
+      if (after !== before) {
+        await followSpaceFrequencyInTx(tx, {
+          workspaceId,
+          spaceId: updated.id,
+          previous: before,
+          next: input.defaultCheckInFrequency ?? null,
+          thresholds: rhythm.thresholds,
+          now: new Date(),
+        });
       }
 
       return {

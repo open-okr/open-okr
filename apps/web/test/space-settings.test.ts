@@ -88,7 +88,9 @@ describe("the space settings card", () => {
 
   test("the enums come from the canon, not from three words typed here", () => {
     expect(card).toContain("COACH_STRICTNESS.map");
-    expect(card).toContain("CHECK_IN_FREQUENCIES.map");
+    // Filtered first since P9-T19a-d-a, to leave out the one no goal holds,
+    // and still the canon's list rather than one typed here.
+    expect(card).toContain("CHECK_IN_FREQUENCIES.filter(");
   });
 
   test("an unchecked box is a decision, not an absent field", () => {

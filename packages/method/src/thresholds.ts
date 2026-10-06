@@ -201,8 +201,8 @@ export const THRESHOLDS = {
     group: "cadence",
     label: "Planning-open lead",
     section: "§2.4",
-    why: "Six weeks before an annual cycle starts, three before a quarterly. Planning that starts in the cycle it plans is already late.",
-    default: { annual: 6, quarterly: 3 },
+    why: "Six weeks before an annual cycle starts, four before a quarterly. Planning that starts in the cycle it plans is already late.",
+    default: { annual: 6, quarterly: 4 },
     schema: z.object({
       annual: z.number().int().min(0).max(52),
       quarterly: z.number().int().min(0).max(52),

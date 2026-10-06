@@ -279,7 +279,7 @@ it has passed.
 
 | Event | Effect on `next_check_in_at` |
 |---|---|
-| Goal created | `firstDue(created_on, ...)` |
+| Goal created | `firstDue(created_on, ...)`, at its space's frequency where the space chose one (P9-T19a-d-a) |
 | Check-in published | `nextAfterPublication(...)` |
 | Latest check-in deleted | Recomputed from the previous check-in's publication date, or from the goal's creation date when there is none |
 | Frequency or anchor changed | `firstDue` from the later of the last publication date and today. A change never makes a goal instantly overdue |
@@ -287,6 +287,7 @@ it has passed.
 | Goal reopened | `firstDue(reopened_on, ...)` |
 | Goal moved to another cycle | Unchanged. The rhythm belongs to the goal |
 | Workspace default frequency changed | Nothing. Goals hold their own frequency, seeded from the default at creation |
+| A space's frequency changed | The open goals following it, with no frequency of their own or the space's previous one, take the new one and `firstDue` from today; a goal set apart keeps its own (P9-T19a-d-a) |
 
 That last row is a deliberate choice. Changing the workspace default silently
 rewriting every existing goal's rhythm would move thousands of deadlines from

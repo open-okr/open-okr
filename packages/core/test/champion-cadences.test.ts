@@ -1026,9 +1026,16 @@ describe("the per-cycle run: the countdown", () => {
     ).toEqual([]);
   });
 
-  it("opens planning three weeks before a quarterly cycle starts", async () => {
+  it("opens planning four weeks before a quarterly cycle starts (§11, P9-T19a-d-a)", async () => {
     await cycleDates({ startsOn: "2026-10-01", endsOn: "2026-12-31" });
+    // Three weeks before is no longer the day.
     await runAt("cycle", new Date("2026-09-10T09:00:00Z"));
+    expect(
+      (await sentNudges()).filter(
+        (row) => row.rule_key === "cycle.planning_opens",
+      ),
+    ).toEqual([]);
+    await runAt("cycle", new Date("2026-09-03T09:00:00Z"));
     expect(
       (await sentNudges()).filter(
         (row) => row.rule_key === "cycle.planning_opens",

@@ -14,7 +14,7 @@ import { getTranslations } from "../../lib/translations";
  * which one they are working in.
  *
  * **The picker opens any cycle in the chosen horizon, not only the current
- * one.** Planning happens before a period starts (§2.4: three weeks before the
+ * one.** Planning happens before a period starts (§2.4: four weeks before the
  * quarter, six before the year), which is exactly when the cycle being planned
  * is not the one containing today. A plain form rather than a script, so it
  * works before the page hydrates and scales to a workspace with many cycles.

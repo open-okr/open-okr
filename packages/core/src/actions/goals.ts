@@ -63,6 +63,7 @@ import {
   dueLocalDate,
   stampFirstDue,
 } from "../cadence/service.ts";
+import { seedGoalFrequencyInTx } from "../cadence/space-frequency.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import {
@@ -1259,6 +1260,13 @@ export const createGoal = defineWriteAction({
       const rhythmSettings = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
+      // A goal in a space checks in at the space's frequency, where it chose
+      // one (§7.1, P9-T19a-d-a), and the first due date is counted at it.
+      await seedGoalFrequencyInTx(tx, {
+        workspaceId,
+        goalId: created.id,
+        spaceId: input.spaceId ?? null,
+      });
       if (!waits) {
         await stampFirstDue(
           tx,

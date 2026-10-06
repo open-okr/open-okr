@@ -50,7 +50,7 @@ These are not preferences. Every rule below serves one of them.
 | Horizon | Runs | Sets | Revisited |
 |---|---|---|---|
 | Annual | Once a year, about 6 weeks before the year starts | The annual frame (mission, vision, mid-term strategy), 2 to 5 annual strategies, up to 5 annual OKRs, the year's not-doing list | Mission and vision stay stable. Annual OKRs and the not-doing list may be revised at a quarterly revalidation, with a written reason. An annual target changes under the same rules as any target (§2.9): easing it needs a reason, and the original stays on record |
-| Quarterly | Four times a year, planning opens about 3 weeks before the quarter | Quarterly OKRs inside the annual frame | Scored and closed at the end of the quarter |
+| Quarterly | Four times a year, planning opens about 4 weeks before the quarter | Quarterly OKRs inside the annual frame | Scored and closed at the end of the quarter |
 
 The annual frame is reference material during a quarterly cycle. Phase 3 of a quarterly cycle revalidates it: it holds, or it changes with a documented reason. *Source:* Castro: company OKRs "are not set in stone"; whatmatters: "it's rare to adjust company-level OKRs … it may be necessary".
 
@@ -918,7 +918,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 
 | Parameter | Canon default |
 |---|---|
-| Check-in frequency | Weekly |
+| Check-in frequency | Weekly. Every two weeks and monthly are also valid |
 | Check-in anchor day | Monday |
 | Cadence tolerance | 1 day either side of the due date without double-advancing |
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |
@@ -929,7 +929,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Nudge deduplication window | 1 nudge per subject per member per day unless the escalation step increases |
 | Nudge volume ceiling | 5 per member per week. Anything past the ceiling waits for the next digest |
 | Due-soon lead | 1 day before the anchor day |
-| Planning-open lead | 6 weeks before an annual cycle starts, 3 weeks before a quarterly |
+| Planning-open lead | 6 weeks before an annual cycle starts, 4 weeks before a quarterly |
 | Team publication window | 2 weeks after the cycle starts |
 | Publication deadline countdown | 14, 7 and 1 days before the deadline |
 | Review preparation lead | 2 weeks before the cycle ends |

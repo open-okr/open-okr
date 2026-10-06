@@ -172,22 +172,23 @@ describe("the planning window", () => {
   });
 
   it("runs from planning-open to the close of the team publication window", () => {
-    // 3 weeks before a quarter today, and 2 weeks into it (§11).
+    // 4 weeks before a quarter today (3 until P9-T19a-d-a), and 2 weeks into
+    // it (§11).
     expect(planningWindow(unready, thresholds)).toEqual({
-      opensOn: "2026-12-11",
+      opensOn: "2026-12-04",
       closesOn: "2027-01-14",
     });
   });
 
   it("allows a new objective inside it and refuses one outside it", () => {
-    for (const today of ["2026-12-11", "2027-01-01", "2027-01-14"]) {
+    for (const today of ["2026-12-04", "2027-01-01", "2027-01-14"]) {
       expect(
         decide(createObjective({ ...ready, today }), practice, thresholds)
           .outcome,
         today,
       ).toBe("allow");
     }
-    for (const today of ["2026-12-10", "2027-01-15", "2027-03-01"]) {
+    for (const today of ["2026-12-03", "2027-01-15", "2027-03-01"]) {
       const decision = decide(
         createObjective({ ...ready, today }),
         practice,
@@ -195,7 +196,7 @@ describe("the planning window", () => {
       );
       expect(decision.outcome, today).toBe("block");
       expect(decision.rules).toEqual(["writing.when"]);
-      expect(decision.reasons[0]).toContain("2026-12-11 to 2027-01-14");
+      expect(decision.reasons[0]).toContain("2026-12-04 to 2027-01-14");
     }
   });
 

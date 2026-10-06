@@ -3292,7 +3292,7 @@
   "spaces.detail.spaceMembership.leave": "Keluar",
   "spaces.detail.spaceMembership.youAreInThisSpace": "Anda berada dalam ruang ini sebagai {ownRole}.{leave}",
   "spaces.detail.spaceMembership.youAreNotIn": "Anda tidak berada dalam ruang ini.",
-  "spaces.detail.spaceSettings.aTeamShippingDaily": "Pasukan yang menghantar setiap hari dan pasukan yang menghantar setiap suku tahun berada dalam ruang kerja yang sama.",
+  "spaces.detail.spaceSettings.aTeamShippingDaily": "Matlamat dalam ruang ini dikemas kini pada kekerapan ini. Mengubahnya memindahkan matlamat terbuka yang mengikutinya, dan matlamat yang ditetapkan pada kekerapannya sendiri mengekalkannya.",
   "spaces.detail.spaceSettings.appliesToThisSpace": "Terpakai pada matlamat ruang ini sahaja dan bukan yang lain. Enam pintu semakan penerbitan kekal ketat walau apa pun tetapan ini.",
   "spaces.detail.spaceSettings.changingTheseIsThe": "Mengubah tetapan ini ialah hak pengurus ruang.",
   "spaces.detail.spaceSettings.channelHint": "{termCoordinator} boleh menyiarkan ringkasan setiap minggu yang ditutup ke sini. Tampal ID saluran, bukan namanya, dan tambahkan bot ke saluran itu. Biarkan kosong untuk tidak menyiarkan ke mana-mana.",

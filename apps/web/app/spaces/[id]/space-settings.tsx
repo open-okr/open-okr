@@ -288,7 +288,11 @@ export function SpaceSettingsCard({
                   workspaceFrequency,
                 })}
               </option>
-              {CHECK_IN_FREQUENCIES.map((option) => (
+              {/* Not quarterly: no goal checks in at it (P9-T19a-d-a), so a
+                  space set to it would change nothing it says it changes. */}
+              {CHECK_IN_FREQUENCIES.filter(
+                (option) => option !== "quarterly",
+              ).map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
