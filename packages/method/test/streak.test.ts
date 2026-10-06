@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   afterCheckIn,
   currentStreakOn,
+  isHoliday,
+  isHolidayPeriod,
   lastWorkingDayOfPeriod,
   periodStartOf,
   weekStartOf,
@@ -116,5 +118,59 @@ describe("the streak at the space's own frequency", () => {
     expect(lastWorkingDayOfPeriod("2026-10-06", "weekly")).toBe("2026-10-09");
     // October 2026 ends on a Saturday.
     expect(lastWorkingDayOfPeriod("2026-10-06", "monthly")).toBe("2026-10-30");
+  });
+});
+
+/**
+ * §7.4: "A skipped period breaks it; a period marked as a holiday does not"
+ * (P9-T19b-a). The week of Monday 10 August 2026 is the holiday throughout.
+ */
+describe("a holiday in the streak", () => {
+  const AUGUST = [{ startsOn: "2026-08-10", endsOn: "2026-08-16" }] as const;
+  const heldAugust3 = afterCheckIn(null, "2026-08-04");
+
+  it("is a period whose last working day is marked", () => {
+    expect(isHoliday("2026-08-12", AUGUST)).toBe(true);
+    expect(isHoliday("2026-08-17", AUGUST)).toBe(false);
+    expect(isHolidayPeriod("2026-08-11", "weekly", AUGUST)).toBe(true);
+    // Away Monday to Wednesday and back on the Friday: that week still owes.
+    const early = [{ startsOn: "2026-08-10", endsOn: "2026-08-12" }];
+    expect(isHolidayPeriod("2026-08-11", "weekly", early)).toBe(false);
+    // A fortnight is a holiday only when its last working day is.
+    expect(isHolidayPeriod("2026-08-11", "biweekly", AUGUST)).toBe(
+      lastWorkingDayOfPeriod("2026-08-11", "biweekly") <= "2026-08-16",
+    );
+    expect(isHolidayPeriod("2026-08-11", "weekly", [])).toBe(false);
+  });
+
+  it("does not break a run while the holiday passes with nothing held (acceptance)", () => {
+    // The Friday of the holiday week, and the Monday after it.
+    expect(currentStreakOn(heldAugust3, "2026-08-14", "weekly", AUGUST)).toBe(
+      1,
+    );
+    expect(currentStreakOn(heldAugust3, "2026-08-21", "weekly", AUGUST)).toBe(
+      1,
+    );
+    // Without the holiday the same week breaks it.
+    expect(currentStreakOn(heldAugust3, "2026-08-21", "weekly")).toBe(0);
+  });
+
+  it("extends across the holiday to the week after it", () => {
+    const after = afterCheckIn(heldAugust3, "2026-08-18", "weekly", AUGUST);
+    expect(after.currentWeeks).toBe(2);
+    expect(afterCheckIn(heldAugust3, "2026-08-18", "weekly").currentWeeks).toBe(
+      1,
+    );
+  });
+
+  it("still counts a check-in held during the holiday", () => {
+    const during = afterCheckIn(heldAugust3, "2026-08-12", "weekly", AUGUST);
+    expect(during.currentWeeks).toBe(2);
+  });
+
+  it("breaks once an ordinary week after the holiday also passes", () => {
+    expect(currentStreakOn(heldAugust3, "2026-08-24", "weekly", AUGUST)).toBe(
+      0,
+    );
   });
 });

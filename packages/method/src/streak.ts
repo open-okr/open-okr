@@ -18,6 +18,13 @@
  * The stored columns keep their names, `current_weeks`, `longest_weeks` and
  * `last_session_week`: they count periods now, and the last one is the start
  * of the last period held.
+ *
+ * **A period marked as a holiday does not break it** (P9-T19b-a): "A skipped
+ * period breaks it; a period marked as a holiday does not." A period is a
+ * holiday when its last working day is inside a span the space marked, which
+ * is the day a check-in for it is last due. The due dates, the booking and the
+ * nudges read the same rule from here, so a week nothing was due in cannot
+ * still break the streak.
  */
 import type { CheckInFrequency } from "./thresholds.ts";
 
@@ -109,6 +116,56 @@ export function lastWorkingDayOfPeriod(
   return day;
 }
 
+/** A span a space marked as a holiday, both days included (METHOD.md §7.4). */
+export interface Holiday {
+  readonly startsOn: string;
+  readonly endsOn: string;
+}
+
+/** Whether a date is inside a marked holiday. */
+export function isHoliday(on: string, holidays: readonly Holiday[]): boolean {
+  return holidays.some(
+    (holiday) => holiday.startsOn <= on && on <= holiday.endsOn,
+  );
+}
+
+/**
+ * Whether the check-in period holding `on` is a holiday: its last working day
+ * is inside a marked span. A team back on the Friday still owes that week.
+ */
+export function isHolidayPeriod(
+  on: string,
+  frequency: CheckInFrequency,
+  holidays: readonly Holiday[],
+): boolean {
+  return (
+    holidays.length > 0 &&
+    isHoliday(lastWorkingDayOfPeriod(on, frequency), holidays)
+  );
+}
+
+/**
+ * Whether every period strictly between two period starts is a holiday, so
+ * nothing between them was owed. With no holidays it is whether they are
+ * neighbours.
+ */
+function onlyHolidaysBetween(
+  from: string,
+  to: string,
+  frequency: CheckInFrequency,
+  holidays: readonly Holiday[],
+): boolean {
+  let period = nextPeriodStart(from, frequency);
+  // Bounded: a run of holidays longer than two years is not a rhythm.
+  for (let guard = 0; guard < 120 && period < to; guard += 1) {
+    if (!isHolidayPeriod(period, frequency, holidays)) {
+      return false;
+    }
+    period = nextPeriodStart(period, frequency);
+  }
+  return period >= to;
+}
+
 export interface StreakState {
   readonly currentWeeks: number;
   readonly longestWeeks: number;
@@ -126,12 +183,15 @@ export interface StreakState {
  * the last one counted is history arriving late and changes nothing either.
  *
  * The last period is read again at the current frequency, so a space that
- * changes its frequency keeps its run where the new periods line up.
+ * changes its frequency keeps its run where the new periods line up. Holiday
+ * periods between the two are not skipped periods, and a check-in held in a
+ * holiday still counts.
  */
 export function afterCheckIn(
   state: StreakState | null,
   heldOn: string,
   frequency: CheckInFrequency = "weekly",
+  holidays: readonly Holiday[] = [],
 ): StreakState {
   const period = periodStartOf(heldOn, frequency);
   if (!state || state.lastWeek === null) {
@@ -145,8 +205,9 @@ export function afterCheckIn(
   if (period <= last) {
     return state;
   }
-  const currentWeeks =
-    period === nextPeriodStart(last, frequency) ? state.currentWeeks + 1 : 1;
+  const currentWeeks = onlyHolidaysBetween(last, period, frequency, holidays)
+    ? state.currentWeeks + 1
+    : 1;
   return {
     currentWeeks,
     longestWeeks: Math.max(state.longestWeeks, currentWeeks),
@@ -159,21 +220,22 @@ export function afterCheckIn(
  *
  * Alive while the last check-in was in this period or the one before: this
  * period's may simply not have happened yet. Once a whole period has passed
- * with none, it is broken, whether or not anybody pressed "skip".
+ * with none, it is broken, whether or not anybody pressed "skip". A holiday
+ * period that passed with none is not a skipped period.
  */
 export function currentStreakOn(
   state: StreakState | null,
   today: string,
   frequency: CheckInFrequency = "weekly",
+  holidays: readonly Holiday[] = [],
 ): number {
   if (!state || state.lastWeek === null) {
     return 0;
   }
-  const previous = previousPeriodStart(
-    periodStartOf(today, frequency),
-    frequency,
-  );
-  return periodStartOf(state.lastWeek, frequency) >= previous
+  const current = periodStartOf(today, frequency);
+  const last = periodStartOf(state.lastWeek, frequency);
+  return last >= current ||
+    onlyHolidaysBetween(last, current, frequency, holidays)
     ? state.currentWeeks
     : 0;
 }

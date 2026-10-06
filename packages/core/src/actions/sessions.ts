@@ -109,6 +109,7 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
 import { nextCheckInDueAt } from "../cadence/blockers.ts";
 import { localInstant } from "../cadence/engine.ts";
+import { spaceHolidaysInTx } from "../cadence/holidays.ts";
 import { dueLocalDate } from "../cadence/service.ts";
 import { ritualFrequencyOf } from "../cadence/space-frequency.ts";
 import {
@@ -768,11 +769,14 @@ export const bookCycleSessions = defineWriteAction({
         input.spaceId,
         bookThresholds,
       );
+      // No check-in is booked in a holiday period (§7.4, P9-T19b-a).
+      const holidays = await spaceHolidaysInTx(tx, workspaceId, input.spaceId);
       const plan = planCycleCadence(bounds, {
         weekday: input.weekday as RitualWeekday,
         from,
         existing,
         frequency,
+        holidays,
       });
 
       const sessionIds: string[] = [];
@@ -798,6 +802,7 @@ export const bookCycleSessions = defineWriteAction({
         bounds,
         [...existing, ...plan],
         frequency,
+        holidays,
       );
       return {
         result: {
@@ -1450,6 +1455,8 @@ export const closeSession = defineWriteAction({
             : null,
           heldOn,
           streakFrequency,
+          // A holiday between two check-ins is not a skipped period (§7.4).
+          await spaceHolidaysInTx(tx, workspaceId, session.spaceId),
         );
         if (existing) {
           // openokr:allow-mutation: streak is derived, not a domain change.
@@ -3685,6 +3692,11 @@ export const readStreak = defineReadAction({
               : null,
             today,
             frequency,
+            await spaceHolidaysInTx(
+              tx as OperationTx,
+              context.workspaceId,
+              input.spaceId,
+            ),
           ),
           longestWeeks: row?.longestWeeks ?? 0,
           lastSessionWeek: row?.lastSessionWeek ?? null,

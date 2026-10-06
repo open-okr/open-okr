@@ -22,6 +22,7 @@ import {
   accessContexts,
   activeOnly,
   SPACE_ROLES,
+  spaceHolidays,
   spaceMembers,
   spaces,
   withContext,
@@ -32,7 +33,7 @@ import {
   type CheckInFrequency,
   COACH_STRICTNESS,
 } from "@openokr/method";
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -41,6 +42,7 @@ import {
   accessScopeFilter,
   getAccessScoped,
 } from "../access/reads.ts";
+import { clearOpenGoalsOfHolidaysInTx } from "../cadence/holidays.ts";
 import { followSpaceFrequencyInTx } from "../cadence/space-frequency.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -520,6 +522,198 @@ export const updateSpaceSettings = defineWriteAction({
       };
     },
   }),
+});
+
+/** One span a space marks as a holiday, both days included. */
+const holidaySpan = z
+  .object({
+    startsOn: z.iso.date(),
+    endsOn: z.iso.date(),
+    /** What it is, for the people reading the list: "Summer", "Eid". */
+    label: z.string().trim().max(80).optional(),
+  })
+  .refine((span) => span.endsOn >= span.startsOn, {
+    message: "A holiday ends on or after the day it starts.",
+  });
+
+const holidayRow = z.object({
+  startsOn: z.string(),
+  endsOn: z.string(),
+  label: z.string().nullable(),
+});
+
+/**
+ * A space's holidays (METHOD.md §7.4, P9-T19b-a): "No check-in is due in
+ * them, nobody is nudged for them, the streak does not break".
+ *
+ * The whole list, written whole, as the screen edits it. The goals already
+ * open in the space whose next check-in falls in a holiday period move on
+ * past it, in the same transaction, so marking the summer in July changes
+ * what is due in August.
+ */
+export const setSpaceHolidays = defineWriteAction({
+  name: "spaces.setHolidays",
+  summary:
+    "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break (METHOD.md §7.4).",
+  input: z.object({
+    id: z.uuid(),
+    holidays: z.array(holidaySpan).max(60),
+  }),
+  output: z.object({
+    id: z.uuid(),
+    /** How many open goals had their next check-in moved past a holiday. */
+    moved: z.number(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actingMemberId(actor.memberId);
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "space",
+        resourceId: input.id,
+        requires: ACCESS_LEVELS.edit,
+      });
+      const [space] = await tx
+        .select({ id: spaces.id, name: spaces.name })
+        // openokr:allow-raw-read: `getAccessScoped` above confirmed edit
+        // access to this space; this reads its name for the activity line.
+        .from(spaces)
+        .where(
+          activeOnly(
+            spaces,
+            eq(spaces.id, input.id),
+            eq(spaces.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!space) {
+        throw new OperationError("not_found", "No such space.");
+      }
+
+      const now = new Date();
+      // openokr:allow-mutation: the operation's own execute. Soft-deleted
+      // rather than removed, so the audit trail can still say what the
+      // calendar held before.
+      await tx
+        .update(spaceHolidays)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(
+          activeOnly(
+            spaceHolidays,
+            eq(spaceHolidays.workspaceId, workspaceId),
+            eq(spaceHolidays.spaceId, input.id),
+          ),
+        );
+      const holidays = [...input.holidays].sort((a, b) =>
+        a.startsOn.localeCompare(b.startsOn),
+      );
+      if (holidays.length > 0) {
+        // openokr:allow-mutation: the operation's own execute.
+        await tx.insert(spaceHolidays).values(
+          holidays.map((span) => ({
+            workspaceId,
+            spaceId: input.id,
+            startsOn: span.startsOn,
+            endsOn: span.endsOn,
+            label: span.label && span.label.length > 0 ? span.label : null,
+          })),
+        );
+      }
+
+      const moved = await clearOpenGoalsOfHolidaysInTx(tx, {
+        workspaceId,
+        spaceId: input.id,
+        holidays,
+        thresholds: resolveRhythm(await readRhythmRow(tx, workspaceId))
+          .thresholds,
+        now,
+      });
+
+      return {
+        result: { id: input.id, moved },
+        activity: {
+          kind: "space.holidaysChanged",
+          subjectType: "space",
+          subjectId: input.id,
+          payload: { name: space.name, count: holidays.length },
+        },
+        audit: {
+          action: "spaces.setHolidays",
+          targetType: "space",
+          targetId: input.id,
+          payload: {
+            holidays: holidays.map((span) => ({
+              startsOn: span.startsOn,
+              endsOn: span.endsOn,
+            })),
+            moved,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const readSpaceHolidays = defineReadAction({
+  name: "spaces.holidays",
+  summary:
+    "The spans a space marks as holidays, oldest first (METHOD.md §7.4).",
+  input: z.object({ id: z.uuid() }),
+  output: z.array(holidayRow),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such space.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [member] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+              eq(workspaceMembers.status, "active"),
+            ),
+          )
+          .limit(1);
+        if (!member) {
+          throw new OperationError("not_found", "No such space.");
+        }
+        // Not-found on forbidden, before a single holiday is read.
+        await getAccessScoped(tx, {
+          workspaceId: context.workspaceId,
+          memberId: member.id,
+          resourceType: "space",
+          resourceId: input.id,
+          requires: ACCESS_LEVELS.view,
+        });
+        return tx
+          .select({
+            startsOn: spaceHolidays.startsOn,
+            endsOn: spaceHolidays.endsOn,
+            label: spaceHolidays.label,
+          })
+          .from(spaceHolidays)
+          .where(
+            activeOnly(
+              spaceHolidays,
+              eq(spaceHolidays.workspaceId, context.workspaceId),
+              eq(spaceHolidays.spaceId, input.id),
+            ),
+          )
+          .orderBy(asc(spaceHolidays.startsOn));
+      },
+    );
+  },
 });
 
 export const createSpace = defineWriteAction({

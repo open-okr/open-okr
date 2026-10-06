@@ -544,6 +544,7 @@ export {
   type SpaceMember,
   type SpaceRole,
   type SpaceSettings,
+  spaceHolidays,
   spaceMembers,
   spaces,
 } from "./schema/spaces.ts";

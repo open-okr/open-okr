@@ -33,7 +33,13 @@ import {
 } from "@openokr/db";
 import type { ResolvedThresholds } from "@openokr/method";
 import { desc, eq, inArray, ne, sql } from "drizzle-orm";
-import { cadence, dueInstant, firstDue } from "../cadence/engine.ts";
+import {
+  cadence,
+  clearOfHolidays,
+  dueInstant,
+  firstDue,
+} from "../cadence/engine.ts";
+import { spaceHolidaysInTx } from "../cadence/holidays.ts";
 import { localDateIn } from "../cycles/generation.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { doneAtFor } from "../goals/service.ts";
@@ -364,6 +370,7 @@ export async function publishCheckInInTx<
       championId: goals.championId,
       checkInFrequency: goals.checkInFrequency,
       nextCheckInAt: goals.nextCheckInAt,
+      spaceId: goals.spaceId,
     })
     .from(goals)
     .where(
@@ -431,15 +438,22 @@ export async function publishCheckInInTx<
   const anchor = input.thresholds["cadence.anchorDay"];
   const publishedOn = localDateIn(input.now, timeZone);
 
-  const nextDue = goal.nextCheckInAt
-    ? cadence.nextAfterPublication(
-        formatDate(localDateIn(new Date(goal.nextCheckInAt), timeZone)),
-        formatDate(publishedOn),
-        frequency,
-        anchor,
-        input.thresholds["cadence.toleranceDays"],
-      ).next
-    : formatDate(firstDue(publishedOn, frequency, anchor));
+  // Never due in a period the space marked as a holiday (§7.4, P9-T19b-a).
+  const holidays = await spaceHolidaysInTx(tx, input.workspaceId, goal.spaceId);
+  const nextDue = cadence.clearOfHolidays(
+    goal.nextCheckInAt
+      ? cadence.nextAfterPublication(
+          formatDate(localDateIn(new Date(goal.nextCheckInAt), timeZone)),
+          formatDate(publishedOn),
+          frequency,
+          anchor,
+          input.thresholds["cadence.toleranceDays"],
+        ).next
+      : formatDate(firstDue(publishedOn, frequency, anchor)),
+    frequency,
+    anchor,
+    holidays,
+  );
 
   // openokr:allow-mutation: same transaction.
   await tx
@@ -614,6 +628,7 @@ export async function deleteCheckInInTx<
       lastCheckInId: goals.lastCheckInId,
       checkInFrequency: goals.checkInFrequency,
       createdAt: goals.createdAt,
+      spaceId: goals.spaceId,
     })
     .from(goals)
     .where(
@@ -724,7 +739,15 @@ export async function deleteCheckInInTx<
     .update(goals)
     .set({
       lastCheckInId: previous?.id ?? null,
-      nextCheckInAt: dueInstant(firstDue(from, frequency, anchor), timeZone),
+      nextCheckInAt: dueInstant(
+        clearOfHolidays(
+          firstDue(from, frequency, anchor),
+          frequency,
+          anchor,
+          await spaceHolidaysInTx(tx, workspaceId, goal.spaceId),
+        ),
+        timeZone,
+      ),
       updatedAt: now,
     })
     .where(activeOnly(goals, eq(goals.id, goal.id)));

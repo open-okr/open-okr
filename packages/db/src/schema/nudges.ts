@@ -50,6 +50,7 @@ export const NUDGE_SUPPRESSION_REASONS = [
   "snooze",
   "disabled",
   "ceiling",
+  "holiday",
 ] as const;
 export type NudgeSuppressionReason = (typeof NUDGE_SUPPRESSION_REASONS)[number];
 

@@ -104,6 +104,53 @@ describe("advancing after a publication", () => {
   }
 });
 
+/**
+ * §7.4: "No check-in is due in them" (P9-T19b-a). The week of Monday
+ * 10 August 2026 is the holiday; a period is one when its last working day is.
+ */
+describe("a due date clear of the holidays", () => {
+  const AUGUST = [{ startsOn: "2026-08-10", endsOn: "2026-08-16" }];
+
+  it("moves a weekly due date in the holiday on a week, keeping its Monday", () => {
+    expect(cadence.clearOfHolidays("2026-08-10", "weekly", 1, AUGUST)).toBe(
+      "2026-08-17",
+    );
+  });
+
+  it("moves past two holiday weeks in a row", () => {
+    const summer = [
+      ...AUGUST,
+      { startsOn: "2026-08-17", endsOn: "2026-08-23" },
+    ];
+    expect(cadence.clearOfHolidays("2026-08-10", "weekly", 1, summer)).toBe(
+      "2026-08-24",
+    );
+  });
+
+  it("leaves a date outside every holiday, and a date with none, alone", () => {
+    expect(cadence.clearOfHolidays("2026-08-03", "weekly", 1, AUGUST)).toBe(
+      "2026-08-03",
+    );
+    expect(cadence.clearOfHolidays("2026-08-10", "weekly", 1, [])).toBe(
+      "2026-08-10",
+    );
+  });
+
+  it("leaves a week the team is back for by its Friday", () => {
+    const early = [{ startsOn: "2026-08-10", endsOn: "2026-08-12" }];
+    expect(cadence.clearOfHolidays("2026-08-10", "weekly", 1, early)).toBe(
+      "2026-08-10",
+    );
+  });
+
+  it("moves a monthly due date a month when the month's last working day is a holiday", () => {
+    const lateAugust = [{ startsOn: "2026-08-24", endsOn: "2026-08-31" }];
+    expect(
+      cadence.clearOfHolidays("2026-08-03", "monthly", 3, lateAugust),
+    ).toBe("2026-09-03");
+  });
+});
+
 describe("staleness", () => {
   for (const row of table("cadence.staleness").rows) {
     it(`${row.case}`, () => {

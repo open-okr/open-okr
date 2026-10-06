@@ -186,3 +186,29 @@ describe("a space at its own frequency", () => {
     );
   });
 });
+
+/**
+ * No check-in is due in a holiday period, so none is booked there and none is
+ * missing (P9-T19b-a). The week of Monday 9 November is the holiday.
+ */
+describe("a holiday in the booking", () => {
+  const NOVEMBER = [{ startsOn: "2026-11-09", endsOn: "2026-11-15" }] as const;
+
+  it("books no check-in in the holiday week", () => {
+    const plan = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [],
+      holidays: NOVEMBER,
+    });
+    const weekly = plan.filter((ritual) => ritual.kind === "weekly");
+    expect(weekly.map((ritual) => ritual.on)).not.toContain("2026-11-09");
+    expect(weekly.map((ritual) => ritual.on)).toContain("2026-11-16");
+    expect(cadenceCoverage(Q4, plan, "weekly", NOVEMBER)).toEqual({
+      booked: true,
+      missing: [],
+    });
+    // Without the holiday, the same plan has a week missing.
+    expect(cadenceCoverage(Q4, plan).booked).toBe(false);
+  });
+});

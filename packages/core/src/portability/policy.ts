@@ -576,6 +576,13 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason: "Who belongs to which space, and in what role.",
   },
   {
+    table: "space_holidays",
+    decision: "export",
+    // After the spaces they belong to (P9-T19b-a).
+    reason:
+      "The holidays each space marked, which decide when nothing was due and why a streak held.",
+  },
+  {
     table: "streaks",
     decision: "export",
     reason:

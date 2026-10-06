@@ -21,7 +21,13 @@ import type { CheckInFrequency, ResolvedThresholds } from "@openokr/method";
 import { eq, isNotNull, isNull, lt } from "drizzle-orm";
 import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { workspaceTimeZone } from "../cycles/service.ts";
-import { type CadenceAnchor, dueInstant, firstDue } from "./engine.ts";
+import {
+  type CadenceAnchor,
+  clearOfHolidays,
+  dueInstant,
+  firstDue,
+} from "./engine.ts";
+import { spaceHolidaysInTx } from "./holidays.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -65,7 +71,7 @@ export async function stampFirstDue<
   from: Date,
 ): Promise<void> {
   const [goal] = await tx
-    .select({ frequency: goals.checkInFrequency })
+    .select({ frequency: goals.checkInFrequency, spaceId: goals.spaceId })
     .from(goals)
     .where(
       activeOnly(
@@ -81,10 +87,12 @@ export async function stampFirstDue<
 
   const timeZone = await workspaceTimeZone(tx, workspaceId);
   const settings = resolveCadence(goal.frequency, thresholds, timeZone);
-  const due = firstDue(
-    localDateIn(from, timeZone),
+  // Never due in a period the space marked as a holiday (§7.4, P9-T19b-a).
+  const due = clearOfHolidays(
+    firstDue(localDateIn(from, timeZone), settings.frequency, settings.anchor),
     settings.frequency,
     settings.anchor,
+    await spaceHolidaysInTx(tx, workspaceId, goal.spaceId),
   );
 
   // openokr:allow-mutation: runs on the transaction the calling Operation

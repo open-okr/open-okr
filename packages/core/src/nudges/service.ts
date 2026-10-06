@@ -38,6 +38,7 @@ import {
   CEILING_CARRIER,
   type EscalationRole,
   escalation,
+  isHoliday,
   isTriggerKey,
   type ResolvedThresholds,
   type SuppressionReason,
@@ -63,7 +64,9 @@ import {
   agentSeesCheckIn,
   agentSeesGoal,
 } from "../agents/scope.ts";
+import { spaceHolidaysInTx } from "../cadence/holidays.ts";
 import { daysPastDue } from "../cadence/service.ts";
+import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError } from "../operations/errors.ts";
 import { practiceFromRow } from "../practice/settings.ts";
@@ -118,6 +121,12 @@ export interface DueNudge {
    * nudge is written, so a sandboxed run discards it with everything else.
    */
   readonly escalatesBlocker?: boolean;
+  /**
+   * Set on a check-in nudge about a goal whose space is on holiday today
+   * (METHOD.md §7.4, P9-T19b-a). Recorded and not sent, with the reason
+   * `holiday`, so the silence is answerable.
+   */
+  readonly onHoliday?: boolean;
 }
 
 /**
@@ -263,6 +272,26 @@ export async function dueCheckInNudges(
   // in it (§11, §12, P9-T19a-c-a).
   const sponsorInLadders = practice["escalation.sponsorInLadders"] === "on";
 
+  // A space on holiday today is nudged about nothing (§7.4, P9-T19b-a). Read
+  // once per space, because a sweep visits every goal in it.
+  const today = formatLocalDate(localDateIn(input.now, input.timeZone));
+  const holidayToday = new Map<string, boolean>();
+  const onHoliday = async (spaceId: string | null): Promise<boolean> => {
+    if (!spaceId) {
+      return false;
+    }
+    const known = holidayToday.get(spaceId);
+    if (known !== undefined) {
+      return known;
+    }
+    const answer = isHoliday(
+      today,
+      await spaceHolidaysInTx(tx, input.workspaceId, spaceId),
+    );
+    holidayToday.set(spaceId, answer);
+    return answer;
+  };
+
   const due: DueNudge[] = [];
   for (const row of rows) {
     const goal = reviewersOff ? { ...row, reviewerId: null } : row;
@@ -291,8 +320,13 @@ export async function dueCheckInNudges(
     // Drafted once per goal, not once per recipient: the escalation may reach
     // four people and they are all looking at one check-in. Only the champion's
     // own nudge carries it, because they are the one who can publish it.
+    const holiday = await onHoliday(goal.spaceId);
+    // Nothing is drafted for a space on holiday: the nudge it would ride on
+    // is recorded and not sent.
     const drafted =
-      input.drafter && past > 0 ? await draftFor(tx, input, goal, past) : null;
+      input.drafter && past > 0 && !holiday
+        ? await draftFor(tx, input, goal, past)
+        : null;
 
     for (const role of step.targets) {
       const memberId = await memberForRole(tx, goal, role);
@@ -326,6 +360,7 @@ export async function dueCheckInNudges(
         // past a ceiling written to stop exactly that, which is what the
         // simulated month found.
         urgent: role !== "champion",
+        ...(holiday ? { onHoliday: true } : {}),
         ...(drafted && role === "champion"
           ? {
               proposal: {
@@ -848,6 +883,7 @@ export async function decideSuppression(
       }),
       sentThisWeek:
         input.context.sentThisWeek.get(input.nudge.recipientMemberId) ?? 0,
+      onHoliday: input.nudge.onHoliday ?? false,
     },
     input.thresholds,
   );

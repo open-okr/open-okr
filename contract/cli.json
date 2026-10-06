@@ -3585,6 +3585,46 @@
       "pages": false
     },
     {
+      "name": "spaces setHolidays",
+      "action": "spaces.setHolidays",
+      "method": "POST",
+      "path": "/spaces/setHolidays",
+      "scope": "write",
+      "summary": "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break (METHOD.md §7.4).",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "holidays",
+          "field": "holidays",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "spaces holidays",
+      "action": "spaces.holidays",
+      "method": "GET",
+      "path": "/spaces/holidays",
+      "scope": "read",
+      "summary": "The spans a space marks as holidays, oldest first (METHOD.md §7.4).",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "spaces archive",
       "action": "spaces.archive",
       "method": "POST",

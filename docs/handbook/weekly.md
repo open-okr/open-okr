@@ -33,6 +33,12 @@ counts your space's own check-in periods: weeks, or fortnights or months if
 your space checks in every two weeks or monthly, so a team that chose every two
 weeks does not break its streak in the week between.
 
+Mark your space's holidays on the space home. No check-in is due in a holiday,
+nobody is nudged about the space on one, and the streak does not break. A week
+counts as a holiday when its last working day is inside one, so a team back by
+the Friday still checks in that week. A goal that was due in a week you mark
+moves on to the week after it, on the same weekday.
+
 ## Confidence, and what the numbers mean
 
 | Score | What it means in the session |

@@ -338,6 +338,9 @@ export {
 export {
   afterCheckIn,
   currentStreakOn,
+  type Holiday,
+  isHoliday,
+  isHolidayPeriod,
   lastWorkingDayOfPeriod,
   nextPeriodStart,
   periodEndOf,

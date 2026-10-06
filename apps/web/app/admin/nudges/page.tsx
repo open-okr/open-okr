@@ -30,6 +30,7 @@ const REASON_LABEL: Record<string, string> = {
   snooze: "Snoozed by the member",
   disabled: "Rule switched off",
   ceiling: "Weekly ceiling reached",
+  holiday: "Space on holiday",
 };
 
 /**

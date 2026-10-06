@@ -1,4 +1,11 @@
-import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  date,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
 import { workspaceMembers, workspaces } from "./workspaces.ts";
 
@@ -66,6 +73,31 @@ export const spaceMembers = pgTable("space_members", {
   role: text("role", { enum: ["member", "manager", "coordinator"] })
     .notNull()
     .default("member"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+/**
+ * A span a space marked as a holiday, both days included (METHOD.md §7.4,
+ * P9-T19b-a). No check-in is due in a period whose last working day is inside
+ * one, nobody is nudged about the space on one, and the streak does not break.
+ */
+export const spaceHolidays = pgTable("space_holidays", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  spaceId: uuid("space_id")
+    .notNull()
+    .references(() => spaces.id, { onDelete: "cascade" }),
+  startsOn: date("starts_on").notNull(),
+  endsOn: date("ends_on").notNull(),
+  label: text("label"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

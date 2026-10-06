@@ -27,6 +27,7 @@ import {
 import { ScheduleSessions } from "../../sessions/schedule.tsx";
 import { BlockerSummary } from "./blocker-summary.tsx";
 import { SpaceManagement } from "./manage.tsx";
+import { SpaceHolidaysCard } from "./space-holidays.tsx";
 import { SpaceMembership } from "./space-membership";
 import { SpaceSettingsCard } from "./space-settings.tsx";
 import { SpaceGoals, SpaceKpiTrees } from "./space-work.tsx";
@@ -123,6 +124,10 @@ export default async function SpacePage({
     }
     throw error;
   }
+
+  // The space's holidays (METHOD.md §7.4, P9-T19b-a), which every reader
+  // of the space may see, because they say when nothing is due.
+  const holidays = await callAction(actor, "spaces.holidays", { id });
 
   // This space's own sessions (P5-T01c). The space is where a session is
   // scheduled and run, so this is the entry point that matters most: a
@@ -317,6 +322,12 @@ export default async function SpacePage({
           connectedProviders={connectedProviders}
         />
       ) : null}
+
+      <SpaceHolidaysCard
+        spaceId={space.id}
+        holidays={holidays}
+        canManage={canManage}
+      />
 
       <SpaceManagement
         spaceId={space.id}

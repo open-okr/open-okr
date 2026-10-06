@@ -84,6 +84,27 @@ describe("streak.at_risk", () => {
     // Already broken: the last one was two weeks ago.
     expect(streakAtRisk({ ...base, lastSessionOn: "2026-09-24" })).toBe(false);
   });
+  it("is quiet in a holiday week, and reads the week before a holiday as the last one (P9-T19b-a)", () => {
+    const holiday = [{ startsOn: "2026-10-05", endsOn: "2026-10-11" }];
+    // The Friday of the holiday itself: nothing can break.
+    expect(streakAtRisk({ ...base, holidays: holiday })).toBe(false);
+    // The Friday after it, with the last session the week before it.
+    expect(
+      streakAtRisk({
+        ...base,
+        today: "2026-10-16",
+        lastSessionOn: "2026-10-01",
+        holidays: holiday,
+      }),
+    ).toBe(true);
+    expect(
+      streakAtRisk({
+        ...base,
+        today: "2026-10-16",
+        lastSessionOn: "2026-10-01",
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("cycle.phase_blocked", () => {

@@ -168,6 +168,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   /** A space set its own §4.14 settings (P6-G18b). */
   "space.settingsChanged": z.object({ name: z.string() }),
+  /** A space marked its holidays (METHOD.md §7.4, P9-T19b-a). */
+  "space.holidaysChanged": z.object({ name: z.string(), count: z.number() }),
   /** An agent's write policy was moved (P6-G13b). */
   "agent.autonomy_changed": z.object({ from: z.string(), to: z.string() }),
   /** A workspace turned one §6.4 rule down, or back up (P6-G21). */

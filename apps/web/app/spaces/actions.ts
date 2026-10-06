@@ -194,3 +194,28 @@ export async function updateSpaceSettings(
     }),
   );
 }
+
+/**
+ * A space's holidays, written whole (METHOD.md §7.4, P9-T19b-a). The goals
+ * already open in the space whose next check-in falls in one move on past
+ * it, in the same write.
+ */
+export async function setSpaceHolidays(
+  spaceId: string,
+  holidays: readonly {
+    readonly startsOn: string;
+    readonly endsOn: string;
+    readonly label: string | null;
+  }[],
+): Promise<SpaceWriteState> {
+  return run(["/spaces", `/spaces/${spaceId}`], (context) =>
+    callAction(context, "spaces.setHolidays", {
+      id: spaceId,
+      holidays: holidays.map((span) => ({
+        startsOn: span.startsOn,
+        endsOn: span.endsOn,
+        ...(span.label ? { label: span.label } : {}),
+      })),
+    }),
+  );
+}

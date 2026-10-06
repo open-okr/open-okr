@@ -342,3 +342,29 @@ describe("which reason wins when two apply", () => {
     ).toBe("ceiling");
   });
 });
+
+describe("holiday (METHOD.md §7.4, P9-T19b-a)", () => {
+  it("keeps a space's check-in nudge quiet on its holiday, an escalation as well", () => {
+    expect(suppressionFor({ ...base, onHoliday: true }, thresholds)).toBe(
+      "holiday",
+    );
+    expect(
+      suppressionFor(
+        { ...base, onHoliday: true, urgent: true, escalationStep: 3 },
+        thresholds,
+      ),
+    ).toBe("holiday");
+  });
+
+  it("reads a switched-off rule as disabled first, and no holiday as nothing", () => {
+    expect(
+      suppressionFor(
+        { ...base, onHoliday: true, ruleEnabled: false },
+        thresholds,
+      ),
+    ).toBe("disabled");
+    expect(
+      suppressionFor({ ...base, onHoliday: false }, thresholds),
+    ).toBeNull();
+  });
+});

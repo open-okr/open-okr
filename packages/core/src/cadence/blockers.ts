@@ -16,6 +16,7 @@ import { activeOnly, goals, type WorkspaceTx } from "@openokr/db";
 import type {
   BlockerClock,
   CheckInFrequency,
+  Holiday,
   ResolvedThresholds,
 } from "@openokr/method";
 import { and, eq } from "drizzle-orm";
@@ -25,6 +26,7 @@ import {
   parseLocalDate,
 } from "../cycles/generation.ts";
 import { cadence, dueInstant } from "./engine.ts";
+import { spaceHolidaysInTx } from "./holidays.ts";
 
 /** How often a goal checks in: its own frequency, or the workspace's. */
 export function frequencyOf(
@@ -51,6 +53,8 @@ export function nextCheckInDueOn(input: {
   readonly anchor: number;
   readonly now: Date;
   readonly timeZone: string;
+  /** The goal's space's holidays, which no check-in is due in (P9-T19b-a). */
+  readonly holidays?: readonly Holiday[];
 }): string {
   const today = formatLocalDate(localDateIn(input.now, input.timeZone));
   let due = input.nextCheckInAt
@@ -61,7 +65,12 @@ export function nextCheckInDueOn(input: {
   for (let guard = 0; guard < 4000 && due <= today; guard += 1) {
     due = cadence.advance(due, input.frequency, input.anchor);
   }
-  return due;
+  return cadence.clearOfHolidays(
+    due,
+    input.frequency,
+    input.anchor,
+    input.holidays ?? [],
+  );
 }
 
 /**
@@ -87,6 +96,7 @@ export async function nextCheckInDueAt(
         .select({
           nextCheckInAt: goals.nextCheckInAt,
           checkInFrequency: goals.checkInFrequency,
+          spaceId: goals.spaceId,
         })
         .from(goals)
         .where(
@@ -106,6 +116,11 @@ export async function nextCheckInDueAt(
     anchor: input.thresholds["cadence.anchorDay"],
     now: input.now,
     timeZone: input.timeZone,
+    holidays: await spaceHolidaysInTx(
+      tx,
+      input.workspaceId,
+      goal?.spaceId ?? null,
+    ),
   });
   return dueInstant(parseLocalDate(due), input.timeZone);
 }

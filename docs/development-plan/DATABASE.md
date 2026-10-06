@@ -70,7 +70,8 @@ Additional conventions:
 workspaces
   ├── workspace_members ────────── users (global)
   ├── spaces
-  │     └── space_members
+  │     ├── space_members
+  │     └── space_holidays
   ├── annual_frames
   │     └── annual_strategies
   ├── cycles
@@ -219,6 +220,9 @@ The two legacy columns and their unique partial index arrived at P6-T03a, sevent
 
 ### space_members
 `space_id` to spaces, `member_id` to workspace_members, `role` (`member` / `manager` / `coordinator`).
+
+### space_holidays
+`space_id` to spaces, `starts_on date`, `ends_on date` (checked on or after `starts_on`), `label?`. A span the space marked as a holiday, both days included (METHOD.md §7.4, P9-T19b-a, migration 0131). A check-in period whose last working day is inside one owes no check-in: the cadence moves a due date in one on a period at a time, the streak neither extends nor breaks across it, the booking leaves it out, and a check-in or commitment nudge about the space on a holiday is recorded with `suppressed_reason = 'holiday'` and not sent. `spaces.setHolidays` writes the list whole, soft-deleting the rows it replaces, and moves the open goals due in a holiday in the same transaction. No legacy source.
 
 ## 6. Cycles and the planning workflow (domain C)
 
@@ -619,7 +623,7 @@ The floor is kept rather than lifted. The policy admits a row two ways: `workspa
 ### nudges *(delivery semantics changed at P5-T01b-b)*
 A nudge row is the delivery queue as well as the record. `sent_at is null` with no `suppressed_reason` and a `scheduled_for` that has passed means "owed to somebody and not yet delivered", which is what `deliverDueNudges` reads. The run that decides *whether* the product speaks no longer stamps `sent_at`; the pass that decides *where* does, along with `channel`. Before this, `channel` was written as the literal `in_app` by the run and resolved nowhere.
 
-`kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`, `fallback_reason?` (migration 0102, completeness review M-23: why delivery went somewhere other than where the nudge was routed, null when it did not), `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
+`kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?` (`dedup` / `quiet_hours` / `snooze` / `disabled` / `ceiling` / `holiday`; `holiday` since migration 0131, P9-T19b-a), `fallback_reason?` (migration 0102, completeness review M-23: why delivery went somewhere other than where the nudge was routed, null when it did not), `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
 
 ### nudge_rules
 `rule_key`, `enabled bool`, `channel_override?`, `escalation_ladder jsonb?`, `quiet_mode_exempt bool`.

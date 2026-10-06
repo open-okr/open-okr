@@ -3,7 +3,7 @@ import type { ResolvedThresholds } from "./thresholds.ts";
 /**
  * Whether to stay quiet, and why (AI-NATIVE-PLAN.md §6.3, P4-T04b).
  *
- * Pure, so the five reasons a product says nothing are golden-master tested
+ * Pure, so the six reasons a product says nothing are golden-master tested
  * without a clock, a member row or a queue. Every one of them is a decision
  * rather than an accident, which is why the answer is a reason and never a
  * bare boolean: a product that silently drops a message cannot answer "why did
@@ -21,7 +21,8 @@ export type SuppressionReason =
   | "quiet_hours"
   | "snooze"
   | "disabled"
-  | "ceiling";
+  | "ceiling"
+  | "holiday";
 
 export interface SuppressionInput {
   /** The rule this nudge cites, for the exemption check. */
@@ -70,6 +71,12 @@ export interface SuppressionInput {
   readonly snoozedUntilHoursAway: number | null;
   /** How many nudges this member has already had in the last seven days. */
   readonly sentThisWeek: number;
+  /**
+   * Set when the nudge is about a space's check-in rhythm and the space is on
+   * holiday today (METHOD.md §7.4, P9-T19b-a): "nobody is nudged for them".
+   * Absent reads as no holiday.
+   */
+  readonly onHoliday?: boolean;
 }
 
 /** `HH:MM` as minutes past midnight, or null when it is not a time. */
@@ -163,6 +170,13 @@ export function suppressionFor(
 ): SuppressionReason | null {
   if (!input.ruleEnabled) {
     return "disabled";
+  }
+
+  // A holiday before everything else the product decides, escalations
+  // included: the whole space is away, so there is nobody to escalate to who
+  // is not also on holiday, and the ladder resumes when they are back.
+  if (input.onHoliday) {
+    return "holiday";
   }
 
   // Deduplication: one per subject per member per window, unless the step

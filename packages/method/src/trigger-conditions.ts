@@ -33,9 +33,11 @@ import {
   tooSafePattern,
 } from "./scoring.ts";
 import {
+  currentStreakOn,
+  type Holiday,
+  isHolidayPeriod,
   lastWorkingDayOfPeriod,
   periodStartOf,
-  previousPeriodStart,
 } from "./streak.ts";
 import type { CheckInFrequency, ResolvedThresholds } from "./thresholds.ts";
 
@@ -135,16 +137,34 @@ export function streakAtRisk(input: {
   readonly bookedLaterThisWeek: boolean;
   /** The space's frequency. Weekly where it is not given. */
   readonly frequency?: CheckInFrequency;
+  /**
+   * The space's marked holidays (P9-T19b-a). A holiday period cannot break
+   * the streak, so it puts nothing at risk, and the holidays before it are
+   * not the gap that would.
+   */
+  readonly holidays?: readonly Holiday[];
 }): boolean {
   if (input.currentWeeks <= 0 || !input.lastSessionOn) {
     return false;
   }
   const frequency = input.frequency ?? "weekly";
+  const holidays = input.holidays ?? [];
   const thisPeriod = periodStartOf(input.today, frequency);
+  if (isHolidayPeriod(input.today, frequency, holidays)) {
+    return false;
+  }
+  const lastPeriod = periodStartOf(input.lastSessionOn, frequency);
   return (
     input.today === lastWorkingDayOfPeriod(input.today, frequency) &&
-    periodStartOf(input.lastSessionOn, frequency) ===
-      previousPeriodStart(thisPeriod, frequency) &&
+    lastPeriod < thisPeriod &&
+    // The last one held was the last period that counted before this one:
+    // alive today, and broken tomorrow if this one passes too.
+    currentStreakOn(
+      { currentWeeks: 1, longestWeeks: 1, lastWeek: lastPeriod },
+      input.today,
+      frequency,
+      holidays,
+    ) > 0 &&
     !input.bookedLaterThisWeek
   );
 }

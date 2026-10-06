@@ -25,7 +25,7 @@
  * other cycle bound. Pure: no clock, no database.
  */
 import type { RitualKind } from "./sessions.ts";
-import { periodStartOf } from "./streak.ts";
+import { type Holiday, isHolidayPeriod, periodStartOf } from "./streak.ts";
 import type { CheckInFrequency } from "./thresholds.ts";
 
 /** A cycle's first and last day, inclusive. */
@@ -64,6 +64,11 @@ export interface CadencePlanOptions {
    * week, fortnight or month. Weekly where not given.
    */
   readonly frequency?: CheckInFrequency;
+  /**
+   * The space's marked holidays (P9-T19b-a). No check-in is due in a holiday
+   * period, so none is booked in one.
+   */
+  readonly holidays?: readonly Holiday[];
 }
 
 interface Span {
@@ -192,6 +197,8 @@ export function cadenceCoverage(
   sessions: readonly BookedRitual[],
   /** The space's check-in frequency (P9-T19a-d-b). Weekly where not given. */
   frequency: CheckInFrequency = "weekly",
+  /** The space's marked holidays, whose periods owe no check-in (P9-T19b-a). */
+  holidays: readonly Holiday[] = [],
 ): CadenceCoverage {
   const missing: string[] = [];
   const of = (kinds: readonly RitualKind[]) =>
@@ -200,6 +207,7 @@ export function cadenceCoverage(
   const weekly = of(["weekly"]);
   const openWeeks = checkInPeriodsOf(window, frequency)
     .filter(hasWorkingDay)
+    .filter((week) => !isHolidayPeriod(week.from, frequency, holidays))
     .filter((week) => !weekly.some((session) => within(session.on, week)));
   if (openWeeks.length > 0) {
     const words = PERIOD_WORDS[frequency];
@@ -301,8 +309,12 @@ export function planCycleCadence(
     }
   }
 
-  for (const week of checkInPeriodsOf(window, options.frequency ?? "weekly")) {
-    if (has(["weekly"], week)) {
+  const frequency = options.frequency ?? "weekly";
+  for (const week of checkInPeriodsOf(window, frequency)) {
+    if (
+      has(["weekly"], week) ||
+      isHolidayPeriod(week.from, frequency, options.holidays ?? [])
+    ) {
       continue;
     }
     const on = pick(week, weekday, from);

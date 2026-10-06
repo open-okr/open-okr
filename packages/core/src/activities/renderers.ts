@@ -92,6 +92,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : "A file was held back by the virus scan",
   "space.settingsChanged": (payload) =>
     `${(payload as { name: string }).name} changed its own settings`,
+  "space.holidaysChanged": (payload) => {
+    const { name, count } = payload as { name: string; count: number };
+    return count === 0
+      ? `${name} cleared its holidays`
+      : count === 1
+        ? `${name} marked one holiday`
+        : `${name} marked ${count} holidays`;
+  },
   "agent.autonomy_changed": (payload) => {
     const { from, to } = payload as { from: string; to: string };
     const words = (value: string) => value.replace(/_/g, " ");

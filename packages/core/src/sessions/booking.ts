@@ -31,6 +31,7 @@ import {
   lte,
   or,
 } from "drizzle-orm";
+import { spaceHolidaysInTx } from "../cadence/holidays.ts";
 import { ritualFrequencyOf } from "../cadence/space-frequency.ts";
 import { localDateIn } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
@@ -208,6 +209,7 @@ export async function loadCycleCadence<
         cycle,
         booked.get(space.id) ?? [],
         frequency,
+        await spaceHolidaysInTx(tx, workspaceId, space.id),
       ).missing.map((line) => `${space.name}: ${line}`),
     );
   }

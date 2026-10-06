@@ -38,6 +38,7 @@ import {
   committedBelowFloor,
   confidenceFellIntoLow,
   confidenceIsCritical,
+  isHoliday,
   isTriggerKey,
   periodEndOf,
   phasesClosingToday,
@@ -63,6 +64,7 @@ import {
   agentSeesSession,
   agentSeesSpaceId,
 } from "../agents/scope.ts";
+import { spaceHolidaysInTx } from "../cadence/holidays.ts";
 import { ritualFrequencyOf } from "../cadence/space-frequency.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -539,6 +541,7 @@ export async function dueCommitmentNudges(
       sessionId: commitments.sessionId,
       ownerId: commitments.ownerId,
       weekStart: commitments.weekStart,
+      spaceId: commitments.spaceId,
     })
     .from(commitments)
     .where(
@@ -556,21 +559,32 @@ export async function dueCommitmentNudges(
 
   const due: DueNudge[] = [];
   const said = new Set<string>();
+  // A space on holiday today is reminded of nothing (§7.4, P9-T19b-a).
+  const holidayToday = new Map<string, boolean>();
   for (const row of open) {
     const key = `${row.sessionId}:${row.ownerId}`;
     if (said.has(key) || !commitmentDueToday(row.weekStart, today)) {
       continue;
     }
     said.add(key);
-    due.push(
-      nudge({
+    let holiday = holidayToday.get(row.spaceId);
+    if (holiday === undefined) {
+      holiday = isHoliday(
+        today,
+        await spaceHolidaysInTx(tx, input.workspaceId, row.spaceId),
+      );
+      holidayToday.set(row.spaceId, holiday);
+    }
+    due.push({
+      ...nudge({
         ruleKey: "commitment.due",
         subjectType: "session",
         subjectId: row.sessionId as string,
         recipientMemberId: row.ownerId,
         urgent: false,
       }),
-    );
+      ...(holiday ? { onHoliday: true } : {}),
+    });
   }
   return due;
 }
@@ -657,6 +671,12 @@ export async function dueStreakNudges(
         lastSessionOn: localDateOf(held.endedAt as Date, input.timeZone),
         bookedLaterThisWeek,
         frequency,
+        // A holiday week puts nothing at risk (§7.4, P9-T19b-a).
+        holidays: await spaceHolidaysInTx(
+          tx,
+          input.workspaceId,
+          streak.spaceId,
+        ),
       })
     ) {
       continue;
