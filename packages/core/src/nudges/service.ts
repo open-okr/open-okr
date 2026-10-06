@@ -127,6 +127,12 @@ export interface DueNudge {
    * `holiday`, so the silence is answerable.
    */
   readonly onHoliday?: boolean;
+  /**
+   * Set on a nudge to somebody on leave that their delegate does not take
+   * over (METHOD.md §7.4, P9-T19b-b). Recorded and not sent, with the reason
+   * `leave`.
+   */
+  readonly onLeave?: boolean;
 }
 
 /**
@@ -884,6 +890,7 @@ export async function decideSuppression(
       sentThisWeek:
         input.context.sentThisWeek.get(input.nudge.recipientMemberId) ?? 0,
       onHoliday: input.nudge.onHoliday ?? false,
+      onLeave: input.nudge.onLeave ?? false,
     },
     input.thresholds,
   );

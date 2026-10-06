@@ -31,6 +31,7 @@ const REASON_LABEL: Record<string, string> = {
   disabled: "Rule switched off",
   ceiling: "Weekly ceiling reached",
   holiday: "Space on holiday",
+  leave: "Member on leave",
 };
 
 /**

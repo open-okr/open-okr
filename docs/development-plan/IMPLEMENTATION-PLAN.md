@@ -3839,9 +3839,9 @@ Scenario steps: NW-Q3-06 (holidays), NW-Q3-16 (the weeks P9-T20's measured rhyth
 Depends on: P9-T19b-a
 Goal: a person's leave asks nothing of them and hands what they owe to somebody who is there.
 Deliverables:
-- **Leave (G-2).** `member_leave` with a delegate, and `people.setLeave`, audited.
+- **Leave (G-2).** `member_leave` with a delegate; `people.setLeave` for a member's own and `people.setMemberLeave` for an administrator's, both audited, the profile's own self-versus-others split; `people.leave` to read it.
 - **The rules.** While a member is away nobody nudges them, recorded with the reason `leave`; their reviews and acknowledgements go to the delegate, and the delegate is nudged for, and may post, the check-ins on goals they champion.
-- **The screen.** Leave on the member's own profile, and on the people screen for an admin.
+- **The screen.** Leave on the member's profile, edited by the member and by an administrator.
 - **Documents.** METHOD.md §7.4's leave paragraph moves in, so §7.4 matches v2. DATABASE.md, the §7.2 mapping (no legacy source) and the contract are updated.
 Test plan: nudge unit tests across a leave; the action's audit row; delegation of a review and an acknowledgement; the delegate's check-in.
 Acceptance: Given Mei on leave with Priya as her delegate, when a check-in on a goal Mei reviews is published, then Priya owes the acknowledgement and Mei receives no nudge.

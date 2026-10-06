@@ -3,7 +3,7 @@ import type { ResolvedThresholds } from "./thresholds.ts";
 /**
  * Whether to stay quiet, and why (AI-NATIVE-PLAN.md §6.3, P4-T04b).
  *
- * Pure, so the six reasons a product says nothing are golden-master tested
+ * Pure, so the seven reasons a product says nothing are golden-master tested
  * without a clock, a member row or a queue. Every one of them is a decision
  * rather than an accident, which is why the answer is a reason and never a
  * bare boolean: a product that silently drops a message cannot answer "why did
@@ -22,7 +22,8 @@ export type SuppressionReason =
   | "snooze"
   | "disabled"
   | "ceiling"
-  | "holiday";
+  | "holiday"
+  | "leave";
 
 export interface SuppressionInput {
   /** The rule this nudge cites, for the exemption check. */
@@ -77,6 +78,12 @@ export interface SuppressionInput {
    * Absent reads as no holiday.
    */
   readonly onHoliday?: boolean;
+  /**
+   * Set when the recipient is on leave today and the nudge is not one their
+   * delegate takes over (METHOD.md §7.4, P9-T19b-b): "While they are away
+   * nobody nudges them." Absent reads as not away.
+   */
+  readonly onLeave?: boolean;
 }
 
 /** `HH:MM` as minutes past midnight, or null when it is not a time. */
@@ -177,6 +184,12 @@ export function suppressionFor(
   // is not also on holiday, and the ladder resumes when they are back.
   if (input.onHoliday) {
     return "holiday";
+  }
+
+  // Away, with nobody to pass this one to: the person is not there to read
+  // it, and an escalation that reaches an empty desk is not an escalation.
+  if (input.onLeave) {
+    return "leave";
   }
 
   // Deduplication: one per subject per member per window, unless the step

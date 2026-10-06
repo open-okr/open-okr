@@ -324,6 +324,17 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     because: "Which spaces they belong to. A membership fact.",
   },
   {
+    table: "member_leave",
+    column: "member_id",
+    // The dates somebody marked themselves away, and who stood in (P9-T19b-b).
+    label: "Leave you marked",
+  },
+  {
+    table: "member_leave",
+    column: "delegate_member_id",
+    label: "Leave you stood in for",
+  },
+  {
     table: "subscriptions",
     column: "member_id",
     label: "What you follow",

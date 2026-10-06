@@ -49,6 +49,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `${asString(p.clientName, "A terminal")} was authorised to sign in`,
   "device.denied": (p) => `${asString(p.clientName, "A terminal")} was refused`,
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
+  "member.leaveSet": (p) =>
+    asString(p.count) === "0"
+      ? `${asString(p.name, "A member")} has no leave marked`
+      : `${asString(p.name, "A member")} marked their leave`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
   "member.restored": (p) => `${asString(p.name, "A member")} was restored`,
   "role.created": (p) => `Role "${asString(p.name, "a role")}" was added`,

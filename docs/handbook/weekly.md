@@ -39,6 +39,11 @@ counts as a holiday when its last working day is inside one, so a team back by
 the Friday still checks in that week. A goal that was due in a week you mark
 moves on to the week after it, on the same weekday.
 
+Mark your own leave on your profile, with somebody to stand in. While you are
+away nobody nudges you. The check-ins on goals you champion and the reviews
+you would receive go to your delegate, and your roles stay yours: you are the
+champion again the day you are back.
+
 ## Confidence, and what the numbers mean
 
 | Score | What it means in the session |

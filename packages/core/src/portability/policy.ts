@@ -500,6 +500,13 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
       "The memberships. Each is matched to a user by email address on import, or becomes a placeholder, which is the same shape the FlowyTeam importer writes.",
   },
   {
+    table: "member_leave",
+    decision: "export",
+    // After the members it names, both of them (P9-T19b-b).
+    reason:
+      "Each member's leave and who stood in, which explain why an acknowledgement went to somebody else.",
+  },
+  {
     table: "access_groups",
     decision: "export",
     reason: "The access model's groups, which bindings are granted to.",

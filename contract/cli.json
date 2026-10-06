@@ -3625,6 +3625,63 @@
       "pages": false
     },
     {
+      "name": "people setLeave",
+      "action": "people.setLeave",
+      "method": "POST",
+      "path": "/people/setLeave",
+      "scope": "write",
+      "summary": "Sets the signed-in member's own leave, each span with the delegate who stands in (METHOD.md §7.4).",
+      "flags": [
+        {
+          "name": "leave",
+          "field": "leave",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "people setMemberLeave",
+      "action": "people.setMemberLeave",
+      "method": "POST",
+      "path": "/people/setMemberLeave",
+      "scope": "write",
+      "summary": "Sets another member's leave, each span with the delegate who stands in (METHOD.md §7.4). For an administrator.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leave",
+          "field": "leave",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "people leave",
+      "action": "people.leave",
+      "method": "GET",
+      "path": "/people/leave",
+      "scope": "read",
+      "summary": "One member's leave, oldest first, with who stands in for each span (METHOD.md §7.4).",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "spaces archive",
       "action": "spaces.archive",
       "method": "POST",

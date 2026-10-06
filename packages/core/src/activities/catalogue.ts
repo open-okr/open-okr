@@ -84,6 +84,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "device.approved": z.object({ clientName: z.string() }),
   "device.denied": z.object({ clientName: z.string() }),
   "member.updated": z.object({ name: z.string() }),
+  /** A member's leave was marked or changed (METHOD.md §7.4, P9-T19b-b). */
+  "member.leaveSet": z.object({ name: z.string(), count: z.number() }),
   "member.suspended": z.object({ name: z.string() }),
   "member.restored": z.object({ name: z.string() }),
   // Workspace roles (P8-G13a). The role name travels on the first three

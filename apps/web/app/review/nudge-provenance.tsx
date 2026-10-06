@@ -62,6 +62,7 @@ const HELD_BACK: Record<string, string> = {
   disabled: "review.nudgeProvenance.heldBackDisabled",
   ceiling: "review.nudgeProvenance.heldBackCeiling",
   holiday: "review.nudgeProvenance.heldBackHoliday",
+  leave: "review.nudgeProvenance.heldBackLeave",
 };
 
 function heldBack(

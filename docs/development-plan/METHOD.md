@@ -717,11 +717,13 @@ A key result that falls into the low band is raised with the coordinator.
 
 Every blocker carries an opened time, an owner and a next action. The next action is due by the next check-in. A blocker whose action passes that point is escalated to the coordinator, not re-discussed. *Source:* OpenOKR default. No OKR source defines a blocker taxonomy.
 
-### 7.4 The rhythm streak and holidays
+### 7.4 The rhythm streak, holidays and leave
 
 Consecutive check-in periods in which a space held its check-in, at whatever frequency the space runs. A skipped period breaks it; a period marked as a holiday does not.
 
 A space marks its holiday periods. No check-in is due in them, nobody is nudged for them, the streak does not break, and the measured rhythm (§8.6) does not count them. Shown on the space home. A light touch that keeps the heartbeat visible. *Source:* Tability (vendor) shows check-in streaks.
+
+A member marks their own leave, with a delegate. While they are away nobody nudges them, their reviews and acknowledgements go to the delegate, and a check-in on a goal they champion is the delegate's to post, so their absence never breaks the space's streak. Leave never moves a role for good: that is a reassignment, recorded as one.
 
 ### 7.5 Monthly review
 

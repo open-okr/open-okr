@@ -308,6 +308,7 @@ import {
   setKpiFormulaAction,
   updateKpi,
 } from "./kpis.ts";
+import { readLeave, setMemberLeave, setOwnLeave } from "./leave.ts";
 import {
   drainNotificationBatches,
   getNotificationSettings,
@@ -661,6 +662,9 @@ export const ACTION_MAP = {
   "spaces.updateSettings": updateSpaceSettings,
   "spaces.setHolidays": setSpaceHolidays,
   "spaces.holidays": readSpaceHolidays,
+  "people.setLeave": setOwnLeave,
+  "people.setMemberLeave": setMemberLeave,
+  "people.leave": readLeave,
   "spaces.archive": archiveSpace,
   "spaces.addMember": addSpaceMember,
   "spaces.setMemberRole": setSpaceMemberRole,

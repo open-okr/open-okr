@@ -160,6 +160,12 @@ export {
   shouldProposeRecoveryClose,
 } from "./kpi-recovery.ts";
 export {
+  DELEGATED_TRIGGERS,
+  type Leave,
+  leaveOn,
+  standInFor,
+} from "./leave.ts";
+export {
   type LinkedWork,
   type LinkedWorkDivergence,
   type LinkedWorkDivergenceInput,

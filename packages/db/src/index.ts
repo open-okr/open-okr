@@ -408,6 +408,7 @@ export {
 } from "./schema/kpis.ts";
 export { type Kudo, kudos } from "./schema/kudos.ts";
 export { type McpSession, mcpSessions } from "./schema/mcp.ts";
+export { memberLeave } from "./schema/member-leave.ts";
 export {
   NOTIFICATION_REASONS,
   type Notification,

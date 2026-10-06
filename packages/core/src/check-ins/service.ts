@@ -44,6 +44,7 @@ import { localDateIn } from "../cycles/generation.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { doneAtFor } from "../goals/service.ts";
 import { OperationError } from "../operations/operation.ts";
+import { standInOnInTx } from "../people/leave.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 
@@ -392,7 +393,24 @@ export async function publishCheckInInTx<
   const reviewersOff =
     practiceFromRow(await readRhythmRow(tx, input.workspaceId)).practice
       .reviewer === "off";
-  const reviewerOfRecord = reviewersOff ? null : goal.reviewerId;
+  // A reviewer on leave is answered for by whoever stands in for them (§7.4,
+  // P9-T19b-b), stamped now because publication is when the obligation is
+  // made. Where every link is away the reviewer keeps it, so it waits for
+  // them rather than vanishing.
+  const reviewerOfRecord =
+    reviewersOff || !goal.reviewerId
+      ? null
+      : ((await standInOnInTx(
+          tx,
+          input.workspaceId,
+          goal.reviewerId,
+          formatDate(
+            localDateIn(
+              input.now,
+              await workspaceTimeZone(tx, input.workspaceId),
+            ),
+          ),
+        )) ?? goal.reviewerId);
 
   const previous = await readPrevious(tx, input.workspaceId, goal.id);
   const valuesWritten = await applyValues(tx, input, previous);
