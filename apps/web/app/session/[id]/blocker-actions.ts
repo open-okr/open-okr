@@ -167,3 +167,40 @@ export async function setCoordinatorNoteAction(
   revalidatePath(`/session/${sessionId}`);
   return NO_ERROR;
 }
+
+/**
+ * A low score's next action, with its owner (METHOD.md §7.2 step 2,
+ * P9-T19a-b). Due by the goal's next check-in, which the action works out;
+ * a blocker is raised beside it only where something is actually blocked.
+ */
+export async function setNextActionAction(
+  _previous: CommitmentState,
+  form: FormData,
+): Promise<CommitmentState> {
+  const sessionId = String(form.get("sessionId") ?? "");
+  const keyResultId = String(form.get("keyResultId") ?? "");
+  const ownerId = String(form.get("ownerId") ?? "");
+  const nextAction = String(form.get("nextAction") ?? "").trim();
+  const { t } = await getTranslations();
+  if (nextAction === "") {
+    return { error: t("session.detail.actions.writeTheNextAction") };
+  }
+  if (ownerId === "") {
+    return { error: t("session.detail.actions.somebodyOwnsTheNextAction") };
+  }
+  try {
+    await callAction(await context(), "sessions.setNextAction", {
+      sessionId,
+      keyResultId,
+      nextAction,
+      ownerId,
+    });
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  revalidatePath(sessionPath(form));
+  return NO_ERROR;
+}

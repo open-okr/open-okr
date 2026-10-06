@@ -1,6 +1,6 @@
 import { blockerEscalation, resolveThresholds } from "@openokr/method";
 import { describe, expect, it } from "vitest";
-import { blockerClockOf, blockerDueOn } from "../src/cadence/blockers.ts";
+import { blockerClockOf, nextCheckInDueOn } from "../src/cadence/blockers.ts";
 import { dueInstant } from "../src/cadence/engine.ts";
 import { parseLocalDate } from "../src/cycles/generation.ts";
 
@@ -24,7 +24,7 @@ const endOf = (date: string, timeZone = UTC) =>
 describe("when a new blocker is due", () => {
   it("is the goal's next check-in when that is after the day it opens", () => {
     expect(
-      blockerDueOn({
+      nextCheckInDueOn({
         nextCheckInAt: endOf("2026-10-13"),
         frequency: "weekly",
         anchor: TUESDAY,
@@ -38,7 +38,7 @@ describe("when a new blocker is due", () => {
     // Raised in the meeting, before this week's check-in is posted: the
     // goal's next check-in is still today, and today is not a deadline.
     expect(
-      blockerDueOn({
+      nextCheckInDueOn({
         nextCheckInAt: endOf("2026-10-06"),
         frequency: "weekly",
         anchor: TUESDAY,
@@ -50,7 +50,7 @@ describe("when a new blocker is due", () => {
 
   it("steps an overdue goal forward, so a blocker is never born late", () => {
     expect(
-      blockerDueOn({
+      nextCheckInDueOn({
         nextCheckInAt: endOf("2026-09-22"),
         frequency: "weekly",
         anchor: TUESDAY,
@@ -62,7 +62,7 @@ describe("when a new blocker is due", () => {
 
   it("follows a goal that checks in every two weeks, or monthly", () => {
     expect(
-      blockerDueOn({
+      nextCheckInDueOn({
         nextCheckInAt: endOf("2026-10-06"),
         frequency: "biweekly",
         anchor: TUESDAY,
@@ -71,7 +71,7 @@ describe("when a new blocker is due", () => {
       }),
     ).toBe("2026-10-20");
     expect(
-      blockerDueOn({
+      nextCheckInDueOn({
         nextCheckInAt: endOf("2026-11-02"),
         frequency: "monthly",
         anchor: 2,
@@ -83,7 +83,7 @@ describe("when a new blocker is due", () => {
 
   it("takes the first check-in from today for a goal with no date yet", () => {
     expect(
-      blockerDueOn({
+      nextCheckInDueOn({
         nextCheckInAt: null,
         frequency: "weekly",
         anchor: TUESDAY,

@@ -473,6 +473,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.confidenceConfirmed": (p) =>
     `Confirmed confidence at ${asString(p.confidence)}`,
   // Blockers (P4-T07c)
+  "session.nextActionSet": () => "Named the next action for a low score",
   "session.blockerCreated": (p) => `Opened a ${asString(p.type)} blocker`,
   "session.blockerResolved": (p) => `Resolved a ${asString(p.type)} blocker`,
   "session.blockerReassigned": (p) =>

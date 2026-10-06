@@ -11,9 +11,10 @@ It is a **decision loop**, not a status meeting. Nobody reads out what they did.
 everybody. Votes reveal together, so nobody anchors on what the champion said
 first, and the champion writes what actually changed this week.
 
-**2. Diagnose what is low.** High and medium move on with no discussion. Every
-low score gets three things before the session moves past it: a blocker type, a
-named owner, and one concrete action due by the next check-in.
+**2. Discuss what dropped.** Any key result whose confidence fell gets a short
+discussion. Every low score gets a next action and its owner before the session
+moves past it, due by the next check-in. Raise a blocker too only where
+something is actually blocked: a next step is not a blocker.
 
 **3. Commitments.** Close last week's out loud, delivered or not, with no
 negotiation. Then set two or three for this week, each with an owner and a

@@ -141,9 +141,11 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
   },
   {
     step: 2,
-    title: "Diagnose what is low",
+    // METHOD v2 (P9-T19a-b): a next action for every low score, and a
+    // blocker only where something is actually blocked.
+    title: "Discuss what dropped",
     purpose:
-      "High and medium move on with no discussion. Every low score gets a blocker type, a named owner and one concrete action within 24 hours",
+      "Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner, and a blocker where something is actually blocked",
   },
   {
     step: 3,

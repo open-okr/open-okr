@@ -396,6 +396,9 @@ Unique on `(workspace_id, session_id, member_id)` where not deleted: one person,
 
 A row is created when somebody takes part, not when the session is made. Seeding the space would claim attendance nobody confirmed, and a room pulse averaged over people who never arrived is not the room's pulse. `pulse` and `word` are null until the person gives them, because a missing pulse and a pulse of one are different facts.
 
+### session_confidences
+`session_id` to sessions, `key_result_id` to key_results, `confirmed_confidence numeric`, `team_average numeric?`, `what_changed`, `confirmed_by_id` to workspace_members, `next_action?`, `next_action_owner_id?` to workspace_members, `next_action_due_at?`. One per key result per weekly session. A low one carries its next action with an owner, due at the end of the goal's next check-in day (METHOD.md §7.2 step 2, 0129, P9-T19a-b); the three are set together, by a check constraint.
+
 ### blockers
 `key_result_id?` to key_results, `goal_id?` to goals, `type` (`resource` / `dependency` / `clarity` / `priority_conflict` / `external` / `approach_not_working` / `other`, the last two since 0128, P9-T19a-a), `description?`, `owner_id` to workspace_members, `next_action`, `opened_at`, `due_at`, `resolved_at?`, `escalated_at?`, `escalated_to_id?` to workspace_members, `session_id?` to sessions, `source` (`session` / `manual` / `channel` / `agent`).
 

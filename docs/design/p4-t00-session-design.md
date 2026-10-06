@@ -89,30 +89,36 @@ Given / When / Then:
   to advance, then it is refused naming the unscored KR.
 - Given all KRs scored, when the facilitator advances, then stage 2 begins.
 
-### 2.3 Stage 2: Diagnose what is low
+### 2.3 Stage 2: Discuss what dropped
 
-Every key result with confidence below the low boundary (SS11
-`scoring.confidenceLow`, default 0.4) requires three things.
+Since P9-T19a-b, METHOD v2's step 2: any key result whose confidence fell
+since the last session that scored it gets a short discussion, and every one
+below the low boundary (SS11 `scoring.confidenceLow`, default 0.4) gets a next
+action with an owner, due by the goal's next check-in. A blocker is raised as
+well only where something is actually blocked; its own next action answers
+the score. Until P9-T19a-b every low score needed a blocker, which had a team
+inventing one where there was only a next step.
 
 | Field | Rule |
 |---|---|
-| Blocker type | One of the seven in SS7.3 (resource, dependency, clarity, priority_conflict, external, approach_not_working, other; the last two since P9-T19a-a) |
-| Blocker owner | A named person, not a team |
-| Next action | One concrete action, due by the next check-in of the goal (SS7.3, P9-T19a-a; it was within 24 hours) |
+| Next action | One concrete action, with a named owner, due by the goal's next check-in (`session_confidences.next_action`) |
+| Blocker, where blocked | A type from the seven in SS7.3, a named owner, and its own next action, due by the same check-in |
 
 At or below the critical threshold (SS11 `scoring.confidenceCritical`, 0.3):
 the coordinator raises it with management the same day, and the escalation
 fires immediately (trigger `confidence.critical`).
 
-**Completion condition:** Every low-confidence KR has a blocker type, a named
-owner, and a next action.
+**Completion condition:** Every low-confidence KR has a next action and an
+owner, or an open blocker raised in this session.
 
 Given / When / Then:
-- Given a KR scored 0.3, when the coordinator tries to continue without a
-  blocker type, owner and action, then it is refused.
-- Given a KR scored 0.3 with all three fields set, when the step completes,
-  then the blocker is due by the goal's next check-in, and the owner is
-  reminded the day before it.
+- Given a KR scored 0.3 with neither, when the coordinator tries to continue,
+  then it is refused, naming the key result.
+- Given a KR scored 0.3 with nothing blocking it, when the team names a next
+  action and its owner, then the session moves on without a blocker, and the
+  action is due by the next check-in.
+- Given a KR scored 0.5 that was 0.7 last time, when step 2 is read, then it
+  is listed as having fallen, and nothing holds the session for it.
 
 ### 2.4 Stage 3: Commitments
 

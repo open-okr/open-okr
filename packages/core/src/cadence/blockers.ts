@@ -36,7 +36,8 @@ export function frequencyOf(
 }
 
 /**
- * The check-in a new blocker's next action is due by, as a local date.
+ * The check-in a new blocker's next action is due by, as a local date. A low
+ * score's next action (§7.2 step 2) is due by the same one.
  *
  * The goal's next check-in, unless that falls on the day the blocker is
  * opened or earlier: a blocker raised in the meeting that is this week's
@@ -44,7 +45,7 @@ export function frequencyOf(
  * not by the meeting it was raised in. An overdue goal steps forward the same
  * way, so a blocker is never born past its own deadline.
  */
-export function blockerDueOn(input: {
+export function nextCheckInDueOn(input: {
   readonly nextCheckInAt: Date | null;
   readonly frequency: CheckInFrequency;
   readonly anchor: number;
@@ -64,13 +65,14 @@ export function blockerDueOn(input: {
 }
 
 /**
- * The instant a new blocker on this goal is due: the local end of
- * `blockerDueOn`, which is when a check-in on that day stops being on time.
+ * The instant a new blocker or next action on this goal is due: the local end
+ * of `nextCheckInDueOn`, which is when a check-in on that day stops being on
+ * time.
  *
  * A blocker on no goal, which a session no longer writes but an older row may
  * be, takes the workspace's own frequency from today.
  */
-export async function blockerDueAt(
+export async function nextCheckInDueAt(
   tx: WorkspaceTx,
   input: {
     readonly workspaceId: string;
@@ -98,7 +100,7 @@ export async function blockerDueAt(
         )
         .limit(1)
     : [];
-  const due = blockerDueOn({
+  const due = nextCheckInDueOn({
     nextCheckInAt: goal?.nextCheckInAt ?? null,
     frequency: frequencyOf(goal?.checkInFrequency ?? null, input.thresholds),
     anchor: input.thresholds["cadence.anchorDay"],

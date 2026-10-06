@@ -98,7 +98,7 @@ When a KPI turns unhealthy, OpenOKR drafts a **recovery objective**: committed, 
 Fifteen to thirty minutes, four steps, run by the product.
 
 1. **Confidence round.** Every key result gets a score from 0.0 to 1.0. Where the team votes, everyone submits privately and the votes reveal together, so nobody anchors on the champion. The champion writes one or two lines: what changed this week. Facts, not feelings.
-2. **Diagnose what is low.** High and medium confidence moves on with no discussion. Every low score gets a blocker type, a named owner and one concrete action within twenty-four hours. Anything at or below 0.3 escalates to management the same day.
+2. **Discuss what dropped.** Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner, and a blocker with its type only where something is actually blocked. Anything at or below 0.3 escalates to management the same day.
 3. **Commitments.** Close last week's out loud, delivered or not, no negotiation. Set this week's: two or three moves that will actually shift a key result.
 4. **Digest.** Generated for you, edited by the coordinator, posted to your channel.
 

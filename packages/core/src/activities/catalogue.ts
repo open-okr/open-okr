@@ -587,6 +587,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     keyResultId: z.string(),
     confidence: z.number(),
   }),
+  // A low score's next action (P9-T19a-b)
+  "session.nextActionSet": z.object({ keyResultId: z.string() }),
   // Blockers (P4-T07c)
   "session.blockerCreated": z.object({
     keyResultId: z.string(),

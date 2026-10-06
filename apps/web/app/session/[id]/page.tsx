@@ -75,6 +75,7 @@ import {
   type MonthlyUntrended,
 } from "./monthly-review";
 import { type Narratives, NarrativesPanel } from "./narratives";
+import { type LowScore, NextActionPanel } from "./next-actions.tsx";
 import { type ProcessHealth, ProcessHealthPanel } from "./process-health";
 import { QuarterlyReview } from "./quarterly-review";
 import { type Recognition, RecognitionPanel } from "./recognition";
@@ -216,9 +217,14 @@ export default async function SessionPage({ params }: SessionPageProps) {
     }>;
     owners: Array<{ id: string; label: string }>;
     keyResults: Array<{ id: string; label: string }>;
+    /** What dropped or is low, with each one's next action (P9-T19a-b). */
+    scores: LowScore[];
   } | null = null;
   if (sessionRow.kind === "weekly" && sessionRow.stageKey === "diagnose") {
     const raised = await callAction(context, "sessions.blockerStatus", {
+      sessionId: id,
+    });
+    const lowScores = await callAction(context, "sessions.lowScores", {
       sessionId: id,
     });
     const cycleGoals =
@@ -253,6 +259,24 @@ export default async function SessionPage({ params }: SessionPageProps) {
         hoursOpen: blocker.hoursOpen,
         overdue: blocker.overdue,
         resolved: blocker.resolvedAt !== null,
+      })),
+      scores: lowScores.map((score) => ({
+        keyResultId: score.keyResultId,
+        title: score.title,
+        confidence: score.confidence,
+        previousConfidence: score.previousConfidence,
+        low: score.low,
+        dropped: score.dropped,
+        nextAction: score.nextAction
+          ? {
+              text: score.nextAction.text,
+              ownerName:
+                names.get(score.nextAction.ownerId) ??
+                "Someone no longer in this session",
+              dueOn: score.nextAction.dueOn,
+            }
+          : null,
+        blocked: score.blocked,
       })),
       owners: participants.map((one) => ({
         id: one.memberId,
@@ -791,6 +815,15 @@ export default async function SessionPage({ params }: SessionPageProps) {
           streakWeeks={weeklyFigures.streakWeeks}
           weeks={TREND_WEEKS}
           thresholds={weeklyFigures.thresholds}
+        />
+      )}
+
+      {isRunning && diagnoseStage && (
+        <NextActionPanel
+          sessionId={id}
+          scores={diagnoseStage.scores}
+          owners={diagnoseStage.owners}
+          canWrite={isFacilitator}
         />
       )}
 

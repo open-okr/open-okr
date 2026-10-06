@@ -166,7 +166,7 @@ test("scheduled state — step rail and controls visible", async () => {
   // page gains a second mention of a word.
   const rail = page.locator("ol").first();
   await expect(rail.getByText("Confidence round")).toBeVisible();
-  await expect(rail.getByText("Diagnose what is low")).toBeVisible();
+  await expect(rail.getByText("Discuss what dropped")).toBeVisible();
   await expect(rail.getByText("Commitments")).toBeVisible();
   await expect(rail.getByText("Digest")).toBeVisible();
 
@@ -192,7 +192,7 @@ test("facilitator opens the session — stage 1 becomes active", async () => {
 /**
  * **Un-skipped at P5-T01a, and rewritten, because it could not fail before.**
  *
- * It asserted that the second client shows "Diagnose what is low" after the
+ * It asserted that the second client shows "Discuss what dropped" after the
  * advance. That is a weekly step title, and the rail renders all four titles at
  * every stage, so the assertion held before the advance as well as after it.
  * P4-T07a's acceptance criterion was never actually proven.
@@ -246,7 +246,7 @@ test("acceptance criterion: second context sees stage advance without reload", a
   // in this context at all: the only thing that touched it was the event the
   // relay delivered.
   await expect(secondPage.locator("li[aria-current=\"step\"]")).toContainText(
-    "Diagnose what is low",
+    "Discuss what dropped",
     { timeout: 8_000 },
   );
 
@@ -260,7 +260,7 @@ test("acceptance criterion: second context sees stage advance without reload", a
 /**
  * §7.2 step 2, which rendered nothing at all before P6-G19b.
  *
- * The rail is at "Diagnose what is low" when this starts, left there by the
+ * The rail is at "Discuss what dropped" when this starts, left there by the
  * test above.
  *
  * **The raise is not exercised end to end here, and the fixture is why.** This
@@ -295,7 +295,7 @@ test("the diagnose stage offers the blocker controls", async () => {
 /**
  * §7.2 step 3, which had no surface until P6-G19a.
  *
- * The rail is at "Diagnose what is low" when this starts, because the test
+ * The rail is at "Discuss what dropped" when this starts, because the test
  * above advanced it there. One more step reaches the commitments stage rather
  * than hunting for it, which keeps this test about the stage and not about
  * navigation.

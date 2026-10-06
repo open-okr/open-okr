@@ -9491,6 +9491,58 @@
       "pages": false
     },
     {
+      "name": "sessions setNextAction",
+      "action": "sessions.setNextAction",
+      "method": "POST",
+      "path": "/sessions/setNextAction",
+      "scope": "write",
+      "summary": "Names the next action for a key result scored in this session, with its owner, due by the goal's next check-in.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "next-action",
+          "field": "nextAction",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "owner-id",
+          "field": "ownerId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions lowScores",
+      "action": "sessions.lowScores",
+      "method": "GET",
+      "path": "/sessions/lowScores",
+      "scope": "read",
+      "summary": "The key results scored low or lower than last time in a session, with each one's next action and whether it is blocked.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "sessions createBlocker",
       "action": "sessions.createBlocker",
       "method": "POST",

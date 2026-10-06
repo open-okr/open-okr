@@ -680,13 +680,13 @@ Keep check-ins forward-looking. Status lives in the product. The meeting is for 
 
 **Step 1. Confidence round.** Every key result gets a confidence from 0.0 to 1.0. Where the team votes, each member submits privately and the votes reveal together with a team average, so nobody anchors on the champion. The champion confirms the score and writes one or two lines: what changed this week. Facts, not feelings.
 
-**Step 2. Diagnose what is low.** High and medium confidence moves on with no discussion. Every low score gets three things, without exception:
+**Step 2. Discuss what dropped.** Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner. Where something is actually blocked, it gets a blocker too:
 
 | Field | Rule |
 |---|---|
-| Blocker type | One of the five in §7.3 |
+| Blocker type | One of the types in §7.3 |
 | Blocker owner | A named person, not a team |
-| Next action | One concrete action within 24 hours, not a discussion |
+| Next action | One concrete action due by the next check-in, not a discussion |
 
 Confidence at or below 0.3 escalates: the coordinator raises it with management the same day.
 

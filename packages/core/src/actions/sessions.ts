@@ -89,6 +89,7 @@ import {
 } from "@openokr/method";
 import {
   and,
+  asc,
   avg,
   count,
   desc,
@@ -106,7 +107,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
-import { blockerDueAt } from "../cadence/blockers.ts";
+import { nextCheckInDueAt } from "../cadence/blockers.ts";
 import { localInstant } from "../cadence/engine.ts";
 import { dueLocalDate } from "../cadence/service.ts";
 import {
@@ -987,7 +988,10 @@ export const advanceStage = defineWriteAction({
         }
 
         // Stage completion gate: diagnose → commitments requires every
-        // low-confidence KR to have a blocker with type, owner and action.
+        // low-confidence KR to have a next action with an owner, or an open
+        // blocker, whose action is the next action (§7.2 step 2, P9-T19a-b).
+        // It asked for a blocker on every one, which had a team inventing a
+        // blocker where there was only a next step.
         if (
           session.stageKey === "diagnose" &&
           nextStageKey === "commitments" &&
@@ -998,6 +1002,7 @@ export const advanceStage = defineWriteAction({
             .select({
               keyResultId: sessionConfidences.keyResultId,
               confidence: sessionConfidences.confirmedConfidence,
+              nextAction: sessionConfidences.nextAction,
             })
             .from(sessionConfidences)
             .where(
@@ -1017,11 +1022,14 @@ export const advanceStage = defineWriteAction({
           // stop. Fixed at P6-G19a.
           const LOW_THRESHOLD = gateThresholds["scoring.confidenceLow"];
           const lowKrIds = confirmations
-            .filter((c) => Number(c.confidence) < LOW_THRESHOLD)
+            .filter(
+              (c) =>
+                Number(c.confidence) < LOW_THRESHOLD && c.nextAction === null,
+            )
             .map((c) => c.keyResultId);
 
           if (lowKrIds.length > 0) {
-            // Check that each low KR has at least one unresolved blocker.
+            // Each low KR with no next action of its own needs an open blocker.
             const existingBlockers = await tx
               .select({ keyResultId: blockers.keyResultId })
               .from(blockers)
@@ -1061,7 +1069,7 @@ export const advanceStage = defineWriteAction({
 
               throw new OperationError(
                 "not_found",
-                `Cannot advance: ${titles} scored below ${LOW_THRESHOLD} and has no blocker.`,
+                `Cannot advance: ${titles} scored below ${LOW_THRESHOLD} and has no next action. Name one and its owner, or raise a blocker where something is actually blocked.`,
               );
             }
           }
@@ -2551,7 +2559,7 @@ export const createSessionBlocker = defineWriteAction({
       const { thresholds } = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
-      const dueAt = await blockerDueAt(tx, {
+      const dueAt = await nextCheckInDueAt(tx, {
         workspaceId,
         goalId,
         now,
@@ -2599,6 +2607,299 @@ export const createSessionBlocker = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * A low score's next action (METHOD.md §7.2 step 2, P9-T19a-b).
+ *
+ * "Every low score gets a next action due by the next check-in, with an
+ * owner. Where something is actually blocked, it gets a blocker too." The
+ * session used to ask for a blocker on every low key result, which had a team
+ * inventing one where there was only a next step. This records the step on
+ * the key result's confirmed confidence for the session, due by the goal's
+ * next check-in as a blocker's action is; setting it again replaces it.
+ */
+export const setSessionNextAction = defineWriteAction({
+  name: "sessions.setNextAction",
+  summary:
+    "Names the next action for a key result scored in this session, with its owner, due by the goal's next check-in.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    nextAction: z.string().trim().min(1).max(500),
+    ownerId: z.uuid(),
+  }),
+  output: z.object({ id: z.uuid(), dueAt: z.string() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [confirmed] = await tx
+        .select({ id: sessionConfidences.id })
+        .from(sessionConfidences)
+        .where(
+          activeOnly(
+            sessionConfidences,
+            eq(sessionConfidences.workspaceId, workspaceId),
+            eq(sessionConfidences.sessionId, input.sessionId),
+            eq(sessionConfidences.keyResultId, input.keyResultId),
+          ),
+        )
+        .limit(1);
+      if (!confirmed) {
+        // A next action answers a score, and there is no score to answer
+        // until the confidence round has confirmed one.
+        throw new OperationError(
+          "forbidden",
+          "Confirm this key result's confidence first. A next action answers its score.",
+        );
+      }
+
+      // The owner must be a person in this workspace, as a blocker's is.
+      const [owner] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.ownerId),
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such member.");
+      }
+
+      const now = new Date();
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      const dueAt = await nextCheckInDueAt(tx, {
+        workspaceId,
+        goalId: await goalOfKeyResult(tx, workspaceId, input.keyResultId),
+        now,
+        thresholds,
+        timeZone: await workspaceTimeZone(tx, workspaceId),
+      });
+
+      // openokr:allow-mutation: the operation's own execute.
+      await tx
+        .update(sessionConfidences)
+        .set({
+          nextAction: input.nextAction,
+          nextActionOwnerId: input.ownerId,
+          nextActionDueAt: dueAt,
+          updatedAt: now,
+        })
+        .where(
+          activeOnly(
+            sessionConfidences,
+            eq(sessionConfidences.id, confirmed.id),
+          ),
+        );
+
+      return {
+        result: { id: confirmed.id, dueAt: dueAt.toISOString() },
+        activity: {
+          kind: "session.nextActionSet",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: { keyResultId: input.keyResultId },
+        },
+        audit: {
+          action: "sessions.setNextAction",
+          targetType: "session_confidence",
+          targetId: confirmed.id,
+          payload: {
+            keyResultId: input.keyResultId,
+            ownerId: input.ownerId,
+          },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * What step 2 discusses (METHOD.md §7.2, P9-T19a-b): every key result scored
+ * low in this session, and every one whose confidence fell since the last
+ * session that scored it, with its next action and whether a blocker is open
+ * on it here. A low one with neither holds the session at step 2.
+ */
+export const readSessionLowScores = defineReadAction({
+  name: "sessions.lowScores",
+  summary:
+    "The key results scored low or lower than last time in a session, with each one's next action and whether it is blocked.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      keyResultId: z.uuid(),
+      title: z.string(),
+      confidence: z.number(),
+      /** The last confidence an earlier session confirmed, or null. */
+      previousConfidence: z.number().nullable(),
+      /** Below §3.2's low boundary, which holds the session at step 2. */
+      low: z.boolean(),
+      /** Lower than the previous confirmed confidence. */
+      dropped: z.boolean(),
+      nextAction: z
+        .object({
+          text: z.string(),
+          ownerId: z.uuid(),
+          /** The check-in it is due by, in the workspace calendar. */
+          dueOn: z.string(),
+        })
+        .nullable(),
+      /** An unresolved blocker on it was raised in this session. */
+      blocked: z.boolean(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(
+          tx,
+          context.workspaceId,
+          context.actor.userId,
+        );
+        await requireSessionAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const low = thresholds["scoring.confidenceLow"];
+        const timeZone = await workspaceTimeZone(tx, context.workspaceId);
+
+        const rows = await tx
+          .select({
+            keyResultId: sessionConfidences.keyResultId,
+            title: keyResults.title,
+            confidence: sessionConfidences.confirmedConfidence,
+            createdAt: sessionConfidences.createdAt,
+            nextAction: sessionConfidences.nextAction,
+            nextActionOwnerId: sessionConfidences.nextActionOwnerId,
+            nextActionDueAt: sessionConfidences.nextActionDueAt,
+          })
+          .from(sessionConfidences)
+          .innerJoin(
+            keyResults,
+            eq(keyResults.id, sessionConfidences.keyResultId),
+          )
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.workspaceId, context.workspaceId),
+              eq(sessionConfidences.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(asc(keyResults.title));
+        if (rows.length === 0) {
+          return [];
+        }
+
+        // The confidence each one was last confirmed at, in any earlier
+        // session. One query for all of them, newest first, the first seen
+        // per key result kept.
+        const earlier = await tx
+          .select({
+            keyResultId: sessionConfidences.keyResultId,
+            confidence: sessionConfidences.confirmedConfidence,
+            createdAt: sessionConfidences.createdAt,
+          })
+          .from(sessionConfidences)
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.workspaceId, context.workspaceId),
+              ne(sessionConfidences.sessionId, input.sessionId),
+              inArray(
+                sessionConfidences.keyResultId,
+                rows.map((row) => row.keyResultId),
+              ),
+            ),
+          )
+          .orderBy(desc(sessionConfidences.createdAt));
+        const thisSession = new Map(
+          rows.map((row) => [row.keyResultId, row.createdAt]),
+        );
+        const previous = new Map<string, number>();
+        for (const row of earlier) {
+          const at = thisSession.get(row.keyResultId);
+          if (
+            at !== undefined &&
+            row.createdAt < at &&
+            !previous.has(row.keyResultId)
+          ) {
+            previous.set(row.keyResultId, Number(row.confidence));
+          }
+        }
+
+        const blocked = new Set(
+          (
+            await tx
+              .select({ keyResultId: blockers.keyResultId })
+              .from(blockers)
+              .where(
+                activeOnly(
+                  blockers,
+                  eq(blockers.workspaceId, context.workspaceId),
+                  eq(blockers.sessionId, input.sessionId),
+                  isNull(blockers.resolvedAt),
+                ),
+              )
+          ).map((row) => row.keyResultId),
+        );
+
+        return rows
+          .map((row) => {
+            const confidence = Number(row.confidence);
+            const before = previous.get(row.keyResultId) ?? null;
+            return {
+              keyResultId: row.keyResultId,
+              title: row.title,
+              confidence,
+              previousConfidence: before,
+              low: confidence < low,
+              dropped: before !== null && confidence < before,
+              nextAction:
+                row.nextAction !== null &&
+                row.nextActionOwnerId !== null &&
+                row.nextActionDueAt !== null
+                  ? {
+                      text: row.nextAction,
+                      ownerId: row.nextActionOwnerId,
+                      dueOn: dueLocalDate(row.nextActionDueAt, timeZone) ?? "",
+                    }
+                  : null,
+              blocked: blocked.has(row.keyResultId),
+            };
+          })
+          .filter((row) => row.low || row.dropped);
+      },
+    );
+  },
 });
 
 export const resolveSessionBlocker = defineWriteAction({

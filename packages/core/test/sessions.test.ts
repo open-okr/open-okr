@@ -761,7 +761,7 @@ describe("sessions.resolveBlocker (P4-T07c)", () => {
 });
 
 describe("sessions.advanceStage — diagnose completion gate (P4-T07c)", () => {
-  it("is refused when a low-confidence KR has no blocker (acceptance criterion)", async () => {
+  it("is refused when a low-confidence KR has neither a next action nor a blocker", async () => {
     const wb = await workerDb();
     await createGoalWithKr();
     const sessionId = await openSessionAtConfidence();
@@ -769,12 +769,135 @@ describe("sessions.advanceStage — diagnose completion gate (P4-T07c)", () => {
     // Confirm at 0.3 (below low threshold of 0.4) and advance to diagnose.
     await advanceToDiagnose(sessionId, 0.3);
 
-    // No blocker created. Advancing from diagnose should fail.
+    // Nothing named. Advancing from diagnose should fail.
     await expect(
       callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
         id: sessionId,
       }),
-    ).rejects.toThrow(/below.*0\.4.*no blocker/i);
+    ).rejects.toThrow(/below.*0\.4.*no next action/i);
+  });
+
+  /**
+   * P9-T19a-b's acceptance criterion: "Given a key result scored low with
+   * nothing blocking it, when the team names a next action and its owner,
+   * then the session moves on without a blocker, and the action is due by the
+   * next check-in."
+   */
+  it("acceptance: moves on with a next action and no blocker, due by the next check-in (P9-T19a-b)", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.3);
+
+    const set = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setNextAction",
+      {
+        sessionId,
+        keyResultId,
+        nextAction: "Mei confirms the new import date on Thursday",
+        ownerId: facilitatorMemberId,
+      },
+    )) as { dueAt: string };
+    const { rows } = await wb.admin.query<{ next_check_in_at: Date }>(
+      `select g.next_check_in_at from goals g
+         join key_results k on k.goal_id = g.id where k.id = $1`,
+      [keyResultId],
+    );
+    const nextCheckIn = rows[0]?.next_check_in_at as Date;
+    expect(new Date(set.dueAt).getTime()).toBe(nextCheckIn.getTime());
+
+    const scores = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.lowScores",
+      { sessionId },
+    )) as {
+      keyResultId: string;
+      low: boolean;
+      blocked: boolean;
+      nextAction: { text: string; ownerId: string; dueOn: string } | null;
+    }[];
+    expect(scores).toHaveLength(1);
+    expect(scores[0]).toMatchObject({
+      keyResultId,
+      low: true,
+      blocked: false,
+      nextAction: {
+        text: "Mei confirms the new import date on Thursday",
+        ownerId: facilitatorMemberId,
+      },
+    });
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+    expect((result as { id: string }).id).toBe(sessionId);
+    const blockers = await wb.admin.query(
+      "select id from blockers where session_id = $1",
+      [sessionId],
+    );
+    expect(blockers.rows).toEqual([]);
+  });
+
+  it("lists a key result whose confidence fell since the last session, though it is not low", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.5);
+    // The same key result confirmed at 0.7 in an earlier session.
+    const other = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.create",
+      {
+        spaceId,
+        kind: "weekly",
+        title: "Last week",
+        scheduledFor: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+        facilitatorId: facilitatorMemberId,
+      },
+    )) as { id: string };
+    await wb.admin.query(
+      `insert into session_confidences
+         (id, workspace_id, session_id, key_result_id, confirmed_confidence,
+          what_changed, confirmed_by_id, created_at)
+       select gen_random_uuid(), workspace_id, $1, $2, 0.7, 'Last week', $3,
+              now() - interval '7 days'
+         from okr_sessions where id = $1`,
+      [other.id, keyResultId, facilitatorMemberId],
+    );
+
+    const scores = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.lowScores",
+      { sessionId },
+    )) as {
+      low: boolean;
+      dropped: boolean;
+      previousConfidence: number | null;
+    }[];
+    expect(scores).toEqual([
+      expect.objectContaining({
+        low: false,
+        dropped: true,
+        previousConfidence: 0.7,
+      }),
+    ]);
+  });
+
+  it("refuses a next action before the confidence is confirmed", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.setNextAction", {
+        sessionId,
+        keyResultId,
+        nextAction: "Something",
+        ownerId: facilitatorMemberId,
+      }),
+    ).rejects.toThrow(/Confirm this key result's confidence first/);
   });
 
   it("succeeds after a blocker is created for the low-confidence KR", async () => {
