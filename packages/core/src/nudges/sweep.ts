@@ -128,7 +128,7 @@ async function kpiOwners(
  * Whether this message gets through quiet hours and past the weekly ceiling.
  *
  * **Read from the catalogue, never chosen per call site.** `urgent` bypasses
- * workspace quiet mode, the member's own quiet hours *and* the ten-a-week
+ * workspace quiet mode, the member's own quiet hours *and* the five-a-week
  * ceiling, so a message that repeats daily and is also urgent is unbounded
  * noise. §6.4 already records which triggers escalate, and only an escalation
  * has earned the bypass: that is what P4-T04c's own note means by "somebody

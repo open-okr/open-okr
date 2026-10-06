@@ -22,14 +22,14 @@ import {
   nudges,
   type WorkspaceTx,
 } from "@openokr/db";
-import { asc, eq, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { buildMessage } from "../channels/builder.ts";
 import type { ChannelProviderKey } from "../channels/capabilities.ts";
 import { queueChannelMessageInTx } from "../channels/log.ts";
 import { connectedProviders, loadRoutingMembers } from "../channels/members.ts";
 import { type PrimaryChannel, resolveDelivery } from "../channels/routing.ts";
 import { whatsAppEnvelope } from "../channels/whatsapp-window.ts";
-import { digestItemsFor } from "../notifications/digest.ts";
+import { digestItemsFor, heldByCeilingFor } from "../notifications/digest.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { primaryChannelSchema } from "../settings/registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
@@ -78,16 +78,56 @@ async function dailyDigestDraft(
     baseUrl: input.baseUrl,
     now: input.now,
   });
-  if (contents.items.length === 0) {
+  // What the weekly ceiling held back since the member's last summary, or in
+  // the last week where there was none (§11, P9-T19a-c-b): "anything past
+  // the ceiling waits for the next digest", and this is that digest.
+  const [last] = await tx
+    .select({ sentAt: nudges.sentAt })
+    .from(nudges)
+    .where(
+      activeOnly(
+        nudges,
+        and(
+          eq(nudges.workspaceId, input.workspaceId),
+          eq(nudges.recipientMemberId, input.memberId),
+          eq(nudges.ruleKey, DAILY_DIGEST_RULE),
+          isNotNull(nudges.sentAt),
+        ),
+      ),
+    )
+    .orderBy(desc(nudges.sentAt))
+    .limit(1);
+  const held = await heldByCeilingFor(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+    since: last?.sentAt ?? new Date(input.now.getTime() - 7 * 86_400_000),
+    baseUrl: input.baseUrl,
+  });
+  if (contents.items.length === 0 && held.items.length === 0) {
     return null;
   }
-  const count = contents.items.length;
+  const count = contents.items.length + held.items.length;
   const lines = [
-    "Here is what happened since you last looked.",
-    "",
-    ...contents.items.map((item) => `- ${item.summary}\n  ${item.link}`),
-    ...(contents.omitted > 0 ? ["", `and ${contents.omitted} more.`] : []),
-    "",
+    ...(contents.items.length === 0
+      ? []
+      : [
+          "Here is what happened since you last looked.",
+          "",
+          ...contents.items.map((item) => `- ${item.summary}\n  ${item.link}`),
+          ...(contents.omitted > 0
+            ? ["", `and ${contents.omitted} more.`]
+            : []),
+          "",
+        ]),
+    ...(held.items.length === 0
+      ? []
+      : [
+          "Held back this week, past your limit of messages a week:",
+          "",
+          ...held.items.map((item) => `- ${item.summary}\n  ${item.link}`),
+          ...(held.omitted > 0 ? ["", `and ${held.omitted} more.`] : []),
+          "",
+        ]),
     // The rule key, on this message as on every other proactive message the
     // product sends. It is what a reader follows back to METHOD.md.
     `Rule: ${DAILY_DIGEST_RULE}`,

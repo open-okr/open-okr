@@ -143,6 +143,14 @@ export function deferralFor(input: {
 }
 
 /**
+ * The rule that carries what the ceiling holds back (METHOD.md §11,
+ * P9-T19a-c-b): "Anything past the ceiling waits for the next digest". The
+ * daily digest is how a held message still arrives, so it is not itself held
+ * by the ceiling it reports on, and it does not count towards it.
+ */
+export const CEILING_CARRIER = "digest.daily";
+
+/**
  * The reason to stay quiet, or null to send.
  *
  * `disabled` comes first because a switched-off rule should never appear in the
@@ -196,7 +204,11 @@ export function suppressionFor(
   // §11 bounds noise; it does not bound the product's duty to tell somebody
   // their goal has been stale for a fortnight.
   const ceiling = thresholds["cadence.nudgeCeilingPerWeek"];
-  if (!input.urgent && input.sentThisWeek >= ceiling) {
+  if (
+    !input.urgent &&
+    input.ruleKey !== CEILING_CARRIER &&
+    input.sentThisWeek >= ceiling
+  ) {
     return "ceiling";
   }
 

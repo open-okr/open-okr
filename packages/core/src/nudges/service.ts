@@ -35,6 +35,7 @@ import {
 } from "@openokr/db";
 import {
   acknowledgementEscalation,
+  CEILING_CARRIER,
   type EscalationRole,
   escalation,
   isTriggerKey,
@@ -54,6 +55,7 @@ import {
   gte,
   isNotNull,
   isNull,
+  ne,
 } from "drizzle-orm";
 import type { AgentDrafter, DraftedCheckIn } from "../agents/drafter.ts";
 import {
@@ -668,6 +670,9 @@ export async function loadSuppressionContext(
           eq(nudges.workspaceId, input.workspaceId),
           isNotNull(nudges.sentAt),
           gte(nudges.scheduledFor, weekAgo),
+          // The daily digest carries what the ceiling holds back, so it is
+          // not counted against it (§11, P9-T19a-c-b).
+          ne(nudges.ruleKey, CEILING_CARRIER),
         ),
       ),
     )

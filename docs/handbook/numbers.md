@@ -19,7 +19,7 @@ thresholds**. The values below are the defaults, and each says where in
 | `cadence.stalenessGraceDays` | 3 | §3.5 |
 | `cadence.blockerLadderDays` | reminder 1 | §11 |
 | `cadence.nudgeDeduplicationHours` | 24 | §11 |
-| `cadence.nudgeCeilingPerWeek` | 10 | §11 |
+| `cadence.nudgeCeilingPerWeek` | 5 | §11 |
 | `cadence.dueSoonLeadDays` | 1 | §11 |
 | `cadence.reviewPreparationLeadWeeks` | 2 | §11 |
 
@@ -35,9 +35,11 @@ check-in of the goal it blocks. The owner is reminded the day before, and the
 coordinator hears if the check-in passes with the action still open. The
 sponsor hears only where your workspace puts the sponsor in its ladders.
 
-**Ten nudges a week, deduplicated to one per subject per member per day.** A
+**Five nudges a week, deduplicated to one per subject per member per day.** A
 product that speaks more than that is one people learn to ignore, which is the
-same as a product that says nothing.
+same as a product that says nothing. Anything past the five waits for your
+next morning summary, which lists it, so nothing held back is lost; an
+escalation about somebody else's work always gets through.
 
 ## Confidence and scoring
 

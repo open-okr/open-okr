@@ -411,5 +411,5 @@ Task bodies for the AI and agent work live in IMPLEMENTATION-PLAN.md alongside e
 | A4 | Evaluation pass bar per capability | Set with the design documents |
 | A5 | Agent default autonomy | Propose and approve. Scoped direct writes require admin opt-in per agent |
 | A6 | Embedding model and dimension | Decide at the retrieval task. Keep the column swappable |
-| A7 | Nudge volume ceiling per member per week | A workspace setting in the METHOD.md §11 registry, default ten. Measure in the pilots |
+| A7 | Nudge volume ceiling per member per week | **Decided: five**, by Akmal on 2 October 2026, and built at P9-T19a-c-b. A workspace setting in the METHOD.md §11 registry; anything past it waits for the member's next daily digest, which is not itself held or counted. It was ten. Measure in the pilots |
 | A8 | Outbound MCP, meaning the copilot calling external tools | Later. The registry is designed so it bolts on |

@@ -6,7 +6,7 @@ import {
   type WorkspaceTx,
 } from "@openokr/db";
 import { trigger } from "@openokr/method";
-import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { renderActivity } from "../activities/renderers.ts";
 import { subjectUrl } from "./links.ts";
 import type { DigestItem } from "./templates.ts";
@@ -193,3 +193,82 @@ const REASON_SUMMARIES: Readonly<Record<string, string>> = {
   review: "A check-in is waiting on your review.",
   check_in: "A reminder is waiting for you.",
 };
+
+/**
+ * What the weekly ceiling held back from this member since `since`, as digest
+ * lines (METHOD.md §11, P9-T19a-c-b): "Anything past the ceiling waits for
+ * the next digest."
+ *
+ * A held nudge is a row with the reason `ceiling` and no `sent_at`, so it was
+ * never heard; this is where it is. Each line is the condition its rule
+ * states and the rule key, so it cites its rule as a sent one would, and a
+ * subject the member can no longer see is left out, as in every digest. One
+ * line per subject and rule: a reminder held on three days is one thing
+ * waiting, not three.
+ */
+export async function heldByCeilingFor(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly since: Date;
+    readonly baseUrl: string;
+    readonly limit?: number;
+  },
+): Promise<DigestContents> {
+  const limit = input.limit ?? DIGEST_ITEM_LIMIT;
+  const rows = await tx
+    .select({
+      ruleKey: nudges.ruleKey,
+      subjectType: nudges.subjectType,
+      subjectId: nudges.subjectId,
+    })
+    .from(nudges)
+    .where(
+      activeOnly(
+        nudges,
+        and(
+          eq(nudges.workspaceId, input.workspaceId),
+          eq(nudges.recipientMemberId, input.memberId),
+          eq(nudges.suppressedReason, "ceiling"),
+          isNull(nudges.sentAt),
+          gt(nudges.createdAt, input.since),
+        ),
+      ),
+    )
+    .orderBy(asc(nudges.createdAt), asc(nudges.id));
+
+  const items: DigestItem[] = [];
+  const once = new Set<string>();
+  let seen = 0;
+  for (const row of rows) {
+    const key = `${row.ruleKey}:${row.subjectType}:${row.subjectId}`;
+    if (once.has(key)) {
+      continue;
+    }
+    once.add(key);
+    if (
+      !(await readerMaySeeSubject(
+        tx,
+        input.workspaceId,
+        input.memberId,
+        row.subjectType,
+        row.subjectId,
+      ))
+    ) {
+      continue;
+    }
+    seen++;
+    if (items.length >= limit) {
+      continue;
+    }
+    items.push({
+      summary: `${trigger(row.ruleKey)?.fires ?? row.ruleKey} (${row.ruleKey})`,
+      link:
+        subjectUrl(input.baseUrl, row.subjectType, row.subjectId) ??
+        subjectUrl(input.baseUrl, "workspace", input.workspaceId) ??
+        input.baseUrl,
+    });
+  }
+  return { items, omitted: Math.max(0, seen - items.length) };
+}

@@ -99,7 +99,8 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
     });
     // No clock of its own since P9-T19a-a: the next check-in is the clock.
     expect(canon["cadence.blockerLadderDays"]).toEqual({ reminder: 1 });
-    expect(canon["cadence.nudgeCeilingPerWeek"]).toBe(10);
+    // Five since P9-T19a-c-b, as Akmal decided on 2 October 2026.
+    expect(canon["cadence.nudgeCeilingPerWeek"]).toBe(5);
     expect(canon["cadence.publicationCountdownDays"]).toEqual([14, 7, 1]);
   });
 

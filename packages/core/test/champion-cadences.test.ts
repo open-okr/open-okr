@@ -794,6 +794,74 @@ describe("the daily run: KPI corridors and the morning summary", () => {
     expect(JSON.stringify(summary?.payload)).not.toContain("OpenOKR");
   });
 
+  /**
+   * P9-T19a-c-b's acceptance criterion: "Given a member who has had five
+   * nudges this week, when a sixth is due, then it is not sent and their next
+   * daily digest names it."
+   */
+  it("acceptance: a sixth nudge in a week is held, and the morning summary names it (§11, P9-T19a-c-b)", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set timezone = 'Asia/Jakarta' where id = $1",
+      [ownerMemberId],
+    );
+    const at = new Date("2026-08-20T01:00:00Z");
+    // Five already this week, on subjects of their own.
+    for (let i = 1; i <= 5; i += 1) {
+      await wb.admin.query(
+        `insert into nudges
+           (id, workspace_id, rule_key, kind, subject_type, subject_id,
+            recipient_member_id, channel, scheduled_for, sent_at)
+         values (gen_random_uuid(), $1, 'checkin.due', 'rhythm', 'goal',
+                 gen_random_uuid(), $2, 'in_app', $3, $3)`,
+        [
+          workspaceId,
+          ownerMemberId,
+          new Date(at.getTime() - i * 86_400_000).toISOString(),
+        ],
+      );
+    }
+    // The sixth: a check-in due today, the champion's own reminder, which is
+    // not an escalation and so does not get past the ceiling.
+    const goalId = await goalDueDaysAgo(
+      0,
+      "Become the default choice for mid-market teams",
+      at,
+    );
+    await wb.admin.query("update goals set champion_id = $2 where id = $1", [
+      goalId,
+      ownerMemberId,
+    ]);
+
+    // Check-in reminders are the hourly cadence's; the summary is the daily's.
+    await runAt("hourly", at);
+    await callAction(
+      { pool: wb.appPool, ...context(), baseUrl: "https://okr.example.com" },
+      "agents.runChampion",
+      { now: at.toISOString(), cadence: "daily" },
+    );
+
+    const held = await wb.admin.query<{ suppressed_reason: string | null }>(
+      `select suppressed_reason from nudges
+        where workspace_id = $1 and subject_id = $2
+          and recipient_member_id = $3 and rule_key = 'checkin.due'`,
+      [workspaceId, goalId, ownerMemberId],
+    );
+    expect(held.rows.map((row) => row.suppressed_reason)).toEqual(["ceiling"]);
+
+    // The summary went anyway, past the ceiling it reports on, and names it.
+    const { rows } = await wb.admin.query<{ payload: { text?: string } }>(
+      "select payload from channel_messages where workspace_id = $1 and member_id = $2",
+      [workspaceId, ownerMemberId],
+    );
+    const summary = rows.find((row) =>
+      String(row.payload.text).includes("Rule: digest.daily"),
+    );
+    expect(summary?.payload.text).toContain("Held back this week");
+    expect(summary?.payload.text).toContain("(checkin.due)");
+    expect(summary?.payload.text).toContain(`/goals/${goalId}`);
+  });
+
   it("never sends the Champion its own morning summary", async () => {
     const wb = await workerDb();
     await wb.admin.query(

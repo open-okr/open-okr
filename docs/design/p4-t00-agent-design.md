@@ -283,7 +283,7 @@ From SS11 `cadence.nudgeDeduplicationHours` (24h) and the trigger catalogue.
 |---|---|
 | Window | 1 nudge per subject per member per day (24h) |
 | Exception | An escalation step increase bypasses deduplication |
-| Volume ceiling | SS11 `cadence.nudgeCeilingPerWeek` (10 per member per week) |
+| Volume ceiling | SS11 `cadence.nudgeCeilingPerWeek` (5 per member per week since P9-T19a-c-b; it was 10). Anything past it waits for the member's next daily digest, `digest.daily`, which is neither held by the ceiling nor counted against it |
 | Enforcement | The nudge engine checks before inserting. A suppressed nudge writes a suppression record with the reason |
 
 ## 6. Quiet hours

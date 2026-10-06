@@ -676,6 +676,9 @@ describe("a simulated month", () => {
               count(*)::text as sent
        from nudges
        where workspace_id = $1 and sent_at is not null
+         -- The morning summary carries what the ceiling holds back and is
+         -- not counted against it (P9-T19a-c-b).
+         and rule_key <> 'digest.daily'
        group by recipient_member_id, date_trunc('week', scheduled_for)
        order by count(*) desc`,
       [workspaceId],

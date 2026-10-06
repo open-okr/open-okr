@@ -339,6 +339,7 @@ export {
   weekStartOf,
 } from "./streak.ts";
 export {
+  CEILING_CARRIER,
   deferralFor,
   insideQuietHours,
   type SuppressionInput,

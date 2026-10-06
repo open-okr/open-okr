@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CEILING_CARRIER,
   deferralFor,
   insideQuietHours,
   suppressionFor,
@@ -248,6 +249,16 @@ describe("the volume ceiling", () => {
     expect(
       suppressionFor({ ...base, sentThisWeek: ceiling - 1 }, thresholds),
     ).toBeNull();
+  });
+
+  it("never holds the daily digest, which carries what the ceiling held (P9-T19a-c-b)", () => {
+    expect(
+      suppressionFor(
+        { ...base, ruleKey: CEILING_CARRIER, sentThisWeek: 999 },
+        thresholds,
+      ),
+    ).toBeNull();
+    expect(CEILING_CARRIER).toBe("digest.daily");
   });
 
   it("never stops an escalation", () => {

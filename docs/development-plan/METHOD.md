@@ -927,7 +927,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Blocker clock | The next action is due by the next check-in |
 | Blocker ladder | Owner reminded 1 day before the next check-in, coordinator when the check-in passes with the action open |
 | Nudge deduplication window | 1 nudge per subject per member per day unless the escalation step increases |
-| Nudge volume ceiling | 10 per member per week |
+| Nudge volume ceiling | 5 per member per week. Anything past the ceiling waits for the next digest |
 | Due-soon lead | 1 day before the anchor day |
 | Planning-open lead | 6 weeks before an annual cycle starts, 3 weeks before a quarterly |
 | Team publication window | 2 weeks after the cycle starts |

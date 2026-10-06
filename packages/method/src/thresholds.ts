@@ -185,8 +185,8 @@ export const THRESHOLDS = {
     group: "cadence",
     label: "Nudge volume ceiling",
     section: "§11",
-    why: "Ten per member per week, so noise is bounded and measurable rather than emergent.",
-    default: 10,
+    why: "Five per member per week, so noise is bounded and measurable rather than emergent. Anything past it waits for the member's next daily digest.",
+    default: 5,
     schema: z.number().int().min(0).max(200),
   }),
   "cadence.dueSoonLeadDays": param({
