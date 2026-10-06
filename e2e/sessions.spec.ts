@@ -278,10 +278,13 @@ test("the diagnose stage offers the blocker controls", async () => {
   await expect(page.getByRole("heading", { name: "Blockers" })).toBeVisible();
   await expect(page.getByText("Nothing raised in this session yet")).toBeVisible();
 
-  // §6.2's five types, from the method package rather than from a list typed
-  // into the component.
+  // §7.3's seven types since P9-T19a-a, from the method package rather than
+  // from a list typed into the component.
   const types = page.locator("select[name='type'] option");
-  await expect(types).toHaveCount(6); // the five, plus "What kind"
+  await expect(types).toHaveCount(8); // the seven, plus "What kind"
+  await expect(types.filter({ hasText: "Approach not working" })).toHaveCount(
+    1,
+  );
   await expect(page.getByRole("button", { name: "Raise a blocker" })).toBeVisible();
 });
 

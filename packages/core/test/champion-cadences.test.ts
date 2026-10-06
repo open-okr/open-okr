@@ -315,8 +315,12 @@ describe("the daily run: blocker aging", () => {
    * Nothing is inserted by hand and nothing is backdated: the blocker opens
    * now, and each run below is asked about a `now` further along its clock.
    * That is what makes this a test of the ladder rather than of a fixture.
+   *
+   * `checkInIn` sets the goal's next check-in that many days out first, the
+   * one thing the acceptance criterion needs fixed: a blocker opened on the
+   * day of a weekly check-in is due a week later.
    */
-  const openBlocker = async () => {
+  const openBlocker = async (checkInIn?: number) => {
     const wb = await workerDb();
     const goal = (await callAction(
       { pool: wb.appPool, ...context() },
@@ -387,6 +391,13 @@ describe("the daily run: blocker aging", () => {
       "sessions.advanceStage",
       { id: session.id },
     );
+    if (checkInIn !== undefined) {
+      await wb.admin.query(
+        `update goals set next_check_in_at = now() + make_interval(days => $2)
+          where id = $1`,
+        [goal.id, checkInIn],
+      );
+    }
     const blocker = (await callAction(
       { pool: wb.appPool, ...context() },
       "sessions.createBlocker",
@@ -398,25 +409,45 @@ describe("the daily run: blocker aging", () => {
         nextAction: "Get the vendor to confirm the date by Thursday",
       },
     )) as { id: string };
-    return { blockerId: blocker.id, goalId: goal.id };
+    const { rows } = await wb.admin.query<{ due_at: Date }>(
+      "select due_at from blockers where id = $1",
+      [blocker.id],
+    );
+    return {
+      blockerId: blocker.id,
+      goalId: goal.id,
+      dueAt: rows[0]?.due_at as Date,
+    };
   };
 
-  /** Hours from now, as an instant a run can be asked about. */
-  const inHours = (hours: number) => new Date(Date.now() + hours * 3_600_000);
+  /** An instant a number of days from another, as a run can be asked about. */
+  const daysFrom = (from: Date, days: number) =>
+    new Date(from.getTime() + days * 86_400_000);
+  const blockerNudges = async () =>
+    (await sentNudges()).filter((row) => row.rule_key.startsWith("blocker."));
 
-  it("says nothing before the twenty-hour warning", async () => {
-    await openBlocker();
-    await runAt("daily", inHours(19));
-    const sent = await sentNudges();
-    expect(sent.filter((row) => row.rule_key.startsWith("blocker."))).toEqual(
-      [],
-    );
+  it("acceptance: opened on Tuesday with weekly check-ins, nobody is escalated when Thursday passes (P9-T19a-a)", async () => {
+    // Opened at the day's check-in: the next is a week away, and the clock is
+    // that check-in rather than twenty-four hours.
+    const { dueAt } = await openBlocker(7);
+    const opened = daysFrom(dueAt, -7);
+    // Thursday has passed: two and a half days after Tuesday's opening.
+    await runAt("daily", daysFrom(opened, 2.5));
+    expect(await blockerNudges()).toEqual([]);
   });
 
-  it("warns the blocker's owner at twenty hours, before the deadline", async () => {
-    const { blockerId } = await openBlocker();
-    await runAt("daily", inHours(20.5));
+  it("is due by the goal's next check-in, not a day after opening", async () => {
+    const before = new Date();
+    const { dueAt } = await openBlocker(7);
+    expect(dueAt.getTime()).toBeGreaterThan(daysFrom(before, 6).getTime());
+  });
 
+  it("reminds the blocker's owner the day before its check-in", async () => {
+    const { blockerId, dueAt } = await openBlocker(7);
+    await runAt("daily", daysFrom(dueAt, -2.5));
+    expect(await blockerNudges()).toEqual([]);
+
+    await runAt("daily", daysFrom(dueAt, -1));
     const warnings = (await sentNudges()).filter(
       (row) => row.rule_key === "blocker.warning",
     );
@@ -428,9 +459,9 @@ describe("the daily run: blocker aging", () => {
     expect(warnings[0]?.recipient_member_id).toBe(secondMemberId);
   });
 
-  it("escalates past the owner at twenty-four hours (acceptance criterion)", async () => {
-    await openBlocker();
-    await runAt("daily", inHours(25));
+  it("tells the coordinator once the check-in passes with the action open", async () => {
+    const { dueAt } = await openBlocker(7);
+    await runAt("daily", daysFrom(dueAt, 0.5));
 
     const overdue = (await sentNudges()).filter(
       (row) => row.rule_key === "blocker.overdue",
@@ -443,10 +474,21 @@ describe("the daily run: blocker aging", () => {
     expect(overdue.every((row) => row.escalation_step === 2)).toBe(true);
   });
 
-  it("reaches the sponsor at forty-eight hours", async () => {
-    await openBlocker();
-    await runAt("daily", inHours(49));
+  it("never reaches the sponsor unless the workspace puts the sponsor in its ladders", async () => {
+    const wb = await workerDb();
+    const { dueAt } = await openBlocker(7);
+    // Two check-ins past, and still the coordinator by default.
+    await runAt("daily", daysFrom(dueAt, 8));
+    expect(
+      (await sentNudges()).filter(
+        (row) => row.rule_key === "blocker.escalated",
+      ),
+    ).toEqual([]);
 
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "escalation.sponsorInLadders": "on" },
+    });
+    await runAt("daily", daysFrom(dueAt, 9));
     const escalated = (await sentNudges()).filter(
       (row) => row.rule_key === "blocker.escalated",
     );
@@ -463,11 +505,12 @@ describe("the daily run: blocker aging", () => {
       { id: blockerId },
     );
 
-    await runAt("daily", inHours(49));
-    const sent = await sentNudges();
-    expect(sent.filter((row) => row.rule_key.startsWith("blocker."))).toEqual(
-      [],
+    const { rows } = await wb.admin.query<{ due_at: Date }>(
+      "select due_at from blockers where id = $1",
+      [blockerId],
     );
+    await runAt("daily", daysFrom(rows[0]?.due_at as Date, 9));
+    expect(await blockerNudges()).toEqual([]);
   });
 });
 

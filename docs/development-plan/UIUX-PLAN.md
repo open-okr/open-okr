@@ -165,7 +165,7 @@ Format: purpose, layout, primary actions, states.
 **S-22 Weekly session.** A space's home before the session shows the run control, the twelve-week confidence trend, the streak ribbon, the open blockers with ages, and last week's scores. Running the session is a four-step flow with a step rail and a continue control that stays disabled with a stated reason until the step is complete. **Mockup:** [07-weekly-session](../stakeholder/mockups/png/07-weekly-session.png).
 
 - Step 1, confidence round: a key result list on the left with score chips and state, and a focus panel on the right with the goal metadata, a draggable confidence dial with band shortcuts, the team votes revealing one by one with the average, a "what changed this week?" note, and a confirm that advances to the next unscored key result.
-- Step 2, diagnose: one card per key result below the threshold, each with its confidence, a blocker type picker with the type's definition shown, a blocker owner, a next action within 24 hours, and an escalation notice at 0.3 and below.
+- Step 2, diagnose: one card per key result below the threshold, each with its confidence, a blocker type picker with the type's definition shown, a blocker owner, a next action due by the next check-in with the date shown (P9-T19a-a), and an escalation notice at 0.3 and below.
 - Step 3, commitments: last week's list with delivered and not-yet controls, then this week's with text, owner and linked key result.
 - Step 4, digest: the generated digest with headline, on track, at risk, blockers and commitments, plus a coordinator note, a summary panel, and controls to copy it or post it to the space's channel.
 

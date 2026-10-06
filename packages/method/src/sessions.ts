@@ -21,8 +21,9 @@ import type { ResolvedThresholds } from "./thresholds.ts";
  */
 
 /**
- * The five blocker types from METHOD.md §7.3, with the definitions the
- * session UI shows beside each picker option.
+ * The seven blocker types from METHOD.md §7.3, with the definitions the
+ * session UI shows beside each picker option. "Approach not working" and
+ * "Other" arrived with METHOD v2 (P9-T19a-a).
  */
 export const BLOCKER_TYPE_DEFINITIONS = [
   {
@@ -49,6 +50,16 @@ export const BLOCKER_TYPE_DEFINITIONS = [
     type: "external" as const,
     label: "External",
     definition: "Market, regulation or partner factors beyond your control",
+  },
+  {
+    type: "approach_not_working" as const,
+    label: "Approach not working",
+    definition: "The work is happening and the number is not moving",
+  },
+  {
+    type: "other" as const,
+    label: "Other",
+    definition: "Anything else, described in a line",
   },
 ] as const;
 

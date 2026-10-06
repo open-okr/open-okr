@@ -165,25 +165,13 @@ export const THRESHOLDS = {
     default: { nudge: 1, escalate: 3 },
     schema: z.object({ nudge: wholeDays, escalate: wholeDays }),
   }),
-  "cadence.blockerClockHours": param({
-    group: "cadence",
-    label: "Blocker clock",
-    section: "§3.2",
-    why: "Twenty-four hours to the next action. A blocker with no next action inside a day is not being worked.",
-    default: 24,
-    schema: positiveHours,
-  }),
-  "cadence.blockerLadderHours": param({
+  "cadence.blockerLadderDays": param({
     group: "cadence",
     label: "Blocker ladder",
     section: "§11",
-    why: "Owner warned at twenty hours, coordinator at twenty-four, sponsor at forty-eight. The warning arrives before the deadline, not after it.",
-    default: { owner: 20, coordinator: 24, sponsor: 48 },
-    schema: z.object({
-      owner: positiveHours,
-      coordinator: positiveHours,
-      sponsor: positiveHours,
-    }),
+    why: "A blocker's next action is due by the next check-in of the goal it blocks (§7.3). The owner is reminded this many days before that check-in, and the coordinator hears when it passes with the action still open.",
+    default: { reminder: 1 },
+    schema: z.object({ reminder: wholeDays }),
   }),
   "cadence.nudgeDeduplicationHours": param({
     group: "cadence",

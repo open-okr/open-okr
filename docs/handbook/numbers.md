@@ -17,7 +17,7 @@ thresholds**. The values below are the defaults, and each says where in
 | `cadence.anchorDay` | 1 | §7.1 |
 | `cadence.toleranceDays` | 1 | §7.1 |
 | `cadence.stalenessGraceDays` | 3 | §3.5 |
-| `cadence.blockerClockHours` | 24 | §3.2 |
+| `cadence.blockerLadderDays` | reminder 1 | §11 |
 | `cadence.nudgeDeduplicationHours` | 24 | §11 |
 | `cadence.nudgeCeilingPerWeek` | 10 | §11 |
 | `cadence.dueSoonLeadDays` | 1 | §11 |
@@ -30,8 +30,10 @@ is planned rather than reported on afterwards.
 **Three days of grace before a goal reads as outdated.** After that, staleness
 overrides whatever health its owner last reported.
 
-**A blocker has twenty-four hours.** The owner is warned before that and the
-sponsor hears about it after.
+**A blocker has until the next check-in.** Its next action is due by the next
+check-in of the goal it blocks. The owner is reminded the day before, and the
+coordinator hears if the check-in passes with the action still open. The
+sponsor hears only where your workspace puts the sponsor in its ladders.
 
 **Ten nudges a week, deduplicated to one per subject per member per day.** A
 product that speaks more than that is one people learn to ignore, which is the

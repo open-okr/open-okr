@@ -703,8 +703,10 @@ Confidence at or below 0.3 escalates: the coordinator raises it with management 
 | Clarity | The key result is ambiguous. Nobody agrees what done means |
 | Priority conflict | Business as usual keeps displacing OKR work |
 | External | Market, regulation or partner factors beyond your control |
+| Approach not working | The work is happening and the number is not moving |
+| Other | Anything else, described in a line |
 
-Every blocker carries an opened time, an owner, a next action, and a 24-hour clock. The clock is the point. A blocker that ages past it is escalated, not re-discussed.
+Every blocker carries an opened time, an owner and a next action. The next action is due by the next check-in. A blocker whose action passes that point is escalated to the coordinator, not re-discussed. *Source:* OpenOKR default. No OKR source defines a blocker taxonomy.
 
 ### 7.4 The rhythm streak
 
@@ -894,7 +896,7 @@ The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice beh
 | Dependency unconfirmed and unowned | Unconfirmed is a risk. Name a risk owner or get the confirmation |
 | Capacity check with nothing cut | If the answer is nothing, capacity was not checked |
 | Check-in overdue past grace | This goal is stale. It cannot quietly stay green |
-| Blocker past its 24-hour clock | This blocker is aging. Escalating to the coordinator |
+| Blocker action past the next check-in | This blocker has not moved. Raising it with the coordinator |
 | Reported health disagrees with the data | Reported on track, but this key result has not moved in four weeks |
 | Trend forecast misses the target | On current trajectory this misses. Better to say it now than at the close |
 | KPI drops out of its corridor | This KPI is unhealthy. Here is a recovery OKR drafted from its leading drivers |
@@ -920,8 +922,8 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |
 | Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded, coordinator at 7 days, sponsor at 14 days |
 | Acknowledgement ladder | Reviewer nudged 1 day after publication, escalated at 3 days |
-| Blocker clock | 24 hours to the next action |
-| Blocker ladder | Owner warned at 20 hours, coordinator at 24 hours, sponsor at 48 hours |
+| Blocker clock | The next action is due by the next check-in |
+| Blocker ladder | Owner reminded 1 day before the next check-in, coordinator when the check-in passes with the action open |
 | Nudge deduplication window | 1 nudge per subject per member per day unless the escalation step increases |
 | Nudge volume ceiling | 10 per member per week |
 | Due-soon lead | 1 day before the anchor day |

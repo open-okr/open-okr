@@ -1,8 +1,9 @@
 /**
  * Blockers (TECHNICAL-PLAN §4, METHOD.md §7.3, P4-T07c).
  *
- * Opened during the weekly session's diagnose step for every key result
- * with confidence below the low boundary. The 24-hour clock starts on save.
+ * Opened during the weekly session's diagnose step where something is
+ * blocked. The next action is due by the next check-in of the goal it blocks
+ * (METHOD.md §7.3, P9-T19a-a), which `due_at` records when it is opened.
  */
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
@@ -16,6 +17,8 @@ export const BLOCKER_TYPES = [
   "clarity",
   "priority_conflict",
   "external",
+  "approach_not_working",
+  "other",
 ] as const;
 export type BlockerType = (typeof BLOCKER_TYPES)[number];
 

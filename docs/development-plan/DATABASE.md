@@ -397,9 +397,9 @@ Unique on `(workspace_id, session_id, member_id)` where not deleted: one person,
 A row is created when somebody takes part, not when the session is made. Seeding the space would claim attendance nobody confirmed, and a room pulse averaged over people who never arrived is not the room's pulse. `pulse` and `word` are null until the person gives them, because a missing pulse and a pulse of one are different facts.
 
 ### blockers
-`key_result_id?` to key_results, `goal_id?` to goals, `type` (`resource` / `dependency` / `clarity` / `priority_conflict` / `external`), `description?`, `owner_id` to workspace_members, `next_action`, `opened_at`, `due_at`, `resolved_at?`, `escalated_at?`, `escalated_to_id?` to workspace_members, `session_id?` to sessions, `source` (`session` / `manual` / `channel` / `agent`).
+`key_result_id?` to key_results, `goal_id?` to goals, `type` (`resource` / `dependency` / `clarity` / `priority_conflict` / `external` / `approach_not_working` / `other`, the last two since 0128, P9-T19a-a), `description?`, `owner_id` to workspace_members, `next_action`, `opened_at`, `due_at`, `resolved_at?`, `escalated_at?`, `escalated_to_id?` to workspace_members, `session_id?` to sessions, `source` (`session` / `manual` / `channel` / `agent`).
 
-`due_at` is `opened_at` plus the workspace blocker clock, twenty-four hours by default.
+`due_at` is the end of the goal's next check-in day, the first one after the day the blocker opens, in the workspace calendar (METHOD.md §7.3, P9-T19a-a). It was `opened_at` plus a twenty-four hour clock; data change 0023 moved the open ones to their goal's next check-in.
 
 ### commitments
 `session_id?` to sessions, `space_id` to spaces, `week_start date`, `text`, `owner_id` to workspace_members, `key_result_id?` to key_results, `delivered bool?`, `closed_at?`.

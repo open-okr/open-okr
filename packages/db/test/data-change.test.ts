@@ -25,6 +25,7 @@ import { dropAlignmentPenalties } from "../src/data-changes/0019_drop_alignment_
 import { kpiTargetTypeFromDirection } from "../src/data-changes/0020_kpi_target_type_from_direction.ts";
 import { kpiRecoveringToBand } from "../src/data-changes/0021_kpi_recovering_to_band.ts";
 import { kpiNamedOwner } from "../src/data-changes/0022_kpi_named_owner.ts";
+import { blockerClockToCheckIn } from "../src/data-changes/0023_blocker_clock_to_check_in.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1309,5 +1310,119 @@ describe("0022: a member's KPI is owned by that member", () => {
       scripts: [kpiNamedOwner],
     });
     expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0023: blockers on the check-in's clock", () => {
+  it("retires the hour clock and moves open blockers to their goal's next check-in, never earlier", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const { rows } = await client.query<{
+      workspace_id: string;
+      member_id: string;
+      later_goal: string;
+      same_day_goal: string;
+    }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), r as (
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, '{"cadence.blockerClockHours": 36,
+                        "cadence.blockerLadderHours":
+                          {"owner": 30, "coordinator": 36, "sponsor": 72},
+                        "cadence.stalenessGraceDays": 2}'::jsonb
+           from w
+         returning workspace_id
+       ), n as (
+         insert into nudge_rules (id, workspace_id, rule_key, escalation_ladder)
+         select gen_random_uuid(), w.id, 'blocker.escalated',
+                '{"owner": 30, "coordinator": 36, "sponsor": 72}'::jsonb
+           from w
+         returning workspace_id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Owner', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, timeframe, next_check_in_at)
+         select gen_random_uuid(), m.workspace_id, d.title, 'team',
+                'workspace', m.id,
+                '{"start": "2026-07-01", "end": "2026-09-30"}'::jsonb,
+                now() + d.ahead
+           from m,
+                (values ('Next week', interval '6 days'),
+                        ('Today', interval '2 hours'))
+                  as d(title, ahead)
+         returning id, title, workspace_id
+       )
+       select m.workspace_id, m.id as member_id,
+              (select id from g where title = 'Next week') as later_goal,
+              (select id from g where title = 'Today') as same_day_goal
+         from m`,
+    );
+    const seeded = rows[0] as {
+      workspace_id: string;
+      member_id: string;
+      later_goal: string;
+      same_day_goal: string;
+    };
+    // Three blockers on the old clock: an open one whose goal checks in next
+    // week, a resolved one on the same goal, and an open one whose goal is
+    // due before the old deadline anyway.
+    await client.query(
+      `insert into blockers (id, workspace_id, goal_id, type, owner_id,
+                             next_action, opened_at, due_at, resolved_at,
+                             source)
+       values (gen_random_uuid(), $1, $2, 'resource', $4, 'Moves',
+               now() - interval '1 hour', now() + interval '35 hours', null,
+               'session'),
+              (gen_random_uuid(), $1, $2, 'resource', $4, 'Resolved',
+               now() - interval '1 hour', now() + interval '35 hours', now(),
+               'session'),
+              (gen_random_uuid(), $1, $3, 'resource', $4, 'Stays',
+               now() - interval '1 hour', now() + interval '35 hours', null,
+               'session')`,
+      [
+        seeded.workspace_id,
+        seeded.later_goal,
+        seeded.same_day_goal,
+        seeded.member_id,
+      ],
+    );
+
+    const [result] = await runDataChanges(client, {
+      scripts: [blockerClockToCheckIn],
+    });
+    // One settings row, one ladder, one blocker.
+    expect(result?.rowsChanged).toBe(3);
+
+    const overrides = (
+      await client.query<{ overrides: object }>(
+        "select overrides from rhythm_settings where workspace_id = $1",
+        [seeded.workspace_id],
+      )
+    ).rows[0]?.overrides;
+    expect(overrides).toEqual({ "cadence.stalenessGraceDays": 2 });
+    const ladder = (
+      await client.query<{ escalation_ladder: object | null }>(
+        "select escalation_ladder from nudge_rules where workspace_id = $1",
+        [seeded.workspace_id],
+      )
+    ).rows[0]?.escalation_ladder;
+    expect(ladder).toBeNull();
+
+    const dues = Object.fromEntries(
+      (
+        await client.query<{ next_action: string; on_check_in: boolean }>(
+          `select b.next_action,
+                  b.due_at = g.next_check_in_at as on_check_in
+             from blockers b join goals g on g.id = b.goal_id`,
+        )
+      ).rows.map((row) => [row.next_action, row.on_check_in]),
+    );
+    expect(dues).toEqual({ Moves: true, Resolved: false, Stays: false });
   });
 });

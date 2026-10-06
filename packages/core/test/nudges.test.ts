@@ -802,11 +802,8 @@ describe("the per-rule escalation ladder (P6-G21b)", () => {
       "checkin.overdue",
     ]);
     const blocker = owners.find((rule) => rule.key === "blocker.escalated");
-    expect(blocker?.ladder?.canon).toEqual({
-      owner: 20,
-      coordinator: 24,
-      sponsor: 48,
-    });
+    // One rung since P9-T19a-a: the reminder's days before the check-in.
+    expect(blocker?.ladder?.canon).toEqual({ reminder: 1 });
     // Null while the workspace is on the canon, which is what lets the screen
     // show §11's numbers as placeholders rather than as something typed.
     expect(blocker?.ladder?.own).toBeNull();
@@ -828,8 +825,8 @@ describe("the per-rule escalation ladder (P6-G21b)", () => {
     // of order fires its top rung first and never reaches the ones below it.
     await expect(
       set({
-        ruleKey: "blocker.escalated",
-        escalationLadder: { owner: 30, coordinator: 24, sponsor: 48 },
+        ruleKey: "checkin.overdue",
+        escalationLadder: { championRepeat: 8, coordinator: 7, sponsor: 14 },
       }),
     ).rejects.toThrow(/must come after/);
   });
@@ -837,8 +834,9 @@ describe("the per-rule escalation ladder (P6-G21b)", () => {
   it("refuses a shape §11 would not recognise", async () => {
     await expect(
       set({
+        // The hour ladder this rule held until P9-T19a-a.
         ruleKey: "blocker.escalated",
-        escalationLadder: { owner: 20, coordinator: 24 },
+        escalationLadder: { owner: 20, coordinator: 24, sponsor: 48 },
       }),
     ).rejects.toThrow(/§11 would recognise/);
   });
@@ -846,15 +844,11 @@ describe("the per-rule escalation ladder (P6-G21b)", () => {
   it("stores one, hands it back, and returns to the canon when emptied", async () => {
     await set({
       ruleKey: "blocker.escalated",
-      escalationLadder: { owner: 4, coordinator: 8, sponsor: 12 },
+      escalationLadder: { reminder: 2 },
     });
     const stored = await read();
     const rule = stored.rules.find((one) => one.key === "blocker.escalated");
-    expect(rule?.ladder?.own).toEqual({
-      owner: 4,
-      coordinator: 8,
-      sponsor: 12,
-    });
+    expect(rule?.ladder?.own).toEqual({ reminder: 2 });
     expect(rule?.configured).toBe(true);
 
     // A row kept only to hold a copy of §11's numbers would survive a change

@@ -209,6 +209,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       keyResultTitle: string | null;
       ownerName: string;
       nextAction: string;
+      dueOn: string;
       hoursOpen: number;
       overdue: boolean;
       resolved: boolean;
@@ -248,6 +249,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
         ownerName:
           names.get(blocker.ownerId) ?? "Someone no longer in this session",
         nextAction: blocker.nextAction,
+        dueOn: blocker.dueOn,
         hoursOpen: blocker.hoursOpen,
         overdue: blocker.overdue,
         resolved: blocker.resolvedAt !== null,

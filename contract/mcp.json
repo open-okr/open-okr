@@ -13071,7 +13071,7 @@
     },
     {
       "name": "sessions.createBlocker",
-      "description": "Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save.",
+      "description": "Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13092,7 +13092,9 @@
               "dependency",
               "clarity",
               "priority_conflict",
-              "external"
+              "external",
+              "approach_not_working",
+              "other"
             ]
           },
           "description": {

@@ -52765,7 +52765,7 @@
     "/sessions/createBlocker": {
       "post": {
         "operationId": "sessions.createBlocker",
-        "summary": "Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save.",
+        "summary": "Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in.",
         "tags": [
           "sessions"
         ],
@@ -52853,7 +52853,9 @@
                       "dependency",
                       "clarity",
                       "priority_conflict",
-                      "external"
+                      "external",
+                      "approach_not_working",
+                      "other"
                     ]
                   },
                   "description": {
@@ -53120,7 +53122,9 @@
                               "dependency",
                               "clarity",
                               "priority_conflict",
-                              "external"
+                              "external",
+                              "approach_not_working",
+                              "other"
                             ]
                           },
                           "description": {
@@ -53141,6 +53145,9 @@
                             "type": "string"
                           },
                           "dueAt": {
+                            "type": "string"
+                          },
+                          "dueOn": {
                             "type": "string"
                           },
                           "resolvedAt": {
@@ -53165,6 +53172,7 @@
                           "nextAction",
                           "openedAt",
                           "dueAt",
+                          "dueOn",
                           "resolvedAt",
                           "hoursOpen",
                           "overdue"

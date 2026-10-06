@@ -175,7 +175,24 @@ if (documented.size < 40) {
 const registered = new Map(
   Object.entries(THRESHOLDS).map(([key, param]) => [param.label, key]),
 );
+// Rows that state a rule in §11's table rather than a value, so there is
+// nothing to register and nothing for a workspace to set. Named one by one,
+// so a misspelt parameter still fails rather than passing as a rule. "Blocker
+// clock" became one at P9-T19a-a, when METHOD v2 made it the next check-in
+// rather than twenty-four hours.
+const RULE_ROWS: ReadonlySet<string> = new Set(["Blocker clock"]);
+for (const label of RULE_ROWS) {
+  if (!documented.has(label)) {
+    fail(
+      "thresholds",
+      `"${label}" is listed as a §11 rule row and METHOD.md §11 no longer has it`,
+    );
+  }
+}
 for (const label of documented) {
+  if (RULE_ROWS.has(label)) {
+    continue;
+  }
   if (!registered.has(label)) {
     fail(
       "thresholds",
@@ -526,19 +543,19 @@ compare(
   8,
 );
 
-// §7.3. The five a blocker must be one of. A type in the document and not in
+// §7.3. The seven a blocker must be one of. A type in the document and not in
 // the package is a type the picker will never offer.
 compare(
   "the blocker taxonomy",
   tableColumn(section(method, "### 7.3 Blocker taxonomy", "### 7.4"), 0),
   BLOCKER_TYPE_DEFINITIONS.map((entry) => entry.label),
-  5,
+  7,
 );
 compare(
   "the blocker definitions",
   tableColumn(section(method, "### 7.3 Blocker taxonomy", "### 7.4"), 1),
   BLOCKER_TYPE_DEFINITIONS.map((entry) => entry.definition),
-  5,
+  7,
 );
 
 // §7.1. Length, frequency and purpose are what a facilitator books a calendar

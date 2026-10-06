@@ -241,7 +241,7 @@ That is the product.
 | **Reach** | Browser, email, Slack, Teams, WhatsApp, Telegram, and your own AI agent |
 | **OKRs** | Weighted, direction-aware key results with value history, confidence, trend forecasting, KPI-backed measurement, and full alignment with dependencies |
 | **KPIs** | Driver trees, health corridors, calculated formulas, recovery objectives and a recovery board |
-| **Rhythm** | Cadence with visible staleness, champion and reviewer accountability, blockers on a 24-hour clock, commitments, streaks and digests |
+| **Rhythm** | Cadence with visible staleness, champion and reviewer accountability, blockers due by the next check-in, commitments, streaks and digests |
 | **The work** | Initiatives, a key-result-linked board, and documents |
 | **Platform** | Spaces, the Work Map, the review inbox, a live feed, notifications that respect you, search, admin and a tamper-evident audit log |
 | **Ownership** | Open source, self-hosted in 30 minutes or in our cloud, air-gap capable, database-level isolation, full export |

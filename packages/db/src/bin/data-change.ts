@@ -32,6 +32,7 @@ import { dropAlignmentPenalties } from "../data-changes/0019_drop_alignment_pena
 import { kpiTargetTypeFromDirection } from "../data-changes/0020_kpi_target_type_from_direction.ts";
 import { kpiRecoveringToBand } from "../data-changes/0021_kpi_recovering_to_band.ts";
 import { kpiNamedOwner } from "../data-changes/0022_kpi_named_owner.ts";
+import { blockerClockToCheckIn } from "../data-changes/0023_blocker_clock_to_check_in.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -71,6 +72,7 @@ try {
       kpiTargetTypeFromDirection,
       kpiRecoveringToBand,
       kpiNamedOwner,
+      blockerClockToCheckIn,
     ],
   });
   process.stdout.write(

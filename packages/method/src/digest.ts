@@ -4,7 +4,8 @@
  * §7.2's own sentence: "The product assembles it: headline average and the
  * change on last week, what is on track, what is at risk with owners, blockers
  * on the 24-hour clock, and the commitment count. The coordinator adds a note
- * for leadership."
+ * for leadership." Since P9-T19a-a the clock is §7.3's: a blocker's action is
+ * due by the next check-in, and the digest says which have passed theirs.
  *
  * **Pure, and here rather than in a template file, because it is the method
  * speaking.** The digest is what the product says to a team about their own week,
@@ -26,11 +27,15 @@ export interface DigestRisk {
   readonly status: string;
 }
 
-/** One open blocker and how long it has been open, in hours. */
+/** One open blocker, and whether its check-in has passed with it open. */
 export interface DigestBlocker {
   readonly title: string;
   readonly ownerName: string | null;
-  readonly ageHours: number;
+  /**
+   * §7.3's clock: the next action was due by the check-in, and that check-in
+   * has passed (P9-T19a-a). It was a number of hours on a 24-hour clock.
+   */
+  readonly pastCheckIn: boolean;
 }
 
 export interface WeeklyDigestInput {
@@ -49,12 +54,6 @@ export interface WeeklyDigestInput {
   readonly commitmentCount: number;
   /** What the coordinator added for leadership, or null. */
   readonly coordinatorNote: string | null;
-  /**
-   * §7.2's blocker clock, `cadence.blockerClockHours` as the workspace
-   * resolves it (completeness review H-17). It was a constant of 24 here
-   * while the same clock was a §11 parameter everywhere else.
-   */
-  readonly blockerClockHours: number;
 }
 
 const percent = (value: number): string => `${Math.round(value * 100)}%`;
@@ -125,20 +124,19 @@ export function weeklyDigestLines(input: WeeklyDigestInput): readonly string[] {
   if (input.blockers.length === 0) {
     lines.push("No blockers open.");
   } else {
-    const named = input.blockers.map((blocker) => {
-      const clock =
-        blocker.ageHours >= input.blockerClockHours
-          ? `${blocker.ageHours}h, past the ${input.blockerClockHours}-hour clock`
-          : `${blocker.ageHours}h`;
-      return `${blocker.title} (${blocker.ownerName ?? "no owner named"}, ${clock})`;
-    });
+    const named = input.blockers.map(
+      (blocker) =>
+        `${blocker.title} (${blocker.ownerName ?? "no owner named"}${
+          blocker.pastCheckIn ? ", past its check-in" : ""
+        })`,
+    );
     const overdue = input.blockers.filter(
-      (blocker) => blocker.ageHours >= input.blockerClockHours,
+      (blocker) => blocker.pastCheckIn,
     ).length;
     lines.push(
       `${input.blockers.length} blocker${
         input.blockers.length === 1 ? "" : "s"
-      } open${overdue === 0 ? "" : `, ${overdue} past the clock`}: ${list(named)}.`,
+      } open${overdue === 0 ? "" : `, ${overdue} past ${overdue === 1 ? "its" : "their"} check-in`}: ${list(named)}.`,
     );
   }
 
@@ -170,8 +168,8 @@ export function weeklyDigestNumbers(
     input.onTrackCount,
     input.atRiskCount,
     input.blockers.length,
+    input.blockers.filter((blocker) => blocker.pastCheckIn).length,
     input.commitmentCount,
-    input.blockerClockHours,
   ];
   if (input.previousAverageConfidence !== null) {
     numbers.push(Math.round(input.previousAverageConfidence * 100));
@@ -182,9 +180,6 @@ export function weeklyDigestNumbers(
         ),
       ),
     );
-  }
-  for (const blocker of input.blockers) {
-    numbers.push(blocker.ageHours);
   }
   return numbers;
 }

@@ -101,34 +101,47 @@ export function acknowledgementEscalation(
 }
 
 /**
- * The blocker ladder (METHOD.md §11, §7.3).
+ * Where a blocker stands against the check-in its next action is due by
+ * (METHOD.md §7.3, P9-T19a-a), in whole days of the workspace calendar.
+ */
+export interface BlockerClock {
+  /**
+   * Days from today to that check-in: 1 the day before it, 0 on it, and
+   * negative once it has passed with the action open.
+   */
+  readonly daysUntilDue: number;
+  /** Whether the check-in after that one has passed as well. */
+  readonly followingPassed: boolean;
+}
+
+/**
+ * The blocker ladder (METHOD.md §11, §7.3, P9-T19a-a).
  *
- * §11's wording: "owner warned at twenty hours, coordinator at twenty-four,
- * sponsor at forty-eight. The warning arrives before the deadline, not after
- * it." Twenty hours is the warning, and twenty-four is the clock in §3.2 that
- * the blocker was given to find its next action.
+ * §11's wording: "owner reminded 1 day before the next check-in, coordinator
+ * when the check-in passes with the action open". The clock is the check-in,
+ * not a number of hours: a blocker raised on Tuesday in a weekly rhythm has
+ * until next Tuesday, and nobody hears about it on Thursday.
  *
- * Hours rather than days, because a blocker's clock is twenty-four hours and a
- * ladder measured in days could not fire twice inside it.
- *
- * **Nothing calls this yet.** Blockers are rows from P4-T07c, and this is here
- * so the ladder is golden-master tested beside the other two rather than
- * written in a hurry alongside the screen that first needs it.
+ * The sponsor is a rung only where the workspace puts the sponsor in its
+ * ladders (§12, "Sponsor in escalation ladders"), and then once the check-in
+ * after that one has passed too, so a sponsor hears about a blocker that has
+ * outlived two of the team's own check-ins and never about one that has not.
  */
 export function blockerEscalation(
-  hoursSinceOpened: number,
+  clock: BlockerClock,
   thresholds: ResolvedThresholds,
+  sponsorInLadders: boolean,
 ): Escalation {
-  const ladder = thresholds["cadence.blockerLadderHours"];
+  const ladder = thresholds["cadence.blockerLadderDays"];
 
-  if (hoursSinceOpened >= ladder.sponsor) {
-    return { step: 3, targets: ["champion", "coordinator", "sponsor"] };
-  }
-  if (hoursSinceOpened >= ladder.coordinator) {
+  if (clock.daysUntilDue < 0) {
+    if (sponsorInLadders && clock.followingPassed) {
+      return { step: 3, targets: ["champion", "coordinator", "sponsor"] };
+    }
     return { step: 2, targets: ["champion", "coordinator"] };
   }
-  if (hoursSinceOpened >= ladder.owner) {
-    // The warning, before the deadline rather than after it. The owner of a
+  if (clock.daysUntilDue <= ladder.reminder) {
+    // The reminder, before the check-in rather than after it. The owner of a
     // blocker is its named owner, which the caller resolves; the role here is
     // the champion's position on the ladder.
     return { step: 1, targets: ["champion"] };

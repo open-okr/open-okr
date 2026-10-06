@@ -260,8 +260,11 @@ Five types. Exported as a typed union and a data array.
 | `clarity` | The key result is ambiguous. Nobody agrees what done means | SS7.3 |
 | `priority_conflict` | Business as usual keeps displacing OKR work | SS7.3 |
 | `external` | Market, regulation or partner factors beyond your control | SS7.3 |
+| `approach_not_working` | The work is happening and the number is not moving | SS7.3, P9-T19a-a |
+| `other` | Anything else, described in a line | SS7.3, P9-T19a-a |
 
-Every blocker carries: opened time, owner, next action, 24-hour clock.
+Every blocker carries: opened time, owner, next action, due by the next
+check-in of the goal it blocks (P9-T19a-a; it was a 24-hour clock).
 
 ## 6. Root-cause taxonomy (SS8.4)
 

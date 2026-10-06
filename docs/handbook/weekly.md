@@ -13,7 +13,7 @@ first, and the champion writes what actually changed this week.
 
 **2. Diagnose what is low.** High and medium move on with no discussion. Every
 low score gets three things before the session moves past it: a blocker type, a
-named owner, and one concrete action inside twenty-four hours.
+named owner, and one concrete action due by the next check-in.
 
 **3. Commitments.** Close last week's out loud, delivered or not, with no
 negotiation. Then set two or three for this week, each with an owner and a
@@ -51,9 +51,12 @@ about.
 | **Clarity** | The key result is ambiguous. Nobody agrees what done means |
 | **Priority conflict** | Business as usual keeps displacing OKR work |
 | **External** | Market, regulation or partner factors beyond your control |
+| **Approach not working** | The work is happening and the number is not moving |
+| **Other** | Anything else, described in a line |
 
-Every blocker gets an owner and a twenty-four hour clock. The owner is warned
-before it runs out; after it, the escalation is visible rather than polite.
+Every blocker gets an owner and a next action due by the next check-in. The
+owner is reminded the day before; if the check-in passes with the action still
+open, the coordinator hears about it, visibly rather than politely.
 
 **A clarity blocker is usually a writing problem.** If nobody agrees what done
 means, the key result is the thing to fix, not the work. See

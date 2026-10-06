@@ -126,10 +126,12 @@ test("the rule goes back to the canon, leaving the instance as it was", async ()
  * whatever spec runs next.
  */
 test("a ladder is set, refused when out of order, and returned to the canon", async () => {
-  const OWNER = "blocker.escalated";
+  // The check-in ladder, since the blocker ladder became one rung at
+  // P9-T19a-a and has no order left to refuse.
+  const OWNER = "checkin.overdue";
   // What the screen calls it, for the labels and the sentence. The key is
   // still what the test ids and the stored row carry.
-  const OWNER_NAME = "Blocker escalated";
+  const OWNER_NAME = "Check-in overdue";
   await goTo(page, "/admin/nudges");
 
   const editor = page.getByTestId(`ladder-${OWNER}`);
@@ -137,14 +139,14 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   // It says what one ladder reaches, because the change is not scoped to the
   // rule it is set on. By name since P8-G11d, which is the point of that
   // change: a reader should not have to know the key to read the sentence.
-  await expect(editor).toContainText("Blocker nearing its deadline");
+  await expect(editor).toContainText("Check-in due tomorrow");
 
   // Out of order first: the top rung fires before the ones below it, which is
   // not a ladder. §11's schema types each rung and says nothing about order,
   // so this refusal is the product's own.
-  await editor.getByLabel(`owner for ${OWNER_NAME}`).fill("30");
-  await editor.getByLabel(`coordinator for ${OWNER_NAME}`).fill("24");
-  await editor.getByLabel(`sponsor for ${OWNER_NAME}`).fill("48");
+  await editor.getByLabel(`championRepeat for ${OWNER_NAME}`).fill("8");
+  await editor.getByLabel(`coordinator for ${OWNER_NAME}`).fill("7");
+  await editor.getByLabel(`sponsor for ${OWNER_NAME}`).fill("14");
   await editor.getByTestId(`save-ladder-${OWNER}`).click();
   await expect(page.getByRole("alert").first()).toContainText(
     "must come after",
@@ -152,7 +154,7 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   );
 
   // Then one §11 accepts.
-  await editor.getByLabel(`owner for ${OWNER_NAME}`).fill("4");
+  await editor.getByLabel(`championRepeat for ${OWNER_NAME}`).fill("2");
   await editor.getByLabel(`coordinator for ${OWNER_NAME}`).fill("8");
   await editor.getByLabel(`sponsor for ${OWNER_NAME}`).fill("12");
   await editor.getByTestId(`save-ladder-${OWNER}`).click();
@@ -167,13 +169,13 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
 
   await goTo(page, "/admin/nudges");
   await expect(page.getByTestId(`ladder-${OWNER}`).getByLabel(
-    `owner for ${OWNER_NAME}`,
-  )).toHaveValue("4", { timeout: 15_000 });
+    `championRepeat for ${OWNER_NAME}`,
+  )).toHaveValue("2", { timeout: 15_000 });
 
   // And away again. A row kept only to hold a copy of §11's numbers would
   // survive a change to §11, so emptying every rung removes it.
   const back = page.getByTestId(`ladder-${OWNER}`);
-  for (const rung of ["owner", "coordinator", "sponsor"]) {
+  for (const rung of ["championRepeat", "coordinator", "sponsor"]) {
     await back.getByLabel(`${rung} for ${OWNER_NAME}`).fill("");
   }
   await back.getByTestId(`save-ladder-${OWNER}`).click();
@@ -183,6 +185,6 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
 
   await goTo(page, "/admin/nudges");
   await expect(page.getByTestId(`ladder-${OWNER}`).getByLabel(
-    `owner for ${OWNER_NAME}`,
+    `championRepeat for ${OWNER_NAME}`,
   )).toHaveValue("", { timeout: 15_000 });
 });

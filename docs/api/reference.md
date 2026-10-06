@@ -520,7 +520,7 @@ the machine-readable document.
 | `sessions.confidenceTrend`<br/>A space's weekly average confidence, oldest first. | `GET /api/v1/sessions/confidenceTrend` | reads |
 | `sessions.confirmConfidence`<br/>The champion confirms the final confidence and writes the what-changed note. | `POST /api/v1/sessions/confirmConfidence` | writes |
 | `sessions.create`<br/>Creates a scheduled session for a space. A time with no offset is read in the workspace timezone. | `POST /api/v1/sessions/create` | writes |
-| `sessions.createBlocker`<br/>Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save. | `POST /api/v1/sessions/createBlocker` | writes |
+| `sessions.createBlocker`<br/>Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in. | `POST /api/v1/sessions/createBlocker` | writes |
 | `sessions.decideObjective`<br/>Closes one objective with §8.8's decision and a one-line why (METHOD.md §8.8). | `POST /api/v1/sessions/decideObjective` | writes |
 | `sessions.diagnostic`<br/>§8.6's verdict for this review, stored or still unreadable. | `GET /api/v1/sessions/diagnostic` | reads |
 | `sessions.digest`<br/>The weekly digest for one session, assembled from METHOD.md §7.2 step 4 with no provider involved. | `GET /api/v1/sessions/digest` | reads |

@@ -436,7 +436,9 @@ export default async function SpacePage({
               {board.blockers.map((blocker) => (
                 <li key={blocker.id} className="flex flex-col gap-1">
                   <span className="flex flex-wrap items-center gap-1.5">
-                    <Chip tone="neutral">{blocker.type.replace("_", " ")}</Chip>
+                    <Chip tone="neutral">
+                      {blocker.type.replace(/_/g, " ")}
+                    </Chip>
                     {blocker.pastTheClock ? (
                       <Chip tone="bad">{t("spaces.detail.pastTheClock")}</Chip>
                     ) : null}

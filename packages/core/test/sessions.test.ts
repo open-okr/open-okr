@@ -679,7 +679,7 @@ async function advanceToDiagnose(
 }
 
 describe("sessions.createBlocker (P4-T07c)", () => {
-  it("stores a blocker with due_at = opened + 24h", async () => {
+  it("stores a blocker due by its goal's next check-in (P9-T19a-a)", async () => {
     const wb = await workerDb();
     await createGoalWithKr();
     const sessionId = await openSessionAtConfidence();
@@ -691,27 +691,37 @@ describe("sessions.createBlocker (P4-T07c)", () => {
       {
         sessionId,
         keyResultId,
-        type: "resource",
+        type: "approach_not_working",
         ownerId: facilitatorMemberId,
-        nextAction: "Hire a contractor by Friday",
+        nextAction: "Try the guided setup with two pilot customers",
       },
     );
 
     expect((result as { id: string }).id).toBeTruthy();
 
-    // Verify the blocker status includes the correct due_at (approx 24h out).
+    // Due at the end of the goal's next check-in day, the first one after
+    // today, and never the same day: it was twenty-four hours from opening.
     const status = (await callAction(
       { pool: wb.appPool, ...context() },
       "sessions.blockerStatus",
       { sessionId },
-    )) as Array<{ dueAt: string; openedAt: string }>;
-
+    )) as Array<{
+      type: string;
+      dueAt: string;
+      dueOn: string;
+      openedAt: string;
+    }>;
     expect(status.length).toBe(1);
-    const blocker = status[0] as { dueAt: string; openedAt: string };
-    const opened = new Date(blocker.openedAt);
-    const due = new Date(blocker.dueAt);
-    const diffHours = (due.getTime() - opened.getTime()) / (1000 * 60 * 60);
-    expect(diffHours).toBeCloseTo(24, 0);
+    const blocker = status[0] as (typeof status)[number];
+    expect(blocker.type).toBe("approach_not_working");
+    const { rows } = await wb.admin.query<{ next_check_in_at: Date }>(
+      `select g.next_check_in_at from goals g
+         join key_results k on k.goal_id = g.id where k.id = $1`,
+      [keyResultId],
+    );
+    const nextCheckIn = rows[0]?.next_check_in_at as Date;
+    expect(new Date(blocker.dueAt).getTime()).toBe(nextCheckIn.getTime());
+    expect(blocker.dueOn > blocker.openedAt.slice(0, 10)).toBe(true);
   });
 });
 

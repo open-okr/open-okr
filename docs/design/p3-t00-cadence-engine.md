@@ -239,26 +239,34 @@ its messages are not about them.
 | three days, the coordinator is brought in | 3 | 2 | reviewer,coordinator |
 | a week later, no further | 7 | 2 | reviewer,coordinator |
 
-**Blocker.** §11: "owner warned at twenty hours, coordinator at twenty-four,
-sponsor at forty-eight. The warning arrives before the deadline, not after it."
-Hours rather than days, because a blocker's clock is twenty-four hours and a
-ladder measured in days could not fire twice inside it.
+**Blocker.** §11, as METHOD v2 has it since P9-T19a-a: "owner reminded 1 day
+before the next check-in, coordinator when the check-in passes with the action
+open". The clock is the check-in the next action is due by, stored on the
+blocker as `due_at` when it is opened: the goal's next check-in, or the one
+after it when that falls on the opening day or earlier. Counted in whole days
+of the workspace calendar, as the check-in ladder is. It was hours on a
+twenty-four hour clock, which told the coordinator about a blocker raised at a
+Tuesday check-in on the Wednesday.
 
-Nothing calls this yet: blockers are rows from P4-T07c. It is here so the ladder
-is tested beside the other two rather than written in a hurry beside the screen
-that first needs it.
+The sponsor is a rung only where the workspace turns on "Sponsor in escalation
+ladders" (§12), and then once the check-in after that one has passed too.
+`days_until_due` is 1 the day before the check-in, 0 on it, and negative once
+it has passed.
 
 <!-- golden: cadence.blocker -->
 
-| case | hours_since_opened | expected_step | expected_targets |
-|---|---|---|---|
-| just opened | 0 | | |
-| nineteen hours, still quiet | 19 | | |
-| the twenty-hour warning, before the deadline | 20 | 1 | champion |
-| the clock runs out | 24 | 2 | champion,coordinator |
-| a day and a half | 36 | 2 | champion,coordinator |
-| two days, the sponsor hears | 48 | 3 | champion,coordinator,sponsor |
-| a week | 168 | 3 | champion,coordinator,sponsor |
+| case | days_until_due | following_passed | sponsor_in_ladders | expected_step | expected_targets |
+|---|---|---|---|---|---|
+| opened on Tuesday, a week to go | 7 | no | no | | |
+| Thursday passes, nobody hears | 5 | no | no | | |
+| two days out, still quiet | 2 | no | no | | |
+| the day before, the owner is reminded | 1 | no | no | 1 | champion |
+| on the check-in day, still the owner | 0 | no | no | 1 | champion |
+| the check-in passes with the action open | -1 | no | no | 2 | champion,coordinator |
+| a week past, the coordinator still | -7 | no | no | 2 | champion,coordinator |
+| the next check-in passes too, no sponsor by default | -8 | yes | no | 2 | champion,coordinator |
+| with the sponsor in the ladders, one check-in past is the coordinator | -1 | no | yes | 2 | champion,coordinator |
+| with the sponsor in the ladders, two check-ins past is the sponsor | -8 | yes | yes | 3 | champion,coordinator,sponsor |
 
 ## 8. What resets the cadence
 

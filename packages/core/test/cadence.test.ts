@@ -178,7 +178,14 @@ describe("the blocker ladder", () => {
     it(`${row.case}`, () => {
       ladderCase(
         row,
-        blockerEscalation(num(row, "hours_since_opened"), thresholds),
+        blockerEscalation(
+          {
+            daysUntilDue: num(row, "days_until_due"),
+            followingPassed: row.following_passed === "yes",
+          },
+          thresholds,
+          row.sponsor_in_ladders === "yes",
+        ),
       );
     });
   }

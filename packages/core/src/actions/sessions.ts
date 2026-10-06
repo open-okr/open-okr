@@ -106,7 +106,9 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { blockerDueAt } from "../cadence/blockers.ts";
 import { localInstant } from "../cadence/engine.ts";
+import { dueLocalDate } from "../cadence/service.ts";
 import {
   addDays,
   formatLocalDate,
@@ -2505,7 +2507,7 @@ export const sessionConfidenceStatus = defineReadAction({
 export const createSessionBlocker = defineWriteAction({
   name: "sessions.createBlocker",
   summary:
-    "Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save.",
+    "Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in.",
   input: z.object({
     sessionId: z.uuid(),
     keyResultId: z.uuid(),
@@ -2542,14 +2544,20 @@ export const createSessionBlocker = defineWriteAction({
       }
 
       const now = new Date();
-      // The clock is the workspace's `cadence.blockerClockHours` (§11), not a
-      // literal 24 (completeness review H-17): a workspace that tuned it got
-      // a board and nudges on one clock and blockers due on another.
+      // Due by the goal's next check-in, at the goal's own frequency (§7.3,
+      // P9-T19a-a). It was twenty-four hours from now, which had the
+      // coordinator hearing about a blocker raised at Tuesday's check-in on
+      // Wednesday, days before the team met again to look at it.
       const { thresholds } = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
-      const clockHours = thresholds["cadence.blockerClockHours"];
-      const dueAt = new Date(now.getTime() + clockHours * 60 * 60 * 1000);
+      const dueAt = await blockerDueAt(tx, {
+        workspaceId,
+        goalId,
+        now,
+        thresholds,
+        timeZone: await workspaceTimeZone(tx, workspaceId),
+      });
 
       const id = crypto.randomUUID();
       await tx.insert(blockers).values({
@@ -2745,6 +2753,11 @@ export const sessionBlockerStatus = defineReadAction({
       nextAction: z.string(),
       openedAt: z.string(),
       dueAt: z.string(),
+      /**
+       * The check-in the next action is due by, as a date in the workspace
+       * calendar (§7.3, P9-T19a-a).
+       */
+      dueOn: z.string(),
       resolvedAt: z.string().nullable(),
       hoursOpen: z.number(),
       overdue: z.boolean(),
@@ -2764,6 +2777,7 @@ export const sessionBlockerStatus = defineReadAction({
       nextAction: string;
       openedAt: string;
       dueAt: string;
+      dueOn: string;
       resolvedAt: string | null;
       hoursOpen: number;
       overdue: boolean;
@@ -2786,6 +2800,10 @@ export const sessionBlockerStatus = defineReadAction({
           );
 
         const now = new Date();
+        const timeZone = await workspaceTimeZone(
+          tx as OperationTx,
+          context.workspaceId,
+        );
         return rows.map((b) => {
           const hoursOpen =
             (now.getTime() - b.openedAt.getTime()) / (1000 * 60 * 60);
@@ -2798,8 +2816,10 @@ export const sessionBlockerStatus = defineReadAction({
             nextAction: b.nextAction,
             openedAt: b.openedAt.toISOString(),
             dueAt: b.dueAt.toISOString(),
+            dueOn: dueLocalDate(b.dueAt, timeZone) ?? "",
             resolvedAt: b.resolvedAt?.toISOString() ?? null,
             hoursOpen: Math.round(hoursOpen * 10) / 10,
+            // Past the end of the check-in's day, which is what `due_at` holds.
             overdue: now > b.dueAt && !b.resolvedAt,
           };
         });

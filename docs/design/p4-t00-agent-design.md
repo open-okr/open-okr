@@ -264,11 +264,14 @@ Targets accumulate. The champion is never dropped.
 
 ### 4.3 Blocker ladder
 
-| Step | After | Goes to | SS11 parameter |
+Against the check-in the next action is due by (METHOD.md §7.3), since
+P9-T19a-a. It was hours on a 24-hour clock.
+
+| Step | After | Goes to | SS11 parameter or setting |
 |---|---|---|---|
-| 1 | 20 hours | Blocker owner | `cadence.blockerLadderHours.owner` |
-| 2 | 24 hours | Coordinator | `cadence.blockerLadderHours.coordinator` |
-| 3 | 48 hours | Sponsor | `cadence.blockerLadderHours.sponsor` |
+| 1 | 1 day before that check-in | Blocker owner | `cadence.blockerLadderDays.reminder` |
+| 2 | That check-in passes with the action open | Coordinator | The check-in itself |
+| 3 | The check-in after it passes too | Sponsor | Only where §12's "Sponsor in escalation ladders" is on |
 
 ## 5. Deduplication rules
 

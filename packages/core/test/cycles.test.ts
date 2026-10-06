@@ -859,13 +859,17 @@ describe("the §11 registry beyond its scalars (P6-G20)", () => {
     // these, and the admin card rendered them read-only until P6-G20: a
     // workspace could see its own ladder and not move it.
     await call({
-      "cadence.blockerLadderHours": { owner: 12, coordinator: 36, sponsor: 60 },
+      "cadence.checkInLadderDays": {
+        championRepeat: 2,
+        coordinator: 9,
+        sponsor: 20,
+      },
     });
     const after = await read();
-    expect(after.thresholds["cadence.blockerLadderHours"]).toEqual({
-      owner: 12,
-      coordinator: 36,
-      sponsor: 60,
+    expect(after.thresholds["cadence.checkInLadderDays"]).toEqual({
+      championRepeat: 2,
+      coordinator: 9,
+      sponsor: 20,
     });
   });
 
@@ -896,14 +900,18 @@ describe("the §11 registry beyond its scalars (P6-G20)", () => {
     await call({
       "cadence.stalenessGraceDays": 5,
       "cadence.toleranceDays": 2,
-      "cadence.blockerLadderHours": { owner: 12, coordinator: 36, sponsor: 60 },
+      "cadence.checkInLadderDays": {
+        championRepeat: 2,
+        coordinator: 9,
+        sponsor: 20,
+      },
     });
     expect(Object.keys((await read()).overrides)).toHaveLength(3);
 
     await call({
       "cadence.stalenessGraceDays": null,
       "cadence.toleranceDays": null,
-      "cadence.blockerLadderHours": null,
+      "cadence.checkInLadderDays": null,
     });
 
     const after = await read();
@@ -911,10 +919,10 @@ describe("the §11 registry beyond its scalars (P6-G20)", () => {
     expect(after.thresholds["cadence.stalenessGraceDays"]).toBe(3);
     expect(after.thresholds["cadence.toleranceDays"]).toBe(1);
     // And the canon's ladder is back, not the one that was stored.
-    expect(after.thresholds["cadence.blockerLadderHours"]).not.toEqual({
-      owner: 12,
-      coordinator: 36,
-      sponsor: 60,
+    expect(after.thresholds["cadence.checkInLadderDays"]).not.toEqual({
+      championRepeat: 2,
+      coordinator: 9,
+      sponsor: 20,
     });
   });
 });

@@ -44,8 +44,12 @@ let page: Page;
 
 /** The staleness grace field, which is a plain scalar in the registry. */
 const GRACE = "input[name='threshold:cadence.stalenessGraceDays']";
-/** One rung of a ladder, which was read-only until P6-G20. */
-const LADDER_OWNER = "input[name='composite:cadence.blockerLadderHours:owner']";
+/**
+ * One rung of a ladder, which was read-only until P6-G20. The check-in
+ * ladder's, since the blocker ladder became one rung at P9-T19a-a.
+ */
+const LADDER_OWNER =
+  "input[name='composite:cadence.checkInLadderDays:championRepeat']";
 
 /**
  * The card both fields live in. Every save, refusal and reset below belongs to
@@ -138,25 +142,25 @@ test("a grace this workspace asked for is written, and nothing else moves", asyn
 });
 
 test("a ladder can be moved, which it could not before", async () => {
-  await page.locator(LADDER_OWNER).fill("12");
+  await page.locator(LADDER_OWNER).fill("2");
   await page
-    .locator("input[name='composite:cadence.blockerLadderHours:coordinator']")
-    .fill("36");
+    .locator("input[name='composite:cadence.checkInLadderDays:coordinator']")
+    .fill("9");
   await page
-    .locator("input[name='composite:cadence.blockerLadderHours:sponsor']")
-    .fill("60");
+    .locator("input[name='composite:cadence.checkInLadderDays:sponsor']")
+    .fill("20");
   await save(page).click();
   await expect(outcome(page, "ok")).toContainText("Saved.", {
     timeout: 15_000,
   });
 
   await goTo(page, "/admin/rhythm");
-  await expect(page.locator(LADDER_OWNER)).toHaveValue("12");
+  await expect(page.locator(LADDER_OWNER)).toHaveValue("2");
 });
 
 test("a half-written set is refused rather than stored", async () => {
   await page
-    .locator("input[name='composite:cadence.blockerLadderHours:sponsor']")
+    .locator("input[name='composite:cadence.checkInLadderDays:sponsor']")
     .fill("");
   await save(page).click();
 

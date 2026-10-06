@@ -96,9 +96,9 @@ Every key result with confidence below the low boundary (SS11
 
 | Field | Rule |
 |---|---|
-| Blocker type | One of the five in SS7.3 (resource, dependency, clarity, priority_conflict, external) |
+| Blocker type | One of the seven in SS7.3 (resource, dependency, clarity, priority_conflict, external, approach_not_working, other; the last two since P9-T19a-a) |
 | Blocker owner | A named person, not a team |
-| Next action | One concrete action within 24 hours |
+| Next action | One concrete action, due by the next check-in of the goal (SS7.3, P9-T19a-a; it was within 24 hours) |
 
 At or below the critical threshold (SS11 `scoring.confidenceCritical`, 0.3):
 the coordinator raises it with management the same day, and the escalation
@@ -111,7 +111,8 @@ Given / When / Then:
 - Given a KR scored 0.3, when the coordinator tries to continue without a
   blocker type, owner and action, then it is refused.
 - Given a KR scored 0.3 with all three fields set, when the step completes,
-  then the blocker's 24-hour clock starts and the escalation fires.
+  then the blocker is due by the goal's next check-in, and the owner is
+  reminded the day before it.
 
 ### 2.4 Stage 3: Commitments
 
@@ -135,7 +136,7 @@ The product assembles:
 | Headline average | Average confidence, change from last week |
 | On track | KRs with high confidence |
 | At risk | KRs with low confidence, with owners |
-| Blockers | On the 24-hour clock |
+| Blockers | Open, and whether their check-in has passed |
 | Commitment count | This week's commitments |
 | Coordinator note | Free text from the coordinator for leadership |
 
@@ -719,7 +720,7 @@ Assembles after the weekly session closes.
 | Change | Delta from last week's average |
 | On track | KRs where confidence >= high boundary |
 | At risk | KRs where confidence < low boundary, with owners |
-| Blockers | Open blockers on the 24-hour clock |
+| Blockers | Open blockers, and whether their check-in has passed |
 | Commitments | Count and list for this week |
 | Coordinator note | Free text |
 

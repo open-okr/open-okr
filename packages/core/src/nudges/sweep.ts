@@ -52,7 +52,8 @@ import {
   agentSeesBlocker,
   agentSeesKpi,
 } from "../agents/scope.ts";
-import { readRhythmRow } from "../cycles/service.ts";
+import { blockerClockOf, frequencyOf } from "../cadence/blockers.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import {
   KPI_RULE_COLUMNS,
   type KpiRule,
@@ -656,10 +657,10 @@ function localHourIn(now: Date, timeZone: string): number {
 /**
  * The rule key each blocker ladder step earns (§6.4).
  *
- * Step 1 is the warning that arrives **before** the deadline, at twenty hours
- * of a twenty-four hour clock. Steps 2 and 3 are past it, and the key changes
- * because the message does: the owner is being reminded, and then somebody
- * other than the owner is being told.
+ * Step 1 is the reminder that arrives **before** the deadline, the day before
+ * the check-in the next action is due by. Steps 2 and 3 are past it, and the
+ * key changes because the message does: the owner is being reminded, and then
+ * somebody other than the owner is being told.
  */
 const RULE_FOR_BLOCKER_STEP: Record<number, TriggerKey> = {
   1: "blocker.warning",
@@ -670,10 +671,11 @@ const RULE_FOR_BLOCKER_STEP: Record<number, TriggerKey> = {
 /**
  * Every blocker aging nudge due in this workspace (§6.4, METHOD.md §7.3).
  *
- * The clock is hours, not days, because §11 gives it twenty-four and a ladder
- * measured in days could not fire twice inside one. `blockerEscalation` decides
- * which step; this resolves the step's roles to members and writes nothing to
- * the blocker.
+ * The clock is the check-in the next action is due by, stored on the blocker
+ * when it was opened, counted in whole days of the workspace calendar
+ * (P9-T19a-a). `blockerEscalation` decides which step, with the sponsor a rung
+ * only where the workspace puts the sponsor in its ladders; this resolves the
+ * step's roles to members and writes nothing to the blocker.
  *
  * **The owner is the blocker's own owner, not the goal's champion.** The ladder
  * returns `champion` for step 1 because that is its name for "the person whose
@@ -708,9 +710,14 @@ export async function dueBlockerNudges(
       goalId: blockers.goalId,
       keyResultId: blockers.keyResultId,
       ownerId: blockers.ownerId,
-      openedAt: blockers.openedAt,
+      dueAt: blockers.dueAt,
+      // The goal's own frequency, for the check-in after the one it is due
+      // by. A key result's blocker written before H-10 has no goal here and
+      // takes the workspace's.
+      checkInFrequency: goals.checkInFrequency,
     })
     .from(blockers)
+    .leftJoin(goals, eq(goals.id, blockers.goalId))
     .where(
       activeOnly(
         blockers,
@@ -719,12 +726,26 @@ export async function dueBlockerNudges(
         input.scope ? agentSeesBlocker(input.scope) : undefined,
       ),
     );
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const timeZone = await workspaceTimeZone(tx, input.workspaceId);
+  const { practice } = practiceFromRow(
+    await readRhythmRow(tx, input.workspaceId),
+  );
+  const sponsorInLadders = practice["escalation.sponsorInLadders"] === "on";
 
   const due: DueNudge[] = [];
   for (const blocker of rows) {
-    const hours =
-      (input.now.getTime() - blocker.openedAt.getTime()) / 3_600_000;
-    const step = blockerEscalation(hours, input.thresholds);
+    const clock = blockerClockOf({
+      dueAt: blocker.dueAt,
+      frequency: frequencyOf(blocker.checkInFrequency, input.thresholds),
+      anchor: input.thresholds["cadence.anchorDay"],
+      now: input.now,
+      timeZone,
+    });
+    const step = blockerEscalation(clock, input.thresholds, sponsorInLadders);
     if (step.step === null) {
       continue;
     }

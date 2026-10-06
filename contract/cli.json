@@ -9496,7 +9496,7 @@
       "method": "POST",
       "path": "/sessions/createBlocker",
       "scope": "write",
-      "summary": "Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save.",
+      "summary": "Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in.",
       "flags": [
         {
           "name": "session-id",
@@ -9520,7 +9520,9 @@
             "dependency",
             "clarity",
             "priority_conflict",
-            "external"
+            "external",
+            "approach_not_working",
+            "other"
           ]
         },
         {

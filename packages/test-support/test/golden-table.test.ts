@@ -150,14 +150,17 @@ const MANIFEST: Record<
       ],
       minRows: 5,
     },
+    // On the check-in's clock since P9-T19a-a, with the sponsor setting.
     "cadence.blocker": {
       columns: [
         "case",
-        "hours_since_opened",
+        "days_until_due",
+        "following_passed",
+        "sponsor_in_ladders",
         "expected_step",
         "expected_targets",
       ],
-      minRows: 7,
+      minRows: 10,
     },
   },
   "p3-t00-kpi-engine.md": {

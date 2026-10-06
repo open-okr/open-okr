@@ -48,11 +48,19 @@ const contextFor = async (drafter?: AgentDrafter) => {
 const call = async (name: string, input: unknown, drafter?: AgentDrafter) =>
   callAction(await contextFor(drafter), name as never, input as never);
 
-/** Opens a blocker on the session, aged by hours. */
+/**
+ * Opens a blocker on the session, aged by hours, and due by a check-in some
+ * days from now (§7.3, P9-T19a-a): negative once it has passed. Five days out
+ * unless a test says otherwise, which is nobody's business yet.
+ */
 const openBlocker = async (
   nextAction: string,
   ageHours: number,
-  options: { readonly goalId?: string; readonly type?: string } = {},
+  options: {
+    readonly goalId?: string;
+    readonly type?: string;
+    readonly dueInDays?: number;
+  } = {},
 ) => {
   const wb = await workerDb();
   const { rows } = await wb.admin.query<{ id: string }>(
@@ -60,7 +68,7 @@ const openBlocker = async (
        (id, workspace_id, type, owner_id, next_action, opened_at, due_at, session_id, goal_id)
      values (gen_random_uuid(), $1, $2, $3, $4,
              now() - ($5 || ' hours')::interval,
-             now() - ($5 || ' hours')::interval + interval '24 hours',
+             now() + make_interval(days => $8),
              $6, $7)
      returning id`,
     [
@@ -71,6 +79,7 @@ const openBlocker = async (
       String(ageHours),
       sessionId,
       options.goalId ?? null,
+      options.dueInDays ?? 5,
     ],
   );
   return rows[0]?.id as string;
@@ -131,10 +140,15 @@ describe("the board, with no provider anywhere near it", () => {
   });
 
   it("puts §11's ladder first, whatever the ages say", async () => {
-    await openBlocker("Waiting on billing", 50);
-    await openBlocker("Waiting on legal", 25);
-    await openBlocker("Waiting on design", 21);
-    await openBlocker("Waiting on nobody", 2);
+    // The sponsor is a rung only where the workspace adds them (§12).
+    await call("practice.update", {
+      overrides: { "escalation.sponsorInLadders": "on" },
+    });
+    // Two check-ins past, one past, the day before, and days to go.
+    await openBlocker("Waiting on billing", 50, { dueInDays: -9 });
+    await openBlocker("Waiting on legal", 25, { dueInDays: -1 });
+    await openBlocker("Waiting on design", 300, { dueInDays: 1 });
+    await openBlocker("Waiting on nobody", 400, { dueInDays: 5 });
 
     const ranked = await board();
     expect(ranked.map((entry) => entry.escalation)).toEqual([
@@ -188,9 +202,9 @@ describe("the board, with no provider anywhere near it", () => {
     ]);
   });
 
-  it("marks what is past §7.3's clock", async () => {
-    await openBlocker("Past it", 25);
-    await openBlocker("Inside it", 5);
+  it("marks what is past its check-in, §7.3's clock", async () => {
+    await openBlocker("Past it", 25, { dueInDays: -1 });
+    await openBlocker("Inside it", 5, { dueInDays: 3 });
     const ranked = await board();
     expect(ranked[0]?.pastTheClock).toBe(true);
     expect(ranked[1]?.pastTheClock).toBe(false);
@@ -250,7 +264,7 @@ describe("the summary the assist writes", () => {
   });
 
   it("is shown the board in order, with the rungs", async () => {
-    await openBlocker("Waiting on billing", 50);
+    await openBlocker("Waiting on billing", 50, { dueInDays: -1 });
     await openBlocker("Waiting on nobody", 2);
     let seen: readonly { nextAction: string; escalation: string }[] = [];
     await call(
@@ -267,7 +281,7 @@ describe("the summary the assist writes", () => {
       "Waiting on billing",
       "Waiting on nobody",
     ]);
-    expect(seen[0]?.escalation).toBe("sponsor");
+    expect(seen[0]?.escalation).toBe("coordinator");
   });
 
   it("is dropped when it quotes a blocker that is not on the board", async () => {
@@ -502,18 +516,18 @@ describe("the KPI suggestion", () => {
  */
 describe("the workspace's own blocker ladder", () => {
   it("ranks by the workspace's rungs rather than §11's", async () => {
-    // Eighteen hours is below §11's first rung at twenty and above a
-    // workspace ladder whose top rung is twelve, so the same blocker reads
-    // differently under each and nothing else about it changes.
-    await openBlocker("Waiting on billing", 18);
+    // Three days before its check-in is outside §11's one-day reminder and
+    // inside a workspace's three, so the same blocker reads differently under
+    // each and nothing else about it changes.
+    await openBlocker("Waiting on billing", 18, { dueInDays: 3 });
     expect((await board())[0]?.escalation).toBe("none");
 
     await call("nudges.setRule", {
       ruleKey: "blocker.escalated",
-      escalationLadder: { owner: 4, coordinator: 8, sponsor: 12 },
+      escalationLadder: { reminder: 3 },
     });
 
-    expect((await board())[0]?.escalation).toBe("sponsor");
+    expect((await board())[0]?.escalation).toBe("owner");
   });
 
   it("falls back to §11 when the stored ladder is unreadable", async () => {
@@ -521,7 +535,7 @@ describe("the workspace's own blocker ladder", () => {
     // this code did not write. Canon is always answerable, so there is no
     // state in which escalation stops working.
     const wb = await workerDb();
-    await openBlocker("Waiting on legal", 30);
+    await openBlocker("Waiting on legal", 30, { dueInDays: -1 });
     await wb.admin.query(
       `insert into nudge_rules (id, workspace_id, rule_key, escalation_ladder)
        values (gen_random_uuid(), $1, 'blocker.escalated', $2::jsonb)`,

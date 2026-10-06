@@ -28,7 +28,6 @@ export {
 } from "./alignment.ts";
 export {
   type BlockerEscalation,
-  type BlockerLadderHours,
   escalationFor,
   type RankableBlocker,
   type RankedBlocker,
@@ -76,6 +75,7 @@ export {
 } from "./enforcement.ts";
 export {
   acknowledgementEscalation,
+  type BlockerClock,
   blockerEscalation,
   type Escalation,
   type EscalationRole,

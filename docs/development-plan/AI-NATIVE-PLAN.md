@@ -180,7 +180,7 @@ Generated from the action registry, so a chat command is the same action as a bu
 | Command | Does |
 |---|---|
 | Check in | Walks the member through their due check-ins: status, confidence, one line of narrative, key result values. Conversational on WhatsApp and Telegram, a modal on Slack and Teams |
-| Blocker | Logs a blocker on a key result: type, owner, next action. Starts the 24-hour clock |
+| Blocker | Logs a blocker on a key result: type, owner, next action, due by the next check-in |
 | Status | Returns a goal, a key result, a space or the member's own review inbox |
 | Ack | Acknowledges a check-in awaiting the member's review |
 | Commit | Sets or closes a weekly commitment |
@@ -238,7 +238,7 @@ What it does:
 
 1. **Chases check-ins.** Reminds before the due date, on the day, and daily after, escalating up the ladder.
 2. **Chases acknowledgements.** A published check-in with no acknowledgement after a day is a reviewer nudge, and after three days an escalation.
-3. **Runs the blocker clock.** At twenty hours it warns the owner. At twenty-four it escalates to the coordinator, then to the sponsor. It never re-opens a discussion, it moves the clock.
+3. **Runs the blocker clock.** A blocker's next action is due by the next check-in of the goal it blocks (METHOD.md §7.3). The day before, it reminds the owner. When the check-in passes with the action open, it tells the coordinator, and the sponsor only where the workspace puts the sponsor in its ladders. It never re-opens a discussion, it moves the clock.
 4. **Opens and closes the weekly session.** Posts the agenda, collects confidence from members who cannot attend, marks the session held or skipped, updates the streak, publishes the digest.
 5. **Watches the KPI corridors.** When a KPI drops out of the healthy corridor it tells the owner. When it stays unhealthy for two consecutive periods it drafts the recovery OKR and proposes it.
 6. **Prepares the sessions.** Before a quarterly review it assembles the pack: scores ready to confirm, missed key results awaiting a cause, retro prompts, the process-health survey, and the draft minutes skeleton.
@@ -256,7 +256,7 @@ Configurable per workspace. The defaults are canon in METHOD.md §11:
 | 4 | 7 days overdue | The space coordinator |
 | 5 | 14 days overdue | The cycle sponsor |
 
-Blockers run a faster ladder against their 24-hour clock: owner at 20 hours, coordinator at 24, sponsor at 48. Confidence at or below 0.3 escalates to the coordinator immediately.
+Blockers run their ladder against the next check-in, the clock METHOD.md §7.3 gives them since P9-T19a-a: the owner the day before it, the coordinator once it passes with the action open, and the sponsor only where the workspace adds them, once the check-in after that passes too. Confidence at or below 0.3 escalates to the coordinator immediately.
 
 Escalation is always visible to the person being escalated past. Nobody is reported behind their back.
 
@@ -274,9 +274,9 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `checkin.stale` | Grace exceeded | Champion and reviewer. The goal renders outdated |
 | `ack.owed` | 1 day after publication | Reviewer |
 | `ack.overdue` | 3 days after publication | Reviewer, then the ladder |
-| `blocker.warning` | 20 hours after opening | Blocker owner |
-| `blocker.overdue` | 24 hours after opening | Coordinator |
-| `blocker.escalated` | 48 hours after opening | Sponsor |
+| `blocker.warning` | 1 day before the check-in the next action is due by | Blocker owner |
+| `blocker.overdue` | That check-in passes with the action open | Coordinator |
+| `blocker.escalated` | The check-in after it passes too, where the sponsor is in the ladders | Sponsor |
 | `confidence.critical` | A key result scored at or below 0.3 | Coordinator, same day |
 | `commitment.due` | End of the commitment week | Owner |
 | `session.due_soon` | 1 day before the weekly session | Coordinator and space |

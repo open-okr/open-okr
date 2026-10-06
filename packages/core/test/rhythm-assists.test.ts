@@ -244,23 +244,23 @@ describe("the deterministic digest", () => {
     );
   });
 
-  it("puts a blocker's age on the 24-hour clock", async () => {
+  it("marks a blocker whose check-in has passed (§7.3, P9-T19a-a)", async () => {
     const wb = await workerDb();
-    // Thirty and a half hours by the database's clock, so the whole hours the
-    // digest counts against the application's clock are 30 even when the two
-    // clocks disagree by a moment. Exactly 30 read as 29 on 5 October 2026,
-    // with the database in a container and the suite on the host.
+    // Due two days ago, so its check-in has gone by in any timezone; and one
+    // due in five days beside it, which has not.
     await wb.admin.query(
       `insert into blockers (id, workspace_id, type, owner_id, next_action, opened_at, due_at, session_id)
        values (gen_random_uuid(), $1, 'dependency', $2, 'Chase the billing team',
-               now() - interval '30 hours 30 minutes', now() - interval '6 hours', $3)`,
+               now() - interval '9 days', now() - interval '2 days', $3),
+              (gen_random_uuid(), $1, 'approach_not_working', $2, 'Try the other onboarding flow',
+               now() - interval '1 day', now() + interval '5 days', $3)`,
       [workspaceId, ownerMemberId, sessionId],
     );
     await writeDigest({
       averageConfidence: 0.5,
       onTrackCount: 1,
       atRiskCount: 0,
-      blockerCount: 1,
+      blockerCount: 2,
       commitmentCount: 2,
     });
 
@@ -268,10 +268,15 @@ describe("the deterministic digest", () => {
       lines: string[];
       numbers: number[];
     };
-    expect(digest.lines[3]).toContain("1 blocker open, 1 past the clock");
-    expect(digest.lines[3]).toContain("Chase the billing team");
-    expect(digest.lines[3]).toContain("past the 24-hour clock");
-    expect(digest.numbers).toContain(30);
+    expect(digest.lines[3]).toContain("2 blockers open, 1 past its check-in");
+    expect(digest.lines[3]).toContain(
+      "dependency: Chase the billing team (Ada, past its check-in)",
+    );
+    // Every underscore of a type, so it reads as words.
+    expect(digest.lines[3]).toContain(
+      "approach not working: Try the other onboarding flow (Ada)",
+    );
+    expect(digest.numbers).toEqual(expect.arrayContaining([2, 1]));
   });
 
   it("leaves out a resolved blocker", async () => {

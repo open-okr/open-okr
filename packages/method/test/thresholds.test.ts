@@ -97,12 +97,8 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
       nudge: 1,
       escalate: 3,
     });
-    expect(canon["cadence.blockerClockHours"]).toBe(24);
-    expect(canon["cadence.blockerLadderHours"]).toEqual({
-      owner: 20,
-      coordinator: 24,
-      sponsor: 48,
-    });
+    // No clock of its own since P9-T19a-a: the next check-in is the clock.
+    expect(canon["cadence.blockerLadderDays"]).toEqual({ reminder: 1 });
     expect(canon["cadence.nudgeCeilingPerWeek"]).toBe(10);
     expect(canon["cadence.publicationCountdownDays"]).toEqual([14, 7, 1]);
   });
@@ -217,7 +213,7 @@ describe("validating an override map", () => {
     // A half-set ladder would leave the missing step reading the canon default
     // while the admin believed they had set the whole thing.
     const result = validateOverrides({
-      "cadence.blockerLadderHours": { owner: 12 },
+      "cadence.checkInLadderDays": { championRepeat: 2 },
     });
     expect(result.problems).toHaveLength(1);
   });

@@ -7,7 +7,8 @@
  * P4-T08 stored the digest as five numbers in a `jsonb` column and nothing ever
  * turned them into the thing METHOD.md §7.2 Step 4 describes: "headline average
  * and the change on last week, what is on track, what is at risk with owners,
- * blockers on the 24-hour clock, and the commitment count". So this read
+ * blockers on the 24-hour clock, and the commitment count", and the clock is
+ * the next check-in since P9-T19a-a (§7.3). So this read
  * assembles all six parts and renders them through `packages/method`. It needs no
  * provider, it is what a provider-off workspace gets, and the assist below is a
  * rewrite of it rather than a replacement for it.
@@ -44,9 +45,9 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { RHYTHM_ASSIST_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { daysPastDue } from "../cadence/service.ts";
 import { spacePostTargets } from "../channels/space-posts.ts";
-import { resolveRhythm } from "../cycles/rhythm.ts";
-import { readRhythmRow } from "../cycles/service.ts";
+import { workspaceTimeZone } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 import { readKpiDetail } from "./kpis.ts";
@@ -238,7 +239,7 @@ export async function digestInputFor(
     .select({
       type: blockers.type,
       nextAction: blockers.nextAction,
-      openedAt: blockers.openedAt,
+      dueAt: blockers.dueAt,
       resolvedAt: blockers.resolvedAt,
       ownerName: workspaceMembers.name,
     })
@@ -251,16 +252,17 @@ export async function digestInputFor(
         eq(blockers.sessionId, sessionId),
       ),
     );
-  const now = Date.now();
+  // §7.3's clock: past it once the check-in the action was due by has gone
+  // by in the workspace calendar (P9-T19a-a).
+  const now = new Date();
+  const timeZone = await workspaceTimeZone(tx, workspaceId);
   const stillOpen = open
     .filter((blocker) => blocker.resolvedAt === null)
     .map((blocker) => ({
-      title: `${blocker.type.replace("_", " ")}: ${blocker.nextAction}`,
+      // Every underscore, so "approach_not_working" reads as three words.
+      title: `${blocker.type.replaceAll("_", " ")}: ${blocker.nextAction}`,
       ownerName: blocker.ownerName ?? null,
-      ageHours: Math.max(
-        0,
-        Math.floor((now - blocker.openedAt.getTime()) / 3_600_000),
-      ),
+      pastCheckIn: (daysPastDue(blocker.dueAt, now, timeZone) ?? 0) > 0,
     }));
 
   return {
@@ -274,8 +276,6 @@ export async function digestInputFor(
     blockers: stillOpen,
     commitmentCount: body.commitmentCount ?? 0,
     coordinatorNote: row.note ?? null,
-    blockerClockHours: resolveRhythm(await readRhythmRow(tx, workspaceId))
-      .thresholds["cadence.blockerClockHours"],
   };
 }
 

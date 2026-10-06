@@ -86,21 +86,22 @@ const RHYTHM_ROWS = [
   {
     key: "blocker.warning",
     title: "Blocker nearing its deadline",
-    fires: "20h after opening",
+    fires: "1 day before the check-in the next action is due by",
     recipient: "Blocker owner",
     escalates: false,
   },
   {
     key: "blocker.overdue",
     title: "Blocker overdue",
-    fires: "24h after opening",
+    fires: "That check-in passes with the action open",
     recipient: "Coordinator",
     escalates: true,
   },
   {
     key: "blocker.escalated",
     title: "Blocker escalated",
-    fires: "48h after opening",
+    fires:
+      "The check-in after it passes too, where the sponsor is in the ladders",
     recipient: "Sponsor",
     escalates: true,
   },
