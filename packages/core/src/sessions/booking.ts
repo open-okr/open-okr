@@ -31,7 +31,10 @@ import {
   lte,
   or,
 } from "drizzle-orm";
+import { ritualFrequencyOf } from "../cadence/space-frequency.ts";
 import { localDateIn } from "../cycles/generation.ts";
+import { resolveRhythm } from "../cycles/rhythm.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -189,12 +192,24 @@ export async function loadCycleCadence<
     };
   }
 
-  const gaps = required
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .flatMap((space) =>
-      cadenceCoverage(cycle, booked.get(space.id) ?? []).missing.map(
-        (line) => `${space.name}: ${line}`,
-      ),
+  // Each space judged at its own frequency (P9-T19a-d-b): a team on every
+  // two weeks is short of nothing in the week between.
+  const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
+  const gaps: string[] = [];
+  for (const space of required.sort((a, b) => a.name.localeCompare(b.name))) {
+    const frequency = await ritualFrequencyOf(
+      tx,
+      workspaceId,
+      space.id,
+      thresholds,
     );
+    gaps.push(
+      ...cadenceCoverage(
+        cycle,
+        booked.get(space.id) ?? [],
+        frequency,
+      ).missing.map((line) => `${space.name}: ${line}`),
+    );
+  }
   return { bookedForWholeCycle: gaps.length === 0, decisionCount, gaps };
 }

@@ -164,7 +164,7 @@ The recovery rule (METHOD.md §6.5) is implemented as an Operation: it creates t
 | `commitments` | `session_id?`, `space_id`, `week_start date`, `text`, `owner_id`, `key_result_id?`, `delivered bool?`, `closed_at?` | Set in one week, closed in the next |
 | `decisions` | `cycle_id?`, `key_result_id?`, `goal_id?`, `at date`, `text`, `author_member_id`, `session_id?` | The decision log. Every decision names what it affects |
 | `digests` | `scope` (`space` / `workspace` / `member`), `scope_id?`, `period` (`daily` / `weekly` / `cycle`), `period_start`, `body jsonb`, `note?`, `generated_at`, `published_at?`, `channels text[]` | Generated, editable, then published to channels. Publishing is `sessions.postDigest` (completeness review M-23): the facilitator posts a closed weekly session's digest to the Slack or Teams channel its space links, once per digest per channel, and the action stamps `published_at` and adds the providers to `channels` |
-| `streaks` | `space_id`, `current_weeks`, `longest_weeks`, `last_session_week`, `history jsonb` | The rhythm streak. A skipped week breaks it |
+| `streaks` | `space_id`, `current_weeks`, `longest_weeks`, `last_session_week`, `history jsonb` | The rhythm streak, in the space's own check-in periods since P9-T19a-d-b: a week, a fortnight or a month. A skipped period breaks it. The column names stay |
 | `objective_trends` | `goal_id`, `month`, `trend` (`improving` / `flat` / `declining`), `author_member_id` | Recorded at the monthly review |
 
 ### 4.8 The quarterly review (domain H)

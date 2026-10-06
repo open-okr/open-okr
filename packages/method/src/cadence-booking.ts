@@ -25,6 +25,8 @@
  * other cycle bound. Pure: no clock, no database.
  */
 import type { RitualKind } from "./sessions.ts";
+import { periodStartOf } from "./streak.ts";
+import type { CheckInFrequency } from "./thresholds.ts";
 
 /** A cycle's first and last day, inclusive. */
 export interface CadenceWindow {
@@ -57,6 +59,11 @@ export interface CadencePlanOptions {
   readonly from: string;
   /** What is already booked. The plan fills only the gaps the check would name. */
   readonly existing: readonly BookedRitual[];
+  /**
+   * The space's check-in frequency (P9-T19a-d-b): one check-in is booked per
+   * week, fortnight or month. Weekly where not given.
+   */
+  readonly frequency?: CheckInFrequency;
 }
 
 interface Span {
@@ -105,6 +112,44 @@ function weeksOf(window: CadenceWindow): Span[] {
 }
 
 /** The calendar months the window touches, clipped to it. */
+/**
+ * The spans a cycle's check-ins are booked in, at the space's frequency
+ * (P9-T19a-d-b): weeks, the streak's fortnights, or months. A daily space still meets weekly, and a quarterly one meets once.
+ */
+function checkInPeriodsOf(
+  window: CadenceWindow,
+  frequency: CheckInFrequency,
+): Span[] {
+  if (frequency === "monthly") {
+    return monthsOf(window);
+  }
+  if (frequency === "quarterly") {
+    return [{ from: window.startsOn, to: window.endsOn }];
+  }
+  if (frequency === "biweekly") {
+    // The streak's own fortnights, counted from the same fixed Monday, so
+    // every check-in booked here lands in a period of its own there.
+    const spans: Span[] = [];
+    let start = periodStartOf(window.startsOn, "biweekly");
+    while (start <= window.endsOn) {
+      spans.push({
+        from: later(start, window.startsOn),
+        to: earlier(addDays(start, 13), window.endsOn),
+      });
+      start = addDays(start, 14);
+    }
+    return spans;
+  }
+  return weeksOf(window);
+}
+
+/** What a period is called in a coverage sentence. */
+const PERIOD_WORDS: Readonly<Record<string, string>> = {
+  biweekly: "fortnight(s)",
+  monthly: "month(s)",
+  quarterly: "cycle",
+};
+
 function monthsOf(window: CadenceWindow): Span[] {
   const spans: Span[] = [];
   let first = `${window.startsOn.slice(0, 7)}-01`;
@@ -145,18 +190,23 @@ function listOf(dates: readonly string[]): string {
 export function cadenceCoverage(
   window: CadenceWindow,
   sessions: readonly BookedRitual[],
+  /** The space's check-in frequency (P9-T19a-d-b). Weekly where not given. */
+  frequency: CheckInFrequency = "weekly",
 ): CadenceCoverage {
   const missing: string[] = [];
   const of = (kinds: readonly RitualKind[]) =>
     sessions.filter((session) => kinds.includes(session.kind));
 
   const weekly = of(["weekly"]);
-  const openWeeks = weeksOf(window)
+  const openWeeks = checkInPeriodsOf(window, frequency)
     .filter(hasWorkingDay)
     .filter((week) => !weekly.some((session) => within(session.on, week)));
   if (openWeeks.length > 0) {
+    const words = PERIOD_WORDS[frequency];
     missing.push(
-      `No weekly check-in is booked in ${openWeeks.length} week(s): the weeks from ${listOf(openWeeks.map((week) => week.from))}`,
+      words === undefined
+        ? `No weekly check-in is booked in ${openWeeks.length} week(s): the weeks from ${listOf(openWeeks.map((week) => week.from))}`
+        : `No check-in is booked in ${openWeeks.length} ${words}: the periods from ${listOf(openWeeks.map((week) => week.from))}`,
     );
   }
 
@@ -251,7 +301,7 @@ export function planCycleCadence(
     }
   }
 
-  for (const week of weeksOf(window)) {
+  for (const week of checkInPeriodsOf(window, options.frequency ?? "weekly")) {
     if (has(["weekly"], week)) {
       continue;
     }

@@ -674,9 +674,11 @@ A KPI may be calculated from a formula over other KPIs rather than entered. Sour
 | Monthly review | 30 to 60 minutes | Monthly | Trend per objective, dependency and risk log, resource shifts, decisions recorded |
 | Quarterly review | 60 minutes | At cycle close | Review the results, retro the way you worked, reset the next cycle |
 
-Book all of them for the whole cycle before the cycle starts. Calendars fill fast, and "set and forget" is the main killer of OKR programmes.
+Book all of them for the whole cycle before the cycle starts. Calendars fill fast, and "set and forget" kills OKR programmes. *Source:* Wodtke's "Set & Forget".
 
-Keep check-ins forward-looking. Status lives in the product. The meeting is for decisions.
+Every two weeks and monthly are valid check-in frequencies (§11). The streak and the escalation ladders follow whichever is chosen. *Source:* Lamorte: "The sweet spot is bi-weekly check-ins"; Doerr and Wodtke: weekly.
+
+Keep check-ins forward-looking. Status lives in the product. The meeting is for decisions. *Source:* Wodtke: if only a third of the time is presentations "you are doing it right".
 
 ### 7.2 The weekly check-in, in four steps
 
@@ -712,7 +714,7 @@ Every blocker carries an opened time, an owner and a next action. The next actio
 
 ### 7.4 The rhythm streak
 
-Consecutive weeks in which a space held its check-in. A skipped week breaks it. Shown on the space home. It is a light touch that reliably keeps the heartbeat, and the OKRs stay alive with it.
+Consecutive check-in periods in which a space held its check-in, at whatever frequency the space runs. A skipped period breaks it. Shown on the space home. A light touch that keeps the heartbeat visible. *Source:* Tability (vendor) shows check-in streaks.
 
 ### 7.5 Monthly review
 

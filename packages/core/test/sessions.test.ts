@@ -1252,6 +1252,40 @@ describe("the streak counts weeks of check-ins (completeness review M-04)", () =
     expect(streak.currentWeeks).toBe(0);
     expect(streak.longestWeeks).toBe(1);
   });
+
+  /**
+   * P9-T19a-d-b's acceptance criterion: "Given a space that checks in every
+   * two weeks, when a week passes without a check-in, then its streak
+   * holds."
+   */
+  it("acceptance: holds for a space on every two weeks through the week between (P9-T19a-d-b)", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.updateSettings",
+      { id: spaceId, defaultCheckInFrequency: "biweekly" },
+    );
+    await holdWeeklyCheckIn();
+    expect((await readStreak()).currentWeeks).toBe(1);
+    // The last check-in a fortnight's period ago: a week of the fortnight
+    // passed with nothing, which on weekly periods reads as broken.
+    await wb.admin.query(
+      `update streaks
+          set last_session_week =
+                (date_trunc('week', current_date) - interval '14 days')::date
+        where space_id = $1`,
+      [spaceId],
+    );
+    expect((await readStreak()).currentWeeks).toBe(1);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.updateSettings",
+      { id: spaceId, defaultCheckInFrequency: "weekly" },
+    );
+    expect((await readStreak()).currentWeeks).toBe(0);
+  });
 });
 
 describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {

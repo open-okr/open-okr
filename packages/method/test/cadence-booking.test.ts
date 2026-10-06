@@ -138,3 +138,51 @@ describe("reading whether a cycle is booked", () => {
     expect(coverage.booked).toBe(false);
   });
 });
+
+/**
+ * §7.1 since METHOD v2 (P9-T19a-d-b): "Every two weeks and monthly are valid
+ * check-in frequencies. The streak and the escalation ladders follow
+ * whichever is chosen." Booking follows it too.
+ */
+describe("a space at its own frequency", () => {
+  it("books one check-in a fortnight for a space on every two weeks", () => {
+    const plan = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [],
+      frequency: "biweekly",
+    });
+    const weekly = plan.filter((row) => row.kind === "weekly");
+    // The streak's fortnights, from a fixed Monday: the cycle starts in the
+    // last days of one (21 September to 4 October), and ends in the first of
+    // another, so eight are touched.
+    expect(weekly).toHaveLength(8);
+    expect(weekly.map((row) => row.on).slice(0, 3)).toEqual([
+      "2026-10-01",
+      "2026-10-05",
+      "2026-10-19",
+    ]);
+    expect(cadenceCoverage(Q4, plan, "biweekly")).toEqual({
+      booked: true,
+      missing: [],
+    });
+    // The same plan read weekly is short of every week between.
+    expect(cadenceCoverage(Q4, plan, "weekly").booked).toBe(false);
+  });
+
+  it("books one check-in a month for a monthly space, and names a missing month", () => {
+    const plan = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [],
+      frequency: "monthly",
+    });
+    expect(plan.filter((row) => row.kind === "weekly")).toHaveLength(3);
+    const withoutNovember = plan.filter(
+      (row) => !(row.kind === "weekly" && row.on.startsWith("2026-11")),
+    );
+    expect(cadenceCoverage(Q4, withoutNovember, "monthly").missing).toContain(
+      "No check-in is booked in 1 month(s): the periods from 2026-11-01",
+    );
+  });
+});

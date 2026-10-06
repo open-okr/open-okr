@@ -25,7 +25,10 @@ coordinator adds a note for leadership and posts it to the team's Slack or
 Teams channel, when the space has linked one in its settings.
 
 The session ends with a streak. That is deliberate: the thing worth making
-visible is that the team kept the rhythm, not that the numbers were good.
+visible is that the team kept the rhythm, not that the numbers were good. It
+counts your space's own check-in periods: weeks, or fortnights or months if
+your space checks in every two weeks or monthly, so a team that chose every two
+weeks does not break its streak in the week between.
 
 ## Confidence, and what the numbers mean
 

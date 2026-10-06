@@ -170,3 +170,21 @@ export async function followSpaceFrequencyInTx<
   }
   return moved.length;
 }
+
+/**
+ * The frequency a space's rituals run at: its own, or the workspace's. What
+ * its streak counts and its check-ins are booked by (§7.4, P9-T19a-d-b).
+ */
+export async function ritualFrequencyOf<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  spaceId: string,
+  thresholds: ResolvedThresholds,
+): Promise<CheckInFrequency> {
+  return (
+    (await spaceFrequencyOf(tx, workspaceId, spaceId)) ??
+    thresholds["cadence.checkInFrequency"]
+  );
+}

@@ -32,7 +32,12 @@ import {
   type OkrKind,
   tooSafePattern,
 } from "./scoring.ts";
-import type { ResolvedThresholds } from "./thresholds.ts";
+import {
+  lastWorkingDayOfPeriod,
+  periodStartOf,
+  previousPeriodStart,
+} from "./streak.ts";
+import type { CheckInFrequency, ResolvedThresholds } from "./thresholds.ts";
 
 const DAY_MS = 86_400_000;
 const toTime = (on: string): number => Date.parse(`${on}T00:00:00Z`);
@@ -117,24 +122,29 @@ export function commitmentDueToday(weekStart: string, today: string): boolean {
 }
 
 /**
- * §7.2: "a rhythm streak that a skipped week breaks." At risk on the last
- * working day of a week that holds no session yet, when the week before did
- * hold one. Nothing to say when a session is still booked for later this week,
- * because the session's own reminders cover it.
+ * §7.4: "a skipped period breaks" the streak (P9-T19a-d-b). At risk on the
+ * last working day of a check-in period that holds no session yet, when the
+ * period before did hold one, counted in the space's own periods: a week, a
+ * fortnight or a month. Nothing to say when a session is still booked for
+ * later in the period, because the session's own reminders cover it.
  */
 export function streakAtRisk(input: {
   readonly today: string;
   readonly currentWeeks: number;
   readonly lastSessionOn: string | null;
   readonly bookedLaterThisWeek: boolean;
+  /** The space's frequency. Weekly where it is not given. */
+  readonly frequency?: CheckInFrequency;
 }): boolean {
   if (input.currentWeeks <= 0 || !input.lastSessionOn) {
     return false;
   }
-  const thisMonday = mondayOf(input.today);
+  const frequency = input.frequency ?? "weekly";
+  const thisPeriod = periodStartOf(input.today, frequency);
   return (
-    input.today === lastWorkingDay(thisMonday) &&
-    mondayOf(input.lastSessionOn) === addDays(thisMonday, -7) &&
+    input.today === lastWorkingDayOfPeriod(input.today, frequency) &&
+    periodStartOf(input.lastSessionOn, frequency) ===
+      previousPeriodStart(thisPeriod, frequency) &&
     !input.bookedLaterThisWeek
   );
 }

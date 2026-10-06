@@ -416,7 +416,7 @@ A row is created when somebody takes part, not when the session is made. Seeding
 `published_at` and `channels` were written by nothing until completeness review M-23. `sessions.postDigest` now sets both when the facilitator posts a closed weekly session's digest to its space's channel: `published_at` on the first post, and the providers it went to added to `channels`.
 
 ### streaks
-`space_id` to spaces, `current_weeks`, `longest_weeks`, `last_session_week`, `history jsonb`.
+`space_id` to spaces, `current_weeks`, `longest_weeks`, `last_session_week`, `history jsonb`. Since P9-T19a-d-b the counts are of the space's own check-in periods, a week, a fortnight or a month, and `last_session_week` is the start of the last period held; the names stay because renaming them spans two releases for no gain.
 
 ### objective_trends
 `goal_id` to goals, `month date`, `trend` (`improving` / `flat` / `declining`), `author_member_id` to workspace_members.

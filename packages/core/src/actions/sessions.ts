@@ -57,7 +57,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
-  afterWeeklyCheckIn,
+  afterCheckIn,
   CLOSE_DECISION_MEANINGS,
   cadenceCoverage,
   currentStreakOn,
@@ -110,6 +110,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { nextCheckInDueAt } from "../cadence/blockers.ts";
 import { localInstant } from "../cadence/engine.ts";
 import { dueLocalDate } from "../cadence/service.ts";
+import { ritualFrequencyOf } from "../cadence/space-frequency.ts";
 import {
   addDays,
   formatLocalDate,
@@ -754,10 +755,21 @@ export const bookCycleSessions = defineWriteAction({
             input.spaceId,
           ])
         ).get(input.spaceId) ?? [];
+      // One check-in per period of the space's own frequency (P9-T19a-d-b).
+      const { thresholds: bookThresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      const frequency = await ritualFrequencyOf(
+        tx,
+        workspaceId,
+        input.spaceId,
+        bookThresholds,
+      );
       const plan = planCycleCadence(bounds, {
         weekday: input.weekday as RitualWeekday,
         from,
         existing,
+        frequency,
       });
 
       const sessionIds: string[] = [];
@@ -779,7 +791,11 @@ export const bookCycleSessions = defineWriteAction({
         sessionIds.push(id);
       }
 
-      const coverage = cadenceCoverage(bounds, [...existing, ...plan]);
+      const coverage = cadenceCoverage(
+        bounds,
+        [...existing, ...plan],
+        frequency,
+      );
       return {
         result: {
           cycleId: cycle.id,
@@ -1412,17 +1428,25 @@ export const closeSession = defineWriteAction({
             ),
           )
           .limit(1);
-        const next = afterWeeklyCheckIn(
+        // Counted in the space's own periods (§7.4, P9-T19a-d-b): a week, a
+        // fortnight or a month. The stored start is read again at the
+        // current frequency, so it is passed as stored.
+        const streakFrequency = await ritualFrequencyOf(
+          tx,
+          workspaceId,
+          session.spaceId,
+          resolveRhythm(await readRhythmRow(tx, workspaceId)).thresholds,
+        );
+        const next = afterCheckIn(
           existing
             ? {
                 currentWeeks: existing.currentWeeks,
                 longestWeeks: existing.longestWeeks,
-                lastWeek: existing.lastSessionWeek
-                  ? weekStartOf(existing.lastSessionWeek)
-                  : null,
+                lastWeek: existing.lastSessionWeek ?? null,
               }
             : null,
           heldOn,
+          streakFrequency,
         );
         if (existing) {
           // openokr:allow-mutation: streak is derived, not a domain change.
@@ -3635,18 +3659,25 @@ export const readStreak = defineReadAction({
           new Date(),
           await workspaceTimeZone(tx, context.workspaceId),
         );
+        // In the space's own periods (P9-T19a-d-b).
+        const frequency = await ritualFrequencyOf(
+          tx as OperationTx,
+          context.workspaceId,
+          input.spaceId,
+          resolveRhythm(await readRhythmRow(tx, context.workspaceId))
+            .thresholds,
+        );
         return {
           currentWeeks: currentStreakOn(
             row
               ? {
                   currentWeeks: row.currentWeeks,
                   longestWeeks: row.longestWeeks,
-                  lastWeek: row.lastSessionWeek
-                    ? weekStartOf(row.lastSessionWeek)
-                    : null,
+                  lastWeek: row.lastSessionWeek ?? null,
                 }
               : null,
             today,
+            frequency,
           ),
           longestWeeks: row?.longestWeeks ?? 0,
           lastSessionWeek: row?.lastSessionWeek ?? null,

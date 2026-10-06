@@ -39,6 +39,7 @@ import {
   confidenceFellIntoLow,
   confidenceIsCritical,
   isTriggerKey,
+  periodEndOf,
   phasesClosingToday,
   type ResolvedThresholds,
   streakAtRisk,
@@ -62,6 +63,8 @@ import {
   agentSeesSession,
   agentSeesSpaceId,
 } from "../agents/scope.ts";
+import { ritualFrequencyOf } from "../cadence/space-frequency.ts";
+import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { evaluateWorkflow, loadCycleForWorkflow } from "../cycles/workflow.ts";
 import { OperationError } from "../operations/errors.ts";
@@ -631,17 +634,21 @@ export async function dueStreakNudges(
     if (!held) {
       continue;
     }
-    // Still booked for later this week, so its own reminders have it. The
-    // check only matters on a Friday, so the week ends two days out.
-    const sunday = localDateOf(
-      new Date(Date.parse(`${today}T12:00:00Z`) + 2 * DAY_MS),
-      "UTC",
+    // The space's own periods (§7.4, P9-T19a-d-b): a week, a fortnight or a
+    // month. Still booked for later in this period, so its own reminders
+    // have it.
+    const frequency = await ritualFrequencyOf(
+      tx,
+      input.workspaceId,
+      streak.spaceId,
+      resolveRhythm(await readRhythmRow(tx, input.workspaceId)).thresholds,
     );
+    const periodEnd = periodEndOf(today, frequency);
     const bookedLaterThisWeek = sessions.some(
       (session) =>
         (session.state === "scheduled" || session.state === "running") &&
         session.scheduledFor >= input.now &&
-        localDateOf(session.scheduledFor, input.timeZone) <= sunday,
+        localDateOf(session.scheduledFor, input.timeZone) <= periodEnd,
     );
     if (
       !streakAtRisk({
@@ -649,6 +656,7 @@ export async function dueStreakNudges(
         currentWeeks: streak.currentWeeks,
         lastSessionOn: localDateOf(held.endedAt as Date, input.timeZone),
         bookedLaterThisWeek,
+        frequency,
       })
     ) {
       continue;

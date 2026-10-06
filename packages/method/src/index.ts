@@ -333,8 +333,13 @@ export {
   type WeeklyStep,
 } from "./sessions.ts";
 export {
-  afterWeeklyCheckIn,
+  afterCheckIn,
   currentStreakOn,
+  lastWorkingDayOfPeriod,
+  nextPeriodStart,
+  periodEndOf,
+  periodStartOf,
+  previousPeriodStart,
   type StreakState,
   weekStartOf,
 } from "./streak.ts";
