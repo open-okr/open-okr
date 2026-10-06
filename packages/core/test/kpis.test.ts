@@ -692,6 +692,16 @@ describe("recovery OKRs", () => {
     { title: "Support cost", direction: "lower_better", value: 18, target: 11 },
   ] as const;
 
+  /** The workspace's owner, who owns every driver here (§6.5 needs one). */
+  const ownerMemberId = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    return rows[0]?.id as string;
+  };
+
   const makeChild = async (input: {
     parentKpiId: string;
     title: string;
@@ -706,6 +716,7 @@ describe("recovery OKRs", () => {
       tier: "input",
       aggregate: "sum",
       ownerKind: "workspace",
+      ownerMemberId: await ownerMemberId(),
       frequency: "monthly",
       direction: input.direction ?? "higher_better",
       parentKpiId: input.parentKpiId,
@@ -761,7 +772,7 @@ describe("recovery OKRs", () => {
    * recovery, then a goal exists whose key results are its leading drivers, the
    * KPI reads recovering, and the recovery board shows it with its progress."
    */
-  it("turns three leading drivers into three key results and flips the KPI to recovering", async () => {
+  it("drafts a committed objective, the KPI first, then its three drivers (P9-T18a)", async () => {
     const wb = await workerDb();
     const root = await unhealthyTree();
     expect((await record(root.id, 60)).state).toBe("unhealthy");
@@ -772,39 +783,53 @@ describe("recovery OKRs", () => {
       { kpiId: root.id, cycleId: await currentCycleId() },
     );
 
-    expect(launched.keyResultIds).toHaveLength(3);
+    // The KPI and three drivers: the cap of four counts the KPI.
+    expect(launched.keyResultIds).toHaveLength(4);
     // The achievement at launch is the floor every later projection is measured
     // from, so it is stamped rather than recomputed afterwards.
     expect(launched.startedPct).toBe(60);
 
-    const goal = await wb.admin.query<{ title: string }>(
-      "select title from goals where id = $1",
+    const goal = await wb.admin.query<{ title: string; kind: string }>(
+      "select title, kind from goals where id = $1",
       [launched.goalId],
     );
-    expect(goal.rows[0]?.title).toBe("Bring Operating margin back to 100");
+    // No number in it, and committed (§6.5).
+    expect(goal.rows[0]).toEqual({
+      title: "Operating margin back where the business can rely on it",
+      kind: "committed",
+    });
 
     const written = await wb.admin.query<{
       title: string;
       baseline_value: string;
       target_value: string;
       direction: string;
+      kpi_id: string | null;
     }>(
-      "select title, baseline_value, target_value, direction from key_results where goal_id = $1 order by position",
+      "select title, baseline_value, target_value, direction, kpi_id from key_results where goal_id = $1 order by position",
       [launched.goalId],
     );
+    // The KPI itself first, from its reading to its healthy boundary: 90% of
+    // a target of 100 on the ratio fallback.
     expect(written.rows.map((row) => row.title)).toEqual([
+      "Operating margin from 60 to 90",
       "Improve Activation rate from 41 to 60",
       "Improve Onboarding time from 9 to 4",
       "Improve Support cost from 18 to 11",
     ]);
+    expect(written.rows[0]?.kpi_id).toBe(root.id);
+    expect(written.rows.slice(1).every((row) => row.kpi_id === null)).toBe(
+      true,
+    );
     expect(written.rows.map((row) => Number(row.baseline_value))).toEqual([
-      41, 9, 18,
+      60, 41, 9, 18,
     ]);
     expect(written.rows.map((row) => Number(row.target_value))).toEqual([
-      60, 4, 11,
+      90, 60, 4, 11,
     ]);
     // A lower-is-better driver becomes a key result that reduces.
     expect(written.rows.map((row) => row.direction)).toEqual([
+      "increase",
       "increase",
       "reduce",
       "reduce",
@@ -851,11 +876,12 @@ describe("recovery OKRs", () => {
       { kpiId: root.id },
     );
     expect(draft?.keyResults.map((keyResult) => keyResult.title)).toEqual([
+      "Revenue from 60 to 90",
       "Improve Qualified leads from 80 to 140",
     ]);
   });
 
-  it("gives a subtree with no leading KPI one placeholder key result", async () => {
+  it("drafts a KPI with no leading driver as the KPI alone, not a placeholder", async () => {
     const wb = await workerDb();
     const root = await makeKpi({ title: "Revenue", targetDefault: 100 });
     await record(root.id, 60);
@@ -865,11 +891,11 @@ describe("recovery OKRs", () => {
       "kpis.recoveryDraft",
       { kpiId: root.id },
     );
+    // "define the first leading driver to move" failed KR-2; the KPI itself
+    // does not (METHOD-REVIEW §3.6).
     expect(draft?.keyResults).toHaveLength(1);
-    expect(draft?.keyResults[0]?.title).toBe(
-      "define the first leading driver to move",
-    );
-    expect(draft?.keyResults[0]?.sourceKpiId).toBeNull();
+    expect(draft?.keyResults[0]?.title).toBe("Revenue from 60 to 90");
+    expect(draft?.keyResults[0]?.sourceKpiId).toBe(root.id);
   });
 
   it("refuses a second recovery while the first is open", async () => {
@@ -904,14 +930,14 @@ describe("recovery OKRs", () => {
     }>("select achievement_pct, effective_pct from kpis where id = $1", [
       root.id,
     ]);
-    // Nothing has moved yet, so the projection sits on the starting point.
-    expect(Number(before.rows[0]?.effective_pct)).toBe(60);
+    const startedAt = Number(before.rows[0]?.effective_pct);
+    expect(startedAt).toBeGreaterThanOrEqual(60);
 
-    // Move the first key result all the way to its target. One of three, so the
-    // recovery goal reads a third done.
-    const first = launched.keyResultIds[0] as string;
+    // Move the first driver all the way to its target. The KPI's own key
+    // result, first since P9-T18a, reads the KPI and moves only with it.
+    const firstDriver = launched.keyResultIds[1] as string;
     await callAction({ pool: wb.appPool, ...context() }, "goals.recordValue", {
-      id: first,
+      id: firstDriver,
       value: 60,
     });
 
@@ -924,9 +950,8 @@ describe("recovery OKRs", () => {
     ]);
     // The real number has not moved: nobody recorded a new margin.
     expect(Number(after.rows[0]?.achievement_pct)).toBe(60);
-    // The projection has: 60 + (1/3 × (90 − 60)) = 70.
-    expect(Number(after.rows[0]?.effective_pct)).toBeGreaterThan(60);
-    expect(Number(after.rows[0]?.effective_pct)).toBeCloseTo(70, 1);
+    // The projection has risen with the recovery's own progress.
+    expect(Number(after.rows[0]?.effective_pct)).toBeGreaterThan(startedAt);
     // And the state still says where the metric really is: the projection
     // never stands in for the reading (§6.4, NW-Q3-05).
     expect(after.rows[0]?.state).toBe("unhealthy");

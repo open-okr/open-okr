@@ -46654,6 +46654,15 @@
                             "objective": {
                               "type": "string"
                             },
+                            "description": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "committed"
+                              ]
+                            },
                             "keyResults": {
                               "type": "array",
                               "items": {
@@ -46694,6 +46703,9 @@
                                         "type": "null"
                                       }
                                     ]
+                                  },
+                                  "kpiBacked": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [
@@ -46702,7 +46714,8 @@
                                   "baseline",
                                   "target",
                                   "ownerMemberId",
-                                  "sourceKpiId"
+                                  "sourceKpiId",
+                                  "kpiBacked"
                                 ],
                                 "additionalProperties": false
                               }
@@ -46710,6 +46723,8 @@
                           },
                           "required": [
                             "objective",
+                            "description",
+                            "kind",
                             "keyResults"
                           ],
                           "additionalProperties": false

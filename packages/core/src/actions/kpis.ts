@@ -2050,6 +2050,9 @@ export const readRecoveryDraft = defineReadAction({
   output: z
     .object({
       objective: z.string(),
+      /** Names the KPI and leaves the why to its owner (§6.5, P9-T18a). */
+      description: z.string(),
+      kind: z.enum(["committed"]),
       keyResults: z.array(
         z.object({
           title: z.string(),
@@ -2058,6 +2061,8 @@ export const readRecoveryDraft = defineReadAction({
           target: z.number(),
           ownerMemberId: z.uuid().nullable(),
           sourceKpiId: z.uuid().nullable(),
+          /** The first key result reads the KPI it is. */
+          kpiBacked: z.boolean(),
         }),
       ),
     })
@@ -2082,7 +2087,12 @@ export const readRecoveryDraft = defineReadAction({
           Number(rhythm.thresholds["kpi.recoveryKeyResultCap"]),
         );
         return draft
-          ? { objective: draft.objective, keyResults: [...draft.keyResults] }
+          ? {
+              objective: draft.objective,
+              description: draft.description,
+              kind: draft.kind,
+              keyResults: [...draft.keyResults],
+            }
           : null;
       },
     );

@@ -633,16 +633,16 @@ State precedence, first match wins: no data, then the band. A KPI with an active
 
 ### 6.5 Recovery OKRs
 
-When a KPI turns unhealthy, the product drafts a recovery OKR:
+A recovery OKR is committed: it restores a level the business already relies on. The product drafts it as follows:
+- **Objective:** a qualitative line naming what the KPI protects, such as "Margins we can run the business on again", with the KPI's name in the description. The owner writes the why.
+- **First key result:** the KPI itself, from its current value to its healthy boundary.
+- **Further key results:** up to three, one per leading driver at the edge of the unhealthy branch that is itself below its target and has an owner. Each is written "improve *driver* from *current* to *target*", inheriting the driver's owner, with each target sized to close the gap.
+  - The drivers are found by walking the unhealthy KPI's subtree breadth-first. A leading child is a candidate directly; a lagging child is descended through until its nearest leading descendants are found.
+  - A driver already at or past its target is skipped.
 
-- **Objective**: "Bring *KPI name* back to *target*".
-- **Key results**: up to four, one per leading driver at the edge of the unhealthy branch, each written "improve *driver* from *current* to *target*", inheriting the driver's owner. The drivers are found by walking the unhealthy KPI's subtree breadth-first: a leading child becomes a key result directly; a lagging child is descended through until its nearest leading descendants are found. The walk stops at four key results.
-- If the subtree contains no leading KPI at all, one placeholder key result: "define the first leading driver to move".
-- The KPI's achievement at launch is stored as the recovery starting point.
+The draft is available for one-click launch the moment the KPI turns unhealthy. The coach proposes it after two consecutive unhealthy periods, or at once when the KPI falls from healthy to unhealthy in a single period.
 
-The draft is available for one-click launch the moment the KPI turns unhealthy. The proactive proposal from the coach fires only after two consecutive unhealthy periods, so a single bad period never triggers a drafted OKR.
-
-While a recovery OKR is active the KPI reads **recovering**, and its displayed health is the higher of its real achievement and a projection: `start + progress × (healthy threshold − start)`. That makes the recovery visible before the lagging number catches up. When real achievement re-enters the healthy corridor, the coach proposes closing the recovery OKR.
+While a recovery OKR is active, the KPI shows its real band and the recovery's progress side by side. When the real reading re-enters the healthy band, the coach proposes closing the recovery OKR. *Source:* whatmatters: "Once it's holding steady, you can demote it to a KPI".
 
 ### 6.6 Recovery board
 
@@ -979,8 +979,8 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 |---|---|
 | KPI healthy threshold | 90% of target, on the ratio fallback |
 | KPI watch threshold | 70% of target, on the ratio fallback |
-| Recovery key result cap | 4 |
-| Recovery proposal delay | 2 consecutive unhealthy periods |
+| Recovery key result cap | 4, the KPI itself included |
+| Recovery proposal delay | 2 consecutive unhealthy periods, or at once on a fall from healthy to unhealthy in one period |
 
 **Sessions**
 

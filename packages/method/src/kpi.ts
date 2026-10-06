@@ -143,6 +143,42 @@ export function thresholdsProblem(
     : null;
 }
 
+/**
+ * Where a KPI is healthy again, in its own units (§6.5, P9-T18a): what a
+ * recovery's first key result aims for. Its green boundary where it has
+ * thresholds, the nearer end of the band for a range, and on the fallback the
+ * value whose ratio to target is the healthy threshold. Null when nothing
+ * says, which is a KPI with neither thresholds nor a target.
+ */
+export function healthyBoundaryOf(input: {
+  readonly targetType: KpiTargetType;
+  readonly thresholds: KpiThresholds;
+  readonly target: number | null;
+  readonly current: number | null;
+  readonly corridor: KpiCorridor;
+}): number | null {
+  const { targetType, thresholds, target, current } = input;
+  if (thresholdsComplete(targetType, thresholds)) {
+    if (targetType === "range") {
+      return current !== null && current > (thresholds.greenHigh as number)
+        ? thresholds.greenHigh
+        : thresholds.greenLow;
+    }
+    return directionOfTargetType(targetType) === "lower_better"
+      ? thresholds.greenHigh
+      : thresholds.greenLow;
+  }
+  if (target === null) {
+    return null;
+  }
+  const share = input.corridor.healthyPct / 100;
+  const value =
+    directionOfTargetType(targetType) === "lower_better"
+      ? target / share
+      : target * share;
+  return Math.round(value * 100) / 100;
+}
+
 export type KpiHealthBasis = "thresholds" | "ratio";
 
 export interface KpiReading {

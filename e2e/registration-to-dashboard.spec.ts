@@ -933,13 +933,16 @@ test("launching recovery creates the objective and flips the KPI", async () => {
   await page.goto("/kpis/recovery");
   await page.getByRole("button", { name: "Launch recovery" }).click();
 
-  // The objective is named from the KPI and its target, per METHOD.md §6.5.
+  // The objective names what the KPI protects, with no number in it, per
+  // METHOD.md §6.5 (P9-T18a).
   await expect(
-    page.getByRole("link", { name: "Bring Operating margin back to 100" }),
+    page.getByRole("link", {
+      name: "Operating margin back where the business can rely on it",
+    }),
   ).toBeVisible();
   await expect(page.getByText("recovering").first()).toBeVisible();
-  // The subtree holds no leading driver yet, so §6.5's placeholder is the one
-  // key result rather than the product inventing a driver nobody named.
+  // The subtree holds no leading driver yet, so the KPI itself is the one key
+  // result rather than the product inventing a driver nobody named.
   await expect(page.getByText("1 key result")).toBeVisible();
 });
 

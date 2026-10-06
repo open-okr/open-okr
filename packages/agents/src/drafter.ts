@@ -850,8 +850,9 @@ const DECOMPOSITION_SYSTEM =
 
 const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
-  "line, an outcome rather than an activity, no more than twelve words, no " +
-  "trailing full stop. Name the metric.";
+  "line naming what the metric protects, an outcome rather than an activity, " +
+  "with no number in it, no more than twelve words, no trailing full stop. " +
+  "Name the metric.";
 
 /**
  * §5.3's four types, positional.

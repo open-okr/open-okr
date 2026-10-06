@@ -226,10 +226,10 @@ const MANIFEST: Record<
       ],
       minRows: 8,
     },
-    "kpi.recovery-draft": { columns: ["case", "tree", "expected"], minRows: 6 },
+    "kpi.recovery-draft": { columns: ["case", "tree", "expected"], minRows: 9 },
     "kpi.recovery-proposal": {
       columns: ["case", "period_states", "expected_propose"],
-      minRows: 8,
+      minRows: 10,
     },
     "kpi.recovery-close": {
       columns: [

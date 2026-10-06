@@ -92,6 +92,7 @@ export {
 } from "./guidance.ts";
 export {
   directionOfTargetType,
+  healthyBoundaryOf,
   KPI_DIRECTIONS,
   KPI_FREQUENCIES,
   KPI_STATES,
@@ -146,7 +147,6 @@ export {
   type EffectiveHealth,
   type EffectiveHealthInput,
   kpiEffectiveHealth,
-  RECOVERY_PLACEHOLDER_TITLE,
   type RecoveryCloseInput,
   type RecoveryDiagnostic,
   type RecoveryDraft,
@@ -154,6 +154,7 @@ export {
   type RecoveryTreeInput,
   type RecoveryTreeNode,
   type RecoveryTreeRoot,
+  recoveryObjective,
   shouldProposeRecovery,
   shouldProposeRecoveryClose,
 } from "./kpi-recovery.ts";

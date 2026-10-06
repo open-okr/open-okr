@@ -95,6 +95,15 @@ describe("the recovery drafter", () => {
       const draft = draftRecovery(tree, 4);
 
       expect(draft.objective).toBe(expected.objective);
+      // §6.5: committed, and no number in the objective for OBJ-2 to find.
+      expect(draft.kind).toBe("committed");
+      expect(draft.objective).not.toMatch(/\d/);
+      // The first key result is the KPI itself, and reads it.
+      expect(draft.keyResults[0]).toMatchObject({
+        sourceKpiId: tree.root.id,
+        kpiBacked: true,
+      });
+      expect(draft.description).toContain(tree.root.title);
       expect(draft.keyResults).toHaveLength(expected.keyResults.length);
       draft.keyResults.forEach((actual, index) => {
         const want = expected.keyResults[index];

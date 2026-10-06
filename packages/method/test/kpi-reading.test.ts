@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  healthyBoundaryOf,
   type KpiTargetType,
   type KpiThresholds,
   kpiReading,
@@ -175,5 +176,44 @@ describe("last and first, for a balance or a headcount (§6.2)", () => {
     expect(
       aggregateForPeriod("daily", "monthly", "last", [], "2026-03-01"),
     ).toBeNull();
+  });
+});
+
+describe("where a KPI is healthy again (§6.5, P9-T18a)", () => {
+  const boundary = (
+    targetType: KpiTargetType,
+    thresholds: Partial<KpiThresholds>,
+    target: number | null,
+    current: number | null = null,
+  ) =>
+    healthyBoundaryOf({
+      targetType,
+      thresholds: { ...NO_THRESHOLDS, ...thresholds },
+      target,
+      current,
+      corridor,
+    });
+
+  it("is the green value where thresholds decide (NW-Q3-04: 7.6% to 13.5%)", () => {
+    expect(boundary("increase_to", { greenLow: 13.5, redLow: 8 }, 15)).toBe(
+      13.5,
+    );
+    expect(boundary("decrease_to", { greenHigh: 2.2, redHigh: 3.2 }, 2)).toBe(
+      2.2,
+    );
+  });
+
+  it("is the nearer end of a range", () => {
+    const band = { greenLow: 99.9, greenHigh: 100, redLow: 99.5 };
+    expect(boundary("range", band, null, 99.4)).toBe(99.9);
+    expect(boundary("range", band, null, 100.5)).toBe(100);
+  });
+
+  it("is the healthy share of the target on the fallback, and null with neither", () => {
+    expect(boundary("at_least", {}, 100)).toBe(90);
+    // Lower is better: 90% achievement is target over actual, so the actual
+    // may be up to a ninth above the target.
+    expect(boundary("at_most", {}, 90)).toBe(100);
+    expect(boundary("at_least", {}, null)).toBeNull();
   });
 });

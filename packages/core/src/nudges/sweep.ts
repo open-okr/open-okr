@@ -40,6 +40,7 @@ import {
   type KpiState,
   kpiStateOf,
   type ResolvedThresholds,
+  recoveryObjective,
   shouldProposeRecovery,
   type TriggerKey,
   trigger,
@@ -372,8 +373,8 @@ export async function dueKpiCorridorNudges(
  * A model's title for a recovery objective, or nothing.
  *
  * Never throws, for the reason the check-in drafter does not: a provider having
- * a bad minute must not stop the corridor being reported. RECOVERY_PLACEHOLDER
- * wording stays §6.5's whenever this returns null.
+ * a bad minute must not stop the corridor being reported. The objective stays
+ * §6.5's `recoveryObjective` whenever this returns null.
  */
 async function refinedRecoveryTitle(
   drafter: AgentDrafter | undefined,
@@ -387,7 +388,7 @@ async function refinedRecoveryTitle(
     return (
       (await drafter.refineRecoveryTitle?.({
         kpiTitle,
-        templateTitle: `Bring ${kpiTitle} back to target`,
+        templateTitle: recoveryObjective(kpiTitle),
         achievementPct,
       })) ?? null
     );

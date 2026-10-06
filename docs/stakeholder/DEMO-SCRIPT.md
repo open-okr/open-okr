@@ -147,7 +147,7 @@ Go to `/kpis/trees`. Two driver trees, drawn by depth and health.
 
 > "Read it the way the method says to: find the unhealthy branch, then look at the leading drivers at its edge. Those drivers are what you can actually pull."
 
-Go to `/kpis/recovery`. **Operating margin** is below its corridor: it reads `unhealthy`, with `recovering` beside it and an objective under it: *Bring Operating margin back to 15*.
+Go to `/kpis/recovery`. **Operating margin** is below its corridor: it reads `unhealthy`, with `recovering` beside it and an objective under it: *Operating margin back where the business can rely on it*, committed, with the KPI itself as its first key result.
 
 > "Nobody wrote that objective. The metric fell through its corridor floor, and the engine walked the unhealthy branch of its driver tree breadth-first and turned the leading drivers at the edge into key results. This is the product proposing work rather than waiting to be told."
 
