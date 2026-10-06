@@ -17,7 +17,7 @@
     "@openokr/adapters": "workspace:*",
     "@openokr/core": "workspace:*",
     "@openokr/method": "workspace:*",
-    "mysql2": "^3.24.4",
+    "mysql2": "^3.24.5",
     "pg": "catalog:"
   },
   "devDependencies": {
