@@ -52,10 +52,17 @@ import {
   agentSeesBlocker,
   agentSeesKpi,
 } from "../agents/scope.ts";
-import { KPI_RULE_COLUMNS, type KpiRule, readingOf } from "../kpis/service.ts";
+import { readRhythmRow } from "../cycles/service.ts";
+import {
+  KPI_RULE_COLUMNS,
+  type KpiRule,
+  kpiResponsesInTx,
+  readingOf,
+} from "../kpis/service.ts";
 import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
 import { workspaceAdministratorIds } from "../people/lifecycle.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 import {
   type DueNudge,
@@ -226,6 +233,9 @@ export async function dueKpiCorridorNudges(
       memberId: kpis.memberId,
       spaceId: kpis.spaceId,
       ownerMemberId: kpis.ownerMemberId,
+      responseKind: kpis.responseKind,
+      responseTaskId: kpis.responseTaskId,
+      responseKeyResultId: kpis.responseKeyResultId,
       recoveryGoalId: kpis.recoveryGoalId,
       recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
       targetDefault: kpis.targetDefault,
@@ -239,7 +249,16 @@ export async function dueKpiCorridorNudges(
       ),
     );
 
-  const delay = input.thresholds["kpi.recoveryProposalDelayPeriods"];
+  // §12's unhealthy KPI response (P9-T18b). Offering the three leaves the
+  // proposal to §6.5's run of unhealthy periods; drafting at once proposes on
+  // the first, which is a delay of one.
+  const { practice } = practiceFromRow(
+    await readRhythmRow(tx, input.workspaceId),
+  );
+  const delay =
+    practice["kpi.unhealthyResponse"] === "draftRecovery"
+      ? 1
+      : input.thresholds["kpi.recoveryProposalDelayPeriods"];
   const due: DueNudge[] = [];
 
   for (const kpi of rows) {
@@ -280,13 +299,21 @@ export async function dueKpiCorridorNudges(
     const achievement =
       kpi.achievementPct === null ? null : Number(kpi.achievementPct);
 
+    // Somebody already answered it another way, fixing it now or with a key
+    // result, and that answer is still open (§6.5, P9-T18b): proposing a
+    // recovery on top would be asking twice.
+    const answered = (
+      await kpiResponsesInTx(tx as never, input.workspaceId, [kpi])
+    ).get(kpi.id)?.open;
     if (recovery === "none") {
       // §6.5: the proposal waits for consecutive unhealthy periods, so one bad
       // month never generates an unsolicited OKR. The states are recomputed
       // from the stored records rather than read from a column, because the
       // column holds today's state and this question is about a run of them.
-      const periods = await periodStatesFor(tx, input.workspaceId, kpi);
-      if (shouldProposeRecovery(periods, delay)) {
+      const periods = answered
+        ? []
+        : await periodStatesFor(tx, input.workspaceId, kpi);
+      if (!answered && shouldProposeRecovery(periods, delay)) {
         // One proposal, to the first owner. A proposal is a decision somebody
         // applies, and a workspace KPI's three administrators each holding a
         // copy would be three decisions about one metric.

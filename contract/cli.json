@@ -8356,6 +8356,45 @@
       "pages": false
     },
     {
+      "name": "kpis recordResponse",
+      "action": "kpis.recordResponse",
+      "method": "POST",
+      "path": "/kpis/recordResponse",
+      "scope": "write",
+      "summary": "Records how an unhealthy KPI was answered: fixed now as a task, or by a key result on an existing objective.",
+      "flags": [
+        {
+          "name": "kpi-id",
+          "field": "kpiId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "fix_now",
+            "key_result"
+          ]
+        },
+        {
+          "name": "task-id",
+          "field": "taskId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "kpis recoveryDraft",
       "action": "kpis.recoveryDraft",
       "method": "GET",

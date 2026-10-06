@@ -26,6 +26,7 @@ import {
   kpis,
   kpiTrees,
   newId,
+  proposedChanges,
   spaces,
   withContext,
   workspaceMembers,
@@ -67,6 +68,7 @@ import {
   isRecovering,
   KPI_RULE_COLUMNS,
   type KpiRule,
+  kpiResponsesInTx,
   loadKpiRecords,
   readingOf,
   recomputeKpi,
@@ -1306,6 +1308,172 @@ export const launchKpiRecovery = defineWriteAction({
   }),
 });
 
+/**
+ * How an unhealthy KPI was answered, when it was not with a recovery
+ * (METHOD.md §6.5, P9-T18b).
+ *
+ * §6.5 offers three responses. A recovery has its own launch. The other two
+ * are work created through their own writes, which keep their own rules: a
+ * task fixed now is `tasks.create`, with its owner and its date, and a key
+ * result for it on an existing objective is `goals.addKeyResult`, which marks
+ * one added mid-cycle and asks the practice. This records which one answers
+ * the KPI, so the recovery board shows the answer instead of offering the
+ * three again, and the coach does not propose a recovery for a KPI somebody
+ * has already answered.
+ */
+export const recordKpiResponse = defineWriteAction({
+  name: "kpis.recordResponse",
+  summary:
+    "Records how an unhealthy KPI was answered: fixed now as a task, or by a key result on an existing objective.",
+  input: z.object({
+    kpiId: z.uuid(),
+    kind: z.enum(["fix_now", "key_result"]),
+    /** The task that fixes it, for `fix_now`. */
+    taskId: z.uuid().optional(),
+    /** The key result that answers it, for `key_result`. */
+    keyResultId: z.uuid().optional(),
+  }),
+  output: z.object({
+    kpiId: z.uuid(),
+    kind: z.enum(["fix_now", "key_result"]),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [kpi] = await tx
+        .select({ id: kpis.id, title: kpis.title })
+        .from(kpis)
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        )
+        .limit(1);
+      if (!kpi) {
+        throw new OperationError("not_found", "No such KPI.");
+      }
+
+      let subjectId: string;
+      if (input.kind === "fix_now") {
+        if (!input.taskId) {
+          throw new OperationError(
+            "forbidden",
+            "Fixing it now needs the task that does it.",
+          );
+        }
+        // The task must be one this member can see: a response pointing at
+        // work they cannot open would answer nothing they could follow.
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "task",
+          resourceId: input.taskId,
+          requires: ACCESS_LEVELS.view,
+        });
+        subjectId = input.taskId;
+      } else {
+        if (!input.keyResultId) {
+          throw new OperationError(
+            "forbidden",
+            "Answering it with a key result needs the key result.",
+          );
+        }
+        const [keyResult] = await tx
+          .select({ goalId: keyResults.goalId })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, workspaceId),
+              eq(keyResults.id, input.keyResultId),
+            ),
+          )
+          .limit(1);
+        if (!keyResult) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "goal",
+          resourceId: keyResult.goalId,
+          requires: ACCESS_LEVELS.view,
+        });
+        subjectId = input.keyResultId;
+      }
+
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(kpis)
+        .set({
+          responseKind: input.kind,
+          responseTaskId: input.kind === "fix_now" ? subjectId : null,
+          responseKeyResultId: input.kind === "key_result" ? subjectId : null,
+          respondedByMemberId: memberId,
+          respondedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        );
+
+      // A recovery the coach proposed for it is answered too: the decision
+      // was made another way, and leaving the proposal in the inbox would ask
+      // for it twice. Settled as dismissed by whoever answered, which is what
+      // the inbox would have recorded had they pressed dismiss.
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      const settled = await tx
+        .update(proposedChanges)
+        .set({
+          status: "dismissed",
+          decidedByMemberId: memberId,
+          decidedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(proposedChanges.workspaceId, workspaceId),
+            eq(proposedChanges.status, "pending"),
+            eq(proposedChanges.action, "kpis.launchRecovery"),
+            eq(proposedChanges.subjectType, "kpi"),
+            eq(proposedChanges.subjectId, input.kpiId),
+          ),
+        )
+        .returning({ id: proposedChanges.id });
+
+      return {
+        result: { kpiId: input.kpiId, kind: input.kind },
+        activity: {
+          kind: "kpi.responded" as const,
+          subjectType: "kpi" as const,
+          subjectId: input.kpiId,
+          payload: { response: input.kind },
+        },
+        audit: {
+          action: "kpis.recordResponse",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: {
+            response: input.kind,
+            subjectId,
+            settledProposalIds: settled.map((row) => row.id),
+          },
+        },
+      };
+    },
+  }),
+});
+
 export const readRecoveryBoard = defineReadAction({
   name: "kpis.recoveryBoard",
   summary:
@@ -1323,11 +1491,34 @@ export const readRecoveryBoard = defineReadAction({
         state: z.string(),
         /** An open recovery objective, shown beside the band (§6.4). */
         recovering: z.boolean(),
+        /**
+         * How it was answered other than by a recovery (§6.5, P9-T18b): a
+         * task fixing it now, or a key result on an existing objective, and
+         * whether that answer is still open. Null when nobody has answered.
+         */
+        response: z
+          .object({
+            kind: z.enum(["fix_now", "key_result"]),
+            /** Null with the title when the reader cannot open it. */
+            subjectId: z.uuid().nullable(),
+            title: z.string().nullable(),
+            dueOn: z.string().nullable(),
+            goalId: z.uuid().nullable(),
+            goalTitle: z.string().nullable(),
+            open: z.boolean(),
+          })
+          .nullable(),
         achievementPct: z.number().nullable(),
         effectivePct: z.number().nullable(),
         healthyPct: z.number(),
         watchPct: z.number(),
         unit: z.string().nullable(),
+        /**
+         * Where it lives and who owns it, so fixing it now can default the
+         * task's space and owner (§6.5, P9-T18b).
+         */
+        spaceId: z.uuid().nullable(),
+        ownerMemberId: z.uuid().nullable(),
         recovery: z
           .object({
             goalId: z.uuid(),
@@ -1368,6 +1559,8 @@ export const readRecoveryBoard = defineReadAction({
             healthyPct: kpis.healthyPct,
             watchPct: kpis.watchPct,
             unit: kpis.unit,
+            spaceId: kpis.spaceId,
+            ownerMemberId: kpis.ownerMemberId,
             recoveryGoalId: kpis.recoveryGoalId,
             recoveryStartedPct: kpis.recoveryStartedPct,
             recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
@@ -1376,6 +1569,9 @@ export const readRecoveryBoard = defineReadAction({
             goalClosedAt: goals.closedAt,
             recoveryGoalLive: goals.id,
             recoveryGoalClosedAt: goals.closedAt,
+            responseKind: kpis.responseKind,
+            responseTaskId: kpis.responseTaskId,
+            responseKeyResultId: kpis.responseKeyResultId,
           })
           .from(kpis)
           .leftJoin(kpiTrees, eq(kpiTrees.id, kpis.treeId))
@@ -1397,6 +1593,18 @@ export const readRecoveryBoard = defineReadAction({
           )
           .orderBy(asc(kpis.title));
 
+        const responses = await kpiResponsesInTx(
+          tx as OperationTx,
+          context.workspaceId,
+          rows,
+          {
+            memberId: await actingMember(
+              tx as OperationTx,
+              context.workspaceId,
+              userId,
+            ),
+          },
+        );
         const counts = new Map<string, number>();
         const goalIds = rows
           .map((row) => row.recoveryGoalId)
@@ -1426,6 +1634,7 @@ export const readRecoveryBoard = defineReadAction({
             treeName: row.treeName,
             state: shownState(row),
             recovering: isRecovering(row),
+            response: responses.get(row.id) ?? null,
             achievementPct:
               row.achievementPct === null ? null : Number(row.achievementPct),
             effectivePct:
@@ -1433,6 +1642,8 @@ export const readRecoveryBoard = defineReadAction({
             healthyPct: Number(row.healthyPct),
             watchPct: Number(row.watchPct),
             unit: row.unit,
+            spaceId: row.spaceId,
+            ownerMemberId: row.ownerMemberId,
             recovery:
               row.recoveryGoalId && row.goalTitle
                 ? {

@@ -493,6 +493,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // moves a corridor state, and a state change is what a nudge reads later.
   "kpi.category_created": z.object({ name: z.string() }),
   "kpi.created": z.object({ title: z.string(), frequency: z.string() }),
+  // How an unhealthy KPI was answered (§6.5, P9-T18b).
+  "kpi.responded": z.object({ response: z.enum(["fix_now", "key_result"]) }),
   "kpi.value_recorded": z.object({
     periodStart: z.string(),
     created: z.boolean(),

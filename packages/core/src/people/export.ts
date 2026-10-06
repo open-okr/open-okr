@@ -227,6 +227,13 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
   },
   {
     table: "kpis",
+    column: "responded_by_member_id",
+    skip: "structural",
+    because:
+      "Who chose how an unhealthy KPI was answered (P9-T18b). The task or key result that answers it is exported with its own rows.",
+  },
+  {
+    table: "kpis",
     column: "owner_member_id",
     skip: "structural",
     because:

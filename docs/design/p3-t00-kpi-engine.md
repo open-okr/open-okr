@@ -367,6 +367,16 @@ with no other state between them.
 | a fall from healthy to unhealthy in one period proposes at once | healthy,unhealthy | yes |
 | a fall through watch waits for the second period | healthy,watch,unhealthy | no |
 
+**Two things decide whether the proposal is asked at all, before the run of
+periods is read** (P9-T18b, METHOD.md §6.5 and §12):
+
+| Given | Then |
+|---|---|
+| The KPI was answered another way, by a fix task not yet done or a key result on an objective still open | No proposal. Asking for a recovery on top of an answer is asking twice |
+| That answer is closed (the task is done, or the objective closed) and the KPI is still unhealthy | The run of periods decides, as above |
+| The practice's `kpi.unhealthyResponse` is `draftRecovery` | The delay is one period: the first unhealthy period proposes |
+| Somebody answers the KPI another way while a proposal is pending | The proposal is settled as dismissed, decided by whoever answered, in the same transaction |
+
 Closure runs the other way. When **real** achievement re-enters the healthy
 corridor, the Coach proposes closing the recovery goal, exactly once. Real, not
 effective: closing on the projection would close a recovery because the recovery

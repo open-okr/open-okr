@@ -924,13 +924,20 @@ test("a KPI recorded below the corridor reaches the recovery board", async () =>
   ).toBeVisible();
   // Sixty of a hundred is below the seventy percent watch floor.
   await expect(page.getByText("unhealthy").first()).toBeVisible();
+  // It asks for a decision and offers METHOD.md §6.5's three (P9-T18b).
+  const responses = page.getByTestId("kpi-responses");
+  await expect(responses.getByText("Fix it now", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Launch recovery" }),
+    responses.getByText("Add a key result", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    responses.getByText("Launch a recovery OKR", { exact: true }),
   ).toBeVisible();
 });
 
 test("launching recovery creates the objective and flips the KPI", async () => {
   await page.goto("/kpis/recovery");
+  await page.getByText("Launch a recovery OKR", { exact: true }).click();
   await page.getByRole("button", { name: "Launch recovery" }).click();
 
   // The objective names what the KPI protects, with no number in it, per

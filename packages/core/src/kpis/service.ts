@@ -1,4 +1,13 @@
-import { activeOnly, goals, kpiRecords, kpis, newId } from "@openokr/db";
+import {
+  activeOnly,
+  goals,
+  includeDeleted,
+  keyResults,
+  kpiRecords,
+  kpis,
+  newId,
+  tasks,
+} from "@openokr/db";
 import {
   type KpiReading as KpiBandReading,
   type KpiDirection,
@@ -15,7 +24,8 @@ import {
   shouldProposeRecoveryClose,
   targetTypeOfDirection,
 } from "@openokr/method";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { visibleResourceIds } from "../access/reads.ts";
 import type { OperationTx } from "../operations/operation.ts";
 
 /**
@@ -129,6 +139,177 @@ export function isRecovering(row: {
     row.recoveryGoalLive !== null &&
     row.recoveryGoalClosedAt === null
   );
+}
+
+/**
+ * How an unhealthy KPI was answered, other than by a recovery (METHOD.md §6.5,
+ * P9-T18b), and whether that answer is still open: a task not yet done, or a
+ * key result whose objective is still open. A closed answer is history, and
+ * the KPI asks for a decision again if it is still unhealthy.
+ */
+export interface KpiResponse {
+  readonly kind: "fix_now" | "key_result";
+  /**
+   * The task or the key result, and its title. Null for a reader who cannot
+   * open it: they are told the KPI was answered, which the KPI's own page
+   * already says, and not what with.
+   */
+  readonly subjectId: string | null;
+  readonly title: string | null;
+  /** The task's due date, for a fix. */
+  readonly dueOn: string | null;
+  /** The objective the key result is on. */
+  readonly goalId: string | null;
+  readonly goalTitle: string | null;
+  readonly open: boolean;
+}
+
+/**
+ * The current response of each KPI that has one, by KPI id.
+ *
+ * With a `reader`, a task or an objective that member cannot open is named by
+ * neither id nor title (§4.1's one access rule, through the set-shaped form
+ * of the getter that every list read uses). Without one, for the coach's own sweep, every answer is
+ * named, because the sweep only asks whether one is open.
+ */
+export async function kpiResponsesInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  rows: readonly {
+    readonly id: string;
+    readonly responseKind: string | null;
+    readonly responseTaskId: string | null;
+    readonly responseKeyResultId: string | null;
+  }[],
+  reader?: { readonly memberId: string },
+): Promise<ReadonlyMap<string, KpiResponse>> {
+  const taskIds = rows.flatMap((row) =>
+    row.responseKind === "fix_now" && row.responseTaskId
+      ? [row.responseTaskId]
+      : [],
+  );
+  const keyResultIds = rows.flatMap((row) =>
+    row.responseKind === "key_result" && row.responseKeyResultId
+      ? [row.responseKeyResultId]
+      : [],
+  );
+  const taskRows =
+    taskIds.length === 0
+      ? []
+      : await tx
+          .select({
+            id: tasks.id,
+            title: tasks.title,
+            dueOn: tasks.dueOn,
+            status: tasks.status,
+            deletedAt: tasks.deletedAt,
+          })
+          .from(tasks)
+          // Deleted rows too: a deleted task is an answer that has closed,
+          // which the board has to know to ask again.
+          .where(
+            includeDeleted(
+              tasks,
+              eq(tasks.workspaceId, workspaceId),
+              inArray(tasks.id, taskIds),
+            ),
+          );
+  const keyResultRows =
+    keyResultIds.length === 0
+      ? []
+      : await tx
+          .select({
+            id: keyResults.id,
+            title: keyResults.title,
+            deletedAt: keyResults.deletedAt,
+            goalId: goals.id,
+            goalTitle: goals.title,
+            goalClosedAt: goals.closedAt,
+            goalDeletedAt: goals.deletedAt,
+          })
+          .from(keyResults)
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          // Deleted rows too, for the same reason.
+          .where(
+            includeDeleted(
+              keyResults,
+              eq(keyResults.workspaceId, workspaceId),
+              inArray(keyResults.id, keyResultIds),
+            ),
+          );
+  const taskById = new Map(taskRows.map((row) => [row.id, row]));
+  const keyResultById = new Map(keyResultRows.map((row) => [row.id, row]));
+
+  const visibleTasks = await readable(
+    tx,
+    workspaceId,
+    "task",
+    taskRows.map((row) => row.id),
+    reader,
+  );
+  const visibleGoals = await readable(
+    tx,
+    workspaceId,
+    "goal",
+    keyResultRows.map((row) => row.goalId),
+    reader,
+  );
+
+  const out = new Map<string, KpiResponse>();
+  for (const row of rows) {
+    if (row.responseKind === "fix_now" && row.responseTaskId) {
+      const task = taskById.get(row.responseTaskId);
+      if (task) {
+        const shown = visibleTasks.has(task.id);
+        out.set(row.id, {
+          kind: "fix_now",
+          subjectId: shown ? task.id : null,
+          title: shown ? task.title : null,
+          dueOn: shown && task.dueOn !== null ? String(task.dueOn) : null,
+          goalId: null,
+          goalTitle: null,
+          open: task.deletedAt === null && task.status !== "done",
+        });
+      }
+    } else if (row.responseKind === "key_result" && row.responseKeyResultId) {
+      const keyResult = keyResultById.get(row.responseKeyResultId);
+      if (keyResult) {
+        const shown = visibleGoals.has(keyResult.goalId);
+        out.set(row.id, {
+          kind: "key_result",
+          subjectId: shown ? keyResult.id : null,
+          title: shown ? keyResult.title : null,
+          dueOn: null,
+          goalId: shown ? keyResult.goalId : null,
+          goalTitle: shown ? keyResult.goalTitle : null,
+          open:
+            keyResult.deletedAt === null &&
+            keyResult.goalDeletedAt === null &&
+            keyResult.goalClosedAt === null,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** Which of these tasks or goals the reader can open, or all with no reader. */
+async function readable(
+  tx: OperationTx,
+  workspaceId: string,
+  resourceType: "task" | "goal",
+  ids: readonly string[],
+  reader: { readonly memberId: string } | undefined,
+): Promise<ReadonlySet<string>> {
+  if (!reader) {
+    return new Set(ids);
+  }
+  return visibleResourceIds(tx, {
+    workspaceId,
+    memberId: reader.memberId,
+    resourceType,
+    ids,
+  });
 }
 
 export interface UpsertRecordInput {

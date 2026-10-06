@@ -155,7 +155,9 @@ Point at the card: the real reading, and the recovery objective's own progress b
 
 > "While a recovery is open, the KPI still says where it really is. The recovery's progress sits next to the reading, never in its place, so nobody mistakes a recovery in progress for a metric that recovered."
 
-The other six unhealthy measures each carry a **Launch recovery** button. Click one to show the engine drafting live.
+The other six unhealthy measures each ask for a decision, and offer three: **Fix it now**, **Add a key result**, **Launch a recovery OKR**. Open the third on one to show the engine drafting live.
+
+> "A defect gets a task with an owner and a date, not an OKR. Something an objective already covers gets a key result there. Only a fall that needs people working together gets a recovery. Watching it is not one of the choices."
 
 ### Beat 7 — Spaces and people (1 min)
 

@@ -569,6 +569,77 @@ describe("the daily run: KPI corridors and the morning summary", () => {
     ]);
   });
 
+  /** The recoveries the runs have proposed, and what became of each. */
+  const recoveryProposals = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      subject_id: string;
+      status: string;
+      decided_by_member_id: string | null;
+    }>(
+      `select subject_id, status, decided_by_member_id
+         from proposed_changes
+        where workspace_id = $1 and action = 'kpis.launchRecovery'
+        order by created_at`,
+      [workspaceId],
+    );
+    return rows;
+  };
+
+  it("waits for the run of unhealthy periods, unless the practice drafts at once (§12, P9-T18b)", async () => {
+    const kpiId = await kpiAt(60, 100);
+    // One unhealthy period, not from healthy: §6.5 waits for a second.
+    await runAt("daily", new Date("2026-08-20T02:00:00Z"));
+    expect(await recoveryProposals()).toEqual([]);
+
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "kpi.unhealthyResponse": "draftRecovery" },
+    });
+    await runAt("daily", new Date("2026-08-21T02:00:00Z"));
+    expect(await recoveryProposals()).toEqual([
+      { subject_id: kpiId, status: "pending", decided_by_member_id: null },
+    ]);
+  });
+
+  it("settles the proposed recovery when the KPI is answered another way, and proposes no other (§6.5, P9-T18b)", async () => {
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "kpi.unhealthyResponse": "draftRecovery" },
+    });
+    const kpiId = await kpiAt(60, 100);
+    await runAt("daily", new Date("2026-08-20T02:00:00Z"));
+    expect(await recoveryProposals()).toHaveLength(1);
+
+    const task = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "tasks.create",
+      {
+        spaceId,
+        title: "Reprice the two loss-making plans",
+        dueOn: "2026-08-29",
+        assigneeIds: [ownerMemberId],
+      },
+    )) as { id: string };
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.recordResponse",
+      { kpiId, kind: "fix_now", taskId: task.id },
+    );
+    // Decided by whoever answered, as if they had pressed dismiss.
+    expect(await recoveryProposals()).toEqual([
+      {
+        subject_id: kpiId,
+        status: "dismissed",
+        decided_by_member_id: ownerMemberId,
+      },
+    ]);
+
+    // The next day's run asks nothing more while the fix is open.
+    await runAt("daily", new Date("2026-08-21T02:00:00Z"));
+    expect(await recoveryProposals()).toHaveLength(1);
+  });
+
   it("says nothing about a KPI inside its corridor", async () => {
     await kpiAt(95, 100);
     await runAt("daily", new Date());

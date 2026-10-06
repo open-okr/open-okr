@@ -311,8 +311,10 @@ async function proposeRecoveryTo(title: string): Promise<string> {
   }
   const kpi = (
     await pool.query<{ id: string }>(
-      `insert into kpis (id, workspace_id, short_id, title, owner_kind, member_id, frequency)
-       values (gen_random_uuid(), $1, $2, $3, 'member', $4, 'monthly')
+      // Unhealthy, as every KPI the Champion proposes a recovery for is, so
+      // it is on the recovery board the proposal links to (P9-T18b).
+      `insert into kpis (id, workspace_id, short_id, title, owner_kind, member_id, frequency, state)
+       values (gen_random_uuid(), $1, $2, $3, 'member', $4, 'monthly', 'unhealthy')
        returning id`,
       [
         member.workspace_id,
@@ -378,8 +380,21 @@ test("a recovery proposal addressed to them is decided on the review screen", as
   ).toBeVisible();
   await expect(card.getByRole("button", { name: "Apply" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Dismiss" })).toBeVisible();
-  // No link away to a screen that would refuse them.
-  await expect(card.getByRole("link")).toHaveCount(0);
+  // One link, to the other two responses on the KPI's own card (METHOD.md
+  // §6.5, P9-T18b), and nothing to a screen that would refuse them: this
+  // member holds edit, and the board offers them all three.
+  const links = card.getByRole("link");
+  await expect(links).toHaveCount(1);
+  const href = (await links.getAttribute("href")) ?? "";
+  expect(href).toMatch(/^\/kpis\/recovery#kpi-/);
+  await memberPage.goto(href);
+  await expect(
+    memberPage.locator(href.slice(href.indexOf("#"))).getByTestId(
+      "kpi-responses",
+    ),
+  ).toBeVisible({ timeout: 20_000 });
+  await memberPage.goto("/review");
+  await expect(card).toBeVisible({ timeout: 20_000 });
 });
 
 test("applying it launches the recovery in their name", async () => {

@@ -62,6 +62,8 @@ export const DEFERRED_COLUMNS: readonly string[] = [
   "goals.parent_key_result_id",
   "kpis.tree_id",
   "kpis.recovery_goal_id",
+  "kpis.response_task_id",
+  "kpis.response_key_result_id",
   "check_ins.snapshot_id",
   "kpi_trees.root_kpi_id",
 ];

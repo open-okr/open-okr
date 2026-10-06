@@ -412,6 +412,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A KPI category "${String(p.name ?? "")}" was added`,
   "kpi.created": (p) =>
     `A ${String(p.frequency ?? "")} KPI "${String(p.title ?? "")}" was added`,
+  "kpi.responded": (p) =>
+    p.response === "fix_now"
+      ? "An unhealthy KPI is being fixed now, as a task with an owner and a date"
+      : "An unhealthy KPI was answered with a key result on an existing objective",
   "kpi.value_recorded": (p) =>
     p.created
       ? `A value was recorded for the period beginning ${String(p.periodStart ?? "")}`

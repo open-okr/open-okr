@@ -624,14 +624,22 @@ A KPI's health comes from its own thresholds, in its own units, by its target ty
 |---|---|
 | Healthy | Inside the green boundary, or 90% of target and above on the fallback |
 | Watch | Between the boundaries, or 70% to below 90% on the fallback. Watch the leading drivers |
-| Unhealthy | Past the red boundary, or below 70% on the fallback. Launch a recovery OKR to focus the team |
+| Unhealthy | Past the red boundary, or below 70% on the fallback. Decide a response (§6.5) |
 | No data | Enter a current value and a target |
 
 For a KPI that should stay within a range, the range is its green band. Its red boundaries sit outside the range: one below, and one above where too high matters too. Between the range and a red boundary is watch.
 
 State precedence, first match wins: no data, then the band. A KPI with an active recovery OKR is shown as **recovering** beside its real band, never instead of it. The fallback thresholds are workspace settings, and each KPI may carry its own (§11). *Source:* Castro: "as long as the dials on the dashboard are within certain thresholds, you don't care about them".
 
-### 6.5 Recovery OKRs
+### 6.5 Responding to an unhealthy KPI
+
+An unhealthy KPI asks for a decision. The product offers three:
+
+1. **Fix it now** as day-to-day work, with an owner and a date.
+2. **Add a key result** for it to an existing objective.
+3. **Launch a recovery OKR.**
+
+*Source:* Wodtke: on a Code Red "you prioritize fixing it … over OKR efforts"; whatmatters: elevate a KPI when it has "slipped so far that it's become a common issue".
 
 A recovery OKR is committed: it restores a level the business already relies on. The product drafts it as follows:
 - **Objective:** a qualitative line naming what the KPI protects, such as "Margins we can run the business on again", with the KPI's name in the description. The owner writes the why.
@@ -646,7 +654,7 @@ While a recovery OKR is active, the KPI shows its real band and the recovery's p
 
 ### 6.6 Recovery board
 
-One list across every KPI tree in the workspace: every KPI that is unhealthy or recovering, with its achievement, its recovery objective and progress, and a one-click launch for those that have none. This is the KPI equivalent of the review inbox.
+One list across every KPI in the workspace: every KPI that is unhealthy or under recovery, with its real band, its recovery objective and progress, and the three responses for those that have none. This is the KPI equivalent of the review inbox.
 
 ### 6.7 Calculated KPIs
 

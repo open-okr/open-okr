@@ -260,7 +260,10 @@ function Row({ obligation }: { readonly obligation: Obligation }) {
           </span>
           <span className="text-xs text-ink-3">{obligation.meta}</span>
           {obligation.proposal ? (
-            <ProposalDecision proposal={obligation.proposal} />
+            <ProposalDecision
+              proposal={obligation.proposal}
+              subjectId={obligation.subjectId}
+            />
           ) : null}
         </div>
         <span className="flex flex-none items-center gap-2.5">

@@ -10,8 +10,9 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
-import { goals } from "./goals.ts";
+import { goals, keyResults } from "./goals.ts";
 import { spaces } from "./spaces.ts";
+import { tasks } from "./tasks.ts";
 import { workspaceMembers, workspaces } from "./workspaces.ts";
 
 /**
@@ -202,6 +203,20 @@ export const kpis = pgTable("kpis", {
     onDelete: "set null",
   }),
   recoveryStartedPct: numeric("recovery_started_pct"),
+  /**
+   * The answer an unhealthy KPI was given other than a recovery (METHOD.md
+   * §6.5, P9-T18b): fixed now as a task, or answered by a key result on an
+   * existing objective. The latest one only; the four are set together.
+   */
+  responseKind: text("response_kind", { enum: ["fix_now", "key_result"] }),
+  responseTaskId: uuid("response_task_id").references(() => tasks.id),
+  responseKeyResultId: uuid("response_key_result_id").references(
+    () => keyResults.id,
+  ),
+  respondedByMemberId: uuid("responded_by_member_id").references(
+    () => workspaceMembers.id,
+  ),
+  respondedAt: timestamp("responded_at", { withTimezone: true }),
   /**
    * When the closure proposal was raised, so §6.5's "exactly once" has
    * somewhere to remember it. Cleared on launch and on close.
