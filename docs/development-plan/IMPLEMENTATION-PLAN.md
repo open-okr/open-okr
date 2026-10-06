@@ -3817,7 +3817,8 @@ Deliverables:
 - **The agenda.** A row for continue, update, start or stop, each move recorded as §2.9 says, through the writes that already keep §2.9's rules.
 - **Documents.** METHOD.md §7.1's monthly row and §7.5 move in.
 Test plan: the agenda row against the document; a move from the review reaching the goal.
-Acceptance: Given a monthly review, when a key result is stopped from it, then the stop carries its reason as §2.9 says and the review's record names it.
+Acceptance: Given a monthly review, when an objective is stopped from it, then the stop carries its reason as §2.9 says and the review's record names it.
+The acceptance named a key result until 6 October 2026. The product stops an objective, through `goals.stop` since P9-T13-c-a, and has no closed state for a key result alone, so the criterion was rewritten to what §2.9's stop does today and the key result stop is recorded as a question for a human in the design note.
 Scenario steps: NW-Q2-10.
 
 ### P9-T19b: Holidays, leave, and a rhythm that follows them [M]

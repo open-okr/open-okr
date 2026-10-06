@@ -10886,7 +10886,7 @@
       "method": "GET",
       "path": "/sessions/monthlyRecord",
       "scope": "read",
-      "summary": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions.",
+      "summary": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
       "flags": [
         {
           "name": "session-id",

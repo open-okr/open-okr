@@ -189,6 +189,7 @@ as the meeting progresses.
 | Trend per objective | `improving`, `flat`, `declining` | One per objective |
 | Dependency and risk log | Status per dependency | From the alignment register |
 | Resource or priority shifts | Free text | |
+| Continue, update, start or stop | Each move recorded as METHOD.md §2.9 says | Read from the objective, not stored again (P9-T19a-d-d) |
 | Decisions | Decision record: text, affected KR/goal, date, author | The artifact that survives |
 
 The decision table is surfaced on:
@@ -215,9 +216,26 @@ objective as evidence and no button starts selected. §7.5 records the trend as
 a judgement, and a judgement that arrives pre-answered is a judgement most
 rooms stop making.
 
+*The moves are read, not recorded twice* (P9-T19a-d-d). A start is an
+objective or key result marked added mid-cycle, an update is a target change
+made once the cycle's plan was published (`key_result_target_changes.mid_cycle`),
+and a stop is an objective closed as abandoned with its reason. Each is the
+write §2.9 already keeps, so `sessions.monthlyRecord` reads them back in the
+review's space and cycle, and the stop the room makes goes through `goals.stop`
+like any other.
+
+| Move | Read from | Made in the review |
+|---|---|---|
+| Continue | Nothing | Nothing to record |
+| Update | `key_result_target_changes` where `mid_cycle` | No: on the objective, where easing asks its reason |
+| Start | `added_mid_cycle_at` on the objective or key result | No: written as on any day |
+| Stop | `goals` closed with outcome `abandoned` | Yes: `goals.stop`, with its one-line reason |
+
 Given / When / Then:
 - Given a monthly review recording a decision against a key result, when the
   goal page is opened, then the decision appears in its history.
+- Given a monthly review, when an objective is stopped from it, then it closes
+  as abandoned with its reason and the review's record names it.
 
 ## 4. The quarterly review (SS8)
 

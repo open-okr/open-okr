@@ -474,6 +474,117 @@ describe("decisions.forCycle", () => {
   });
 });
 
+describe("continue, update, start or stop (METHOD.md §7.5, P9-T19a-d-d)", () => {
+  interface Moves {
+    stops: { goalId: string; goalTitle: string; reason: string | null }[];
+    updates: {
+      keyResultId: string;
+      from: number;
+      to: number;
+      eased: boolean;
+      reason: string | null;
+    }[];
+    untrended: { goalId: string }[];
+  }
+
+  it("names a stop made from the review, with its reason, and asks no trend of it (acceptance)", async () => {
+    const reason = "The partner programme it served was cancelled in March";
+    await call("goals.stop", { id: goalId, reason });
+
+    // §2.9: "Closed as abandoned with a one-line reason".
+    const wb = await workerDb();
+    const closed = await wb.admin.query<{
+      success_status: string;
+      close_decision: string;
+      close_reason: string;
+    }>(
+      "select success_status, close_decision, close_reason from goals where id = $1",
+      [goalId],
+    );
+    expect(closed.rows[0]).toEqual({
+      success_status: "abandoned",
+      close_decision: "abandon",
+      close_reason: reason,
+    });
+
+    const record = (await call("sessions.monthlyRecord", {
+      sessionId,
+    })) as Moves;
+    expect(record.stops).toEqual([
+      {
+        goalId,
+        goalTitle: "Become the platform mid-market teams reach for first",
+        reason,
+        stoppedAt: expect.any(String),
+      },
+    ]);
+    expect(record.untrended.map((entry) => entry.goalId)).not.toContain(goalId);
+  });
+
+  it("drops a stop that was reopened, because there is no longer a close to show", async () => {
+    await call("goals.stop", { id: goalId, reason: "No longer matters" });
+    await call("goals.reopen", { id: goalId });
+    const record = (await call("sessions.monthlyRecord", {
+      sessionId,
+    })) as Moves;
+    expect(record.stops).toEqual([]);
+  });
+
+  it("does not read a close at the end of the work as a stop", async () => {
+    await call("goals.close", {
+      id: goalId,
+      successStatus: "achieved",
+      closeDecision: "keep",
+      retrospectiveBody: {
+        type: "doc" as const,
+        content: [
+          {
+            type: "paragraph" as const,
+            content: [{ type: "text" as const, text: "Delivered." }],
+          },
+        ],
+      },
+    });
+    const record = (await call("sessions.monthlyRecord", {
+      sessionId,
+    })) as Moves;
+    expect(record.stops).toEqual([]);
+  });
+
+  it("names a target updated once the plan was published, and not one changed while it was written", async () => {
+    // Before publication: the plan being written, not a move.
+    await call("goals.changeTarget", { id: keyResultId, targetValue: 320 });
+
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update cycles set published_at = now() where id = $1",
+      [cycleId],
+    );
+    await call("goals.changeTarget", {
+      id: keyResultId,
+      targetValue: 250,
+      reason: "Two of the three launch partners pushed to next quarter",
+    });
+
+    const record = (await call("sessions.monthlyRecord", {
+      sessionId,
+    })) as Moves;
+    expect(record.updates).toEqual([
+      {
+        goalId,
+        goalTitle: "Become the platform mid-market teams reach for first",
+        keyResultId,
+        keyResultTitle: "Raise weekly active teams from 120 to 300 by 31 March",
+        from: 320,
+        to: 250,
+        eased: true,
+        reason: "Two of the three launch partners pushed to next quarter",
+        changedAt: expect.any(String),
+      },
+    ]);
+  });
+});
+
 describe("access", () => {
   it("refuses the record to a suspended member", async () => {
     await expect(

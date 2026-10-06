@@ -671,7 +671,7 @@ A KPI may be calculated from a formula over other KPIs rather than entered. Sour
 | Ritual | Length | Frequency | Purpose |
 |---|---|---|---|
 | Weekly check-in | 15 to 30 minutes | Weekly | A decision loop. Score confidence, discuss what dropped, close and set commitments, name the wins |
-| Monthly review | 30 to 60 minutes | Monthly | Trend per objective, dependency and risk log, resource shifts, decisions recorded |
+| Monthly review | 30 to 60 minutes | Monthly | Trend per objective, dependency and risk log, resource shifts, continue, update, start or stop, decisions recorded |
 | Quarterly review | 60 minutes | At cycle close | Review the results, retro the way you worked, reset the next cycle |
 
 Book all of them for the whole cycle before the cycle starts. Calendars fill fast, and "set and forget" kills OKR programmes. *Source:* Wodtke's "Set & Forget".
@@ -728,9 +728,10 @@ Consecutive check-in periods in which a space held its check-in, at whatever fre
 | Trend per objective | Improving, flat, declining |
 | Dependency and risk log | Status per dependency |
 | Resource or priority shifts | Free text |
+| Continue, update, start or stop | Each move recorded as §2.9 says |
 | Decisions | A dated decision against the affected key result |
 
-The decision log is the artifact that survives the meeting. Every decision names the key result it affects.
+The decision log is the artifact that survives the meeting. Every decision names the key result it affects. *Source:* re:Work: "it can be helpful to have a mid-quarter check-in"; Doerr's continue, update, start, stop.
 
 ### 7.6 Mid-cycle calibration
 

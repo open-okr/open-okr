@@ -535,7 +535,7 @@ the machine-readable document.
 | `sessions.managementRetro`<br/>§8.7's four questions with what leadership answered (METHOD.md §8.1 stage 6). | `GET /api/v1/sessions/managementRetro` | reads |
 | `sessions.mine`<br/>Sessions in every space this member can read, running first. | `GET /api/v1/sessions/mine` | reads |
 | `sessions.minutes`<br/>§8.10's minutes: the executive summary and every stage's record (screen S-25). | `GET /api/v1/sessions/minutes` | reads |
-| `sessions.monthlyRecord`<br/>Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions. | `GET /api/v1/sessions/monthlyRecord` | reads |
+| `sessions.monthlyRecord`<br/>Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions. | `GET /api/v1/sessions/monthlyRecord` | reads |
 | `sessions.narrateDiagnostic`<br/>Narrates §8.6's diagnostic with this cycle's specifics, beside the verdict and never instead of it. | `GET /api/v1/sessions/narrateDiagnostic` | reads |
 | `sessions.narrateDigest`<br/>Rewrites the weekly digest as prose, refusing any narration that states a number the product did not compute. | `GET /api/v1/sessions/narrateDigest` | reads |
 | `sessions.narratives`<br/>Stage three's state: who holds the mic, who has spoken, and what was written. | `GET /api/v1/sessions/narratives` | reads |

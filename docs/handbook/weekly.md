@@ -88,9 +88,15 @@ review inbox still says you owe it.
 ## Monthly
 
 Thirty to sixty minutes: trend per objective, the dependency and risk log,
-resource shifts, and decisions recorded. It exists because some problems are
-only visible over four weeks, and because a decision nobody wrote down gets
-made again next month.
+resource shifts, continue, update, start or stop, and decisions recorded. It
+exists because some problems are only visible over four weeks, and because a
+decision nobody wrote down gets made again next month.
+
+The review lists what was started, updated or stopped since the plan was
+published. Continue needs no record. Update a target on its objective, where
+easing one asks for a reason. Stop an objective from the review itself, with a
+line on why it no longer matters: it closes as abandoned and the review names
+it.
 
 ## Next
 

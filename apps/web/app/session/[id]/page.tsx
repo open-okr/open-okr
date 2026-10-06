@@ -71,8 +71,10 @@ import {
   type MonthlyDecision,
   type MonthlyDependency,
   MonthlyReview,
+  type MonthlyStop,
   type MonthlyTrend,
   type MonthlyUntrended,
+  type MonthlyUpdate,
 } from "./monthly-review";
 import { type Narratives, NarrativesPanel } from "./narratives";
 import { type LowScore, NextActionPanel } from "./next-actions.tsx";
@@ -450,6 +452,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
     trends: MonthlyTrend[];
     untrended: MonthlyUntrended[];
     additions: MonthlyAddition[];
+    stops: MonthlyStop[];
+    updates: MonthlyUpdate[];
     dependencies: MonthlyDependency[];
     decisions: MonthlyDecision[];
   }
@@ -1048,6 +1052,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
           trends={monthly.trends}
           untrended={monthly.untrended}
           additions={monthly.additions}
+          stops={monthly.stops}
+          updates={monthly.updates}
           dependencies={monthly.dependencies}
           decisions={monthly.decisions}
           subjects={decisionSubjects}

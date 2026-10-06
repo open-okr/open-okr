@@ -3701,10 +3701,13 @@ export const readStreak = defineReadAction({
 /**
  * A monthly review has no stages, so nothing here advances one.
  *
- * §7.5 records four things and this module stores two of them. The dependency
+ * §7.5 records five things and this module stores three of them. The dependency
  * and risk log is a read of P3-T09's alignment register, returned by
  * `sessions.monthlyRecord` rather than copied into a table of its own, because
  * two copies of one dependency is two answers a facilitator has to reconcile.
+ * The moves are the same kind of read (P9-T19a-d-d): a start, an update and a
+ * stop are each the write §2.9 already keeps, made from the review or anywhere
+ * else, and the record reads them back from the objective.
  */
 /**
  * `2026-03-14` from an instant, as the workspace's own timezone sees it.
@@ -4170,7 +4173,7 @@ const decisionColumns = {
 export const readMonthlyRecord = defineReadAction({
   name: "sessions.monthlyRecord",
   summary:
-    "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions.",
+    "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     shifts: z.string().nullable(),
@@ -4203,6 +4206,35 @@ export const readMonthlyRecord = defineReadAction({
         keyResultId: z.uuid().nullable(),
         keyResultTitle: z.string().nullable(),
         addedAt: z.string(),
+      }),
+    ),
+    /**
+     * §2.9's stops in the review's scope, oldest first: objectives closed as
+     * abandoned, each with its one-line reason (METHOD.md §7.5, P9-T19a-d-d).
+     */
+    stops: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        reason: z.string().nullable(),
+        stoppedAt: z.string(),
+      }),
+    ),
+    /**
+     * §2.9's updates to a target once the plan was published, oldest first,
+     * each with the target it replaced and, where it eased, its reason.
+     */
+    updates: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        keyResultId: z.uuid(),
+        keyResultTitle: z.string(),
+        from: z.number(),
+        to: z.number(),
+        eased: z.boolean(),
+        reason: z.string().nullable(),
+        changedAt: z.string(),
       }),
     ),
     dependencies: z.array(
@@ -4380,6 +4412,63 @@ export const readMonthlyRecord = defineReadAction({
           ),
         ].sort((a, b) => a.addedAt.localeCompare(b.addedAt));
 
+        // §2.9's stops, in the scope the trends read. Abandoned is the outcome
+        // a stop closes with, and a reopened objective has no close to show.
+        const stopRows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            reason: goals.closeReason,
+            closedAt: goals.closedAt,
+          })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+              eq(goals.successStatus, "abandoned"),
+              isNotNull(goals.closedAt),
+            ),
+          )
+          .orderBy(asc(goals.closedAt));
+
+        // §2.9's updates. A change made before the plan was published is the
+        // plan being written, not a move, which is what `mid_cycle` records.
+        const updateRows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            keyResultId: keyResults.id,
+            keyResultTitle: keyResults.title,
+            from: keyResultTargetChanges.fromValue,
+            to: keyResultTargetChanges.toValue,
+            eased: keyResultTargetChanges.eased,
+            reason: keyResultTargetChanges.reason,
+            changedAt: keyResultTargetChanges.changedAt,
+          })
+          .from(keyResultTargetChanges)
+          .innerJoin(
+            keyResults,
+            and(
+              eq(keyResults.id, keyResultTargetChanges.keyResultId),
+              isNull(keyResults.deletedAt),
+            ),
+          )
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          .where(
+            activeOnly(
+              keyResultTargetChanges,
+              eq(keyResultTargetChanges.workspaceId, context.workspaceId),
+              eq(keyResultTargetChanges.midCycle, true),
+              isNull(goals.deletedAt),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+            ),
+          )
+          .orderBy(asc(keyResultTargetChanges.changedAt));
+
         // §7.5's dependency and risk log, read from P3-T09's register rather
         // than stored a second time here.
         const dependencyRows = await tx
@@ -4430,6 +4519,23 @@ export const readMonthlyRecord = defineReadAction({
           trends,
           untrended,
           additions,
+          stops: stopRows.map((row) => ({
+            goalId: row.goalId,
+            goalTitle: row.goalTitle,
+            reason: row.reason,
+            stoppedAt: new Date(row.closedAt as Date).toISOString(),
+          })),
+          updates: updateRows.map((row) => ({
+            goalId: row.goalId,
+            goalTitle: row.goalTitle,
+            keyResultId: row.keyResultId,
+            keyResultTitle: row.keyResultTitle,
+            from: Number(row.from),
+            to: Number(row.to),
+            eased: row.eased,
+            reason: row.reason,
+            changedAt: new Date(row.changedAt).toISOString(),
+          })),
           dependencies: dependencyRows.map((row) => ({
             id: row.id,
             keyResultId: row.keyResultId,

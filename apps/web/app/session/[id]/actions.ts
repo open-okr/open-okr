@@ -174,6 +174,33 @@ export async function recordDecisionAction(
 }
 
 /**
+ * §7.5's stop, made from the review (METHOD.md §2.9, P9-T19a-d-d).
+ *
+ * The same `goals.stop` the objective's own page calls, so the stop is closed
+ * as abandoned with its one-line reason whichever screen it came from, and the
+ * review's record reads it back from the objective.
+ */
+export async function stopObjectiveAction(
+  sessionId: string,
+  goalId: string,
+  reason: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "goals.stop",
+    { id: goalId, reason },
+  );
+  revalidatePath(`/session/${sessionId}`);
+  revalidatePath(`/goals/${goalId}`);
+  revalidatePath("/cycle");
+}
+
+/**
  * The quarterly review's pacing (METHOD.md §8.1, P4-T10a-a).
  *
  * Both are the facilitator's, and the actions refuse anybody else rather than

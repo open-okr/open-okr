@@ -15100,7 +15100,7 @@
     },
     {
       "name": "sessions.monthlyRecord",
-      "description": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions.",
+      "description": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
       "inputSchema": {
         "type": "object",
         "properties": {

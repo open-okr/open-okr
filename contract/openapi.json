@@ -60401,7 +60401,7 @@
     "/sessions/monthlyRecord": {
       "get": {
         "operationId": "sessions.monthlyRecord",
-        "summary": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions.",
+        "summary": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
         "tags": [
           "sessions"
         ],
@@ -60536,6 +60536,92 @@
                               "keyResultId",
                               "keyResultTitle",
                               "addedAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "stops": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "goalId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "goalTitle": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "stoppedAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "goalId",
+                              "goalTitle",
+                              "reason",
+                              "stoppedAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "updates": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "goalId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "goalTitle": {
+                                "type": "string"
+                              },
+                              "keyResultId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "keyResultTitle": {
+                                "type": "string"
+                              },
+                              "from": {
+                                "type": "number"
+                              },
+                              "to": {
+                                "type": "number"
+                              },
+                              "eased": {
+                                "type": "boolean"
+                              },
+                              "reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "changedAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "goalId",
+                              "goalTitle",
+                              "keyResultId",
+                              "keyResultTitle",
+                              "from",
+                              "to",
+                              "eased",
+                              "reason",
+                              "changedAt"
                             ],
                             "additionalProperties": false
                           }
@@ -60682,6 +60768,8 @@
                         "trends",
                         "untrended",
                         "additions",
+                        "stops",
+                        "updates",
                         "dependencies",
                         "decisions"
                       ],

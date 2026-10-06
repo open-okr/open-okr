@@ -106,7 +106,7 @@ export const RITUALS: readonly Ritual[] = [
     length: "30 to 60 minutes",
     frequency: "Monthly",
     purpose:
-      "Trend per objective, dependency and risk log, resource shifts, decisions recorded",
+      "Trend per objective, dependency and risk log, resource shifts, continue, update, start or stop, decisions recorded",
   },
   {
     kind: "quarterly",
@@ -115,6 +115,35 @@ export const RITUALS: readonly Ritual[] = [
     frequency: "At cycle close",
     purpose:
       "Review the results, retro the way you worked, reset the next cycle",
+  },
+];
+
+export interface MonthlyReviewItem {
+  /** §7.5's name for the agenda row. */
+  readonly item: string;
+  /** What the review keeps of it, in §7.5's words. */
+  readonly recordedAs: string;
+}
+
+/**
+ * §7.5's agenda, in its order.
+ *
+ * The moves row records nothing of its own (P9-T19a-d-d). A start, an update
+ * and a stop are each the write §2.9 already describes, so the review reads
+ * them back from the objective rather than keeping a second copy a facilitator
+ * would have to reconcile with the first.
+ */
+export const MONTHLY_REVIEW_ITEMS: readonly MonthlyReviewItem[] = [
+  { item: "Trend per objective", recordedAs: "Improving, flat, declining" },
+  { item: "Dependency and risk log", recordedAs: "Status per dependency" },
+  { item: "Resource or priority shifts", recordedAs: "Free text" },
+  {
+    item: "Continue, update, start or stop",
+    recordedAs: "Each move recorded as §2.9 says",
+  },
+  {
+    item: "Decisions",
+    recordedAs: "A dated decision against the affected key result",
   },
 ];
 

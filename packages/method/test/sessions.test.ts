@@ -6,6 +6,7 @@ import {
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   MID_CYCLE_CALIBRATION,
+  MONTHLY_REVIEW_ITEMS,
   PROCESS_HEALTH_STATEMENTS,
   REVIEW_STAGE_KEYS,
   REVIEW_STAGES,
@@ -34,6 +35,30 @@ const method = readFileSync(
   join(import.meta.dirname, "../../../docs/development-plan/METHOD.md"),
   "utf8",
 );
+
+describe("§7.5's monthly review", () => {
+  it("has the document's five rows, the moves among them (P9-T19a-d-d)", () => {
+    const table = method
+      .split("### 7.5 Monthly review")[1]
+      ?.split("### 7.6")[0]
+      ?.split("\n")
+      .filter((line) => line.startsWith("| ") && !line.startsWith("| Item"))
+      .map((line) => line.split("|").map((cell) => cell.trim()));
+    expect(
+      table?.map(([, item, recordedAs]) => ({ item, recordedAs })),
+    ).toEqual(MONTHLY_REVIEW_ITEMS);
+    expect(MONTHLY_REVIEW_ITEMS[3]).toEqual({
+      item: "Continue, update, start or stop",
+      recordedAs: "Each move recorded as §2.9 says",
+    });
+  });
+
+  it("names the moves in the ritual's purpose as well", () => {
+    expect(RITUALS.find((r) => r.kind === "monthly")?.purpose).toContain(
+      "continue, update, start or stop",
+    );
+  });
+});
 
 describe("§8.1's eleven stages", () => {
   it("are all here, numbered in order", () => {

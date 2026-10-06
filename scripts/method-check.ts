@@ -37,6 +37,7 @@ import {
   KEY_RESULT_CHECKS,
   MANAGEMENT_RETRO_QUESTIONS,
   MID_CYCLE_CALIBRATION,
+  MONTHLY_REVIEW_ITEMS,
   OBJECTIVE_CHECKS,
   PHASE_TITLES,
   PRACTICE,
@@ -447,7 +448,7 @@ for (const documentedRead of documentedReads) {
  * saying what it looked at is a suite nobody notices has stopped looking.
  * Raise it when you add a list.
  */
-const ENUMERATIONS_CHECKED = 20;
+const ENUMERATIONS_CHECKED = 21;
 
 // --- 5. The enumerations (P7-T07) -------------------------------------------
 //
@@ -565,6 +566,23 @@ compare("the rituals: name", tableColumn(ritualRows, 0), RITUALS.map((r) => r.na
 compare("the rituals: length", tableColumn(ritualRows, 1), RITUALS.map((r) => r.length), 3);
 compare("the rituals: frequency", tableColumn(ritualRows, 2), RITUALS.map((r) => r.frequency), 3);
 compare("the rituals: purpose", tableColumn(ritualRows, 3), RITUALS.map((r) => r.purpose), 3);
+
+// §7.5. The monthly review's agenda, and what each row is recorded as. The
+// moves row arrived at P9-T19a-d-d; before it the review's screen had four
+// panels and the document five rows, and nothing here could see the gap.
+const monthlyRows = section(method, "### 7.5 Monthly review", "### 7.6");
+compare(
+  "the monthly review items",
+  tableColumn(monthlyRows, 0),
+  MONTHLY_REVIEW_ITEMS.map((row) => row.item),
+  5,
+);
+compare(
+  "the monthly review records",
+  tableColumn(monthlyRows, 1),
+  MONTHLY_REVIEW_ITEMS.map((row) => row.recordedAs),
+  5,
+);
 
 // §8.5. Statements a room scores itself against. Wording is the whole of a
 // statement, so these are compared word for word.
