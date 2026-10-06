@@ -386,6 +386,7 @@ export {
   closeIsSandbagged,
   commitmentDueToday,
   committedBelowFloor,
+  confidenceFellIntoLow,
   confidenceIsCritical,
   draftIsSandbagged,
   objectivesOverCap,

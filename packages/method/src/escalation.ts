@@ -1,10 +1,11 @@
 /**
  * The check-in escalation ladder (METHOD.md §11, P3-T06).
  *
- * §11's own wording: "champion at due, champion again at one day overdue,
- * reviewer once the grace is exceeded, coordinator at seven days, sponsor at
- * fourteen. Widening rather than repeating is what makes an escalation mean
- * something."
+ * §11's own wording: "champion at due, champion again at 1 day overdue,
+ * reviewer when grace is exceeded where the goal has one, coordinator at 7
+ * days. The sponsor sees stale goals in the weekly digest, and is a ladder
+ * step only where the workspace adds it" (METHOD v2, P9-T19a-c-a). Widening
+ * rather than repeating is what makes an escalation mean something.
  *
  * Targets accumulate rather than replace, because the champion keeps being asked
  * while the escalation widens. An escalation that dropped the champion at step 3
@@ -46,6 +47,12 @@ export function escalation(
   daysPastDue: number,
   graceDays: number,
   thresholds: ResolvedThresholds,
+  /**
+   * §12's "Sponsor in escalation ladders" (P9-T19a-c-a). Off, the ladder
+   * stops at the coordinator: the sponsor sees stale goals in the weekly
+   * digest, and is a ladder step only where the workspace adds it.
+   */
+  sponsorInLadders = false,
 ): Escalation {
   const ladder = thresholds["cadence.checkInLadderDays"];
   const lead = thresholds["cadence.dueSoonLeadDays"];
@@ -55,7 +62,7 @@ export function escalation(
     return daysPastDue === -lead ? { step: 0, targets: ["champion"] } : NOTHING;
   }
 
-  if (daysPastDue >= ladder.sponsor) {
+  if (sponsorInLadders && daysPastDue >= ladder.sponsor) {
     return {
       step: 5,
       targets: ["champion", "reviewer", "coordinator", "sponsor"],

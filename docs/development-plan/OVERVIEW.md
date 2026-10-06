@@ -98,7 +98,7 @@ When a KPI turns unhealthy, OpenOKR drafts a **recovery objective**: committed, 
 Fifteen to thirty minutes, four steps, run by the product.
 
 1. **Confidence round.** Every key result gets a score from 0.0 to 1.0. Where the team votes, everyone submits privately and the votes reveal together, so nobody anchors on the champion. The champion writes one or two lines: what changed this week. Facts, not feelings.
-2. **Discuss what dropped.** Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner, and a blocker with its type only where something is actually blocked. Anything at or below 0.3 escalates to management the same day.
+2. **Discuss what dropped.** Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner, and a blocker with its type only where something is actually blocked. A key result whose confidence falls into the low band is raised with the coordinator the same day.
 3. **Commitments.** Close last week's out loud, delivered or not, no negotiation. Set this week's: two or three moves that will actually shift a key result.
 4. **Digest.** Generated for you, edited by the coordinator, posted to your channel.
 
@@ -138,7 +138,7 @@ Every message cites the rule behind it. You can open the rule and disagree with 
 
 ### The OKR Champion guards the rhythm
 
-It reminds the champion before the check-in is due, on the day, and daily after. It escalates: to the reviewer at the grace boundary, to the coordinator at a week, to the sponsor at a fortnight, always visibly to the person being escalated past. It runs the blocker clock: a warning at twenty hours, an escalation at twenty-four. It opens and closes the weekly session, assembles the digest, keeps the streak, watches the KPI corridors, and prepares the pack before your quarterly review so the session starts warm.
+It reminds the champion before the check-in is due, on the day, and daily after. It escalates: to the reviewer at the grace boundary where the goal has one, to the coordinator at a week, and to the sponsor at a fortnight only where the workspace puts the sponsor in its ladders, always visibly to the person being escalated past. It runs the blocker clock: a reminder the day before the check-in a blocker's next action is due by, and the coordinator once that check-in passes. It opens and closes the weekly session, assembles the digest, keeps the streak, watches the KPI corridors, and prepares the pack before your quarterly review so the session starts warm.
 
 ### They are safe, cheap and honest
 

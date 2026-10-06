@@ -70,7 +70,8 @@ The product runs the cadence rather than reminding you to.
 | What happens | When |
 |---|---|
 | A check-in is due | The champion is nudged before it, not after |
-| A check-in is missed | The escalation ladder starts: the champion again, then the coordinator, then the sponsor |
+| A check-in is missed | The escalation ladder starts: the champion again, the reviewer where the goal has one, then the coordinator. The sponsor only where your workspace puts the sponsor in its ladders |
+| A key result's confidence falls into the low band | The coordinator hears the same day. One drafted low on purpose that stays there does not escalate. At 0.3 and below the sponsor hears too, only where your workspace turns critical escalation on |
 | A goal goes unchecked | After three days of grace it reads as **outdated**, whatever health was last reported |
 | A blocker's clock runs low | Its owner hears, then the coordinator |
 

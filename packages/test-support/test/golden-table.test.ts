@@ -131,15 +131,17 @@ const MANIFEST: Record<
       columns: ["case", "timezone", "due_date", "expected_instant"],
       minRows: 12,
     },
+    // The sponsor an opt-in step since P9-T19a-c-a.
     "cadence.escalation": {
       columns: [
         "case",
         "days_past_due",
         "grace_days",
+        "sponsor_in_ladders",
         "expected_step",
         "expected_targets",
       ],
-      minRows: 14,
+      minRows: 16,
     },
     "cadence.acknowledgement": {
       columns: [

@@ -143,10 +143,11 @@ afterAll(async () => {
 });
 
 describe("the Champion's five", () => {
-  it("confidence.critical goes to the space's coordinator the day it is scored", async () => {
+  /** A session in the space, with confirmed confidences written into it. */
+  const confirmIn = async (
+    entries: readonly { krId: string; confidence: number; daysAgo?: number }[],
+  ) => {
     const wb = await workerDb();
-    const goalId = await goal({ cycleId: planningCycleId, inSpace: true });
-    const krId = await keyResult(goalId);
     const session = (await call("sessions.create", {
       spaceId,
       kind: "weekly",
@@ -154,12 +155,30 @@ describe("the Champion's five", () => {
       scheduledFor: new Date().toISOString(),
       facilitatorId: ownerMemberId,
     })) as { id: string };
-    await wb.admin.query(
-      `insert into session_confidences
-         (id, workspace_id, session_id, key_result_id, confirmed_confidence, what_changed, confirmed_by_id)
-       values (gen_random_uuid(), $1, $2, $3, 0.2, 'The contractor left', $4)`,
-      [workspaceId, session.id, krId, ownerMemberId],
-    );
+    for (const entry of entries) {
+      await wb.admin.query(
+        `insert into session_confidences
+           (id, workspace_id, session_id, key_result_id, confirmed_confidence,
+            what_changed, confirmed_by_id, created_at)
+         values (gen_random_uuid(), $1, $2, $3, $4, 'Scored', $5,
+                 now() - make_interval(days => $6))`,
+        [
+          workspaceId,
+          session.id,
+          entry.krId,
+          entry.confidence,
+          ownerMemberId,
+          entry.daysAgo ?? 0,
+        ],
+      );
+    }
+  };
+
+  it("confidence.critical goes to the space's coordinator the day a confidence falls into the low band", async () => {
+    const goalId = await goal({ cycleId: planningCycleId, inSpace: true });
+    const krId = await keyResult(goalId);
+    await confirmIn([{ krId, confidence: 0.6, daysAgo: 7 }]);
+    await confirmIn([{ krId, confidence: 0.35 }]);
     const now = new Date();
     const nudges = await read((tx) =>
       dueCriticalConfidenceNudges(tx, { workspaceId, now, thresholds }),
@@ -177,6 +196,150 @@ describe("the Champion's five", () => {
       }),
     );
     expect(later).toEqual([]);
+  });
+
+  it("says nothing for a key result drafted low that stays there (§3.2, P9-T19a-c-a)", async () => {
+    // A moonshot: first scored at 0.2, and 0.2 again. Nothing fell.
+    const goalId = await goal({ cycleId: planningCycleId, inSpace: true });
+    const krId = await keyResult(goalId);
+    await confirmIn([{ krId, confidence: 0.2, daysAgo: 7 }]);
+    await confirmIn([{ krId, confidence: 0.2 }]);
+    const nudges = await read((tx) =>
+      dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: new Date(),
+        thresholds,
+      }),
+    );
+    expect(nudges).toEqual([]);
+  });
+
+  /**
+   * P9-T19a-c-a's acceptance criterion: "Given a company objective whose
+   * confidence drops into the low band, when the Champion runs, then the
+   * company space's coordinator is told and the sponsor is not, unless the
+   * workspace turned critical escalation on and the confidence is 0.3 or
+   * below."
+   */
+  it("acceptance: a company objective's fall reaches the company space's coordinator, and the sponsor only with critical escalation on", async () => {
+    const wb = await workerDb();
+    await wb.admin.query("update cycles set sponsor_id = $2 where id = $1", [
+      planningCycleId,
+      secondMemberId,
+    ]);
+    // Held by the workspace, as a company objective is: no space of its own.
+    const goalId = await goal({ cycleId: planningCycleId, level: "company" });
+    const krId = await keyResult(goalId);
+    await confirmIn([{ krId, confidence: 0.7, daysAgo: 7 }]);
+    await confirmIn([{ krId, confidence: 0.3 }]);
+
+    const off = await read((tx) =>
+      dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: new Date(),
+        thresholds,
+      }),
+    );
+    // The company space is the workspace's own first space, whose manager
+    // covers for its coordinator. Not the sponsor.
+    expect(said(off, "confidence.critical")).toEqual([ownerMemberId]);
+
+    await call("practice.update", {
+      overrides: { "escalation.criticalConfidence": "on" },
+    });
+    const on = await read((tx) =>
+      dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: new Date(),
+        thresholds,
+      }),
+    );
+    expect(said(on, "confidence.critical")).toEqual(
+      [ownerMemberId, secondMemberId].sort(),
+    );
+    const toSponsor = on.find(
+      (nudge) => nudge.recipientMemberId === secondMemberId,
+    );
+    // A step above the coordinator's, so the two are not deduplicated away.
+    expect(toSponsor?.escalationStep).toBe(2);
+  });
+
+  it("tells the sponsor of a critical score with critical escalation on, though nothing fell", async () => {
+    const wb = await workerDb();
+    await wb.admin.query("update cycles set sponsor_id = $2 where id = $1", [
+      planningCycleId,
+      secondMemberId,
+    ]);
+    await call("practice.update", {
+      overrides: { "escalation.criticalConfidence": "on" },
+    });
+    const goalId = await goal({ cycleId: planningCycleId, inSpace: true });
+    const krId = await keyResult(goalId);
+    await confirmIn([{ krId, confidence: 0.3 }]);
+    const nudges = await read((tx) =>
+      dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: new Date(),
+        thresholds,
+      }),
+    );
+    // NW-Q2-09: checked in at 0.3 with critical escalation on, the sponsor
+    // hears the same day. No earlier score, so the coordinator does not.
+    expect(said(nudges, "confidence.critical")).toEqual([secondMemberId]);
+  });
+
+  it("reads a fall from a check-in's snapshot", async () => {
+    const goalId = await goal({ cycleId: planningCycleId, inSpace: true });
+    const krId = await keyResult(goalId);
+    const narrative = {
+      type: "doc" as const,
+      content: [
+        {
+          type: "paragraph" as const,
+          content: [
+            { type: "text" as const, text: "Import slipped two weeks." },
+          ],
+        },
+      ],
+    };
+    // Two check-ins as the champion writes them: 0.7, then 0.3.
+    const publish = async (confidence: number) => {
+      const wb = await workerDb();
+      const actor = {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human" as const, userId: SECOND },
+      };
+      const draft = (await callAction(actor, "goals.startCheckIn", {
+        goalId,
+      })) as { id: string };
+      await callAction(actor, "goals.publishCheckIn", {
+        id: draft.id,
+        status: "caution",
+        confidence,
+        narrative,
+        values: [{ keyResultId: krId, confidence }],
+      });
+    };
+    await publish(0.7);
+    const quiet = await read((tx) =>
+      dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: new Date(),
+        thresholds,
+      }),
+    );
+    expect(quiet).toEqual([]);
+
+    await publish(0.3);
+    const nudges = await read((tx) =>
+      dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: new Date(),
+        thresholds,
+      }),
+    );
+    expect(said(nudges, "confidence.critical")).toEqual([ownerMemberId]);
   });
 
   it("digest.weekly goes to the space and the sponsor once the session closes", async () => {

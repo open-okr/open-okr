@@ -173,7 +173,7 @@ the build.
 | `blocker.warning` | 20h after opening | Blocker owner | No | Yes |
 | `blocker.overdue` | 24h after opening | Coordinator | Yes | Yes |
 | `blocker.escalated` | 48h after opening | Sponsor | Yes | Yes |
-| `confidence.critical` | KR scored <= 0.3 | Coordinator, same day | Yes | Yes |
+| `confidence.critical` | A KR's confidence falls into the low band; at <= 0.3, the sponsor too where critical escalation is on (P9-T19a-c-a) | Coordinator, same day; sponsor where critical escalation is on | Yes | Yes |
 | `commitment.due` | End of commitment week | Owner | No | Yes |
 | `session.due_soon` | 1 day before weekly session | Coordinator + space | No | Yes |
 | `session.open` | Scheduled start | Space | No | Yes |
@@ -251,9 +251,11 @@ Already implemented in `packages/method/src/escalation.ts`.
 | 2 | 1 day overdue | Champion (repeat) | `cadence.checkInLadderDays.championRepeat` |
 | 3 | Grace exceeded (3 days) | Champion + reviewer | `cadence.stalenessGraceDays` |
 | 4 | 7 days | Champion + reviewer + coordinator | `cadence.checkInLadderDays.coordinator` |
-| 5 | 14 days | All four roles | `cadence.checkInLadderDays.sponsor` |
+| 5 | 14 days, only where the sponsor is in the ladders (P9-T19a-c-a) | All four roles | `cadence.checkInLadderDays.sponsor`, and §12's "Sponsor in escalation ladders" |
 
-Targets accumulate. The champion is never dropped.
+Targets accumulate. The champion is never dropped. The reviewer is reached
+only where the goal has one. Without the sponsor in its ladders, a workspace's
+ladder stops at the coordinator at step 4.
 
 ### 4.2 Acknowledgement ladder
 
@@ -349,8 +351,8 @@ The instructions are versioned like prompts (AI-NATIVE-PLAN.md SS6.5).
 Given a champion who misses their check-in, when the engine runs over the
 following fortnight, then they are nudged on the due day and once daily after,
 the reviewer is brought in at the grace boundary, the coordinator at seven
-days and the sponsor at fourteen, each step recorded and visible to the
-champion.
+days, and the sponsor at fourteen only where the workspace puts the sponsor
+in its ladders, each step recorded and visible to the champion.
 
 Given a burst of triggers on one subject, when the nudge engine runs, then
 only one nudge is produced per member per day, and the suppression record

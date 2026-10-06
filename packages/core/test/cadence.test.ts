@@ -198,6 +198,7 @@ describe("the escalation ladder", () => {
         num(row, "days_past_due"),
         num(row, "grace_days"),
         thresholds,
+        row.sponsor_in_ladders === "yes",
       );
       const expectedStep = cellNumber(row, "expected_step");
       expect(result.step).toBe(expectedStep);

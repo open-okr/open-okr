@@ -253,7 +253,13 @@ export async function dueCheckInNudges(
     );
   // Where reviewers are off (METHOD.md §2.5, P9-T04), no ladder names one: a
   // goal's existing reviewer stays on it and is simply not brought in.
-  const reviewersOff = await reviewersAreOff(tx, input.workspaceId);
+  const { practice } = practiceFromRow(
+    await readRhythmRow(tx, input.workspaceId),
+  );
+  const reviewersOff = practice.reviewer === "off";
+  // The ladder stops at the coordinator unless the workspace puts the sponsor
+  // in it (§11, §12, P9-T19a-c-a).
+  const sponsorInLadders = practice["escalation.sponsorInLadders"] === "on";
 
   const due: DueNudge[] = [];
   for (const row of rows) {
@@ -265,7 +271,7 @@ export async function dueCheckInNudges(
     if (past === null) {
       continue;
     }
-    const step = escalation(past, grace, input.thresholds);
+    const step = escalation(past, grace, input.thresholds, sponsorInLadders);
     if (step.step === null) {
       continue;
     }

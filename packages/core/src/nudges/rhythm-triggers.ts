@@ -19,6 +19,7 @@
  */
 import {
   activeOnly,
+  checkInSnapshots,
   checkIns,
   commitments,
   cycles,
@@ -27,6 +28,7 @@ import {
   okrSessions,
   sessionConfidences,
   spaceMembers,
+  spaces,
   streaks,
   type WorkspaceTx,
   workspaceMembers,
@@ -34,6 +36,7 @@ import {
 import {
   commitmentDueToday,
   committedBelowFloor,
+  confidenceFellIntoLow,
   confidenceIsCritical,
   isTriggerKey,
   phasesClosingToday,
@@ -42,15 +45,27 @@ import {
   type TriggerKey,
   trigger,
 } from "@openokr/method";
-import { and, eq, gte, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+} from "drizzle-orm";
 import {
   type AgentScope,
   agentSeesGoal,
   agentSeesSession,
   agentSeesSpaceId,
 } from "../agents/scope.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import { evaluateWorkflow, loadCycleForWorkflow } from "../cycles/workflow.ts";
 import { OperationError } from "../operations/errors.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { localDateOf } from "../sessions/booking.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 import { spaceRoleHolders } from "./rituals.ts";
@@ -93,14 +108,30 @@ const windowStart = (now: Date, thresholds: ResolvedThresholds): Date =>
   );
 
 /**
- * `confidence.critical`: a key result scored at or below 0.3, to the
- * coordinator the same day (§3.2, §6.4).
+ * `confidence.critical`: a key result whose confidence fell into the low band,
+ * to the coordinator the same day, and at 0.3 and below to the sponsor too
+ * where the workspace turns critical escalation on (METHOD.md §3.2, §6.4,
+ * P9-T19a-c-a).
+ *
+ * **A fall, not a level.** METHOD v2: "A drop matters more than a level." It
+ * fired on any score at or below 0.3, so a moonshot drafted at 0.2 told the
+ * coordinator every week it was scored, and a key result that fell from 0.8
+ * to 0.35 told nobody. Now the coordinator hears when a confidence crosses
+ * from at or above the low boundary to below it; with no earlier confidence
+ * there is nothing to have fallen from.
  *
  * "Scored" is a confidence somebody recorded: confirmed in a session's
- * confidence round, or published with a check-in. The coordinator is the
- * goal's space coordinator; a goal outside a space goes to its cycle's
- * sponsor, because §3.2 says management, and the sponsor is who that is when
- * no space is involved. It escalates, so it is urgent.
+ * confidence round, against the last confidence an earlier session confirmed,
+ * or published with a check-in, against what its snapshot says the key
+ * result held before. The coordinator is the goal's space coordinator; a goal
+ * outside a space, which is how a company objective is held, goes to the
+ * company space's coordinator, the workspace's own first space (v2: "a
+ * confidence drop on a company objective tells the company space's
+ * coordinator"). It used to go to the cycle's sponsor.
+ *
+ * **The sponsor only where the workspace asks.** Critical escalation is off
+ * by default (§12); on, a key result scored at 0.3 or below reaches the
+ * cycle's sponsor the same day, a step above the coordinator's.
  */
 export async function dueCriticalConfidenceNudges(
   tx: WorkspaceTx,
@@ -112,12 +143,28 @@ export async function dueCriticalConfidenceNudges(
   },
 ): Promise<readonly DueNudge[]> {
   const since = windowStart(input.now, input.thresholds);
+  const fell = new Set<string>();
   const critical = new Set<string>();
+  const consider = (
+    goalId: string,
+    previous: number | null,
+    current: number | null,
+  ) => {
+    if (confidenceFellIntoLow(previous, current, input.thresholds)) {
+      fell.add(goalId);
+    }
+    if (confidenceIsCritical(current, input.thresholds)) {
+      critical.add(goalId);
+    }
+  };
 
   const confirmed = await tx
     .select({
       goalId: keyResults.goalId,
+      keyResultId: sessionConfidences.keyResultId,
+      sessionId: sessionConfidences.sessionId,
       confidence: sessionConfidences.confirmedConfidence,
+      createdAt: sessionConfidences.createdAt,
     })
     .from(sessionConfidences)
     .innerJoin(keyResults, eq(keyResults.id, sessionConfidences.keyResultId))
@@ -132,68 +179,146 @@ export async function dueCriticalConfidenceNudges(
         input.scope ? agentSeesGoal(input.scope) : undefined,
       ),
     );
-  for (const row of confirmed) {
-    if (confidenceIsCritical(Number(row.confidence), input.thresholds)) {
-      critical.add(row.goalId);
+  if (confirmed.length > 0) {
+    // What each key result was confirmed at before, in any earlier session.
+    // One query, newest first.
+    const earlier = await tx
+      .select({
+        keyResultId: sessionConfidences.keyResultId,
+        sessionId: sessionConfidences.sessionId,
+        confidence: sessionConfidences.confirmedConfidence,
+        createdAt: sessionConfidences.createdAt,
+      })
+      .from(sessionConfidences)
+      .where(
+        activeOnly(
+          sessionConfidences,
+          eq(sessionConfidences.workspaceId, input.workspaceId),
+          inArray(
+            sessionConfidences.keyResultId,
+            confirmed.map((row) => row.keyResultId),
+          ),
+        ),
+      )
+      .orderBy(desc(sessionConfidences.createdAt));
+    for (const row of confirmed) {
+      const before = earlier.find(
+        (one) =>
+          one.keyResultId === row.keyResultId &&
+          one.sessionId !== row.sessionId &&
+          one.createdAt < row.createdAt,
+      );
+      consider(
+        row.goalId,
+        before ? Number(before.confidence) : null,
+        Number(row.confidence),
+      );
     }
   }
 
-  // A check-in writes each key result's confidence as it publishes, so the
-  // key results of a goal checked in inside the window carry what it said.
+  // A check-in's snapshot records each key result's confidence as it
+  // published and what it held before, which is the fall in one row.
   const published = await tx
-    .select({ goalId: keyResults.goalId, confidence: keyResults.confidence })
+    .select({
+      goalId: checkIns.subjectId,
+      entries: checkInSnapshots.entries,
+    })
     .from(checkIns)
-    .innerJoin(keyResults, eq(keyResults.goalId, checkIns.subjectId))
-    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .innerJoin(checkInSnapshots, eq(checkInSnapshots.checkInId, checkIns.id))
+    .innerJoin(goals, eq(goals.id, checkIns.subjectId))
     .where(
       activeOnly(
         checkIns,
         eq(checkIns.workspaceId, input.workspaceId),
         isNotNull(checkIns.publishedAt),
         gte(checkIns.publishedAt, since),
-        isNull(keyResults.deletedAt),
+        isNull(checkInSnapshots.deletedAt),
         isNull(goals.deletedAt),
         isNull(goals.closedAt),
         input.scope ? agentSeesGoal(input.scope) : undefined,
       ),
     );
   for (const row of published) {
-    if (
-      confidenceIsCritical(
-        row.confidence === null ? null : Number(row.confidence),
-        input.thresholds,
-      )
-    ) {
-      critical.add(row.goalId);
+    for (const entry of row.entries ?? []) {
+      consider(row.goalId, entry.previousConfidence, entry.confidence);
     }
   }
 
+  const { practice } = practiceFromRow(
+    await readRhythmRow(tx, input.workspaceId),
+  );
+  const criticalOn = practice["escalation.criticalConfidence"] === "on";
+  const companySpace = fell.size > 0 ? await companySpaceOf(tx, input) : null;
+
   const due: DueNudge[] = [];
-  for (const goalId of critical) {
+  for (const goalId of new Set([...fell, ...(criticalOn ? critical : [])])) {
     const roles = await goalRolesFor(tx, input.workspaceId, goalId);
-    const recipient = roles.spaceId
-      ? await memberForRole(tx, roles, "coordinator")
-      : await cycleSponsor(tx, roles.cycleId);
-    if (!recipient) {
-      continue;
+    if (fell.has(goalId)) {
+      const coordinator = await memberForRole(
+        tx,
+        { ...roles, spaceId: roles.spaceId ?? companySpace },
+        "coordinator",
+      );
+      if (coordinator) {
+        due.push(
+          nudge({
+            ruleKey: "confidence.critical",
+            subjectType: "goal",
+            subjectId: goalId,
+            recipientMemberId: coordinator,
+            // A step above the champion's own reminders, so a check-in nudge
+            // to the same coordinator today does not swallow it.
+            escalationStep: 1,
+            urgent: urgentFor(
+              "confidence.critical",
+              coordinator === roles.championId,
+            ),
+          }),
+        );
+      }
     }
-    due.push(
-      nudge({
-        ruleKey: "confidence.critical",
-        subjectType: "goal",
-        subjectId: goalId,
-        recipientMemberId: recipient,
-        // A step above the champion's own reminders, so a check-in nudge to
-        // the same coordinator today does not swallow it.
-        escalationStep: 1,
-        urgent: urgentFor(
-          "confidence.critical",
-          recipient === roles.championId,
-        ),
-      }),
-    );
+    if (criticalOn && critical.has(goalId)) {
+      const sponsor = await cycleSponsor(tx, roles.cycleId);
+      if (sponsor) {
+        due.push(
+          nudge({
+            ruleKey: "confidence.critical",
+            subjectType: "goal",
+            subjectId: goalId,
+            recipientMemberId: sponsor,
+            escalationStep: 2,
+            urgent: urgentFor(
+              "confidence.critical",
+              sponsor === roles.championId,
+            ),
+          }),
+        );
+      }
+    }
   }
   return due;
+}
+
+/**
+ * The company space: the workspace's own first space, which provisioning
+ * creates named after the workspace (P3-T01). A company objective is held by
+ * the workspace rather than a space, and its confidence is the company
+ * space's coordinator's to hear (P9-T19a-c-a).
+ */
+async function companySpaceOf(
+  tx: WorkspaceTx,
+  input: { readonly workspaceId: string },
+): Promise<string | null> {
+  const [space] = await tx
+    .select({ id: spaces.id })
+    // openokr:allow-raw-read: the Champion's own sweep, with no member behind
+    // it, naming which space's coordinator to tell; the id leaves this
+    // function and nothing about the space is shown to anybody.
+    .from(spaces)
+    .where(activeOnly(spaces, eq(spaces.workspaceId, input.workspaceId)))
+    .orderBy(asc(spaces.createdAt))
+    .limit(1);
+  return space?.id ?? null;
 }
 
 /**

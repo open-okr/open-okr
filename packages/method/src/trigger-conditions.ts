@@ -73,7 +73,31 @@ export function committedBelowFloor(
   );
 }
 
-/** §3.2: "0.3 and below is raised with management the same day." */
+/**
+ * §3.2, METHOD v2 (P9-T19a-c-a): "A drop matters more than a level. When a
+ * key result's confidence falls into the low band, the coordinator is told.
+ * A key result drafted low on purpose, such as an aspirational moonshot, does
+ * not escalate for staying where it started."
+ *
+ * So a fall, not a level: from at or above the low boundary to below it.
+ * With no earlier confidence there is nothing to have fallen from, which is
+ * what keeps a moonshot drafted at 0.2 quiet.
+ */
+export function confidenceFellIntoLow(
+  previous: number | null,
+  current: number | null,
+  thresholds: ResolvedThresholds,
+): boolean {
+  const low = thresholds["scoring.confidenceLow"];
+  return (
+    previous !== null && current !== null && previous >= low && current < low
+  );
+}
+
+/**
+ * §3.2: critical confidence, 0.3 and below. Since METHOD v2 it reaches the
+ * sponsor the same day only where the workspace turns critical escalation on.
+ */
 export function confidenceIsCritical(
   confidence: number | null,
   thresholds: ResolvedThresholds,

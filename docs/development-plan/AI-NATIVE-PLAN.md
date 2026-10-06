@@ -252,11 +252,11 @@ Configurable per workspace. The defaults are canon in METHOD.md §11:
 |---|---|---|
 | 1 | Due date reached | The champion or the owner |
 | 2 | 1 day overdue | The champion again, on their primary channel |
-| 3 | Grace exceeded (3 days by default) | The reviewer, and the goal renders outdated |
+| 3 | Grace exceeded (3 days by default) | The reviewer where the goal has one, and the goal renders outdated |
 | 4 | 7 days overdue | The space coordinator |
-| 5 | 14 days overdue | The cycle sponsor |
+| 5 | 14 days overdue | The cycle sponsor, only where the workspace puts the sponsor in its ladders (P9-T19a-c-a). Otherwise the ladder stops at the coordinator, and the sponsor sees stale goals in the weekly digest |
 
-Blockers run their ladder against the next check-in, the clock METHOD.md §7.3 gives them since P9-T19a-a: the owner the day before it, the coordinator once it passes with the action open, and the sponsor only where the workspace adds them, once the check-in after that passes too. Confidence at or below 0.3 escalates to the coordinator immediately.
+Blockers run their ladder against the next check-in, the clock METHOD.md §7.3 gives them since P9-T19a-a: the owner the day before it, the coordinator once it passes with the action open, and the sponsor only where the workspace adds them, once the check-in after that passes too. A key result whose confidence falls into the low band is raised with the coordinator the same day, and at 0.3 and below with the sponsor only where the workspace turns critical escalation on.
 
 Escalation is always visible to the person being escalated past. Nobody is reported behind their back.
 
@@ -277,7 +277,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `blocker.warning` | 1 day before the check-in the next action is due by | Blocker owner |
 | `blocker.overdue` | That check-in passes with the action open | Coordinator |
 | `blocker.escalated` | The check-in after it passes too, where the sponsor is in the ladders | Sponsor |
-| `confidence.critical` | A key result scored at or below 0.3 | Coordinator, same day |
+| `confidence.critical` | A key result's confidence falls into the low band, and not a key result drafted low that stays there; at or below 0.3, the sponsor too, only where critical escalation is on (P9-T19a-c-a) | Coordinator, same day: the company space's coordinator for a company objective. The sponsor where critical escalation is on |
 | `commitment.due` | End of the commitment week | Owner |
 | `session.due_soon` | 1 day before the weekly session | Coordinator and space |
 | `session.open` | At the scheduled start | Space |

@@ -107,9 +107,12 @@ const RHYTHM_ROWS = [
   },
   {
     key: "confidence.critical",
-    title: "Confidence critically low",
-    fires: "KR scored <= 0.3",
-    recipient: "Coordinator, same day",
+    // A fall into the low band since P9-T19a-c-a, not a level (METHOD v2
+    // §3.2). The key stays, so stored nudges and routing keep their meaning.
+    title: "Confidence fell into the low band",
+    fires:
+      "A KR's confidence falls below the low boundary; at <= 0.3, the sponsor too where critical escalation is on",
+    recipient: "Coordinator, same day; sponsor where critical escalation is on",
     escalates: true,
   },
   {

@@ -3400,7 +3400,7 @@
   "triggers.checkinOverdue": "Kemas kini lewat",
   "triggers.checkinStale": "Kemas kini melepasi tempoh ihsan",
   "triggers.commitmentDue": "Komitmen perlu dipenuhi",
-  "triggers.confidenceCritical": "Keyakinan sangat rendah",
+  "triggers.confidenceCritical": "Keyakinan jatuh ke jalur rendah",
   "triggers.cycleClosing": "Kitaran ditutup tanpa skor",
   "triggers.cycleDeadline": "Tarikh akhir penerbitan semakin hampir",
   "triggers.cyclePhaseBlocked": "Fasa tersekat",

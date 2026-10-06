@@ -3400,7 +3400,7 @@
   "triggers.checkinOverdue": "Check-in overdue",
   "triggers.checkinStale": "Check-in past its grace",
   "triggers.commitmentDue": "Commitment due",
-  "triggers.confidenceCritical": "Confidence critically low",
+  "triggers.confidenceCritical": "Confidence fell into the low band",
   "triggers.cycleClosing": "Cycle closing unscored",
   "triggers.cycleDeadline": "Publication deadline approaching",
   "triggers.cyclePhaseBlocked": "Phase blocked",

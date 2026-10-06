@@ -194,30 +194,37 @@ the ladder is golden-master tested with no channel, no queue and no clock.
 | 2 | One day overdue | champion |
 | 3 | The grace boundary is exceeded | champion, reviewer |
 | 4 | Seven days overdue | champion, reviewer, coordinator |
-| 5 | Fourteen days overdue | champion, reviewer, coordinator, sponsor |
+| 5 | Fourteen days overdue, only where the sponsor is in the ladders (P9-T19a-c-a) | champion, reviewer, coordinator, sponsor |
 
 Where a space has no coordinator, the target resolves to the space manager
 (TECHNICAL-PLAN.md §4.2). The engine returns the role; resolving the role to a
 member is the caller's job.
 
+Since P9-T19a-c-a the ladder stops at the coordinator. The sponsor is a step
+only where the workspace turns on "Sponsor in escalation ladders" (§12), at
+§11's fourteen days; without it a goal fourteen days late stays at step 4. The
+reviewer is reached only where the goal has one, which the caller resolves.
+
 <!-- golden: cadence.escalation -->
 
-| case | days_past_due | grace_days | expected_step | expected_targets |
-|---|---|---|---|---|
-| the day before it is due | -1 | 3 | 0 | champion |
-| two days before, nothing fires | -2 | 3 | | |
-| on the due date | 0 | 3 | 1 | champion |
-| one day overdue | 1 | 3 | 2 | champion |
-| still inside the grace | 2 | 3 | 2 | champion |
-| the last day of the grace | 3 | 3 | 2 | champion |
-| the grace is exceeded | 4 | 3 | 3 | champion,reviewer |
-| still with the reviewer | 6 | 3 | 3 | champion,reviewer |
-| a week overdue | 7 | 3 | 4 | champion,reviewer,coordinator |
-| still with the coordinator | 13 | 3 | 4 | champion,reviewer,coordinator |
-| a fortnight overdue | 14 | 3 | 5 | champion,reviewer,coordinator,sponsor |
-| long abandoned | 30 | 3 | 5 | champion,reviewer,coordinator,sponsor |
-| a longer grace delays the reviewer | 4 | 5 | 2 | champion |
-| a longer grace, then the reviewer | 6 | 5 | 3 | champion,reviewer |
+| case | days_past_due | grace_days | sponsor_in_ladders | expected_step | expected_targets |
+|---|---|---|---|---|---|
+| the day before it is due | -1 | 3 | no | 0 | champion |
+| two days before, nothing fires | -2 | 3 | no | | |
+| on the due date | 0 | 3 | no | 1 | champion |
+| one day overdue | 1 | 3 | no | 2 | champion |
+| still inside the grace | 2 | 3 | no | 2 | champion |
+| the last day of the grace | 3 | 3 | no | 2 | champion |
+| the grace is exceeded | 4 | 3 | no | 3 | champion,reviewer |
+| still with the reviewer | 6 | 3 | no | 3 | champion,reviewer |
+| a week overdue | 7 | 3 | no | 4 | champion,reviewer,coordinator |
+| still with the coordinator | 13 | 3 | no | 4 | champion,reviewer,coordinator |
+| a fortnight overdue, and the ladder stops at the coordinator | 14 | 3 | no | 4 | champion,reviewer,coordinator |
+| long abandoned, still the coordinator | 30 | 3 | no | 4 | champion,reviewer,coordinator |
+| a fortnight overdue, with the sponsor in the ladders | 14 | 3 | yes | 5 | champion,reviewer,coordinator,sponsor |
+| a week overdue, with the sponsor in the ladders, is still the coordinator | 7 | 3 | yes | 4 | champion,reviewer,coordinator |
+| a longer grace delays the reviewer | 4 | 5 | no | 2 | champion |
+| a longer grace, then the reviewer | 6 | 5 | no | 3 | champion,reviewer |
 
 ## 7b. The other two ladders (P4-T04c)
 

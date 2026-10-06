@@ -260,11 +260,13 @@ A goal's progress is the weighted average of its key results' progress. Includin
 
 | Confidence | Band | What happens |
 |---|---|---|
-| 0.7 and above | High | Move to the next key result |
-| 0.4 to below 0.7 | Medium | Name what changes this week |
-| Below 0.4 | Low | Capture a blocker, name an owner and a next action within 24 hours |
+| 0.7 and above | High | Nothing to do |
+| 0.4 to below 0.7 | Medium | When it has dropped since last week, name what changes this week |
+| Below 0.4 | Low | A next action due by the next check-in, with an owner. Capture a blocker where something is actually blocked |
 
-One further rule inside the low band: at 0.3 and below, the coordinator raises it with management the same day.
+**A drop matters more than a level.** When a key result's confidence falls into the low band, the coordinator is told. A key result drafted low on purpose, such as an aspirational moonshot, does not escalate for staying where it started. *Source:* Wodtke: "has that moved up or down? Have a discussion about why."
+
+**Critical confidence** (0.3 and below) escalates to the sponsor the same day only where the workspace turns that on (§12). Off by default.
 
 **At drafting time, judge the set.** For aspirational key results, judge the average:
 
@@ -688,7 +690,7 @@ Keep check-ins forward-looking. Status lives in the product. The meeting is for 
 | Blocker owner | A named person, not a team |
 | Next action | One concrete action due by the next check-in, not a discussion |
 
-Confidence at or below 0.3 escalates: the coordinator raises it with management the same day.
+A key result that falls into the low band is raised with the coordinator.
 
 **Step 3. Commitments.** Close last week's out loud: delivered or not. No negotiation and no explanation needed. Then set this week's: two or three concrete actions, each with an owner and a linked key result. Not a to-do list. The few moves that shift a key result.
 
@@ -920,8 +922,8 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Check-in anchor day | Monday |
 | Cadence tolerance | 1 day either side of the due date without double-advancing |
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |
-| Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded, coordinator at 7 days, sponsor at 14 days |
-| Acknowledgement ladder | Reviewer nudged 1 day after publication, escalated at 3 days |
+| Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded where the goal has one, coordinator at 7 days. The sponsor sees stale goals in the weekly digest, and is a ladder step only where the workspace adds it |
+| Acknowledgement ladder | Reviewer nudged 1 day after publication, escalated at 3 days. Only where the goal has a reviewer |
 | Blocker clock | The next action is due by the next check-in |
 | Blocker ladder | Owner reminded 1 day before the next check-in, coordinator when the check-in passes with the action open |
 | Nudge deduplication window | 1 nudge per subject per member per day unless the escalation step increases |
@@ -938,7 +940,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 |---|---|
 | Confidence high boundary | 0.7 |
 | Confidence low boundary | 0.4 |
-| Critical confidence | 0.3 and below escalates the same day |
+| Critical confidence | 0.3 and below. Escalates the same day only where critical escalation is on |
 | Aspirational draft target | About 0.5, shown as 5 in 10 |
 | Draft near-certain threshold | Average above 0.90 on aspirational key results |
 | Draft comfortable boundary | 0.70 |
