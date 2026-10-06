@@ -91,6 +91,7 @@ export default function RichTextEditorPreviewPage() {
       </p>
       <div className="rounded-lg border border-line-2 bg-surface p-3">
         <RichTextEditor
+          label={t("dev.richText.richTextEditor")}
           content={{ type: "doc", content: [{ type: "paragraph" }] }}
           searchMembers={searchMembers}
           searchEntities={searchEntities}

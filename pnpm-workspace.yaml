@@ -28,24 +28,24 @@ catalog:
   # tree read it from 5.9 under this name, so nothing else can pick it up by
   # accident. Same package, same licence.
   typescript5: npm:typescript@5.9.3
-  vitest: 5.0.2
-  "@types/node": 26.6.2
+  vitest: 5.0.3
+  "@types/node": 26.6.4
   # 0.45.2 is the first release past GHSA-gpj5-g38j-94v9 (SQL injection via
   # improperly escaped identifiers).
   drizzle-orm: ^0.45.3
-  pg: ^8.23.0
+  pg: ^8.23.1
   "@types/pg": ^8.23.1
-  pg-boss: ^12.34.0
-  ws: ^8.21.3
-  "@types/ws": ^8.18.1
-  better-auth: ^1.7.6
-  "@better-auth/passkey": ^1.7.6
-  "@better-auth/sso": ^1.7.6
+  pg-boss: ^12.36.0
+  ws: ^8.22.0
+  "@types/ws": ^8.18.2
+  better-auth: ^1.7.7
+  "@better-auth/passkey": ^1.7.7
+  "@better-auth/sso": ^1.7.7
   samlify: ^2.13.1
   # The SMTP client, approved in P1-T09. MIT-0, and it carries no runtime
   # dependencies of its own. Confined to packages/adapters like every vendor
   # SDK, behind the Mailer port.
-  nodemailer: ^10.0.10
+  nodemailer: ^10.0.13
   "@types/nodemailer": ^8.0.2
   # Image re-encoding and thumbnails (completeness review M-24), approved by
   # the human on 28 September 2026. Apache-2.0, and its prebuilt libvips
@@ -53,7 +53,7 @@ catalog:
   # The same range `next` asks for as its own optional dependency, so the
   # lockfile holds one copy. Confined to packages/adapters behind the
   # ImageProcessor port; `pnpm check:boundaries` refuses it anywhere else.
-  sharp: ^0.35.4
+  sharp: ^0.35.5
   # Already used by the environment schema. Shared here so the action contract
   # registry validates against the same version the boundary does.
   zod: 4.6.5
@@ -62,9 +62,9 @@ catalog:
   # openrouter, ollama and openai-compatible: all three speak the same
   # OpenAI-shaped chat completions API, just a different base URL and key,
   # so one client covers four of the six real drivers.
-  "@anthropic-ai/sdk": ^0.128.0
-  openai: ^7.23.0
-  "@google/genai": ^2.24.0
+  "@anthropic-ai/sdk": ^0.131.0
+  openai: ^7.27.0
+  "@google/genai": ^2.27.0
   # The design system (P2-T10), approved by the human alongside P2-T11's
   # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
   # SmoothUI on Motion; these are the concrete packages that stack resolves
@@ -77,17 +77,17 @@ catalog:
   "@tailwindcss/postcss": ^4.3.3
   postcss: ^8.5.28
   "@base-ui-components/react": 1.0.0-rc.0
-  motion: ^13.4.4
-  lucide-react: ^1.48.0
+  motion: ^14.0.0
+  lucide-react: ^1.51.0
   clsx: ^2.1.1
   tailwind-merge: ^3.7.0
   class-variance-authority: ^0.7.1
   # The persisted client cache (P2-T10 item 9), part of the locked stack's
   # "TanStack Query, Table and Virtual" line — its own persistence add-ons,
   # not a new stack decision.
-  "@tanstack/react-query": ^5.104.0
-  "@tanstack/react-query-persist-client": ^5.104.0
-  "@tanstack/query-sync-storage-persister": ^5.104.0
+  "@tanstack/react-query": ^5.104.1
+  "@tanstack/react-query-persist-client": ^5.104.1
+  "@tanstack/query-sync-storage-persister": ^5.104.1
   # Test tooling for P2-T10's own required "keyboard and focus component
   # tests" and accessibility checks (UIUX-PLAN.md §9) — inferred from the
   # human's UI-dependency approval rather than asked separately, because
@@ -100,13 +100,13 @@ catalog:
   # design-system deps. Every @tiptap/* package in v3 peer-pins its
   # siblings to the exact same version string, not a range, so all four
   # pin identically rather than each getting its own `^` range.
-  "@tiptap/core": 3.31.3
-  "@tiptap/pm": 3.31.3
-  "@tiptap/react": 3.31.3
-  "@tiptap/starter-kit": 3.31.3
-  "@tiptap/extension-table": 3.31.3
-  "@tiptap/extension-mention": 3.31.3
-  "@tiptap/suggestion": 3.31.3
+  "@tiptap/core": 3.31.4
+  "@tiptap/pm": 3.31.4
+  "@tiptap/react": 3.31.4
+  "@tiptap/starter-kit": 3.31.4
+  "@tiptap/extension-table": 3.31.4
+  "@tiptap/extension-mention": 3.31.4
+  "@tiptap/suggestion": 3.31.4
   # The OKR diagram (P9-T09a), approved by Akmal on 2 October 2026 as
   # decision D1 of the Phase 9 design gate. MIT, bundled at build time, so an
   # air-gapped install is unaffected; its own dependencies are MIT and ISC.
