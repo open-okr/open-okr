@@ -426,7 +426,8 @@ export const THRESHOLDS = {
     label: "Quarterly stage minutes",
     section: "§8.1",
     why: "The quarterly session durations, eleven of them in stage order. Pacing rather than a rule: going over is normal and visible, and the facilitator lands it.",
-    default: [5, 12, 9, 3, 7, 3, 5, 3, 5, 4, 4] as readonly number[],
+    // Ninety minutes since P9-T20a (METHOD v2 §8.1), where it was sixty.
+    default: [5, 20, 12, 5, 10, 8, 8, 4, 8, 5, 5] as readonly number[],
     schema: z.array(z.number().int().min(1).max(120)).length(11),
   }),
   "quality.strengthScoreBands": param({
@@ -599,8 +600,8 @@ export const THRESHOLDS = {
     group: "sessions",
     label: "Quarterly review length",
     section: "§8.1",
-    why: "Sixty minutes across the quarterly session stages.",
-    default: 60,
+    why: "Ninety minutes across the quarterly session stages, four acts, enough to grade every key result and still hold the retrospective.",
+    default: 90,
     schema: z.number().int().min(1).max(600),
   }),
   "sessions.annualRevalidationMinutes": param({

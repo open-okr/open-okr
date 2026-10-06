@@ -26,7 +26,7 @@
  */
 import type { RitualKind } from "./sessions.ts";
 import { type Holiday, isHolidayPeriod, periodStartOf } from "./streak.ts";
-import type { CheckInFrequency } from "./thresholds.ts";
+import { type CheckInFrequency, canonThresholds } from "./thresholds.ts";
 
 /** A cycle's first and last day, inclusive. */
 export interface CadenceWindow {
@@ -69,6 +69,11 @@ export interface CadencePlanOptions {
    * period, so none is booked in one.
    */
   readonly holidays?: readonly Holiday[];
+  /**
+   * §11's review preparation lead, in weeks (P9-T20a): the review is booked
+   * that far before the cycle ends. The canon's where not given.
+   */
+  readonly reviewLeadWeeks?: number;
 }
 
 interface Span {
@@ -171,12 +176,33 @@ function monthsOf(window: CadenceWindow): Span[] {
 }
 
 /** The cycle's last seven days and the week after them. */
-function closeOf(window: CadenceWindow): Span {
+/**
+ * When the quarterly review may be held (METHOD.md §8, P9-T20a): "held about
+ * two weeks before the cycle ends". From the week around the date the review
+ * preparation lead names, so there is time to act on what it decides, to a
+ * week after the end, so a review already booked at the close still counts.
+ */
+function closeOf(window: CadenceWindow, leadWeeks: number): Span {
   return {
-    from: later(addDays(window.endsOn, -6), window.startsOn),
+    from: reviewWeekOf(window, leadWeeks).from,
     to: addDays(window.endsOn, 7),
   };
 }
+
+/**
+ * The seven days the planner books the review in, centred on the date the
+ * lead names, so "about two weeks" is never nearly three.
+ */
+function reviewWeekOf(window: CadenceWindow, leadWeeks: number): Span {
+  const aim = addDays(window.endsOn, -7 * leadWeeks);
+  const from = later(addDays(aim, -3), window.startsOn);
+  return { from, to: later(addDays(aim, 3), from) };
+}
+
+/** §11's review preparation lead, where the caller does not pass its own. */
+const CANON_REVIEW_LEAD = canonThresholds()[
+  "cadence.reviewPreparationLeadWeeks"
+] as number;
 
 const hasWorkingDay = (span: Span): boolean => daysOf(span).some(isWorkingDay);
 
@@ -199,6 +225,8 @@ export function cadenceCoverage(
   frequency: CheckInFrequency = "weekly",
   /** The space's marked holidays, whose periods owe no check-in (P9-T19b-a). */
   holidays: readonly Holiday[] = [],
+  /** §11's review preparation lead, in weeks (P9-T20a). */
+  reviewLeadWeeks: number = CANON_REVIEW_LEAD,
 ): CadenceCoverage {
   const missing: string[] = [];
   const of = (kinds: readonly RitualKind[]) =>
@@ -228,10 +256,10 @@ export function cadenceCoverage(
     );
   }
 
-  const close = closeOf(window);
+  const close = closeOf(window, reviewLeadWeeks);
   if (!of(["quarterly"]).some((session) => within(session.on, close))) {
     missing.push(
-      `No quarterly review is booked at cycle close, between ${close.from} and ${close.to}`,
+      `No quarterly review is booked for the cycle's close, between ${close.from} and ${close.to}`,
     );
   }
 
@@ -289,11 +317,15 @@ export function planCycleCadence(
     );
 
   // The close first, because the month it lands in needs no monthly review.
-  const close = closeOf(window);
+  // In the lead's week, about two weeks before the end (§8, P9-T20a), or as
+  // near to it as the cycle still allows.
+  const lead = options.reviewLeadWeeks ?? CANON_REVIEW_LEAD;
+  const close = closeOf(window, lead);
   if (!has(["quarterly"], close)) {
-    const inside = { from: close.from, to: window.endsOn };
     const on =
-      pick(inside, weekday, from, true) ?? pick(close, weekday, from, false);
+      pick(reviewWeekOf(window, lead), weekday, from, true) ??
+      pick({ from: close.from, to: window.endsOn }, weekday, from, false) ??
+      pick(close, weekday, from, false);
     if (on) {
       plan.push({ kind: "quarterly", on });
     }

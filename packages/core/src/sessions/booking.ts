@@ -210,6 +210,7 @@ export async function loadCycleCadence<
         booked.get(space.id) ?? [],
         frequency,
         await spaceHolidaysInTx(tx, workspaceId, space.id),
+        thresholds["cadence.reviewPreparationLeadWeeks"],
       ).missing.map((line) => `${space.name}: ${line}`),
     );
   }

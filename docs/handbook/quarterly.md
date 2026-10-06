@@ -78,8 +78,9 @@ achieved was a set of predictions.
 
 ## The quarterly review
 
-Sixty minutes, three acts, eleven timed stages. The clock is part of the
-method: a review that runs long stops happening.
+Ninety minutes, four acts, eleven timed stages, held about two weeks before
+the cycle ends so there is time to act on what it decides. The clock is part
+of the method: a review that runs long stops happening.
 
 | Act | Stages |
 |---|---|

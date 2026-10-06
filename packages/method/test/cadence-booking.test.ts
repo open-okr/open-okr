@@ -37,8 +37,23 @@ describe("planning the whole cycle", () => {
     expect(of("monthly")).toEqual(["2026-10-26", "2026-11-30"]);
   });
 
-  it("books the quarterly review on the last chosen weekday of the cycle", () => {
-    expect(of("quarterly")).toEqual(["2026-12-28"]);
+  it("books the quarterly review about two weeks before the cycle ends (P9-T20a)", () => {
+    // §8: "held about two weeks before the cycle ends", the §11 review
+    // preparation lead. Its week runs 14 to 20 December, around the 17th,
+    // and its Monday is the 14th: time to act on what it decides.
+    expect(of("quarterly")).toEqual(["2026-12-14"]);
+  });
+
+  it("books it at the lead a workspace chose", () => {
+    const oneWeek = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [],
+      reviewLeadWeeks: 1,
+    });
+    expect(
+      oneWeek.filter((row) => row.kind === "quarterly").map((row) => row.on),
+    ).toEqual(["2026-12-21"]);
   });
 
   it("reads as booked, and a second run books nothing", () => {
@@ -92,7 +107,7 @@ describe("reading whether a cycle is booked", () => {
     expect(coverage.missing).toEqual([
       "No weekly check-in is booked in 14 week(s): the weeks from 2026-10-01, 2026-10-05, 2026-10-12 and 11 more",
       "No monthly review is booked in 3 month(s): 2026-10, 2026-11, 2026-12",
-      "No quarterly review is booked at cycle close, between 2026-12-25 and 2027-01-07",
+      "No quarterly review is booked for the cycle's close, between 2026-12-14 and 2027-01-07",
     ]);
   });
 

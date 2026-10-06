@@ -672,7 +672,7 @@ A KPI may be calculated from a formula over other KPIs rather than entered. Sour
 |---|---|---|---|
 | Weekly check-in | 15 to 30 minutes | Weekly | A decision loop. Score confidence, discuss what dropped, close and set commitments, name the wins |
 | Monthly review | 30 to 60 minutes | Monthly | Trend per objective, dependency and risk log, resource shifts, continue, update, start or stop, decisions recorded |
-| Quarterly review | 60 minutes | At cycle close | Review the results, retro the way you worked, reset the next cycle |
+| Quarterly review | 90 minutes | At cycle close | Review the results, retro the way you worked, reset the next cycle |
 
 Book all of them for the whole cycle before the cycle starts. Calendars fill fast, and "set and forget" kills OKR programmes. *Source:* Wodtke's "Set & Forget".
 
@@ -745,31 +745,34 @@ A target may be changed at any time in the cycle, as §2.9 says. Making a target
 
 ## 8. The quarterly review
 
-Sixty minutes, three acts, eleven timed stages. Each act asks one question.
+Ninety minutes by default, four acts, eleven timed stages, held about two weeks before the cycle ends. Each act asks one question.
 
 | Act | Question |
 |---|---|
+| Open | Where is everyone, before the numbers? |
 | Review | Did we achieve the results we set out to? |
 | Retro | How did we work together to get there? |
 | Reset | What do we decide for the next cycle? |
+
+*Source:* Mooncamp (vendor): a retrospective takes "45 to 90 minutes"; Workpath (vendor): "a Review is about the outcome, while the Retrospective focuses on the process"; Lamorte suggests about ten minutes per key result.
 
 ### 8.1 The stages
 
 | # | Stage | Act | Minutes | Purpose |
 |---|---|---|---|---|
 | 1 | Open and check-in | Open | 5 | Before the numbers, the people. A pulse and one word for the cycle |
-| 2 | Score the key results | Review | 12 | Grade every key result against the key result as written, then reveal the objective score together |
-| 3 | Objective narratives | Review | 9 | Owner by owner, the story behind the score, and what the number does not show |
-| 4 | Recognition and wins | Review | 3 | Name the effort that deserved to be seen. Specific beats generous |
-| 5 | Team retro | Retro | 7 | What worked, what did not. Silent writing, then dot voting |
-| 6 | Management retro | Retro | 3 | The four questions leadership owes the team |
-| 7 | Root cause and diagnostic | Retro | 5 | Every key result under 0.7 gets one honest cause. Then read the diagnostic |
-| 8 | OKR process health | Retro | 3 | Score the practice, not the results. Anonymous |
-| 9 | Keep, modify or abandon | Reset | 5 | Close every objective deliberately |
-| 10 | Learnings and next drafts | Reset | 4 | Turn what happened into what you now know |
-| 11 | Decisions and actions | Reset | 4 | Every action has a name and a date, or it is a wish |
+| 2 | Score the key results | Review | 20 | Grade every key result against the key result as written, then reveal the objective score together |
+| 3 | Objective narratives | Review | 12 | Owner by owner, the story behind the score, and what the number does not show |
+| 4 | Recognition and wins | Review | 5 | Name the effort that deserved to be seen. Specific beats generous |
+| 5 | Team retro | Retro | 10 | What worked, what did not. Silent writing, then dot voting |
+| 6 | Management retro | Retro | 8 | The four questions leadership owes the team |
+| 7 | Root cause and diagnostic | Retro | 8 | Every key result below its root-cause threshold gets one honest cause. Then read the diagnostic |
+| 8 | OKR process health | Retro | 4 | Score the practice, not the results. Anonymous |
+| 9 | Keep, modify or abandon | Reset | 8 | Close every objective deliberately |
+| 10 | Learnings and next drafts | Reset | 5 | Turn what happened into what you now know |
+| 11 | Decisions and actions | Reset | 5 | Every action has a name and a date, or it is a wish |
 
-A stage timer runs with pacing cues. Going over is normal and visible. The facilitator lands it and moves.
+Stage minutes are defaults (§11). A stage timer runs with pacing cues. Going over is normal and visible. The facilitator lands it and moves.
 
 ### 8.2 Room pulse
 
@@ -1012,7 +1015,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 |---|---|
 | Weekly session length | 15 to 30 minutes |
 | Monthly review length | 30 to 60 minutes |
-| Quarterly review length | 60 minutes |
+| Quarterly review length | 90 minutes |
 | Annual revalidation length | 30 to 60 minutes |
 | Weekly commitment bounds | 3 to 4 per team per week |
 | Quarterly stage minutes | The §8.1 durations |

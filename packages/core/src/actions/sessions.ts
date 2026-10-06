@@ -777,6 +777,8 @@ export const bookCycleSessions = defineWriteAction({
         existing,
         frequency,
         holidays,
+        // About two weeks before the end, at the workspace's own lead (§8).
+        reviewLeadWeeks: bookThresholds["cadence.reviewPreparationLeadWeeks"],
       });
 
       const sessionIds: string[] = [];
@@ -803,6 +805,7 @@ export const bookCycleSessions = defineWriteAction({
         [...existing, ...plan],
         frequency,
         holidays,
+        bookThresholds["cadence.reviewPreparationLeadWeeks"],
       );
       return {
         result: {

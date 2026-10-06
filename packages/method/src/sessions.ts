@@ -111,7 +111,7 @@ export const RITUALS: readonly Ritual[] = [
   {
     kind: "quarterly",
     name: "Quarterly review",
-    length: "60 minutes",
+    length: "90 minutes",
     frequency: "At cycle close",
     purpose:
       "Review the results, retro the way you worked, reset the next cycle",
@@ -302,7 +302,7 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
     title: "Root cause and diagnostic",
     act: "retro",
     purpose:
-      "Every key result under 0.7 gets one honest cause. Then read the diagnostic",
+      "Every key result below its root-cause threshold gets one honest cause. Then read the diagnostic",
   },
   {
     stage: 8,

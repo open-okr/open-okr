@@ -535,14 +535,15 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(page.getByText(/The cycle score appears as objectives/)).toBeVisible();
 
   // The second client's rail moves and its timer restarts on stage two's own
-  // twelve minutes rather than continuing stage one's six. Reloaded, for the
+  // twenty minutes (twelve until the review was re-timed at P9-T20a) rather
+  // than continuing stage one's six. Reloaded, for the
   // reason above: what this proves is that the stage change reached the server
   // and that both clients read the same rail from it.
   await secondPage.reload();
   await expect(secondPage.getByText(/Stage 2 of 11/)).toBeVisible({
     timeout: 10_000,
   });
-  await expect(secondPage.getByText(/of 12:00/)).toBeVisible();
+  await expect(secondPage.getByText(/of 20:00/)).toBeVisible();
   // The room grades together, so the second client reads the grade the first
   // one saved rather than an empty stage.
   //

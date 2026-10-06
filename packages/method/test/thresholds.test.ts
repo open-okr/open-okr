@@ -172,7 +172,8 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
 
   it("sessions", () => {
     expect(canon["sessions.weeklyMinutes"]).toEqual({ low: 15, high: 30 });
-    expect(canon["sessions.quarterlyMinutes"]).toBe(60);
+    // Ninety since P9-T20a, as METHOD v2 §8 has it.
+    expect(canon["sessions.quarterlyMinutes"]).toBe(90);
     // Three or four since P9-T19a-d-c, as METHOD v2's step 3 has it.
     expect(canon["sessions.weeklyCommitmentBounds"]).toEqual({
       low: 3,

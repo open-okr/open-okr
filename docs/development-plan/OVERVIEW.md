@@ -35,7 +35,7 @@ OpenOKR runs the entire OKR practice, from the annual frame to the quarterly clo
 | **A champion** | A composer that tells you why your key result is weak while you write it, a check-in the coach has already drafted from what actually happened, and a clear view of what is blocking you |
 | **A reviewer** | Every check-in from your people in one queue for a one-click acknowledgement, with stale and at-risk work impossible to miss |
 | **A coordinator** | A weekly session the product runs for you: confidence, blockers with owners and clocks, commitments, a digest, and a streak that makes the habit visible |
-| **A facilitator** | A guided cycle that knows which phase it is in and what is blocking it, and a sixty-minute quarterly review with a timer, a scoring reveal and exportable minutes |
+| **A facilitator** | A guided cycle that knows which phase it is in and what is blocking it, and a ninety-minute quarterly review with a timer, a scoring reveal and exportable minutes |
 | **An executive or sponsor** | The whole company on one map, escalations that reach you before things are unrecoverable, and a diagnostic at the close that tells you what to actually fix |
 | **An OKR lead or PMO** | Cycles across the organisation, KPI driver trees with recovery objectives, alignment health with named gaps, and everything exportable |
 | **An admin** | Members, access, single sign-on, backups with tested restores, a tamper-evident audit log, AI governance with hard cost caps, and a system built to pass a security review |
@@ -106,7 +106,7 @@ It ends with a streak: the number of consecutive weeks your team held the sessio
 
 ### 3.6 The quarterly review
 
-Sixty minutes, three acts, eleven timed stages, ending in exported minutes.
+Ninety minutes, four acts, eleven timed stages, about two weeks before the cycle ends, ending in exported minutes. The first act opens the room before the numbers.
 
 **Review** asks whether you achieved the results. A room pulse first, because steady rooms round their numbers up. Then score every key result against evidence, with the objective score hidden until the team reveals it together. Then the story behind each number, owner by owner. Then recognition.
 
@@ -226,7 +226,7 @@ Both are the same release. Self-host is never seat-limited and never feature-gat
 4. **Open a cycle.** The product walks you through the eight phases. It will tell you what is missing and refuse to let you draft on a thin input pack.
 5. **Draft your OKRs.** The coach checks every line as you write it, and will not let you publish a set that fails a gate.
 6. **Friday comes.** Everyone's review inbox fills. The Champion nudges the people who forgot. The session runs in twenty minutes. The digest goes out. The streak ticks up.
-7. **The quarter ends.** Sixty minutes, three acts, honest scores, a real diagnosis, and the next cycle already half-populated with what you learned.
+7. **The quarter ends.** Ninety minutes, four acts, honest scores, a real diagnosis, and the next cycle already half-populated with what you learned.
 
 That is the product.
 

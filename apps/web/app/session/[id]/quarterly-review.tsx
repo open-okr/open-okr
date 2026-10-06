@@ -383,7 +383,7 @@ export function QuarterlyReview({
                 </>
               ) : (
                 <p className="text-sm text-ink-3">
-                  {t("session.detail.quarterlyReview.elevenStagesAcrossThree")}
+                  {t("session.detail.quarterlyReview.elevenStagesAcrossFour")}
                 </p>
               )}
               {Object.keys(elapsed).length > 0 ? (

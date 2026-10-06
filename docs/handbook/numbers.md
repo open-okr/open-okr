@@ -136,7 +136,8 @@ so: a metric still under its red line still reads unhealthy.
 ## Sessions
 
 The quarterly review is eleven timed stages,
-`sessions.quarterlyStageMinutes`, sixty minutes in total. The weekly session is
+`sessions.quarterlyStageMinutes`, ninety minutes in total, booked about two
+weeks before the cycle ends by `cadence.reviewPreparationLeadWeeks`. The weekly session is
 four steps and fifteen to thirty minutes. Both are in
 [the weekly rhythm](weekly.md) and [the quarterly cycle](quarterly.md).
 

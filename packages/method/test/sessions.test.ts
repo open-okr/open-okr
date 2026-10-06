@@ -68,16 +68,17 @@ describe("§8.1's eleven stages", () => {
     ]);
   });
 
-  it("sum to the sixty minutes §7.1 gives the quarterly review", () => {
+  it("sum to the ninety minutes §7.1 gives the quarterly review (P9-T20a)", () => {
     // The minutes come from §11's `sessions.quarterlyStageMinutes`, not from
     // this list. The list carries the order, which §11 says is canon.
     const total = reviewStages(thresholds).reduce(
       (sum, entry) => sum + entry.minutes,
       0,
     );
-    expect(total).toBe(60);
+    expect(total).toBe(90);
+    expect(total).toBe(thresholds["sessions.quarterlyMinutes"]);
     expect(RITUALS.find((r) => r.kind === "quarterly")?.length).toBe(
-      "60 minutes",
+      "90 minutes",
     );
   });
 
