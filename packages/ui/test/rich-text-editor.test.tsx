@@ -9,7 +9,9 @@ const SIMPLE_DOC = {
 
 describe("RichTextEditor", () => {
   test("mounts with initial content and renders it", async () => {
-    const { container } = render(<RichTextEditor content={SIMPLE_DOC} />);
+    const { container } = render(
+      <RichTextEditor label="Notes" content={SIMPLE_DOC} />,
+    );
     await waitFor(() => {
       expect(container.querySelector('[contenteditable="true"]')).toBeTruthy();
     });
@@ -20,6 +22,7 @@ describe("RichTextEditor", () => {
     const seen: unknown[] = [];
     const { container } = render(
       <RichTextEditor
+        label="Notes"
         content={SIMPLE_DOC}
         onUpdate={(json) => seen.push(json)}
         validate={(json) => {
@@ -38,7 +41,7 @@ describe("RichTextEditor", () => {
 
   test("renders read-only when editable is false", async () => {
     const { container } = render(
-      <RichTextEditor content={SIMPLE_DOC} editable={false} />,
+      <RichTextEditor label="Notes" content={SIMPLE_DOC} editable={false} />,
     );
     await waitFor(() => {
       expect(container.querySelector("[contenteditable]")).toBeTruthy();
@@ -52,10 +55,27 @@ describe("RichTextEditor", () => {
    * carried are in `styles/prosemirror.css`.
    */
   test("adds no inline style element for the policy to refuse", async () => {
-    const { container } = render(<RichTextEditor content={SIMPLE_DOC} />);
+    const { container } = render(
+      <RichTextEditor label="Notes" content={SIMPLE_DOC} />,
+    );
     await waitFor(() => {
       expect(container.querySelector('[contenteditable="true"]')).toBeTruthy();
     });
     expect(document.head.querySelector("style[data-tiptap-style]")).toBeNull();
+  });
+
+  /**
+   * The editing surface is a textbox, and a textbox with no name is a serious
+   * axe finding (`aria-input-field-name`): a screen reader announces it as
+   * "edit text" with nothing to say what it is for. TipTap 3.31.4 started
+   * keeping the role it adds, which is how s43 found the missing name; this
+   * holds on either side of that release.
+   */
+  test("names the editing surface for assistive technology", async () => {
+    const { findByRole } = render(
+      <RichTextEditor label="Bio" content={SIMPLE_DOC} />,
+    );
+    const surface = await findByRole("textbox", { name: "Bio" });
+    expect(surface.getAttribute("aria-multiline")).toBe("true");
   });
 });

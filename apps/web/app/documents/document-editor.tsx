@@ -21,12 +21,16 @@ import type { WriteState } from "../cycle/write-state.ts";
  * this document is searched by all come from the same module.
  */
 export function DocumentEditor({
+  title,
   body,
   state,
   canEdit,
   onSave,
   onPublish,
 }: {
+  /** The document's own title names the editor, which is what a screen
+   * reader user needs to hear when they land in it. */
+  readonly title: string;
   readonly body: unknown;
   readonly state: "draft" | "published";
   readonly canEdit: boolean;
@@ -57,6 +61,7 @@ export function DocumentEditor({
     <div className="flex flex-col gap-2">
       <RichTextEditor
         ref={editor}
+        label={title}
         content={body ?? null}
         editable={canEdit}
         placeholder={t("documents.documentEditor.whatIsThePlan")}

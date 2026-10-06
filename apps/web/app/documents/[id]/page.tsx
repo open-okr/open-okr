@@ -145,6 +145,7 @@ export default async function DocumentPage({
           ) : null}
           <CardBody>
             <DocumentEditor
+              title={document.title}
               body={document.body}
               state={document.state}
               canEdit={canEdit}

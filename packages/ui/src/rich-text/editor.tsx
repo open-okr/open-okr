@@ -34,6 +34,11 @@ export interface UploadedFile {
 }
 
 export interface RichTextEditorProps {
+  /** The accessible name of the editing surface. Required, because TipTap
+   * marks that surface `role="textbox"` and a textbox nobody named is a
+   * serious accessibility finding. The placeholder is not a name: it
+   * disappears the moment somebody types. */
+  readonly label: string;
   readonly content?: unknown;
   readonly placeholder?: string;
   readonly editable?: boolean;
@@ -76,6 +81,7 @@ export const RichTextEditor = forwardRef<
   RichTextEditorProps
 >(function RichTextEditor(
   {
+    label,
     content,
     placeholder,
     editable = true,
@@ -123,7 +129,16 @@ export const RichTextEditor = forwardRef<
     // `styles/prosemirror.css` instead (completeness review L-22).
     injectCSS: false,
     editorProps: {
-      attributes: placeholder ? { "data-placeholder": placeholder } : {},
+      // TipTap adds this role itself, but up to 3.31.3 it lost it as soon as
+      // React re-applied these props, so it is stated here rather than
+      // trusted. Enter starts a new paragraph, so the textbox says it is
+      // multi-line; without that a screen reader announces a single field.
+      attributes: {
+        role: "textbox",
+        "aria-label": label,
+        "aria-multiline": "true",
+        ...(placeholder ? { "data-placeholder": placeholder } : {}),
+      },
       handlePaste(view, event) {
         const files = Array.from(event.clipboardData?.files ?? []);
         if (files.length === 0 || !uploadFile) {
