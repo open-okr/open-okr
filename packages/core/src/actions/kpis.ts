@@ -43,6 +43,7 @@ import {
 } from "@openokr/method";
 import { and, asc, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ensureContext } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -209,6 +210,9 @@ const recoveryJoin = and(
   isNull(goals.deletedAt),
 );
 
+/** The named owner, joined beside where a KPI lives (P9-T17b-b). */
+const namedOwners = alias(workspaceMembers, "named_owner");
+
 /** The rule as every KPI read reports it (P9-T17a). */
 const ruleOutput = {
   targetType: z.enum(KPI_TARGET_TYPES),
@@ -231,6 +235,46 @@ function ruleOf(rule: KpiRule) {
     ...thresholds,
     basis: readingOf(rule, null, null).basis,
   };
+}
+
+/**
+ * A named owner, checked: an active person in this workspace, or nobody
+ * (§6.2, P9-T17b-b). An agent is a member too, and is refused, because §6.2
+ * says a person.
+ */
+async function namedOwner(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string | null,
+): Promise<string | null> {
+  if (memberId === null) {
+    return null;
+  }
+  const [member] = await tx
+    .select({ id: workspaceMembers.id, kind: workspaceMembers.kind })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.id, memberId),
+        eq(workspaceMembers.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (!member) {
+    throw new OperationError(
+      "not_found",
+      "No such member. A KPI's owner is a person who is still here.",
+    );
+  }
+  if (member.kind !== "human") {
+    throw new OperationError(
+      "forbidden",
+      "A KPI is owned by a person, not an agent.",
+    );
+  }
+  return member.id;
 }
 
 async function actingMember(
@@ -329,11 +373,18 @@ export const createKpi = defineWriteAction({
     direction: z.enum(KPI_DIRECTION_VALUES).optional(),
     ...ruleFields,
     indicatorType: z.enum(["leading", "lagging"]).default("lagging"),
-    tier: z.enum(KPI_TIERS).default("output"),
+    /** Optional since P9-T17b-b (METHOD.md §6.2): none unless one is chosen. */
+    tier: z.enum(KPI_TIERS).nullable().optional(),
     aggregate: z.enum(KPI_AGGREGATES).default("sum"),
     ownerKind: z.enum(KPI_OWNER_KINDS).default("workspace"),
     spaceId: z.uuid().optional(),
     memberId: z.uuid().optional(),
+    /**
+     * The one named person who owns it (§6.2, P9-T17b-b), and who hears when
+     * it leaves its corridor. Where it lives is `ownerKind`. A KPI on a
+     * member's own list is owned by that member unless another is named.
+     */
+    ownerMemberId: z.uuid().nullable().optional(),
     categoryId: z.uuid().optional(),
     parentKpiId: z.uuid().optional(),
     unit: z.string().trim().max(60).optional(),
@@ -382,8 +433,14 @@ export const createKpi = defineWriteAction({
         frequency: input.frequency,
         ...rule,
         indicatorType: input.indicatorType,
-        tier: input.tier,
+        tier: input.tier ?? null,
         aggregate: input.aggregate,
+        ownerMemberId: await namedOwner(
+          tx,
+          workspaceId,
+          input.ownerMemberId ??
+            (input.ownerKind === "member" ? (input.memberId ?? null) : null),
+        ),
         ownerKind: input.ownerKind,
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
@@ -578,7 +635,7 @@ export const readKpiGrid = defineReadAction({
         unit: z.string().nullable(),
         direction: z.string(),
         indicatorType: z.string(),
-        tier: z.string(),
+        tier: z.string().nullable(),
         /** The band, or no data. Never `recovering` since P9-T17b-a. */
         state: z.string(),
         /** An open recovery objective, shown beside the band (§6.4). */
@@ -598,6 +655,9 @@ export const readKpiGrid = defineReadAction({
          */
         ownerId: z.uuid().nullable(),
         ownerName: z.string().nullable(),
+        /** The one named person who owns it (§6.2), when somebody is named. */
+        namedOwnerId: z.uuid().nullable(),
+        namedOwnerName: z.string().nullable(),
         /**
          * The expression behind a calculated cell (P6-G30).
          *
@@ -673,11 +733,14 @@ export const readKpiGrid = defineReadAction({
             spaceName: spaces.name,
             formula: kpis.formula,
             ...RECOVERY_COLUMNS,
+            namedOwnerId: kpis.ownerMemberId,
+            namedOwnerName: namedOwners.name,
           })
           .from(kpis)
           .leftJoin(workspaceMembers, eq(workspaceMembers.id, kpis.memberId))
           .leftJoin(spaces, eq(spaces.id, kpis.spaceId))
           .leftJoin(goals, recoveryJoin)
+          .leftJoin(namedOwners, eq(namedOwners.id, kpis.ownerMemberId))
           .where(activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)))
           .orderBy(asc(kpis.position), asc(kpis.title));
 
@@ -925,7 +988,10 @@ export const updateKpi = defineWriteAction({
     direction: z.enum(KPI_DIRECTION_VALUES).optional(),
     ...ruleFields,
     indicatorType: z.enum(["leading", "lagging"]).optional(),
-    tier: z.enum(KPI_TIERS).optional(),
+    /** Null takes the tier away, which §6.2 allows. */
+    tier: z.enum(KPI_TIERS).nullable().optional(),
+    /** The named owner (§6.2); null leaves it unnamed. */
+    ownerMemberId: z.uuid().nullable().optional(),
     targetDefault: z.number().nullable().optional(),
     /** Null detaches it, which makes it a root of its own. */
     parentKpiId: z.uuid().nullable().optional(),
@@ -1032,6 +1098,13 @@ export const updateKpi = defineWriteAction({
       }
       if (input.tier !== undefined) {
         set.tier = input.tier;
+      }
+      if (input.ownerMemberId !== undefined) {
+        set.ownerMemberId = await namedOwner(
+          tx,
+          workspaceId,
+          input.ownerMemberId,
+        );
       }
       if (input.targetDefault !== undefined) {
         set.targetDefault =
@@ -1389,7 +1462,7 @@ const kpiTreeNode = z.object({
   title: z.string(),
   unit: z.string().nullable(),
   indicatorType: z.string(),
-  tier: z.string(),
+  tier: z.string().nullable(),
   direction: z.string(),
   /** The band, or no data. Never `recovering` since P9-T17b-a. */
   state: z.string(),
@@ -1481,7 +1554,7 @@ function toTreeNode(
     readonly title: string;
     readonly unit: string | null;
     readonly indicatorType: string;
-    readonly tier: string;
+    readonly tier: string | null;
     readonly direction: string;
     readonly state: string;
     readonly achievementPct: string | null;
@@ -1722,11 +1795,14 @@ export const readKpiDetail = defineReadAction({
       title: z.string(),
       categoryName: z.string().nullable(),
       ownerName: z.string().nullable(),
+      /** The one named person who owns it (§6.2), when somebody is named. */
+      namedOwnerId: z.uuid().nullable(),
+      namedOwnerName: z.string().nullable(),
       frequency: z.string(),
       unit: z.string().nullable(),
       direction: z.string(),
       indicatorType: z.string(),
-      tier: z.string(),
+      tier: z.string().nullable(),
       /** The band, or no data. Never `recovering` since P9-T17b-a. */
       state: z.string(),
       /** An open recovery objective, shown beside the band (§6.4). */
@@ -1791,6 +1867,8 @@ export const readKpiDetail = defineReadAction({
             title: kpis.title,
             categoryName: kpiCategories.name,
             ownerName: workspaceMembers.name,
+            namedOwnerId: kpis.ownerMemberId,
+            namedOwnerName: namedOwners.name,
             frequency: kpis.frequency,
             unit: kpis.unit,
             indicatorType: kpis.indicatorType,
@@ -1814,6 +1892,7 @@ export const readKpiDetail = defineReadAction({
           .leftJoin(workspaceMembers, eq(workspaceMembers.id, kpis.memberId))
           .leftJoin(kpiTrees, eq(kpiTrees.id, kpis.treeId))
           .leftJoin(goals, recoveryJoin)
+          .leftJoin(namedOwners, eq(namedOwners.id, kpis.ownerMemberId))
           .where(
             activeOnly(
               kpis,
@@ -1907,6 +1986,8 @@ export const readKpiDetail = defineReadAction({
             title: kpi.title,
             categoryName: kpi.categoryName,
             ownerName: kpi.ownerName,
+            namedOwnerId: kpi.namedOwnerId,
+            namedOwnerName: kpi.namedOwnerName,
             frequency: kpi.frequency,
             unit: kpi.unit,
             direction: kpi.direction,

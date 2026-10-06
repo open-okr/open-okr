@@ -597,9 +597,10 @@ A KPI is a number you watch every period whether or not it is an OKR. KPIs descr
 | Target type | Stay at or above, stay at or below, increase to, decrease to, stay within a range |
 | Thresholds | Green and red boundaries in the KPI's own units. Optional; without them the ratio fallback in §6.4 applies |
 | Type | Leading, lagging |
-| Tier | Input, output, outcome, impact |
+| Tier | Input, output, outcome, impact. Optional |
 | Frequency | Daily, weekly, monthly, quarterly, yearly |
 | Aggregate | Sum, average, max, min, count, last value, first value. Used when a finer period rolls into a coarser one. Use last value for balances and headcount, and model a rate as a calculated KPI (§6.7) |
+| Owner | One named person |
 
 *Source:* Perdoo (vendor) target types; Intrafocus (vendor) on banded thresholds for "measures where both extremes are undesirable".
 

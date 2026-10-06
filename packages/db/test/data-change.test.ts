@@ -24,6 +24,7 @@ import { keyResultScoreComputed } from "../src/data-changes/0018_key_result_scor
 import { dropAlignmentPenalties } from "../src/data-changes/0019_drop_alignment_penalties.ts";
 import { kpiTargetTypeFromDirection } from "../src/data-changes/0020_kpi_target_type_from_direction.ts";
 import { kpiRecoveringToBand } from "../src/data-changes/0021_kpi_recovering_to_band.ts";
+import { kpiNamedOwner } from "../src/data-changes/0022_kpi_named_owner.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1254,6 +1255,58 @@ describe("0021: a recovering KPI reads its real band", () => {
     await client.query("delete from _data_changes");
     const [again] = await runDataChanges(client, {
       scripts: [kpiRecoveringToBand],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0022: a member's KPI is owned by that member", () => {
+  it("names the member, and invents nobody for the rest", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       )
+       insert into kpis (id, workspace_id, short_id, title, frequency,
+                         owner_kind, member_id)
+       select gen_random_uuid(), m.workspace_id, d.short_id, d.title,
+              'monthly', d.owner_kind,
+              case when d.owner_kind = 'member' then m.id end
+         from m,
+              (values ('K-1', 'Mine', 'member'),
+                      ('K-2', 'Everybody''s', 'workspace'))
+                as d(short_id, title, owner_kind)`,
+    );
+    const owners = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{
+            title: string;
+            owner_member_id: string | null;
+            member_id: string | null;
+          }>("select title, owner_member_id, member_id from kpis")
+        ).rows.map((row) => [
+          row.title,
+          row.owner_member_id === row.member_id && row.owner_member_id !== null,
+        ]),
+      );
+
+    const [result] = await runDataChanges(client, {
+      scripts: [kpiNamedOwner],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    expect(await owners()).toEqual({ Mine: true, "Everybody's": false });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [kpiNamedOwner],
     });
     expect(again?.rowsChanged).toBe(0);
   });

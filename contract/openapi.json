@@ -45550,13 +45550,19 @@
                     ]
                   },
                   "tier": {
-                    "default": "output",
-                    "type": "string",
-                    "enum": [
-                      "input",
-                      "output",
-                      "outcome",
-                      "impact"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "input",
+                          "output",
+                          "outcome",
+                          "impact"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "aggregate": {
@@ -45590,6 +45596,18 @@
                     "type": "string",
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "ownerMemberId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "categoryId": {
                     "type": "string",
@@ -45885,7 +45903,10 @@
                                 "type": "string"
                               },
                               "tier": {
-                                "type": "string"
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "state": {
                                 "type": "string"
@@ -45968,6 +45989,24 @@
                                 ]
                               },
                               "ownerName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "namedOwnerId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "namedOwnerName": {
                                 "type": [
                                   "string",
                                   "null"
@@ -46057,6 +46096,8 @@
                               "isCalculated",
                               "ownerId",
                               "ownerName",
+                              "namedOwnerId",
+                              "namedOwnerName",
                               "formula",
                               "records"
                             ],
@@ -47013,7 +47054,10 @@
                                 "type": "string"
                               },
                               "tier": {
-                                "type": "string"
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "direction": {
                                 "type": "string"
@@ -47246,7 +47290,10 @@
                                       "type": "string"
                                     },
                                     "tier": {
-                                      "type": "string"
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
                                     },
                                     "direction": {
                                       "type": "string"
@@ -47447,6 +47494,24 @@
                                 "null"
                               ]
                             },
+                            "namedOwnerId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "namedOwnerName": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
                             "frequency": {
                               "type": "string"
                             },
@@ -47463,7 +47528,10 @@
                               "type": "string"
                             },
                             "tier": {
-                              "type": "string"
+                              "type": [
+                                "string",
+                                "null"
+                              ]
                             },
                             "state": {
                               "type": "string"
@@ -47589,6 +47657,8 @@
                             "title",
                             "categoryName",
                             "ownerName",
+                            "namedOwnerId",
+                            "namedOwnerName",
                             "frequency",
                             "unit",
                             "direction",
@@ -47997,12 +48067,31 @@
                     ]
                   },
                   "tier": {
-                    "type": "string",
-                    "enum": [
-                      "input",
-                      "output",
-                      "outcome",
-                      "impact"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "input",
+                          "output",
+                          "outcome",
+                          "impact"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "ownerMemberId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "targetDefault": {

@@ -34,7 +34,8 @@ async function run(
     }
     throw error;
   }
-  revalidatePath("/kpis");
+  // The layout, so a KPI's own page is fresh too after it is edited there.
+  revalidatePath("/kpis", "layout");
   return NO_ERROR;
 }
 
@@ -58,19 +59,79 @@ export async function recordCell(
   );
 }
 
+const TARGET_TYPES = [
+  "at_least",
+  "at_most",
+  "increase_to",
+  "decrease_to",
+  "range",
+] as const;
+const TIERS = ["input", "output", "outcome", "impact"] as const;
+
+/** A number field, or null when it was left blank or is not a number. */
+function numberField(formData: FormData, name: string): number | null {
+  const raw = String(formData.get(name) ?? "").trim();
+  if (raw === "") {
+    return null;
+  }
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * The rule `JudgedBy` posts, as `kpis.create` and `kpis.update` take it
+ * (METHOD.md §6.2, P9-T17b-b). A one-sided green and red value become the
+ * pair the type uses; the action refuses a rule it cannot judge by, in words.
+ */
+function kpiRuleFrom(formData: FormData) {
+  const raw = String(formData.get("targetType") ?? "at_least");
+  const targetType = (TARGET_TYPES as readonly string[]).includes(raw)
+    ? (raw as (typeof TARGET_TYPES)[number])
+    : "at_least";
+  if (targetType === "range") {
+    return {
+      targetType,
+      greenLow: numberField(formData, "bandLow"),
+      greenHigh: numberField(formData, "bandHigh"),
+      redLow: numberField(formData, "redBelow"),
+      redHigh: numberField(formData, "redAbove"),
+    };
+  }
+  const green = numberField(formData, "green");
+  const red = numberField(formData, "red");
+  const lowIsGood = targetType === "at_most" || targetType === "decrease_to";
+  return {
+    targetType,
+    greenLow: lowIsGood ? null : green,
+    greenHigh: lowIsGood ? green : null,
+    redLow: lowIsGood ? null : red,
+    redHigh: lowIsGood ? red : null,
+  };
+}
+
+/** The owner and tier fields, as the action takes them. Blank is none. */
+function ownerAndTier(formData: FormData) {
+  const owner = String(formData.get("ownerMemberId") ?? "").trim();
+  const tier = String(formData.get("tier") ?? "").trim();
+  return {
+    ownerMemberId: owner === "" ? null : owner,
+    tier: (TIERS as readonly string[]).includes(tier)
+      ? (tier as (typeof TIERS)[number])
+      : null,
+  };
+}
+
 export async function addKpi(
   _previous: WriteState,
   formData: FormData,
 ): Promise<WriteState> {
   const title = String(formData.get("title") ?? "").trim();
   const frequency = String(formData.get("frequency") ?? "monthly");
-  const direction = String(formData.get("direction") ?? "higher_better");
-  const targetRaw = String(formData.get("targetDefault") ?? "").trim();
+  const target = numberField(formData, "targetDefault");
   if (title === "") {
     const { t } = await getTranslations();
     return { error: t("kpis.actions.kpiNeedsATitle") };
   }
-  const target = Number(targetRaw);
   return run((context) =>
     callAction(context, "kpis.create", {
       title,
@@ -80,16 +141,32 @@ export async function addKpi(
         | "monthly"
         | "quarterly"
         | "yearly",
-      direction: direction as "higher_better" | "lower_better",
       // Every field with a schema default has to be named: callAction types on
       // the schema output, so a default is a value the caller still states.
       indicatorType: "lagging",
-      tier: "output",
       aggregate: "sum",
       ownerKind: "workspace",
-      ...(targetRaw !== "" && Number.isFinite(target)
-        ? { targetDefault: target }
-        : {}),
+      ...kpiRuleFrom(formData),
+      ...ownerAndTier(formData),
+      ...(target === null ? {} : { targetDefault: target }),
+    }),
+  );
+}
+
+/**
+ * How a KPI is judged, who owns it and its tier, from the KPI page
+ * (METHOD.md §6.2, P9-T17b-b).
+ */
+export async function updateKpiRule(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const kpiId = String(formData.get("kpiId") ?? "");
+  return run((context) =>
+    callAction(context, "kpis.update", {
+      kpiId,
+      ...kpiRuleFrom(formData),
+      ...ownerAndTier(formData),
     }),
   );
 }

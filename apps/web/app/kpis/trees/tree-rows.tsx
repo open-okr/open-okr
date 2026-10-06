@@ -34,7 +34,8 @@ export interface KpiTreeNode {
   readonly title: string;
   readonly unit: string | null;
   readonly indicatorType: string;
-  readonly tier: string;
+  /** Optional (§6.2): null when no tier was chosen. */
+  readonly tier: string | null;
   /** The band, or no data (§6.4). */
   readonly state: string;
   /** An open recovery objective, shown beside the band (P9-T17b-a). */
@@ -115,7 +116,8 @@ export async function KpiTreeRows({
             ) : null}
           </span>
           <span className="text-xs text-ink-4">
-            {node.indicatorType} · {node.tier}
+            {node.indicatorType}
+            {node.tier ? ` · ${node.tier}` : ""}
           </span>
           {node.link ? (
             <span data-testid="kpi-link" className="text-xs text-ink-3">

@@ -305,6 +305,91 @@ describe("the tree's links (§6.3, P9-T17b-a)", () => {
   });
 });
 
+describe("the named owner and an optional tier (§6.2, P9-T17b-b)", () => {
+  const call = async (name: string, input: object) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context() },
+      name as never,
+      input as never,
+    ) as Promise<never>;
+  };
+  const me = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    return rows[0]?.id as string;
+  };
+  type Detail = {
+    kpi: {
+      namedOwnerId: string | null;
+      namedOwnerName: string | null;
+      tier: string | null;
+    };
+  };
+
+  it("names a person, and has no tier unless one is chosen", async () => {
+    const owner = await me();
+    const kpi = (await call("kpis.create", {
+      title: "Net revenue retention",
+      frequency: "monthly",
+      ownerMemberId: owner,
+    })) as { id: string };
+    const detail = (await call("kpis.detail", {
+      kpiId: kpi.id,
+      periods: 12,
+    })) as Detail;
+    expect(detail.kpi).toMatchObject({
+      namedOwnerId: owner,
+      namedOwnerName: "Owner",
+      tier: null,
+    });
+
+    await call("kpis.update", {
+      kpiId: kpi.id,
+      tier: "outcome",
+      ownerMemberId: null,
+    });
+    const after = (await call("kpis.detail", {
+      kpiId: kpi.id,
+      periods: 12,
+    })) as Detail;
+    expect(after.kpi).toMatchObject({ namedOwnerId: null, tier: "outcome" });
+  });
+
+  it("owns a member's own KPI by that member, unless another is named", async () => {
+    const owner = await me();
+    const kpi = (await call("kpis.create", {
+      title: "Deals closed",
+      frequency: "monthly",
+      ownerKind: "member",
+      memberId: owner,
+    })) as { id: string };
+    const detail = (await call("kpis.detail", {
+      kpiId: kpi.id,
+      periods: 12,
+    })) as Detail;
+    expect(detail.kpi.namedOwnerId).toBe(owner);
+  });
+
+  it("refuses an agent as the owner, because §6.2 says a person", async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and kind = 'agent' limit 1",
+      [workspaceId],
+    );
+    await expect(
+      call("kpis.create", {
+        title: "Uptime",
+        frequency: "monthly",
+        ownerMemberId: rows[0]?.id,
+      }),
+    ).rejects.toThrow(/owned by a person, not an agent/);
+  });
+});
+
 describe("period normalisation on the write path", () => {
   it("buckets every frequency from a date inside the period", async () => {
     const wb = await workerDb();

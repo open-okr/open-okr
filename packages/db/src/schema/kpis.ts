@@ -146,6 +146,12 @@ export const kpis = pgTable("kpis", {
   memberId: uuid("member_id").references(() => workspaceMembers.id, {
     onDelete: "set null",
   }),
+  /**
+   * The one named person who owns it (METHOD.md §6.2, P9-T17b-b), and who
+   * hears when it leaves its corridor. Separate from where it lives. Null is
+   * a KPI nobody has named.
+   */
+  ownerMemberId: uuid("owner_member_id").references(() => workspaceMembers.id),
   frequency: text("frequency", { enum: KPI_FREQUENCIES }).notNull(),
   unit: text("unit"),
   direction: text("direction", { enum: KPI_DIRECTIONS })
@@ -169,7 +175,8 @@ export const kpis = pgTable("kpis", {
   indicatorType: text("indicator_type", { enum: ["leading", "lagging"] })
     .notNull()
     .default("lagging"),
-  tier: text("tier", { enum: KPI_TIERS }).notNull().default("output"),
+  /** Optional since P9-T17b-b (METHOD.md §6.2). A label; nothing decides by it. */
+  tier: text("tier", { enum: KPI_TIERS }).default("output"),
   targetDefault: numeric("target_default"),
   aggregate: text("aggregate", { enum: KPI_AGGREGATES })
     .notNull()

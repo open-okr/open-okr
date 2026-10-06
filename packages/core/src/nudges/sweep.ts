@@ -76,6 +76,10 @@ const RULE_FOR_STATE: Partial<Record<KpiState, TriggerKey>> = {
  * the space's coordinator, falling back to the manager through §4.2's one rule
  * rather than a second copy of it here.
  *
+ * **A named owner comes first** (METHOD.md §6.2, P9-T17b-b): the one person
+ * who owns the KPI hears about it, wherever it lives. Without one, the rules
+ * below decide, as they did before a KPI could name its owner.
+ *
  * **A workspace-owned KPI goes to the workspace's administrators**
  * (completeness review M-29). It went to nobody: the reasoning was that
  * escalating a metric to everybody is escalating it to nobody, which is true,
@@ -90,8 +94,12 @@ async function kpiOwners(
     readonly ownerKind: string;
     readonly memberId: string | null;
     readonly spaceId: string | null;
+    readonly ownerMemberId: string | null;
   },
 ): Promise<readonly string[]> {
+  if (kpi.ownerMemberId) {
+    return [kpi.ownerMemberId];
+  }
   if (kpi.ownerKind === "member") {
     return kpi.memberId ? [kpi.memberId] : [];
   }
@@ -216,6 +224,7 @@ export async function dueKpiCorridorNudges(
       ownerKind: kpis.ownerKind,
       memberId: kpis.memberId,
       spaceId: kpis.spaceId,
+      ownerMemberId: kpis.ownerMemberId,
       recoveryGoalId: kpis.recoveryGoalId,
       recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
       targetDefault: kpis.targetDefault,

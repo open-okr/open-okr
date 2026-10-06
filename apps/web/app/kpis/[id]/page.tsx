@@ -14,6 +14,9 @@ import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
+import { ActionForm } from "../../cycle/action-form.tsx";
+import { updateKpiRule } from "../actions.ts";
+import { JudgedBy } from "../judged-by.tsx";
 import { FormulaBuilder } from "./formula-builder.tsx";
 import { TrendNarration } from "./trend-narration.tsx";
 
@@ -117,6 +120,13 @@ export default async function KpiDetailPage({
   }).format(new Date());
 
   const { kpi } = detail;
+  // Who may own it: a person who is here (§6.2, P9-T17b-b). Read only for
+  // somebody who may change it.
+  const people = canEdit
+    ? (await callAction(context, "people.directory", {})).filter(
+        (member) => member.kind === "human" && member.status === "active",
+      )
+    : [];
   // Oldest first for the chart; the read returns newest first for the table.
   const series = [...detail.records].reverse();
   const target = kpi.targetDefault ?? 0;
@@ -172,7 +182,9 @@ export default async function KpiDetailPage({
                 kpi.treeName ?? t("kpis.detail.noTree"),
                 kpi.ownerName ?? t("kpis.detail.workspaceOwned"),
                 kpi.frequency,
-                `${kpi.indicatorType} · ${kpi.tier}`,
+                kpi.tier
+                  ? `${kpi.indicatorType} · ${kpi.tier}`
+                  : kpi.indicatorType,
               ].join(" · ")}
             </p>
           </div>
@@ -211,6 +223,84 @@ export default async function KpiDetailPage({
                     progress: Math.round(kpi.recoveryProgressPct ?? 0),
                   })}
             </span>
+          </CardBody>
+        ) : null}
+      </Card>
+
+      {/* How it is judged, who owns it and its tier (§6.2, §6.4,
+          P9-T17b-b). */}
+      <Card>
+        <CardHeader className="justify-between">
+          <h2 className="text-sm font-bold text-ink">
+            {t("kpis.rule.howItIsJudged")}
+          </h2>
+          <span data-testid="kpi-basis" className="text-xs text-ink-3">
+            {kpi.basis === "thresholds"
+              ? t("kpis.rule.byThresholds")
+              : t("kpis.rule.byRatio")}
+            {" · "}
+            {kpi.namedOwnerName
+              ? t("kpis.rule.ownedBy", { name: kpi.namedOwnerName })
+              : t("kpis.rule.nobodyNamed")}
+          </span>
+        </CardHeader>
+        {canEdit ? (
+          <CardBody>
+            <ActionForm action={updateKpiRule} className="flex flex-col gap-2">
+              <input type="hidden" name="kpiId" value={kpi.id} />
+              <JudgedBy
+                idPrefix="edit"
+                initial={{
+                  targetType: kpi.targetType,
+                  greenLow: kpi.greenLow,
+                  greenHigh: kpi.greenHigh,
+                  redLow: kpi.redLow,
+                  redHigh: kpi.redHigh,
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-2.5">
+                <label
+                  className="text-xs text-ink-3"
+                  htmlFor="edit-ownerMemberId"
+                >
+                  {t("kpis.rule.owner")}
+                </label>
+                <select
+                  id="edit-ownerMemberId"
+                  name="ownerMemberId"
+                  defaultValue={kpi.namedOwnerId ?? ""}
+                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                >
+                  <option value="">{t("kpis.rule.nobodyNamedOption")}</option>
+                  {people.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                    </option>
+                  ))}
+                </select>
+                <label className="text-xs text-ink-3" htmlFor="edit-tier">
+                  {t("kpis.rule.tier")}
+                </label>
+                <select
+                  id="edit-tier"
+                  name="tier"
+                  defaultValue={kpi.tier ?? ""}
+                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                >
+                  <option value="">{t("kpis.rule.noTier")}</option>
+                  <option value="input">{t("kpis.rule.tierInput")}</option>
+                  <option value="output">{t("kpis.rule.tierOutput")}</option>
+                  <option value="outcome">{t("kpis.rule.tierOutcome")}</option>
+                  <option value="impact">{t("kpis.rule.tierImpact")}</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
+              >
+                {t("common.save")}
+              </button>
+            </ActionForm>
           </CardBody>
         ) : null}
       </Card>

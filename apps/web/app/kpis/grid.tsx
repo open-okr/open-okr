@@ -32,7 +32,8 @@ export interface GridKpi {
   readonly unit: string | null;
   readonly direction: string;
   readonly indicatorType: string;
-  readonly tier: string;
+  /** Optional (§6.2): null when no tier was chosen. */
+  readonly tier: string | null;
   /** The band, or no data (§6.4). */
   readonly state: string;
   /** An open recovery objective, shown beside the band (P9-T17b-a). */
@@ -259,7 +260,8 @@ export function KpiGrid({
                         </span>
                         <span className="text-ink-4">
                           {kpi.frequency} · {kpi.direction.replace("_", " ")} ·{" "}
-                          {kpi.indicatorType} · {kpi.tier}
+                          {kpi.indicatorType}
+                          {kpi.tier ? ` · ${kpi.tier}` : ""}
                           {kpi.unit ? ` · ${kpi.unit}` : ""}
                           {kpi.isCalculated ? (
                             <> · {t("kpis.grid.calculated")}</>

@@ -539,6 +539,36 @@ describe("the daily run: KPI corridors and the morning summary", () => {
     ).toEqual([]);
   });
 
+  it("tells the KPI's named owner, wherever the KPI lives (§6.2, P9-T17b-b)", async () => {
+    const wb = await workerDb();
+    const kpi = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.create",
+      {
+        title: "Net revenue retention",
+        ownerKind: "workspace",
+        ownerMemberId: secondMemberId,
+        frequency: "monthly",
+        indicatorType: "lagging",
+        aggregate: "sum",
+      },
+    )) as { id: string };
+    await callAction({ pool: wb.appPool, ...context() }, "kpis.record", {
+      kpiId: kpi.id,
+      on: new Date().toISOString().slice(0, 10),
+      targetValue: 100,
+      actualValue: 60,
+    });
+    await runAt("daily", new Date("2026-08-20T02:00:00Z"));
+    const unhealthy = (await sentNudges()).filter(
+      (row) => row.rule_key === "kpi.unhealthy" && row.subject_id === kpi.id,
+    );
+    // The named person, not the administrators a workspace KPI went to.
+    expect(unhealthy.map((row) => row.recipient_member_id)).toEqual([
+      secondMemberId,
+    ]);
+  });
+
   it("says nothing about a KPI inside its corridor", async () => {
     await kpiAt(95, 100);
     await runAt("daily", new Date());

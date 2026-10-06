@@ -31,6 +31,7 @@ import { keyResultScoreComputed } from "../data-changes/0018_key_result_score_co
 import { dropAlignmentPenalties } from "../data-changes/0019_drop_alignment_penalties.ts";
 import { kpiTargetTypeFromDirection } from "../data-changes/0020_kpi_target_type_from_direction.ts";
 import { kpiRecoveringToBand } from "../data-changes/0021_kpi_recovering_to_band.ts";
+import { kpiNamedOwner } from "../data-changes/0022_kpi_named_owner.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -69,6 +70,7 @@ try {
       dropAlignmentPenalties,
       kpiTargetTypeFromDirection,
       kpiRecoveringToBand,
+      kpiNamedOwner,
     ],
   });
   process.stdout.write(

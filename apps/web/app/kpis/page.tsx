@@ -10,6 +10,7 @@ import { ActionForm } from "../cycle/action-form.tsx";
 import { addCategory, addKpi } from "./actions.ts";
 import { KpiGrid } from "./grid.tsx";
 import { CategorySubtotal, FilterRow, RowSparkline } from "./grid-extras.tsx";
+import { JudgedBy } from "./judged-by.tsx";
 import { KpiSuggestion } from "./kpi-suggestion.tsx";
 
 /**
@@ -66,6 +67,13 @@ export default async function KpisPage({
     ));
 
   const grid = await callAction(context, "kpis.grid", { periods: 12 });
+  // Who may own a KPI: a person who is here (§6.2, P9-T17b-b). Read only for
+  // somebody who may add one.
+  const people = canEdit
+    ? (await callAction(context, "people.directory", {})).filter(
+        (member) => member.kind === "human" && member.status === "active",
+      )
+    : [];
 
   // **Filtered here rather than in the read.** The grid is one page of every
   // KPI a workspace has, the read already returns them all, and a filter that
@@ -275,18 +283,6 @@ export default async function KpisPage({
                     <option value="quarterly">{t("common.quarterly")}</option>
                     <option value="yearly">{t("common.yearly")}</option>
                   </select>
-                  <label className="text-xs text-ink-3" htmlFor="direction">
-                    {t("common.betterWhen")}
-                  </label>
-                  <select
-                    id="direction"
-                    name="direction"
-                    defaultValue="higher_better"
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
-                  >
-                    <option value="higher_better">{t("common.higher")}</option>
-                    <option value="lower_better">{t("common.lower")}</option>
-                  </select>
                   <label className="text-xs text-ink-3" htmlFor="targetDefault">
                     {t("common.standingTarget")}
                   </label>
@@ -297,6 +293,41 @@ export default async function KpisPage({
                     step="any"
                     className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
                   />
+                </div>
+                <JudgedBy idPrefix="add" />
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <label className="text-xs text-ink-3" htmlFor="ownerMemberId">
+                    {t("kpis.rule.owner")}
+                  </label>
+                  <select
+                    id="ownerMemberId"
+                    name="ownerMemberId"
+                    defaultValue={workspace.memberId}
+                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                  >
+                    {people.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.name}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="text-xs text-ink-3" htmlFor="tier">
+                    {t("kpis.rule.tier")}
+                  </label>
+                  <select
+                    id="tier"
+                    name="tier"
+                    defaultValue=""
+                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                  >
+                    <option value="">{t("kpis.rule.noTier")}</option>
+                    <option value="input">{t("kpis.rule.tierInput")}</option>
+                    <option value="output">{t("kpis.rule.tierOutput")}</option>
+                    <option value="outcome">
+                      {t("kpis.rule.tierOutcome")}
+                    </option>
+                    <option value="impact">{t("kpis.rule.tierImpact")}</option>
+                  </select>
                 </div>
                 <Button type="submit" variant="primary" className="self-start">
                   {t("common.add")}

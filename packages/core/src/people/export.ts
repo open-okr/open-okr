@@ -225,6 +225,13 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     skip: "structural",
     because: "Ownership of a KPI. The readings are exported from kpi_records.",
   },
+  {
+    table: "kpis",
+    column: "owner_member_id",
+    skip: "structural",
+    because:
+      "Who a KPI's named owner is (P9-T17b-b), the same kind of fact as where it lives. The readings are exported from kpi_records.",
+  },
   { table: "kudos", column: "from_member_id", label: "Kudos you gave" },
   {
     table: "notification_batches",

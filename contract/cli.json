@@ -8115,13 +8115,7 @@
           "name": "tier",
           "field": "tier",
           "type": "string",
-          "required": false,
-          "enum": [
-            "input",
-            "output",
-            "outcome",
-            "impact"
-          ]
+          "required": false
         },
         {
           "name": "aggregate",
@@ -8158,6 +8152,12 @@
         {
           "name": "member-id",
           "field": "memberId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "owner-member-id",
+          "field": "ownerMemberId",
           "type": "string",
           "required": false
         },
@@ -8526,13 +8526,13 @@
           "name": "tier",
           "field": "tier",
           "type": "string",
-          "required": false,
-          "enum": [
-            "input",
-            "output",
-            "outcome",
-            "impact"
-          ]
+          "required": false
+        },
+        {
+          "name": "owner-member-id",
+          "field": "ownerMemberId",
+          "type": "string",
+          "required": false
         },
         {
           "name": "target-default",
