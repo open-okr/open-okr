@@ -587,6 +587,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     keyResultId: z.string(),
     confidence: z.number(),
   }),
+  // The week's wins (P9-T19a-d-c)
+  "session.winsNamed": z.object({ count: z.number() }),
   // A low score's next action (P9-T19a-b)
   "session.nextActionSet": z.object({ keyResultId: z.string() }),
   // Blockers (P4-T07c)

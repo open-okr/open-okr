@@ -381,7 +381,7 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 ## 10. The rhythm (domain G)
 
 ### sessions *(short_id)*
-`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `added_minutes jsonb`.
+`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c).
 
 `shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes.
 
@@ -405,7 +405,7 @@ A row is created when somebody takes part, not when the session is made. Seeding
 `due_at` is the end of the goal's next check-in day, the first one after the day the blocker opens, in the workspace calendar (METHOD.md §7.3, P9-T19a-a). It was `opened_at` plus a twenty-four hour clock; data change 0023 moved the open ones to their goal's next check-in.
 
 ### commitments
-`session_id?` to sessions, `space_id` to spaces, `week_start date`, `text`, `owner_id` to workspace_members, `key_result_id?` to key_results, `delivered bool?`, `closed_at?`.
+`session_id?` to sessions, `space_id` to spaces, `week_start date`, `text`, `owner_id` to workspace_members, `key_result_id?` to key_results, `delivered bool?`, `closed_at?`, `closing_note?` (the line on why written when it was closed, where it helps; 0130, P9-T19a-d-c).
 
 ### decisions
 `cycle_id?` to cycles, `key_result_id?` to key_results, `goal_id?` to goals, `at date`, `text`, `author_member_id` to workspace_members, `session_id?` to sessions.

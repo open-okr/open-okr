@@ -434,6 +434,7 @@ import {
   setRootCause,
   setSessionCommitments,
   setSessionNextAction,
+  setSessionWins,
   setShifts,
   setStageNote,
   setTrend,
@@ -863,6 +864,7 @@ export const ACTION_MAP = {
   "sessions.confidenceStatus": sessionConfidenceStatus,
   // Blockers (P4-T07c)
   "sessions.setNextAction": setSessionNextAction,
+  "sessions.setWins": setSessionWins,
   "sessions.lowScores": readSessionLowScores,
   "sessions.createBlocker": createSessionBlocker,
   "sessions.resolveBlocker": resolveSessionBlocker,

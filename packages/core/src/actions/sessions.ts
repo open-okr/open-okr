@@ -442,6 +442,8 @@ const sessionOutput = z.object({
   notes: z.record(z.string(), z.unknown()),
   /** Whole minutes added per stage by the facilitator (METHOD.md §8.1). */
   addedMinutes: z.record(z.string(), z.number()),
+  /** The week's wins a weekly session named (§7.2 step 3, P9-T19a-d-c). */
+  wins: z.array(z.string()),
   state: z.enum(SESSION_STATES),
   digestId: z.uuid().nullable(),
   createdAt: z.string(),
@@ -478,6 +480,7 @@ function toOutput(
     elapsed: (row.elapsed ?? {}) as Record<string, number>,
     notes: isFacilitator ? ((row.notes ?? {}) as Record<string, unknown>) : {},
     addedMinutes: (row.addedMinutes ?? {}) as Record<string, number>,
+    wins: (row.wins ?? []) as string[],
     state: row.state,
     digestId: row.digestId ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -3235,6 +3238,8 @@ export const closeSessionCommitments = defineWriteAction({
       z.object({
         id: z.uuid(),
         delivered: z.boolean(),
+        /** A line on why, where it helps (§7.2 step 3, P9-T19a-d-c). */
+        note: z.string().trim().max(300).optional(),
       }),
     ),
   }),
@@ -3282,6 +3287,8 @@ export const closeSessionCommitments = defineWriteAction({
           .update(commitments)
           .set({
             delivered: item.delivered,
+            closingNote:
+              item.note === undefined || item.note === "" ? null : item.note,
             closedAt: now,
             updatedAt: now,
           })
@@ -3900,6 +3907,75 @@ export const setShifts = defineWriteAction({
           action: "sessions.setShifts",
           targetType: "session",
           targetId: input.sessionId,
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * The week's wins (METHOD.md §7.2 step 3, P9-T19a-d-c): "Name the week's
+ * wins." A weekly session's own short list, written whole, and carried into
+ * the digest. A closed session keeps the wins it closed with.
+ */
+export const setSessionWins = defineWriteAction({
+  name: "sessions.setWins",
+  summary:
+    "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+  input: z.object({
+    sessionId: z.uuid(),
+    wins: z.array(z.string().trim().min(1).max(200)).max(10),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      if (session.kind !== "weekly") {
+        throw new OperationError(
+          "forbidden",
+          "Wins are named in a weekly check-in.",
+        );
+      }
+      if (session.state === "closed") {
+        throw new OperationError(
+          "forbidden",
+          "This check-in is closed, and its digest went out with the wins it had.",
+        );
+      }
+
+      // openokr:allow-mutation: the operation's own execute.
+      await tx
+        .update(sessions)
+        .set({ wins: input.wins, updatedAt: new Date() })
+        .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
+
+      return {
+        result: { id: input.sessionId },
+        activity: {
+          kind: "session.winsNamed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { count: input.wins.length },
+        },
+        audit: {
+          action: "sessions.setWins",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { count: input.wins.length },
         },
       };
     },

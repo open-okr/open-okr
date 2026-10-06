@@ -1,5 +1,5 @@
 /**
- * The weekly digest template (METHOD.md §7.2 step 4, P4-T15b-a).
+ * The weekly digest template (METHOD.md §7.2 step 4, P4-T15b-a, P9-T19a-d-c).
  *
  * §7.2's own sentence lists six parts: "headline average and the change on last
  * week, what is on track, what is at risk with owners, blockers on the 24-hour
@@ -37,19 +37,54 @@ const base: WeeklyDigestInput = {
     },
   ],
   commitmentCount: 4,
+  wins: ["Pricing page live", "Two renewals signed early"],
+  staleGoals: [],
   coordinatorNote: "Billing is the whole story this week.",
 };
 
-describe("all six parts, in §7.2's order", () => {
-  it("renders them", () => {
+describe("every part, in §7.2's order", () => {
+  it("renders them, the wins after the commitments (P9-T19a-d-c)", () => {
     expect(weeklyDigestLines(base)).toEqual([
       "Product, week of 2026-08-24: confidence 62%, up 7 points on last week.",
       "3 objectives on track.",
       "1 at risk: Raise mid-market activation (Ada, caution).",
       "1 blocker open, 1 past its check-in: dependency: chase the billing team (Ada, past its check-in).",
       "4 commitments for next week.",
+      "Wins: Pricing page live and Two renewals signed early.",
       "For leadership: Billing is the whole story this week.",
     ]);
+  });
+});
+
+describe("the wins (§7.2 step 3, P9-T19a-d-c)", () => {
+  it("says none were named rather than leaving the line out", () => {
+    expect(weeklyDigestLines({ ...base, wins: [] })).toContain(
+      "No wins named this week.",
+    );
+  });
+});
+
+describe("stale goals (§11, P9-T19a-c-a)", () => {
+  it("names the space's stale goals after what is at risk, and only when there are some", () => {
+    const lines = weeklyDigestLines({
+      ...base,
+      staleGoals: [
+        { title: "Keep the platform standing", ownerName: "Leo" },
+        { title: "Answer once, in the product", ownerName: null },
+      ],
+    });
+    expect(lines[3]).toBe(
+      "2 stale, past the check-in grace: Keep the platform standing (Leo) and Answer once, in the product (no owner named).",
+    );
+    expect(weeklyDigestLines(base).some((line) => line.includes("stale"))).toBe(
+      false,
+    );
+    expect(
+      weeklyDigestNumbers({
+        ...base,
+        staleGoals: [{ title: "One", ownerName: null }],
+      }),
+    ).toContain(1);
   });
 });
 
@@ -149,10 +184,10 @@ describe("the check-in's clock (§7.3, P9-T19a-a)", () => {
 describe("the coordinator's note", () => {
   it("is left out when there is not one, because it is the coordinator's own", () => {
     expect(weeklyDigestLines({ ...base, coordinatorNote: null })).toHaveLength(
-      5,
+      6,
     );
     expect(weeklyDigestLines({ ...base, coordinatorNote: "   " })).toHaveLength(
-      5,
+      6,
     );
   });
 });

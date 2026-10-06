@@ -147,6 +147,7 @@ export async function digestInputFor(
       id: okrSessions.id,
       spaceId: okrSessions.spaceId,
       digestId: okrSessions.digestId,
+      wins: okrSessions.wins,
     })
     .from(okrSessions)
     .where(
@@ -212,6 +213,7 @@ export async function digestInputFor(
         .select({
           title: goals.title,
           health: goals.health,
+          closedAt: goals.closedAt,
           championName: workspaceMembers.name,
         })
         .from(goals)
@@ -224,6 +226,15 @@ export async function digestInputFor(
           ),
         )
     : [];
+  // The space's goals past their check-in grace, which read outdated (§3.5).
+  // The sponsor reads them here now that the check-in ladder stops at the
+  // coordinator (§11, P9-T19a-c-a). Only open ones: a closed goal is history.
+  const staleGoals = risky
+    .filter((goal) => goal.health === "outdated" && goal.closedAt === null)
+    .map((goal) => ({
+      title: goal.title,
+      ownerName: goal.championName ?? null,
+    }));
   const risks = risky
     .filter((goal) => goal.health === "caution" || goal.health === "off_track")
     .map((goal) => ({
@@ -275,6 +286,9 @@ export async function digestInputFor(
     risks,
     blockers: stillOpen,
     commitmentCount: body.commitmentCount ?? 0,
+    // The week's wins, as the session named them (§7.2 step 3, P9-T19a-d-c).
+    wins: (session.wins ?? []) as string[],
+    staleGoals,
     coordinatorNote: row.note ?? null,
   };
 }

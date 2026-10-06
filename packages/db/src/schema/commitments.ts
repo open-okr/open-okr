@@ -39,6 +39,11 @@ export const commitments = pgTable("commitments", {
   }),
   delivered: boolean("delivered"),
   closedAt: timestamp("closed_at", { withTimezone: true }),
+  /**
+   * The line on why, written when it is closed, where it helps (METHOD.md
+   * §7.2 step 3, P9-T19a-d-c, migration 0130).
+   */
+  closingNote: text("closing_note"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

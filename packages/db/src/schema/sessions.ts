@@ -84,6 +84,12 @@ export const sessions = pgTable("okr_sessions", {
     .notNull()
     .default({}),
   /**
+   * The week's wins a weekly session named, in order (METHOD.md §7.2 step 3,
+   * P9-T19a-d-c, migration 0130). Read and written whole; the digest carries
+   * them.
+   */
+  wins: jsonb("wins").$type<string[]>().notNull().default([]),
+  /**
    * §7.5's resource or priority shifts, one note for a monthly review.
    *
    * Its own column rather than a key inside `notes`, which holds the

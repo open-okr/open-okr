@@ -12,6 +12,7 @@ import { useActionState } from "react";
 import {
   closeCommitmentsAction,
   setCommitmentsAction,
+  setWinsAction,
 } from "./commitment-actions.ts";
 import { type CommitmentState, NO_ERROR } from "./commitment-state.ts";
 
@@ -105,12 +106,15 @@ function LastWeek({
               })}
             </span>
           </span>
+          {/* One group per commitment. They shared one name, which made
+              every row one radio group, so a press could answer only one
+              commitment (P9-T19a-d-c). */}
           <span className="flex flex-none items-center gap-3 text-xs text-ink-2">
             <label className="flex items-center gap-1.5">
               <input
                 type="radio"
-                name="verdict"
-                value={`${one.id}:yes`}
+                name={`verdict:${one.id}`}
+                value="yes"
                 className="size-3.5"
               />
               {t("session.detail.commitments.delivered")}
@@ -118,13 +122,23 @@ function LastWeek({
             <label className="flex items-center gap-1.5">
               <input
                 type="radio"
-                name="verdict"
-                value={`${one.id}:no`}
+                name={`verdict:${one.id}`}
+                value="no"
                 className="size-3.5"
               />
               {t("session.detail.commitments.notDelivered")}
             </label>
           </span>
+          {/* §7.2 step 3: "with a line on why where it helps". */}
+          <input
+            name={`note:${one.id}`}
+            aria-label={t("session.detail.commitments.whyFor", {
+              text: one.text,
+            })}
+            placeholder={t("session.detail.commitments.aLineOnWhy")}
+            maxLength={300}
+            className="w-full rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+          />
         </div>
       ))}
       <p className="text-xs text-ink-4">
@@ -259,6 +273,55 @@ function ThisWeek({
   );
 }
 
+/**
+ * The week's wins (§7.2 step 3, P9-T19a-d-c): "Name the week's wins." One
+ * line each, written whole, so the list on screen is the list the digest
+ * carries.
+ */
+function Wins({
+  sessionId,
+  wins,
+}: {
+  readonly sessionId: string;
+  readonly wins: readonly string[];
+}) {
+  const { t } = useTranslations();
+  const [state, submit, pending] = useActionState(setWinsAction, NO_ERROR);
+  // The ones named so far, and one empty line more.
+  const lines = [...wins, ""];
+  return (
+    <form action={submit} aria-busy={pending} className="flex flex-col gap-2">
+      <input type="hidden" name="sessionId" value={sessionId} />
+      {lines.map((win, index) => (
+        <input
+          // biome-ignore lint/suspicious/noArrayIndexKey: a line's position is its identity in a list written whole.
+          key={index}
+          name="win"
+          defaultValue={win}
+          aria-label={t("session.detail.commitments.winNumber", {
+            number: index + 1,
+          })}
+          placeholder={t("session.detail.commitments.aWin")}
+          maxLength={200}
+          className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+        />
+      ))}
+      <Button
+        type="submit"
+        variant="default"
+        size="sm"
+        disabled={pending}
+        className="self-start"
+      >
+        {pending
+          ? t("session.detail.saving")
+          : t("session.detail.commitments.saveTheWins")}
+      </Button>
+      <Problem state={state} />
+    </form>
+  );
+}
+
 export function Commitments({
   sessionId,
   carried,
@@ -267,6 +330,7 @@ export function Commitments({
   keyResults,
   low,
   high,
+  wins,
   canWrite,
 }: {
   readonly sessionId: string;
@@ -276,6 +340,8 @@ export function Commitments({
   readonly keyResults: readonly Option[];
   readonly low: number;
   readonly high: number;
+  /** The week's wins named so far (P9-T19a-d-c). */
+  readonly wins: readonly string[];
   readonly canWrite: boolean;
 }) {
   const { t } = useTranslations();
@@ -357,6 +423,37 @@ export function Commitments({
                     </span>
                   </li>
                 ))
+              )}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader className="justify-between">
+          <div className="flex min-w-0 flex-col">
+            <h2 className="text-sm font-bold text-ink">
+              {t("session.detail.commitments.theWeekSWins")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("session.detail.commitments.winsGoInTheDigest")}
+            </p>
+          </div>
+          <Chip tone={wins.length > 0 ? "ok" : "neutral"}>
+            {t("session.detail.commitments.named", { count: wins.length })}
+          </Chip>
+        </CardHeader>
+        <CardBody>
+          {canWrite ? (
+            <Wins sessionId={sessionId} wins={wins} />
+          ) : (
+            <ul className="flex flex-col gap-1 text-sm text-ink-2">
+              {wins.length === 0 ? (
+                <li className="text-xs text-ink-3">
+                  {t("session.detail.commitments.noWinsYet")}
+                </li>
+              ) : (
+                wins.map((win) => <li key={win}>{win}</li>)
               )}
             </ul>
           )}

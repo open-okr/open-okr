@@ -615,8 +615,8 @@ export const THRESHOLDS = {
     group: "sessions",
     label: "Weekly commitment bounds",
     section: "§7.2",
-    why: "Two to three commitments per week. More than three is a list nobody keeps.",
-    default: { low: 2, high: 3 },
+    why: "Three or four commitments per team per week: the few moves that shift a key result. More than four is a list nobody keeps.",
+    default: { low: 3, high: 4 },
     schema: bounds(0, 20),
   }),
   "sessions.retroDotsPerMember": param({

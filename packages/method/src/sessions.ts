@@ -98,7 +98,7 @@ export const RITUALS: readonly Ritual[] = [
     length: "15 to 30 minutes",
     frequency: "Weekly",
     purpose:
-      "A decision loop. Score confidence, diagnose what is low, close and set commitments",
+      "A decision loop. Score confidence, discuss what dropped, close and set commitments, name the wins",
   },
   {
     kind: "monthly",
@@ -137,7 +137,7 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
     step: 1,
     title: "Confidence round",
     purpose:
-      "Every key result gets a confidence. Votes reveal together so nobody anchors on the champion, and the champion writes what changed this week",
+      "Every key result gets a confidence. Votes reveal together so nobody anchors on the champion, and the champion confirms it and writes what changed this week. Facts first",
   },
   {
     step: 2,
@@ -149,15 +149,16 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
   },
   {
     step: 3,
-    title: "Commitments",
+    // METHOD v2 (P9-T19a-d-c).
+    title: "Commitments and wins",
     purpose:
-      "Close last week's out loud, delivered or not, with no negotiation. Then set two or three for this week, each with an owner and a linked key result",
+      "Close last week's, delivered or not, with a line on why where it helps. Set three or four for this week, each with an owner and a linked key result. Name the week's wins",
   },
   {
     step: 4,
     title: "Digest",
     purpose:
-      "The product assembles it. The coordinator adds a note for leadership and it posts to the team's channel",
+      "The product assembles it, with open blockers and their next actions, the commitment count and the wins. The coordinator adds a note for leadership and it posts to the team's channel",
   },
 ];
 

@@ -54,6 +54,7 @@ export {
 export {
   type DigestBlocker,
   type DigestRisk,
+  type DigestStale,
   type WeeklyDigestInput,
   weeklyDigestLines,
   weeklyDigestNumbers,

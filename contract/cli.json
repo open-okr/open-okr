@@ -9526,6 +9526,29 @@
       "pages": false
     },
     {
+      "name": "sessions setWins",
+      "action": "sessions.setWins",
+      "method": "POST",
+      "path": "/sessions/setWins",
+      "scope": "write",
+      "summary": "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "wins",
+          "field": "wins",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "sessions lowScores",
       "action": "sessions.lowScores",
       "method": "GET",

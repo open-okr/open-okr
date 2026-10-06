@@ -322,16 +322,19 @@ test("the commitment stage closes last week and sets this week", async () => {
 
   // The bounds are stated, and they come from the workspace's resolved §11
   // numbers rather than from a sentence written into the component.
-  await expect(page.getByText("2 to 3 a week")).toBeVisible();
+  // Three or four since P9-T19a-d-c.
+  await expect(page.getByText("3 to 4 a week")).toBeVisible();
 
-  // Two commitments, each with an owner. The owner select lists the session's
-  // participants.
+  // Three commitments, each with an owner. The owner select lists the
+  // session's participants.
   const texts = page.locator("input[name='text']");
   const owners = page.locator("select[name='ownerId']");
   await texts.nth(0).fill("Ship the onboarding flow");
   await owners.nth(0).selectOption({ index: 1 });
   await texts.nth(1).fill("Review the pipeline");
   await owners.nth(1).selectOption({ index: 1 });
+  await texts.nth(2).fill("Call the two stalled accounts");
+  await owners.nth(2).selectOption({ index: 1 });
 
   await page
     .getByRole("button", { name: "Set this week's commitments" })
@@ -344,6 +347,15 @@ test("the commitment stage closes last week and sets this week", async () => {
   // Set, and the form now offers one more row rather than the whole set again,
   // because the action appends.
   await expect(page.getByRole("button", { name: "Add one more" })).toBeVisible();
+
+  // The week's wins (§7.2 step 3, P9-T19a-d-c), kept on the session for its
+  // digest.
+  await expect(
+    page.getByRole("heading", { name: "The week's wins" }),
+  ).toBeVisible();
+  await page.getByLabel("Win 1").fill("Pricing page live");
+  await page.getByRole("button", { name: "Save the wins" }).click();
+  await expect(page.getByText("1 named")).toBeVisible({ timeout: 10_000 });
 });
 
 // ---------------------------------------------------------------------------

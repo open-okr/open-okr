@@ -16,13 +16,16 @@ discussion. Every low score gets a next action and its owner before the session
 moves past it, due by the next check-in. Raise a blocker too only where
 something is actually blocked: a next step is not a blocker.
 
-**3. Commitments.** Close last week's out loud, delivered or not, with no
-negotiation. Then set two or three for this week, each with an owner and a
-linked key result.
+**3. Commitments and wins.** Close last week's, delivered or not, with a line
+on why where it helps. Then set three or four for this week, each with an owner
+and a linked key result: the few moves that shift a key result, not a to-do
+list. Then name the week's wins.
 
-**4. Digest.** The product assembles it. Once the session closes, the
-coordinator adds a note for leadership and posts it to the team's Slack or
-Teams channel, when the space has linked one in its settings.
+**4. Digest.** The product assembles it, with the open blockers and their next
+actions, the commitments and the wins, and any of the space's goals that have
+gone stale. Once the session closes, the coordinator adds a note for leadership
+and posts it to the team's Slack or Teams channel, when the space has linked
+one in its settings.
 
 The session ends with a streak. That is deliberate: the thing worth making
 visible is that the team kept the rhythm, not that the numbers were good. It

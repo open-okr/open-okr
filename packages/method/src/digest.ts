@@ -38,6 +38,16 @@ export interface DigestBlocker {
   readonly pastCheckIn: boolean;
 }
 
+/**
+ * A goal past its staleness grace, which reads outdated (§3.5). The weekly
+ * digest names them, because that is how §11 says the sponsor sees them now
+ * that the check-in ladder stops at the coordinator (P9-T19a-c-a).
+ */
+export interface DigestStale {
+  readonly title: string;
+  readonly ownerName: string | null;
+}
+
 export interface WeeklyDigestInput {
   readonly spaceName: string;
   /** The week this digest is for, as an ISO date. */
@@ -52,6 +62,10 @@ export interface WeeklyDigestInput {
   readonly risks: readonly DigestRisk[];
   readonly blockers: readonly DigestBlocker[];
   readonly commitmentCount: number;
+  /** The week's wins, as the session named them (§7.2 step 3). */
+  readonly wins: readonly string[];
+  /** The space's goals that read outdated. */
+  readonly staleGoals: readonly DigestStale[];
   /** What the coordinator added for leadership, or null. */
   readonly coordinatorNote: string | null;
 }
@@ -121,6 +135,17 @@ export function weeklyDigestLines(input: WeeklyDigestInput): readonly string[] {
     );
   }
 
+  // Not one of §7.2's parts, so said only when there is something to say:
+  // the sponsor reads stale goals here (§11, P9-T19a-c-a).
+  if (input.staleGoals.length > 0) {
+    const named = input.staleGoals.map(
+      (goal) => `${goal.title} (${goal.ownerName ?? "no owner named"})`,
+    );
+    lines.push(
+      `${input.staleGoals.length} stale, past the check-in grace: ${list(named)}.`,
+    );
+  }
+
   if (input.blockers.length === 0) {
     lines.push("No blockers open.");
   } else {
@@ -144,6 +169,12 @@ export function weeklyDigestLines(input: WeeklyDigestInput): readonly string[] {
     input.commitmentCount === 1
       ? "1 commitment for next week."
       : `${input.commitmentCount} commitments for next week.`,
+  );
+
+  lines.push(
+    input.wins.length === 0
+      ? "No wins named this week."
+      : `Wins: ${list(input.wins)}.`,
   );
 
   if (input.coordinatorNote !== null && input.coordinatorNote.trim() !== "") {
@@ -170,6 +201,7 @@ export function weeklyDigestNumbers(
     input.blockers.length,
     input.blockers.filter((blocker) => blocker.pastCheckIn).length,
     input.commitmentCount,
+    input.staleGoals.length,
   ];
   if (input.previousAverageConfidence !== null) {
     numbers.push(Math.round(input.previousAverageConfidence * 100));

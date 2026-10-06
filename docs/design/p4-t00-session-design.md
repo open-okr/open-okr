@@ -120,12 +120,15 @@ Given / When / Then:
 - Given a KR scored 0.5 that was 0.7 last time, when step 2 is read, then it
   is listed as having fallen, and nothing holds the session for it.
 
-### 2.4 Stage 3: Commitments
+### 2.4 Stage 3: Commitments and wins
+
+METHOD v2's step 3, since P9-T19a-d-c.
 
 | Element | Behaviour |
 |---|---|
-| Last week | Close each commitment: delivered or not. No negotiation |
-| This week | 2 to 3 concrete actions (SS11 `sessions.weeklyCommitmentBounds`), each with an owner and a linked key result |
+| Last week | Close each commitment: delivered or not, with a line on why where it helps (`commitments.closing_note`) |
+| This week | 3 to 4 concrete actions (SS11 `sessions.weeklyCommitmentBounds`; it was 2 to 3), each with an owner and a linked key result |
+| Wins | The week's wins, one line each, kept on the session (`okr_sessions.wins`) and carried into the digest |
 
 Closing a session rolls this week's commitments into next week's list to close.
 
@@ -142,16 +145,19 @@ The product assembles:
 | Headline average | Average confidence, change from last week |
 | On track | KRs with high confidence |
 | At risk | KRs with low confidence, with owners |
-| Blockers | Open, and whether their check-in has passed |
+| Stale goals | The space's goals that read outdated, only when there are some: how the sponsor sees them now that the check-in ladder stops at the coordinator (P9-T19a-c-a) |
+| Blockers | Open, with their next actions, and whether their check-in has passed |
 | Commitment count | This week's commitments |
+| Wins | The week's wins, or that none were named (P9-T19a-d-c) |
 | Coordinator note | Free text from the coordinator for leadership |
 
 Posts to the team's channel (in-app and email now; chat channels in Phase 5).
 
 ### 2.6 The streak (SS7.4)
 
-Consecutive weeks a space held its check-in. A skipped week breaks it.
-Shown on the space home.
+Consecutive check-in periods a space held its check-in, at the space's own
+frequency since P9-T19a-d-b: weeks, fortnights or months. A skipped period
+breaks it. Shown on the space home.
 
 | Event | Effect |
 |---|---|

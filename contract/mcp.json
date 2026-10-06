@@ -13117,6 +13117,43 @@
       }
     },
     {
+      "name": "sessions.setWins",
+      "description": "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "wins": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "sessionId",
+          "wins"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "wins": []
+      }
+    },
+    {
       "name": "sessions.lowScores",
       "description": "The key results scored low or lower than last time in a session, with each one's next action and whether it is blocked.",
       "inputSchema": {
@@ -13417,6 +13454,10 @@
                 },
                 "delivered": {
                   "type": "boolean"
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 300
                 }
               },
               "required": [

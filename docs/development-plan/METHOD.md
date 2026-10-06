@@ -670,7 +670,7 @@ A KPI may be calculated from a formula over other KPIs rather than entered. Sour
 
 | Ritual | Length | Frequency | Purpose |
 |---|---|---|---|
-| Weekly check-in | 15 to 30 minutes | Weekly | A decision loop. Score confidence, diagnose what is low, close and set commitments |
+| Weekly check-in | 15 to 30 minutes | Weekly | A decision loop. Score confidence, discuss what dropped, close and set commitments, name the wins |
 | Monthly review | 30 to 60 minutes | Monthly | Trend per objective, dependency and risk log, resource shifts, decisions recorded |
 | Quarterly review | 60 minutes | At cycle close | Review the results, retro the way you worked, reset the next cycle |
 
@@ -682,7 +682,7 @@ Keep check-ins forward-looking. Status lives in the product. The meeting is for 
 
 ### 7.2 The weekly check-in, in four steps
 
-**Step 1. Confidence round.** Every key result gets a confidence from 0.0 to 1.0. Where the team votes, each member submits privately and the votes reveal together with a team average, so nobody anchors on the champion. The champion confirms the score and writes one or two lines: what changed this week. Facts, not feelings.
+**Step 1. Confidence round.** Every key result gets a confidence. Where the team votes, each member submits privately and the votes reveal together with a team average, so nobody anchors on the champion. The champion confirms the confidence and writes one or two lines: what changed this week. Facts first.
 
 **Step 2. Discuss what dropped.** Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner. Where something is actually blocked, it gets a blocker too:
 
@@ -694,9 +694,14 @@ Keep check-ins forward-looking. Status lives in the product. The meeting is for 
 
 A key result that falls into the low band is raised with the coordinator.
 
-**Step 3. Commitments.** Close last week's out loud: delivered or not. No negotiation and no explanation needed. Then set this week's: two or three concrete actions, each with an owner and a linked key result. Not a to-do list. The few moves that shift a key result.
+**Step 3. Commitments and wins.**
+1. Close last week's commitments: delivered or not, with a line on why where it helps.
+2. Set this week's: three or four concrete actions for the team, each with an owner and a linked key result. Not a to-do list; the few moves that shift a key result.
+3. Name the week's wins.
 
-**Step 4. Digest.** The product assembles it: headline average and the change on last week, what is on track, what is at risk with owners, blockers on the 24-hour clock, and the commitment count. The coordinator adds a note for leadership. It posts to the team's channel.
+*Source:* Wodtke: "what are the 3-4 most important things you must get done this week toward the Objective?"; her Friday wins.
+
+**Step 4. Digest.** The product assembles it: headline average and the change on last week, what is on track, what is at risk with owners, open blockers and their next actions, the commitment count and the wins. The coordinator adds a note for leadership. It posts to the team's channel.
 
 ### 7.3 Blocker taxonomy
 
@@ -1004,7 +1009,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Monthly review length | 30 to 60 minutes |
 | Quarterly review length | 60 minutes |
 | Annual revalidation length | 30 to 60 minutes |
-| Weekly commitment bounds | 2 to 3 per week |
+| Weekly commitment bounds | 3 to 4 per team per week |
 | Quarterly stage minutes | The §8.1 durations |
 | Retro dots per member | 3 |
 | Room pulse read boundaries | 4.0 and 3.0 |

@@ -997,16 +997,17 @@ describe("sessions.setCommitments (P4-T08)", () => {
         items: [
           { text: "Ship the onboarding flow", ownerId: facilitatorMemberId },
           { text: "Review the Q3 pipeline", ownerId: memberMemberId },
+          { text: "Call the two stalled accounts", ownerId: memberMemberId },
         ],
       },
     );
 
-    expect((result as { count: number }).count).toBe(2);
+    expect((result as { count: number }).count).toBe(3);
   });
 });
 
 describe("sessions.advanceStage commitments gate (P4-T08)", () => {
-  it("is refused from commitments to digest with fewer than 2 commitments", async () => {
+  it("is refused from commitments to digest with fewer than 3 commitments (§11, P9-T19a-d-c)", async () => {
     const wb = await workerDb();
     await createGoalWithKr();
     const sessionId = await openSessionAtConfidence();
@@ -1025,10 +1026,10 @@ describe("sessions.advanceStage commitments gate (P4-T08)", () => {
       callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
         id: sessionId,
       }),
-    ).rejects.toThrow(/at least 2 commitments/i);
+    ).rejects.toThrow(/at least 3 commitments/i);
   });
 
-  it("succeeds with 2 commitments", async () => {
+  it("succeeds with 3 commitments", async () => {
     const wb = await workerDb();
     await createGoalWithKr();
     const sessionId = await openSessionAtConfidence();
@@ -1042,6 +1043,7 @@ describe("sessions.advanceStage commitments gate (P4-T08)", () => {
         items: [
           { text: "Ship the onboarding flow", ownerId: facilitatorMemberId },
           { text: "Review the Q3 pipeline", ownerId: memberMemberId },
+          { text: "Call the two stalled accounts", ownerId: memberMemberId },
         ],
       },
     );
@@ -1070,6 +1072,7 @@ describe("sessions.close digest and streak (P4-T08)", () => {
         items: [
           { text: "Ship it", ownerId: facilitatorMemberId },
           { text: "Review it", ownerId: memberMemberId },
+          { text: "Tell them", ownerId: memberMemberId },
         ],
       },
     );
@@ -1105,6 +1108,7 @@ describe("sessions.close digest and streak (P4-T08)", () => {
         items: [
           { text: "Ship it", ownerId: facilitatorMemberId },
           { text: "Review it", ownerId: memberMemberId },
+          { text: "Tell them", ownerId: memberMemberId },
         ],
       },
     );
@@ -1138,6 +1142,7 @@ describe("sessions.close digest and streak (P4-T08)", () => {
         items: [
           { text: "A", ownerId: facilitatorMemberId },
           { text: "B", ownerId: memberMemberId },
+          { text: "C", ownerId: memberMemberId },
         ],
       },
     );
@@ -1178,6 +1183,7 @@ describe("the streak counts weeks of check-ins (completeness review M-04)", () =
         items: [
           { text: "A", ownerId: facilitatorMemberId },
           { text: "B", ownerId: memberMemberId },
+          { text: "C", ownerId: memberMemberId },
         ],
       },
     );
@@ -1293,12 +1299,12 @@ describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {
     const wb = await workerDb();
     await createGoalWithKr();
 
-    // A workspace that wants three a week. The gate held `const
+    // A workspace that wants four a week. The gate held `const
     // MIN_COMMITMENTS = 2` under a comment naming this very registry entry,
     // so a workspace that moved the bound was still gated on the canon
     // default and told the wrong number.
     await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
-      overrides: { "sessions.weeklyCommitmentBounds": { low: 3, high: 4 } },
+      overrides: { "sessions.weeklyCommitmentBounds": { low: 4, high: 5 } },
     });
 
     const sessionId = await openSessionAtConfidence();
@@ -1311,16 +1317,17 @@ describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {
         items: [
           { text: "One", ownerId: facilitatorMemberId },
           { text: "Two", ownerId: memberMemberId },
+          { text: "Three", ownerId: memberMemberId },
         ],
       },
     );
 
-    // Two would have passed the canon default. This workspace asked for three.
+    // Three would have passed the canon default. This workspace asked for four.
     await expect(
       callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
         id: sessionId,
       }),
-    ).rejects.toThrow(/at least 3 commitments/i);
+    ).rejects.toThrow(/at least 4 commitments/i);
   });
 });
 
@@ -1393,14 +1400,32 @@ describe("sessions.carriedCommitments (P6-G19a)", () => {
     expect(before).toHaveLength(2);
 
     // Not delivered is still closed. §7.2 asks the room to say whether it
-    // landed, not to keep asking until it does.
+    // landed, not to keep asking until it does, and since METHOD v2 with a
+    // line on why where it helps (P9-T19a-d-c).
     await callAction(
       { pool: wb.appPool, ...context() },
       "sessions.closeCommitments",
       {
-        items: before.map((one) => ({ id: one.id, delivered: false })),
+        items: before.map((one) => ({
+          id: one.id,
+          delivered: false,
+          ...(one.text === "Missed one"
+            ? { note: "Legal held the contract a week" }
+            : {}),
+        })),
       },
     );
+    const notes = await wb.admin.query<{
+      text: string;
+      closing_note: string | null;
+    }>(
+      "select text, closing_note from commitments where session_id = $1 order by text",
+      [lastWeek],
+    );
+    expect(notes.rows).toEqual([
+      { text: "Delivered one", closing_note: null },
+      { text: "Missed one", closing_note: "Legal held the contract a week" },
+    ]);
 
     const after = await callAction(
       { pool: wb.appPool, ...context() },
@@ -1408,6 +1433,33 @@ describe("sessions.carriedCommitments (P6-G19a)", () => {
       { sessionId: thisWeek },
     );
     expect(after).toEqual([]);
+  });
+
+  it("names the week's wins in a weekly check-in, and nowhere else (P9-T19a-d-c)", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const weekly = await openSessionAtConfidence();
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.setWins", {
+      sessionId: weekly,
+      wins: ["Pricing page live"],
+    });
+    const read = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.read",
+      { id: weekly },
+    )) as { wins: string[] };
+    expect(read.wins).toEqual(["Pricing page live"]);
+
+    const monthly = (await createSession({
+      kind: "monthly",
+      title: "Monthly review",
+    })) as { id: string };
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.setWins", {
+        sessionId: monthly.id,
+        wins: ["Not here"],
+      }),
+    ).rejects.toThrow(/weekly check-in/);
   });
 
   it("refuses a session id it cannot see, rather than answering empty", async () => {
@@ -1437,6 +1489,7 @@ async function holdAWeek(confidence: number): Promise<string> {
       items: [
         { text: "One", ownerId: facilitatorMemberId },
         { text: "Two", ownerId: memberMemberId },
+        { text: "Three", ownerId: memberMemberId },
       ],
     },
   );

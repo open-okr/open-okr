@@ -132,6 +132,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
     elapsed: Record<string, number>;
     addedMinutes: Record<string, number>;
     notes: Record<string, unknown>;
+    /** The week's wins a weekly session named (P9-T19a-d-c). */
+    wins: string[];
   };
 
   try {
@@ -859,6 +861,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
             keyResults={commitmentStage.keyResults}
             low={commitmentStage.low}
             high={commitmentStage.high}
+            wins={sessionRow.wins}
             canWrite={isFacilitator}
           />
         )}

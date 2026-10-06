@@ -99,8 +99,8 @@ Fifteen to thirty minutes, four steps, run by the product.
 
 1. **Confidence round.** Every key result gets a score from 0.0 to 1.0. Where the team votes, everyone submits privately and the votes reveal together, so nobody anchors on the champion. The champion writes one or two lines: what changed this week. Facts, not feelings.
 2. **Discuss what dropped.** Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner, and a blocker with its type only where something is actually blocked. A key result whose confidence falls into the low band is raised with the coordinator the same day.
-3. **Commitments.** Close last week's out loud, delivered or not, no negotiation. Set this week's: two or three moves that will actually shift a key result.
-4. **Digest.** Generated for you, edited by the coordinator, posted to your channel.
+3. **Commitments and wins.** Close last week's, delivered or not, with a line on why where it helps. Set this week's: three or four moves that will actually shift a key result. Name the week's wins.
+4. **Digest.** Generated for you, with open blockers and their next actions, the commitments and the wins, edited by the coordinator, posted to your channel.
 
 It ends with a streak: the number of consecutive weeks your team held the session. A skipped week breaks it. It is a light touch that reliably keeps the heartbeat.
 
