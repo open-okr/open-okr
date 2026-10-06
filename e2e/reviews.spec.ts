@@ -1105,6 +1105,8 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // Section 8.10's own list. The review above graded one key result at 0.4, so
   // one key result was reviewed and one came in below 0.6.
   await expect(summary).toContainText("Key results");
+  // Committed key results met, apart from the score (§8.10, P9-T20e-b).
+  await expect(summary).toContainText("Committed met");
   await expect(summary).toContainText("Team pulse");
   await expect(summary).toContainText("Actions agreed");
 
@@ -1137,6 +1139,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   const body = await markdown.text();
   expect(body).toContain("# Q1 review");
   expect(body).toContain("## Executive summary");
+  expect(body).toContain("- Committed key results met:");
   expect(body).not.toContain("Pulse was low");
 
   const pdf = await page.request.get(`/session/${reviewId}/minutes/pdf`);

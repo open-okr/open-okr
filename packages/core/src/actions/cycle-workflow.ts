@@ -349,6 +349,12 @@ export const readWorkflow = defineReadAction({
         nextCycle: z.object({ id: z.uuid(), name: z.string() }).nullable(),
         priorScores: z.number().int(),
         carriedIssues: z.number().int(),
+        /**
+         * Kept and modified objectives the next cycle holds as pre-filled
+         * drafts, and the ones it could not, by title (§8.9, P9-T20e-b).
+         */
+        carriedDrafts: z.number().int(),
+        notCarried: z.array(z.string()),
         processPriority: z.string().nullable(),
         packNote: z.boolean(),
       })

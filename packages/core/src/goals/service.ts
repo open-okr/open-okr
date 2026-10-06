@@ -116,6 +116,11 @@ export interface CreateGoalInput {
   /** Waiting for its owner, when the workspace starts additions so (P9-T13-b-b). */
   readonly draftState?: "draft" | null;
   /**
+   * The objective a kept or modified close pre-filled this one from
+   * (METHOD.md §8.9, P9-T20e-b). Absent for everything a person creates.
+   */
+  readonly carriedFromGoalId?: string | null;
+  /**
    * The source-system identity, when an import created this row (P6-T01a).
    *
    * Absent for everything created in the product. Present, it is what makes
@@ -286,6 +291,9 @@ export async function createGoalInTx<
         ? { addedMidCycleAt: input.addedMidCycleAt }
         : {}),
       ...(input.draftState ? { draftState: input.draftState } : {}),
+      ...(input.carriedFromGoalId
+        ? { carriedFromGoalId: input.carriedFromGoalId }
+        : {}),
       ownerKind: input.ownerKind,
       spaceId,
       memberId: input.ownerKind === "member" ? (input.memberId ?? null) : null,

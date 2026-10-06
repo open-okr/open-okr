@@ -1798,12 +1798,18 @@ const feedForwardOutput = z.object({
   /** Rows of the mapping this build cannot fill, each naming its task. Empty since P4-T12-b. */
   waiting: z.array(z.string()),
   /**
-   * The process-health statement the next cycle now holds as a Phase 3
-   * priority, or null when the survey went unanswered (M-05).
+   * The process-health statement the next cycle now holds in Phase 3 as its
+   * improvement action, or null when the survey went unanswered (M-05).
    */
   processPriority: z.string().nullable(),
   /** Whether the learnings reached the next cycle's input pack. */
   packNote: z.boolean(),
+  /**
+   * Kept and modified objectives this run pre-filled as drafts, and the ones
+   * it could not because their champion has left, by title (§8.9, P9-T20e-b).
+   */
+  drafts: z.number().int(),
+  notCarried: z.array(z.string()),
 });
 
 /**
@@ -1815,7 +1821,7 @@ const feedForwardOutput = z.object({
 export const feedForwardCycle = defineWriteAction({
   name: "cycles.feedForward",
   summary:
-    "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
+    "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
   input: z.object({ fromCycleId: z.uuid(), toCycleId: z.uuid() }),
   output: feedForwardOutput,
   access: ACCESS_LEVELS.edit,
@@ -1828,7 +1834,11 @@ export const feedForwardCycle = defineWriteAction({
         input.toCycleId,
       );
       return {
-        result: { ...result, waiting: [...result.waiting] },
+        result: {
+          ...result,
+          waiting: [...result.waiting],
+          notCarried: [...result.notCarried],
+        },
         activity: {
           kind: "cycle.fed_forward" as const,
           subjectType: "cycle" as const,
@@ -1846,6 +1856,7 @@ export const feedForwardCycle = defineWriteAction({
             from: input.fromCycleId,
             priorScores: result.priorScores,
             issues: result.issues,
+            drafts: result.drafts,
           },
         },
       };
@@ -1869,7 +1880,7 @@ export const feedForwardCycle = defineWriteAction({
 export const closeCycle = defineWriteAction({
   name: "cycles.close",
   summary:
-    "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+    "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action.",
   input: z.object({ cycleId: z.uuid() }),
   output: z.object({
     cycleId: z.uuid(),
@@ -1897,6 +1908,7 @@ export const closeCycle = defineWriteAction({
             name: closed.fedInto.name,
             ...closed.fedInto.result,
             waiting: [...closed.fedInto.result.waiting],
+            notCarried: [...closed.fedInto.result.notCarried],
           }
         : null;
       return {
@@ -1931,6 +1943,7 @@ export const closeCycle = defineWriteAction({
                   cycleId: fedInto.cycleId,
                   priorScores: fedInto.priorScores,
                   issues: fedInto.issues,
+                  drafts: fedInto.drafts,
                   processPriority: fedInto.processPriority,
                   packNote: fedInto.packNote,
                 }

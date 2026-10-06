@@ -769,7 +769,7 @@ Ninety minutes by default, four acts, eleven timed stages, held about two weeks 
 | 7 | Root cause and diagnostic | Retro | 8 | Every key result below its root-cause threshold gets one honest cause. Then read the diagnostic |
 | 8 | OKR process health | Retro | 4 | Score the practice, not the results. Anonymous |
 | 9 | Keep, modify, abandon or defer | Reset | 8 | Close every objective deliberately |
-| 10 | Learnings and next drafts | Reset | 5 | Turn what happened into what you now know |
+| 10 | Learnings | Reset | 5 | Turn what happened into what you now know |
 | 11 | Decisions and actions | Reset | 5 | Every action has a name and a date, or it is a wish |
 
 Stage minutes are defaults (§11). A stage timer runs with pacing cues. Going over is normal and visible. The facilitator lands it and moves.
@@ -843,6 +843,8 @@ The four questions leadership answers out loud, before anyone drafts a next cycl
 3. Did we change how we work, or reinforce old habits?
 4. Where did alignment break down?
 
+*Source:* OpenOKR default. Guidance for the facilitator.
+
 ### 8.8 Keep, modify, abandon or defer
 
 Every objective is closed deliberately with one decision and a one-line why:
@@ -859,25 +861,28 @@ Nothing carries over silently. An unfinished aspirational objective is proposed 
 
 ### 8.9 Learnings and feed-forward
 
-Capture learnings as "we learned that…". Promote the top dot-voted retro themes into learnings. Mark the ones to carry forward.
+Capture learnings as "we learned that…". Promote the top dot-voted retro themes into learnings. Mark the ones to carry forward. *Source:* Doerr: "What have I learned that might alter my approach to the next cycle's OKRs?"
 
 At close, the product feeds the next cycle automatically:
 
 | From this cycle | Into the next cycle |
 |---|---|
 | Every key result and its score | Phase 2, the prior-cycle scoring list |
-| Every carry-forward item | Phase 2, the strategic issue list at impact 4 |
+| Every kept or modified objective | Phase 4, a pre-filled draft whose key results start from their last recorded values as baselines |
+| Every deferred item and carry-forward learning | Phase 2, the strategic issue list at impact 4 |
 | Learnings and the retrospective | Phase 1, the input pack |
-| The lowest process-health statement | Phase 3, a process priority |
+| The lowest process-health statement | Phase 3, an improvement action |
 | The annual frame and annual OKRs | Phase 0 reference, focus flags cleared |
-
-Carried work re-enters as an issue. It must survive the next prioritisation on its merits. It does not get a free pass.
 
 ### 8.10 Minutes
 
-The review produces minutes with an executive summary (cycle score, objectives and key results reviewed, key results below 0.7, team pulse, learnings carried, actions agreed) and every stage's record. Exportable as a document and as a PDF.
+The review produces minutes with:
+- an executive summary: the cycle score, committed key results met, objectives and key results reviewed, key results below their root-cause threshold, the team pulse, learnings carried and actions agreed;
+- every stage's record.
 
-Hold the review before drafting the next cycle's OKRs, never in the same session. Drafting pressure distorts honest scoring.
+The minutes are exportable as a document and as a PDF.
+
+Grade and hold the review before drafting the next cycle's OKRs, and preferably not in the same session. Drafting pressure distorts honest scoring.
 
 ---
 

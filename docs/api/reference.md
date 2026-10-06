@@ -229,11 +229,11 @@ the machine-readable document.
 | Action | Method and path | Class |
 |---|---|---|
 | `cycles.archive`<br/>Archives a cycle. Its goals and scores stay readable. | `POST /api/v1/cycles/archive` | destroys |
-| `cycles.close`<br/>Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority. | `POST /api/v1/cycles/close` | writes |
+| `cycles.close`<br/>Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action. | `POST /api/v1/cycles/close` | writes |
 | `cycles.create`<br/>Creates a named cycle for the period containing a chosen date. | `POST /api/v1/cycles/create` | writes |
 | `cycles.current`<br/>The cycle to show: the one containing today, else the soonest ahead, else the most recent behind. | `GET /api/v1/cycles/current` | reads |
 | `cycles.ensureCurrent`<br/>Creates the cycle containing today if the workspace has none. Idempotent. | `POST /api/v1/cycles/ensureCurrent` | writes |
-| `cycles.feedForward`<br/>Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this. | `POST /api/v1/cycles/feedForward` | writes |
+| `cycles.feedForward`<br/>Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this. | `POST /api/v1/cycles/feedForward` | writes |
 | `cycles.levelsInUse`<br/>The OKR levels one cycle offers: the levels it began with, plus any its objectives already use. | `GET /api/v1/cycles/levelsInUse` | reads |
 | `cycles.list`<br/>Every cycle this workspace has, newest first. | `GET /api/v1/cycles/list` | reads |
 | `cycles.rules`<br/>The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after. | `GET /api/v1/cycles/rules` | reads |

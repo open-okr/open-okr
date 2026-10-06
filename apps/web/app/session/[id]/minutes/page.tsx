@@ -180,6 +180,17 @@ export default async function MinutesPage({
                   ? t("session.detail.minutes.notRead")
                   : summary.cycleScore.toFixed(2),
               ],
+              // Apart from the score, because a committed key result is met
+              // or it is not (§8.10, P9-T20e-b).
+              [
+                t("session.detail.minutes.committedMet"),
+                summary.committed.reviewed === 0
+                  ? t("session.detail.minutes.noneCommitted")
+                  : t("session.detail.minutes.metOf", {
+                      met: summary.committed.met,
+                      reviewed: summary.committed.reviewed,
+                    }),
+              ],
               [
                 t("session.detail.minutes.objectives"),
                 String(summary.objectivesReviewed),

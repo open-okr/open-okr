@@ -203,6 +203,11 @@ export const goals = pgTable("goals", {
   addedMidCycleAt: timestamp("added_mid_cycle_at", { withTimezone: true }),
   /** Waiting for its owner or its reviewer (§2.9); null follows its cycle. */
   draftState: text("draft_state", { enum: GOAL_DRAFT_STATES }),
+  /**
+   * The objective a keep or a modify pre-filled this draft from (METHOD.md
+   * §8.9, P9-T20e-b). The foreign key is in migration 0137.
+   */
+  carriedFromGoalId: uuid("carried_from_goal_id"),
   position: integer("position").notNull().default(0),
   legacyType: text("legacy_type"),
   legacyId: text("legacy_id"),

@@ -21270,7 +21270,7 @@
     "/cycles/feedForward": {
       "post": {
         "operationId": "cycles.feedForward",
-        "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
+        "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
         "tags": [
           "cycles"
         ],
@@ -21314,6 +21314,17 @@
                         },
                         "packNote": {
                           "type": "boolean"
+                        },
+                        "drafts": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "notCarried": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
@@ -21322,7 +21333,9 @@
                         "frameCarried",
                         "waiting",
                         "processPriority",
-                        "packNote"
+                        "packNote",
+                        "drafts",
+                        "notCarried"
                       ],
                       "additionalProperties": false
                     }
@@ -21393,7 +21406,7 @@
     "/cycles/close": {
       "post": {
         "operationId": "cycles.close",
-        "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+        "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action.",
         "tags": [
           "cycles"
         ],
@@ -21465,6 +21478,17 @@
                                 "packNote": {
                                   "type": "boolean"
                                 },
+                                "drafts": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "notCarried": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
                                 "cycleId": {
                                   "type": "string",
                                   "format": "uuid",
@@ -21481,6 +21505,8 @@
                                 "waiting",
                                 "processPriority",
                                 "packNote",
+                                "drafts",
+                                "notCarried",
                                 "cycleId",
                                 "name"
                               ],
@@ -24499,6 +24525,17 @@
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991
                                 },
+                                "carriedDrafts": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "notCarried": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
                                 "processPriority": {
                                   "type": [
                                     "string",
@@ -24515,6 +24552,8 @@
                                 "nextCycle",
                                 "priorScores",
                                 "carriedIssues",
+                                "carriedDrafts",
+                                "notCarried",
                                 "processPriority",
                                 "packNote"
                               ],
@@ -59827,6 +59866,26 @@
                                 "null"
                               ]
                             },
+                            "committed": {
+                              "type": "object",
+                              "properties": {
+                                "met": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "reviewed": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "met",
+                                "reviewed"
+                              ],
+                              "additionalProperties": false
+                            },
                             "verdict": {
                               "type": [
                                 "string",
@@ -59883,6 +59942,7 @@
                           },
                           "required": [
                             "cycleScore",
+                            "committed",
                             "verdict",
                             "objectivesReviewed",
                             "keyResultsReviewed",

@@ -8718,6 +8718,14 @@ export const readMinutes = defineReadAction({
     /** §8.10's executive summary, in its own words. */
     summary: z.object({
       cycleScore: z.number().nullable(),
+      /**
+       * Committed key results met, apart from the score (§8.10, P9-T20e-b):
+       * a commitment is met or it is not, and averaging it in hides both.
+       */
+      committed: z.object({
+        met: z.number().int(),
+        reviewed: z.number().int(),
+      }),
       verdict: z.string().nullable(),
       objectivesReviewed: z.number().int(),
       keyResultsReviewed: z.number().int(),
@@ -9090,6 +9098,10 @@ export const readMinutes = defineReadAction({
           pulse?.average === null || pulse?.average === undefined
             ? null
             : Number(pulse.average);
+        const committedScores = scoreRows
+          .filter((row) => row.kind === "committed")
+          .map((row) => Number(row.score));
+        const committedShare = committedShareMet(committedScores, thresholds);
 
         return {
           title: session.title,
@@ -9101,6 +9113,13 @@ export const readMinutes = defineReadAction({
             // minutes.
             cycleScore:
               diagnostic === undefined ? null : Number(diagnostic.cycleScore),
+            committed: {
+              met:
+                committedShare === null
+                  ? 0
+                  : Math.round(committedShare * committedScores.length),
+              reviewed: committedScores.length,
+            },
             verdict: diagnostic?.verdict ?? null,
             objectivesReviewed: new Set(scoreRows.map((row) => row.goalId))
               .size,

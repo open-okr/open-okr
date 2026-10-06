@@ -17,6 +17,8 @@ export interface Minutes {
   readonly state: string;
   readonly summary: {
     readonly cycleScore: number | null;
+    /** Committed key results met, apart from the score (§8.10, P9-T20e-b). */
+    readonly committed: { readonly met: number; readonly reviewed: number };
     readonly verdict: string | null;
     readonly objectivesReviewed: number;
     readonly keyResultsReviewed: number;
@@ -118,6 +120,7 @@ export function minutesToMarkdown(minutes: Minutes): string {
     "## Executive summary",
     "",
     `- Cycle score: ${summary.cycleScore === null ? "not read yet" : summary.cycleScore.toFixed(2)}`,
+    `- Committed key results met: ${summary.committed.reviewed === 0 ? "none committed" : `${summary.committed.met} of ${summary.committed.reviewed}`}`,
     `- Diagnostic: ${summary.verdict === null ? "not read yet" : (VERDICTS[summary.verdict] ?? summary.verdict)}`,
     `- Objectives reviewed: ${summary.objectivesReviewed}`,
     `- Key results reviewed: ${summary.keyResultsReviewed}`,

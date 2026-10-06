@@ -318,7 +318,7 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
   },
   {
     stage: 10,
-    title: "Learnings and next drafts",
+    title: "Learnings",
     act: "reset",
     purpose: "Turn what happened into what you now know",
   },

@@ -5,6 +5,12 @@
  * own bands, and lists what moved in it, here a grade above its computed
  * score.
  *
+ * And what the close hands on (P9-T20e-b, METHOD.md §8.9): the objective is
+ * kept at stage 9, so the next quarter holds it as a draft whose key result
+ * starts from its last recorded value. **The spec makes that next quarter
+ * too**, so the draft lands in a cycle it owns and takes away again, never in
+ * the shared current quarter.
+ *
  * Acceptance A7:
  *   Given a closed cycle scored under score bands 1.0, 0.6 and 0.3, when an
  *   admin changes the bands to Doerr's colours, then the closed cycle's
@@ -37,6 +43,7 @@ let pool: pg.Pool;
 let token = "";
 let cycleId = "";
 let cycleName = "";
+let nextCycleId = "";
 let spaceId = "";
 
 const authed = () => ({ authorization: `Bearer ${token}` });
@@ -77,10 +84,10 @@ test.afterAll(async () => {
       });
     }
   }
-  if (cycleId) {
+  for (const id of [cycleId, nextCycleId].filter(Boolean)) {
     await pool.query(
       "update cycles set deleted_at = now() where id = $1 and deleted_at is null",
-      [cycleId],
+      [id],
     );
   }
   await pool?.end();
@@ -110,6 +117,13 @@ test("a quarter two years back, graded 0.65 and closed under Google's colours", 
   });
   cycleId = created.id;
   cycleName = created.name;
+  // The quarter after, so the close feeds a cycle this spec owns.
+  nextCycleId = (
+    await post<{ id: string }>("cycles.create", {
+      on: `${new Date().getUTCFullYear() - 2}-08-15`,
+      cadence: "quarterly",
+    })
+  ).id;
   spaceId = (
     await post<{ id: string }>("spaces.create", { name: `Rules ${STAMP}` })
   ).id;
@@ -162,8 +176,38 @@ test("a quarter two years back, graded 0.65 and closed under Google's colours", 
       score,
     })),
   });
+  await post("sessions.decideObjective", {
+    sessionId,
+    goalId,
+    decision: "keep",
+    why: "Still the bet for the next quarter.",
+  });
   await post("sessions.close", { id: sessionId });
   await post("cycles.close", { cycleId });
+});
+
+test("the kept objective is a draft in the next quarter, and the closed cycle says so", async () => {
+  await goTo(page, `/cycle?cycle=${cycleId}&phase=7`);
+  const drafts = page
+    .locator("dt", { hasText: "Pre-filled drafts, phase 4" })
+    .locator("xpath=following-sibling::dd[1]");
+  await expect(drafts).toHaveText("1", { timeout: 15_000 });
+  await expect(page.getByText("Improvement action, phase 3")).toBeVisible();
+
+  const listed = await api.get(`/api/v1/goals/list?cycleId=${nextCycleId}`, {
+    headers: authed(),
+  });
+  expect(listed.status()).toBe(200);
+  const goals = ((await listed.json()).data?.goals ?? []) as {
+    title: string;
+    keyResults: { baselineValue: number; targetValue: number | null }[];
+  }[];
+  const draft = goals.find((goal) => goal.title.endsWith(STAMP));
+  // Nothing was recorded against the key result, so its last recorded value
+  // is where it started, and that is where the next quarter starts it.
+  expect(draft?.keyResults).toEqual([
+    expect.objectContaining({ baselineValue: 120, targetValue: 300 }),
+  ]);
 });
 
 test("acceptance A7: Doerr's colours leave the closed cycle's bands alone, and the open cycle takes them", async () => {

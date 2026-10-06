@@ -280,7 +280,7 @@ describe("closing a cycle", () => {
     expect(closed.fedInto?.packNote).toBe(true);
   });
 
-  it("makes the lowest process-health statement a Phase 3 priority, not an issue", async () => {
+  it("makes the lowest process-health statement Phase 3's improvement action, not an issue", async () => {
     const next = await createNext();
     await holdTheReview();
     const closed = await close();
@@ -291,7 +291,7 @@ describe("closing a cycle", () => {
     expect(priorities).toHaveLength(1);
     expect(priorities[0]?.text).toContain("measured outcomes");
 
-    // §8.9's table: "Phase 3, a process priority". Not a Phase 2 issue.
+    // §8.9's table: "Phase 3, an improvement action". Not a Phase 2 issue.
     const issues = await issuesIn(next.id);
     expect(issues.some((issue) => issue.source === "process_health")).toBe(
       false,
@@ -338,6 +338,41 @@ describe("closing a cycle", () => {
       packNote: true,
     });
     expect(workflow.closure?.processPriority).toContain("measured outcomes");
+  });
+
+  it("carries a kept objective into the next cycle as a draft, and phase 7 says so (§8.9, P9-T20e-b)", async () => {
+    const [goal] = await rows<{ id: string }>(
+      "select id from goals where cycle_id = $1 and deleted_at is null",
+      [cycleId],
+    );
+    await call("sessions.decideObjective", {
+      sessionId,
+      goalId: goal?.id,
+      decision: "keep",
+      why: "Still the bet for the next quarter.",
+    });
+    await holdTheReview();
+    await close();
+    // Created after the close, the order §8.10 asks for, so the draft lands
+    // when the next cycle does.
+    const next = await createNext();
+
+    const drafts = await rows<{ title: string }>(
+      `select title from goals
+        where cycle_id = $1 and carried_from_goal_id = $2 and deleted_at is null`,
+      [next.id, goal?.id],
+    );
+    expect(drafts.map((row) => row.title)).toEqual([
+      "Become the platform mid-market teams reach for first",
+    ]);
+
+    const workflow = (await call("workflow.read", { cycleId })) as {
+      closure: { carriedDrafts: number; notCarried: string[] } | null;
+    };
+    expect(workflow.closure).toMatchObject({
+      carriedDrafts: 1,
+      notCarried: [],
+    });
   });
 
   it("reads no closure for a cycle that is still open", async () => {

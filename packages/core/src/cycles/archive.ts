@@ -13,7 +13,6 @@ import {
   okrSessions,
   performanceSnapshots,
   processHealthResponses,
-  reviewDecisions,
 } from "@openokr/db";
 import {
   lowestProcessHealthStatement,
@@ -29,6 +28,11 @@ import {
 import { asc, count, desc, eq, gt, inArray, isNull, lt, ne } from "drizzle-orm";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
+import {
+  CARRIED_DECISIONS,
+  carryKeptObjectivesInTx,
+  closeDecisionsInTx,
+} from "./carry.ts";
 import { resolveRhythm } from "./rhythm.ts";
 import { rulesSnapshot } from "./rules.ts";
 import { readRhythmRow } from "./service.ts";
@@ -356,13 +360,17 @@ export interface FeedForwardResult {
   /** Rows of §8.9's mapping this build cannot fill, each naming its task. */
   readonly waiting: readonly string[];
   /**
-   * The process-health statement the next cycle holds as a Phase 3 priority,
-   * or null when the survey went unanswered (§8.5, §8.9; M-05). Reported
-   * whether this run wrote it or an earlier one did.
+   * The process-health statement the next cycle holds in Phase 3 as its
+   * improvement action, or null when the survey went unanswered (§8.5, §8.9;
+   * M-05). Reported whether this run wrote it or an earlier one did.
    */
   readonly processPriority: string | null;
   /** Whether the learnings reached the next cycle's input pack (P4-T12-b). */
   readonly packNote: boolean;
+  /** Kept and modified objectives pre-filled as drafts by this run (P9-T20e-b). */
+  readonly drafts: number;
+  /** Kept objectives not carried because their champion has left, by title. */
+  readonly notCarried: readonly string[];
 }
 
 /**
@@ -456,10 +464,10 @@ export async function feedForwardInTx(
       "A cycle cannot feed itself. Name the cycle that is closing and the one that is opening.",
     );
   }
+  const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
   // §8.9's impact for anything fed forward, as the workspace resolves it
   // (completeness review H-17). It was the literal 4 in three places.
-  const carriedImpact = resolveRhythm(await readRhythmRow(tx, workspaceId))
-    .thresholds["quality.carryForwardIssueImpact"];
+  const carriedImpact = thresholds["quality.carryForwardIssueImpact"];
 
   const [source] = await tx
     .select({ id: cycles.id, frameId: cycles.frameId })
@@ -658,21 +666,17 @@ export async function feedForwardInTx(
   //
   // "Defer: still worth doing, not next cycle. It goes to the issue list."
   // At the carry-forward impact, like every other carried item, so it has to
-  // survive the next prioritisation on its merits.
-  const deferred = review
-    ? await tx
-        .select({ text: goals.title })
-        .from(reviewDecisions)
-        .innerJoin(goals, eq(goals.id, reviewDecisions.goalId))
-        .where(
-          activeOnly(
-            reviewDecisions,
-            eq(reviewDecisions.workspaceId, workspaceId),
-            eq(reviewDecisions.sessionId, review.id),
-            eq(reviewDecisions.decision, "defer"),
-          ),
-        )
-    : [];
+  // survive the next prioritisation on its merits. Deferred at stage 9 or
+  // from the objective's own page, whichever was decided later (P9-T20e-b).
+  const decided = await closeDecisionsInTx(
+    tx,
+    workspaceId,
+    fromCycleId,
+    review?.id ?? null,
+  );
+  const deferred = decided
+    .filter((objective) => objective.decision === "defer")
+    .map((objective) => ({ text: objective.title }));
   for (const objective of deferred) {
     const [duplicate] = await tx
       .select({ id: cycleIssues.id })
@@ -702,14 +706,24 @@ export async function feedForwardInTx(
     issues += 1;
   }
 
-  // --- the lowest process-health statement becomes a Phase 3 priority ---
+  // --- kept and modified objectives pre-fill Phase 4 (§8.9, P9-T20e-b) ---
+  const keptDrafts = await carryKeptObjectivesInTx(tx, {
+    workspaceId,
+    toCycleId,
+    kept: decided,
+    thresholds,
+    now,
+  });
+
+  // --- the lowest process-health statement, Phase 3's improvement action ---
   //
-  // §8.9's table: "The lowest process-health statement | Phase 3, a process
-  // priority", and §8.5: it "becomes next cycle's process OKR". From P4-T12-b
-  // until M-05 it landed as a Phase 2 issue instead, on a reading of §8.9's
-  // closing line that the table itself does not support: that line is about
-  // carried work, and a process statement is not carried work. Changing the
-  // practice was never this file's to decide, so it follows the table.
+  // §8.9's table: "The lowest process-health statement | Phase 3, an
+  // improvement action", and §8.5: it "becomes an improvement action for the
+  // next cycle, with an owner and a date". The owner and the date are stage
+  // 11's, where the review records it as an action (P9-T20d); this is where
+  // the next cycle's Phase 3 meets it, beside the priorities it is ranked
+  // with. From P4-T12-b until M-05 it landed as a Phase 2 issue instead, on a
+  // reading of a closing line about carried work that v2 removed.
   //
   // Matched on its text, because a priority has no source column. The text is
   // the canon statement, so a facilitator's own priority cannot collide with it
@@ -864,6 +878,8 @@ export async function feedForwardInTx(
     waiting: [],
     processPriority: lowest,
     packNote,
+    drafts: keptDrafts.drafts,
+    notCarried: keptDrafts.notCarried,
   };
 }
 
@@ -1090,6 +1106,10 @@ export interface ClosureSummary {
   readonly nextCycle: { readonly id: string; readonly name: string } | null;
   readonly priorScores: number;
   readonly carriedIssues: number;
+  /** Kept and modified objectives the next cycle holds as drafts (P9-T20e-b). */
+  readonly carriedDrafts: number;
+  /** Kept objectives it could not carry, their champion having left. */
+  readonly notCarried: string[];
   readonly processPriority: string | null;
   readonly packNote: boolean;
 }
@@ -1165,6 +1185,8 @@ export async function readClosureInTx(
       nextCycle: null,
       priorScores: 0,
       carriedIssues: 0,
+      carriedDrafts: 0,
+      notCarried: [],
       processPriority: null,
       packNote: false,
     };
@@ -1233,11 +1255,39 @@ export async function readClosureInTx(
     )
     .limit(1);
 
+  // The drafts this cycle's kept objectives became, including one deleted
+  // since: it was handed on, and deleting it was the next cycle's decision.
+  const kept = (
+    await closeDecisionsInTx(tx, workspaceId, cycleId, review?.id ?? null)
+  ).filter((objective) => CARRIED_DECISIONS.includes(objective.decision));
+  const drafts =
+    kept.length === 0
+      ? []
+      : await tx
+          .select({ from: goals.carriedFromGoalId })
+          .from(goals)
+          .where(
+            includeDeleted(
+              goals,
+              eq(goals.workspaceId, workspaceId),
+              eq(goals.cycleId, next.id),
+              inArray(
+                goals.carriedFromGoalId,
+                kept.map((objective) => objective.goalId),
+              ),
+            ),
+          );
+  const handedOn = new Set(drafts.map((row) => row.from));
+
   return {
     ...figures,
     nextCycle: { id: next.id, name: next.name },
     priorScores: Number(scores?.total ?? 0),
     carriedIssues: Number(carried?.total ?? 0),
+    carriedDrafts: handedOn.size,
+    notCarried: kept
+      .filter((objective) => !handedOn.has(objective.goalId))
+      .map((objective) => objective.title),
     processPriority: priority?.text ?? null,
     packNote: Boolean(pack?.note),
   };

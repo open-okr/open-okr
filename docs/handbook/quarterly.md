@@ -98,7 +98,7 @@ year is graded before anybody writes next year's OKRs.
 | **Open** | 1. Open and check in. Before the numbers, the people |
 | **Review** | 2. Score the key results. 3. Objective narratives. 4. Recognition and wins |
 | **Retro** | 5. Team retro, silent writing then dot voting. 6. Management retro, the four questions leadership owes the team. 7. Root cause and the diagnostic. 8. OKR process health, scored anonymously |
-| **Reset** | 9. Keep, modify, abandon or defer each objective, or close it as achieved. 10. Learnings and next drafts. 11. Decisions and actions |
+| **Reset** | 9. Keep, modify, abandon or defer each objective, or close it as achieved. 10. Learnings. 11. Decisions and actions |
 
 **Stage 7 is the point of the whole thing.** Every aspirational key result
 below 0.6, and every committed one below 1.0, gets one honest cause from a
@@ -145,10 +145,22 @@ closed, and feeds the next cycle:
 | From this cycle | Into the next cycle |
 |---|---|
 | Every key result and its score | Phase 2, the prior-cycle scoring list |
-| Every carry-forward item | Phase 2, the strategic issue list at impact 4 |
+| Every kept or modified objective | Phase 4, a pre-filled draft whose key results start from their last recorded values |
+| Every deferred item and carry-forward learning | Phase 2, the strategic issue list at impact 4 |
 | Learnings and the retrospective | Phase 1, the input pack |
-| The lowest process-health statement | Phase 3, a process priority |
+| The lowest process-health statement | Phase 3, an improvement action |
 | The annual frame | Carried as reference |
+
+**A kept objective arrives as a draft, not a copy.** It passes Phase 4's
+checks and Phase 5's gates like any other, and nothing about it is locked.
+Each key result starts from the last value it recorded, with the same target,
+so the next quarter begins where this one ended rather than where it began. A
+milestone already done stays behind, and a baseline that was measured comes
+back as a metric with its target to set. What belonged to the old cycle stays
+with it: the alignment, the due dates and the capacity verdicts, which Phase 5
+asks for again. An objective whose champion has left is named on the closed
+cycle rather than carried, because a draft needs somebody to own it. A carried
+draft somebody deletes stays deleted.
 
 **The next cycle does not have to exist yet.** The review comes before anybody
 drafts the next cycle, so usually it does not. When it is created, it receives

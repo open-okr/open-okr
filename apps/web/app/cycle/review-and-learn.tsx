@@ -42,6 +42,8 @@ export interface Closure {
   readonly nextCycle: { readonly id: string; readonly name: string } | null;
   readonly priorScores: number;
   readonly carriedIssues: number;
+  readonly carriedDrafts: number;
+  readonly notCarried: readonly string[];
   readonly processPriority: string | null;
   readonly packNote: boolean;
 }
@@ -300,6 +302,24 @@ export async function ReviewAndLearn({
                   </dt>
                   <dd className="tabular-nums text-ink">
                     {closure.carriedIssues}
+                  </dd>
+                  <dt className="text-ink-3">
+                    {t("cycle.reviewAndLearn.close.carriedDrafts")}
+                  </dt>
+                  <dd className="text-ink">
+                    <span className="tabular-nums">
+                      {closure.carriedDrafts}
+                    </span>
+                    {closure.notCarried.length === 0 ? null : (
+                      // Said rather than dropped: a kept objective whose
+                      // champion has left needs somebody to own it before it
+                      // can be a draft (§2.5).
+                      <span className="block text-ink-3">
+                        {t("cycle.reviewAndLearn.close.notCarried", {
+                          titles: closure.notCarried.join(", "),
+                        })}
+                      </span>
+                    )}
                   </dd>
                   <dt className="text-ink-3">
                     {t("cycle.reviewAndLearn.close.processPriority")}
