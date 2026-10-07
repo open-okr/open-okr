@@ -54,10 +54,15 @@ interface DemoKeyResult {
   readonly key: string;
   readonly title: string;
   readonly unit?: string;
-  readonly direction: "increase" | "reduce" | "maintain" | "move";
+  /**
+   * Metric unless it says otherwise (METHOD.md §2.10, P9-T22b). A milestone is
+   * done or not done, so it carries no direction, baseline or target.
+   */
+  readonly kind?: "milestone";
+  readonly direction?: "increase" | "reduce" | "maintain" | "move";
   readonly indicatorType: "leading" | "lagging";
-  readonly baselineValue: number;
-  readonly targetValue: number;
+  readonly baselineValue?: number;
+  readonly targetValue?: number;
   readonly weight?: number;
   readonly ownerKey?: CastKey;
   readonly capacity?: "fits" | "tight" | "exceeds";
@@ -476,6 +481,19 @@ export const GOALS: readonly DemoGoal[] = [
         ownerKey: "amara",
         capacity: "fits",
         current: 6,
+      },
+      {
+        // A milestone (§2.10): done or not done, so the one key result in
+        // the quarter with no number to move. Nobody has ever agreed what a
+        // renewal at ninety days is, and the cohort report means nothing
+        // until somebody has.
+        key: "renewalDefinition",
+        title:
+          "Finance and Customer Success sign one definition of a 90-day renewal",
+        kind: "milestone",
+        indicatorType: "leading",
+        ownerKey: "amara",
+        capacity: "fits",
       },
     ],
     openDraft: true,

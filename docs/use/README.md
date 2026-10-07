@@ -59,19 +59,56 @@ runs through the same permission checks as a click.
 |---|---|
 | On track | Reported healthy, and checked in recently |
 | At risk | Reported at risk, or confidence below the line |
-| **Outdated** | Nobody has checked in within the grace period. **This overrides whatever health was last reported** |
-| Closed | Deliberately ended, with a retrospective |
+| Off track | Reported off track |
+| **Outdated** | Nobody has checked in within the grace period. **This overrides whatever health was last reported**, which is shown beside it, such as "Outdated, last on track" |
+| Achieved, missed or abandoned | Closed, deliberately, with a retrospective. Abandoned is a stop with its reason, not a miss |
 
 Outdated is the one worth understanding: it is not an opinion, and an owner
 cannot claim their way out of it.
 
+## Writing and changing OKRs
+
+**Anybody can write an objective or a key result at any time.** The planning
+phases show what is still missing beside the form; they do not stop you. The
+coach warns beside the work rather than refusing it, and only a structural
+defect, such as an objective with no key result, holds a set back from
+publishing.
+
+An objective is **committed**, which the team agrees will be done and is
+expected to score 1.0, or **aspirational**, a stretch expected to land around
+0.7. A key result is a **metric** that moves a number, a **maintain** that
+holds one inside a band, a **milestone** that is done or not done, or a
+**baseline** that measures what nobody has measured yet.
+
+Changing course mid-cycle is allowed and recorded. An objective started after
+the plan is marked as an addition, a stopped one closes as abandoned with its
+reason, and an eased target keeps its original beside it. The close reads all
+of it.
+
+How strictly any of this applies is your workspace's choice. **Admin,
+Practice** holds every setting with the method's default, and a profile such
+as **Governed** sets a stricter practice in one step.
+
 ## KPIs
 
 A KPI is a number you watch continuously, not a goal you set for a quarter.
-Each sits in a health corridor. When one drops out of range the product drafts
-a **recovery objective**: one key result per leading child driver, capped at
-four. The KPI then reads "recovering" and its effective health rises as that
-objective moves.
+Each sits in a health corridor, in its own units. When one turns unhealthy its
+owner chooses one of three responses: fix it now, add a key result to an
+objective that already exists, or launch the **recovery objective** the
+product drafts, one key result per leading child driver, capped at four. The
+KPI keeps reading the band its value is in, with the recovery shown beside it,
+so a recovery never makes a red number look green.
+
+## The quarterly review
+
+Ninety minutes in four acts, Open, Review, Retro and Reset, booked about two
+weeks before the cycle ends; a workspace may hold the review and the
+retrospective as two sessions. The product keeps the clock and the stages.
+Every key result is graded with a reason, every objective closes on one of
+five decisions, achieved, keep, modify, defer or abandon, and the minutes
+are written as the room goes. When the cycle closes, a kept or modified
+objective arrives in the next one as a draft, its key results starting from
+where they ended.
 
 ## The copilot
 

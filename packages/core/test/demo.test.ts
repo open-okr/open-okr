@@ -89,6 +89,33 @@ describe("the demo builder", () => {
     expect(after.goals).toHaveLength(goals.goals.length);
   });
 
+  it("shows the practice 0.2.0 ships: both kinds of objective and a milestone (P9-T22b)", async () => {
+    const wb = await workerDb();
+    await seed();
+    const { rows } = await wb.admin.query<{ kind: string }>(
+      `select distinct g.kind from goals g
+         join cycles c on c.id = g.cycle_id
+        where g.workspace_id = $1 and g.deleted_at is null
+          and c.starts_on <= current_date and c.ends_on >= current_date`,
+      [workspaceId],
+    );
+    // METHOD.md §2.8: committed and aspirational, side by side.
+    expect(rows.map((row) => row.kind).sort()).toEqual([
+      "aspirational",
+      "committed",
+    ]);
+    const milestones = await wb.admin.query<{ title: string }>(
+      `select k.title from key_results k
+        where k.workspace_id = $1 and k.deleted_at is null
+          and k.kind = 'milestone'`,
+      [workspaceId],
+    );
+    // §2.10: done or not done, so it is the one with no number to move.
+    expect(milestones.rows.map((row) => row.title)).toEqual([
+      "Finance and Customer Success sign one definition of a 90-day renewal",
+    ]);
+  });
+
   it("leaves every key result with one value point, so no trend is fitted", async () => {
     const wb = await workerDb();
     await seed();

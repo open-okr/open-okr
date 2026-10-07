@@ -104,6 +104,16 @@ describe("the closed cycle", () => {
     expect(row?.resultValue).not.toBeNull();
     expect(row?.verdict).not.toBeNull();
   });
+
+  it("counts the objective started in week three among what moved (§2.9, P9-T22b)", async () => {
+    // Mid-cycle changes are evidence, not failure, and the close reads them:
+    // the demo's last quarter has one, so the scorecard has one to show.
+    expect(
+      LAST_QUARTER.filter((objective) => objective.startedInWeek),
+    ).toHaveLength(1);
+    const scorecard = await callAction(await context(), "cycles.scorecard", {});
+    expect(scorecard.rows[0]?.moved?.addedMidCycle).toBe(1);
+  });
 });
 
 describe("§8.6's diagnostic", () => {

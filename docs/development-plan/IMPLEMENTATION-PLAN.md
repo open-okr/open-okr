@@ -3960,10 +3960,10 @@ Scenario steps: NW-P-07.
 Depends on: P9-T22a
 Goal: the demo shows what 0.2.0 ships.
 Deliverables:
-- **The demo.** The seed keeps its cycles current and holds committed and aspirational objectives, milestone key results and a mid-cycle addition.
+- **The demo.** The seed keeps its cycles current and holds committed and aspirational objectives, milestone key results and a mid-cycle addition. The addition is in the finished quarter: the current set is left unpublished on purpose, so a visitor can watch the gates, and an addition exists only in a published set (§2.9). Corrected at P9-T22b, which wrote this row a day earlier without noticing.
 - **The guides.** The handbook and user guide updated.
 Test plan: the demo seed run against today's date.
-Acceptance: Given a demo built today, when a visitor opens the current cycle, then it holds a committed and an aspirational objective, a milestone key result and an objective added mid-cycle.
+Acceptance: Given a demo built today, when a visitor opens the current cycle, then it holds a committed and an aspirational objective and a milestone key result, and last quarter's scorecard row counts an objective added mid-cycle.
 
 ### P9-T22c: The Northwind year (G-4) [M]
 Depends on: P9-T22b

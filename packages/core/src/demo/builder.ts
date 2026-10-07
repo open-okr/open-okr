@@ -43,7 +43,14 @@
  *   the quarterly review is P4-T10. There is nothing to seed yet, and seeding
  *   invented scores would put a number on a screen that no review agreed.
  */
-import { checkIns, newId, workspaceMembers } from "@openokr/db";
+import {
+  activeOnly,
+  checkIns,
+  goals,
+  newId,
+  workspaceMembers,
+} from "@openokr/db";
+import { eq } from "drizzle-orm";
 import type { Pool } from "pg";
 import { callAction } from "../actions/registry.ts";
 import { runOperation } from "../operations/operation.ts";
@@ -665,10 +672,15 @@ async function createOkrs(
         goalId: created.id,
         title: keyResult.title,
         ...(keyResult.unit ? { unit: keyResult.unit } : {}),
-        direction: keyResult.direction,
+        ...(keyResult.kind ? { kind: keyResult.kind } : {}),
+        ...(keyResult.direction ? { direction: keyResult.direction } : {}),
         indicatorType: keyResult.indicatorType,
-        baselineValue: keyResult.baselineValue,
-        targetValue: keyResult.targetValue,
+        ...(keyResult.baselineValue === undefined
+          ? {}
+          : { baselineValue: keyResult.baselineValue }),
+        ...(keyResult.targetValue === undefined
+          ? {}
+          : { targetValue: keyResult.targetValue }),
         weight: keyResult.weight ?? 1,
         // Due when the quarter closes, which is the date §3.6 already projects
         // a forecast to. §4.2's KR-3 asks for a baseline, a target, a date and
@@ -997,7 +1009,25 @@ async function runLastQuarter(
           if (!authorId) {
             continue;
           }
+          // An objective started mid-quarter owed nothing before it existed
+          // (§2.9), so it is marked as an addition and checks in from then.
+          const started = objective?.startedInWeek
+            ? mondays[objective.startedInWeek - 1]
+            : undefined;
+          if (started) {
+            // openokr:allow-mutation: the builder's own audited operation.
+            await tx
+              .update(goals)
+              .set({
+                addedMidCycleAt: new Date(`${started}T09:00:00.000Z`),
+                updatedAt: new Date(),
+              })
+              .where(activeOnly(goals, eq(goals.id, goalId)));
+          }
           for (const [week, on] of mondays.entries()) {
+            if (started && on < started) {
+              continue;
+            }
             if (position === 1 && week % 4 === 3) {
               continue;
             }
@@ -1183,6 +1213,7 @@ export async function buildDemoWorkspace(
     "The set is not published yet, and publish gate 5 warns: one key result is still marked as exceeding capacity. Gate 5 warns rather than blocks by default, so the set can be published as it is; change the key result to tight on the goal page and watch the warning clear.",
     "The Draft Coach warns on one key result: the cohort key result is worded as the activity rather than the outcome it is there to prove. §4.2's KR-5 asks for impact, not effort. It is a warning rather than a refusal, so publish gate 2 stays green; reword it on the goal page and watch the warning clear.",
     `The scorecard has last quarter on it, and the closing diagnostic reads "${lastQuarter.verdict}" from a cycle score of ${lastQuarter.cycleScore.toFixed(2)} against ${lastQuarter.onTimeShare === null ? "no measured rhythm" : `${Math.round(lastQuarter.onTimeShare * 100)}% of due check-ins published on time`}. The cycle score came from the review, five key results graded with their reasons; the rhythm was measured from the quarter's check-ins, and the five process-health statements answered beside it are the cross-check. The verdict is derived by packages/method, so changing either threshold changes what the demo says.`,
+    "The current quarter shows what 0.2.0 ships: one committed objective among aspirational ones, and one milestone key result, Amara's renewal definition, which is done or not done rather than a number to move. Last quarter's sales objective was started in week three, so the scorecard counts it among what moved in that quarter, and its check-ins begin that week.",
     "The rhythm score is one respondent's, because every write in this seed is authored by whoever ran it and the survey is anonymous per member. Submitting four more would be putting words in the mouths of people who have no accounts.",
   ];
   if (recoveryLaunched) {
