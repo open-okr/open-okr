@@ -16,7 +16,11 @@
  * The escalation ladder itself lives in `packages/method`, because which roles it
  * widens to is §11 practice rather than date arithmetic.
  */
-import type { CheckInFrequency } from "@openokr/method";
+import {
+  type CheckInFrequency,
+  type Holiday,
+  isHolidayPeriod,
+} from "@openokr/method";
 import {
   addDays,
   formatLocalDate,
@@ -142,6 +146,34 @@ export function firstDue(
   const step = frequency === "quarterly" ? 3 : 1;
   const next = addMonths(from, step);
   return monthAnchor(next.year, next.month, anchor);
+}
+
+/**
+ * A due date moved on, a period at a time, until no holiday holds it
+ * (METHOD.md §7.4, P9-T19b-a): "No check-in is due in them."
+ *
+ * Moved by whole periods rather than to the day after the holiday, so the
+ * anchor weekday survives: a team due on Mondays is due on the Monday after
+ * the summer, not on whichever day the summer ended. The period is the
+ * streak's, read from `packages/method`, so a week that owes no check-in here
+ * is the week the streak does not count.
+ */
+export function clearOfHolidays(
+  due: LocalDate,
+  frequency: CheckInFrequency,
+  anchor: CadenceAnchor,
+  holidays: readonly Holiday[],
+): LocalDate {
+  let next = due;
+  // Bounded: a space on holiday for two years has no rhythm to keep.
+  for (
+    let guard = 0;
+    guard < 800 && isHolidayPeriod(formatLocalDate(next), frequency, holidays);
+    guard += 1
+  ) {
+    next = advance(next, frequency, anchor);
+  }
+  return next;
 }
 
 interface AfterPublication {
@@ -285,6 +317,15 @@ export const cadence = {
     anchor: CadenceAnchor,
   ): string =>
     formatLocalDate(firstDue(parseLocalDate(from), frequency, anchor)),
+  clearOfHolidays: (
+    due: string,
+    frequency: CheckInFrequency,
+    anchor: CadenceAnchor,
+    holidays: readonly Holiday[],
+  ): string =>
+    formatLocalDate(
+      clearOfHolidays(parseLocalDate(due), frequency, anchor, holidays),
+    ),
   nextAfterPublication: (
     due: string,
     publishedOn: string,

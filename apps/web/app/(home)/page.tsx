@@ -152,7 +152,7 @@ export default async function HomePage({
       keyResultCount === 0 ? null : (onTrackKeyResults / keyResultCount) * 100,
     outdatedGoals: goals.filter((goal) => goal.health === "outdated").length,
     alignmentScore: alignment?.score ?? null,
-    alignmentThreshold: alignment?.threshold ?? 0,
+    alignmentBand: alignment?.band ?? null,
   };
 
   const workMapContext: WorkMapContext | null = workflow
@@ -256,16 +256,16 @@ export default async function HomePage({
         <a className="text-brand-text underline" href="/goals">
           {t("home.filterAndSearchIn")}
         </a>
-        <a className="text-brand-text underline" href="/goals/studio">
+        <a className="text-brand-text underline" href="/goals?display=diagram">
           {t("home.seeTheCascade")}
         </a>
         <a className="text-brand-text underline" href="/review">
           {t("common.whatYouOwe")}
         </a>
-        {/* P5-T01c. The sidebar carries it on every page; this is here
-            because the task asks for a door from the front door itself, and
-            a member who lands here should not have to know the product has
-            a sidebar item for the room they are late to. */}
+        {/* P5-T01c. The task asks for a door from the front door itself,
+            two clicks from the session, and since P9-T07a-b this is the
+            only one outside the Cycle module's own tabs: Sessions left the
+            sidebar for a tab inside Cycle (okr-entry-points.md §3.1). */}
         <a className="text-brand-text underline" href="/sessions">
           {t("common.sessions")}
         </a>

@@ -84,6 +84,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "device.approved": z.object({ clientName: z.string() }),
   "device.denied": z.object({ clientName: z.string() }),
   "member.updated": z.object({ name: z.string() }),
+  /** A member's leave was marked or changed (METHOD.md §7.4, P9-T19b-b). */
+  "member.leaveSet": z.object({ name: z.string(), count: z.number() }),
   "member.suspended": z.object({ name: z.string() }),
   "member.restored": z.object({ name: z.string() }),
   // Workspace roles (P8-G13a). The role name travels on the first three
@@ -168,6 +170,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   /** A space set its own §4.14 settings (P6-G18b). */
   "space.settingsChanged": z.object({ name: z.string() }),
+  /** A space marked its holidays (METHOD.md §7.4, P9-T19b-a). */
+  "space.holidaysChanged": z.object({ name: z.string(), count: z.number() }),
   /** An agent's write policy was moved (P6-G13b). */
   "agent.autonomy_changed": z.object({ from: z.string(), to: z.string() }),
   /** A workspace turned one §6.4 rule down, or back up (P6-G21). */
@@ -278,7 +282,16 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.updated": z.object({ name: z.string() }),
   "cycle.archived": z.object({ name: z.string() }),
   "rhythm.updated": z.object({ keys: z.array(z.string()) }),
+  // The METHOD.md §12 practice settings (P9-T01).
+  "practice.updated": z.object({ keys: z.array(z.string()) }),
+  "practice.profile_applied": z.object({ from: z.string(), to: z.string() }),
   "frame.set": z.object({ yearLabel: z.string() }),
+  // An agreed frame revised within its year, with why (P9-T13-c-c, §2.1).
+  "frame.revised": z.object({
+    yearLabel: z.string(),
+    fields: z.array(z.string()),
+    reason: z.string(),
+  }),
   // The guided cycle workflow (P3-T03).
   "cycle.pack_item_set": z.object({
     itemKey: z.number().int(),
@@ -301,6 +314,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     // Which gates were unmet when somebody published anyway (P4-T03).
     // Empty on a normal publication, which is most of them.
     overrodeGates: z.array(z.number().int()).optional(),
+    // Which step this was (METHOD.md §4.5, P9-T03b): the company set, or the
+    // whole set. Absent on rows written before the two steps existed.
+    published: z.enum(["company", "set"]).optional(),
   }),
   // The nudge run (P4-T04a). One activity per run rather than per nudge:
   // the nudges are rows of their own, and a feed with one entry per message
@@ -317,13 +333,39 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // Goals and key results (P3-T04). A goal's title is snapshotted for the same
   // reason a member's name is: "closed Raise activation" has to keep reading that
   // way after the goal is renamed or erased.
-  "goal.created": z.object({ title: z.string(), level: z.string() }),
+  "goal.created": z.object({
+    title: z.string(),
+    level: z.string(),
+    // Started mid-cycle, and why, where it was (P9-T13-a, METHOD.md §2.9).
+    addedMidCycle: z.boolean().optional(),
+    reason: z.string().nullable().optional(),
+    // Started as a draft that waits for a person (P9-T13-b-b).
+    draft: z.boolean().optional(),
+  }),
   "goal.updated": z.object({ title: z.string() }),
+  // A draft published by its owner, live or now with its reviewer, and a
+  // draft approved by its reviewer (METHOD.md §2.9, P9-T13-b-b).
+  "goal.draft_published": z.object({
+    title: z.string(),
+    awaitingApproval: z.boolean(),
+  }),
+  "goal.draft_approved": z.object({ title: z.string() }),
   "goal.closed": z.object({
     successStatus: z.enum(["achieved", "missed"]),
-    closeDecision: z.enum(["keep", "modify", "abandon"]),
+    closeDecision: z.enum(["achieved", "keep", "modify", "defer", "abandon"]),
   }),
   "goal.reopened": z.object({}),
+  // A move between spaces, both named (P9-T13a, METHOD.md §2.9).
+  "goal.moved_space": z.object({
+    title: z.string(),
+    // Null when it was the company's (P9-T22c-e-a).
+    fromSpaceId: z.uuid().nullable(),
+    fromSpace: z.string(),
+    toSpaceId: z.uuid(),
+    toSpace: z.string(),
+  }),
+  // §2.9's stop, closed as abandoned with its one-line reason (P9-T13-c-a).
+  "goal.stopped": z.object({ title: z.string(), reason: z.string() }),
   // The title, because a feed entry about a goal being removed has to read as
   // a sentence after the goal is gone (P4-T14b-a).
   "goal.deleted": z.object({ title: z.string() }),
@@ -391,10 +433,39 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "task.checklist_changed": z.object({ change: z.string() }),
   "task.deleted": z.object({ title: z.string() }),
   "task.restored": z.object({ title: z.string() }),
-  "key_result.created": z.object({ title: z.string() }),
+  "key_result.created": z.object({
+    title: z.string(),
+    // Started mid-cycle, and why, where it was (P9-T13-a, METHOD.md §2.9).
+    addedMidCycle: z.boolean().optional(),
+    reason: z.string().nullable().optional(),
+  }),
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
   "key_result.removed": z.object({ title: z.string() }),
+  // A target moved, and whether it eased (P9-T06b). The reason is in the
+  // target history, not the feed, where it would be read out of context.
+  "key_result.target_changed": z.object({
+    keyResultId: z.uuid(),
+    // Null when the key result had no target before (P9-T13-b-a).
+    from: z.number().nullable(),
+    to: z.number(),
+    eased: z.boolean(),
+  }),
+  "key_result.restored": z.object({ title: z.string() }),
+  // An order changed in the OKR list (P9-T07b-b). Which way is in the list.
+  "key_result.placed": z.object({
+    keyResultId: z.uuid(),
+    afterId: z.uuid().nullable(),
+  }),
+  "goal.placed": z.object({ afterId: z.uuid().nullable() }),
+  // The kind of promise changed (METHOD.md §2.8, P9-T11b-a). The reason is
+  // kept here, because the close reads what an objective was promised as and
+  // why that changed, and there is no other record of it.
+  "goal.kind_changed": z.object({
+    from: z.enum(["committed", "aspirational"]),
+    to: z.enum(["committed", "aspirational"]),
+    reason: z.string().nullable(),
+  }),
   "key_result.kpi_linked": z.object({ kpiId: z.uuid() }),
   "key_result.kpi_unlinked": z.object({}),
   // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing
@@ -415,6 +486,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "alignment.register_added": z.object({ provider: z.string() }),
   "alignment.register_confirmed": z.object({}),
   "alignment.register_risk_owned": z.object({}),
+  // Escalated to the cycle's sponsor (§5.4, P9-T16b-b).
+  "alignment.register_escalated": z.object({}),
   "alignment.register_removed": z.object({}),
   "alignment.finding_dismissed": z.object({ ruleKey: z.string() }),
   // The one finding kind with a mechanical fix (§5.3, P4-T06b-b). The re-parent
@@ -425,6 +498,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // moves a corridor state, and a state change is what a nudge reads later.
   "kpi.category_created": z.object({ name: z.string() }),
   "kpi.created": z.object({ title: z.string(), frequency: z.string() }),
+  // How an unhealthy KPI was answered (§6.5, P9-T18b).
+  "kpi.responded": z.object({ response: z.enum(["fix_now", "key_result"]) }),
   "kpi.value_recorded": z.object({
     periodStart: z.string(),
     created: z.boolean(),
@@ -517,6 +592,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     keyResultId: z.string(),
     confidence: z.number(),
   }),
+  // The week's wins (P9-T19a-d-c)
+  "session.winsNamed": z.object({ count: z.number() }),
+  // A low score's next action (P9-T19a-b)
+  "session.nextActionSet": z.object({ keyResultId: z.string() }),
   // Blockers (P4-T07c)
   "session.blockerCreated": z.object({
     keyResultId: z.string(),

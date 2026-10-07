@@ -21,4 +21,8 @@ if (result.out !== "") {
 if (result.err !== "") {
   process.stderr.write(`${result.err}\n`);
 }
-process.exit(result.code);
+// The code, and not `process.exit`: a write to a pipe finishes after it
+// returns, and exiting at once cut a long answer off at the pipe's 64 KB, so
+// `okr goals list` on a workspace with a few hundred objectives printed
+// half a JSON document. Found by P9-T09a's three hundred objectives.
+process.exitCode = result.code;

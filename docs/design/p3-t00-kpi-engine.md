@@ -100,39 +100,59 @@ answer: an operating margin of -3% against a target of 12% is nowhere near it.
 
 ## 3. The corridor state
 
-METHOD.md §6.4. Precedence, first match wins: no data, then recovering, then the
-band. Both thresholds are §11 parameters, defaults 90 and 70.
+**Since P9-T17a this is the fallback.** METHOD v2 §6.2 gives a KPI a target
+type (at or above, at or below, increase to, decrease to, a range) and green and
+red thresholds in its own units, and `kpiReading` judges by those first:
+
+| Type | Healthy | Unhealthy | Watch |
+|---|---|---|---|
+| At or above, increase to | At or above the green value | Below the red value | Between |
+| At or below, decrease to | At or below the green value | Above the red value | Between |
+| Range | Inside the green band, ends included | Past a red boundary on either side | Outside the band, short of a red boundary |
+
+Green is inclusive and red is strict, as the method writes them. A KPI with no
+thresholds, or half a pair, falls back to the table below, and every read says
+which basis it used. A range has no ratio, because it has no single target to
+divide by. The grid colours each period by its own band from the server rather
+than working the ratio out in the browser. `kpiStateOf(band, recovery)` keeps
+the precedence below until P9-T17b moves the recovery beside the band.
+
+The fallback, as built at P3-T12. METHOD.md §6.4. Precedence, first match wins:
+no data, then the band. Both thresholds are §11 parameters, defaults 90 and 70.
 
 | Order | Condition | State |
 |---|---|---|
 | 1 | Achievement is null | `no_data` |
-| 2 | An open recovery goal is linked | `recovering` |
-| 3 | Achievement at or above the healthy threshold | `healthy` |
-| 4 | Achievement at or above the watch threshold | `watch` |
-| 5 | Otherwise | `unhealthy` |
+| 2 | Achievement at or above the healthy threshold | `healthy` |
+| 3 | Achievement at or above the watch threshold | `watch` |
+| 4 | Otherwise | `unhealthy` |
 
-A recovery goal that has been closed no longer holds the KPI in `recovering`.
-The KPI returns to whichever band it has actually reached, which is the honest
-outcome whether the recovery worked or not.
+**Recovering is beside the state, not one of them (P9-T17b-a).** Until then an
+open recovery goal outranked the band, so a collapsing KPI read "recovering"
+for as long as its recovery ran, whatever the metric did. Now the state is
+always the band, and a KPI whose recovery goal is open is marked recovering
+beside it. A closed recovery no longer marks it. A row stored as `recovering`
+before the change is read as the band its achievement gives, which is the rule
+it was judged by, and data change 0021 rewrites those rows.
 
 <!-- golden: kpi.state -->
 
-| case | achievement_pct | recovery | healthy_pct | watch_pct | expected |
-|---|---|---|---|---|---|
-| nothing recorded | | none | 90 | 70 | no_data |
-| comfortably healthy | 95 | none | 90 | 70 | healthy |
-| exactly at the healthy threshold | 90 | none | 90 | 70 | healthy |
-| just below healthy | 89.99 | none | 90 | 70 | watch |
-| exactly at the watch threshold | 70 | none | 90 | 70 | watch |
-| just below watch | 69.99 | none | 90 | 70 | unhealthy |
-| nothing achieved | 0 | none | 90 | 70 | unhealthy |
-| far over target | 200 | none | 90 | 70 | healthy |
-| an open recovery outranks the band | 50 | open | 90 | 70 | recovering |
-| an open recovery outranks even a healthy band | 95 | open | 90 | 70 | recovering |
-| no data outranks a recovery | | open | 90 | 70 | no_data |
-| a closed recovery returns the real band | 50 | closed | 90 | 70 | unhealthy |
-| a stricter workspace | 92 | none | 95 | 80 | watch |
-| a looser workspace | 65 | none | 80 | 60 | watch |
+| case | achievement_pct | recovery | healthy_pct | watch_pct | expected | expected_recovering |
+|---|---|---|---|---|---|---|
+| nothing recorded | | none | 90 | 70 | no_data | no |
+| comfortably healthy | 95 | none | 90 | 70 | healthy | no |
+| exactly at the healthy threshold | 90 | none | 90 | 70 | healthy | no |
+| just below healthy | 89.99 | none | 90 | 70 | watch | no |
+| exactly at the watch threshold | 70 | none | 90 | 70 | watch | no |
+| just below watch | 69.99 | none | 90 | 70 | unhealthy | no |
+| nothing achieved | 0 | none | 90 | 70 | unhealthy | no |
+| far over target | 200 | none | 90 | 70 | healthy | no |
+| an open recovery is shown beside the band, not in its place | 50 | open | 90 | 70 | unhealthy | yes |
+| a recovering KPI that is healthy again says so | 95 | open | 90 | 70 | healthy | yes |
+| no data with a recovery is still no data | | open | 90 | 70 | no_data | yes |
+| a closed recovery no longer marks it | 50 | closed | 90 | 70 | unhealthy | no |
+| a stricter workspace | 92 | none | 95 | 80 | watch | no |
+| a looser workspace | 65 | none | 80 | 60 | watch | no |
 
 ## 4. Effective health while recovering
 
@@ -280,35 +300,47 @@ In the matrix, `dependencies` lists `[dependent, dependsOn]` pairs.
 
 ## 8. The recovery drafter
 
-METHOD.md §6.5. Given an unhealthy KPI, produce a recovery goal and up to four
-key results from the leading drivers at the edge of the unhealthy branch.
+METHOD.md §6.5, as METHOD v2 writes it (rewritten at P9-T18a). Given an
+unhealthy KPI, produce a committed recovery goal whose first key result is the
+KPI itself, then up to three drivers.
 
 | Rule | Detail |
 |---|---|
-| Objective title | `Bring <KPI title> back to <target>` |
+| Kind | `committed`: a recovery restores a level the business relies on |
+| Objective title | `<KPI title> back where the business can rely on it`. No number, so OBJ-2 has nothing to find; the old `Bring <KPI title> back to <target>` failed it |
+| Description | Names the KPI, its reading and its healthy level, and leaves the why to its owner |
+| First key result | `<KPI title> from <reading> to <healthy boundary>`, owned by the KPI's owner, reading the KPI (`kpi_id` set), with the KPI's own indicator type. This replaced the placeholder `define the first leading driver to move`, which failed KR-2 |
+| Healthy boundary | The green value where the KPI has thresholds, the nearer end of a range's band, and on the fallback the value whose ratio to target is the healthy threshold; the KPI's own target when nothing says |
 | The walk | Breadth-first through the KPI's subtree, ordered by `position` then identifier |
-| A leading child | Becomes a key result directly |
+| A leading child | A candidate directly |
 | A lagging child | Descended through, until its nearest leading descendants are reached |
-| Health filter | None (decision D-8). §6.5 describes the walk by indicator type, never by state |
-| Cap | Four key results, the §11 `recovery_key_result_cap` |
-| No leading KPI anywhere in the subtree | One placeholder key result, `define the first leading driver to move` |
-| Key result title | `Improve <driver title> from <current> to <target>` |
-| Key result direction | `increase` for a `higher_better` driver, `reduce` for a `lower_better` one |
-| Key result baseline and target | The driver's current actual and its target |
-| Key result owner | Inherited from the driver |
-| Key result indicator type | `leading`, always. That is what made it a driver |
-| At launch | `recovery_started_pct` stores the KPI's achievement, `recovery_goal_id` links back, state flips to `recovering`. One Operation, one transaction |
+| Which candidates | Only a driver below its own target with an owner. One at or past its target is skipped, because it would ask a number to go the wrong way: "Improve Sales calls per week from 120 to 100" marked increase |
+| Cap | The §11 `recovery_key_result_cap`, four, the KPI included: the KPI and three drivers |
+| Driver key result | `Improve <driver title> from <current> to <target>`, `increase` or `reduce` by the driver's direction, owned by the driver's named owner or the member whose list it is on, indicator type `leading` |
+| At launch | `recovery_started_pct` stores the KPI's achievement and `recovery_goal_id` links back. The state stays the band (P9-T17b-a). One Operation, one transaction |
+
+**A question this leaves for a human.** A KPI-backed key result's progress is
+the KPI's achievement against the KPI's own target (decision D-4), so the
+first key result, written "from its reading to its healthy boundary", reads
+about 90% when the KPI reaches its boundary on the ratio fallback, rather than
+100%. Whether a KPI-backed key result should instead progress from its own
+baseline to its own target is a change to D-4 for every such key result, and is
+recorded in p9-t00-adaptable-practice.md's open questions rather than made
+here.
 
 <!-- golden: kpi.recovery-draft -->
 
 | case | tree | expected |
 |---|---|---|
-| three leading children become three key results | {"root":{"id":"r","title":"Operating margin","target":12,"current":6},"nodes":[{"id":"c1","parent":"r","type":"leading","title":"Onboarding time","direction":"lower_better","current":9,"target":4,"owner":"m1","position":1},{"id":"c2","parent":"r","type":"leading","title":"Activation rate","direction":"higher_better","current":41,"target":60,"owner":"m2","position":2},{"id":"c3","parent":"r","type":"leading","title":"Support cost per ticket","direction":"lower_better","current":18,"target":11,"owner":"m3","position":3}]} | {"objective":"Bring Operating margin back to 12","keyResults":[{"title":"Improve Onboarding time from 9 to 4","direction":"reduce","baseline":9,"target":4,"owner":"m1"},{"title":"Improve Activation rate from 41 to 60","direction":"increase","baseline":41,"target":60,"owner":"m2"},{"title":"Improve Support cost per ticket from 18 to 11","direction":"reduce","baseline":18,"target":11,"owner":"m3"}]} |
-| a lagging child is descended through | {"root":{"id":"r","title":"Revenue","target":100,"current":60},"nodes":[{"id":"c1","parent":"r","type":"lagging","title":"Pipeline","direction":"higher_better","current":30,"target":50,"position":1},{"id":"g1","parent":"c1","type":"leading","title":"Qualified leads","direction":"higher_better","current":80,"target":140,"owner":"m1","position":1}]} | {"objective":"Bring Revenue back to 100","keyResults":[{"title":"Improve Qualified leads from 80 to 140","direction":"increase","baseline":80,"target":140,"owner":"m1"}]} |
-| a leading child comes before a lagging child's descendant | {"root":{"id":"r","title":"Revenue","target":100,"current":60},"nodes":[{"id":"c1","parent":"r","type":"lagging","title":"Pipeline","direction":"higher_better","current":30,"target":50,"position":1},{"id":"c2","parent":"r","type":"leading","title":"Trial starts","direction":"higher_better","current":200,"target":400,"owner":"m2","position":2},{"id":"g1","parent":"c1","type":"leading","title":"Qualified leads","direction":"higher_better","current":80,"target":140,"owner":"m1","position":1}]} | {"objective":"Bring Revenue back to 100","keyResults":[{"title":"Improve Trial starts from 200 to 400","direction":"increase","baseline":200,"target":400,"owner":"m2"},{"title":"Improve Qualified leads from 80 to 140","direction":"increase","baseline":80,"target":140,"owner":"m1"}]} |
-| the cap stops the walk at four | {"root":{"id":"r","title":"Revenue","target":100,"current":60},"nodes":[{"id":"c1","parent":"r","type":"leading","title":"D1","direction":"higher_better","current":1,"target":2,"owner":"m1","position":1},{"id":"c2","parent":"r","type":"leading","title":"D2","direction":"higher_better","current":2,"target":3,"owner":"m1","position":2},{"id":"c3","parent":"r","type":"leading","title":"D3","direction":"higher_better","current":3,"target":4,"owner":"m1","position":3},{"id":"c4","parent":"r","type":"leading","title":"D4","direction":"higher_better","current":4,"target":5,"owner":"m1","position":4},{"id":"c5","parent":"r","type":"leading","title":"D5","direction":"higher_better","current":5,"target":6,"owner":"m1","position":5}]} | {"objective":"Bring Revenue back to 100","keyResults":[{"title":"Improve D1 from 1 to 2","direction":"increase","baseline":1,"target":2,"owner":"m1"},{"title":"Improve D2 from 2 to 3","direction":"increase","baseline":2,"target":3,"owner":"m1"},{"title":"Improve D3 from 3 to 4","direction":"increase","baseline":3,"target":4,"owner":"m1"},{"title":"Improve D4 from 4 to 5","direction":"increase","baseline":4,"target":5,"owner":"m1"}]} |
-| a subtree with no leading KPI gets the placeholder | {"root":{"id":"r","title":"Revenue","target":100,"current":60},"nodes":[{"id":"c1","parent":"r","type":"lagging","title":"Pipeline","direction":"higher_better","current":30,"target":50,"position":1}]} | {"objective":"Bring Revenue back to 100","keyResults":[{"title":"define the first leading driver to move","direction":"increase","baseline":0,"target":1}]} |
-| a leaf KPI gets the placeholder | {"root":{"id":"r","title":"Revenue","target":100,"current":60},"nodes":[]} | {"objective":"Bring Revenue back to 100","keyResults":[{"title":"define the first leading driver to move","direction":"increase","baseline":0,"target":1}]} |
+| the KPI first, then its drivers below target with owners | {"root":{"id":"r","title":"Operating margin","target":15,"current":7.6,"direction":"higher_better","healthyBoundary":13.5,"owner":"m0"},"nodes":[{"id":"c1","parent":"r","type":"leading","title":"Onboarding time","direction":"lower_better","current":9,"target":4,"position":1,"owner":"m1"},{"id":"c2","parent":"r","type":"leading","title":"Activation rate","direction":"higher_better","current":41,"target":60,"position":2,"owner":"m2"},{"id":"c3","parent":"r","type":"leading","title":"Support cost per ticket","direction":"lower_better","current":18,"target":11,"position":3,"owner":"m3"}]} | {"objective":"Operating margin back where the business can rely on it","keyResults":[{"title":"Operating margin from 7.6 to 13.5","direction":"increase","baseline":7.6,"target":13.5,"owner":"m0"},{"title":"Improve Onboarding time from 9 to 4","direction":"reduce","baseline":9,"target":4,"owner":"m1"},{"title":"Improve Activation rate from 41 to 60","direction":"increase","baseline":41,"target":60,"owner":"m2"},{"title":"Improve Support cost per ticket from 18 to 11","direction":"reduce","baseline":18,"target":11,"owner":"m3"}]} |
+| a lagging child is descended through | {"root":{"id":"r","title":"Revenue","target":100,"current":60,"direction":"higher_better","healthyBoundary":90,"owner":"m0"},"nodes":[{"id":"c1","parent":"r","type":"lagging","title":"Pipeline","direction":"higher_better","current":30,"target":50,"position":1},{"id":"g1","parent":"c1","type":"leading","title":"Qualified leads","direction":"higher_better","current":80,"target":140,"position":1,"owner":"m1"}]} | {"objective":"Revenue back where the business can rely on it","keyResults":[{"title":"Revenue from 60 to 90","direction":"increase","baseline":60,"target":90,"owner":"m0"},{"title":"Improve Qualified leads from 80 to 140","direction":"increase","baseline":80,"target":140,"owner":"m1"}]} |
+| a leading child comes before a lagging child's descendant | {"root":{"id":"r","title":"Revenue","target":100,"current":60,"direction":"higher_better","healthyBoundary":90,"owner":"m0"},"nodes":[{"id":"c1","parent":"r","type":"lagging","title":"Pipeline","direction":"higher_better","current":30,"target":50,"position":1},{"id":"c2","parent":"r","type":"leading","title":"Trial starts","direction":"higher_better","current":200,"target":400,"position":2,"owner":"m2"},{"id":"g1","parent":"c1","type":"leading","title":"Qualified leads","direction":"higher_better","current":80,"target":140,"position":1,"owner":"m1"}]} | {"objective":"Revenue back where the business can rely on it","keyResults":[{"title":"Revenue from 60 to 90","direction":"increase","baseline":60,"target":90,"owner":"m0"},{"title":"Improve Trial starts from 200 to 400","direction":"increase","baseline":200,"target":400,"owner":"m2"},{"title":"Improve Qualified leads from 80 to 140","direction":"increase","baseline":80,"target":140,"owner":"m1"}]} |
+| the cap of four counts the KPI | {"root":{"id":"r","title":"Revenue","target":100,"current":60,"direction":"higher_better","healthyBoundary":90,"owner":"m0"},"nodes":[{"id":"c1","parent":"r","type":"leading","title":"D1","direction":"higher_better","current":1,"target":2,"position":1,"owner":"m1"},{"id":"c2","parent":"r","type":"leading","title":"D2","direction":"higher_better","current":2,"target":3,"position":2,"owner":"m1"},{"id":"c3","parent":"r","type":"leading","title":"D3","direction":"higher_better","current":3,"target":4,"position":3,"owner":"m1"},{"id":"c4","parent":"r","type":"leading","title":"D4","direction":"higher_better","current":4,"target":5,"position":4,"owner":"m1"},{"id":"c5","parent":"r","type":"leading","title":"D5","direction":"higher_better","current":5,"target":6,"position":5,"owner":"m1"}]} | {"objective":"Revenue back where the business can rely on it","keyResults":[{"title":"Revenue from 60 to 90","direction":"increase","baseline":60,"target":90,"owner":"m0"},{"title":"Improve D1 from 1 to 2","direction":"increase","baseline":1,"target":2,"owner":"m1"},{"title":"Improve D2 from 2 to 3","direction":"increase","baseline":2,"target":3,"owner":"m1"},{"title":"Improve D3 from 3 to 4","direction":"increase","baseline":3,"target":4,"owner":"m1"}]} |
+| acceptance: a driver already at or past its target is skipped | {"root":{"id":"r","title":"Revenue","target":100,"current":60,"direction":"higher_better","healthyBoundary":90,"owner":"m0"},"nodes":[{"id":"c1","parent":"r","type":"leading","title":"Sales calls per week","direction":"higher_better","current":120,"target":100,"position":1,"owner":"m1"},{"id":"c2","parent":"r","type":"leading","title":"Churned accounts","direction":"lower_better","current":3,"target":5,"position":2,"owner":"m2"},{"id":"c3","parent":"r","type":"leading","title":"Demos booked","direction":"higher_better","current":50,"target":50,"position":3,"owner":"m3"},{"id":"c4","parent":"r","type":"leading","title":"Activation rate","direction":"higher_better","current":41,"target":60,"position":4,"owner":"m4"}]} | {"objective":"Revenue back where the business can rely on it","keyResults":[{"title":"Revenue from 60 to 90","direction":"increase","baseline":60,"target":90,"owner":"m0"},{"title":"Improve Activation rate from 41 to 60","direction":"increase","baseline":41,"target":60,"owner":"m4"}]} |
+| a driver nobody owns is skipped | {"root":{"id":"r","title":"Revenue","target":100,"current":60,"direction":"higher_better","healthyBoundary":90,"owner":"m0"},"nodes":[{"id":"c1","parent":"r","type":"leading","title":"Trial starts","direction":"higher_better","current":200,"target":400,"position":1}]} | {"objective":"Revenue back where the business can rely on it","keyResults":[{"title":"Revenue from 60 to 90","direction":"increase","baseline":60,"target":90,"owner":"m0"}]} |
+| a leaf KPI is its own key result | {"root":{"id":"r","title":"Revenue","target":100,"current":60,"direction":"higher_better","healthyBoundary":90,"owner":"m0"},"nodes":[]} | {"objective":"Revenue back where the business can rely on it","keyResults":[{"title":"Revenue from 60 to 90","direction":"increase","baseline":60,"target":90,"owner":"m0"}]} |
+| a KPI that should fall reduces to its green boundary | {"root":{"id":"r","title":"Support tickets per account","target":2,"current":3.3,"direction":"lower_better","healthyBoundary":2.2,"owner":"m0"},"nodes":[]} | {"objective":"Support tickets per account back where the business can rely on it","keyResults":[{"title":"Support tickets per account from 3.3 to 2.2","direction":"reduce","baseline":3.3,"target":2.2,"owner":"m0"}]} |
+| with nothing to say where healthy is, the KPI's own target stands in | {"root":{"id":"r","title":"Revenue","target":100,"current":60},"nodes":[]} | {"objective":"Revenue back where the business can rely on it","keyResults":[{"title":"Revenue from 60 to 100","direction":"increase","baseline":60,"target":100}]} |
 
 ## 9. The recovery proposal and its closure
 
@@ -332,6 +364,18 @@ with no other state between them.
 | watching is not unhealthy | watch,watch | no |
 | a gap in the data resets it | unhealthy,no_data,unhealthy | no |
 | the most recent period is fine | unhealthy,unhealthy,healthy | no |
+| a fall from healthy to unhealthy in one period proposes at once | healthy,unhealthy | yes |
+| a fall through watch waits for the second period | healthy,watch,unhealthy | no |
+
+**Two things decide whether the proposal is asked at all, before the run of
+periods is read** (P9-T18b, METHOD.md §6.5 and §12):
+
+| Given | Then |
+|---|---|
+| The KPI was answered another way, by a fix task not yet done or a key result on an objective still open | No proposal. Asking for a recovery on top of an answer is asking twice |
+| That answer is closed (the task is done, or the objective closed) and the KPI is still unhealthy | The run of periods decides, as above |
+| The practice's `kpi.unhealthyResponse` is `draftRecovery` | The delay is one period: the first unhealthy period proposes |
+| Somebody answers the KPI another way while a proposal is pending | The proposal is settled as dismissed, decided by whoever answered, in the same transaction |
 
 Closure runs the other way. When **real** achievement re-enters the healthy
 corridor, the Coach proposes closing the recovery goal, exactly once. Real, not

@@ -1,0 +1,22 @@
+-- A key result may be saved before its target is known (METHOD.md §2.9,
+-- P9-T13-b-a).
+--
+-- **Quality checks never stop anybody writing; the gates stop publishing.**
+-- A metric key result with no target yet fails KR-3, which is a check set to
+-- block, and that is what the method asks for: added mid-cycle, it is a draft
+-- its space can see, with "a target" named as what is missing, and it goes
+-- live when the target is added. Refusing the row instead would lose what the
+-- writer did know, the title, the baseline, the date and the owner.
+--
+-- **A milestone or a baseline still stores nought to one**, as it has since
+-- P9-T12b. Its progress is read from being done, so those numbers mean
+-- nothing and a missing one would mean nothing either. Null is a metric or a
+-- maintain key result whose target nobody has set yet.
+--
+-- Forward-only and safe for a rolling upgrade: relaxing a constraint asks
+-- nothing of the previous release, which writes a target on every insert and
+-- reads the column through a number parse that turns null into nought. No row
+-- holds a null until this release writes one. `key_results` carries its
+-- tenant policy from migration 0022, which a constraint change does not touch.
+alter table key_results
+  alter column target_value drop not null;

@@ -97,8 +97,12 @@ test("the Draft Coach evaluates it, exactly as it does today", async () => {
     return;
   }
   // The coach's own region is not named in every layout, so fall back to what
-  // it renders: a §4 check id, which only the catalogue produces.
-  await expect(page.getByText(/OBJ-\d/).first()).toBeVisible({
+  // it renders: a §4 check id, or the strength line it writes under every
+  // objective. Until P9-T18a this asked for a check id alone, and found one
+  // only because the recovery objective an earlier spec launches carried a
+  // number, "Bring Operating margin back to 100", which OBJ-2 flagged. The
+  // recovery objective has no number since then.
+  await expect(page.getByText(/OBJ-\d|OKR strength/).first()).toBeVisible({
     timeout: 15_000,
   });
 });

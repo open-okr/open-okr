@@ -679,7 +679,7 @@ async function advanceToDiagnose(
 }
 
 describe("sessions.createBlocker (P4-T07c)", () => {
-  it("stores a blocker with due_at = opened + 24h", async () => {
+  it("stores a blocker due by its goal's next check-in (P9-T19a-a)", async () => {
     const wb = await workerDb();
     await createGoalWithKr();
     const sessionId = await openSessionAtConfidence();
@@ -691,27 +691,37 @@ describe("sessions.createBlocker (P4-T07c)", () => {
       {
         sessionId,
         keyResultId,
-        type: "resource",
+        type: "approach_not_working",
         ownerId: facilitatorMemberId,
-        nextAction: "Hire a contractor by Friday",
+        nextAction: "Try the guided setup with two pilot customers",
       },
     );
 
     expect((result as { id: string }).id).toBeTruthy();
 
-    // Verify the blocker status includes the correct due_at (approx 24h out).
+    // Due at the end of the goal's next check-in day, the first one after
+    // today, and never the same day: it was twenty-four hours from opening.
     const status = (await callAction(
       { pool: wb.appPool, ...context() },
       "sessions.blockerStatus",
       { sessionId },
-    )) as Array<{ dueAt: string; openedAt: string }>;
-
+    )) as Array<{
+      type: string;
+      dueAt: string;
+      dueOn: string;
+      openedAt: string;
+    }>;
     expect(status.length).toBe(1);
-    const blocker = status[0] as { dueAt: string; openedAt: string };
-    const opened = new Date(blocker.openedAt);
-    const due = new Date(blocker.dueAt);
-    const diffHours = (due.getTime() - opened.getTime()) / (1000 * 60 * 60);
-    expect(diffHours).toBeCloseTo(24, 0);
+    const blocker = status[0] as (typeof status)[number];
+    expect(blocker.type).toBe("approach_not_working");
+    const { rows } = await wb.admin.query<{ next_check_in_at: Date }>(
+      `select g.next_check_in_at from goals g
+         join key_results k on k.goal_id = g.id where k.id = $1`,
+      [keyResultId],
+    );
+    const nextCheckIn = rows[0]?.next_check_in_at as Date;
+    expect(new Date(blocker.dueAt).getTime()).toBe(nextCheckIn.getTime());
+    expect(blocker.dueOn > blocker.openedAt.slice(0, 10)).toBe(true);
   });
 });
 
@@ -751,7 +761,7 @@ describe("sessions.resolveBlocker (P4-T07c)", () => {
 });
 
 describe("sessions.advanceStage — diagnose completion gate (P4-T07c)", () => {
-  it("is refused when a low-confidence KR has no blocker (acceptance criterion)", async () => {
+  it("is refused when a low-confidence KR has neither a next action nor a blocker", async () => {
     const wb = await workerDb();
     await createGoalWithKr();
     const sessionId = await openSessionAtConfidence();
@@ -759,12 +769,135 @@ describe("sessions.advanceStage — diagnose completion gate (P4-T07c)", () => {
     // Confirm at 0.3 (below low threshold of 0.4) and advance to diagnose.
     await advanceToDiagnose(sessionId, 0.3);
 
-    // No blocker created. Advancing from diagnose should fail.
+    // Nothing named. Advancing from diagnose should fail.
     await expect(
       callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
         id: sessionId,
       }),
-    ).rejects.toThrow(/below.*0\.4.*no blocker/i);
+    ).rejects.toThrow(/below.*0\.4.*no next action/i);
+  });
+
+  /**
+   * P9-T19a-b's acceptance criterion: "Given a key result scored low with
+   * nothing blocking it, when the team names a next action and its owner,
+   * then the session moves on without a blocker, and the action is due by the
+   * next check-in."
+   */
+  it("acceptance: moves on with a next action and no blocker, due by the next check-in (P9-T19a-b)", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.3);
+
+    const set = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setNextAction",
+      {
+        sessionId,
+        keyResultId,
+        nextAction: "Mei confirms the new import date on Thursday",
+        ownerId: facilitatorMemberId,
+      },
+    )) as { dueAt: string };
+    const { rows } = await wb.admin.query<{ next_check_in_at: Date }>(
+      `select g.next_check_in_at from goals g
+         join key_results k on k.goal_id = g.id where k.id = $1`,
+      [keyResultId],
+    );
+    const nextCheckIn = rows[0]?.next_check_in_at as Date;
+    expect(new Date(set.dueAt).getTime()).toBe(nextCheckIn.getTime());
+
+    const scores = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.lowScores",
+      { sessionId },
+    )) as {
+      keyResultId: string;
+      low: boolean;
+      blocked: boolean;
+      nextAction: { text: string; ownerId: string; dueOn: string } | null;
+    }[];
+    expect(scores).toHaveLength(1);
+    expect(scores[0]).toMatchObject({
+      keyResultId,
+      low: true,
+      blocked: false,
+      nextAction: {
+        text: "Mei confirms the new import date on Thursday",
+        ownerId: facilitatorMemberId,
+      },
+    });
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+    expect((result as { id: string }).id).toBe(sessionId);
+    const blockers = await wb.admin.query(
+      "select id from blockers where session_id = $1",
+      [sessionId],
+    );
+    expect(blockers.rows).toEqual([]);
+  });
+
+  it("lists a key result whose confidence fell since the last session, though it is not low", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.5);
+    // The same key result confirmed at 0.7 in an earlier session.
+    const other = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.create",
+      {
+        spaceId,
+        kind: "weekly",
+        title: "Last week",
+        scheduledFor: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+        facilitatorId: facilitatorMemberId,
+      },
+    )) as { id: string };
+    await wb.admin.query(
+      `insert into session_confidences
+         (id, workspace_id, session_id, key_result_id, confirmed_confidence,
+          what_changed, confirmed_by_id, created_at)
+       select gen_random_uuid(), workspace_id, $1, $2, 0.7, 'Last week', $3,
+              now() - interval '7 days'
+         from okr_sessions where id = $1`,
+      [other.id, keyResultId, facilitatorMemberId],
+    );
+
+    const scores = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.lowScores",
+      { sessionId },
+    )) as {
+      low: boolean;
+      dropped: boolean;
+      previousConfidence: number | null;
+    }[];
+    expect(scores).toEqual([
+      expect.objectContaining({
+        low: false,
+        dropped: true,
+        previousConfidence: 0.7,
+      }),
+    ]);
+  });
+
+  it("refuses a next action before the confidence is confirmed", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.setNextAction", {
+        sessionId,
+        keyResultId,
+        nextAction: "Something",
+        ownerId: facilitatorMemberId,
+      }),
+    ).rejects.toThrow(/Confirm this key result's confidence first/);
   });
 
   it("succeeds after a blocker is created for the low-confidence KR", async () => {
@@ -864,16 +997,17 @@ describe("sessions.setCommitments (P4-T08)", () => {
         items: [
           { text: "Ship the onboarding flow", ownerId: facilitatorMemberId },
           { text: "Review the Q3 pipeline", ownerId: memberMemberId },
+          { text: "Call the two stalled accounts", ownerId: memberMemberId },
         ],
       },
     );
 
-    expect((result as { count: number }).count).toBe(2);
+    expect((result as { count: number }).count).toBe(3);
   });
 });
 
 describe("sessions.advanceStage commitments gate (P4-T08)", () => {
-  it("is refused from commitments to digest with fewer than 2 commitments", async () => {
+  it("is refused from commitments to digest with fewer than 3 commitments (§11, P9-T19a-d-c)", async () => {
     const wb = await workerDb();
     await createGoalWithKr();
     const sessionId = await openSessionAtConfidence();
@@ -892,10 +1026,10 @@ describe("sessions.advanceStage commitments gate (P4-T08)", () => {
       callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
         id: sessionId,
       }),
-    ).rejects.toThrow(/at least 2 commitments/i);
+    ).rejects.toThrow(/at least 3 commitments/i);
   });
 
-  it("succeeds with 2 commitments", async () => {
+  it("succeeds with 3 commitments", async () => {
     const wb = await workerDb();
     await createGoalWithKr();
     const sessionId = await openSessionAtConfidence();
@@ -909,6 +1043,7 @@ describe("sessions.advanceStage commitments gate (P4-T08)", () => {
         items: [
           { text: "Ship the onboarding flow", ownerId: facilitatorMemberId },
           { text: "Review the Q3 pipeline", ownerId: memberMemberId },
+          { text: "Call the two stalled accounts", ownerId: memberMemberId },
         ],
       },
     );
@@ -937,6 +1072,7 @@ describe("sessions.close digest and streak (P4-T08)", () => {
         items: [
           { text: "Ship it", ownerId: facilitatorMemberId },
           { text: "Review it", ownerId: memberMemberId },
+          { text: "Tell them", ownerId: memberMemberId },
         ],
       },
     );
@@ -972,6 +1108,7 @@ describe("sessions.close digest and streak (P4-T08)", () => {
         items: [
           { text: "Ship it", ownerId: facilitatorMemberId },
           { text: "Review it", ownerId: memberMemberId },
+          { text: "Tell them", ownerId: memberMemberId },
         ],
       },
     );
@@ -1005,6 +1142,7 @@ describe("sessions.close digest and streak (P4-T08)", () => {
         items: [
           { text: "A", ownerId: facilitatorMemberId },
           { text: "B", ownerId: memberMemberId },
+          { text: "C", ownerId: memberMemberId },
         ],
       },
     );
@@ -1045,6 +1183,7 @@ describe("the streak counts weeks of check-ins (completeness review M-04)", () =
         items: [
           { text: "A", ownerId: facilitatorMemberId },
           { text: "B", ownerId: memberMemberId },
+          { text: "C", ownerId: memberMemberId },
         ],
       },
     );
@@ -1119,6 +1258,40 @@ describe("the streak counts weeks of check-ins (completeness review M-04)", () =
     expect(streak.currentWeeks).toBe(0);
     expect(streak.longestWeeks).toBe(1);
   });
+
+  /**
+   * P9-T19a-d-b's acceptance criterion: "Given a space that checks in every
+   * two weeks, when a week passes without a check-in, then its streak
+   * holds."
+   */
+  it("acceptance: holds for a space on every two weeks through the week between (P9-T19a-d-b)", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.updateSettings",
+      { id: spaceId, defaultCheckInFrequency: "biweekly" },
+    );
+    await holdWeeklyCheckIn();
+    expect((await readStreak()).currentWeeks).toBe(1);
+    // The last check-in a fortnight's period ago: a week of the fortnight
+    // passed with nothing, which on weekly periods reads as broken.
+    await wb.admin.query(
+      `update streaks
+          set last_session_week =
+                (date_trunc('week', current_date) - interval '14 days')::date
+        where space_id = $1`,
+      [spaceId],
+    );
+    expect((await readStreak()).currentWeeks).toBe(1);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.updateSettings",
+      { id: spaceId, defaultCheckInFrequency: "weekly" },
+    );
+    expect((await readStreak()).currentWeeks).toBe(0);
+  });
 });
 
 describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {
@@ -1126,12 +1299,12 @@ describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {
     const wb = await workerDb();
     await createGoalWithKr();
 
-    // A workspace that wants three a week. The gate held `const
+    // A workspace that wants four a week. The gate held `const
     // MIN_COMMITMENTS = 2` under a comment naming this very registry entry,
     // so a workspace that moved the bound was still gated on the canon
     // default and told the wrong number.
     await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
-      overrides: { "sessions.weeklyCommitmentBounds": { low: 3, high: 4 } },
+      overrides: { "sessions.weeklyCommitmentBounds": { low: 4, high: 5 } },
     });
 
     const sessionId = await openSessionAtConfidence();
@@ -1144,16 +1317,17 @@ describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {
         items: [
           { text: "One", ownerId: facilitatorMemberId },
           { text: "Two", ownerId: memberMemberId },
+          { text: "Three", ownerId: memberMemberId },
         ],
       },
     );
 
-    // Two would have passed the canon default. This workspace asked for three.
+    // Three would have passed the canon default. This workspace asked for four.
     await expect(
       callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
         id: sessionId,
       }),
-    ).rejects.toThrow(/at least 3 commitments/i);
+    ).rejects.toThrow(/at least 4 commitments/i);
   });
 });
 
@@ -1226,14 +1400,32 @@ describe("sessions.carriedCommitments (P6-G19a)", () => {
     expect(before).toHaveLength(2);
 
     // Not delivered is still closed. §7.2 asks the room to say whether it
-    // landed, not to keep asking until it does.
+    // landed, not to keep asking until it does, and since METHOD v2 with a
+    // line on why where it helps (P9-T19a-d-c).
     await callAction(
       { pool: wb.appPool, ...context() },
       "sessions.closeCommitments",
       {
-        items: before.map((one) => ({ id: one.id, delivered: false })),
+        items: before.map((one) => ({
+          id: one.id,
+          delivered: false,
+          ...(one.text === "Missed one"
+            ? { note: "Legal held the contract a week" }
+            : {}),
+        })),
       },
     );
+    const notes = await wb.admin.query<{
+      text: string;
+      closing_note: string | null;
+    }>(
+      "select text, closing_note from commitments where session_id = $1 order by text",
+      [lastWeek],
+    );
+    expect(notes.rows).toEqual([
+      { text: "Delivered one", closing_note: null },
+      { text: "Missed one", closing_note: "Legal held the contract a week" },
+    ]);
 
     const after = await callAction(
       { pool: wb.appPool, ...context() },
@@ -1241,6 +1433,33 @@ describe("sessions.carriedCommitments (P6-G19a)", () => {
       { sessionId: thisWeek },
     );
     expect(after).toEqual([]);
+  });
+
+  it("names the week's wins in a weekly check-in, and nowhere else (P9-T19a-d-c)", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const weekly = await openSessionAtConfidence();
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.setWins", {
+      sessionId: weekly,
+      wins: ["Pricing page live"],
+    });
+    const read = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.read",
+      { id: weekly },
+    )) as { wins: string[] };
+    expect(read.wins).toEqual(["Pricing page live"]);
+
+    const monthly = (await createSession({
+      kind: "monthly",
+      title: "Monthly review",
+    })) as { id: string };
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.setWins", {
+        sessionId: monthly.id,
+        wins: ["Not here"],
+      }),
+    ).rejects.toThrow(/weekly check-in/);
   });
 
   it("refuses a session id it cannot see, rather than answering empty", async () => {
@@ -1270,6 +1489,7 @@ async function holdAWeek(confidence: number): Promise<string> {
       items: [
         { text: "One", ownerId: facilitatorMemberId },
         { text: "Two", ownerId: memberMemberId },
+        { text: "Three", ownerId: memberMemberId },
       ],
     },
   );

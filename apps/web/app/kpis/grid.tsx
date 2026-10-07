@@ -32,8 +32,12 @@ export interface GridKpi {
   readonly unit: string | null;
   readonly direction: string;
   readonly indicatorType: string;
-  readonly tier: string;
+  /** Optional (§6.2): null when no tier was chosen. */
+  readonly tier: string | null;
+  /** The band, or no data (§6.4). */
   readonly state: string;
+  /** An open recovery objective, shown beside the band (P9-T17b-a). */
+  readonly recovering: boolean;
   readonly achievementPct: number | null;
   readonly targetDefault: number | null;
   readonly healthyPct: number;
@@ -44,6 +48,8 @@ export interface GridKpi {
     readonly actualValue: number | null;
     readonly targetValue: number | null;
     readonly remark: string | null;
+    /** This period's band by the KPI's own rule, from the server (P9-T17a). */
+    readonly band: "healthy" | "watch" | "unhealthy" | null;
   }[];
 }
 
@@ -88,32 +94,16 @@ function isPeriodOf(kpi: GridKpi, column: string, today: string): boolean {
   return normalisePeriod(kpi.frequency as KpiFrequency, today) === column;
 }
 
-/** The band this one cell falls in, from this KPI's own corridor. */
-function cellTone(
-  kpi: GridKpi,
-  actual: number | null,
-  target: number | null,
-): string {
-  if (actual === null || target === null || target < 0) {
-    return "bg-surface";
-  }
-  const pct =
-    kpi.direction === "higher_better"
-      ? target === 0
-        ? actual > 0
-          ? 200
-          : 0
-        : (actual / target) * 100
-      : actual <= 0
-        ? 200
-        : target === 0
-          ? 0
-          : (target / actual) * 100;
-  if (pct >= kpi.healthyPct) {
-    return "bg-ok-bg";
-  }
-  return pct >= kpi.watchPct ? "bg-warn-bg" : "bg-bad-bg";
-}
+/**
+ * The colour of one cell, from the band the server read for that period by
+ * the KPI's own rule (P9-T17a). It used to work the ratio out here, which was
+ * a second copy of §6.4 and the wrong answer for a KPI with thresholds.
+ */
+const BAND_TONE: Readonly<Record<string, string>> = {
+  healthy: "bg-ok-bg",
+  watch: "bg-warn-bg",
+  unhealthy: "bg-bad-bg",
+};
 
 const STATE_TONE: Readonly<Record<string, string>> = {
   healthy: "text-ok",
@@ -270,7 +260,8 @@ export function KpiGrid({
                         </span>
                         <span className="text-ink-4">
                           {kpi.frequency} · {kpi.direction.replace("_", " ")} ·{" "}
-                          {kpi.indicatorType} · {kpi.tier}
+                          {kpi.indicatorType}
+                          {kpi.tier ? ` · ${kpi.tier}` : ""}
                           {kpi.unit ? ` · ${kpi.unit}` : ""}
                           {kpi.isCalculated ? (
                             <> · {t("kpis.grid.calculated")}</>
@@ -279,6 +270,7 @@ export function KpiGrid({
                       </span>
                     </th>
                     <td
+                      data-state={kpi.state}
                       className={`p-2 text-right font-semibold ${
                         STATE_TONE[kpi.state] ?? "text-ink-4"
                       }`}
@@ -286,19 +278,30 @@ export function KpiGrid({
                       {kpi.achievementPct === null
                         ? kpi.state.replace("_", " ")
                         : `${kpi.achievementPct}%`}
+                      {/* Beside the band, never instead of it (§6.4,
+                          P9-T17b-a). */}
+                      {kpi.recovering ? (
+                        <span
+                          data-testid="kpi-recovering"
+                          className="block text-[10px] font-semibold text-brand-text"
+                        >
+                          {t("kpis.grid.recovering")}
+                        </span>
+                      ) : null}
                     </td>
                     {columns.map((column) => {
                       const record = kpi.records.find(
                         (entry) => entry.periodStart === column,
                       );
                       const actual = record?.actualValue ?? null;
-                      const target =
-                        record?.targetValue ?? kpi.targetDefault ?? null;
                       const original = actual === null ? "" : String(actual);
                       return (
                         <td
                           key={column}
-                          className={`p-0.5 ${cellTone(kpi, actual, target)}`}
+                          data-band={record?.band ?? undefined}
+                          className={`p-0.5 ${
+                            BAND_TONE[record?.band ?? ""] ?? "bg-surface"
+                          }`}
                         >
                           {!isPeriodOf(kpi, column, today) ? (
                             <span className="block px-1.5 py-1 text-right text-ink-4">

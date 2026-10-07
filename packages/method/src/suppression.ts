@@ -3,7 +3,7 @@ import type { ResolvedThresholds } from "./thresholds.ts";
 /**
  * Whether to stay quiet, and why (AI-NATIVE-PLAN.md §6.3, P4-T04b).
  *
- * Pure, so the five reasons a product says nothing are golden-master tested
+ * Pure, so the seven reasons a product says nothing are golden-master tested
  * without a clock, a member row or a queue. Every one of them is a decision
  * rather than an accident, which is why the answer is a reason and never a
  * bare boolean: a product that silently drops a message cannot answer "why did
@@ -21,7 +21,9 @@ export type SuppressionReason =
   | "quiet_hours"
   | "snooze"
   | "disabled"
-  | "ceiling";
+  | "ceiling"
+  | "holiday"
+  | "leave";
 
 export interface SuppressionInput {
   /** The rule this nudge cites, for the exemption check. */
@@ -70,6 +72,18 @@ export interface SuppressionInput {
   readonly snoozedUntilHoursAway: number | null;
   /** How many nudges this member has already had in the last seven days. */
   readonly sentThisWeek: number;
+  /**
+   * Set when the nudge is about a space's check-in rhythm and the space is on
+   * holiday today (METHOD.md §7.4, P9-T19b-a): "nobody is nudged for them".
+   * Absent reads as no holiday.
+   */
+  readonly onHoliday?: boolean;
+  /**
+   * Set when the recipient is on leave today and the nudge is not one their
+   * delegate takes over (METHOD.md §7.4, P9-T19b-b): "While they are away
+   * nobody nudges them." Absent reads as not away.
+   */
+  readonly onLeave?: boolean;
 }
 
 /** `HH:MM` as minutes past midnight, or null when it is not a time. */
@@ -143,6 +157,14 @@ export function deferralFor(input: {
 }
 
 /**
+ * The rule that carries what the ceiling holds back (METHOD.md §11,
+ * P9-T19a-c-b): "Anything past the ceiling waits for the next digest". The
+ * daily digest is how a held message still arrives, so it is not itself held
+ * by the ceiling it reports on, and it does not count towards it.
+ */
+export const CEILING_CARRIER = "digest.daily";
+
+/**
  * The reason to stay quiet, or null to send.
  *
  * `disabled` comes first because a switched-off rule should never appear in the
@@ -155,6 +177,19 @@ export function suppressionFor(
 ): SuppressionReason | null {
   if (!input.ruleEnabled) {
     return "disabled";
+  }
+
+  // A holiday before everything else the product decides, escalations
+  // included: the whole space is away, so there is nobody to escalate to who
+  // is not also on holiday, and the ladder resumes when they are back.
+  if (input.onHoliday) {
+    return "holiday";
+  }
+
+  // Away, with nobody to pass this one to: the person is not there to read
+  // it, and an escalation that reaches an empty desk is not an escalation.
+  if (input.onLeave) {
+    return "leave";
   }
 
   // Deduplication: one per subject per member per window, unless the step
@@ -196,7 +231,11 @@ export function suppressionFor(
   // §11 bounds noise; it does not bound the product's duty to tell somebody
   // their goal has been stale for a fortnight.
   const ceiling = thresholds["cadence.nudgeCeilingPerWeek"];
-  if (!input.urgent && input.sentThisWeek >= ceiling) {
+  if (
+    !input.urgent &&
+    input.ruleKey !== CEILING_CARRIER &&
+    input.sentThisWeek >= ceiling
+  ) {
     return "ceiling";
   }
 

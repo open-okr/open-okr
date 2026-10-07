@@ -50,6 +50,9 @@ export async function createGoal(
   const level = String(formData.get("level") ?? "company");
   const championId = String(formData.get("championId") ?? "");
   const reviewerId = String(formData.get("reviewerId") ?? "");
+  // Absent where the workspace uses one kind; `goals.create` then uses its
+  // default. Anything but the two words is left to that default too.
+  const kind = String(formData.get("kind") ?? "");
 
   if (title === "") {
     const { t } = await getTranslations();
@@ -66,12 +69,12 @@ export async function createGoal(
       // `goals.create` then names whoever is drafting, and an empty string
       // would fail the uuid schema instead.
       ...(championId ? { championId } : {}),
-      ...(reviewerId ? { reviewerId } : {}),
+      // "" is the "No reviewer" option, or no picker at all where the
+      // practice turns reviewers off (P9-T04), and either means none.
+      reviewerId: reviewerId === "" ? null : reviewerId,
       weight: 1,
       ...(contributionStatement === "" ? {} : { contributionStatement }),
-      // Phase 4 of the guided cycle: refused, with the reason, while an
-      // earlier phase is incomplete (REQUIREMENTS §3.1, H-09).
-      guided: true,
+      ...(kind === "committed" || kind === "aspirational" ? { kind } : {}),
     }),
   );
 }
@@ -111,7 +114,6 @@ export async function addKeyResult(
       ...(ownerId === "" ? {} : { ownerId }),
       ...(dueOn === "" ? {} : { dueOn }),
       ...(kpiId === "" ? {} : { kpiId }),
-      guided: true,
       direction: String(formData.get("direction") ?? "increase") as
         | "increase"
         | "reduce"

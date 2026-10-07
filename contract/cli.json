@@ -3585,6 +3585,103 @@
       "pages": false
     },
     {
+      "name": "spaces setHolidays",
+      "action": "spaces.setHolidays",
+      "method": "POST",
+      "path": "/spaces/setHolidays",
+      "scope": "write",
+      "summary": "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break (METHOD.md §7.4).",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "holidays",
+          "field": "holidays",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "spaces holidays",
+      "action": "spaces.holidays",
+      "method": "GET",
+      "path": "/spaces/holidays",
+      "scope": "read",
+      "summary": "The spans a space marks as holidays, oldest first (METHOD.md §7.4).",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "people setLeave",
+      "action": "people.setLeave",
+      "method": "POST",
+      "path": "/people/setLeave",
+      "scope": "write",
+      "summary": "Sets the signed-in member's own leave, each span with the delegate who stands in (METHOD.md §7.4).",
+      "flags": [
+        {
+          "name": "leave",
+          "field": "leave",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "people setMemberLeave",
+      "action": "people.setMemberLeave",
+      "method": "POST",
+      "path": "/people/setMemberLeave",
+      "scope": "write",
+      "summary": "Sets another member's leave, each span with the delegate who stands in (METHOD.md §7.4). For an administrator.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leave",
+          "field": "leave",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "people leave",
+      "action": "people.leave",
+      "method": "GET",
+      "path": "/people/leave",
+      "scope": "read",
+      "summary": "One member's leave, oldest first, with who stands in for each span (METHOD.md §7.4).",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "spaces archive",
       "action": "spaces.archive",
       "method": "POST",
@@ -3734,6 +3831,40 @@
       "scope": "read",
       "summary": "Every cycle this workspace has, newest first.",
       "flags": [],
+      "pages": false
+    },
+    {
+      "name": "cycles levelsInUse",
+      "action": "cycles.levelsInUse",
+      "method": "GET",
+      "path": "/cycles/levelsInUse",
+      "scope": "read",
+      "summary": "The OKR levels one cycle offers: the levels it began with, plus any its objectives already use.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "cycles rules",
+      "action": "cycles.rules",
+      "method": "GET",
+      "path": "/cycles/rules",
+      "scope": "read",
+      "summary": "The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
       "pages": false
     },
     {
@@ -3960,7 +4091,7 @@
       "method": "POST",
       "path": "/cycles/feedForward",
       "scope": "write",
-      "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
+      "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
       "flags": [
         {
           "name": "from-cycle-id",
@@ -3983,7 +4114,7 @@
       "method": "POST",
       "path": "/cycles/close",
       "scope": "write",
-      "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+      "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action.",
       "flags": [
         {
           "name": "cycle-id",
@@ -4000,7 +4131,7 @@
       "method": "GET",
       "path": "/cycles/scorecard",
       "scope": "read",
-      "summary": "Every archived cycle's result with its band counts and verdict, oldest first. Drives the scorecard.",
+      "summary": "Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard.",
       "flags": [],
       "pages": false
     },
@@ -4185,6 +4316,57 @@
       "pages": false
     },
     {
+      "name": "practice read",
+      "action": "practice.read",
+      "method": "GET",
+      "path": "/practice/read",
+      "scope": "read",
+      "summary": "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "practice update",
+      "action": "practice.update",
+      "method": "POST",
+      "path": "/practice/update",
+      "scope": "write",
+      "summary": "Changes some of this workspace's practice settings. A setting set to null goes back to its profile's value.",
+      "flags": [
+        {
+          "name": "overrides",
+          "field": "overrides",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "practice applyProfile",
+      "action": "practice.applyProfile",
+      "method": "POST",
+      "path": "/practice/applyProfile",
+      "scope": "write",
+      "summary": "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
+      "flags": [
+        {
+          "name": "profile",
+          "field": "profile",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "recommended",
+            "googleStyle",
+            "radicalFocus",
+            "lightweight",
+            "governed"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "frame annualObjectives",
       "action": "frame.annualObjectives",
       "method": "GET",
@@ -4200,7 +4382,7 @@
       "method": "GET",
       "path": "/frame/read",
       "scope": "read",
-      "summary": "The current annual frame and its strategic thrusts.",
+      "summary": "The current annual frame, its strategic thrusts, and every revision made since it was agreed.",
       "flags": [],
       "pages": false
     },
@@ -4210,7 +4392,7 @@
       "method": "POST",
       "path": "/frame/set",
       "scope": "write",
-      "summary": "Creates or replaces the current annual frame. A replacement supersedes rather than edits.",
+      "summary": "Creates or replaces the current annual frame. A replacement supersedes rather than edits. Revising an agreed frame within its year needs a written reason, and the revision is kept.",
       "flags": [
         {
           "name": "year-label",
@@ -4258,6 +4440,12 @@
           "name": "strategies",
           "field": "strategies",
           "type": "array",
+          "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
           "required": false
         }
       ],
@@ -4560,12 +4748,12 @@
       "pages": false
     },
     {
-      "name": "workflow calibrate",
-      "action": "workflow.calibrate",
+      "name": "workflow publish",
+      "action": "workflow.publish",
       "method": "POST",
-      "path": "/workflow/calibrate",
+      "path": "/workflow/publish",
       "scope": "write",
-      "summary": "Records the one mid-cycle calibration a cycle is allowed (METHOD.md §7.6).",
+      "summary": "Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated.",
       "flags": [
         {
           "name": "cycle-id",
@@ -4574,27 +4762,14 @@
           "required": true
         },
         {
-          "name": "reason",
-          "field": "reason",
+          "name": "step",
+          "field": "step",
           "type": "string",
-          "required": true
-        }
-      ],
-      "pages": false
-    },
-    {
-      "name": "workflow publish",
-      "action": "workflow.publish",
-      "method": "POST",
-      "path": "/workflow/publish",
-      "scope": "write",
-      "summary": "Publishes the set, refusing while any of the six gates is red or cannot be evaluated.",
-      "flags": [
-        {
-          "name": "cycle-id",
-          "field": "cycleId",
-          "type": "string",
-          "required": true
+          "required": false,
+          "enum": [
+            "company",
+            "teams"
+          ]
         },
         {
           "name": "override",
@@ -6048,7 +6223,8 @@
             "off_track",
             "outdated",
             "achieved",
-            "missed"
+            "missed",
+            "abandoned"
           ]
         },
         {
@@ -6134,6 +6310,16 @@
           ]
         },
         {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "committed",
+            "aspirational"
+          ]
+        },
+        {
           "name": "owner-kind",
           "field": "ownerKind",
           "type": "string",
@@ -6215,6 +6401,12 @@
           "field": "guided",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -6282,6 +6474,12 @@
           "required": false
         },
         {
+          "name": "standalone-reason",
+          "field": "standaloneReason",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "strategy-id",
           "field": "strategyId",
           "type": "string",
@@ -6317,7 +6515,8 @@
           "required": true,
           "enum": [
             "achieved",
-            "missed"
+            "missed",
+            "abandoned"
           ]
         },
         {
@@ -6326,8 +6525,10 @@
           "type": "string",
           "required": true,
           "enum": [
+            "achieved",
             "keep",
             "modify",
+            "defer",
             "abandon"
           ]
         },
@@ -6415,12 +6616,35 @@
       "pages": false
     },
     {
+      "name": "goals stop",
+      "action": "goals.stop",
+      "method": "POST",
+      "path": "/goals/stop",
+      "scope": "write",
+      "summary": "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9).",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals reassignRole",
       "action": "goals.reassignRole",
       "method": "POST",
       "path": "/goals/reassignRole",
       "scope": "write",
-      "summary": "Moves the champion or the reviewer to another member, rebinding access with it.",
+      "summary": "Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off.",
       "flags": [
         {
           "name": "id",
@@ -6497,10 +6721,22 @@
           "required": false
         },
         {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "metric",
+            "maintain",
+            "milestone",
+            "baseline"
+          ]
+        },
+        {
           "name": "direction",
           "field": "direction",
           "type": "string",
-          "required": true,
+          "required": false,
           "enum": [
             "increase",
             "reduce",
@@ -6522,13 +6758,13 @@
           "name": "baseline-value",
           "field": "baselineValue",
           "type": "number",
-          "required": true
+          "required": false
         },
         {
           "name": "target-value",
           "field": "targetValue",
           "type": "number",
-          "required": true
+          "required": false
         },
         {
           "name": "current-value",
@@ -6582,6 +6818,12 @@
           "field": "guided",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -6592,7 +6834,7 @@
       "method": "POST",
       "path": "/goals/updateKeyResult",
       "scope": "write",
-      "summary": "Edits a key result's definition. The current value has its own action, because it is history.",
+      "summary": "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
       "flags": [
         {
           "name": "id",
@@ -6610,6 +6852,24 @@
           "name": "unit",
           "field": "unit",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "metric",
+            "maintain",
+            "milestone",
+            "baseline"
+          ]
+        },
+        {
+          "name": "done",
+          "field": "done",
+          "type": "boolean",
           "required": false
         },
         {
@@ -6647,6 +6907,12 @@
           "required": false
         },
         {
+          "name": "target-reason",
+          "field": "targetReason",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "due-on",
           "field": "dueOn",
           "type": "string",
@@ -6675,6 +6941,319 @@
           "field": "carryForward",
           "type": "boolean",
           "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals tree",
+      "action": "goals.tree",
+      "method": "GET",
+      "path": "/goals/tree",
+      "scope": "read",
+      "summary": "One cycle's objectives with their key results, alignment and dependencies, shaped for the OKR list and diagram, with parents outside the set as read-only context.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "scope",
+          "field": "scope",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "all",
+            "mine"
+          ]
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "include-closed",
+          "field": "includeClosed",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals creationPolicy",
+      "action": "goals.creationPolicy",
+      "method": "GET",
+      "path": "/goals/creationPolicy",
+      "scope": "read",
+      "summary": "Whether a new objective may be written in a cycle now, with the practice's reasons and the settings behind them when it may not.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals place",
+      "action": "goals.place",
+      "method": "POST",
+      "path": "/goals/place",
+      "scope": "write",
+      "summary": "Puts an objective straight after another in its cycle, or first, and renumbers the cycle's whole order so a row a filter hides keeps its place.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "after-id",
+          "field": "afterId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals placeKeyResult",
+      "action": "goals.placeKeyResult",
+      "method": "POST",
+      "path": "/goals/placeKeyResult",
+      "scope": "write",
+      "summary": "Puts a key result straight after another under its objective, or first, and renumbers the objective's key results.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "after-id",
+          "field": "afterId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals patch",
+      "action": "goals.patch",
+      "method": "POST",
+      "path": "/goals/patch",
+      "scope": "write",
+      "summary": "Changes some of an objective's fields, refused with the current values if any of them changed since the caller read them.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "set",
+          "field": "set",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals patchKeyResult",
+      "action": "goals.patchKeyResult",
+      "method": "POST",
+      "path": "/goals/patchKeyResult",
+      "scope": "write",
+      "summary": "Changes some of a key result's fields, refused with the current values if any of them changed since the caller read them. The target and the current value have their own actions.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "set",
+          "field": "set",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals changeTarget",
+      "action": "goals.changeTarget",
+      "method": "POST",
+      "path": "/goals/changeTarget",
+      "scope": "write",
+      "summary": "Changes a key result's target and records the change. Easing it toward its baseline needs a reason where the workspace asks for one.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "target-value",
+          "field": "targetValue",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals setKind",
+      "action": "goals.setKind",
+      "method": "POST",
+      "path": "/goals/setKind",
+      "scope": "write",
+      "summary": "Marks an objective committed or aspirational (METHOD.md §2.8), recording the change and its reason in the objective's activity.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "committed",
+            "aspirational"
+          ]
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals moveToSpace",
+      "action": "goals.moveToSpace",
+      "method": "POST",
+      "path": "/goals/moveToSpace",
+      "scope": "write",
+      "summary": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals publishDraft",
+      "action": "goals.publishDraft",
+      "method": "POST",
+      "path": "/goals/publishDraft",
+      "scope": "write",
+      "summary": "Publishes an objective that waits as a draft (METHOD.md §2.9). Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals approveDraft",
+      "action": "goals.approveDraft",
+      "method": "POST",
+      "path": "/goals/approveDraft",
+      "scope": "write",
+      "summary": "Approves a published draft, which only its reviewer does (METHOD.md §2.9). It goes live, and its check-in rhythm starts.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals targetHistory",
+      "action": "goals.targetHistory",
+      "method": "GET",
+      "path": "/goals/targetHistory",
+      "scope": "read",
+      "summary": "Every change to a key result's target, oldest first, with who made it and the reason given for easing it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals restoreKeyResult",
+      "action": "goals.restoreKeyResult",
+      "method": "POST",
+      "path": "/goals/restoreKeyResult",
+      "scope": "write",
+      "summary": "Brings back a key result that was removed on its own, with its value history.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false
@@ -7428,6 +8007,23 @@
       "pages": false
     },
     {
+      "name": "goals escalateDependency",
+      "action": "goals.escalateDependency",
+      "method": "POST",
+      "path": "/goals/escalateDependency",
+      "scope": "write",
+      "summary": "Escalates an unconfirmed dependency to the cycle's sponsor, whose review inbox lists it until it is confirmed or a risk owner is named.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals removeKeyResultDependency",
       "action": "goals.removeKeyResultDependency",
       "method": "POST",
@@ -7568,6 +8164,43 @@
           ]
         },
         {
+          "name": "target-type",
+          "field": "targetType",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "at_least",
+            "at_most",
+            "increase_to",
+            "decrease_to",
+            "range"
+          ]
+        },
+        {
+          "name": "green-low",
+          "field": "greenLow",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "green-high",
+          "field": "greenHigh",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "red-low",
+          "field": "redLow",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "red-high",
+          "field": "redHigh",
+          "type": "number",
+          "required": false
+        },
+        {
           "name": "indicator-type",
           "field": "indicatorType",
           "type": "string",
@@ -7581,13 +8214,7 @@
           "name": "tier",
           "field": "tier",
           "type": "string",
-          "required": false,
-          "enum": [
-            "input",
-            "output",
-            "outcome",
-            "impact"
-          ]
+          "required": false
         },
         {
           "name": "aggregate",
@@ -7599,7 +8226,9 @@
             "avg",
             "max",
             "min",
-            "count"
+            "count",
+            "last",
+            "first"
           ]
         },
         {
@@ -7622,6 +8251,12 @@
         {
           "name": "member-id",
           "field": "memberId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "owner-member-id",
+          "field": "ownerMemberId",
           "type": "string",
           "required": false
         },
@@ -7820,6 +8455,45 @@
       "pages": false
     },
     {
+      "name": "kpis recordResponse",
+      "action": "kpis.recordResponse",
+      "method": "POST",
+      "path": "/kpis/recordResponse",
+      "scope": "write",
+      "summary": "Records how an unhealthy KPI was answered: fixed now as a task, or by a key result on an existing objective.",
+      "flags": [
+        {
+          "name": "kpi-id",
+          "field": "kpiId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "fix_now",
+            "key_result"
+          ]
+        },
+        {
+          "name": "task-id",
+          "field": "taskId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "kpis recoveryDraft",
       "action": "kpis.recoveryDraft",
       "method": "GET",
@@ -7940,6 +8614,43 @@
           ]
         },
         {
+          "name": "target-type",
+          "field": "targetType",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "at_least",
+            "at_most",
+            "increase_to",
+            "decrease_to",
+            "range"
+          ]
+        },
+        {
+          "name": "green-low",
+          "field": "greenLow",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "green-high",
+          "field": "greenHigh",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "red-low",
+          "field": "redLow",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "red-high",
+          "field": "redHigh",
+          "type": "number",
+          "required": false
+        },
+        {
           "name": "indicator-type",
           "field": "indicatorType",
           "type": "string",
@@ -7953,13 +8664,13 @@
           "name": "tier",
           "field": "tier",
           "type": "string",
-          "required": false,
-          "enum": [
-            "input",
-            "output",
-            "outcome",
-            "impact"
-          ]
+          "required": false
+        },
+        {
+          "name": "owner-member-id",
+          "field": "ownerMemberId",
+          "type": "string",
+          "required": false
         },
         {
           "name": "target-default",
@@ -8564,6 +9275,16 @@
           "field": "facilitatorId",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "part",
+          "field": "part",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "review",
+            "retrospective"
+          ]
         }
       ],
       "pages": false
@@ -8879,12 +9600,87 @@
       "pages": false
     },
     {
+      "name": "sessions setNextAction",
+      "action": "sessions.setNextAction",
+      "method": "POST",
+      "path": "/sessions/setNextAction",
+      "scope": "write",
+      "summary": "Names the next action for a key result scored in this session, with its owner, due by the goal's next check-in.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "next-action",
+          "field": "nextAction",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "owner-id",
+          "field": "ownerId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions setWins",
+      "action": "sessions.setWins",
+      "method": "POST",
+      "path": "/sessions/setWins",
+      "scope": "write",
+      "summary": "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "wins",
+          "field": "wins",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions lowScores",
+      "action": "sessions.lowScores",
+      "method": "GET",
+      "path": "/sessions/lowScores",
+      "scope": "read",
+      "summary": "The key results scored low or lower than last time in a session, with each one's next action and whether it is blocked.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "sessions createBlocker",
       "action": "sessions.createBlocker",
       "method": "POST",
       "path": "/sessions/createBlocker",
       "scope": "write",
-      "summary": "Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save.",
+      "summary": "Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in.",
       "flags": [
         {
           "name": "session-id",
@@ -8908,7 +9704,9 @@
             "dependency",
             "clarity",
             "priority_conflict",
-            "external"
+            "external",
+            "approach_not_working",
+            "other"
           ]
         },
         {
@@ -9618,7 +10416,7 @@
       "method": "POST",
       "path": "/sessions/setRootCause",
       "scope": "write",
-      "summary": "Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4).",
+      "summary": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
       "flags": [
         {
           "name": "session-id",
@@ -9639,6 +10437,12 @@
           "required": true
         },
         {
+          "name": "secondary-cause-key",
+          "field": "secondaryCauseKey",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "detail",
           "field": "detail",
           "type": "string",
@@ -9653,7 +10457,7 @@
       "method": "GET",
       "path": "/sessions/rootCauses",
       "scope": "read",
-      "summary": "Every key result this review graded below the threshold, with its cause (METHOD.md §8.4).",
+      "summary": "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
       "flags": [
         {
           "name": "session-id",
@@ -9795,7 +10599,7 @@
       "method": "GET",
       "path": "/sessions/proposeFromLearnings",
       "scope": "read",
-      "summary": "Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
+      "summary": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
       "flags": [
         {
           "name": "session-id",
@@ -9849,8 +10653,10 @@
           "type": "string",
           "required": true,
           "enum": [
+            "achieved",
             "keep",
             "modify",
+            "defer",
             "abandon"
           ]
         },
@@ -9921,7 +10727,7 @@
       "method": "POST",
       "path": "/sessions/draftNextCycle",
       "scope": "write",
-      "summary": "Notes an objective the next cycle might carry (METHOD.md §8.9 stage 10).",
+      "summary": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
       "flags": [
         {
           "name": "session-id",
@@ -10197,7 +11003,7 @@
       "method": "GET",
       "path": "/sessions/monthlyRecord",
       "scope": "read",
-      "summary": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions.",
+      "summary": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
       "flags": [
         {
           "name": "session-id",

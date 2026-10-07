@@ -93,11 +93,13 @@ interface StateTally {
   readonly noData: number;
 }
 
-const tally = (states: readonly string[]): StateTally => ({
+const tally = (states: readonly string[], recovering: number): StateTally => ({
   healthy: states.filter((state) => state === "healthy").length,
   watch: states.filter((state) => state === "watch").length,
   unhealthy: states.filter((state) => state === "unhealthy").length,
-  recovering: states.filter((state) => state === "recovering").length,
+  // Counted beside the bands rather than as one of them since P9-T17b-a: a
+  // recovering KPI is also in its real band, and both are true at once.
+  recovering,
   noData: states.filter((state) => state === "no_data").length,
 });
 
@@ -115,13 +117,16 @@ const tally = (states: readonly string[]): StateTally => ({
  */
 export async function CategorySubtotal({
   states,
+  recovering,
 }: {
   readonly states: readonly string[];
+  /** How many of them have an open recovery objective. */
+  readonly recovering: number;
 }) {
   // A server component, so the catalogue comes from `getTranslations` rather
   // than from the client hook (P6-G25 built that seam).
   const { t } = await getTranslations();
-  const counted = tally(states);
+  const counted = tally(states, recovering);
   return (
     <span
       className="flex flex-wrap items-center gap-1.5 text-xs"

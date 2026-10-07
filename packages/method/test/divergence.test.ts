@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { averageConfidence, divergences } from "../src/divergence.ts";
-import { resolveThresholds } from "../src/thresholds.ts";
+import {
+  averageConfidence,
+  divergences,
+  stalledWhileOnTrack,
+} from "../src/divergence.ts";
+import { canonThresholds, resolveThresholds } from "../src/thresholds.ts";
 
 /**
  * Divergence between reported health and the data (P4-T06b-a).
@@ -175,5 +179,43 @@ describe("averageConfidence", () => {
 
   it("is the value itself for one answer", () => {
     expect(averageConfidence([0.55])).toBe(0.55);
+  });
+});
+
+describe("§3.5's divergence window (P9-T15b-b)", () => {
+  const thresholds = canonThresholds();
+  const now = Date.UTC(2027, 2, 1);
+  const weeks = (n: number) => n * 7 * 86_400_000;
+  const input = (
+    overrides: Partial<Parameters<typeof stalledWhileOnTrack>[0]>,
+  ) =>
+    stalledWhileOnTrack(
+      {
+        health: "on_track",
+        keyResultTitle: "Win rate against Brightline",
+        keyResultKind: "metric",
+        lastMovedAt: now - weeks(5),
+        now,
+        ...overrides,
+      },
+      thresholds,
+    );
+
+  it("names a metric key result still for more than four weeks while reported on track", () => {
+    expect(input({})).toMatchObject({
+      kind: "stalled_while_on_track",
+      severity: "high",
+    });
+  });
+
+  it("is quiet at exactly four weeks, and inside them", () => {
+    expect(input({ lastMovedAt: now - weeks(4) })).toBeNull();
+    expect(input({ lastMovedAt: now - weeks(1) })).toBeNull();
+  });
+
+  it("judges only a metric, and only a goal that claims all is well", () => {
+    expect(input({ keyResultKind: "milestone" })).toBeNull();
+    expect(input({ health: "caution" })).toBeNull();
+    expect(input({ health: "outdated" })).toBeNull();
   });
 });

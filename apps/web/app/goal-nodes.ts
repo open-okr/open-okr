@@ -108,16 +108,21 @@ export function mapNodesFor(
       progressPct: keyResult.progressPct,
       confidence: keyResult.confidence,
       timeframe: keyResult.dueOn,
-      nextStep: keyResult.unit
-        ? t("goalNodes.progressWithUnit", {
-            current: keyResult.currentValue,
-            target: keyResult.targetValue,
-            unit: keyResult.unit,
-          })
-        : t("goalNodes.progress", {
-            current: keyResult.currentValue,
-            target: keyResult.targetValue,
-          }),
+      nextStep:
+        keyResult.targetValue === null
+          ? t("goalNodes.progressNoTarget", {
+              current: keyResult.currentValue,
+            })
+          : keyResult.unit
+            ? t("goalNodes.progressWithUnit", {
+                current: keyResult.currentValue,
+                target: keyResult.targetValue,
+                unit: keyResult.unit,
+              })
+            : t("goalNodes.progress", {
+                current: keyResult.currentValue,
+                target: keyResult.targetValue,
+              }),
       goalId: goal.id,
       keyResultId: keyResult.id,
       currentValue: keyResult.currentValue,

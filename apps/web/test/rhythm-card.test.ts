@@ -115,10 +115,10 @@ describe("the rhythm and thresholds card", () => {
   test("a card sends only its own fields, and the action sends only what arrived", () => {
     // `rhythm.update` takes every field as optional and merges `overrides`,
     // which is what lets eight small saves replace one large one. Reading
-    // `form.get("coachStrictness")` unconditionally, as the single form did,
+    // `form.get("checkInAnchorDay")` unconditionally, as the single form did,
     // would send null for the cadence settings on every save from any card
     // that does not hold them.
-    expect(actions).toContain('form.has("coachStrictness")');
+    expect(actions).toContain('form.has("checkInAnchorDay")');
     expect(actions).toContain("sawThreshold");
     expect(actions).toContain("Object.keys(patch).length === 0");
   });

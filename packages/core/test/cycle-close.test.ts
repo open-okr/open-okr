@@ -280,7 +280,37 @@ describe("closing a cycle", () => {
     expect(closed.fedInto?.packNote).toBe(true);
   });
 
-  it("makes the lowest process-health statement a Phase 3 priority, not an issue", async () => {
+  it("closes past an objective stopped mid-cycle, whose key results are not scored (P9-T22c-c-b)", async () => {
+    const stopped = (await call("goals.create", {
+      title: "Expansion comes from accounts that reached value",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: memberId,
+      reviewerId: memberId,
+      weight: 1,
+    })) as { id: string };
+    await call("goals.addKeyResult", {
+      goalId: stopped.id,
+      title: "Raise expansion seats added from 138 to 170 a month",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 138,
+      targetValue: 170,
+      weight: 1,
+    });
+    await call("goals.stop", {
+      id: stopped.id,
+      reason: "Capacity moves to the competitive response",
+    });
+
+    await holdTheReview();
+    await close();
+    expect((await cycleRow(cycleId))?.status).toBe("closed");
+  });
+
+  it("makes the lowest process-health statement Phase 3's improvement action, not an issue", async () => {
     const next = await createNext();
     await holdTheReview();
     const closed = await close();
@@ -291,7 +321,7 @@ describe("closing a cycle", () => {
     expect(priorities).toHaveLength(1);
     expect(priorities[0]?.text).toContain("measured outcomes");
 
-    // §8.9's table: "Phase 3, a process priority". Not a Phase 2 issue.
+    // §8.9's table: "Phase 3, an improvement action". Not a Phase 2 issue.
     const issues = await issuesIn(next.id);
     expect(issues.some((issue) => issue.source === "process_health")).toBe(
       false,
@@ -338,6 +368,41 @@ describe("closing a cycle", () => {
       packNote: true,
     });
     expect(workflow.closure?.processPriority).toContain("measured outcomes");
+  });
+
+  it("carries a kept objective into the next cycle as a draft, and phase 7 says so (§8.9, P9-T20e-b)", async () => {
+    const [goal] = await rows<{ id: string }>(
+      "select id from goals where cycle_id = $1 and deleted_at is null",
+      [cycleId],
+    );
+    await call("sessions.decideObjective", {
+      sessionId,
+      goalId: goal?.id,
+      decision: "keep",
+      why: "Still the bet for the next quarter.",
+    });
+    await holdTheReview();
+    await close();
+    // Created after the close, the order §8.10 asks for, so the draft lands
+    // when the next cycle does.
+    const next = await createNext();
+
+    const drafts = await rows<{ title: string }>(
+      `select title from goals
+        where cycle_id = $1 and carried_from_goal_id = $2 and deleted_at is null`,
+      [next.id, goal?.id],
+    );
+    expect(drafts.map((row) => row.title)).toEqual([
+      "Become the platform mid-market teams reach for first",
+    ]);
+
+    const workflow = (await call("workflow.read", { cycleId })) as {
+      closure: { carriedDrafts: number; notCarried: string[] } | null;
+    };
+    expect(workflow.closure).toMatchObject({
+      carriedDrafts: 1,
+      notCarried: [],
+    });
   });
 
   it("reads no closure for a cycle that is still open", async () => {
@@ -498,5 +563,254 @@ describe("a closed cycle's record", () => {
     await expect(
       call("cycles.feedForward", { fromCycleId: next.id, toCycleId: cycleId }),
     ).rejects.toThrow(/closed/i);
+  });
+});
+
+describe("a closed cycle keeps the rules it was graded under (§12, P9-T14b)", () => {
+  /** The review again, graded 0.65: on target under Google's colours. */
+  const holdTheReviewAt = async (score: number) => {
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId,
+      score,
+      reason: "Landed most of the way.",
+    });
+    await call("sessions.addRetroNote", {
+      sessionId,
+      columnKey: "didnt",
+      text: "Nobody owned the integration dependency.",
+      anonymous: false,
+    });
+    await call("sessions.submitProcessHealth", {
+      sessionId,
+      scores: [5, 4, 2, 5, 4].map((value, index) => ({
+        statementKey: index + 1,
+        score: value,
+      })),
+    });
+    await call("sessions.close", { id: sessionId });
+  };
+
+  const bandAtTheReview = async () => {
+    const status = (await call("sessions.scoringStatus", { sessionId })) as {
+      objectives: { keyResults: { band: { key: string } | null }[] }[];
+    };
+    return status.objectives[0]?.keyResults[0]?.band?.key;
+  };
+
+  it("acceptance A7: bands moved after the close leave its verdicts as they were, and the open cycle reads the new ones", async () => {
+    await holdTheReviewAt(0.65);
+    await close();
+
+    const [snapshot] = await rows<{
+      practice_snapshot: {
+        thresholds: Record<string, unknown>;
+        practice: Record<string, unknown>;
+      } | null;
+    }>("select practice_snapshot from cycles where id = $1", [cycleId]);
+    expect(snapshot?.practice_snapshot?.practice["scoring.colours"]).toBe(
+      "google",
+    );
+    expect(
+      snapshot?.practice_snapshot?.thresholds["scoring.scoreBands"],
+    ).toEqual({ achieved: 1, strong: 0.6, partial: 0.3 });
+    expect(await bandAtTheReview()).toBe("strong");
+
+    // An admin changes the bands to Doerr's colours.
+    await call("practice.update", {
+      overrides: { "scoring.colours": "doerr" },
+    });
+    expect(await bandAtTheReview()).toBe("strong");
+    expect(
+      ((await call("cycles.rules", { cycleId })) as { source: string }).source,
+    ).toBe("snapshot");
+
+    const next = (await createNext()) as { id: string };
+    const open = (await call("cycles.rules", { cycleId: next.id })) as {
+      source: string;
+      practice: Record<string, unknown>;
+    };
+    expect(open.source).toBe("live");
+    expect(open.practice["scoring.colours"]).toBe("doerr");
+  });
+
+  it("reads today's canon for a cycle closed before snapshots existed", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update cycles set status = 'closed', practice_snapshot = null where id = $1",
+      [cycleId],
+    );
+    await call("practice.update", {
+      overrides: { "scoring.colours": "doerr" },
+    });
+    const rules = (await call("cycles.rules", { cycleId })) as {
+      source: string;
+      practice: Record<string, unknown>;
+    };
+    expect(rules.source).toBe("canon");
+    expect(rules.practice["scoring.colours"]).toBe("google");
+  });
+});
+
+describe("the scorecard by cycle (P9-T14c)", () => {
+  /** A review in `cycle` that completes its phase 7, graded at `score`. */
+  const reviewIn = async (
+    cycle: string,
+    keyResult: string,
+    session: string,
+    score: number,
+  ) => {
+    await call("sessions.scoreKeyResult", {
+      sessionId: session,
+      keyResultId: keyResult,
+      score,
+      reason: "Landed most of the way.",
+    });
+    await call("sessions.addRetroNote", {
+      sessionId: session,
+      columnKey: "didnt",
+      text: "Nobody owned the integration dependency.",
+      anonymous: false,
+    });
+    await call("sessions.submitProcessHealth", {
+      sessionId: session,
+      scores: [5, 4, 2, 5, 4].map((value, index) => ({
+        statementKey: index + 1,
+        score: value,
+      })),
+    });
+    await call("sessions.close", { id: session });
+    await call("cycles.close", { cycleId: cycle });
+  };
+
+  interface Row {
+    cycleId: string;
+    bands: { achieved: number; strong: number; partial: number };
+    resultBand: string | null;
+    moved: {
+      adjusted: { score: number; computed: number; reason: string }[];
+      eased: {
+        original: number;
+        target: number | null;
+        reason: string | null;
+      }[];
+      addedMidCycle: number;
+      kindChanges: { from: string; to: string; reason: string | null }[];
+    };
+  }
+
+  it("acceptance: two cycles closed under different bands each read their own, and show what moved in them", async () => {
+    // The first cycle, under Google's colours: its target eased, its
+    // objective made committed, and its grade above what its progress
+    // computes.
+    const [goal] = await rows<{ id: string }>(
+      "select goal_id as id from key_results where id = $1",
+      [keyResultId],
+    );
+    await call("goals.changeTarget", {
+      id: keyResultId,
+      targetValue: 250,
+      reason: "The integration partner left the market",
+    });
+    await call("goals.setKind", {
+      id: goal?.id,
+      kind: "committed",
+      reason: "The board asked for it as a promise",
+    });
+    await reviewIn(cycleId, keyResultId, sessionId, 0.65);
+
+    // The second, under Doerr's.
+    await call("practice.update", {
+      overrides: { "scoring.colours": "doerr" },
+    });
+    const next = await createNext();
+    const nextGoal = (await call("goals.create", {
+      title: "Make the first week the reason teams renew",
+      cycleId: next.id,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: memberId,
+      reviewerId: memberId,
+      weight: 1,
+    })) as { id: string };
+    const nextKeyResult = (await call("goals.addKeyResult", {
+      goalId: nextGoal.id,
+      title: "Renewal after the first week from 61% to 70%",
+      direction: "increase",
+      indicatorType: "lagging",
+      baselineValue: 61,
+      targetValue: 70,
+      weight: 1,
+    })) as { id: string };
+    const nextSession = (await call("sessions.create", {
+      spaceId,
+      cycleId: next.id,
+      kind: "quarterly",
+      title: "Next quarterly review",
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      facilitatorId: memberId,
+    })) as { id: string };
+    await call("sessions.open", { id: nextSession.id });
+    await reviewIn(next.id, nextKeyResult.id, nextSession.id, 0.65);
+
+    const scorecard = (await call("cycles.scorecard", {})) as { rows: Row[] };
+    const first = scorecard.rows.find((row) => row.cycleId === cycleId);
+    const second = scorecard.rows.find((row) => row.cycleId === next.id);
+
+    // Each colours by its own bands: 0.65 is on target under 0.6, partial
+    // under 0.7.
+    expect(first?.bands).toEqual({ achieved: 1, strong: 0.6, partial: 0.3 });
+    expect(first?.resultBand).toBe("strong");
+    expect(second?.bands).toEqual({ achieved: 1, strong: 0.7, partial: 0.4 });
+    expect(second?.resultBand).toBe("partial");
+
+    // And what moved in the first, behind its number.
+    expect(first?.moved.adjusted).toEqual([
+      expect.objectContaining({
+        score: 0.65,
+        computed: 0,
+        reason: "Landed most of the way.",
+      }),
+    ]);
+    expect(first?.moved.eased).toEqual([
+      expect.objectContaining({
+        original: 300,
+        target: 250,
+        reason: "The integration partner left the market",
+      }),
+    ]);
+    expect(first?.moved.kindChanges).toEqual([
+      expect.objectContaining({
+        from: "aspirational",
+        to: "committed",
+        reason: "The board asked for it as a promise",
+      }),
+    ]);
+    expect(second?.moved.eased).toEqual([]);
+  });
+
+  it("shows the target the plan published with as the original, not an edit made while drafting (P9-T22c-c-b)", async () => {
+    // Drafting: 300 becomes 320 before anybody publishes.
+    await call("goals.changeTarget", { id: keyResultId, targetValue: 320 });
+    // Published, set directly as the mid-cycle tests do, because publishing
+    // through the gates is not what is under test.
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update cycles set published_at = now() where id = $1",
+      [cycleId],
+    );
+    await call("goals.changeTarget", {
+      id: keyResultId,
+      targetValue: 250,
+      reason: "The integration partner left the market",
+    });
+    await reviewIn(cycleId, keyResultId, sessionId, 0.65);
+
+    const scorecard = (await call("cycles.scorecard", {})) as { rows: Row[] };
+    const row = scorecard.rows.find((one) => one.cycleId === cycleId);
+    expect(row?.moved.eased).toEqual([
+      expect.objectContaining({ original: 320, target: 250 }),
+    ]);
   });
 });

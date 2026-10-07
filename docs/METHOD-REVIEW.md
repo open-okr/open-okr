@@ -174,6 +174,8 @@ The last row passes because "to" is on the list of why markers (L276), and every
 
 METHOD itself says "a word list will always be behind English" (L286). The fix is to make every word-list check advisory, and to let a person, not a word, decide what blocks.
 
+**Re-run at P9-T03a, 2 October 2026.** Every objective above now warns or passes on OBJ-1, and none fails; "Increase revenue from $2M to $3M" warns as bare metric movement once "to" left the why markers. The key results warn on KR-2 or KR-5 rather than failing, and whatmatters' leading indicator passes KR-5 once it is tagged leading. The two pure-output key results still pass: no word list can see them. `packages/method/test/published-examples.test.ts` holds every verdict.
+
 ### 3.5 No legitimate way to change an OKR mid-cycle
 
 METHOD allows exactly one mid-cycle change: §7.6 L552, "Once per cycle … a target may be adjusted only for a verifiable change in external reality". There is no way to add an objective, add a key result, close one early, or drop one.

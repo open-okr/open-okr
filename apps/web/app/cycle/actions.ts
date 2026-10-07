@@ -161,34 +161,15 @@ export async function publishCycle(
   // means a plain publish, and the action refuses a red gate on its own; this
   // never decides whether the gates are met.
   const reason = String(formData.get("override.reason") ?? "").trim();
+  // The first of the two steps when the company button sent it; absent
+  // publishes whatever is not yet out (METHOD.md §4.5, P9-T03b).
+  const step = formData.get("step") === "company" ? "company" : undefined;
   return run((context) =>
     callAction(context, "workflow.publish", {
       cycleId,
+      ...(step ? { step } : {}),
       ...(reason === "" ? {} : { override: { reason } }),
     }),
-  );
-}
-
-/**
- * The one mid-cycle calibration (METHOD.md §7.6, completeness review M-06).
- *
- * `workflow.calibrate` has been registered since P3-T03 with no caller, and the
- * coverage test excused it as an AI draft, which it never was: it records a
- * person's reason. A second calibration is refused by the action, in words,
- * and this puts that sentence in front of whoever tried.
- */
-export async function calibrateCycle(
-  _previous: WriteState,
-  formData: FormData,
-): Promise<WriteState> {
-  const cycleId = String(formData.get("cycleId") ?? "");
-  const reason = String(formData.get("reason") ?? "").trim();
-  if (reason === "") {
-    const { t } = await getTranslations();
-    return { error: t("cycle.actions.calibrationNeedsAReason") };
-  }
-  return run((context) =>
-    callAction(context, "workflow.calibrate", { cycleId, reason }),
   );
 }
 
@@ -247,6 +228,21 @@ export async function setDependencyRiskOwner(
       id,
       memberId: memberId === "" ? null : memberId,
     }),
+  );
+}
+
+/**
+ * Escalates an unconfirmed dependency to the cycle's sponsor (METHOD.md §5.4,
+ * P9-T16b-b): the third way to settle one, beside a confirmation and a named
+ * risk owner.
+ */
+export async function escalateDependency(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const id = String(formData.get("id") ?? "");
+  return run((context) =>
+    callAction(context, "goals.escalateDependency", { id }),
   );
 }
 

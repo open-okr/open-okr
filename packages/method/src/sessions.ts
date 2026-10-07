@@ -21,8 +21,9 @@ import type { ResolvedThresholds } from "./thresholds.ts";
  */
 
 /**
- * The five blocker types from METHOD.md §7.3, with the definitions the
- * session UI shows beside each picker option.
+ * The seven blocker types from METHOD.md §7.3, with the definitions the
+ * session UI shows beside each picker option. "Approach not working" and
+ * "Other" arrived with METHOD v2 (P9-T19a-a).
  */
 export const BLOCKER_TYPE_DEFINITIONS = [
   {
@@ -49,6 +50,16 @@ export const BLOCKER_TYPE_DEFINITIONS = [
     type: "external" as const,
     label: "External",
     definition: "Market, regulation or partner factors beyond your control",
+  },
+  {
+    type: "approach_not_working" as const,
+    label: "Approach not working",
+    definition: "The work is happening and the number is not moving",
+  },
+  {
+    type: "other" as const,
+    label: "Other",
+    definition: "Anything else, described in a line",
   },
 ] as const;
 
@@ -87,7 +98,7 @@ export const RITUALS: readonly Ritual[] = [
     length: "15 to 30 minutes",
     frequency: "Weekly",
     purpose:
-      "A decision loop. Score confidence, diagnose what is low, close and set commitments",
+      "A decision loop. Score confidence, discuss what dropped, close and set commitments, name the wins",
   },
   {
     kind: "monthly",
@@ -95,15 +106,44 @@ export const RITUALS: readonly Ritual[] = [
     length: "30 to 60 minutes",
     frequency: "Monthly",
     purpose:
-      "Trend per objective, dependency and risk log, resource shifts, decisions recorded",
+      "Trend per objective, dependency and risk log, resource shifts, continue, update, start or stop, decisions recorded",
   },
   {
     kind: "quarterly",
     name: "Quarterly review",
-    length: "60 minutes",
+    length: "90 minutes",
     frequency: "At cycle close",
     purpose:
       "Review the results, retro the way you worked, reset the next cycle",
+  },
+];
+
+export interface MonthlyReviewItem {
+  /** §7.5's name for the agenda row. */
+  readonly item: string;
+  /** What the review keeps of it, in §7.5's words. */
+  readonly recordedAs: string;
+}
+
+/**
+ * §7.5's agenda, in its order.
+ *
+ * The moves row records nothing of its own (P9-T19a-d-d). A start, an update
+ * and a stop are each the write §2.9 already describes, so the review reads
+ * them back from the objective rather than keeping a second copy a facilitator
+ * would have to reconcile with the first.
+ */
+export const MONTHLY_REVIEW_ITEMS: readonly MonthlyReviewItem[] = [
+  { item: "Trend per objective", recordedAs: "Improving, flat, declining" },
+  { item: "Dependency and risk log", recordedAs: "Status per dependency" },
+  { item: "Resource or priority shifts", recordedAs: "Free text" },
+  {
+    item: "Continue, update, start or stop",
+    recordedAs: "Each move recorded as §2.9 says",
+  },
+  {
+    item: "Decisions",
+    recordedAs: "A dated decision against the affected key result",
   },
 ];
 
@@ -126,44 +166,46 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
     step: 1,
     title: "Confidence round",
     purpose:
-      "Every key result gets a confidence. Votes reveal together so nobody anchors on the champion, and the champion writes what changed this week",
+      "Every key result gets a confidence. Votes reveal together so nobody anchors on the champion, and the champion confirms it and writes what changed this week. Facts first",
   },
   {
     step: 2,
-    title: "Diagnose what is low",
+    // METHOD v2 (P9-T19a-b): a next action for every low score, and a
+    // blocker only where something is actually blocked.
+    title: "Discuss what dropped",
     purpose:
-      "High and medium move on with no discussion. Every low score gets a blocker type, a named owner and one concrete action within 24 hours",
+      "Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner, and a blocker where something is actually blocked",
   },
   {
     step: 3,
-    title: "Commitments",
+    // METHOD v2 (P9-T19a-d-c).
+    title: "Commitments and wins",
     purpose:
-      "Close last week's out loud, delivered or not, with no negotiation. Then set two or three for this week, each with an owner and a linked key result",
+      "Close last week's, delivered or not, with a line on why where it helps. Set three or four for this week, each with an owner and a linked key result. Name the week's wins",
   },
   {
     step: 4,
     title: "Digest",
     purpose:
-      "The product assembles it. The coordinator adds a note for leadership and it posts to the team's channel",
+      "The product assembles it, with open blockers and their next actions, the commitment count and the wins. The coordinator adds a note for leadership and it posts to the team's channel",
   },
 ];
 
 /**
  * §7.6, the mid-cycle calibration, sentence by sentence (completeness review
- * M-06).
+ * M-06), as METHOD v2 rewrote it (P9-T13-c-b).
  *
- * Phase 6 shows it beside the form that records one, because a reason is only
- * worth reading if it was written against the rule. It is split at the
- * document's own full stops, the way `PHASE_GUIDANCE` carries §9, so `pnpm
- * method:check` can compare it word for word. "Once" stays in the text rather
- * than becoming a number here: §11 has no calibration parameter, and the
- * schema already holds at most one calibration per cycle.
+ * There is no longer a once-a-cycle calibration to record: a target moves at
+ * any time under §2.9's one rule, and these four sentences are that rule as
+ * phase 6 shows it. Split at the document's own full stops, the way
+ * `PHASE_GUIDANCE` carries §9, so `pnpm method:check` can compare it word for
+ * word.
  */
 export const MID_CYCLE_CALIBRATION: readonly string[] = [
-  "Once per cycle, optional",
-  "A target may be adjusted only for a verifiable change in external reality, with a written reason",
-  "Not for difficulty, not for mood",
-  "Anything else is moving the goalposts and it destroys the score's meaning",
+  "A target may be changed at any time in the cycle, as §2.9 says",
+  "Making a target harder needs no reason",
+  "Easing one, toward its baseline, needs a written reason, and the original target stays on record",
+  "It got hard is not a reason, and changing a target only because it got hard empties the score of meaning",
 ];
 
 export type ReviewAct = "open" | "review" | "retro" | "reset";
@@ -260,7 +302,7 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
     title: "Root cause and diagnostic",
     act: "retro",
     purpose:
-      "Every key result under 0.7 gets one honest cause. Then read the diagnostic",
+      "Every key result below its root-cause threshold gets one honest cause. Then read the diagnostic",
   },
   {
     stage: 8,
@@ -270,13 +312,13 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
   },
   {
     stage: 9,
-    title: "Keep, modify or abandon",
+    title: "Keep, modify, abandon or defer",
     act: "reset",
     purpose: "Close every objective deliberately",
   },
   {
     stage: 10,
-    title: "Learnings and next drafts",
+    title: "Learnings",
     act: "reset",
     purpose: "Turn what happened into what you now know",
   },
@@ -301,6 +343,36 @@ export function reviewStages(
     ...stage,
     minutes: minutes[index] as number,
   }));
+}
+
+/**
+ * The two halves of a review a workspace holds apart (§8, §12's "Quarterly
+ * review format", P9-T20b-a): "the review session holds the Open and Review
+ * acts (stages 1 to 4) and the retrospective holds the Retro and Reset acts
+ * (stages 5 to 11)".
+ */
+export const REVIEW_PARTS = ["review", "retrospective"] as const;
+export type ReviewPart = (typeof REVIEW_PARTS)[number];
+
+const PART_ACTS: Record<ReviewPart, readonly ReviewAct[]> = {
+  review: ["open", "review"],
+  retrospective: ["retro", "reset"],
+};
+
+/**
+ * The stages a review session walks, in order: all eleven for one session,
+ * or its half's. Read from the acts, so the split cannot drift from the
+ * stage list it splits.
+ */
+export function reviewStageKeysFor(
+  part: ReviewPart | null,
+): readonly ReviewStageKey[] {
+  if (part === null) {
+    return REVIEW_STAGE_KEYS;
+  }
+  return REVIEW_STAGES.filter((entry) =>
+    PART_ACTS[part].includes(entry.act),
+  ).map((entry) => REVIEW_STAGE_KEYS[entry.stage - 1] as ReviewStageKey);
 }
 
 /**
@@ -378,8 +450,11 @@ export function roomPulseRead(
  * default.
  */
 export const CLOSE_DECISION_MEANINGS: Readonly<Record<string, string>> = {
-  keep: "Still relevant. Carry forward deliberately",
-  modify: "Adjust the target or wording from what we learned",
+  // Achieved and defer since P9-T20e-a, in §8.8's own order.
+  achieved: "Done. Close it",
+  keep: "Still relevant. It pre-fills next cycle's draft, and still passes next cycle's checks",
+  modify: "Adjust the target or wording from what we learned, then keep it",
+  defer: "Still worth doing, not next cycle. It goes to the issue list",
   abandon: "Priority shifted. End it cleanly",
 };
 
@@ -403,7 +478,14 @@ export const ROOT_CAUSES: readonly string[] = [
   "External or market change",
   "Lack of focus. Too many OKRs",
   "No clear owner or cadence",
+  "Other, described in a line",
 ];
+
+/**
+ * §8.4's ninth cause, which is named with its line or not at all (P9-T20c).
+ * The key is its place in the list, as every cause's is.
+ */
+export const ROOT_CAUSE_OTHER = ROOT_CAUSES.length;
 
 export const PROCESS_HEALTH_STATEMENTS: readonly string[] = [
   "Our OKRs stayed visible and were genuinely used to make decisions this cycle.",
@@ -439,9 +521,12 @@ export interface Diagnosis {
  * §8.6's rhythm diagnostic, which METHOD.md calls the most valuable output of
  * the review.
  *
- * Two numbers in, one verdict out. The cycle score is the §3.4 portfolio
- * average over every scored key result; the rhythm score is the average of the
- * two §8.5 statements about cadence and candour.
+ * Two numbers in, one verdict out. The cycle score is the §3.4 average over
+ * the scored aspirational key results; the rhythm is the share of due
+ * check-ins published within tolerance, measured by the product with holiday
+ * periods left out (P9-T20d). It was the average of two §8.5 statements until
+ * then, which asked a room how well it kept a rhythm the product had watched
+ * it keep; those two are shown beside the measured share as a cross-check.
  *
  * The first row is the whole answer when it holds: at or above the cycle
  * threshold the rhythm score is not consulted at all, because a delivered cycle
@@ -452,34 +537,105 @@ export interface Diagnosis {
  */
 export function rhythmDiagnostic(
   cycleScore: number,
-  rhythmScore: number,
+  rhythm: number,
   thresholds: ResolvedThresholds,
 ): Diagnosis {
   const cycleFloor = thresholds["sessions.diagnosticCycleScore"];
-  const rhythmFloor = thresholds["sessions.diagnosticRhythmScore"];
+  const rhythmFloor = thresholds["sessions.diagnosticRhythm"];
 
   if (cycleScore >= cycleFloor) {
-    return {
-      kind: "results_delivered",
-      diagnosis: "Results delivered",
-      prescription:
-        "The question is not effort. It is whether the ambition was set high enough to be worth the quarter",
-    };
+    return diagnosisFor("results_delivered");
   }
-  if (rhythmScore >= rhythmFloor) {
-    return {
-      kind: "strategy_or_quality",
-      diagnosis: "Strategy or OKR-quality problem",
-      prescription:
-        "The team ran the rhythm and still missed. The OKRs themselves, or the strategy behind them, were wrong. Fix the key results before you push the team",
-    };
+  // "Likely": a hypothesis for the room to test, not a verdict (§8.6).
+  return diagnosisFor(rhythm >= rhythmFloor ? "strategy_or_quality" : "rhythm");
+}
+
+/**
+ * §8.6's sentences for a verdict already read. A stored diagnostic is shown
+ * by its verdict, not recomputed from its numbers: a review read before
+ * P9-T20d stored a survey rhythm out of five, which the measured threshold
+ * would misread, and the verdict the room heard is the record.
+ */
+export function diagnosisFor(kind: DiagnosisKind): Diagnosis {
+  switch (kind) {
+    case "results_delivered":
+      return {
+        kind,
+        diagnosis: "Results delivered",
+        prescription:
+          "The question is not effort. It is whether the ambition was set high enough to be worth the quarter",
+      };
+    case "strategy_or_quality":
+      return {
+        kind,
+        diagnosis: "Likely a strategy or OKR-quality problem",
+        prescription:
+          "The team ran the rhythm and still missed. Look first at the OKRs themselves, or the strategy behind them, before you push the team",
+      };
+    default:
+      return {
+        kind: "rhythm",
+        diagnosis: "Likely a rhythm problem",
+        prescription:
+          "This looks like a cadence problem, not an ambition problem. Restore the weekly check-in before you rewrite a single objective",
+      };
   }
-  return {
-    kind: "rhythm",
-    diagnosis: "Rhythm problem",
-    prescription:
-      "This is a cadence problem, not an ambition problem. Restore the weekly check-in before you rewrite a single objective",
-  };
+}
+
+/** One goal's check-in record across the period a review reads. */
+export interface CheckInRecord {
+  /** Every date a check-in fell due, holiday periods already left out. */
+  readonly dueOn: readonly string[];
+  /** The local date of every check-in published on it. */
+  readonly publishedOn: readonly string[];
+}
+
+/**
+ * §8.6's rhythm, measured (P9-T20d): "the share of due check-ins published
+ * within tolerance". A due date is kept when a check-in was published after
+ * the one before it fell due and no later than the tolerance after it, so an
+ * early check-in counts for the period it was meant for and a late one past
+ * the tolerance counts for nothing. Null when nothing fell due, because a
+ * share of nothing is not a rhythm.
+ */
+export function onTimeShare(
+  records: readonly CheckInRecord[],
+  toleranceDays: number,
+): {
+  readonly due: number;
+  readonly onTime: number;
+  readonly share: number | null;
+} {
+  const DAY_MS = 86_400_000;
+  const shift = (on: string, days: number) =>
+    new Date(Date.parse(`${on}T00:00:00Z`) + days * DAY_MS)
+      .toISOString()
+      .slice(0, 10);
+  let due = 0;
+  let onTime = 0;
+  for (const record of records) {
+    const dues = [...record.dueOn].sort();
+    const published = [...record.publishedOn].sort();
+    // Each check-in answers one period: the first it can, so one published
+    // late is not counted again for the period after.
+    const used = new Set<number>();
+    let previous: string | null = null;
+    for (const on of dues) {
+      due += 1;
+      const latest = shift(on, toleranceDays);
+      const after = previous;
+      const index = published.findIndex(
+        (when, at) =>
+          !used.has(at) && (after === null || when > after) && when <= latest,
+      );
+      if (index >= 0) {
+        used.add(index);
+        onTime += 1;
+      }
+      previous = on;
+    }
+  }
+  return { due, onTime, share: due === 0 ? null : onTime / due };
 }
 
 /**

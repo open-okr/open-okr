@@ -21,15 +21,17 @@ pnpm db:migrate
 pnpm dev                          # the app on http://localhost:3000
 ```
 
-The compose stack ships no application database, which is why the `CREATE DATABASE` line is there. `pnpm db:migrate` and `pnpm db:seed` read the process environment rather than `apps/web/.env`, so either export `DATABASE_URL` as above or pass it inline on each command.
+The compose stack ships no application database, which is why the `CREATE DATABASE` line is there. `pnpm db:migrate` and `pnpm db:seed --quarter` read the process environment rather than `apps/web/.env`, so either export `DATABASE_URL` as above or pass it inline on each command.
 
 Open <http://localhost:3000>. An empty database sends you to the first-run wizard. Register yourself there: that account claims the instance and gets a workspace. **Use your real name.** The seed makes you the Chief Executive of the invented company, and a demo where the presenter cannot find themselves in the org chart is a worse demo.
 
 Then, in another terminal:
 
 ```sh
-pnpm db:seed
+pnpm db:seed --quarter
 ```
+
+This walkthrough follows the one-quarter demo, which `--quarter` builds. Without it, `pnpm db:seed` builds the Northwind year as of today, which is what the public demo shows (`docs/scenarios/northwind-year`).
 
 It prints what it wrote and a short list headed **"Worth knowing before you present it"**. Read that list. It is the same set of caveats as section 5 below, printed there so nobody meets one for the first time on stage.
 
@@ -129,15 +131,15 @@ Then open *Onboarding runs without us in the room* to show the other side: a dep
 
 Go to `/goals/studio`.
 
-The alignment health score is **79**, above its threshold of 75, so the set is healthy — and there are still four open findings, including one at high severity.
+The alignment health score is **100%**: all six goals below company level align to a parent or say why they stand alone. Open the recovery objective for operating margin in the drawer: it has no parent, and its alignment tab says why it stands alone.
 
-> "Healthy is not the same as finished. The high-severity finding is a team objective with no parent, which supports nothing above it. The score does not hide it, and the score is not a grade — it is a prompt."
+> "The score is a share, not a grade. A goal with no parent is not a mistake when somebody has said why: this one serves the annual thrust on cost rather than any quarterly objective. Clear that reason and the share drops to 83%, watch, with the goal listed as not counted. The level skips in this set are there and unsaid, because a strict cascade is a choice a workspace makes, not the default."
 
 ### Beat 6 — KPIs, and an objective the product wrote (4 min)
 
 Go to `/kpis`. Twelve measures in four categories, six months of readings each, entered like a spreadsheet.
 
-Show the five states on one screen: **healthy**, **watch**, **unhealthy**, **recovering**, and one measure with **no data** at all.
+Show the four states on one screen: **healthy**, **watch**, **unhealthy**, and one measure with **no data** at all, and point at the one marked **recovering** beside its band.
 
 > "A KPI nobody has recorded is unmeasured, not failing. It says `no data` rather than showing zero, because zero is a claim and this product does not make claims it cannot support."
 
@@ -147,15 +149,17 @@ Go to `/kpis/trees`. Two driver trees, drawn by depth and health.
 
 > "Read it the way the method says to: find the unhealthy branch, then look at the leading drivers at its edge. Those drivers are what you can actually pull."
 
-Go to `/kpis/recovery`. **Operating margin** is below its corridor and shows as `recovering`, with an objective under it: *Bring Operating margin back to 15*.
+Go to `/kpis/recovery`. **Operating margin** is below its corridor: it reads `unhealthy`, with `recovering` beside it and an objective under it: *Operating margin back where the business can rely on it*, committed, with the KPI itself as its first key result.
 
 > "Nobody wrote that objective. The metric fell through its corridor floor, and the engine walked the unhealthy branch of its driver tree breadth-first and turned the leading drivers at the edge into key results. This is the product proposing work rather than waiting to be told."
 
-Point at the card showing **both** the projected figure and the real one.
+Point at the card: the real reading, and the recovery objective's own progress beside it.
 
-> "While a recovery is open, the KPI reads better than it is, because the recovery's own progress counts toward it. The card shows you both numbers side by side, so nobody mistakes a recovery in progress for a metric that recovered."
+> "While a recovery is open, the KPI still says where it really is. The recovery's progress sits next to the reading, never in its place, so nobody mistakes a recovery in progress for a metric that recovered."
 
-The other six unhealthy measures each carry a **Launch recovery** button. Click one to show the engine drafting live.
+The other six unhealthy measures each ask for a decision, and offer three: **Fix it now**, **Add a key result**, **Launch a recovery OKR**. Open the third on one to show the engine drafting live.
+
+> "A defect gets a task with an owner and a date, not an OKR. Something an objective already covers gets a key result there. Only a fall that needs people working together gets a recovery. Watching it is not one of the choices."
 
 ### Beat 7 — Spaces and people (1 min)
 
@@ -193,7 +197,7 @@ If you have sixty seconds, do beat 3 only. Open `/cycle`, point at gate 5 naming
 
 Say these before somebody notices them. Each one is a consequence of a rule worth defending, and each is a better answer than a workaround would have been.
 
-**Nobody can sign in as Priya, unless you ran `pnpm demo:prepare`.** After `pnpm db:seed` the demo people are members with no user accounts: they own objectives, champion and review them, hold space roles and appear in the org chart, and there is nobody behind them. That is the right state for a seed on a laptop, where you are signed in and they are names on a screen. `pnpm demo:prepare` is the other state, built for a public demo instance where the visitor is nobody: it gives each of them an account at `@northwind.example` with a published password, puts both agents in sandbox, and runs the Coach and the Champion once. It refuses a workspace the demo builder did not build.
+**Nobody can sign in as Priya, unless you ran `pnpm demo:prepare`.** After `pnpm db:seed --quarter` the demo people are members with no user accounts: they own objectives, champion and review them, hold space roles and appear in the org chart, and there is nobody behind them. That is the right state for a seed on a laptop, where you are signed in and they are names on a screen. `pnpm demo:prepare` is the other state, built for a public demo instance where the visitor is nobody: it gives each of them an account at `@northwind.example` with a published password, puts both agents in sandbox, and runs the Coach and the Champion once. It refuses a workspace the demo builder did not build.
 
 **Every row was written by you.** An action resolves its author from the acting user, so the audit trail and the activity feed name you rather than naming Priya for something Priya did not do. The narratives are written in each person's voice; the authorship is honest about who typed them.
 
@@ -233,7 +237,7 @@ pnpm db:down && pnpm db:up
 docker exec openokr-test-postgres-1 psql -U postgres -c "CREATE DATABASE openokr;"
 pnpm db:migrate
 pnpm dev                          # register through the wizard again
-pnpm db:seed
+pnpm db:seed --quarter
 ```
 
 The builder's own tests are in `packages/core/test/demo.test.ts`. They assert the things this script promises: all four objective levels present, gates 2 and 5 each red for exactly one reason, every KPI state on the grid, a three-deep manager chain, a dependency register that passes gate 4 three different ways, and one value point per key result so no nonsense trend appears.

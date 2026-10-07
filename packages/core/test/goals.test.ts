@@ -178,7 +178,7 @@ describe("creating a goal", () => {
     expect(read.progressPct).toBe(0);
     expect(read.health).toBe("pending");
     expect(read.champion.name).toBe("Goal Owner");
-    expect(read.reviewer.name).toBe("Second Member");
+    expect(read.reviewer?.name).toBe("Second Member");
     expect(read.keyResults).toHaveLength(2);
     // The current value defaults to the baseline, so progress starts at 0 rather
     // than undefined (§5.1).
@@ -601,7 +601,7 @@ describe("reassigning a role", () => {
       "goals.read",
       { id: created.id },
     );
-    expect(read.reviewer.id).toBe(ownerMemberId);
+    expect(read.reviewer?.id).toBe(ownerMemberId);
 
     // The binding moved with the column. A reassignment that updated one and not
     // the other would leave the outgoing reviewer holding access they no longer
@@ -836,7 +836,37 @@ describe("the workflow snapshot now that goals exist", () => {
     expect(gateThree?.missing[0]).toContain("Make mobile");
   });
 
-  it("reports gate 5 red while a key result still exceeds capacity", async () => {
+  // METHOD.md §5.5 (P9-T11a, P9-T11b-b): a committed OKR left at "exceeds"
+  // holds gate 5 back, and an aspirational one may exceed.
+  it("reports gate 5 red while a committed key result still exceeds capacity", async () => {
+    const wb = await workerDb();
+    const created = await createGoal({
+      contributionStatement: "Carries the annual mobile thrust",
+      kind: "committed",
+    });
+    await callAction({ pool: wb.appPool, ...context() }, "goals.addKeyResult", {
+      goalId: created.id,
+      title: "Raise activation from 41% to 60%",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 41,
+      targetValue: 60,
+      weight: 1,
+      capacity: "exceeds",
+    });
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    );
+    const gateFive = read.gates.find((gate) => gate.gateKey === 5);
+    expect(gateFive?.evaluable).toBe(true);
+    expect(gateFive?.passed).toBe(false);
+    expect(gateFive?.missing.join(" ")).toMatch(/committed and still exceeds/);
+  });
+
+  it("lets an aspirational key result exceed capacity without a gate 5 warning", async () => {
     const wb = await workerDb();
     const created = await createGoal({
       contributionStatement: "Carries the annual mobile thrust",
@@ -859,8 +889,7 @@ describe("the workflow snapshot now that goals exist", () => {
     );
     const gateFive = read.gates.find((gate) => gate.gateKey === 5);
     expect(gateFive?.evaluable).toBe(true);
-    expect(gateFive?.passed).toBe(false);
-    expect(gateFive?.missing.join(" ")).toMatch(/exceeds capacity/);
+    expect(gateFive?.missing.join(" ")).not.toMatch(/exceeds capacity/);
 
     void keyResults;
   });
@@ -955,6 +984,11 @@ describe("the scoring cascade against real rows", () => {
 
   it("rolls a child's progress into its parent", async () => {
     const wb = await workerDb();
+    // Off by default since P9-T12b (METHOD.md §3.1); this is the workspace
+    // that turned it on.
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "progress.rollUp": "on" },
+    });
     const parent = await createGoal({ title: "Parent" });
     await callAction({ pool: wb.appPool, ...context() }, "goals.addKeyResult", {
       goalId: parent.id,

@@ -503,7 +503,10 @@ describe("the number of answers a form demands (P8-G13d)", () => {
       { id: created.id },
     );
     expect(read.champion.id).toBe(ownerMemberId);
-    expect(read.reviewer.id).toBe(ownerMemberId);
+    // The reviewer follows the practice since Phase 9 merged with P8-G13d:
+    // optional by default (P9-T04), so a title alone names nobody to
+    // acknowledge, and the creator only where reviewers are required.
+    expect(read.reviewer).toBeNull();
     // And the quality canon says what is still missing rather than the create
     // refusing: a reviewer who is also the champion is a finding, not a wall.
     expect(read.quality).toBeTruthy();

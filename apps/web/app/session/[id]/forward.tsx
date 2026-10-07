@@ -1,12 +1,22 @@
 "use client";
 
 /**
- * Stage ten: learnings and next-cycle drafts. Stage eleven: decisions and
- * actions (UIUX-PLAN.md S-24, METHOD.md §8.9 and §8.1 stage 11, P4-T11c-b).
+ * Stage ten: learnings. Stage eleven: decisions and actions (UIUX-PLAN.md
+ * S-24, METHOD.md §8.9 and §8.1 stage 11, P4-T11c-b).
  *
  * One component for both, because the page renders it on whichever of the two
  * stages is running and the two halves are one flow: what we learned, what the
  * next cycle might carry, and who does what by when.
+ *
+ * **The review drafts nothing for the next cycle** (P9-T22d). Stage ten was
+ * "Learnings and next drafts", and the method review found it contradicting
+ * §8.10's own rule: grade and hold the review before drafting, because drafting
+ * pressure distorts honest scoring. The drafts it collected also went nowhere
+ * but the minutes. A kept or modified objective now reaches the next cycle's
+ * Phase 4 as a draft on its own, and an idea reaches its issue list as a
+ * learning marked to carry, so the composer and the assist that filled it are
+ * gone. A draft written before is still shown, read-only, because it is part of
+ * the record.
  *
  * **Carry forward is off by default.** §8.9's own rule is that carried work
  * re-enters the next cycle as an issue and has to survive prioritisation on its
@@ -28,15 +38,12 @@ import {
   Chip,
   useTranslations,
 } from "@openokr/ui";
-import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import {
   addActionAction,
   captureLearningAction,
   completeActionAction,
-  draftNextCycleAction,
-  proposeFromLearningsAction,
 } from "./actions";
 
 export interface Forward {
@@ -72,28 +79,14 @@ export interface Forward {
   readonly carried: number;
 }
 
-/** One next-cycle objective the assist proposed, citing its learning. */
-interface ProposedDraft {
-  readonly title: string;
-  readonly learningText: string;
-  readonly why: string;
-}
-
 export function ForwardPanel({
   sessionId,
   forward,
   canEdit,
-  assistAvailable = false,
 }: {
   readonly sessionId: string;
   readonly forward: Forward;
   readonly canEdit: boolean;
-  /**
-   * Whether a provider may propose drafts from the carried learnings
-   * (AI-NATIVE-PLAN §2.3, completeness review M-09). False is the normal case
-   * and the stage is then exactly what it was.
-   */
-  readonly assistAvailable?: boolean;
 }) {
   const { t } = useTranslations();
 
@@ -103,20 +96,6 @@ export function ForwardPanel({
 
   const [learning, setLearning] = useState("");
   const [carry, setCarry] = useState(false);
-  const [draftTitle, setDraftTitle] = useState("");
-  const [draftWhy, setDraftWhy] = useState("");
-  const [proposed, setProposed] = useState<readonly ProposedDraft[] | null>(
-    null,
-  );
-  const [proposing, startProposing] = useTransition();
-  const [proposalNotice, setProposalNotice] = useState<string | null>(null);
-  // Offered only where there is something to propose from: §8.9 hands the
-  // carried learnings forward, and a proposal from nothing would be one
-  // somebody could have typed unaided.
-  const canPropose =
-    canEdit &&
-    assistAvailable &&
-    forward.learnings.some((entry) => entry.carryForward);
   const [what, setWhat] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [dueOn, setDueOn] = useState("");
@@ -297,19 +276,21 @@ export function ForwardPanel({
               <p className="text-xs text-ink-4">
                 {t("session.detail.forward.aCarriedItemRe")}
               </p>
+              <p className="text-xs text-ink-4">
+                {t("session.detail.forward.anIdeaForTheNextCycle")}
+              </p>
             </div>
           ) : null}
         </section>
 
-        <section className="flex flex-col gap-2">
-          <h3 className="text-xs font-semibold text-ink-2">
-            {t("common.nextCycleDrafts")}
-          </h3>
-          {forward.drafts.length === 0 ? (
+        {forward.drafts.length > 0 ? (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-semibold text-ink-2">
+              {t("common.nextCycleDrafts")}
+            </h3>
             <p className="text-xs text-ink-4">
-              {t("session.detail.forward.nothingDraftedYet")}
+              {t("session.detail.forward.draftsWrittenBefore")}
             </p>
-          ) : (
             <ul className="flex flex-col gap-1.5">
               {forward.drafts.map((draft) => (
                 <li
@@ -321,164 +302,8 @@ export function ForwardPanel({
                 </li>
               ))}
             </ul>
-          )}
-
-          {canPropose ? (
-            <div
-              className="flex flex-col gap-1.5"
-              data-testid="propose-from-learnings"
-            >
-              {proposed === null ? (
-                <Button
-                  type="button"
-                  variant="ai"
-                  size="sm"
-                  className="self-start"
-                  disabled={proposing || pending}
-                  onClick={() => {
-                    setProposalNotice(null);
-                    startProposing(async () => {
-                      try {
-                        const result =
-                          await proposeFromLearningsAction(sessionId);
-                        setProposed(result);
-                        if (result === null) {
-                          setProposalNotice(
-                            t("assists.reading.nothingThisTime"),
-                          );
-                        }
-                      } catch {
-                        setProposalNotice(t("assists.reading.couldNotRun"));
-                      }
-                    });
-                  }}
-                >
-                  <Sparkles className="size-3" />
-                  {proposing
-                    ? t("assists.reading.working")
-                    : t("session.detail.forward.proposeFromLearnings")}
-                </Button>
-              ) : (
-                <section
-                  aria-label={t("session.detail.forward.proposeFromLearnings")}
-                  className="flex flex-col gap-1.5 rounded-md border border-line bg-surface p-2.5"
-                >
-                  <span className="flex items-center gap-2">
-                    <Chip tone="agent">{t("common.ai")}</Chip>
-                    <span className="text-xs text-ink-4">
-                      {t("session.detail.forward.useOneThenEdit")}
-                    </span>
-                  </span>
-                  <ul className="flex flex-col gap-1.5">
-                    {proposed.map((draft) => (
-                      <li
-                        key={`${draft.title}-${draft.learningText}`}
-                        className="flex flex-col gap-0.5 rounded-md border border-line p-2"
-                      >
-                        <span className="text-sm text-ink">{draft.title}</span>
-                        <span className="text-xs text-ink-3">
-                          {t("session.detail.forward.fromTheLearning", {
-                            text: draft.learningText,
-                          })}
-                        </span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="self-start"
-                          disabled={pending}
-                          onClick={() => {
-                            setDraftTitle(draft.title);
-                            setDraftWhy(
-                              draft.why.trim() === ""
-                                ? draft.learningText
-                                : draft.why,
-                            );
-                          }}
-                        >
-                          {t("session.detail.forward.useThisDraft")}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="self-start"
-                    onClick={() => setProposed(null)}
-                  >
-                    {t("common.dismiss")}
-                  </Button>
-                </section>
-              )}
-              {proposalNotice ? (
-                <p role="status" className="text-xs text-ink-4">
-                  {proposalNotice}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-
-          {canEdit ? (
-            <div className="flex flex-col gap-1.5">
-              <label className="flex flex-col gap-1" htmlFor="draft-title">
-                <span className="text-xs font-medium text-ink-3">
-                  {t("session.detail.forward.aCandidateObjective")}
-                </span>
-                <input
-                  id="draft-title"
-                  type="text"
-                  className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                  value={draftTitle}
-                  disabled={pending}
-                  onChange={(event) => setDraftTitle(event.target.value)}
-                />
-              </label>
-              <label className="flex flex-col gap-1" htmlFor="draft-why">
-                <span className="text-xs font-medium text-ink-3">
-                  {t("session.detail.forward.why")}
-                </span>
-                <input
-                  id="draft-why"
-                  type="text"
-                  className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                  value={draftWhy}
-                  disabled={pending}
-                  placeholder={t("session.detail.forward.whatInThisCycle")}
-                  onChange={(event) => setDraftWhy(event.target.value)}
-                />
-              </label>
-              <span>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => {
-                    if (
-                      draftTitle.trim().length === 0 ||
-                      draftWhy.trim().length === 0
-                    ) {
-                      setProblem(t("session.detail.forward.aDraftNeedsATitle"));
-                      return;
-                    }
-                    run(async () => {
-                      await draftNextCycleAction(
-                        sessionId,
-                        draftTitle.trim(),
-                        draftWhy.trim(),
-                      );
-                      setDraftTitle("");
-                      setDraftWhy("");
-                    });
-                  }}
-                >
-                  {t("common.draftIt")}
-                </Button>
-              </span>
-            </div>
-          ) : null}
-        </section>
+          </section>
+        ) : null}
 
         <section className="flex flex-col gap-2">
           <h3 className="text-xs font-semibold text-ink-2">

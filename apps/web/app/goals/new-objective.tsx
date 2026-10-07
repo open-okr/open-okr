@@ -1,10 +1,15 @@
 "use client";
 
 import type { GoalLevel } from "@openokr/db";
+import type { OkrKind } from "@openokr/method";
 import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { addObjective } from "./editor-actions.ts";
+import {
+  RestrictedWriting,
+  type WritingRefusal,
+} from "./restricted-writing.tsx";
 
 /**
  * Starting an objective from the top of the screen (S-13).
@@ -23,25 +28,58 @@ import { addObjective } from "./editor-actions.ts";
 export function NewObjectiveButton({
   cycleId,
   level,
+  refusal,
+  initiallyOpen,
+  kinds,
+  defaultKind,
+  askReason,
 }: {
   readonly cycleId: string;
   readonly level: GoalLevel;
+  /**
+   * Why the workspace holds writing back here now, or null when it does
+   * not (P9-T07b-a). The button then opens the reason instead of a field.
+   */
+  readonly refusal: WritingRefusal | null;
+  /** Open on arrival, for the topbar's `+ New`, which links here. */
+  readonly initiallyOpen?: boolean;
+  /**
+   * The kinds the workspace uses, and the one a new objective starts as
+   * (METHOD.md §2.8, decision D2). The choice is offered only where there
+   * are two.
+   */
+  readonly kinds: readonly OkrKind[];
+  readonly defaultKind: OkrKind;
+  /**
+   * Whether an objective added now is started mid-cycle and the workspace
+   * asks why (METHOD.md §2.9, P9-T13-a).
+   */
+  readonly askReason?: "optional" | "required" | null;
 }) {
   const { t } = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen === true);
   const [title, setTitle] = useState("");
+  const [kind, setKind] = useState<OkrKind>(defaultKind);
+  const [reason, setReason] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  const needsReason = askReason === "required" && reason.trim() === "";
 
   const save = () => {
     const wanted = title.trim();
-    if (wanted === "") {
+    if (wanted === "" || needsReason) {
       return;
     }
     setProblem(null);
     start(async () => {
-      const created = await addObjective({ cycleId, level, title: wanted });
+      const created = await addObjective({
+        cycleId,
+        level,
+        title: wanted,
+        ...(kinds.length > 1 ? { kind } : {}),
+        ...(askReason && reason.trim() !== "" ? { reason: reason.trim() } : {}),
+      });
       if (created.error) {
         setProblem(created.error);
         return;
@@ -60,9 +98,27 @@ export function NewObjectiveButton({
     );
   }
 
+  if (refusal) {
+    return (
+      <RestrictedWriting refusal={refusal} onClose={() => setOpen(false)} />
+    );
+  }
+
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <div className="flex min-w-0 items-center gap-2">
+        {kinds.length > 1 ? (
+          <select
+            aria-label={t("okrKind.label")}
+            value={kind}
+            disabled={pending}
+            onChange={(event) => setKind(event.target.value as OkrKind)}
+            className="h-7.5 rounded-control border border-line bg-surface px-1.5 text-xs text-ink outline-none focus:border-brand"
+          >
+            <option value="aspirational">{t("okrKind.aspirational")}</option>
+            <option value="committed">{t("okrKind.committed")}</option>
+          </select>
+        ) : null}
         <input
           // Focused through a ref rather than `autoFocus`, which also steals
           // focus when a page loads with one of these already open.
@@ -86,7 +142,7 @@ export function NewObjectiveButton({
         <Button
           type="button"
           variant="primary"
-          disabled={pending || title.trim() === ""}
+          disabled={pending || title.trim() === "" || needsReason}
           onClick={save}
         >
           {t("common.save")}
@@ -102,6 +158,20 @@ export function NewObjectiveButton({
           {t("common.cancel")}
         </Button>
       </div>
+      {askReason ? (
+        <input
+          value={reason}
+          aria-label={
+            askReason === "required"
+              ? t("midCycle.whyNowRequired")
+              : t("midCycle.whyNowOptional")
+          }
+          placeholder={t("midCycle.whyNowPlaceholder")}
+          disabled={pending}
+          onChange={(event) => setReason(event.target.value)}
+          className="h-7.5 w-full min-w-0 rounded-control border border-line bg-surface px-2 text-xs text-ink outline-none focus:border-brand"
+        />
+      ) : null}
       {problem ? (
         <span role="alert" className="text-xs text-bad">
           {problem}

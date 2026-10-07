@@ -26,10 +26,6 @@ const APP = fileURLToPath(new URL("../app", import.meta.url));
 const E2E = fileURLToPath(new URL("../../../e2e", import.meta.url));
 
 const NO_DIRECT_VISIT: Readonly<Record<string, string>> = {
-  // Counted as visited until M-30, because `/people` was: the directory link
-  // is followed, never typed.
-  "/people/[id]":
-    "reached by clicking a member in the directory and in the org chart in s33-people, which is how a member arrives there",
   "/documents/[id]":
     "reached by clicking its own goal's link in s29-documents, because there is no document index to navigate from",
   "/session/[id]/minutes":

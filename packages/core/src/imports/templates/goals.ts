@@ -13,7 +13,7 @@
  * can answer once for the whole file.
  */
 
-import { GOAL_LEVELS } from "@openokr/db";
+import { GOAL_KINDS, GOAL_LEVELS } from "@openokr/db";
 import { richTextFromPlainText } from "../../rich-text/from-text.ts";
 import { asDay, asEnum, asNumber, asText } from "./coerce.ts";
 import type { EntityTemplate, PlanContext, RowPlan } from "./types.ts";
@@ -52,6 +52,15 @@ export const goalsTemplate: EntityTemplate = {
       aliases: ["level", "tier", "scope"],
       required: true,
       example: "company",
+    },
+    {
+      field: "kind",
+      describe: `One of: ${GOAL_KINDS.join(", ")} (METHOD.md §2.8). The workspace's default if the file does not say.`,
+      aliases: ["kind", "okrKind", "promise", "commitment"],
+      required: false,
+      example: "aspirational",
+      whenAbsent:
+        "This file has no kind column, so every new objective arrives as the workspace's default kind: aspirational, unless it uses committed OKRs only.",
     },
     {
       field: "cycle",
@@ -123,6 +132,9 @@ export const goalsTemplate: EntityTemplate = {
   }: PlanContext): Promise<RowPlan> {
     const title = asText("title", values.title ?? "");
     const level = asEnum("level", values.level ?? "", GOAL_LEVELS);
+    const kind = values.kind
+      ? asEnum("kind", values.kind, GOAL_KINDS)
+      : undefined;
     const description = values.description
       ? richTextFromPlainText(values.description)
       : undefined;
@@ -132,9 +144,10 @@ export const goalsTemplate: EntityTemplate = {
         : asNumber("weight", values.weight);
 
     if (existingId) {
-      // The cycle, the timeframe and the owner are not updated. An objective
-      // that has moved cycle is a decision somebody made in the product, and a
-      // re-run of an old file should not move it back.
+      // The cycle, the timeframe, the owner and the kind are not updated. An
+      // objective that has moved cycle, or been promised as the other kind, is
+      // a decision somebody made in the product, and a re-run of an old file
+      // should not undo it.
       return {
         kind: "update",
         action: "goals.update",
@@ -172,6 +185,7 @@ export const goalsTemplate: EntityTemplate = {
       input: {
         title,
         level,
+        ...(kind ? { kind } : {}),
         ...(description ? { description } : {}),
         ...(hasCycle
           ? { cycleId: await references.cycle(values.cycle as string) }

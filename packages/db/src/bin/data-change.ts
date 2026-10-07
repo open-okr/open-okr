@@ -23,6 +23,17 @@ import { scrubErasedMemberNames } from "../data-changes/0010_scrub_erased_member
 import { sealAccountTokens } from "../data-changes/0011_seal_account_tokens.ts";
 import { backfillWorkspaceRoles } from "../data-changes/0012_backfill_workspace_roles.ts";
 import { dropSpaceEditOnGoals } from "../data-changes/0013_drop_space_edit_on_goals.ts";
+import { carryStrategicIssueMinimum } from "../data-changes/0014_carry_strategic_issue_minimum.ts";
+import { carryObjectiveLengthLimit } from "../data-changes/0015_carry_objective_length_limit.ts";
+import { carryCoachStrictness } from "../data-changes/0016_carry_coach_strictness.ts";
+import { keyResultKindFromDirection } from "../data-changes/0017_key_result_kind_from_direction.ts";
+import { keyResultScoreComputed } from "../data-changes/0018_key_result_score_computed.ts";
+import { dropAlignmentPenalties } from "../data-changes/0019_drop_alignment_penalties.ts";
+import { kpiTargetTypeFromDirection } from "../data-changes/0020_kpi_target_type_from_direction.ts";
+import { kpiRecoveringToBand } from "../data-changes/0021_kpi_recovering_to_band.ts";
+import { kpiNamedOwner } from "../data-changes/0022_kpi_named_owner.ts";
+import { blockerClockToCheckIn } from "../data-changes/0023_blocker_clock_to_check_in.ts";
+import { retireRhythmScoreThreshold } from "../data-changes/0024_retire_rhythm_score_threshold.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -50,6 +61,20 @@ try {
       // After 0012, never before it: 0012 is what gives everybody the role
       // that replaces the binding this removes.
       dropSpaceEditOnGoals,
+      // Phase 9's three, numbered after main's 0013 when main was merged in
+      // on 5 October 2026: the ledger keys a script by its whole name, and
+      // 0013 had already run on instances built from main.
+      carryStrategicIssueMinimum,
+      carryObjectiveLengthLimit,
+      carryCoachStrictness,
+      keyResultKindFromDirection,
+      keyResultScoreComputed,
+      dropAlignmentPenalties,
+      kpiTargetTypeFromDirection,
+      kpiRecoveringToBand,
+      kpiNamedOwner,
+      blockerClockToCheckIn,
+      retireRhythmScoreThreshold,
     ],
   });
   process.stdout.write(

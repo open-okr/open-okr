@@ -1,6 +1,7 @@
 "use client";
 
 import type { callAction } from "@openokr/core";
+import { isTermKey, suggestedTerm } from "@openokr/method";
 import {
   Button,
   Card,
@@ -15,6 +16,7 @@ import {
   useTranslations,
   useUnsavedGuard,
 } from "@openokr/ui";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   createContext,
@@ -771,7 +773,7 @@ export function RhythmForm({
       <SettingsCard
         id="check-in"
         title={t("admin.rhythm.rhythmForm.theCheckInRhythm")}
-        description={t("admin.rhythm.rhythmForm.theseThreeHaveTheir")}
+        description={t("admin.rhythm.rhythmForm.theseTwoHaveTheir")}
         canManage={canManage}
       >
         <div className="flex flex-col gap-3 text-sm">
@@ -811,25 +813,18 @@ export function RhythmForm({
               ))}
             </select>
           </label>
-          <label className="flex items-center justify-between gap-3">
-            <span className="text-ink-2">
-              {t("admin.rhythm.rhythmForm.coachStrictness")}
-            </span>
-            <select
-              name="coachStrictness"
-              disabled={!canManage}
-              defaultValue={rhythm.coachStrictness}
-              className="rounded-md border border-line bg-bg px-2 py-1"
-            >
-              {["advisory", "warn", "strict"].map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/*
+           * **Coach strictness left this card at P9-T05.** Every check now has
+           * its own level (METHOD.md §4), and strict mode, which raises them
+           * all to block, is one setting among the practice's. Two switches
+           * for one behaviour is two places for an admin to look, and data
+           * change 0015 carried every workspace that had chosen strict across.
+           */}
           <p className="text-sm text-ink-3">
-            {t("admin.rhythm.rhythmForm.theSixPublishGates")}
+            {t("admin.rhythm.rhythmForm.strictModeIsOnThe")}{" "}
+            <Link href="/admin/practice" className="text-brand-text underline">
+              {t("admin.practice.title")}
+            </Link>
           </p>
         </div>
       </SettingsCard>
@@ -868,8 +863,9 @@ export function RhythmForm({
         <div className="flex flex-col gap-2 text-sm">
           {Object.entries(rhythm.terminology).map(([term, label]) => {
             const value = label as { singular: string; plural: string };
+            const suggested = isTermKey(term) ? suggestedTerm(term) : undefined;
             return (
-              <div key={term} className="flex items-center gap-2">
+              <div key={term} className="flex flex-wrap items-center gap-2">
                 <span className="w-32 text-ink-3">{term}</span>
                 <input
                   name={`label:${term}:singular`}
@@ -883,6 +879,39 @@ export function RhythmForm({
                   defaultValue={value.plural}
                   className="w-40 rounded-md border border-line bg-bg px-2 py-1"
                 />
+                {suggested &&
+                canManage &&
+                value.singular !== suggested.singular ? (
+                  // METHOD.md's terms name a common alternative (D6, P9-T21).
+                  // Offered rather than applied: it fills both fields and the
+                  // card's own Save decides.
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={(event) => {
+                      const form = event.currentTarget.form;
+                      for (const [form_, word] of [
+                        ["singular", suggested.singular],
+                        ["plural", suggested.plural],
+                      ] as const) {
+                        const field = form?.elements.namedItem(
+                          `label:${term}:${form_}`,
+                        );
+                        if (field instanceof HTMLInputElement) {
+                          field.value = word;
+                          // The unsaved-changes tracker listens for input.
+                          field.dispatchEvent(
+                            new Event("input", { bubbles: true }),
+                          );
+                        }
+                      }
+                    }}
+                  >
+                    {t("admin.rhythm.rhythmForm.useSuggested", {
+                      singular: suggested.singular,
+                    })}
+                  </Button>
+                ) : null}
               </div>
             );
           })}

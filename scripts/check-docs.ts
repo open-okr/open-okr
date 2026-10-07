@@ -227,7 +227,14 @@ try {
       return;
     }
     quoted += 1;
-    const actual = String(entry.default);
+    // A threshold split by kind (P9-T11a) is quoted as "aspirational 0.6,
+    // committed 1", in the registry's own order.
+    const actual =
+      typeof entry.default === "object" && entry.default !== null
+        ? Object.entries(entry.default)
+            .map(([name, part]) => `${name} ${String(part)}`)
+            .join(", ")
+        : String(entry.default);
     if (actual !== value) {
       problems.push(
         `${NUMBERS}:${index + 1} says \`${key}\` is ${value}; the registry says ${actual}`,

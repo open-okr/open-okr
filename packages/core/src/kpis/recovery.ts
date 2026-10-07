@@ -1,6 +1,7 @@
 import { activeOnly, goals, kpiRecords, kpis } from "@openokr/db";
 import {
   draftRecovery,
+  healthyBoundaryOf,
   type RecoveryDraft,
   type RecoveryTreeInput,
   type RecoveryTreeNode,
@@ -8,7 +9,13 @@ import {
 import { desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { createGoalInTx, createKeyResultInTx } from "../goals/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
-import { recomputeKpi } from "./service.ts";
+import { richTextFromPlainText } from "../rich-text/from-text.ts";
+import {
+  KPI_RULE_COLUMNS,
+  recomputeKpi,
+  targetTypeOf,
+  thresholdsOf,
+} from "./service.ts";
 
 /**
  * The recovery loop's half that needs rows (METHOD.md §6.5, design
@@ -102,9 +109,10 @@ async function loadRecoveryTree(
       parentKpiId: kpis.parentKpiId,
       title: kpis.title,
       indicatorType: kpis.indicatorType,
-      direction: kpis.direction,
+      ...KPI_RULE_COLUMNS,
       targetDefault: kpis.targetDefault,
       memberId: kpis.memberId,
+      ownerMemberId: kpis.ownerMemberId,
       position: kpis.position,
     })
     .from(kpis)
@@ -164,7 +172,9 @@ async function loadRecoveryTree(
       direction: row.direction,
       current: value?.actual ?? 0,
       target: value?.target ?? 0,
-      owner: row.memberId,
+      // The named owner first (§6.2, P9-T17b-b), then the member whose list
+      // it is on.
+      owner: row.ownerMemberId ?? row.memberId,
       position: row.position,
     };
   });
@@ -176,6 +186,18 @@ async function loadRecoveryTree(
       title: root.title,
       target: rootValue?.target ?? 0,
       current: rootValue?.actual ?? 0,
+      direction: root.direction,
+      healthyBoundary: healthyBoundaryOf({
+        targetType: targetTypeOf(root),
+        thresholds: thresholdsOf(root),
+        target: rootValue?.target ?? null,
+        current: rootValue?.actual ?? null,
+        corridor: {
+          healthyPct: Number(root.healthyPct),
+          watchPct: Number(root.watchPct),
+        },
+      }),
+      owner: root.ownerMemberId ?? root.memberId,
     },
     nodes,
   };
@@ -222,6 +244,8 @@ export interface LaunchedRecovery {
   readonly goalId: string;
   readonly keyResultIds: readonly string[];
   readonly startedPct: number | null;
+  /** The KPI's band after the launch, which a recovery does not change. */
+  readonly state: string;
 }
 
 /**
@@ -294,6 +318,9 @@ export async function launchRecoveryInTx(
     workspaceId: input.workspaceId,
     // The drafted sentence when one was offered, the §6.5 template otherwise.
     title: input.objectiveTitle?.trim() || draft.objective,
+    description: richTextFromPlainText(draft.description),
+    // §6.5: a recovery restores a level the business relies on.
+    kind: draft.kind,
     cycleId: input.cycleId,
     level: "team",
     ownerKind: spaceId ? "space" : "workspace",
@@ -305,6 +332,20 @@ export async function launchRecoveryInTx(
     reviewerId: input.memberId,
   });
 
+  // The KPI's own indicator type, for its own key result.
+  const [rootRow] = await tx
+    .select({ indicatorType: kpis.indicatorType })
+    .from(kpis)
+    .where(
+      activeOnly(
+        kpis,
+        eq(kpis.workspaceId, input.workspaceId),
+        eq(kpis.id, input.kpiId),
+      ),
+    )
+    .limit(1);
+  const rootIndicator = rootRow?.indicatorType ?? "lagging";
+
   const keyResultIds: string[] = [];
   for (const keyResult of draft.keyResults) {
     const created = await createKeyResultInTx(tx, {
@@ -312,11 +353,14 @@ export async function launchRecoveryInTx(
       goalId: goal.id,
       title: keyResult.title,
       direction: keyResult.direction,
-      // Always leading. That is what made it a driver (design §8).
-      indicatorType: "leading",
+      // The KPI's own key result is what the KPI is; every other one is a
+      // driver, and leading is what made it one (design §8).
+      indicatorType: keyResult.kpiBacked ? rootIndicator : "leading",
       baselineValue: keyResult.baseline,
       targetValue: keyResult.target,
       ownerId: keyResult.ownerMemberId,
+      // The first reads the KPI it is (P9-T18a), so a reading moves it.
+      ...(keyResult.kpiBacked ? { kpiId: keyResult.sourceKpiId } : {}),
       authorMemberId: input.memberId,
     });
     keyResultIds.push(created.id);
@@ -343,10 +387,15 @@ export async function launchRecoveryInTx(
       ),
     );
 
-  // The state flips to `recovering` through the one recompute entry point
-  // rather than by writing the word here, so the corridor precedence stays in
-  // one place.
-  await recomputeKpi(tx, input.workspaceId, input.kpiId, now);
+  // Through the one recompute entry point, so the effective figure and the
+  // band are written in one place. The band does not move for a launch: the
+  // recovery sits beside it (P9-T17b-a).
+  const recomputed = await recomputeKpi(
+    tx,
+    input.workspaceId,
+    input.kpiId,
+    now,
+  );
 
-  return { goalId: goal.id, keyResultIds, startedPct };
+  return { goalId: goal.id, keyResultIds, startedPct, state: recomputed.state };
 }

@@ -28,6 +28,274 @@ export type KpiFrequency = (typeof KPI_FREQUENCIES)[number];
 export const KPI_DIRECTIONS = ["higher_better", "lower_better"] as const;
 export type KpiDirection = (typeof KPI_DIRECTIONS)[number];
 
+/**
+ * §6.2's five kinds of target (P9-T17a): stay at or above, stay at or below,
+ * increase to, decrease to, stay within a range.
+ */
+export const KPI_TARGET_TYPES = [
+  "at_least",
+  "at_most",
+  "increase_to",
+  "decrease_to",
+  "range",
+] as const;
+export type KpiTargetType = (typeof KPI_TARGET_TYPES)[number];
+
+/** The bands a KPI can be in, before a recovery or missing data is considered. */
+export type KpiBand = "healthy" | "watch" | "unhealthy";
+
+/**
+ * §6.2's thresholds, in the KPI's own units. Null where unset.
+ *
+ * A KPI that should stay high uses the low pair, one that should stay low the
+ * high pair, and a range uses `greenLow` to `greenHigh` as its band with a red
+ * boundary on either side where too far that way matters.
+ */
+export interface KpiThresholds {
+  readonly greenLow: number | null;
+  readonly greenHigh: number | null;
+  readonly redLow: number | null;
+  readonly redHigh: number | null;
+}
+
+export const NO_THRESHOLDS: KpiThresholds = {
+  greenLow: null,
+  greenHigh: null,
+  redLow: null,
+  redHigh: null,
+};
+
+/** Which way is better under a target type, for the ratio fallback. Null for a range. */
+export function directionOfTargetType(
+  type: KpiTargetType,
+): KpiDirection | null {
+  if (type === "range") {
+    return null;
+  }
+  return type === "at_most" || type === "decrease_to"
+    ? "lower_better"
+    : "higher_better";
+}
+
+/** The target type a KPI written before §6.2 had them reads as. */
+export function targetTypeOfDirection(direction: KpiDirection): KpiTargetType {
+  return direction === "lower_better" ? "at_most" : "at_least";
+}
+
+/**
+ * Whether the thresholds a type needs are all present (§6.2). A range needs
+ * its band; its red boundaries are optional. A one-sided type needs its green
+ * and its red value.
+ */
+function thresholdsComplete(
+  type: KpiTargetType,
+  thresholds: KpiThresholds,
+): boolean {
+  if (type === "range") {
+    return thresholds.greenLow !== null && thresholds.greenHigh !== null;
+  }
+  return directionOfTargetType(type) === "lower_better"
+    ? thresholds.greenHigh !== null && thresholds.redHigh !== null
+    : thresholds.greenLow !== null && thresholds.redLow !== null;
+}
+
+/**
+ * What is wrong with a set of thresholds for a type, in words, or null.
+ *
+ * Refused at the boundary so a KPI is never judged by half a rule. None at all
+ * is fine: the ratio fallback applies.
+ */
+export function thresholdsProblem(
+  type: KpiTargetType,
+  thresholds: KpiThresholds,
+): string | null {
+  const { greenLow, greenHigh, redLow, redHigh } = thresholds;
+  const none = [greenLow, greenHigh, redLow, redHigh].every((v) => v === null);
+  if (none) {
+    return type === "range"
+      ? "A range needs its band: the lowest and highest values that are green."
+      : null;
+  }
+  if (!thresholdsComplete(type, thresholds)) {
+    return type === "range"
+      ? "A range needs its band: the lowest and highest values that are green."
+      : "Give both the green value and the red value, or neither.";
+  }
+  if (type === "range") {
+    if ((greenLow as number) > (greenHigh as number)) {
+      return "The bottom of the green band is above its top.";
+    }
+    if (redLow !== null && redLow > (greenLow as number)) {
+      return "The red boundary below sits above the green band.";
+    }
+    if (redHigh !== null && redHigh < (greenHigh as number)) {
+      return "The red boundary above sits below the green band.";
+    }
+    return null;
+  }
+  if (directionOfTargetType(type) === "lower_better") {
+    return (redHigh as number) < (greenHigh as number)
+      ? "The red value has to be above the green one when lower is better."
+      : null;
+  }
+  return (redLow as number) > (greenLow as number)
+    ? "The red value has to be below the green one when higher is better."
+    : null;
+}
+
+/**
+ * Where a KPI is healthy again, in its own units (§6.5, P9-T18a): what a
+ * recovery's first key result aims for. Its green boundary where it has
+ * thresholds, the nearer end of the band for a range, and on the fallback the
+ * value whose ratio to target is the healthy threshold. Null when nothing
+ * says, which is a KPI with neither thresholds nor a target.
+ */
+export function healthyBoundaryOf(input: {
+  readonly targetType: KpiTargetType;
+  readonly thresholds: KpiThresholds;
+  readonly target: number | null;
+  readonly current: number | null;
+  readonly corridor: KpiCorridor;
+}): number | null {
+  const { targetType, thresholds, target, current } = input;
+  if (thresholdsComplete(targetType, thresholds)) {
+    if (targetType === "range") {
+      return current !== null && current > (thresholds.greenHigh as number)
+        ? thresholds.greenHigh
+        : thresholds.greenLow;
+    }
+    return directionOfTargetType(targetType) === "lower_better"
+      ? thresholds.greenHigh
+      : thresholds.greenLow;
+  }
+  if (target === null) {
+    return null;
+  }
+  const share = input.corridor.healthyPct / 100;
+  const value =
+    directionOfTargetType(targetType) === "lower_better"
+      ? target / share
+      : target * share;
+  return Math.round(value * 100) / 100;
+}
+
+export type KpiHealthBasis = "thresholds" | "ratio";
+
+export interface KpiReading {
+  /** Null when there is nothing to judge: no value, or a ratio with no target. */
+  readonly band: KpiBand | null;
+  /** What decided the band, so a screen can say which rule it is reading. */
+  readonly basis: KpiHealthBasis;
+  /** §6.4's ratio, kept for display and the recovery projection. Null for a range. */
+  readonly achievementPct: number | null;
+  readonly diagnostic: KpiDiagnostic | null;
+}
+
+/**
+ * §6.4: a KPI's band from its own thresholds, in its own units, by its target
+ * type, and the ratio fallback where it has none (P9-T17a).
+ *
+ * Green is inclusive and red is strict, as the method writes them: "green at
+ * or above 13.5, red below 8". Between the two is watch. A range is green
+ * inside its band; outside it, past a red boundary is unhealthy and short of
+ * one is watch.
+ *
+ * The fallback is the corridor over achievement that every KPI used before
+ * §6.2 had target types. It suits a positive number counted from zero and
+ * nothing else, which is why `basis` travels with the answer.
+ */
+export function kpiReading(input: {
+  readonly targetType: KpiTargetType;
+  readonly thresholds: KpiThresholds;
+  readonly actual: number | null;
+  readonly target: number | null;
+  readonly corridor: KpiCorridor;
+}): KpiReading {
+  const { targetType, thresholds, actual, target } = input;
+  const direction = directionOfTargetType(targetType);
+  const ratio =
+    direction === null
+      ? { pct: null, diagnostic: null }
+      : kpiAchievement(direction, actual, target);
+
+  if (thresholdsComplete(targetType, thresholds)) {
+    return {
+      band:
+        actual === null
+          ? null
+          : bandByThresholds(targetType, thresholds, actual),
+      basis: "thresholds",
+      achievementPct: ratio.pct,
+      diagnostic: null,
+    };
+  }
+  return {
+    band:
+      ratio.pct === null
+        ? null
+        : ratio.pct >= input.corridor.healthyPct
+          ? "healthy"
+          : ratio.pct >= input.corridor.watchPct
+            ? "watch"
+            : "unhealthy",
+    basis: "ratio",
+    achievementPct: ratio.pct,
+    diagnostic: ratio.diagnostic,
+  };
+}
+
+function bandByThresholds(
+  type: KpiTargetType,
+  thresholds: KpiThresholds,
+  actual: number,
+): KpiBand {
+  const { greenLow, greenHigh, redLow, redHigh } = thresholds;
+  if (type === "range") {
+    if (actual >= (greenLow as number) && actual <= (greenHigh as number)) {
+      return "healthy";
+    }
+    if (actual < (greenLow as number)) {
+      return redLow !== null && actual < redLow ? "unhealthy" : "watch";
+    }
+    return redHigh !== null && actual > redHigh ? "unhealthy" : "watch";
+  }
+  if (directionOfTargetType(type) === "lower_better") {
+    if (actual <= (greenHigh as number)) {
+      return "healthy";
+    }
+    return actual > (redHigh as number) ? "unhealthy" : "watch";
+  }
+  if (actual >= (greenLow as number)) {
+    return "healthy";
+  }
+  return actual < (redLow as number) ? "unhealthy" : "watch";
+}
+
+/**
+ * §6.4's state from a band: no data first, then the band (P9-T17b-a).
+ *
+ * A recovery is not a state. A KPI with an active recovery OKR is shown as
+ * recovering beside its real band, never instead of it, because a collapsing
+ * metric that read "recovering" could quietly stay that way while the
+ * recovery's own progress moved.
+ */
+export function kpiStateOf(band: KpiBand | null): KpiState {
+  return band ?? "no_data";
+}
+
+/**
+ * Whether a KPI is recovering: an overlay beside its state, never the state
+ * itself (§6.4, P9-T17b-a). A closed recovery no longer holds it.
+ */
+export function kpiRecovering(recovery: RecoveryLink): boolean {
+  return recovery === "open";
+}
+
+/**
+ * §6.4's states. `recovering` is no longer written since P9-T17b-a, and is
+ * kept because rows the previous release wrote still carry it and the
+ * database still accepts it; readers turn it back into the band it hid.
+ */
 export const KPI_STATES = [
   "healthy",
   "watch",
@@ -164,26 +432,17 @@ export interface KpiCorridor {
 }
 
 /**
- * §6.4's corridor state (design §3). Precedence, first match wins.
- *
- * No data outranks a recovery on purpose: a KPI nobody has recorded is not
- * recovering, it is unmeasured, and telling somebody a recovery is under way on
- * a metric with no values would be the product inventing progress.
- *
- * A closed recovery no longer holds the KPI. It returns to whichever band it has
- * actually reached, which is the honest outcome whether the recovery worked or
- * not.
+ * §6.4's corridor state on the ratio fallback (design §3): no data, then the
+ * band. Also how a reader turns a stored `recovering`, written before
+ * P9-T17b-a, back into the band it hid: those rows predate thresholds, so the
+ * ratio is the rule they were judged by.
  */
 export function kpiState(
   achievementPct: number | null,
-  recovery: RecoveryLink,
   corridor: KpiCorridor,
 ): KpiState {
   if (achievementPct === null) {
     return "no_data";
-  }
-  if (recovery === "open") {
-    return "recovering";
   }
   if (achievementPct >= corridor.healthyPct) {
     return "healthy";

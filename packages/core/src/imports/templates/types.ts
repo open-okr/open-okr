@@ -43,6 +43,12 @@ export interface ColumnSpec {
   readonly aliases: readonly string[];
   readonly required: boolean;
   /**
+   * What the import assumes when a file has no such column, said in the
+   * report (P9-T12c-b). Only for a column whose absence changes what is
+   * written, such as a kind every row then takes by default.
+   */
+  readonly whenAbsent?: string;
+  /**
    * What this column holds in the downloadable template's one example row
    * (completeness review M-17).
    *

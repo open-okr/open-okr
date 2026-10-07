@@ -10,8 +10,9 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
-import { goals } from "./goals.ts";
+import { goals, keyResults } from "./goals.ts";
 import { spaces } from "./spaces.ts";
+import { tasks } from "./tasks.ts";
 import { workspaceMembers, workspaces } from "./workspaces.ts";
 
 /**
@@ -45,8 +46,25 @@ export type KpiDirectionValue = (typeof KPI_DIRECTIONS)[number];
 export const KPI_TIERS = ["input", "output", "outcome", "impact"] as const;
 export type KpiTier = (typeof KPI_TIERS)[number];
 
-export const KPI_AGGREGATES = ["sum", "avg", "max", "min", "count"] as const;
+export const KPI_AGGREGATES = [
+  "sum",
+  "avg",
+  "max",
+  "min",
+  "count",
+  "last",
+  "first",
+] as const;
 export type KpiAggregate = (typeof KPI_AGGREGATES)[number];
+
+/** §6.2's kinds of target (P9-T17a). */
+const KPI_TARGET_TYPES = [
+  "at_least",
+  "at_most",
+  "increase_to",
+  "decrease_to",
+  "range",
+] as const;
 
 export const KPI_STATES = [
   "healthy",
@@ -129,15 +147,37 @@ export const kpis = pgTable("kpis", {
   memberId: uuid("member_id").references(() => workspaceMembers.id, {
     onDelete: "set null",
   }),
+  /**
+   * The one named person who owns it (METHOD.md §6.2, P9-T17b-b), and who
+   * hears when it leaves its corridor. Separate from where it lives. Null is
+   * a KPI nobody has named.
+   */
+  ownerMemberId: uuid("owner_member_id").references(() => workspaceMembers.id),
   frequency: text("frequency", { enum: KPI_FREQUENCIES }).notNull(),
   unit: text("unit"),
   direction: text("direction", { enum: KPI_DIRECTIONS })
     .notNull()
     .default("higher_better"),
+  /**
+   * §6.2's kind of target (P9-T17a). Null is a KPI written before it, which
+   * reads as the type its direction implies; `direction` is still written for
+   * the release that reads only that.
+   */
+  targetType: text("target_type", { enum: KPI_TARGET_TYPES }),
+  /**
+   * §6.2's thresholds, in the KPI's own units. A high-is-good type uses the
+   * low pair, a low-is-good type the high pair, a range the green pair as its
+   * band with a red boundary either side. All null is the ratio fallback.
+   */
+  greenLow: numeric("green_low"),
+  greenHigh: numeric("green_high"),
+  redLow: numeric("red_low"),
+  redHigh: numeric("red_high"),
   indicatorType: text("indicator_type", { enum: ["leading", "lagging"] })
     .notNull()
     .default("lagging"),
-  tier: text("tier", { enum: KPI_TIERS }).notNull().default("output"),
+  /** Optional since P9-T17b-b (METHOD.md §6.2). A label; nothing decides by it. */
+  tier: text("tier", { enum: KPI_TIERS }).default("output"),
   targetDefault: numeric("target_default"),
   aggregate: text("aggregate", { enum: KPI_AGGREGATES })
     .notNull()
@@ -163,6 +203,20 @@ export const kpis = pgTable("kpis", {
     onDelete: "set null",
   }),
   recoveryStartedPct: numeric("recovery_started_pct"),
+  /**
+   * The answer an unhealthy KPI was given other than a recovery (METHOD.md
+   * §6.5, P9-T18b): fixed now as a task, or answered by a key result on an
+   * existing objective. The latest one only; the four are set together.
+   */
+  responseKind: text("response_kind", { enum: ["fix_now", "key_result"] }),
+  responseTaskId: uuid("response_task_id").references(() => tasks.id),
+  responseKeyResultId: uuid("response_key_result_id").references(
+    () => keyResults.id,
+  ),
+  respondedByMemberId: uuid("responded_by_member_id").references(
+    () => workspaceMembers.id,
+  ),
+  respondedAt: timestamp("responded_at", { withTimezone: true }),
   /**
    * When the closure proposal was raised, so §6.5's "exactly once" has
    * somewhere to remember it. Cleared on launch and on close.

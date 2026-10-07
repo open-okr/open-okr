@@ -507,14 +507,17 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // slider's local state, which a `router.refresh()` does not reset.
   const rows = page.getByRole("listitem").filter({ has: page.getByRole("slider") });
   const firstRow = rows.first();
-  await firstRow.getByRole("slider").fill("0.6");
-  await firstRow.getByLabel("One line on why").fill("Landed 210 of 300.");
+  await firstRow.getByRole("slider").fill("0.4");
+  await firstRow.getByLabel("One line on why").fill("Landed 120 of 300.");
   await firstRow.getByRole("button", { name: "Save the grade" }).click();
   await expect(ungraded).toHaveCount(before - 1, { timeout: 10_000 });
-  // The grade the room agreed, back from the server. The row carries "0.6"
+  // The grade the room agreed, back from the server. The row carries "0.40"
   // twice, as the chip the server rendered and as the slider's own readout, and
-  // the chip comes first in the row.
-  await expect(firstRow.getByText("0.6", { exact: true }).first()).toBeVisible({
+  // the chip comes first in the row. Hundredths since P9-T14a, so a computed
+  // score is a stop on the slider.
+  await expect(
+    firstRow.getByText("0.40", { exact: true }).first(),
+  ).toBeVisible({
     timeout: 10_000,
   });
 
@@ -532,14 +535,15 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(page.getByText(/The cycle score appears as objectives/)).toBeVisible();
 
   // The second client's rail moves and its timer restarts on stage two's own
-  // twelve minutes rather than continuing stage one's six. Reloaded, for the
+  // twenty minutes (twelve until the review was re-timed at P9-T20a) rather
+  // than continuing stage one's six. Reloaded, for the
   // reason above: what this proves is that the stage change reached the server
   // and that both clients read the same rail from it.
   await secondPage.reload();
   await expect(secondPage.getByText(/Stage 2 of 11/)).toBeVisible({
     timeout: 10_000,
   });
-  await expect(secondPage.getByText(/of 12:00/)).toBeVisible();
+  await expect(secondPage.getByText(/of 20:00/)).toBeVisible();
   // The room grades together, so the second client reads the grade the first
   // one saved rather than an empty stage.
   //
@@ -548,7 +552,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // in a row here, and it is the same mistake that made the monthly decision
   // assertion pass on the click instead of on the write.
   await expect(secondPage.getByLabel("One line on why").first()).toHaveValue(
-    "Landed 210 of 300.",
+    "Landed 120 of 300.",
   );
 
   // The reveal (METHOD.md section 8.3, P4-T10b-b).
@@ -562,26 +566,59 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // packages/core/test/review-scoring.test.ts.
   await page.getByRole("button", { name: "Reveal the score" }).first().click();
 
-  // Weighted over the graded key results alone: one at 0.6. Section 8.3 leaves
+  // Weighted over the graded key results alone: one at 0.4. Section 8.3 leaves
   // an ungraded key result out rather than counting it as a zero, so a
   // half-graded objective does not read as a failing one.
-  await expect(page.getByText("0.60").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("0.40").first()).toBeVisible({ timeout: 10_000 });
   await expect(hidden).toHaveCount(hiddenBefore - 1, { timeout: 10_000 });
 
-  // The running cycle score, and section 3.4's verdict on it. 0.6 is the floor
-  // of the healthy band, inclusive, which is the boundary most likely to be
+  // The running cycle score, and section 3.4's verdict on it. 0.4 is the floor
+  // of the partial band, inclusive, which is the boundary most likely to be
   // written the wrong way round.
   await expect(page.getByText("Cycle score so far")).toBeVisible();
-  await expect(page.getByText("healthy").first()).toBeVisible();
+  await expect(page.getByText("partial").first()).toBeVisible();
 
   // **The same number for the participant, from the same write.** Reloaded for
   // the reason every other assertion in this file is: it is about the server's
   // answer, not the push's timing. What this proves is that both clients read
   // one answer off the server rather than each computing their own.
   await secondPage.reload();
-  await expect(secondPage.getByText("0.60").first()).toBeVisible({
+  await expect(secondPage.getByText("0.40").first()).toBeVisible({
     timeout: 10_000,
   });
+
+  // **Scoring closes on explanations (METHOD.md section 8.3, P9-T20c).** A
+  // committed key result below 1.0 needs its line before the stage closes.
+  // Earlier specs leave committed objectives in this cycle (the recovery
+  // objective the registration spec launches), so whatever is committed and
+  // ungraded in the review's scope is graded here at 1.0, met, with its line,
+  // which asks no root cause of it and leaves stage seven's count alone. The
+  // refusal itself is proved in packages/core/test/review-diagnosis.test.ts.
+  const committedOpen = (
+    await pool.query<{ title: string }>(
+      `select k.title
+         from key_results k
+         join goals g on g.id = k.goal_id
+        where g.workspace_id = $1 and g.cycle_id = $2
+          and ($3::uuid is null or g.space_id = $3)
+          and g.kind = 'committed' and g.closed_at is null
+          and g.deleted_at is null and k.deleted_at is null
+          and not exists (
+            select 1 from review_scores r
+             where r.session_id = $4 and r.key_result_id = k.id
+               and r.deleted_at is null)`,
+      [member.workspace_id, scope.cycle_id, scope.space_id, reviewId],
+    )
+  ).rows;
+  for (const { title } of committedOpen) {
+    const row = rows.filter({ hasText: title });
+    await row.getByRole("slider").fill("1");
+    await row.getByLabel("One line on why").fill("Met in full.");
+    await row.getByRole("button", { name: "Save the grade" }).click();
+    await expect(row.getByText("1.00", { exact: true }).first()).toBeVisible({
+      timeout: 10_000,
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // Stage three: objective narratives (METHOD.md section 8.1 stage 3, P4-T10c)
@@ -821,14 +858,19 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   const rootCause = page.getByRole("region", { name: "Root cause" });
   await expect(rootCause).toHaveCount(1, { timeout: 10_000 });
 
-  // The one key result graded earlier came in at 0.6, which is below the
-  // section 11 threshold of 0.7, so exactly one row is listed and the other
-  // graded-at-nothing key results are not.
+  // The one key result graded earlier came in at 0.4, which is below the
+  // section 11 aspirational threshold of 0.6, so exactly one row is listed and
+  // the other graded-at-nothing key results are not. The objective is
+  // aspirational, the default.
   await expect(rootCause).toContainText("0 of 1 named");
-  await expect(rootCause.getByText("0.6")).toBeVisible();
-  // Eight causes, from the method package rather than from this screen.
+  await expect(rootCause.getByText("0.4")).toBeVisible();
+  // Nine causes since P9-T20c, from the method package rather than from this
+  // screen, the ninth "Other" with its line.
   await expect(
     rootCause.getByRole("button", { name: "Ambition set too high" }),
+  ).toBeVisible();
+  await expect(
+    rootCause.getByRole("button", { name: "Other, described in a line" }),
   ).toBeVisible();
   await expect(
     rootCause.getByRole("button", { name: "No clear owner or cadence" }),
@@ -838,16 +880,27 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     .getByRole("button", { name: "Blocked by a dependency" })
     .click();
   await expect(rootCause).toContainText("1 of 1 named", { timeout: 10_000 });
+  // A second cause is offered once there is a first, and never the first again.
+  await expect(
+    rootCause.getByRole("button", { name: "Second cause: Capacity or resourcing" }),
+  ).toBeVisible();
+  await expect(
+    rootCause.getByRole("button", {
+      name: "Second cause: Blocked by a dependency",
+    }),
+  ).toHaveCount(0);
 
   // The diagnostic shares this stage: section 8.4 names the causes and section
-  // 8.6 reads what they add up to. It cannot be read yet, because the survey is
-  // stage eight and section 8.6 needs both numbers.
+  // 8.6 reads what they add up to. Since P9-T20d its rhythm is measured from
+  // the check-ins that have fallen due rather than asked of the survey, so
+  // whether it can be read already depends on the day the suite runs: early
+  // in a quarter nothing has fallen due yet. Either way it says which.
   const diagnosticPanel = page.getByRole("region", {
     name: "The diagnostic",
   });
   await expect(diagnosticPanel).toHaveCount(1);
   await expect(diagnosticPanel).toContainText(
-    "needs a cycle score and a rhythm score",
+    /The numbers are in|needs a cycle score/,
   );
   // Exact, because the header chip reads "1 of 1 named" and the row's own chip
   // reads "named": unscoped, that is two matches.
@@ -901,9 +954,20 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(
     processHealth.locator("p").filter({ hasText: "Rhythm score" }),
   ).toContainText("3.0");
-  // Section 8.5's closing rule: the lowest becomes next cycle's process OKR.
-  // Statement 5 scored 2, the lowest of the five.
+  // Section 8.5's closing rule: the lowest becomes an improvement action for
+  // the next cycle, with an owner and a date (P9-T20d). Statement 5 scored 2,
+  // the lowest of the five.
   await expect(processHealth).toContainText("Lowest: statement 5");
+  const makeIt = processHealth.getByRole("button", {
+    name: "Make it an action",
+  });
+  await expect(makeIt).toBeDisabled();
+  await processHealth.getByLabel("Who owns it").selectOption({ index: 1 });
+  await processHealth.getByLabel("By when").fill("2026-12-15");
+  await makeIt.click();
+  await expect(processHealth).toContainText("Added to the actions", {
+    timeout: 10_000,
+  });
 
   // **Not asserted here: reading the diagnostic once both numbers exist.** The
   // rail advances forward only, so a browser cannot return to stage seven after
@@ -913,17 +977,29 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // database by packages/core/test/review-reset.test.ts.
 
   // ---------------------------------------------------------------------------
-  // Stage nine: keep, modify or abandon (METHOD.md section 8.8, P4-T11c-a)
+  // Stage nine: keep, modify, abandon or defer (METHOD.md section 8.8,
+  // P4-T11c-a; achieved and defer since P9-T20e-a)
   // ---------------------------------------------------------------------------
 
   await page.getByRole("button", { name: "Continue to next step" }).click();
-  const reset = page.getByRole("region", { name: "Keep, modify or abandon" });
+  const reset = page.getByRole("region", {
+    name: "Keep, modify, abandon or defer",
+  });
   await expect(reset).toHaveCount(1, { timeout: 10_000 });
   await expect(reset).toContainText("0 of 2 decided");
   // Nothing pre-selected: section 8.8's closing line is that nothing carries
   // over by default, and a screen arriving with keep chosen is that carry-over
   // wearing a decision's clothes.
   await expect(reset.getByText("undecided").first()).toBeVisible();
+  // An unfinished aspirational objective is proposed as Keep, beside the
+  // controls and never chosen (section 8.8, P9-T20e-a). The first objective
+  // came in at 0.4.
+  await expect(reset.getByText("Proposed: Keep").first()).toBeVisible();
+  for (const label of ["Achieved, close it", "Defer"]) {
+    await expect(
+      reset.getByRole("button", { name: label }).first(),
+    ).toBeVisible();
+  }
 
   const firstObjective = reset.getByRole("listitem").first();
   // A decision with no why is refused on the screen before it reaches the
@@ -946,7 +1022,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(reset).toContainText("Adjust the target or wording");
 
   // ---------------------------------------------------------------------------
-  // Stage ten: learnings and next-cycle drafts (METHOD.md section 8.9, P4-T11c-b)
+  // Stage ten: learnings (METHOD.md section 8.9, P4-T11c-b, P9-T22d)
   // ---------------------------------------------------------------------------
 
   await page.getByRole("button", { name: "Continue to next step" }).click();
@@ -963,21 +1039,13 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(forward).toContainText("from the retro", { timeout: 10_000 });
   await expect(forward).toContainText("1 carried");
 
-  // A draft with no why is refused on the screen: without it the next cycle
-  // cannot prioritise the draft against anything.
-  await forward
-    .getByLabel("A candidate objective")
-    .fill("Make the platform something a team can adopt without us");
-  await forward.getByRole("button", { name: "Draft it" }).click();
-  await expect(forward).toContainText("needs a title and a why");
-
-  await forward
-    .getByLabel("Why", { exact: true })
-    .fill("Three of five losses last quarter were onboarding, not features.");
-  await forward.getByRole("button", { name: "Draft it" }).click();
-  await expect(
-    forward.getByText("Make the platform something a team can adopt without us"),
-  ).toBeVisible({ timeout: 10_000 });
+  // The review drafts nothing for the next cycle (P9-T22d): section 8.10
+  // holds the review before drafting. The stage says where an idea goes
+  // instead, and offers no draft form.
+  await expect(forward).toContainText("An idea for the next cycle?");
+  await expect(forward.getByRole("button", { name: "Draft it" })).toHaveCount(
+    0,
+  );
 
   // ---------------------------------------------------------------------------
   // Stage eleven: decisions and actions (METHOD.md section 8.1 stage 11)
@@ -988,7 +1056,9 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     name: "Learnings and what happens next",
   });
   await expect(actions).toHaveCount(1, { timeout: 10_000 });
-  await expect(actions).toContainText("0 actions");
+  // The improvement action stage eight made is already here.
+  await expect(actions).toContainText("1 action");
+  await expect(actions).toContainText("Improve:");
 
   // An action with no owner and no date is refused on the screen. Section 8.1:
   // every action has a name and a date, or it is a wish.
@@ -1001,11 +1071,14 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await actions.getByLabel("Owner").selectOption({ index: 1 });
   await actions.getByLabel("By", { exact: true }).fill("2026-12-31");
   await actions.getByRole("button", { name: "Agree it" }).click();
-  await expect(actions).toContainText("1 action", { timeout: 10_000 });
+  await expect(actions).toContainText("2 actions", { timeout: 10_000 });
   await expect(actions).toContainText("2026-12-31");
 
   // Ticking is reversible, because a room ticking by mistake is normal.
-  await actions.getByRole("button", { name: "Done", exact: true }).click();
+  await actions
+    .getByRole("button", { name: "Done", exact: true })
+    .first()
+    .click();
   await expect(
     actions.getByRole("button", { name: "Reopen it" }),
   ).toBeVisible({ timeout: 10_000 });
@@ -1021,14 +1094,16 @@ test("a quarterly review runs its rail, and the second client follows", async ({
 
   const summary = page.getByRole("region", { name: "Executive summary" });
   await expect(summary).toHaveCount(1);
-  // Section 8.10's own list. The review above graded one key result at 0.6, so
-  // one key result was reviewed and one came in below 0.7.
+  // Section 8.10's own list. The review above graded one key result at 0.4, so
+  // one key result was reviewed and one came in below 0.6.
   await expect(summary).toContainText("Key results");
+  // Committed key results met, apart from the score (§8.10, P9-T20e-b).
+  await expect(summary).toContainText("Committed met");
   await expect(summary).toContainText("Team pulse");
   await expect(summary).toContainText("Actions agreed");
 
   // Every stage that recorded something is in the document.
-  await expect(page.getByText("Landed 210 of 300.")).toBeVisible();
+  await expect(page.getByText("Landed 120 of 300.")).toBeVisible();
   await expect(page.getByText("Activation held. The funnel above it never did.")).toBeVisible();
   await expect(page.getByText("Blocked by a dependency")).toBeVisible();
   await expect(page.getByText("Adjust the target or wording")).toHaveCount(0);
@@ -1056,6 +1131,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   const body = await markdown.text();
   expect(body).toContain("# Q1 review");
   expect(body).toContain("## Executive summary");
+  expect(body).toContain("- Committed key results met:");
   expect(body).not.toContain("Pulse was low");
 
   const pdf = await page.request.get(`/session/${reviewId}/minutes/pdf`);

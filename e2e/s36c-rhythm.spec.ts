@@ -44,8 +44,12 @@ let page: Page;
 
 /** The staleness grace field, which is a plain scalar in the registry. */
 const GRACE = "input[name='threshold:cadence.stalenessGraceDays']";
-/** One rung of a ladder, which was read-only until P6-G20. */
-const LADDER_OWNER = "input[name='composite:cadence.blockerLadderHours:owner']";
+/**
+ * One rung of a ladder, which was read-only until P6-G20. The check-in
+ * ladder's, since the blocker ladder became one rung at P9-T19a-a.
+ */
+const LADDER_OWNER =
+  "input[name='composite:cadence.checkInLadderDays:championRepeat']";
 
 /**
  * The card both fields live in. Every save, refusal and reset below belongs to
@@ -138,25 +142,25 @@ test("a grace this workspace asked for is written, and nothing else moves", asyn
 });
 
 test("a ladder can be moved, which it could not before", async () => {
-  await page.locator(LADDER_OWNER).fill("12");
+  await page.locator(LADDER_OWNER).fill("2");
   await page
-    .locator("input[name='composite:cadence.blockerLadderHours:coordinator']")
-    .fill("36");
+    .locator("input[name='composite:cadence.checkInLadderDays:coordinator']")
+    .fill("9");
   await page
-    .locator("input[name='composite:cadence.blockerLadderHours:sponsor']")
-    .fill("60");
+    .locator("input[name='composite:cadence.checkInLadderDays:sponsor']")
+    .fill("20");
   await save(page).click();
   await expect(outcome(page, "ok")).toContainText("Saved.", {
     timeout: 15_000,
   });
 
   await goTo(page, "/admin/rhythm");
-  await expect(page.locator(LADDER_OWNER)).toHaveValue("12");
+  await expect(page.locator(LADDER_OWNER)).toHaveValue("2");
 });
 
 test("a half-written set is refused rather than stored", async () => {
   await page
-    .locator("input[name='composite:cadence.blockerLadderHours:sponsor']")
+    .locator("input[name='composite:cadence.checkInLadderDays:sponsor']")
     .fill("");
   await save(page).click();
 
@@ -273,4 +277,33 @@ test("a renamed term is what every screen calls it, and the canon comes back", a
   await expect(
     page.getByRole("heading", { level: 1, name: "Spaces" }).first(),
   ).toBeVisible({ timeout: 15_000 });
+});
+
+/**
+ * The terminology card offers "Owner" for "Champion" (METHOD.md terms,
+ * decision D6, P9-T21).
+ *
+ * Offered, never applied: the button fills both fields and the card's own
+ * Save decides. **Nothing is saved here**, because every later spec reads
+ * "Champion"; the page is left by navigating away, which the unsaved guard
+ * allows for a programmatic navigation.
+ */
+test('the terminology card offers "Owner" for "Champion", and saves nothing by itself', async () => {
+  await goTo(page, "/admin/rhythm");
+  const terminology = page.getByTestId("rhythm-card-terminology");
+  const singular = terminology.locator("input[name='label:champion:singular']");
+  const plural = terminology.locator("input[name='label:champion:plural']");
+  await expect(singular).toHaveValue("Champion", { timeout: 15_000 });
+
+  await terminology.getByRole("button", { name: "Use “Owner”" }).click();
+  await expect(singular).toHaveValue("Owner");
+  await expect(plural).toHaveValue("Owners");
+
+  // Nothing was stored: a fresh read still says Champion.
+  await goTo(page, "/admin/rhythm");
+  await expect(
+    page
+      .getByTestId("rhythm-card-terminology")
+      .locator("input[name='label:champion:singular']"),
+  ).toHaveValue("Champion", { timeout: 15_000 });
 });

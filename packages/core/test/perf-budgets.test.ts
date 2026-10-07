@@ -45,9 +45,9 @@ describe("statisticOf", () => {
 
 describe("the budget table", () => {
   it("holds every row TECHNICAL-PLAN §13.1 lists", () => {
-    // Fourteen. A row quietly dropped from this table would be a budget
-    // nobody measures and nobody misses.
-    expect(BUDGETS).toHaveLength(14);
+    // Fifteen since P9-T06a added the OKR tree. A row quietly dropped from
+    // this table would be a budget nobody measures and nobody misses.
+    expect(BUDGETS).toHaveLength(15);
   });
 
   it("gives every row a ceiling and a statistic", () => {

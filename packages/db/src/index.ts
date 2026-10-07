@@ -241,6 +241,7 @@ export {
 export {
   type AnnualFrame,
   type AnnualStrategy,
+  annualFrameRevisions,
   annualFrames,
   annualStrategies,
   CYCLE_CADENCES,
@@ -252,6 +253,8 @@ export {
   type CycleSessionDate,
   type CycleStatus,
   cycles,
+  FRAME_FIELDS,
+  type FrameField,
   GOAL_LEVELS,
   type GoalLevel,
   type RhythmSettingsRow,
@@ -316,12 +319,16 @@ export {
   CAPACITY_VERDICTS,
   type CapacityVerdict,
   GOAL_CLOSE_DECISIONS,
+  GOAL_DRAFT_STATES,
   GOAL_HEALTH,
+  GOAL_KINDS,
   GOAL_OWNER_KINDS,
   GOAL_SUCCESS_STATUSES,
   type Goal,
   type GoalCloseDecision,
+  type GoalDraftState,
   type GoalHealth,
+  type GoalKind,
   type GoalOwnerKind,
   type GoalRetrospective,
   type GoalSuccessStatus,
@@ -331,10 +338,13 @@ export {
   INDICATOR_TYPES,
   type IndicatorType,
   KEY_RESULT_DIRECTIONS,
+  KEY_RESULT_KINDS,
   type KeyResult,
   type KeyResultDirection,
+  type KeyResultKind,
   type KeyResultValue,
   keyResults,
+  keyResultTargetChanges,
   keyResultValues,
   VALUE_SOURCES,
   type ValueSource,
@@ -398,6 +408,7 @@ export {
 } from "./schema/kpis.ts";
 export { type Kudo, kudos } from "./schema/kudos.ts";
 export { type McpSession, mcpSessions } from "./schema/mcp.ts";
+export { memberLeave } from "./schema/member-leave.ts";
 export {
   NOTIFICATION_REASONS,
   type Notification,
@@ -534,6 +545,7 @@ export {
   type SpaceMember,
   type SpaceRole,
   type SpaceSettings,
+  spaceHolidays,
   spaceMembers,
   spaces,
 } from "./schema/spaces.ts";

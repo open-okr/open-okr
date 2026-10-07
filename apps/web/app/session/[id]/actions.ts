@@ -174,6 +174,33 @@ export async function recordDecisionAction(
 }
 
 /**
+ * §7.5's stop, made from the review (METHOD.md §2.9, P9-T19a-d-d).
+ *
+ * The same `goals.stop` the objective's own page calls, so the stop is closed
+ * as abandoned with its one-line reason whichever screen it came from, and the
+ * review's record reads it back from the objective.
+ */
+export async function stopObjectiveAction(
+  sessionId: string,
+  goalId: string,
+  reason: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "goals.stop",
+    { id: goalId, reason },
+  );
+  revalidatePath(`/session/${sessionId}`);
+  revalidatePath(`/goals/${goalId}`);
+  revalidatePath("/cycle");
+}
+
+/**
  * The quarterly review's pacing (METHOD.md §8.1, P4-T10a-a).
  *
  * Both are the facilitator's, and the actions refuse anybody else rather than
@@ -288,25 +315,6 @@ export async function captureLearningAction(
   revalidatePath(`/session/${sessionId}`);
 }
 
-/** A candidate objective for the next cycle (METHOD.md §8.9, P4-T11c-b). */
-export async function draftNextCycleAction(
-  sessionId: string,
-  title: string,
-  why: string,
-) {
-  const { session, workspace } = await requireWorkspace();
-  await callAction(
-    {
-      pool: getPool(),
-      workspaceId: workspace.workspaceId,
-      actor: { kind: "human", userId: session.user.id },
-    },
-    "sessions.draftNextCycle",
-    { sessionId, title, why },
-  );
-  revalidatePath(`/session/${sessionId}`);
-}
-
 /**
  * One action, with an owner and a date (METHOD.md §8.1 stage 11, P4-T11c-b).
  *
@@ -381,7 +389,7 @@ export async function recordDiagnosticAction(sessionId: string) {
 export async function decideObjectiveAction(
   sessionId: string,
   goalId: string,
-  decision: "keep" | "modify" | "abandon",
+  decision: "achieved" | "keep" | "modify" | "defer" | "abandon",
   why: string,
 ) {
   const { session, workspace } = await requireWorkspace();
@@ -409,6 +417,7 @@ export async function setRootCauseAction(
   sessionId: string,
   keyResultId: string,
   causeKey: number,
+  secondaryCauseKey: number | null,
   detail: string,
 ) {
   const { session, workspace } = await requireWorkspace();
@@ -423,6 +432,7 @@ export async function setRootCauseAction(
       sessionId,
       keyResultId,
       causeKey,
+      secondaryCauseKey,
       ...(detail.length === 0 ? {} : { detail }),
     },
   );
@@ -768,21 +778,6 @@ export async function clusterRetroAction(sessionId: string) {
     "sessions.clusterRetro",
     { sessionId },
   );
-}
-
-/**
- * Next-cycle objectives proposed from the learnings the room carried, each
- * citing its learning, or null (completeness review M-09).
- *
- * Writes nothing. A proposal the facilitator keeps goes into the draft form,
- * where they edit it and save it with `sessions.draftNextCycle` like any
- * other draft.
- */
-export async function proposeFromLearningsAction(sessionId: string) {
-  const { assistContext } = await import("../../../lib/assists");
-  return callAction(await assistContext(), "sessions.proposeFromLearnings", {
-    sessionId,
-  });
 }
 
 /** The review written up as prose from its own record, or null (M-09). */

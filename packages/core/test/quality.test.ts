@@ -166,10 +166,10 @@ describe("the flags stored on a goal", () => {
 
     const kr = (await addKeyResult(created.id)) as { id: string };
     const after = await storedGoal(created.id);
-    // One key result is a warn on KR-1, not a fail, and the set is now all
-    // lagging so KR-4 warns too.
+    // One key result is a warn on KR-1, not a fail. The set is now all
+    // lagging, which KR-4 notes, and a note is not a flag (P9-T03a).
     expect(after?.quality_flags).toContain("KR-1");
-    expect(after?.quality_flags).toContain("KR-4");
+    expect(after?.quality_flags).not.toContain("KR-4");
     expect(await storedKeyResultFlags(kr.id)).not.toContain("KR-2");
   });
 
@@ -190,11 +190,13 @@ describe("the flags stored on a goal", () => {
 describe("per-workspace strictness", () => {
   it("changes the stored score for the same input", async () => {
     const wb = await workerDb();
-    // Three words: OBJ-1 passes on "trusted" and OBJ-2 warns on the length.
+    // OBJ-1 passes on "trusted" and OBJ-2 warns on the digit, which is not a
+    // year. (Three words used to warn on the length; there is no lower bound
+    // since P9-T03a.)
     // A title that *failed* would be no test at all, because strict mode
     // promotes warns and leaves fails alone.
     const warned = (await createGoal({
-      title: "Become genuinely trusted",
+      title: "Become trusted by 3 regulators",
     })) as { id: string };
     const atWarn = await storedGoal(warned.id);
 
@@ -208,7 +210,7 @@ describe("per-workspace strictness", () => {
     // and not a rendering choice.
     await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
       id: warned.id,
-      title: "Become genuinely trusted",
+      title: "Become trusted by 3 regulators",
     } as never);
     const atStrict = await storedGoal(warned.id);
 
@@ -308,8 +310,12 @@ describe("the panel and the stored flags", () => {
     });
 
     const stored = await storedGoal(created.id);
-    const { applyStrictness, evaluateKeyResults, evaluateObjective } =
-      await import("@openokr/method");
+    const {
+      applyEnforcement,
+      defaultPractice,
+      evaluateKeyResults,
+      evaluateObjective,
+    } = await import("@openokr/method");
     const { canonThresholds } = await import("@openokr/method");
     const thresholds = canonThresholds();
 
@@ -331,7 +337,7 @@ describe("the panel and the stored flags", () => {
       [created.id],
     );
 
-    const objective = applyStrictness(
+    const objective = applyEnforcement(
       evaluateObjective(
         {
           title: "Launch the new mobile app",
@@ -344,9 +350,9 @@ describe("the panel and the stored flags", () => {
         },
         thresholds,
       ),
-      "warn",
+      defaultPractice(),
     );
-    const keyResults = applyStrictness(
+    const keyResults = applyEnforcement(
       evaluateKeyResults(
         {
           keyResults: rows.map((row) => ({
@@ -362,11 +368,13 @@ describe("the panel and the stored flags", () => {
         },
         thresholds,
       ),
-      "warn",
+      defaultPractice(),
     );
 
     const inBrowser = [...objective, ...keyResults]
-      .filter((verdict) => verdict.status !== "pass")
+      .filter(
+        (verdict) => verdict.status !== "pass" && verdict.status !== "info",
+      )
       .map((verdict) => verdict.id)
       .sort();
 
@@ -395,12 +403,12 @@ describe("per-space strictness (P6-G18b)", () => {
     // The same three-word title in two places: one inside the space, one
     // owned by the workspace. OBJ-2 warns on the length in both.
     const inSpace = (await createGoal({
-      title: "Become genuinely trusted",
+      title: "Become trusted by 3 regulators",
       ownerKind: "space",
       spaceId,
     })) as { id: string };
     const outside = (await createGoal({
-      title: "Become genuinely trusted",
+      title: "Become trusted by 3 regulators",
     })) as { id: string };
 
     const spaceBefore = await storedGoal(inSpace.id);
@@ -418,7 +426,7 @@ describe("per-space strictness (P6-G18b)", () => {
     for (const goal of [inSpace, outside]) {
       await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
         id: goal.id,
-        title: "Become genuinely trusted",
+        title: "Become trusted by 3 regulators",
       } as never);
     }
 
@@ -437,7 +445,7 @@ describe("per-space strictness (P6-G18b)", () => {
     const wb = await workerDb();
     const spaceId = await defaultSpace();
     const goal = (await createGoal({
-      title: "Become genuinely trusted",
+      title: "Become trusted by 3 regulators",
       ownerKind: "space",
       spaceId,
     })) as { id: string };
@@ -446,7 +454,7 @@ describe("per-space strictness (P6-G18b)", () => {
     const rescore = () =>
       callAction({ pool: wb.appPool, ...context() }, "goals.update", {
         id: goal.id,
-        title: "Become genuinely trusted",
+        title: "Become trusted by 3 regulators",
       } as never);
 
     await callAction(

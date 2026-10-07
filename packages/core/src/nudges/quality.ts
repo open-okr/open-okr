@@ -31,6 +31,7 @@ import {
   type WorkspaceTx,
 } from "@openokr/db";
 import {
+  enforcementLevel,
   isTriggerKey,
   type ResolvedThresholds,
   type TriggerKey,
@@ -38,7 +39,9 @@ import {
 } from "@openokr/method";
 import { and, eq, isNull } from "drizzle-orm";
 import { type AgentScope, agentSeesGoal } from "../agents/scope.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError } from "../operations/errors.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { evaluateGoalInTx } from "../quality/service.ts";
 import { resolveManagers } from "../spaces/roles.ts";
 import { spaceRoleHolders } from "./rituals.ts";
@@ -68,8 +71,9 @@ const TRIGGER_FOR_FINDING: Record<string, TriggerKey> = {
  * KR-4 is why this is keyed on the condition. It trips on "All lagging" and on
  * "All leading", and only the first is `quality.all_lagging`; a trigger chosen
  * from the id alone would tell a champion their key results are all lagging when
- * they are all leading. KR-3 has one failing condition and could have been keyed
- * on the id, and is keyed the same way so the table has one shape.
+ * they are all leading. KR-3 is keyed the same way, and since P9-T03a it has to
+ * be: "Target, date or owner missing" and "Baseline missing" are two
+ * conditions, and only the second is `quality.no_baseline`.
  */
 const TRIGGER_FOR_VERDICT: readonly {
   readonly id: string;
@@ -83,7 +87,7 @@ const TRIGGER_FOR_VERDICT: readonly {
   },
   {
     id: "KR-3",
-    condition: "Baseline, target, date or owner missing",
+    condition: "Baseline missing",
     ruleKey: "quality.no_baseline",
   },
 ];
@@ -248,7 +252,10 @@ async function verdictNudges(
 
   const due: DueNudge[] = [];
   for (const verdict of evaluated.keyResults) {
-    if (verdict.status === "pass") {
+    // A note asks nothing of anybody (METHOD.md §4, P9-T03a), so it sends
+    // nothing either: KR-4 is information by default, and the all-lagging
+    // nudge fires where a workspace has set KR-4 to warn or block.
+    if (verdict.status === "pass" || verdict.status === "info") {
       continue;
     }
     const mapped = TRIGGER_FOR_VERDICT.find(
@@ -296,6 +303,9 @@ async function dependencyNudges(
         eq(keyResults.goalId, goal.id),
         eq(keyResultDependencies.confirmed, false),
         isNull(keyResultDependencies.riskOwnerId),
+        // Escalated is answered too (§5.4, P9-T16b-b): the sponsor's review
+        // inbox carries it from there.
+        isNull(keyResultDependencies.escalatedToId),
       ),
     )
     .limit(1);
@@ -345,11 +355,18 @@ async function findingNudges(
     );
 
   const byId = new Map(open.map((goal) => [goal.id, goal]));
+  // A check the practice turned off says nothing, and a stored finding may
+  // predate the change, because a practice change recomputes nothing
+  // (P9-T16b-a). AL-3 and AL-6 are off by default, so their nudges are too.
+  const { practice } = practiceFromRow(await readRhythmRow(tx, workspaceId));
   const due: DueNudge[] = [];
   for (const finding of rows) {
     if (!finding.ruleKey || !finding.subjectGoalId) {
       // The anchor finding has no subject because no goal caused it (decision
       // D-16), and §6.4 names no trigger for it.
+      continue;
+    }
+    if (enforcementLevel(finding.ruleKey, practice) === "off") {
       continue;
     }
     const ruleKey = TRIGGER_FOR_FINDING[finding.ruleKey];

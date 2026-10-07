@@ -53,6 +53,8 @@ const REACHED_FROM_OUTSIDE: Readonly<Record<string, string>> = {
   // rest of this file exists to catch, which is why both entries say so
   // rather than naming a screen that sends somebody here.
   "/operator": "the vendor's own operators, by URL; no link advertises it",
+  "/goals/studio":
+    "the alignment studio's old address, which bookmarks and old messages still name; it redirects to the OKRs screen's diagram (P9-T09b)",
   "/operator/instance":
     "the vendor's own operators, by URL; no link advertises it",
 };

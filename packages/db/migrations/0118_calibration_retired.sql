@@ -1,0 +1,18 @@
+-- The once-a-cycle calibration is retired (METHOD.md §7.6, P9-T13-c-b).
+--
+-- METHOD v2 lets a target move at any time under §2.9's one rule: harder
+-- needs no reason, easing needs one, and the original stays on record in
+-- `key_result_target_changes`. There is nothing left to record once a
+-- cycle, so `workflow.calibrate` is gone and nothing writes this table.
+--
+-- **The index that allowed one calibration per cycle is dropped now**; it
+-- enforced a rule that no longer exists. **The table stays for one more
+-- release** (PLAN.md §5.1): `workflow.read` still shows a calibration
+-- recorded before this, and the previous release reads the table too. The
+-- next release removes it.
+--
+-- Forward-only and safe for a rolling upgrade: the previous release still
+-- writes at most one row per cycle through its own refusal, and dropping an
+-- index never refuses a write. The table keeps its tenant policy from
+-- migration 0021.
+drop index if exists cycle_calibrations_one_per_cycle_idx;

@@ -35,14 +35,14 @@ permissions:
   contents: read
 
 env:
-  # **A pinned commit until the first public release exists.**
+  # **The oldest supported release** (PLAN.md §5.1), v0.1.2 since P9-T22a.
   #
-  # PLAN.md §5.1 says the baseline is the oldest supported release. There is
-  # no release yet, so this is the commit that stands in for one: the last
-  # point the schema was known good end to end. Replace it with the oldest
-  # supported tag the day one exists, and never with `main`, which would
-  # make this job compare a commit against itself and pass for free.
-  UPGRADE_BASELINE: e27ce1340c260c2be6a69faf566d6c64a8ccf032
+  # Until then this was a pinned commit standing in for a release that did
+  # not exist. 0.2.0 is the first release that changes how the practice
+  # behaves for an instance already running, so the upgrade it has to prove
+  # is the one a 0.1.2 operator makes. Never `main`, which would make this
+  # job compare a commit against itself and pass for free.
+  UPGRADE_BASELINE: v0.1.2
 
 jobs:
   compose:
@@ -194,6 +194,19 @@ jobs:
             echo "${table}: ${now}, unchanged"
           done
 
+          # **Every workspace is on the recommended profile** (P9-T22a). 0.1.2
+          # had no practice settings, so a workspace upgrading to 0.2.0 starts
+          # from METHOD.md's defaults, and the operator chooses Governed to
+          # keep the stricter behaviour. A workspace with no settings row reads
+          # the default, which is what `coalesce` says.
+          off="$(docker compose -p openokr exec -T db psql -U openokr -d openokr -tAc \
+            "select count(*) from workspaces w left join rhythm_settings r on r.workspace_id = w.id where coalesce(r.profile, 'recommended') <> 'recommended'")"
+          [ "$off" = "0" ] || {
+            echo "${off} workspace(s) upgraded onto a profile other than recommended" >&2
+            exit 1
+          }
+          echo "every workspace on the recommended profile"
+
           # **The audit trail may only grow.** It is append-only by design and
           # the upgrade itself writes to it, so equality would be the wrong
           # assertion here and shrinkage is the failure worth catching.
@@ -332,6 +345,13 @@ jobs:
               exit 1
             }
           done
+          # On the recommended profile, as on Compose (P9-T22a).
+          off="$(kubectl exec -n openokr-test "$pod" -- psql -U openokr -d openokr -tAc \
+            "select count(*) from workspaces w left join rhythm_settings r on r.workspace_id = w.id where coalesce(r.profile, 'recommended') <> 'recommended'" | tr -d ' ')"
+          [ "$off" = "0" ] || {
+            echo "${off} workspace(s) upgraded onto a profile other than recommended" >&2
+            exit 1
+          }
           # Append-only, so it may grow and must not shrink.
           was="${{ steps.before.outputs.audit_events }}"
           now="$(kubectl exec -n openokr-test "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from audit_events" | tr -d ' ')"

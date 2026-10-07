@@ -270,6 +270,46 @@ describe("the two rows that were waiting", () => {
   });
 });
 
+describe("a deferred objective (§8.8, P9-T20e-a)", () => {
+  it("goes to the next cycle's issue list at the carry-forward impact, once", async () => {
+    await call("sessions.decideObjective", {
+      sessionId,
+      goalId,
+      decision: "defer",
+      why: "Still worth doing, not next quarter.",
+    });
+    await holdTheReview();
+    await feedForward();
+    await feedForward();
+
+    const deferred = (await issuesIn(toCycleId)).filter(
+      (row) =>
+        row.text === "Become the platform mid-market teams reach for first",
+    );
+    expect(deferred).toEqual([
+      {
+        text: "Become the platform mid-market teams reach for first",
+        impact: 4,
+        source: "carry_forward",
+      },
+    ]);
+  });
+
+  it("does not carry an objective kept or abandoned to the issue list", async () => {
+    await call("sessions.decideObjective", {
+      sessionId,
+      goalId,
+      decision: "abandon",
+      why: "The priority moved.",
+    });
+    await holdTheReview();
+    await feedForward();
+    expect((await issuesIn(toCycleId)).map((row) => row.text)).not.toContain(
+      "Become the platform mid-market teams reach for first",
+    );
+  });
+});
+
 describe("idempotence", () => {
   it("does not double the issues when run twice", async () => {
     await holdTheReview();

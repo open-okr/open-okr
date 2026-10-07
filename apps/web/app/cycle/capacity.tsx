@@ -25,6 +25,7 @@ export interface CapacityKeyResult {
   readonly goalTitle: string;
   readonly title: string;
   readonly capacity: "fits" | "tight" | "exceeds" | null;
+  readonly kind: "committed" | "aspirational";
   readonly initiativeIds: readonly string[];
 }
 
@@ -32,6 +33,8 @@ export interface CapacityInitiative {
   readonly id: string;
   readonly title: string;
   readonly capacity: "fits" | "tight" | "exceeds" | null;
+  /** It serves a committed objective (METHOD.md §5.5, P9-T11b-b). */
+  readonly committed: boolean;
 }
 
 export async function Capacity({
@@ -44,7 +47,11 @@ export async function Capacity({
   const { t } = await getTranslations();
 
   const byId = new Map(initiatives.map((one) => [one.id, one]));
-  const overCommitted = initiatives.filter((one) => one.capacity === "exceeds");
+  // Only committed work holds gate five back; an aspirational OKR may exceed
+  // capacity (METHOD.md §5.5).
+  const overCommitted = initiatives.filter(
+    (one) => one.capacity === "exceeds" && one.committed,
+  );
   const unjudged = initiatives.filter((one) => one.capacity === null);
 
   return (

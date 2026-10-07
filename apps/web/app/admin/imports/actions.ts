@@ -64,6 +64,8 @@ export interface ReportView {
   readonly updated: number;
   readonly skipped: number;
   readonly unmappedHeaders: readonly string[];
+  /** What the file did not say and the import assumed (P9-T12c-b). */
+  readonly assumed: readonly string[];
   readonly rows: readonly RowOutcomeView[];
 }
 

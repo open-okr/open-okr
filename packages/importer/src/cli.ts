@@ -108,6 +108,10 @@ export function render(report: RunReport, runId: string): string {
       `Columns nothing claimed: ${report.unmappedHeaders.join(", ")}. Supply --map to name them.`,
     );
   }
+  // What the file did not say, and so what every row took (P9-T12c-b).
+  for (const sentence of report.assumed) {
+    lines.push(sentence);
+  }
   for (const row of report.rows) {
     if (row.outcome === "skipped") {
       lines.push(`  line ${row.line}: skipped. ${row.reason}`);

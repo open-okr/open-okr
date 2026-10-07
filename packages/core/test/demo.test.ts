@@ -89,6 +89,33 @@ describe("the demo builder", () => {
     expect(after.goals).toHaveLength(goals.goals.length);
   });
 
+  it("shows the practice 0.2.0 ships: both kinds of objective and a milestone (P9-T22b)", async () => {
+    const wb = await workerDb();
+    await seed();
+    const { rows } = await wb.admin.query<{ kind: string }>(
+      `select distinct g.kind from goals g
+         join cycles c on c.id = g.cycle_id
+        where g.workspace_id = $1 and g.deleted_at is null
+          and c.starts_on <= current_date and c.ends_on >= current_date`,
+      [workspaceId],
+    );
+    // METHOD.md §2.8: committed and aspirational, side by side.
+    expect(rows.map((row) => row.kind).sort()).toEqual([
+      "aspirational",
+      "committed",
+    ]);
+    const milestones = await wb.admin.query<{ title: string }>(
+      `select k.title from key_results k
+        where k.workspace_id = $1 and k.deleted_at is null
+          and k.kind = 'milestone'`,
+      [workspaceId],
+    );
+    // §2.10: done or not done, so it is the one with no number to move.
+    expect(milestones.rows.map((row) => row.title)).toEqual([
+      "Finance and Customer Success sign one definition of a 90-day renewal",
+    ]);
+  });
+
   it("leaves every key result with one value point, so no trend is fitted", async () => {
     const wb = await workerDb();
     await seed();
@@ -115,7 +142,7 @@ describe("the demo builder", () => {
     expect(forecasts.rows[0]?.count).toBe("0");
   });
 
-  it("leaves publish gates 2 and 5 each red for one reason", async () => {
+  it("leaves publish gate 5 warning for one reason, and gate 2 green under a KR-5 warning", async () => {
     const wb = await workerDb();
     await seed();
     const ctx = { pool: wb.appPool, ...context() };
@@ -128,26 +155,26 @@ describe("the demo builder", () => {
     });
 
     const byKey = new Map(workflow.gates.map((gate) => [gate.gateKey, gate]));
-    for (const gateKey of [1, 3, 4, 6]) {
+    for (const gateKey of [1, 2, 3, 4, 6]) {
       expect(byKey.get(gateKey)?.passed).toBe(true);
     }
-    // Gate 2 was unevaluable while the §4 quality engine was still ahead of
-    // this seed. P4-T01 shipped it, so the gate now judges the set and the demo
-    // is held to it like any other workspace. One key result is worded as the
-    // activity rather than the outcome, and the Draft Coach saying so on a real
-    // set is worth more to a reader than a green gate would be.
+    // Gate 2 judges the set like any other workspace's. One key result is
+    // worded as the activity rather than the outcome, and since P9-T03a that
+    // is a KR-5 warning the Draft Coach shows rather than a failure the gate
+    // refuses (METHOD.md §4.2).
     expect(byKey.get(2)?.evaluable).toBe(true);
-    const two = byKey.get(2);
-    expect(two?.passed).toBe(false);
-    expect(two?.missing).toHaveLength(1);
-    expect(two?.missing[0]).toContain("KR-5");
 
+    // Gate 5 warns by default since P9-T03b (METHOD.md §4.5): shown and
+    // coached, and not a reason the set cannot be published. Its one reason
+    // is the over-capacity key result under the story's committed objective;
+    // an aspirational one may exceed (§5.5, P9-T11b-b).
     const five = byKey.get(5);
+    expect(five?.level).toBe("warn");
     expect(five?.passed).toBe(false);
     expect(five?.missing).toHaveLength(1);
     expect(five?.missing[0]).toContain("exceeds capacity");
 
-    expect(workflow.publishable).toBe(false);
+    expect(workflow.publishable).toBe(true);
   });
 
   it("gives the person running it real obligations to work through", async () => {
@@ -190,7 +217,18 @@ describe("the demo builder", () => {
       expect(entry.blocksPublish).toBe(false);
     }
     expect(alignment.register.some((entry) => entry.confirmed)).toBe(true);
-    expect(alignment.score).not.toBeNull();
+    // The share DEMO-SCRIPT.md beat 5 quotes (P9-T16b-a): every goal below
+    // company level counts, the recovery objective because it says why it
+    // stands alone.
+    expect(alignment).toMatchObject({
+      score: 100,
+      band: "healthy",
+      measured: 6,
+      counted: 6,
+      uncounted: [],
+    });
+    // The level skips are there and unsaid, because AL-3 is off by default.
+    expect(alignment.findings).toEqual([]);
   });
 
   it("puts every KPI state on the grid, including one nobody has measured", async () => {
@@ -201,8 +239,11 @@ describe("the demo builder", () => {
     const grid = await callAction(ctx, "kpis.grid", { periods: 12 });
     const states = new Set(grid.kpis.map((kpi) => kpi.state));
     expect(states).toEqual(
-      new Set(["healthy", "watch", "unhealthy", "recovering", "no_data"]),
+      new Set(["healthy", "watch", "unhealthy", "no_data"]),
     );
+    // Recovering is beside a band, not one of them (P9-T17b-a), and the demo
+    // has one under way.
+    expect(grid.kpis.some((kpi) => kpi.recovering)).toBe(true);
     expect(grid.kpis.some((kpi) => kpi.isCalculated)).toBe(true);
   });
 

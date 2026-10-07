@@ -30,6 +30,7 @@ import {
   BLOCKER_TYPE_DEFINITIONS,
   canonThresholds,
   CLOSE_DECISION_MEANINGS,
+  COACH_LINES,
   CYCLE_CHECKS,
   END_STATE_SHAPES,
   isTriggerKey,
@@ -37,9 +38,14 @@ import {
   KEY_RESULT_CHECKS,
   MANAGEMENT_RETRO_QUESTIONS,
   MID_CYCLE_CALIBRATION,
+  MONTHLY_REVIEW_ITEMS,
   OBJECTIVE_CHECKS,
+  PHASE_GUIDANCE,
   PHASE_TITLES,
+  PRACTICE,
   PROCESS_HEALTH_STATEMENTS,
+  PROFILE_KEYS,
+  PROFILES,
   QUALITY_WORD_LISTS,
   REVIEW_STAGES,
   RITUALS,
@@ -172,7 +178,24 @@ if (documented.size < 40) {
 const registered = new Map(
   Object.entries(THRESHOLDS).map(([key, param]) => [param.label, key]),
 );
+// Rows that state a rule in §11's table rather than a value, so there is
+// nothing to register and nothing for a workspace to set. Named one by one,
+// so a misspelt parameter still fails rather than passing as a rule. "Blocker
+// clock" became one at P9-T19a-a, when METHOD v2 made it the next check-in
+// rather than twenty-four hours.
+const RULE_ROWS: ReadonlySet<string> = new Set(["Blocker clock"]);
+for (const label of RULE_ROWS) {
+  if (!documented.has(label)) {
+    fail(
+      "thresholds",
+      `"${label}" is listed as a §11 rule row and METHOD.md §11 no longer has it`,
+    );
+  }
+}
 for (const label of documented) {
+  if (RULE_ROWS.has(label)) {
+    continue;
+  }
   if (!registered.has(label)) {
     fail(
       "thresholds",
@@ -187,6 +210,123 @@ for (const [label, key] of registered) {
       `the registry carries \`${key}\` labelled "${label}", which METHOD.md §11 does not list. A value not in the registry is not a setting`,
     );
   }
+}
+
+// --- 2b. Practice settings (P9-T01) -----------------------------------------
+//
+// The §12.1 rows against the `PRACTICE` registry, both directions, the same
+// rule §11 holds the thresholds to: a setting that is in one and not the other
+// either does nothing or cannot be found. Several registry entries share one
+// row (each check, each gate, each level, each key result kind), so the
+// comparison is between the document's rows and the registry's distinct
+// labels. §12.2's profile names are compared the same way.
+
+const practiceRows = new Set(
+  firstColumnLabels(
+    section(method, "### 12.1 The settings", "### 12.2"),
+  ).filter((label) => label !== "Setting"),
+);
+if (practiceRows.size < 20) {
+  fail(
+    "practice",
+    `only ${practiceRows.size} settings found in METHOD.md §12.1; the parse is wrong, not the document`,
+  );
+}
+const practiceLabels = new Set(
+  Object.values(PRACTICE).map((entry) => entry.label as string),
+);
+for (const label of practiceRows) {
+  if (!practiceLabels.has(label)) {
+    fail(
+      "practice",
+      `METHOD.md §12.1 lists "${label}" and the practice registry has no setting with that label`,
+    );
+  }
+}
+for (const label of practiceLabels) {
+  if (!practiceRows.has(label)) {
+    fail(
+      "practice",
+      `the practice registry carries "${label}", which METHOD.md §12.1 does not list. A setting not in §12 does not exist`,
+    );
+  }
+}
+
+// Each option's words against §12.1's options column (P9-T05), because the
+// settings screen shows the registry's words and a reader holds them against
+// the document's. A row whose options are a list separated by "·" is compared
+// both ways; a row that describes its options in a sentence instead ("each on
+// or off") has nothing to split, and is skipped. The one option a column may
+// leave out is the default, which §12.1 names in the next column instead: "As
+// §4" is every check's default and is not repeated among Block, Warn and Off.
+let optionRows = 0;
+for (const line of section(
+  method,
+  "### 12.1 The settings",
+  "### 12.2",
+).split("\n")) {
+  const cells = line
+    .split("|")
+    .slice(1, -1)
+    .map((cell) => cell.trim());
+  const [label, optionsCell, defaultCell] = cells;
+  if (
+    label === undefined ||
+    optionsCell === undefined ||
+    defaultCell === undefined ||
+    !optionsCell.includes(" · ")
+  ) {
+    continue;
+  }
+  const entry = Object.values(PRACTICE).find(
+    (candidate) => candidate.label === label,
+  );
+  if (!entry) {
+    continue;
+  }
+  optionRows += 1;
+  // "Each check: Block · Warn · Off" lists the options after the colon.
+  const listed = optionsCell
+    .replace(/^[^·]*?:\s+/, "")
+    .split(" · ")
+    .map((option) => option.trim());
+  const worded = Object.values(
+    entry.optionLabels as Record<string, string>,
+  );
+  for (const option of listed) {
+    if (!worded.includes(option)) {
+      fail(
+        "practice",
+        `METHOD.md §12.1 offers "${option}" for "${label}", and the registry words none of that setting's options that way`,
+      );
+    }
+  }
+  for (const option of worded) {
+    if (!listed.includes(option) && option !== defaultCell) {
+      fail(
+        "practice",
+        `the registry words an option of "${label}" as "${option}", which METHOD.md §12.1 does not offer`,
+      );
+    }
+  }
+}
+if (optionRows < 15) {
+  fail(
+    "practice",
+    `only ${optionRows} option lists compared in METHOD.md §12.1; the parse is wrong, not the document`,
+  );
+}
+
+const documentedProfiles = section(method, "### 12.2 Profiles", "\n---")
+  .split(NEWLINE)
+  .map((line) => /^\|\s*\*\*([^*]+)\*\*\s*\|/.exec(line)?.[1])
+  .filter((label): label is string => label !== undefined);
+const registeredProfiles = PROFILE_KEYS.map((key) => PROFILES[key].label);
+if (documentedProfiles.join("|") !== registeredProfiles.join("|")) {
+  fail(
+    "practice",
+    `METHOD.md §12.2 names the profiles ${documentedProfiles.join(", ") || "(none found)"}; the package defines ${registeredProfiles.join(", ")}`,
+  );
 }
 
 // --- 3. Word lists ----------------------------------------------------------
@@ -310,7 +450,7 @@ for (const documentedRead of documentedReads) {
  * saying what it looked at is a suite nobody notices has stopped looking.
  * Raise it when you add a list.
  */
-const ENUMERATIONS_CHECKED = 20;
+const ENUMERATIONS_CHECKED = 25;
 
 // --- 5. The enumerations (P7-T07) -------------------------------------------
 //
@@ -403,22 +543,22 @@ compare(
   "the root causes",
   numberedItems(section(method, "### 8.4 Root causes", "### 8.5")),
   ROOT_CAUSES,
-  8,
+  9,
 );
 
-// §7.3. The five a blocker must be one of. A type in the document and not in
+// §7.3. The seven a blocker must be one of. A type in the document and not in
 // the package is a type the picker will never offer.
 compare(
   "the blocker taxonomy",
   tableColumn(section(method, "### 7.3 Blocker taxonomy", "### 7.4"), 0),
   BLOCKER_TYPE_DEFINITIONS.map((entry) => entry.label),
-  5,
+  7,
 );
 compare(
   "the blocker definitions",
   tableColumn(section(method, "### 7.3 Blocker taxonomy", "### 7.4"), 1),
   BLOCKER_TYPE_DEFINITIONS.map((entry) => entry.definition),
-  5,
+  7,
 );
 
 // §7.1. Length, frequency and purpose are what a facilitator books a calendar
@@ -428,6 +568,23 @@ compare("the rituals: name", tableColumn(ritualRows, 0), RITUALS.map((r) => r.na
 compare("the rituals: length", tableColumn(ritualRows, 1), RITUALS.map((r) => r.length), 3);
 compare("the rituals: frequency", tableColumn(ritualRows, 2), RITUALS.map((r) => r.frequency), 3);
 compare("the rituals: purpose", tableColumn(ritualRows, 3), RITUALS.map((r) => r.purpose), 3);
+
+// §7.5. The monthly review's agenda, and what each row is recorded as. The
+// moves row arrived at P9-T19a-d-d; before it the review's screen had four
+// panels and the document five rows, and nothing here could see the gap.
+const monthlyRows = section(method, "### 7.5 Monthly review", "### 7.6");
+compare(
+  "the monthly review items",
+  tableColumn(monthlyRows, 0),
+  MONTHLY_REVIEW_ITEMS.map((row) => row.item),
+  5,
+);
+compare(
+  "the monthly review records",
+  tableColumn(monthlyRows, 1),
+  MONTHLY_REVIEW_ITEMS.map((row) => row.recordedAs),
+  5,
+);
 
 // §8.5. Statements a room scores itself against. Wording is the whole of a
 // statement, so these are compared word for word.
@@ -446,6 +603,50 @@ compare(
   MANAGEMENT_RETRO_QUESTIONS,
   3,
 );
+
+// §9 (P9-T21). What a facilitator is told at each phase, sentence for
+// sentence. The phase rail shows it and the coach speaks from it. `guidance.ts`
+// has said since P3-T03 that this suite compared it, and nothing did: the
+// revised §9 landed and the package went on telling a facilitator to refuse
+// Phase 4 without a complete input pack, which the method no longer says.
+const guidanceRows = section(method, "## 9. Facilitator guidance", "## 10.");
+compare(
+  "the facilitator guidance phases",
+  tableColumn(guidanceRows, 0),
+  PHASE_GUIDANCE.map((entry) => `${entry.phase} ${entry.title}`),
+  8,
+);
+compare(
+  "the facilitator guidance",
+  tableColumn(guidanceRows, 1),
+  PHASE_GUIDANCE.map((entry) => entry.guidance.join(". ")),
+  8,
+);
+
+// §10 (P9-T21). The coach's lines, word for word, and the rule each cites.
+// They reach people in nudges, so a line the package carries and the
+// document does not is the coach saying something nobody approved.
+const coachRows = section(method, "## 10. What the coach watches for", "\n---");
+compare(
+  "the coach's situations",
+  tableColumn(coachRows, 0),
+  COACH_LINES.map((line) => line.situation),
+  20,
+);
+compare(
+  "the coach's lines",
+  tableColumn(coachRows, 1),
+  COACH_LINES.map((line) => line.says),
+  20,
+);
+for (const line of COACH_LINES) {
+  if (!isTriggerKey(line.ruleKey) && !CHECK_IDS.has(line.ruleKey)) {
+    fail(
+      "rule keys",
+      `the coach's line for "${line.situation}" cites \`${line.ruleKey}\`, which is neither a trigger nor a check the package defines`,
+    );
+  }
+}
 
 // §8.1. Eleven stages, in order, with the act each belongs to. The minutes
 // are not compared here: §11 lists "Quarterly stage minutes" as a parameter
@@ -532,13 +733,13 @@ compare(
   "the close decisions",
   tableColumn(closeRows, 0).map((label) => label.toLowerCase()),
   Object.keys(CLOSE_DECISION_MEANINGS),
-  3,
+  5,
 );
 compare(
   "the close decision meanings",
   tableColumn(closeRows, 1),
   Object.values(CLOSE_DECISION_MEANINGS),
-  3,
+  5,
 );
 
 // §8.6. **The diagnostic METHOD.md calls the most valuable output of the
@@ -555,11 +756,11 @@ const diagnosticRows = section(
 );
 const canon = canonThresholds();
 const cycleFloor = canon["sessions.diagnosticCycleScore"];
-const rhythmFloor = canon["sessions.diagnosticRhythmScore"];
+const rhythmFloor = canon["sessions.diagnosticRhythm"];
 const producedDiagnoses = [
-  // Above the cycle floor, the rhythm score is not consulted at all. The
-  // second argument is deliberately the failing one, to prove it is ignored.
-  rhythmDiagnostic(cycleFloor, rhythmFloor - 1, canon),
+  // Above the cycle floor, the rhythm is not consulted at all. The second
+  // argument is deliberately the failing one, to prove it is ignored.
+  rhythmDiagnostic(cycleFloor, rhythmFloor / 2, canon),
   rhythmDiagnostic(cycleFloor - 0.01, rhythmFloor, canon),
   rhythmDiagnostic(cycleFloor - 0.01, rhythmFloor - 0.01, canon),
 ];
@@ -663,7 +864,8 @@ const terms = Object.values(QUALITY_WORD_LISTS).reduce(
 );
 console.log(
   `Conformance passed. ${triggerKeys.length} trigger keys, ${CHECK_IDS.size} checks, ` +
-    `${documented.size} thresholds, ${terms} word-list terms, ` +
+    `${documented.size} thresholds, ${practiceRows.size} practice settings, ` +
+    `${documentedProfiles.length} profiles, ${terms} word-list terms, ` +
     `${corpusEntries.length} corpus entries and ${ENUMERATIONS_CHECKED} enumerations ` +
     `agree with the documents.`,
 );

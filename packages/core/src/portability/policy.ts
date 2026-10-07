@@ -62,6 +62,8 @@ export const DEFERRED_COLUMNS: readonly string[] = [
   "goals.parent_key_result_id",
   "kpis.tree_id",
   "kpis.recovery_goal_id",
+  "kpis.response_task_id",
+  "kpis.response_key_result_id",
   "check_ins.snapshot_id",
   "kpi_trees.root_kpi_id",
 ];
@@ -454,7 +456,8 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
   {
     table: "rhythm_settings",
     decision: "export",
-    reason: "Check-in day, frequency, grace and the escalation ladders.",
+    reason:
+      "Check-in day, frequency, grace and the escalation ladders, and the practice profile and settings (METHOD.md §12).",
   },
   {
     table: "scorecard_settings",
@@ -495,6 +498,13 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     decision: "export",
     reason:
       "The memberships. Each is matched to a user by email address on import, or becomes a placeholder, which is the same shape the FlowyTeam importer writes.",
+  },
+  {
+    table: "member_leave",
+    decision: "export",
+    // After the members it names, both of them (P9-T19b-b).
+    reason:
+      "Each member's leave and who stood in, which explain why an acknowledgement went to somebody else.",
   },
   {
     table: "access_groups",
@@ -571,6 +581,13 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "space_members",
     decision: "export",
     reason: "Who belongs to which space, and in what role.",
+  },
+  {
+    table: "space_holidays",
+    decision: "export",
+    // After the spaces they belong to (P9-T19b-a).
+    reason:
+      "The holidays each space marked, which decide when nothing was due and why a streak held.",
   },
   {
     table: "streaks",
@@ -784,6 +801,20 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "key_result_values",
     decision: "export",
     reason: "The measured history of every key result.",
+  },
+  {
+    table: "annual_frame_revisions",
+    decision: "export",
+    // After the members it names (P9-T13-c-c): the export order is the
+    // order rows are restored in.
+    reason:
+      "Every mid-year revision of an agreed annual frame, with what it held before and why it changed.",
+  },
+  {
+    table: "key_result_target_changes",
+    decision: "export",
+    reason:
+      "Every change to a key result's target, and the reason given for easing one.",
   },
   {
     table: "kudos",

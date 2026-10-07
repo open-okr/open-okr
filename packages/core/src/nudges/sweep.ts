@@ -37,11 +37,10 @@ import {
 import {
   blockerEscalation,
   isTriggerKey,
-  type KpiDirection,
   type KpiState,
-  kpiAchievement,
-  kpiState,
+  kpiStateOf,
   type ResolvedThresholds,
+  recoveryObjective,
   shouldProposeRecovery,
   type TriggerKey,
   trigger,
@@ -53,9 +52,18 @@ import {
   agentSeesBlocker,
   agentSeesKpi,
 } from "../agents/scope.ts";
+import { blockerClockOf, frequencyOf } from "../cadence/blockers.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import {
+  KPI_RULE_COLUMNS,
+  type KpiRule,
+  kpiResponsesInTx,
+  readingOf,
+} from "../kpis/service.ts";
 import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
 import { workspaceAdministratorIds } from "../people/lifecycle.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 import {
   type DueNudge,
@@ -77,6 +85,10 @@ const RULE_FOR_STATE: Partial<Record<KpiState, TriggerKey>> = {
  * the space's coordinator, falling back to the manager through §4.2's one rule
  * rather than a second copy of it here.
  *
+ * **A named owner comes first** (METHOD.md §6.2, P9-T17b-b): the one person
+ * who owns the KPI hears about it, wherever it lives. Without one, the rules
+ * below decide, as they did before a KPI could name its owner.
+ *
  * **A workspace-owned KPI goes to the workspace's administrators**
  * (completeness review M-29). It went to nobody: the reasoning was that
  * escalating a metric to everybody is escalating it to nobody, which is true,
@@ -91,8 +103,12 @@ async function kpiOwners(
     readonly ownerKind: string;
     readonly memberId: string | null;
     readonly spaceId: string | null;
+    readonly ownerMemberId: string | null;
   },
 ): Promise<readonly string[]> {
+  if (kpi.ownerMemberId) {
+    return [kpi.ownerMemberId];
+  }
   if (kpi.ownerKind === "member") {
     return kpi.memberId ? [kpi.memberId] : [];
   }
@@ -112,7 +128,7 @@ async function kpiOwners(
  * Whether this message gets through quiet hours and past the weekly ceiling.
  *
  * **Read from the catalogue, never chosen per call site.** `urgent` bypasses
- * workspace quiet mode, the member's own quiet hours *and* the ten-a-week
+ * workspace quiet mode, the member's own quiet hours *and* the five-a-week
  * ceiling, so a message that repeats daily and is also urgent is unbounded
  * noise. §6.4 already records which triggers escalate, and only an escalation
  * has earned the bypass: that is what P4-T04c's own note means by "somebody
@@ -212,13 +228,15 @@ export async function dueKpiCorridorNudges(
       id: kpis.id,
       title: kpis.title,
       state: kpis.state,
-      direction: kpis.direction,
+      ...KPI_RULE_COLUMNS,
       achievementPct: kpis.achievementPct,
-      healthyPct: kpis.healthyPct,
-      watchPct: kpis.watchPct,
       ownerKind: kpis.ownerKind,
       memberId: kpis.memberId,
       spaceId: kpis.spaceId,
+      ownerMemberId: kpis.ownerMemberId,
+      responseKind: kpis.responseKind,
+      responseTaskId: kpis.responseTaskId,
+      responseKeyResultId: kpis.responseKeyResultId,
       recoveryGoalId: kpis.recoveryGoalId,
       recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
       targetDefault: kpis.targetDefault,
@@ -232,7 +250,16 @@ export async function dueKpiCorridorNudges(
       ),
     );
 
-  const delay = input.thresholds["kpi.recoveryProposalDelayPeriods"];
+  // §12's unhealthy KPI response (P9-T18b). Offering the three leaves the
+  // proposal to §6.5's run of unhealthy periods; drafting at once proposes on
+  // the first, which is a delay of one.
+  const { practice } = practiceFromRow(
+    await readRhythmRow(tx, input.workspaceId),
+  );
+  const delay =
+    practice["kpi.unhealthyResponse"] === "draftRecovery"
+      ? 1
+      : input.thresholds["kpi.recoveryProposalDelayPeriods"];
   const due: DueNudge[] = [];
 
   for (const kpi of rows) {
@@ -241,11 +268,16 @@ export async function dueKpiCorridorNudges(
       continue;
     }
 
-    // The corridor message itself. `healthy`, `recovering` and `no_data` are
-    // all silent: a metric inside its corridor needs no message, a recovering
-    // one already has an objective attached, and one nobody has recorded is
-    // unmeasured rather than failing.
-    const corridorRule = RULE_FOR_STATE[kpi.state];
+    const recovery = await recoveryLinkFor(tx, input.workspaceId, kpi);
+
+    // The corridor message itself. `healthy` and `no_data` are silent: a
+    // metric inside its corridor needs no message, and one nobody has
+    // recorded is unmeasured rather than failing. So is a KPI with an open
+    // recovery, whatever its band, because it already has an objective
+    // attached. That was the `recovering` state until P9-T17b-a moved the
+    // recovery beside the band; the silence stays where it was.
+    const corridorRule =
+      recovery === "open" ? undefined : RULE_FOR_STATE[kpi.state];
     if (corridorRule) {
       for (const owner of owners) {
         due.push(
@@ -267,15 +299,22 @@ export async function dueKpiCorridorNudges(
 
     const achievement =
       kpi.achievementPct === null ? null : Number(kpi.achievementPct);
-    const recovery = await recoveryLinkFor(tx, input.workspaceId, kpi);
 
+    // Somebody already answered it another way, fixing it now or with a key
+    // result, and that answer is still open (§6.5, P9-T18b): proposing a
+    // recovery on top would be asking twice.
+    const answered = (
+      await kpiResponsesInTx(tx as never, input.workspaceId, [kpi])
+    ).get(kpi.id)?.open;
     if (recovery === "none") {
       // §6.5: the proposal waits for consecutive unhealthy periods, so one bad
       // month never generates an unsolicited OKR. The states are recomputed
       // from the stored records rather than read from a column, because the
       // column holds today's state and this question is about a run of them.
-      const periods = await periodStatesFor(tx, input.workspaceId, kpi);
-      if (shouldProposeRecovery(periods, delay)) {
+      const periods = answered
+        ? []
+        : await periodStatesFor(tx, input.workspaceId, kpi);
+      if (!answered && shouldProposeRecovery(periods, delay)) {
         // One proposal, to the first owner. A proposal is a decision somebody
         // applies, and a workspace KPI's three administrators each holding a
         // copy would be three decisions about one metric.
@@ -362,8 +401,8 @@ export async function dueKpiCorridorNudges(
  * A model's title for a recovery objective, or nothing.
  *
  * Never throws, for the reason the check-in drafter does not: a provider having
- * a bad minute must not stop the corridor being reported. RECOVERY_PLACEHOLDER
- * wording stays §6.5's whenever this returns null.
+ * a bad minute must not stop the corridor being reported. The objective stays
+ * §6.5's `recoveryObjective` whenever this returns null.
  */
 async function refinedRecoveryTitle(
   drafter: AgentDrafter | undefined,
@@ -377,7 +416,7 @@ async function refinedRecoveryTitle(
     return (
       (await drafter.refineRecoveryTitle?.({
         kpiTitle,
-        templateTitle: `Bring ${kpiTitle} back to target`,
+        templateTitle: recoveryObjective(kpiTitle),
         achievementPct,
       })) ?? null
     );
@@ -445,11 +484,8 @@ async function recoveryLinkFor(
 async function periodStatesFor(
   tx: WorkspaceTx,
   workspaceId: string,
-  kpi: {
+  kpi: KpiRule & {
     readonly id: string;
-    readonly direction: KpiDirection;
-    readonly healthyPct: string;
-    readonly watchPct: string;
     readonly targetDefault: string | null;
   },
 ): Promise<readonly KpiState[]> {
@@ -468,31 +504,26 @@ async function periodStatesFor(
     )
     .orderBy(asc(kpiRecords.periodStart));
 
-  const corridor = {
-    healthyPct: Number(kpi.healthyPct),
-    watchPct: Number(kpi.watchPct),
-  };
   return rows.map((row) => {
-    // Achievement per period is derived, not stored: `kpi_records` holds the
-    // target and the actual, and §6.4's ratio is the one function that turns
-    // them into a percentage. Reading a stored column here would need a column
-    // that does not exist, and computing the ratio a second way would give the
-    // sweep its own opinion about a number the grid already shows.
+    // Each period judged by the KPI's own rule (§6.4, P9-T17a): its
+    // thresholds where it has them, the ratio where it has not, through the
+    // one function the recompute uses, so the sweep has no opinion of its own
+    // about a number the grid already shows.
     //
     // A period with no target of its own is measured against the KPI's
     // standing one, exactly as `recomputeKpi` does (completeness review
     // M-29). Without the fallback a KPI that only ever had a standing target
     // read as "no data" in every period and never earned its proposal.
     const target = row.targetValue ?? kpi.targetDefault;
-    const { pct } = kpiAchievement(
-      kpi.direction,
+    const { band } = readingOf(
+      kpi,
       row.actualValue === null ? null : Number(row.actualValue),
       target === null ? null : Number(target),
     );
-    // "none" rather than the KPI's real recovery link: this asks what each
-    // period looked like on its own terms, and a recovery opened last month
-    // would otherwise rewrite the history that justified opening it.
-    return kpiState(pct, "none", corridor);
+    // The band alone: this asks what each period looked like on its own
+    // terms, which is what a state has been since a recovery stopped being
+    // one (P9-T17b-a).
+    return kpiStateOf(band);
   });
 }
 
@@ -626,10 +657,10 @@ function localHourIn(now: Date, timeZone: string): number {
 /**
  * The rule key each blocker ladder step earns (§6.4).
  *
- * Step 1 is the warning that arrives **before** the deadline, at twenty hours
- * of a twenty-four hour clock. Steps 2 and 3 are past it, and the key changes
- * because the message does: the owner is being reminded, and then somebody
- * other than the owner is being told.
+ * Step 1 is the reminder that arrives **before** the deadline, the day before
+ * the check-in the next action is due by. Steps 2 and 3 are past it, and the
+ * key changes because the message does: the owner is being reminded, and then
+ * somebody other than the owner is being told.
  */
 const RULE_FOR_BLOCKER_STEP: Record<number, TriggerKey> = {
   1: "blocker.warning",
@@ -640,10 +671,11 @@ const RULE_FOR_BLOCKER_STEP: Record<number, TriggerKey> = {
 /**
  * Every blocker aging nudge due in this workspace (§6.4, METHOD.md §7.3).
  *
- * The clock is hours, not days, because §11 gives it twenty-four and a ladder
- * measured in days could not fire twice inside one. `blockerEscalation` decides
- * which step; this resolves the step's roles to members and writes nothing to
- * the blocker.
+ * The clock is the check-in the next action is due by, stored on the blocker
+ * when it was opened, counted in whole days of the workspace calendar
+ * (P9-T19a-a). `blockerEscalation` decides which step, with the sponsor a rung
+ * only where the workspace puts the sponsor in its ladders; this resolves the
+ * step's roles to members and writes nothing to the blocker.
  *
  * **The owner is the blocker's own owner, not the goal's champion.** The ladder
  * returns `champion` for step 1 because that is its name for "the person whose
@@ -678,9 +710,14 @@ export async function dueBlockerNudges(
       goalId: blockers.goalId,
       keyResultId: blockers.keyResultId,
       ownerId: blockers.ownerId,
-      openedAt: blockers.openedAt,
+      dueAt: blockers.dueAt,
+      // The goal's own frequency, for the check-in after the one it is due
+      // by. A key result's blocker written before H-10 has no goal here and
+      // takes the workspace's.
+      checkInFrequency: goals.checkInFrequency,
     })
     .from(blockers)
+    .leftJoin(goals, eq(goals.id, blockers.goalId))
     .where(
       activeOnly(
         blockers,
@@ -689,12 +726,26 @@ export async function dueBlockerNudges(
         input.scope ? agentSeesBlocker(input.scope) : undefined,
       ),
     );
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const timeZone = await workspaceTimeZone(tx, input.workspaceId);
+  const { practice } = practiceFromRow(
+    await readRhythmRow(tx, input.workspaceId),
+  );
+  const sponsorInLadders = practice["escalation.sponsorInLadders"] === "on";
 
   const due: DueNudge[] = [];
   for (const blocker of rows) {
-    const hours =
-      (input.now.getTime() - blocker.openedAt.getTime()) / 3_600_000;
-    const step = blockerEscalation(hours, input.thresholds);
+    const clock = blockerClockOf({
+      dueAt: blocker.dueAt,
+      frequency: frequencyOf(blocker.checkInFrequency, input.thresholds),
+      anchor: input.thresholds["cadence.anchorDay"],
+      now: input.now,
+      timeZone,
+    });
+    const step = blockerEscalation(clock, input.thresholds, sponsorInLadders);
     if (step.step === null) {
       continue;
     }

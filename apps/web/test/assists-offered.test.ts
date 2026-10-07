@@ -169,12 +169,6 @@ const ASSISTS: readonly {
     tier: "deep",
   },
   {
-    name: "the next-cycle proposals",
-    run: () => sessionActions.proposeFromLearningsAction("session-1"),
-    action: "sessions.proposeFromLearnings",
-    input: { sessionId: "session-1" },
-  },
-  {
     name: "the minutes write-up",
     run: () => sessionActions.draftMinutesAction("session-1"),
     action: "sessions.draftMinutes",
@@ -362,12 +356,16 @@ describe("every screen draws its affordance only when offered", () => {
     });
   }
 
-  it("hands the close form and the review stage their flags", () => {
+  it("hands the close form its flag", () => {
     const goalPage = source("../app/goals/[id]/page.tsx");
     expect(goalPage).toContain("REVIEW_ASSIST_KEYS.draftRetrospective");
     expect(goalPage).toContain("offered={retrospectiveOffered}");
+  });
+
+  it("offers no next-cycle proposals on the review, which drafts nothing now (P9-T22d)", () => {
+    // Stage ten is Learnings: the review no longer drafts the next cycle, so
+    // the assist that filled the draft form has no screen to sit on.
     const sessionPage = source("../app/session/[id]/page.tsx");
-    expect(sessionPage).toContain("REVIEW_ASSIST_KEYS.proposeObjectives");
-    expect(sessionPage).toContain("assistAvailable={forwardAssistAvailable}");
+    expect(sessionPage).not.toContain("REVIEW_ASSIST_KEYS.proposeObjectives");
   });
 });

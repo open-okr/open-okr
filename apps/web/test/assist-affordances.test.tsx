@@ -13,8 +13,8 @@ import { describe, expect, test, vi } from "vitest";
  * `assistOffered`'s answer, proved in `assists-offered.test.ts`.
  *
  * **Every one of these renders nothing that writes.** The draft-bearing ones
- * (the retrospective, the decomposition, the KPI suggestion, the next-cycle
- * proposals and the minutes write-up) show a button that asks for a draft,
+ * (the retrospective, the decomposition, the KPI suggestion and the minutes
+ * write-up) show a button that asks for a draft,
  * and the draft, once it arrives, sits in fields the person edits before any
  * save. That second state needs a click, which a server render cannot make,
  * so it is covered by the component code and the end-to-end suite.
@@ -41,8 +41,6 @@ vi.mock("../app/session/[id]/actions.ts", () => ({
   addActionAction: vi.fn(),
   captureLearningAction: vi.fn(),
   completeActionAction: vi.fn(),
-  draftNextCycleAction: vi.fn(),
-  proposeFromLearningsAction: vi.fn(),
   draftMinutesAction: vi.fn(),
   saveMinutesWriteUpAction: vi.fn(),
 }));
@@ -161,65 +159,56 @@ describe("the minutes write-up", () => {
   });
 });
 
-describe("the next-cycle proposals on the learnings stage", () => {
-  const forward = (carried: boolean) => ({
+describe("the learnings stage drafts nothing for the next cycle (P9-T22d)", () => {
+  const forward = (
+    drafts: readonly { id: string; title: string; why: string }[] = [],
+  ) => ({
     learnings: [
       {
         id: ID,
         text: "Billing needs a week's notice",
-        carryForward: carried,
+        carryForward: true,
         source: "manual",
         authorName: "Priya",
       },
     ],
     promotable: [],
-    drafts: [],
+    drafts: drafts.map((draft) => ({ ...draft, promoted: false })),
     actions: [],
     owners: [],
-    carried: carried ? 1 : 0,
+    carried: 1,
   });
-  const PROPOSE = "Propose drafts from the carried learnings";
 
-  test("are absent with AI off, and the stage is what it was", () => {
+  test("offers no draft form and no proposal, and says where an idea goes", () => {
+    // METHOD.md §8.10: hold the review before drafting. A kept objective
+    // reaches the next cycle's Phase 4 on its own, and an idea reaches its
+    // issue list as a carried learning.
     const html = render(
-      <ForwardPanel sessionId={ID} forward={forward(true)} canEdit />,
+      <ForwardPanel sessionId={ID} forward={forward()} canEdit />,
     );
-    expect(html).not.toContain(PROPOSE);
-    expect(html).toContain("Draft it");
+    expect(html).not.toContain("Draft it");
+    expect(html).not.toContain("Propose drafts from the carried learnings");
+    expect(html).toContain("An idea for the next cycle?");
   });
 
-  test("are offered to the room when there is a carried learning", () => {
+  test("still shows a draft written before, read-only, as part of the record", () => {
     const html = render(
       <ForwardPanel
         sessionId={ID}
-        forward={forward(true)}
+        forward={forward([
+          {
+            id: ID,
+            title: "Make onboarding something a team finishes in one sitting",
+            why: "Three of five losses were onboarding.",
+          },
+        ])}
         canEdit
-        assistAvailable
       />,
     );
-    expect(html).toContain(PROPOSE);
-  });
-
-  test("are not offered with nothing carried, or to a reader who cannot draft", () => {
-    expect(
-      render(
-        <ForwardPanel
-          sessionId={ID}
-          forward={forward(false)}
-          canEdit
-          assistAvailable
-        />,
-      ),
-    ).not.toContain(PROPOSE);
-    expect(
-      render(
-        <ForwardPanel
-          sessionId={ID}
-          forward={forward(true)}
-          canEdit={false}
-          assistAvailable
-        />,
-      ),
-    ).not.toContain(PROPOSE);
+    expect(html).toContain(
+      "Make onboarding something a team finishes in one sitting",
+    );
+    expect(html).toContain("before it became Learnings");
+    expect(html).not.toContain("Draft it");
   });
 });

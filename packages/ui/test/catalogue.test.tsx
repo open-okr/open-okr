@@ -84,8 +84,8 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "common.ai",
   "dev.components.ai",
   "term.kpi.singular",
-  "common.count.krOne",
   "workMap.kr",
+  "okrDiagram.addKeyResult",
   "workMap.obj",
   // Words Bahasa Melayu uses as they are.
   "kpis.suggestion.unit",
@@ -104,6 +104,9 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "session.detail.quarterlyReview.actRetro",
   "sessions.schedule.kind",
   // Only holes and punctuation.
+  // The label for the caution status is the "At risk" term's own hole, so a
+  // workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).
+  "common.caution",
   "copilot.copilotPanel.preview.cycle",
   "copilot.copilotPanel.preview.keyResult",
   "copilot.copilotPanel.preview.objective",

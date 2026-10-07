@@ -69,8 +69,10 @@ Additional conventions:
 ```
 workspaces
   ├── workspace_members ────────── users (global)
+  │     └── member_leave ──► workspace_members (the delegate)
   ├── spaces
-  │     └── space_members
+  │     ├── space_members
+  │     └── space_holidays
   ├── annual_frames
   │     └── annual_strategies
   ├── cycles
@@ -81,6 +83,7 @@ workspaces
   │     └── goals
   │           ├── key_results
   │           │     ├── key_result_values
+  │           │     ├── key_result_target_changes
   │           │     ├── key_result_dependencies
   │           │     ├── blockers
   │           │     └── kpi_id ──► kpis  (measured by)
@@ -214,21 +217,38 @@ One row is one provider, OIDC or SAML. **This line said SAML arrives through a S
 
 The two legacy columns and their unique partial index arrived at P6-T03a, seventeen migrations after the table: `spaces` was written before there was an importer to write them, and the FlowyTeam mapper is the first thing to map a source table onto it (§7.2, teams).
 
-`settings` holds §4.14's space scope, declared in the settings registry at P6-G18b and written when a space is created: `teamVoting` (default true), `coachStrictness` (default null) and `defaultCheckInFrequency` (default null). `slackChannel` and `teamsChannel` (default null, completeness review M-23) are the provider's own channel id the space's weekly digest is posted to; null posts nowhere. Null means the workspace's, not unset, and the two nullable ones store a deviation rather than a resolved value so a workspace that changes its own does not leave every space holding the old one. A space created before the scope existed holds `{}` and every key resolves from the registry, which is what makes the column readable without a backfill.
+`settings` holds §4.14's space scope, declared in the settings registry at P6-G18b and written when a space is created: `teamVoting` (default true), `coachStrictness` (default null) and `defaultCheckInFrequency` (default null; a goal created in the space takes it, and a change moves the open goals following it, P9-T19a-d-a). `slackChannel` and `teamsChannel` (default null, completeness review M-23) are the provider's own channel id the space's weekly digest is posted to; null posts nowhere. Null means the workspace's, not unset, and the two nullable ones store a deviation rather than a resolved value so a workspace that changes its own does not leave every space holding the old one. A space created before the scope existed holds `{}` and every key resolves from the registry, which is what makes the column readable without a backfill.
+
+### member_leave
+`member_id` to workspace_members, `starts_on date`, `ends_on date` (checked on or after `starts_on`), `delegate_member_id` to workspace_members (checked not the member). A member's leave, both days included (METHOD.md §7.4, P9-T19b-b, migration 0132). While it runs the nudge run sends the check-in and acknowledgement nudges that would have reached the member to whoever stands in, the delegate or the delegate's own when they are away too, and records every other nudge to the member with `suppressed_reason = 'leave'`. A check-in published while its goal's reviewer is away is stamped with the stand-in as its reviewer of record. The goal's roles never change. `people.setLeave` writes a member's own list whole and `people.setMemberLeave` an administrator's write for somebody else, both soft-deleting the rows they replace. No legacy source.
 
 ### space_members
 `space_id` to spaces, `member_id` to workspace_members, `role` (`member` / `manager` / `coordinator`).
+
+### space_holidays
+`space_id` to spaces, `starts_on date`, `ends_on date` (checked on or after `starts_on`), `label?`. A span the space marked as a holiday, both days included (METHOD.md §7.4, P9-T19b-a, migration 0131). A check-in period whose last working day is inside one owes no check-in: the cadence moves a due date in one on a period at a time, the streak neither extends nor breaks across it, the booking leaves it out, and a check-in or commitment nudge about the space on a holiday is recorded with `suppressed_reason = 'holiday'` and not sent. `spaces.setHolidays` writes the list whole, soft-deleting the rows it replaces, and moves the open goals due in a holiday in the same transaction. No legacy source.
 
 ## 6. Cycles and the planning workflow (domain C)
 
 ### annual_frames
 `year_label`, `horizon_label`, `mission` (rich), `vision` (rich), `strategy` (rich), `agreed bool`, `open_issues` (rich), `not_doing` (rich).
 
+A new year's frame supersedes the last; within its year a frame is edited in place, prose included (P9-T13-c-c corrected `frame.set`, which wrote only the horizon and the agreement on an in-place edit and dropped the rest). An agreed frame keeps each revision in `annual_frame_revisions`.
+
+### annual_frame_revisions
+`frame_id` to annual_frames, `fields text[]` (`mission` / `vision` / `strategy` / `notDoing` / `strategies`), `before jsonb` (what the changed fields held, editor JSON for prose and a list for the strategies), `reason` (never blank), `author_member_id?` to workspace_members, `revised_at`. 0119, P9-T13-c-c, METHOD.md §2.1.
+
+One row per revision of an **agreed** frame within its year, written by `frame.set` and refused without a reason. A frame still being drafted keeps no history, and a new year supersedes rather than revises. `frame.read` answers them newest first. No legacy source.
+
 ### annual_strategies
 `frame_id` to annual_frames, `text`, `note?`, `position`.
 
 ### cycles *(short_id, importable)*
-`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `levels jsonb`, `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `company_published_at?`, `levels jsonb` (the levels the cycle began with, written from the practice when it is created and moved by a practice change only while it has not started, P9-T07a-c), `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+
+`practice_snapshot jsonb?` (0121, P9-T14b, METHOD.md §12) holds the practice settings and every threshold in force when the cycle closed, resolved, so a band or a cap moved later does not rewrite its verdicts. Null while open, and on a cycle closed before the column existed, which reads today's canon.
+
+`company_published_at` (0110, P9-T03b) is the first of the two publish steps, METHOD.md §4.5: the company set, published before the cycle starts. `published_at` still means the whole set is out, so a set published in one go sets both and a cycle published before the column existed reads as it always did. No legacy source.
 
 The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An imported cycle keeps the name the source used, because that is the name the people being migrated recognise; the period still decides the dates and the mode.
 
@@ -259,26 +279,39 @@ The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An i
 ### cycle_capacity_notes
 `cycle_id` to cycles, `cuts` (rich).
 
-### cycle_calibrations
+### cycle_calibrations *(retiring)*
 `cycle_id` to cycles, `used bool`, `reason`, `at`, `author_member_id` to workspace_members.
 
+**Nothing writes it since P9-T13-c-b** (METHOD.md §7.6): a target moves at any time under §2.9's one rule, each eased change keeping its reason in `key_result_target_changes`, so there is no once-a-cycle calibration to record. Migration 0118 dropped the one-per-cycle index. `workflow.read` still shows a row recorded before, as history. **The table is removed in the release after 0.2.0** (PLAN.md §5.1), once no running release reads it.
+
 ### rhythm_settings *(one row per workspace)*
-`default_check_in_frequency`, `check_in_anchor_day`, `coach_strictness` (`advisory` / `warn` / `strict`), `overrides jsonb`, `labels jsonb`. `overrides` holds sparse deviations from the METHOD.md §11 registry, validated against the method package's schema; an unset key reads the canon default.
+`default_check_in_frequency`, `check_in_anchor_day`, `coach_strictness` (`advisory` / `warn` / `strict`), `overrides jsonb`, `labels jsonb`, `quiet_mode bool`, `profile` (`recommended` / `googleStyle` / `radicalFocus` / `lightweight` / `governed`, default `recommended`), `practice jsonb` (default `{}`, an object). `overrides` holds sparse deviations from the METHOD.md §11 registry, validated against the method package's schema; an unset key reads the canon default. `profile` and `practice` (0109, P9-T01) are the METHOD.md §12 practice settings: the chosen profile, and only what the workspace changed on top of it, validated against `PRACTICE`. No legacy source.
 
 ## 7. Goals, key results and check-ins (domain D)
 
 ### goals *(short_id, importable)*
-`title`, `description` (rich), `cycle_id?` to cycles, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `champion_id` to workspace_members, `reviewer_id` to workspace_members, `parent_goal_id?` to goals, `parent_key_result_id?` to key_results, `strategy_id?` to annual_strategies, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?` to check_ins, `contribution_statement?`, `closed_at?`, `closed_by_id?`, `success_status?` (`achieved` / `missed`), `close_decision?` (`keep` / `modify` / `abandon`), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `ai_generated bool` (written for the first time by P4-T15a: an objective a reader kept from an assist's draft says so, and one they typed says so too), `position`.
+`title`, `description` (rich), `cycle_id?` to cycles, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `kind` (`committed` / `aspirational`, default `aspirational`; 0113, P9-T11b-a, METHOD.md §2.8), `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `champion_id` to workspace_members, `reviewer_id?` to workspace_members (optional since 0111, P9-T04: the practice decides whether a goal needs one), `parent_goal_id?` to goals, `parent_key_result_id?` to key_results, `strategy_id?` to annual_strategies, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?` to check_ins, `contribution_statement?`, `standalone_reason?` (0123, P9-T16a, METHOD.md §5.2: why a goal with no parent stands alone; counts as aligned, and cleared when a parent is set), `closed_at?`, `closed_by_id?`, `success_status?` (`achieved` / `missed` / `abandoned`, the last since 0122, P9-T15b-a: a stop, METHOD.md §3.5), `close_decision?` (`achieved` / `keep` / `modify` / `defer` / `abandon`; achieved and defer since 0136, P9-T20e-a), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `ai_generated bool` (written for the first time by P4-T15a: an objective a reader kept from an assist's draft says so, and one they typed says so too), `added_mid_cycle_at timestamptz?` (0115, P9-T13-a, METHOD.md §2.9: when it was started after the team publication window into a published set; null is the plan), `draft_state?` (`draft` / `awaiting_approval`; 0117, P9-T13-b-b: an addition waiting for its owner to publish it or its reviewer to approve it; null follows its cycle), `carried_from_goal_id?` to goals (0137, P9-T20e-b, METHOD.md §8.9: the objective a keep or modify pre-filled this draft from; unique per cycle, deleted drafts included), `position`.
+
+A waiting draft has no `next_check_in_at`: its rhythm starts when it goes live. `added_mid_cycle_at` and `draft_state` were left out of this page when 0115 arrived and were added at P9-T13-b-b.
 
 At most one of `parent_goal_id` and `parent_key_result_id` is set. Cycles in the alignment graph are rejected.
 
 `strategy_id` (0076, P6-G14b) is the §2.1 annual strategy an objective serves, and is independent of the two parent pointers: a strategy is what an annual objective is *for*, a parent is what a quarterly one hangs *under*, and an objective can honestly have both. Null for every quarterly objective, and `on delete set null` because replacing a frame supersedes its strategies and an objective that pointed at a superseded one is still a real objective.
 
 ### key_results *(short_id, importable)*
-`goal_id` to goals, `title`, `unit`, `direction` (`increase` / `reduce` / `maintain` / `move`), `indicator_type` (`leading` / `lagging`), `baseline_value numeric`, `target_value numeric`, `current_value numeric`, `due_on date?`, `owner_id?` to workspace_members, `weight numeric`, `kpi_id?` to kpis, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct numeric`, `confidence numeric?`, `forecast jsonb?`, `score numeric?`, `carry_forward bool`, `quality_flags jsonb`, `position`.
+`goal_id` to goals, `title`, `unit`, `kind` (`metric` / `maintain` / `milestone` / `baseline`, default `metric`; 0114, P9-T12b), `done_at?`, `direction` (`increase` / `reduce` / `maintain` / `move`), `indicator_type` (`leading` / `lagging`), `added_mid_cycle_at timestamptz?` (0115, P9-T13-a), `baseline_value numeric`, `target_value numeric?` (null until somebody sets it; 0116, P9-T13-b-a), `current_value numeric`, `due_on date?`, `owner_id?` to workspace_members, `weight numeric`, `kpi_id?` to kpis, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct numeric`, `confidence numeric?`, `forecast jsonb?`, `score numeric?`, `score_computed numeric?`, `score_reason?`, `carry_forward bool`, `quality_flags jsonb`, `position`.
+
+`score` is what the review decided at the close; `score_computed` is what METHOD.md §2.10 computed then, and `score_reason` why the two differ, null where they agree (0120, P9-T14a). Data change 0018 copied `score` into `score_computed` for every key result scored before adjusting existed.
+
+`kind` is METHOD.md §2.10's: a metric moves a number, a maintain holds one inside the band its baseline and target bound, a milestone is done or not, a baseline establishes a number. Every key result before 0114 is a metric, and data change `0017_key_result_kind_from_direction` makes each one written with a `maintain` direction a maintain key result. `done_at` is when a milestone was done or a baseline recorded, null until then and always null for the other two kinds; a baseline's first recorded value becomes its `baseline_value` and sets it.
 
 ### key_result_values
 `key_result_id` to key_results, `value numeric`, `at`, `author_member_id` to workspace_members, `check_in_id?` to check_ins, `source` (`manual` / `check_in` / `kpi` / `import` / `agent`).
+
+### key_result_target_changes
+`key_result_id` to key_results, `from_value numeric`, `to_value numeric`, `baseline_value numeric`, `eased bool`, `reason?`, `mid_cycle bool`, `actor_member_id?` to workspace_members, `changed_at`. Migration 0112 (P9-T06b).
+
+Every change to a key result's target, written by `goals.changeTarget` and by a target sent through `goals.updateKeyResult`, so the original stays on record (METHOD v2 §2.9). `eased` and `baseline_value` are what the change was judged on when it was made, because the baseline can move afterwards. A reason is required for an eased target unless the workspace made it optional, and is never an empty string. `mid_cycle` is whether the cycle's plan was already published.
 
 ### check_ins
 `subject_type` (`goal`), `subject_id`, `author_member_id` to workspace_members, `state` (`draft` / `published`), `published_at?`, `status` (`on_track` / `caution` / `off_track`), `confidence numeric?`, `narrative` (rich), `snapshot_id?` to check_in_snapshots, `session_id?` to sessions, `reviewer_member_id?` to workspace_members, `acknowledged_by_id?` to workspace_members, `acknowledged_at?`, `ai_drafted bool`.
@@ -299,7 +332,7 @@ The snapshot is immutable, which is why it is a table rather than a column: an e
 Horizontal links between goals in different teams (METHOD.md §5.1). Two-way by meaning, stored once in canonical id order, with a unique index on the pair and a check constraint refusing a self-link.
 
 ### key_result_dependencies
-`key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `note?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members, `created_by_id` to workspace_members.
+`key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `note?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members, `escalated_to_id?`, `escalated_by_id?` to workspace_members and `escalated_at?` (0124, P9-T16b-b, METHOD.md §5.4: the sponsor it was escalated to, copied at the time; the three are present together or not at all), `created_by_id` to workspace_members.
 
 The §5.4 register. A provider is named either as a space in this workspace or as free text, and a check constraint requires one of the two. Only a space provider can be confirmed, and only by that space; only a space provider clears a silo finding, because only it names something the engine can find. Unconfirmed and unowned blocks publish gate 4.
 
@@ -319,7 +352,7 @@ The §5.4 register. A provider is named either as a space in this workspace or a
 `from_goal_id` and `to_goal_id` to goals, `note?`, `created_by_id` to workspace_members.
 
 ### key_result_dependencies
-`key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members.
+`key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members, `escalated_to_id?`, `escalated_by_id?`, `escalated_at?` (0124, P9-T16b-b).
 
 ### alignment_findings
 `scope` (`workspace` / `space`), `scope_id?`, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap` / `divergence`), `severity` (`high` / `medium` / `low`), `subject_goal_id` to goals, `subject_key_result_id?` to key_results, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`.
@@ -336,7 +369,7 @@ The §5.4 register. A provider is named either as a space in this workspace or a
 `name`, `description?`, `root_kpi_id?` to kpis.
 
 ### kpis *(short_id, importable)*
-`tree_id?` to kpi_trees, `category_id?` to kpi_categories, `parent_kpi_id?` to kpis, `title`, `description` (rich), `owner_kind`, `space_id?`, `member_id?`, `frequency` (`daily` / `weekly` / `monthly` / `quarterly` / `yearly`), `unit`, `direction` (`higher_better` / `lower_better`), `indicator_type` (`leading` / `lagging`), `tier` (`input` / `output` / `outcome` / `impact`), `target_default numeric?`, `aggregate` (`sum` / `avg` / `max` / `min` / `count`), `is_calculated bool`, `formula jsonb?`, `healthy_pct`, `watch_pct`, `state` (`healthy` / `watch` / `unhealthy` / `recovering` / `no_data`), `achievement_pct numeric?`, `effective_pct numeric?`, `recovery_goal_id?` to goals, `recovery_started_pct numeric?`, `recovery_close_proposed_at?`, `starts_on?`, `ends_on?`, `position`. The closure stamp is what makes METHOD.md §6.5's "propose exactly once" true; it is cleared when a recovery is launched or closed (P3-T14).
+`tree_id?` to kpi_trees, `category_id?` to kpi_categories, `parent_kpi_id?` to kpis, `title`, `description` (rich), `owner_kind`, `space_id?`, `member_id?`, `frequency` (`daily` / `weekly` / `monthly` / `quarterly` / `yearly`), `unit`, `direction` (`higher_better` / `lower_better`), `target_type?` (`at_least` / `at_most` / `increase_to` / `decrease_to` / `range`; 0125, P9-T17a, METHOD.md §6.2; null reads as the direction implies, and data change 0020 writes it), `green_low?`, `green_high?`, `red_low?`, `red_high?` (0125: the thresholds in the KPI's own units; all null is the ratio fallback), `indicator_type` (`leading` / `lagging`), `tier?` (`input` / `output` / `outcome` / `impact`; optional since 0126, P9-T17b-b), `owner_member_id?` to workspace_members (0126: the one named person who owns it, METHOD.md §6.2, and who hears when it leaves its corridor; data change 0022 names the member for a KPI on a member's own list), `target_default numeric?`, `aggregate` (`sum` / `avg` / `max` / `min` / `count` / `last` / `first`, the last two since 0125), `is_calculated bool`, `formula jsonb?`, `healthy_pct`, `watch_pct`, `state` (`healthy` / `watch` / `unhealthy` / `recovering` / `no_data`; `recovering` is no longer written since P9-T17b-a, where a recovery moved beside the band, and data change 0021 rewrites the rows that still say it), `achievement_pct numeric?`, `effective_pct numeric?`, `recovery_goal_id?` to goals, `recovery_started_pct numeric?`, `recovery_close_proposed_at?`, `response_kind?` (`fix_now` / `key_result`), `response_task_id?` to tasks, `response_key_result_id?` to key_results, `responded_by_member_id?` to workspace_members, `responded_at?` (0127, P9-T18b: how an unhealthy KPI was answered other than by a recovery, METHOD.md §6.5; the latest answer only, set together, and the board reads whether it is still open from the task or the objective), `starts_on?`, `ends_on?`, `position`. The closure stamp is what makes METHOD.md §6.5's "propose exactly once" true; it is cleared when a recovery is launched or closed (P3-T14).
 
 ### kpi_records
 `kpi_id` to kpis, `period_start date`, `target_value numeric?`, `actual_value numeric?`, `remark?`, `author_member_id` to workspace_members. Unique on `(workspace_id, kpi_id, period_start)`.
@@ -348,7 +381,7 @@ The §5.4 register. A provider is named either as a space in this workspace or a
 `kpi_id` to kpis, `member_id` to workspace_members, `access` (`read` / `update`).
 
 ### performance_snapshots
-`cycle_id` to cycles, `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `result_value numeric(3,2)?`, the four §3.3 band counts as integers (`fully_achieved_count`, `strong_count`, `partial_count`, `little_count`), `verdict` (`too_safe` / `healthy` / `partial` / `outran_capacity`)?. Unique on the cycle, the owner kind and the coalesced owner columns, so archiving twice updates rather than doubling the trend. The owner has to agree with its kind, as a check constraint. Derived: written by the archive and never imported (P3-T15).
+`cycle_id` to cycles, `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `result_value numeric(3,2)?`, the four §3.3 band counts as integers (`fully_achieved_count`, `strong_count`, `partial_count`, `little_count`), `verdict` (`too_safe` / `healthy` / `partial` / `outran_capacity`)?. `result_value` is the cycle score over every scored key result (METHOD.md §8.6); since P9-T11b-b the `verdict` is §3.4's over the **aspirational** key results alone, and null where none was scored, because committed key results are judged by the share met. Unique on the cycle, the owner kind and the coalesced owner columns, so archiving twice updates rather than doubling the trend. The owner has to agree with its kind, as a check constraint. Derived: written by the archive and never imported (P3-T15).
 
 ### scorecard_settings and score_entries
 Points configuration and entries. `scorecard_settings` is one row per workspace with `enabled bool default false` and a `points jsonb`; `score_entries` carries `member_id`, `cycle_id?`, `points`, `reason`. Off by default, with no rows unless enabled (P3-T15).
@@ -356,7 +389,7 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 ## 10. The rhythm (domain G)
 
 ### sessions *(short_id)*
-`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `added_minutes jsonb`.
+`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c), `review_part?` (`review` / `retrospective`; null is the whole review in one session) and `review_session_id?` to sessions (the review session a retrospective reads its scores from), both 0133, P9-T20b-a, checked so only a quarterly session has a part and only a retrospective names a review.
 
 `shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes.
 
@@ -371,13 +404,16 @@ Unique on `(workspace_id, session_id, member_id)` where not deleted: one person,
 
 A row is created when somebody takes part, not when the session is made. Seeding the space would claim attendance nobody confirmed, and a room pulse averaged over people who never arrived is not the room's pulse. `pulse` and `word` are null until the person gives them, because a missing pulse and a pulse of one are different facts.
 
-### blockers
-`key_result_id?` to key_results, `goal_id?` to goals, `type` (`resource` / `dependency` / `clarity` / `priority_conflict` / `external`), `description?`, `owner_id` to workspace_members, `next_action`, `opened_at`, `due_at`, `resolved_at?`, `escalated_at?`, `escalated_to_id?` to workspace_members, `session_id?` to sessions, `source` (`session` / `manual` / `channel` / `agent`).
+### session_confidences
+`session_id` to sessions, `key_result_id` to key_results, `confirmed_confidence numeric`, `team_average numeric?`, `what_changed`, `confirmed_by_id` to workspace_members, `next_action?`, `next_action_owner_id?` to workspace_members, `next_action_due_at?`. One per key result per weekly session. A low one carries its next action with an owner, due at the end of the goal's next check-in day (METHOD.md §7.2 step 2, 0129, P9-T19a-b); the three are set together, by a check constraint.
 
-`due_at` is `opened_at` plus the workspace blocker clock, twenty-four hours by default.
+### blockers
+`key_result_id?` to key_results, `goal_id?` to goals, `type` (`resource` / `dependency` / `clarity` / `priority_conflict` / `external` / `approach_not_working` / `other`, the last two since 0128, P9-T19a-a), `description?`, `owner_id` to workspace_members, `next_action`, `opened_at`, `due_at`, `resolved_at?`, `escalated_at?`, `escalated_to_id?` to workspace_members, `session_id?` to sessions, `source` (`session` / `manual` / `channel` / `agent`).
+
+`due_at` is the end of the goal's next check-in day, the first one after the day the blocker opens, in the workspace calendar (METHOD.md §7.3, P9-T19a-a). It was `opened_at` plus a twenty-four hour clock; data change 0023 moved the open ones to their goal's next check-in.
 
 ### commitments
-`session_id?` to sessions, `space_id` to spaces, `week_start date`, `text`, `owner_id` to workspace_members, `key_result_id?` to key_results, `delivered bool?`, `closed_at?`.
+`session_id?` to sessions, `space_id` to spaces, `week_start date`, `text`, `owner_id` to workspace_members, `key_result_id?` to key_results, `delivered bool?`, `closed_at?`, `closing_note?` (the line on why written when it was closed, where it helps; 0130, P9-T19a-d-c).
 
 ### decisions
 `cycle_id?` to cycles, `key_result_id?` to key_results, `goal_id?` to goals, `at date`, `text`, `author_member_id` to workspace_members, `session_id?` to sessions.
@@ -388,7 +424,7 @@ A row is created when somebody takes part, not when the session is made. Seeding
 `published_at` and `channels` were written by nothing until completeness review M-23. `sessions.postDigest` now sets both when the facilitator posts a closed weekly session's digest to its space's channel: `published_at` on the first post, and the providers it went to added to `channels`.
 
 ### streaks
-`space_id` to spaces, `current_weeks`, `longest_weeks`, `last_session_week`, `history jsonb`.
+`space_id` to spaces, `current_weeks`, `longest_weeks`, `last_session_week`, `history jsonb`. Since P9-T19a-d-b the counts are of the space's own check-in periods, a week, a fortnight or a month, and `last_session_week` is the start of the last period held; the names stay because renaming them spans two releases for no gain.
 
 ### objective_trends
 `goal_id` to goals, `month date`, `trend` (`improving` / `flat` / `declining`), `author_member_id` to workspace_members.
@@ -405,13 +441,13 @@ Every table references `session_id` to sessions.
 | `retro_notes` | `column_key` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
 | `retro_votes` | `note_id` to retro_notes, `member_id` |
 | `management_answers` | `question_key smallint` (1 to 4), `body`, `answered_by_id` |
-| `root_causes` | `key_result_id`, `cause_key smallint` (1 to 8), `detail?`, `named_by_id` |
+| `root_causes` | `key_result_id`, `cause_key smallint` (1 to 9), `secondary_cause_key smallint?` (1 to 9, never the primary; 0134), `detail?` (required where either cause is 9, "Other"), `named_by_id` |
 | `process_health_responses` | `statement_key smallint` (1 to 5), `score smallint`, `respondent_hash` |
-| `review_decisions` | `goal_id`, `decision` (`keep` / `modify` / `abandon`), `why`, `decided_by_id` |
+| `review_decisions` | `goal_id`, `decision` (`achieved` / `keep` / `modify` / `defer` / `abandon`; achieved and defer since 0136, P9-T20e-a), `why`, `decided_by_id` |
 | `learnings` | `cycle_id`, `text`, `carry_forward bool`, `source`, `retro_note_id?`, `created_by_id` |
-| `next_cycle_drafts` | `title`, `why`, `promoted_to_goal_id?` |
+| `next_cycle_drafts` | `title`, `why`, `promoted_to_goal_id?`. No screen writes it since 0.2.0 (P9-T22d); removed in 0.3 |
 | `review_actions` | `what`, `owner_id`, `due_on`, `done bool`, `created_by_id` |
-| `review_diagnostics` | `cycle_score numeric`, `rhythm_score numeric?`, `verdict` (`results_delivered` / `strategy_or_quality` / `rhythm`), `narrative`, `ai_narrative?`, `recorded_by_id` |
+| `review_diagnostics` | `cycle_score numeric` (the aspirational key results' average since P9-T20d), `rhythm_score numeric?` (process-health statements 2 and 5, the cross-check), `on_time_share numeric?`, `due_check_ins integer?`, `on_time_check_ins integer?` (the measured rhythm the verdict is read on, 0135, P9-T20d; null on a diagnostic read before it, or on a delivered cycle read before anything fell due), `verdict` (`results_delivered` / `strategy_or_quality` / `rhythm`), `narrative`, `ai_narrative?`, `recorded_by_id` |
 
 `review_scores` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: regrading corrects the row, because a room that changes its mind has one answer and not two. The score lands on `key_results.score` when the session closes, in the same transaction, and only for what was graded. METHOD.md §8.3 hides the objective score until the room reveals it, and a score on the key result is visible on the goal page immediately; a grade also has to be revisable while the room talks. `revealed_at` sits on the row rather than the objective, so the reveal is one update over an objective's rows and every client reads the same answer from it, the same shape as `check_in_votes.revealed_at`.
 
@@ -427,7 +463,7 @@ Every table references `session_id` to sessions.
 
 `management_answers` is unique on `(workspace_id, session_id, question_key)`: leadership answers out loud and the record is one answer per question. The question text is canon in `packages/method` and never stored, so a workspace cannot edit a question §11 lists as unchangeable structure and no old answer ends up quoting a question nobody asked. **Read by a space's managers and its coordinator only.** §8.7 says leadership answers, the write-access floor here is `edit` for every active member (P3-T16), and a review with no space falls back to workspace administration because there are no space roles to read.
 
-`root_causes` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: §8.4's own word is "primary", and a key result with two causes has had the question dodged rather than answered. `cause_key` indexes the canon taxonomy in `packages/method`, never the text, so a workspace cannot edit a taxonomy §11 lists as unchangeable structure and no old row ends up naming a cause the method no longer has. The stage's list comes from `review_scores` rather than `key_results.score`, because grades do not land on the key results until the session closes and stage seven runs before that.
+`root_causes` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: one primary per key result, and since P9-T20c (migration 0134) v2's "and may name a second" is `secondary_cause_key` on the same row, so a key result never carries two primaries. `cause_key` indexes the canon taxonomy in `packages/method`, never the text, so a workspace cannot edit a taxonomy §11 lists as unchangeable structure and no old row ends up naming a cause the method no longer has. The stage's list comes from `review_scores` rather than `key_results.score`, because grades do not land on the key results until the session closes and stage seven runs before that.
 
 `review_diagnostics` is unique on `(workspace_id, session_id)` and **stores the two numbers the verdict was read against**. §8.6 calls the diagnostic the review's most valuable output and the minutes have to show what the room was told, so a verdict recomputed later would quietly change as scores were corrected. Reading it again replaces the row, numbers and verdict together, so a room that deliberately re-reads has one internally consistent answer. `verdict` is `results_delivered` rather than `delivered`, matching `packages/method`'s `DiagnosisKind`: two names for one verdict is a translation layer with nothing to gain. `narrative` holds the deterministic prescription and `ai_narrative` anything a provider added, so the sentence survives with AI off.
 
@@ -591,7 +627,7 @@ The floor is kept rather than lifted. The policy admits a row two ways: `workspa
 ### nudges *(delivery semantics changed at P5-T01b-b)*
 A nudge row is the delivery queue as well as the record. `sent_at is null` with no `suppressed_reason` and a `scheduled_for` that has passed means "owed to somebody and not yet delivered", which is what `deliverDueNudges` reads. The run that decides *whether* the product speaks no longer stamps `sent_at`; the pass that decides *where* does, along with `channel`. Before this, `channel` was written as the literal `in_app` by the run and resolved nowhere.
 
-`kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`, `fallback_reason?` (migration 0102, completeness review M-23: why delivery went somewhere other than where the nudge was routed, null when it did not), `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
+`kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?` (`dedup` / `quiet_hours` / `snooze` / `disabled` / `ceiling` / `holiday` / `leave`; `holiday` since migration 0131, P9-T19b-a, and `leave` since 0132, P9-T19b-b), `fallback_reason?` (migration 0102, completeness review M-23: why delivery went somewhere other than where the nudge was routed, null when it did not), `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
 
 ### nudge_rules
 `rule_key`, `enabled bool`, `channel_override?`, `escalation_ladder jsonb?`, `quiet_mode_exempt bool`.

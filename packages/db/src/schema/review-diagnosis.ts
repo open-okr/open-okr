@@ -22,8 +22,13 @@ export const rootCauses = pgTable("root_causes", {
   keyResultId: uuid("key_result_id")
     .notNull()
     .references(() => keyResults.id, { onDelete: "cascade" }),
-  /** 1 to 8, indexing METHOD.md §8.4. The text is canon in `packages/method`. */
+  /** 1 to 9, indexing METHOD.md §8.4. The text is canon in `packages/method`. */
   causeKey: smallint("cause_key").notNull(),
+  /**
+   * §8.4's optional second cause, never the primary again (P9-T20c). "Other"
+   * as either one needs the detail line.
+   */
+  secondaryCauseKey: smallint("secondary_cause_key"),
   /** §8.4's "ask why until it stops being a symptom", and optional. */
   detail: text("detail"),
   namedById: uuid("named_by_id")

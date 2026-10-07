@@ -1,11 +1,12 @@
 "use client";
 
 import {
-  applyStrictness,
+  applyEnforcement,
   evaluateKeyResults,
   evaluateObjective,
   type KeyResultInput,
   type QualityStatus,
+  type ResolvedPractice,
   type ResolvedThresholds,
 } from "@openokr/method";
 import { useTranslations } from "@openokr/ui";
@@ -39,10 +40,12 @@ const ORDER: Record<QualityStatus, number> = {
   fail: 0,
   warn: 1,
   todo: 2,
-  pass: 3,
+  info: 3,
+  pass: 4,
 };
 
 const TONE: Record<QualityStatus, string> = {
+  info: "bg-raised text-ink-2",
   fail: "bg-bad-bg text-bad",
   warn: "bg-warn-bg text-warn",
   todo: "bg-raised text-ink-3",
@@ -57,10 +60,13 @@ export interface PanelObjective {
 export function QualityPanel({
   set,
   thresholds,
+  practice,
   checkTitles,
 }: {
   readonly set: readonly PanelObjective[];
   readonly thresholds: ResolvedThresholds;
+  /** How hard each check is here (METHOD.md §12). */
+  readonly practice: ResolvedPractice;
   readonly checkTitles: readonly {
     readonly id: string;
     readonly title: string;
@@ -74,7 +80,9 @@ export function QualityPanel({
   );
 
   const groups = useMemo(() => {
-    const strictness = thresholds["quality.coachStrictness"];
+    const options = {
+      strict: thresholds["quality.coachStrictness"] === "strict",
+    };
     return set.map((entry) => {
       const rows: KeyResultInput[] = entry.keyResults.map((row) => ({
         text: row.title,
@@ -85,20 +93,28 @@ export function QualityPanel({
         indicatorType: row.indicatorType,
         direction: row.direction,
         confidence: row.confidence,
+        // KR-6 judges only aspirational key results (METHOD.md §3.2).
+        kind: entry.objective.kind,
+        // KR-2, KR-3 and KR-7 judge by the key result's own kind (§2.10).
+        keyResultKind: row.keyResultKind,
       }));
 
-      const objective = applyStrictness(
+      const objective = applyEnforcement(
         evaluateObjective(entry.objective, thresholds),
-        strictness,
+        practice,
+        options,
       );
-      const keyResults = applyStrictness(
+      const keyResults = applyEnforcement(
         evaluateKeyResults({ keyResults: rows }, thresholds),
-        strictness,
+        practice,
+        options,
       );
 
       const issues = [
         ...objective
-          .filter((verdict) => verdict.status !== "pass")
+          .filter(
+            (verdict) => verdict.status !== "pass" && verdict.status !== "info",
+          )
           .map((verdict) => ({
             id: verdict.id,
             status: verdict.status,
@@ -107,7 +123,9 @@ export function QualityPanel({
             where: "the objective",
           })),
         ...keyResults
-          .filter((verdict) => verdict.status !== "pass")
+          .filter(
+            (verdict) => verdict.status !== "pass" && verdict.status !== "info",
+          )
           .flatMap((verdict) =>
             verdict.keyResults.length === 0
               ? [
@@ -136,7 +154,7 @@ export function QualityPanel({
 
       return { objective: entry.objective, issues };
     });
-  }, [set, thresholds]);
+  }, [set, thresholds, practice]);
 
   const total = groups.reduce((sum, group) => sum + group.issues.length, 0);
 

@@ -18,6 +18,7 @@ import {
   cycles,
   GOAL_CLOSE_DECISIONS,
   GOAL_HEALTH,
+  GOAL_KINDS,
   GOAL_LEVELS,
   GOAL_OWNER_KINDS,
   GOAL_SUCCESS_STATUSES,
@@ -26,6 +27,7 @@ import {
   INDICATOR_TYPES,
   includeDeleted,
   KEY_RESULT_DIRECTIONS,
+  KEY_RESULT_KINDS,
   keyResults,
   keyResultValues,
   okrSessions,
@@ -35,6 +37,8 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
+  additionStartsAs,
+  defaultOkrKind,
   evaluateKeyResults,
   KEY_RESULT_CHECKS,
   type KeyResultInput,
@@ -59,15 +63,16 @@ import {
   dueLocalDate,
   stampFirstDue,
 } from "../cadence/service.ts";
+import { seedGoalFrequencyInTx } from "../cadence/space-frequency.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
-import { draftingRefusal } from "../cycles/workflow.ts";
 import {
   asNumber,
   clampWeight,
   closeGoalInTx,
   createGoalInTx,
   createKeyResultInTx,
+  doneAtFor,
   type GoalRole,
   linkKpiInTx,
   reassignRoleInTx,
@@ -81,16 +86,20 @@ import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { readLinkableKpi } from "../kpis/linked.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { midCycleInTx, requirePolicy } from "../practice/policy.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import {
   recomputeGoalQualityInTx,
   recomputeUnitQualityInTx,
 } from "../quality/service.ts";
+import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
 import { recomputeAlignmentFor } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { changeTargetInTx, targetReason } from "./goal-targets.ts";
 
 /**
  * Goals per page when the caller names no limit.
@@ -105,23 +114,6 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
  * end of the list: the cursor still advances, and the caller asks again.
  */
 const GOAL_PAGE = 200;
-
-/** Refuses guided drafting while an earlier phase is incomplete (H-09). */
-async function refuseUnreadyDrafting(
-  tx: OperationTx,
-  workspaceId: string,
-  cycleId: string,
-): Promise<void> {
-  const refusal = await draftingRefusal(
-    tx,
-    workspaceId,
-    cycleId,
-    resolveRhythm(await readRhythmRow(tx, workspaceId)).thresholds,
-  );
-  if (refusal) {
-    throw new OperationError("forbidden", refusal);
-  }
-}
 
 /** A key result's due date: a local calendar date, never a free string. */
 const localDate = z
@@ -149,10 +141,17 @@ const keyResultOutput = z.object({
   goalId: z.uuid(),
   title: z.string(),
   unit: z.string().nullable(),
+  /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). */
+  kind: z.enum(KEY_RESULT_KINDS),
+  /** When a milestone was done or a baseline recorded, or null. */
+  doneAt: z.string().nullable(),
+  /** When it was started mid-cycle (§2.9, P9-T13-a), or null for the plan. */
+  addedMidCycleAt: z.string().nullable(),
   direction: z.enum(KEY_RESULT_DIRECTIONS),
   indicatorType: z.enum(INDICATOR_TYPES),
   baselineValue: z.number(),
-  targetValue: z.number(),
+  /** Null until somebody sets it (§2.9, P9-T13-b-a). */
+  targetValue: z.number().nullable(),
   currentValue: z.number(),
   dueOn: z.string().nullable(),
   ownerId: z.uuid().nullable(),
@@ -173,15 +172,22 @@ const goalOutput = z.object({
   cycleId: z.uuid().nullable(),
   timeframe: timeframe.nullable(),
   level: z.enum(GOAL_LEVELS),
+  /** Committed or aspirational (METHOD.md §2.8, P9-T11b-a). */
+  kind: z.enum(GOAL_KINDS),
+  /** When it was started mid-cycle (§2.9, P9-T13-a), or null for the plan. */
+  addedMidCycleAt: z.string().nullable(),
   ownerKind: z.enum(GOAL_OWNER_KINDS),
   spaceId: z.uuid().nullable(),
   memberId: z.uuid().nullable(),
   champion: z.object({ id: z.uuid(), name: z.string() }),
-  reviewer: z.object({ id: z.uuid(), name: z.string() }),
+  /** Null where the goal has none, which the practice allows (P9-T04). */
+  reviewer: z.object({ id: z.uuid(), name: z.string() }).nullable(),
   parentGoalId: z.uuid().nullable(),
   parentKeyResultId: z.uuid().nullable(),
   weight: z.number(),
   contributionStatement: z.string().nullable(),
+  /** Why it stands alone, when it does (METHOD.md §5.2, P9-T16a). */
+  standaloneReason: z.string().nullable(),
   closedAt: z.string().nullable(),
   successStatus: z.enum(GOAL_SUCCESS_STATUSES).nullable(),
   closeDecision: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
@@ -320,10 +326,13 @@ function keyResultRow(row: {
   goalId: string;
   title: string;
   unit: string | null;
+  kind: (typeof KEY_RESULT_KINDS)[number];
+  doneAt: Date | null;
+  addedMidCycleAt: Date | null;
   direction: (typeof KEY_RESULT_DIRECTIONS)[number];
   indicatorType: (typeof INDICATOR_TYPES)[number];
   baselineValue: string;
-  targetValue: string;
+  targetValue: string | null;
   currentValue: string;
   dueOn: string | null;
   ownerId: string | null;
@@ -339,8 +348,12 @@ function keyResultRow(row: {
 }) {
   return {
     ...row,
+    doneAt: row.doneAt ? row.doneAt.toISOString() : null,
+    addedMidCycleAt: row.addedMidCycleAt
+      ? row.addedMidCycleAt.toISOString()
+      : null,
     baselineValue: asNumber(row.baselineValue) ?? 0,
-    targetValue: asNumber(row.targetValue) ?? 0,
+    targetValue: asNumber(row.targetValue),
     currentValue: asNumber(row.currentValue) ?? 0,
     weight: asNumber(row.weight) ?? 0,
     progressPct: asNumber(row.progressPct) ?? 0,
@@ -356,6 +369,8 @@ const GOAL_COLUMNS = {
   cycleId: goals.cycleId,
   timeframe: goals.timeframe,
   level: goals.level,
+  kind: goals.kind,
+  addedMidCycleAt: goals.addedMidCycleAt,
   ownerKind: goals.ownerKind,
   spaceId: goals.spaceId,
   memberId: goals.memberId,
@@ -365,6 +380,7 @@ const GOAL_COLUMNS = {
   parentKeyResultId: goals.parentKeyResultId,
   weight: goals.weight,
   contributionStatement: goals.contributionStatement,
+  standaloneReason: goals.standaloneReason,
   closedAt: goals.closedAt,
   successStatus: goals.successStatus,
   closeDecision: goals.closeDecision,
@@ -382,6 +398,9 @@ const KEY_RESULT_COLUMNS = {
   goalId: keyResults.goalId,
   title: keyResults.title,
   unit: keyResults.unit,
+  kind: keyResults.kind,
+  doneAt: keyResults.doneAt,
+  addedMidCycleAt: keyResults.addedMidCycleAt,
   direction: keyResults.direction,
   indicatorType: keyResults.indicatorType,
   baselineValue: keyResults.baselineValue,
@@ -605,7 +624,11 @@ export const listGoals = defineReadAction({
         const names = await memberNames(
           tx,
           context.workspaceId,
-          visible.flatMap((row) => [row.championId, row.reviewerId]),
+          visible.flatMap((row) =>
+            row.reviewerId
+              ? [row.championId, row.reviewerId]
+              : [row.championId],
+          ),
         );
         // The due date is a date in the workspace calendar, so it is read in the
         // workspace timezone rather than the reader's.
@@ -620,16 +643,21 @@ export const listGoals = defineReadAction({
             closedAt: row.closedAt
               ? new Date(row.closedAt).toISOString()
               : null,
+            addedMidCycleAt: row.addedMidCycleAt
+              ? new Date(row.addedMidCycleAt).toISOString()
+              : null,
             nextCheckInOn: dueLocalDate(row.nextCheckInAt, timeZone),
             daysPastDue: daysPastDue(row.nextCheckInAt, now, timeZone),
             champion: {
               id: row.championId,
               name: names.get(row.championId) ?? "Unknown",
             },
-            reviewer: {
-              id: row.reviewerId,
-              name: names.get(row.reviewerId) ?? "Unknown",
-            },
+            reviewer: row.reviewerId
+              ? {
+                  id: row.reviewerId,
+                  name: names.get(row.reviewerId) ?? "Unknown",
+                }
+              : null,
             keyResults: children
               .filter((child) => child.goalId === row.id)
               .map(keyResultRow),
@@ -717,10 +745,11 @@ export const readGoal = defineReadAction({
           )
           .limit(1);
 
-        const names = await memberNames(tx, context.workspaceId, [
-          row.championId,
-          row.reviewerId,
-        ]);
+        const names = await memberNames(
+          tx,
+          context.workspaceId,
+          row.reviewerId ? [row.championId, row.reviewerId] : [row.championId],
+        );
         const timeZone = await workspaceTimeZone(tx, context.workspaceId);
         const now = new Date();
 
@@ -729,16 +758,21 @@ export const readGoal = defineReadAction({
           weight: asNumber(row.weight) ?? 0,
           progressPct: asNumber(row.progressPct) ?? 0,
           closedAt: row.closedAt ? new Date(row.closedAt).toISOString() : null,
+          addedMidCycleAt: row.addedMidCycleAt
+            ? new Date(row.addedMidCycleAt).toISOString()
+            : null,
           nextCheckInOn: dueLocalDate(row.nextCheckInAt, timeZone),
           daysPastDue: daysPastDue(row.nextCheckInAt, now, timeZone),
           champion: {
             id: row.championId,
             name: names.get(row.championId) ?? "Unknown",
           },
-          reviewer: {
-            id: row.reviewerId,
-            name: names.get(row.reviewerId) ?? "Unknown",
-          },
+          reviewer: row.reviewerId
+            ? {
+                id: row.reviewerId,
+                name: names.get(row.reviewerId) ?? "Unknown",
+              }
+            : null,
           keyResults: children.map(keyResultRow),
           // Read, never recomputed here: the score on the row is what the
           // write path committed to and what the quality panel already shows,
@@ -998,24 +1032,37 @@ export const createGoal = defineWriteAction({
       cycleId: z.uuid().optional(),
       timeframe: timeframe.optional(),
       level: z.enum(GOAL_LEVELS),
+      /**
+       * Committed or aspirational (METHOD.md §2.8, P9-T11b-a). Left out, the
+       * workspace's default: aspirational, or committed where it uses
+       * committed OKRs only (decision D2). A kind it has turned off is
+       * refused through the policy.
+       */
+      kind: z.enum(GOAL_KINDS).optional(),
       ownerKind: z.enum(GOAL_OWNER_KINDS).default("workspace"),
       spaceId: z.uuid().optional(),
       memberId: z.uuid().optional(),
       /**
-       * Who champions and who reviews it (P8-G13d).
+       * Who champions and who reviews it (P8-G13d, P9-T04).
        *
        * Both default to whoever creates the objective when they are not
-       * given. They are `not null` on the row and METHOD.md §2.5 wants both
-       * named, so this names them rather than loosening anything: somebody
-       * drafting on their own is both until they say otherwise, and every
-       * surface that creates an objective can accept a title alone. The goal
-       * detail reassigns either, which rebinds access with it.
+       * given, so every surface that creates an objective can accept a title
+       * alone: somebody drafting on their own is both until they say
+       * otherwise. The goal detail reassigns either, which rebinds access
+       * with it.
+       *
+       * **The reviewer follows the practice** (METHOD.md §2.5, P9-T04). Left
+       * out, it is the creator only where the workspace requires reviewers,
+       * and nobody where they are optional or off: defaulting everybody to
+       * the creator would give every new objective an acknowledgement nobody
+       * asked for. `null` is nobody, and a workspace that requires reviewers
+       * refuses that through the policy, from every caller alike.
        *
        * A reviewer who is also the champion is a quality finding rather than
        * a refusal: §4 reports it, and reporting it is what makes it fixable.
        */
       championId: z.uuid().optional(),
-      reviewerId: z.uuid().optional(),
+      reviewerId: z.uuid().nullable().optional(),
       parentGoalId: z.uuid().optional(),
       parentKeyResultId: z.uuid().optional(),
       /**
@@ -1047,12 +1094,20 @@ export const createGoal = defineWriteAction({
        */
       legacy: legacyKey.optional(),
       /**
-       * Drafted in the guided cycle's phase 4 (REQUIREMENTS §3.1). Refused,
-       * with the reason, while an earlier phase is incomplete. The cycle
-       * screen sets it; a goal added anywhere else does not wait on the
-       * planning phases (completeness review H-09).
+       * Accepted and ignored since P9-T02, for one release (PLAN.md §5.1).
+       *
+       * It used to make this action wait for the planning phases, and only
+       * the cycle screen set it, so the API, the command line and the copilot
+       * never waited (completeness review H-09). Whether drafting waits is now
+       * the workspace's practice, decided by `requirePolicy` for every caller.
        */
       guided: z.boolean().optional(),
+      /**
+       * Why it starts now, when it is added mid-cycle (METHOD.md §2.9,
+       * P9-T13-a). Required where the workspace asks for it; kept in the
+       * activity either way.
+       */
+      reason: z.string().trim().min(1).max(500).optional(),
     })
     // OBJ-3 as a boundary check, so the refusal is a sentence rather than a
     // constraint violation. The database enforces the same thing underneath.
@@ -1074,9 +1129,36 @@ export const createGoal = defineWriteAction({
       );
 
       await assertLegacyKeyFree(tx, workspaceId, goals, input.legacy, "goal");
-      if (input.guided && input.cycleId) {
-        await refuseUnreadyDrafting(tx, workspaceId, input.cycleId);
-      }
+      const { practice } = practiceFromRow(
+        await readRhythmRow(tx, workspaceId),
+      );
+      // Where P8-G13d's default meets P9-T04's setting (STATUS, P9-T04).
+      const reviewerId =
+        input.reviewerId !== undefined
+          ? input.reviewerId
+          : practice.reviewer === "required"
+            ? memberId
+            : null;
+      await requirePolicy(
+        tx,
+        { workspaceId, bulk: context.bulk },
+        {
+          kind: "objective.create",
+          cycleId: input.cycleId ?? null,
+          hasReviewer: reviewerId !== null,
+          // §2.7: only a level the cycle uses (P9-T07a-c).
+          level: input.level,
+          // §2.8: only a kind the workspace uses (P9-T11b-a).
+          ...(input.kind === undefined ? {} : { okrKind: input.kind }),
+          // §2.9: a start mid-cycle says why where it must (P9-T13-a).
+          hasReason: input.reason !== undefined,
+        },
+      );
+      // An import records history, so it never starts anything now.
+      const addedMidCycle =
+        !context.bulk &&
+        (await midCycleInTx(tx, workspaceId, input.cycleId ?? null));
+      const waits = addedMidCycle && additionStartsAs(practice) === "draft";
 
       // A parent has to be one this writer can actually see, resolved through
       // the getter so an invisible parent reads as not found (§4.2).
@@ -1143,11 +1225,16 @@ export const createGoal = defineWriteAction({
         cycleId: input.cycleId ?? null,
         timeframe: input.timeframe ?? null,
         level: input.level,
+        kind: input.kind ?? defaultOkrKind(practice),
+        addedMidCycleAt: addedMidCycle ? new Date() : null,
+        // §2.9: where the workspace says so, an addition waits for a person
+        // rather than going live once complete (P9-T13-b-b).
+        draftState: waits ? "draft" : null,
         ownerKind: input.ownerKind,
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
         championId: input.championId ?? memberId,
-        reviewerId: input.reviewerId ?? memberId,
+        reviewerId,
         parentGoalId: input.parentGoalId ?? null,
         parentKeyResultId: input.parentKeyResultId ?? null,
         strategyId: input.strategyId ?? null,
@@ -1168,17 +1255,27 @@ export const createGoal = defineWriteAction({
       });
 
       // The rhythm starts at creation (§8 of the cadence design), and the
-      // recompute below reads the due date this stamps.
+      // recompute below reads the due date this stamps. A draft waiting for a
+      // person owes no check-in yet, so it starts when the draft goes live.
       const rhythmSettings = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
-      await stampFirstDue(
-        tx,
+      // A goal in a space checks in at the space's frequency, where it chose
+      // one (§7.1, P9-T19a-d-a), and the first due date is counted at it.
+      await seedGoalFrequencyInTx(tx, {
         workspaceId,
-        created.id,
-        rhythmSettings.thresholds,
-        new Date(),
-      );
+        goalId: created.id,
+        spaceId: input.spaceId ?? null,
+      });
+      if (!waits) {
+        await stampFirstDue(
+          tx,
+          workspaceId,
+          created.id,
+          rhythmSettings.thresholds,
+          new Date(),
+        );
+      }
       await recompute(tx, workspaceId, created.id);
       await realign(tx, workspaceId, created.id);
       // The whole unit, not just this goal: OBJ-5 is a property of the set, so
@@ -1191,7 +1288,14 @@ export const createGoal = defineWriteAction({
           kind: "goal.created",
           subjectType: "goal",
           subjectId: created.id,
-          payload: { title: created.title, level: input.level },
+          payload: {
+            title: created.title,
+            level: input.level,
+            ...(addedMidCycle
+              ? { addedMidCycle: true, reason: input.reason ?? null }
+              : {}),
+            ...(waits ? { draft: true } : {}),
+          },
         },
         audit: {
           action: "goals.create",
@@ -1206,6 +1310,7 @@ export const createGoal = defineWriteAction({
 
 export const updateGoal = defineWriteAction({
   name: "goals.update",
+  // openokr:policy-exempt: changing an objective that exists stays open under every setting (METHOD.md §2.9); its target changes join the policy at P9-T06.
   summary: "Edits a goal's own fields, including its alignment pointer.",
   input: z.object({
     id: z.uuid(),
@@ -1217,6 +1322,12 @@ export const updateGoal = defineWriteAction({
     /** Null clears the alignment. A goal with no parent is an island, not an error. */
     parentGoalId: z.uuid().nullable().optional(),
     parentKeyResultId: z.uuid().nullable().optional(),
+    /**
+     * Why this goal stands alone (METHOD.md §5.2, P9-T16a). Setting one clears
+     * the parent, and setting a parent clears it, because a goal that aligns
+     * has no need to explain why it does not. Null or blank clears it.
+     */
+    standaloneReason: z.string().trim().max(1000).nullable().optional(),
     /**
      * The §2.1 annual strategy this objective serves, or null (P6-G14b).
      *
@@ -1257,6 +1368,16 @@ export const updateGoal = defineWriteAction({
         throw new OperationError(
           "forbidden",
           "A goal aligns to one parent, not two.",
+        );
+      }
+      const standaloneReason =
+        input.standaloneReason === undefined
+          ? undefined
+          : input.standaloneReason || null;
+      if (standaloneReason && (input.parentGoalId || input.parentKeyResultId)) {
+        throw new OperationError(
+          "forbidden",
+          "A goal either aligns to a parent or says why it stands alone, not both.",
         );
       }
 
@@ -1366,6 +1487,19 @@ export const updateGoal = defineWriteAction({
       if (input.parentKeyResultId !== undefined) {
         patch.parentKeyResultId = input.parentKeyResultId;
         patch.parentGoalId = null;
+      }
+      // A parent and a reason to stand alone are one or the other, for the
+      // same reason. Clearing a parent leaves a reason alone, so a goal can
+      // be unhung and explained in one call.
+      if (input.parentGoalId || input.parentKeyResultId) {
+        patch.standaloneReason = null;
+      }
+      if (standaloneReason !== undefined) {
+        patch.standaloneReason = standaloneReason;
+        if (standaloneReason !== null) {
+          patch.parentGoalId = null;
+          patch.parentKeyResultId = null;
+        }
       }
 
       const [updated] = await tx
@@ -1512,6 +1646,7 @@ export const goalReviewDecision = defineReadAction({
 
 export const closeGoal = defineWriteAction({
   name: "goals.close",
+  // openokr:policy-exempt: closing is the close decision the review records (METHOD.md §8.8), not writing; stopping mid-cycle with a reason joins the policy at P9-T13.
   summary:
     "Closes a goal with an outcome, a keep/modify/abandon decision and a retrospective.",
   input: z.object({
@@ -1596,8 +1731,94 @@ export const closeGoal = defineWriteAction({
   }),
 });
 
+/**
+ * §2.9's stop: an OKR that no longer matters, "closed as abandoned with a
+ * one-line reason" (P9-T13-c-a).
+ *
+ * A close with the decision "abandon" and the reason as its one account, so
+ * the archive, the history and a reopen read it as they read any close. Its
+ * outcome is §3.5's abandoned, since P9-T15b-a; it read missed before that.
+ */
+export const stopGoal = defineWriteAction({
+  name: "goals.stop",
+  // openokr:policy-exempt: a stop is always allowed and always needs its one-line reason (METHOD.md §2.9), which the input requires; no practice setting governs it.
+  summary:
+    "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9).",
+  input: z.object({
+    id: z.uuid(),
+    /** One line: why it no longer matters. */
+    reason: z.string().trim().min(1).max(280),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    subject: { type: "goal", id: input.id },
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+      const [goal] = await tx
+        .select({ title: goals.title })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .limit(1);
+
+      await closeGoalInTx(tx, {
+        workspaceId,
+        goalId: input.id,
+        closedById: memberId,
+        // §3.5's abandoned outcome (P9-T15b-a): it stopped mattering, which
+        // is neither achieved nor missed.
+        successStatus: "abandoned",
+        closeDecision: "abandon",
+        closeReason: input.reason,
+        retrospectiveBody: richTextFromPlainText(input.reason),
+      });
+      // The same aftermath as any close: never due again, and the set it
+      // left is judged without it.
+      await clearDue(tx, workspaceId, input.id);
+      await recompute(tx, workspaceId, input.id);
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: input.id });
+      await realign(tx, workspaceId, input.id);
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "goal.stopped",
+          subjectType: "goal",
+          subjectId: input.id,
+          payload: { title: goal?.title ?? "", reason: input.reason },
+          notify: true,
+        },
+        audit: {
+          action: "goals.stop",
+          targetType: "goal",
+          targetId: input.id,
+          payload: { reason: input.reason },
+        },
+      };
+    },
+  }),
+});
+
 export const reopenGoal = defineWriteAction({
   name: "goals.reopen",
+  // openokr:policy-exempt: reopening undoes a close on an objective that exists, which stays open under every setting (METHOD.md §2.9).
   summary:
     "Reopens a closed goal, clearing its outcome and keeping its retrospective.",
   input: z.object({ id: z.uuid() }),
@@ -1655,12 +1876,20 @@ export const reopenGoal = defineWriteAction({
 export const reassignGoalRole = defineWriteAction({
   name: "goals.reassignRole",
   summary:
-    "Moves the champion or the reviewer to another member, rebinding access with it.",
-  input: z.object({
-    id: z.uuid(),
-    role: z.enum(["champion", "reviewer"]),
-    memberId: z.uuid(),
-  }),
+    "Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off.",
+  input: z
+    .object({
+      id: z.uuid(),
+      role: z.enum(["champion", "reviewer"]),
+      /**
+       * Null takes the reviewer off (P9-T04), which the practice refuses where
+       * reviewers are required. A champion is moved, never removed.
+       */
+      memberId: z.uuid().nullable(),
+    })
+    .refine((value) => value.memberId !== null || value.role === "reviewer", {
+      message: "A goal always has a champion. Move it to somebody else.",
+    }),
   output: z.object({ id: z.uuid(), role: z.string() }),
   // Full, not edit: naming who owns and who reviews a goal is administering it,
   // and the champion is the one who holds full on their own goal.
@@ -1697,6 +1926,14 @@ export const reassignGoalRole = defineWriteAction({
       const role = input.role as GoalRole;
       const fromMemberId =
         role === "champion" ? goal.championId : goal.reviewerId;
+      if (input.memberId === null) {
+        // §2.5: where reviewers are required, every objective keeps one.
+        await requirePolicy(
+          tx,
+          { workspaceId, bulk: context.bulk },
+          { kind: "reviewer.remove" },
+        );
+      }
 
       await reassignRoleInTx(tx, {
         workspaceId,
@@ -1731,6 +1968,7 @@ export const reassignGoalRole = defineWriteAction({
 
 export const moveGoalToCycle = defineWriteAction({
   name: "goals.moveToCycle",
+  // openokr:policy-exempt: moving an objective that exists is a change to it, and changes stay open under every setting (METHOD.md §2.9).
   summary:
     "Moves a goal into another cycle, taking its check-in history with it.",
   input: z.object({ id: z.uuid(), cycleId: z.uuid() }),
@@ -1838,25 +2076,51 @@ export const createKeyResult = defineWriteAction({
   name: "goals.addKeyResult",
   summary:
     "Adds a key result to a goal, with its baseline recorded as history.",
-  input: z.object({
-    goalId: z.uuid(),
-    title: z.string().trim().min(1).max(500),
-    unit: z.string().trim().max(60).optional(),
-    direction: z.enum(KEY_RESULT_DIRECTIONS),
-    indicatorType: z.enum(INDICATOR_TYPES),
-    baselineValue: z.number(),
-    targetValue: z.number(),
-    currentValue: z.number().optional(),
-    dueOn: localDate.optional(),
-    ownerId: z.uuid().optional(),
-    weight: z.number().default(1),
-    kpiId: z.uuid().optional(),
-    capacity: z.enum(CAPACITY_VERDICTS).optional(),
-    /** The source-system identity, when an import is creating this (P6-T01a). */
-    legacy: legacyKey.optional(),
-    /** Drafted in the guided cycle's phase 4, as on `goals.create`. */
-    guided: z.boolean().optional(),
-  }),
+  input: z
+    .object({
+      goalId: z.uuid(),
+      title: z.string().trim().min(1).max(500),
+      unit: z.string().trim().max(60).optional(),
+      /**
+       * Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b).
+       * Left out, a maintain where the direction says maintain and a metric
+       * otherwise, which is how every key result before kinds was read.
+       */
+      kind: z.enum(KEY_RESULT_KINDS).optional(),
+      /**
+       * Asked of a metric and a maintain key result, with a baseline. A
+       * milestone or a baseline reads its progress from being done, so it may
+       * leave all three out. The target may wait for anybody (P9-T13-b-a):
+       * KR-3 fails until it is set, and a key result added mid-cycle is a
+       * draft until then (METHOD.md §2.9).
+       */
+      direction: z.enum(KEY_RESULT_DIRECTIONS).optional(),
+      indicatorType: z.enum(INDICATOR_TYPES),
+      baselineValue: z.number().optional(),
+      targetValue: z.number().optional(),
+      currentValue: z.number().optional(),
+      dueOn: localDate.optional(),
+      ownerId: z.uuid().optional(),
+      weight: z.number().default(1),
+      kpiId: z.uuid().optional(),
+      capacity: z.enum(CAPACITY_VERDICTS).optional(),
+      /** The source-system identity, when an import is creating this (P6-T01a). */
+      legacy: legacyKey.optional(),
+      /** Accepted and ignored since P9-T02, as on `goals.create`. */
+      guided: z.boolean().optional(),
+      /** Why it starts now, when added mid-cycle (§2.9), as on `goals.create`. */
+      reason: z.string().trim().min(1).max(500).optional(),
+    })
+    .refine(
+      (value) =>
+        value.kind === "milestone" ||
+        value.kind === "baseline" ||
+        (value.direction !== undefined && value.baselineValue !== undefined),
+      {
+        message:
+          "A metric or a maintain key result needs its direction and its baseline.",
+      },
+    ),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -1873,16 +2137,33 @@ export const createKeyResult = defineWriteAction({
         input.goalId,
         ACCESS_LEVELS.edit,
       );
-      if (input.guided) {
-        const [goal] = await tx
-          .select({ cycleId: goals.cycleId })
-          .from(goals)
-          .where(activeOnly(goals, eq(goals.id, input.goalId)))
-          .limit(1);
-        if (goal?.cycleId) {
-          await refuseUnreadyDrafting(tx, workspaceId, goal.cycleId);
-        }
-      }
+      const kind =
+        input.kind ?? (input.direction === "maintain" ? "maintain" : "metric");
+      // §2.10: a kind the workspace has turned off is refused, from every
+      // surface alike (P9-T12b).
+      await requirePolicy(
+        tx,
+        { workspaceId, bulk: context.bulk },
+        { kind: "keyResult.kind", keyResultKind: kind },
+      );
+      const [goal] = await tx
+        .select({ cycleId: goals.cycleId })
+        .from(goals)
+        .where(activeOnly(goals, eq(goals.id, input.goalId)))
+        .limit(1);
+      await requirePolicy(
+        tx,
+        { workspaceId, bulk: context.bulk },
+        {
+          kind: "keyResult.create",
+          cycleId: goal?.cycleId ?? null,
+          hasReason: input.reason !== undefined,
+        },
+      );
+      // An import records history, so it never starts anything now.
+      const addedMidCycle =
+        !context.bulk &&
+        (await midCycleInTx(tx, workspaceId, goal?.cycleId ?? null));
 
       await assertLegacyKeyFree(
         tx,
@@ -1901,16 +2182,23 @@ export const createKeyResult = defineWriteAction({
         : null;
       const currentValue = kpi?.reading ?? input.currentValue;
 
+      // A milestone or a baseline left without numbers is stored nought to
+      // one, increasing, so the columns stay filled; its progress is read
+      // from being done and never from these (§2.10). A metric or a maintain
+      // without a target keeps none until somebody sets one (§2.9).
+      const measured = kind === "metric" || kind === "maintain";
       const created = await createKeyResultInTx(tx, {
         workspaceId,
         goalId: input.goalId,
         title: input.title,
         unit: input.unit ?? null,
-        direction: input.direction,
+        kind,
+        direction: input.direction ?? "increase",
         indicatorType: input.indicatorType,
-        baselineValue: input.baselineValue,
-        targetValue: input.targetValue,
+        baselineValue: input.baselineValue ?? 0,
+        targetValue: input.targetValue ?? (measured ? null : 1),
         currentValue,
+        addedMidCycleAt: addedMidCycle ? new Date() : null,
         dueOn: input.dueOn ?? null,
         ownerId: input.ownerId ?? null,
         weight: input.weight,
@@ -1948,7 +2236,12 @@ export const createKeyResult = defineWriteAction({
           kind: "key_result.created",
           subjectType: "goal",
           subjectId: input.goalId,
-          payload: { title: input.title },
+          payload: {
+            title: input.title,
+            ...(addedMidCycle
+              ? { addedMidCycle: true, reason: input.reason ?? null }
+              : {}),
+          },
         },
         audit: {
           action: "goals.addKeyResult",
@@ -1963,16 +2256,29 @@ export const createKeyResult = defineWriteAction({
 
 export const updateKeyResult = defineWriteAction({
   name: "goals.updateKeyResult",
+  // openokr:policy-exempt: changing a key result that exists stays open under every setting (METHOD.md §2.9); a target it is given goes through changeTargetInTx, which asks the policy, and a kind it is given asks it here (P9-T12b).
   summary:
-    "Edits a key result's definition. The current value has its own action, because it is history.",
+    "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
   input: z.object({
     id: z.uuid(),
     title: z.string().trim().min(1).max(500).optional(),
     unit: z.string().trim().max(60).nullable().optional(),
+    /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). */
+    kind: z.enum(KEY_RESULT_KINDS).optional(),
+    /**
+     * A milestone done, or a baseline recorded; false undoes it. Refused for
+     * a metric or a maintain key result, which reads its number instead.
+     */
+    done: z.boolean().optional(),
     direction: z.enum(KEY_RESULT_DIRECTIONS).optional(),
     indicatorType: z.enum(INDICATOR_TYPES).optional(),
     baselineValue: z.number().optional(),
     targetValue: z.number().optional(),
+    /**
+     * Why an eased target was eased (P9-T06b). Needed only when the new
+     * target is closer to the baseline and the workspace asks for a reason.
+     */
+    targetReason: targetReason.optional(),
     dueOn: localDate.nullable().optional(),
     ownerId: z.uuid().nullable().optional(),
     weight: z.number().optional(),
@@ -1989,7 +2295,11 @@ export const updateKeyResult = defineWriteAction({
         context.actor.userId,
       );
       const [owner] = await tx
-        .select({ goalId: keyResults.goalId })
+        .select({
+          goalId: keyResults.goalId,
+          kind: keyResults.kind,
+          doneAt: keyResults.doneAt,
+        })
         .from(keyResults)
         .where(
           activeOnly(
@@ -2009,6 +2319,18 @@ export const updateKeyResult = defineWriteAction({
         owner.goalId,
         ACCESS_LEVELS.edit,
       );
+      if (input.kind !== undefined && input.kind !== owner.kind) {
+        await requirePolicy(
+          tx,
+          { workspaceId, bulk: context.bulk },
+          { kind: "keyResult.kind", keyResultKind: input.kind },
+        );
+      }
+      const doneAt = doneAtFor(
+        input.kind ?? owner.kind,
+        owner.doneAt,
+        input.done,
+      );
       if (input.ownerId) {
         await requireActiveMember(
           tx,
@@ -2025,6 +2347,12 @@ export const updateKeyResult = defineWriteAction({
       if (input.unit !== undefined) {
         patch.unit = input.unit?.trim() || null;
       }
+      if (input.kind !== undefined) {
+        patch.kind = input.kind;
+      }
+      if (doneAt !== owner.doneAt) {
+        patch.doneAt = doneAt;
+      }
       if (input.direction !== undefined) {
         patch.direction = input.direction;
       }
@@ -2033,9 +2361,6 @@ export const updateKeyResult = defineWriteAction({
       }
       if (input.baselineValue !== undefined) {
         patch.baselineValue = String(input.baselineValue);
-      }
-      if (input.targetValue !== undefined) {
-        patch.targetValue = String(input.targetValue);
       }
       if (input.dueOn !== undefined) {
         patch.dueOn = input.dueOn;
@@ -2063,6 +2388,19 @@ export const updateKeyResult = defineWriteAction({
             eq(keyResults.id, input.id),
           ),
         );
+      // After the rest, so an easing is judged against the baseline this
+      // same call may have just set.
+      if (input.targetValue !== undefined) {
+        await changeTargetInTx(tx, {
+          workspaceId,
+          keyResultId: input.id,
+          to: input.targetValue,
+          reason: input.targetReason ?? null,
+          actorMemberId: memberId,
+          ...(context.bulk === undefined ? {} : { bulk: context.bulk }),
+        });
+        patch.targetValue = String(input.targetValue);
+      }
 
       await recompute(tx, workspaceId, owner.goalId);
       // Editing a key result changes its own verdicts and the set's.
@@ -2094,6 +2432,7 @@ export const updateKeyResult = defineWriteAction({
 
 export const recordKeyResultValue = defineWriteAction({
   name: "goals.recordValue",
+  // openokr:policy-exempt: a value is a fact about the world recorded against a key result, which no practice setting may refuse.
   summary: "Moves a key result's value and records the movement as history.",
   input: z.object({
     id: z.uuid(),
@@ -2163,6 +2502,7 @@ export const recordKeyResultValue = defineWriteAction({
 
 export const removeKeyResult = defineWriteAction({
   name: "goals.removeKeyResult",
+  // openokr:policy-exempt: removing a key result is a change to an objective that exists, which stays open under every setting (METHOD.md §2.9); access decides who may, at full.
   summary:
     "Removes one key result from its goal, which is not the same as closing the goal.",
   input: z.object({ id: z.uuid() }),
@@ -2240,8 +2580,9 @@ export const removeKeyResult = defineWriteAction({
           subjectType: "goal",
           subjectId: owner.goalId,
           // The title travels, because the feed entry has to read as a sentence
-          // after the row it names is gone.
-          payload: { title: owner.title },
+          // after the row it names is gone. The id travels so deleted items
+          // can say who removed it (P9-T06b).
+          payload: { title: owner.title, keyResultId: input.id },
         },
         audit: {
           action: "goals.removeKeyResult",
@@ -2264,6 +2605,7 @@ export const removeKeyResult = defineWriteAction({
  */
 export const linkKeyResultKpi = defineWriteAction({
   name: "goals.linkKpi",
+  // openokr:policy-exempt: linking a KPI changes where a key result reads its value from, which stays open under every setting (METHOD.md §2.9).
   summary:
     "Links a KPI to a key result, which from then on reads its value and progress from it.",
   input: z.object({ id: z.uuid(), kpiId: z.uuid() }),
@@ -2353,6 +2695,7 @@ export const linkKeyResultKpi = defineWriteAction({
 
 export const unlinkKeyResultKpi = defineWriteAction({
   name: "goals.unlinkKpi",
+  // openokr:policy-exempt: unlinking a KPI changes where a key result reads its value from, which stays open under every setting (METHOD.md §2.9).
   summary: "Unlinks a KPI, keeping the value it last reported as a manual one.",
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
@@ -2440,6 +2783,7 @@ export const unlinkKeyResultKpi = defineWriteAction({
  */
 export const deleteGoal = defineWriteAction({
   name: "goals.delete",
+  // openokr:policy-exempt: deleting is governed by access and is undone from deleted items; no practice setting decides it (design §2.5).
   summary:
     "Removes a goal and its key results, which is not the same as closing one.",
   input: z.object({ id: z.uuid() }),
@@ -2549,6 +2893,7 @@ export const deleteGoal = defineWriteAction({
  */
 export const restoreGoal = defineWriteAction({
   name: "goals.restore",
+  // openokr:policy-exempt: restoring undoes a delete, and no setting may stop data coming back (design §2.5).
   summary:
     "Brings back a deleted goal and the key results that were deleted with it.",
   input: z.object({ id: z.uuid() }),
@@ -2706,6 +3051,7 @@ export const rewriteKeyResult = defineReadAction({
             indicatorType: keyResults.indicatorType,
             direction: keyResults.direction,
             confidence: keyResults.confidence,
+            keyResultKind: keyResults.kind,
           })
           .from(keyResults)
           .where(
@@ -2721,7 +3067,7 @@ export const rewriteKeyResult = defineReadAction({
         }
 
         const [goal] = await tx
-          .select({ title: goals.title })
+          .select({ title: goals.title, kind: goals.kind })
           .from(goals)
           .where(activeOnly(goals, eq(goals.id, row.goalId)))
           .limit(1);
@@ -2742,12 +3088,16 @@ export const rewriteKeyResult = defineReadAction({
         const asInput = (text: string): KeyResultInput => ({
           text,
           baseline: Number(row.baselineValue),
-          target: Number(row.targetValue),
+          target: row.targetValue === null ? null : Number(row.targetValue),
           dueOn: row.dueOn,
           ownerId: row.ownerId,
           indicatorType: row.indicatorType,
           direction: row.direction,
           confidence: row.confidence === null ? null : Number(row.confidence),
+          // KR-6 judges only aspirational key results (P9-T11b-b).
+          ...(goal ? { kind: goal.kind } : {}),
+          // KR-2, KR-3 and KR-7 judge by its own kind (P9-T12b).
+          keyResultKind: row.keyResultKind,
         });
 
         const failingBefore = new Set(

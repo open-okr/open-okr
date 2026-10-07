@@ -25,13 +25,14 @@ import {
   callAction,
   excerptRichText,
   OperationError,
-  REVIEW_ASSIST_KEYS,
 } from "@openokr/core";
 import {
   canonThresholds,
   REVIEW_STAGE_KEYS,
   type ResolvedThresholds,
+  ROOT_CAUSE_OTHER,
   ROOT_CAUSES,
+  reviewStageKeysFor,
   reviewStages,
   WEEKLY_STAGE_KEYS,
   WEEKLY_STEPS,
@@ -41,7 +42,6 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
-import { assistOffered } from "../../../lib/assists";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
@@ -67,13 +67,17 @@ import { type Forward, ForwardPanel } from "./forward";
 import { type ManagementRetro, ManagementRetroPanel } from "./management-retro";
 import {
   type DecisionSubject,
+  type MonthlyAddition,
   type MonthlyDecision,
   type MonthlyDependency,
   MonthlyReview,
+  type MonthlyStop,
   type MonthlyTrend,
   type MonthlyUntrended,
+  type MonthlyUpdate,
 } from "./monthly-review";
 import { type Narratives, NarrativesPanel } from "./narratives";
+import { type LowScore, NextActionPanel } from "./next-actions.tsx";
 import { type ProcessHealth, ProcessHealthPanel } from "./process-health";
 import { QuarterlyReview } from "./quarterly-review";
 import { type Recognition, RecognitionPanel } from "./recognition";
@@ -130,6 +134,10 @@ export default async function SessionPage({ params }: SessionPageProps) {
     elapsed: Record<string, number>;
     addedMinutes: Record<string, number>;
     notes: Record<string, unknown>;
+    /** The week's wins a weekly session named (P9-T19a-d-c). */
+    wins: string[];
+    /** Which half of a review held apart this is, or null (P9-T20b-a). */
+    reviewPart: "review" | "retrospective" | null;
   };
 
   try {
@@ -208,15 +216,21 @@ export default async function SessionPage({ params }: SessionPageProps) {
       keyResultTitle: string | null;
       ownerName: string;
       nextAction: string;
+      dueOn: string;
       hoursOpen: number;
       overdue: boolean;
       resolved: boolean;
     }>;
     owners: Array<{ id: string; label: string }>;
     keyResults: Array<{ id: string; label: string }>;
+    /** What dropped or is low, with each one's next action (P9-T19a-b). */
+    scores: LowScore[];
   } | null = null;
   if (sessionRow.kind === "weekly" && sessionRow.stageKey === "diagnose") {
     const raised = await callAction(context, "sessions.blockerStatus", {
+      sessionId: id,
+    });
+    const lowScores = await callAction(context, "sessions.lowScores", {
       sessionId: id,
     });
     const cycleGoals =
@@ -247,9 +261,28 @@ export default async function SessionPage({ params }: SessionPageProps) {
         ownerName:
           names.get(blocker.ownerId) ?? "Someone no longer in this session",
         nextAction: blocker.nextAction,
+        dueOn: blocker.dueOn,
         hoursOpen: blocker.hoursOpen,
         overdue: blocker.overdue,
         resolved: blocker.resolvedAt !== null,
+      })),
+      scores: lowScores.map((score) => ({
+        keyResultId: score.keyResultId,
+        title: score.title,
+        confidence: score.confidence,
+        previousConfidence: score.previousConfidence,
+        low: score.low,
+        dropped: score.dropped,
+        nextAction: score.nextAction
+          ? {
+              text: score.nextAction.text,
+              ownerName:
+                names.get(score.nextAction.ownerId) ??
+                "Someone no longer in this session",
+              dueOn: score.nextAction.dueOn,
+            }
+          : null,
+        blocked: score.blocked,
       })),
       owners: participants.map((one) => ({
         id: one.memberId,
@@ -406,10 +439,17 @@ export default async function SessionPage({ params }: SessionPageProps) {
 
   // §8.1's eleven stages with the durations §11 gives this workspace, so a
   // workspace that tuned its agenda is paced by its own numbers.
+  // A review held apart walks its own half (§8, P9-T20b-a): the review
+  // stages 1 to 4, the retrospective 5 to 11.
+  const reviewKeys = reviewStageKeysFor(sessionRow.reviewPart);
   const reviewAgenda = isQuarterly
     ? reviewStages(
         (await callAction(context, "rhythm.read", {}))
           .thresholds as unknown as Parameters<typeof reviewStages>[0],
+      ).filter((stage) =>
+        (reviewKeys as readonly string[]).includes(
+          REVIEW_STAGE_KEYS[stage.stage - 1] ?? "",
+        ),
       )
     : [];
 
@@ -420,6 +460,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
     shifts: string | null;
     trends: MonthlyTrend[];
     untrended: MonthlyUntrended[];
+    additions: MonthlyAddition[];
+    stops: MonthlyStop[];
+    updates: MonthlyUpdate[];
     dependencies: MonthlyDependency[];
     decisions: MonthlyDecision[];
   }
@@ -530,8 +573,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[6]) {
     const read = (await callAction(context, "sessions.rootCauses", {
       sessionId: id,
-    })) as Omit<RootCauses, "causes">;
-    rootCauses = { ...read, causes: ROOT_CAUSES };
+    })) as Omit<RootCauses, "causes" | "otherKey">;
+    rootCauses = { ...read, causes: ROOT_CAUSES, otherKey: ROOT_CAUSE_OTHER };
   }
 
   // Stage seven's second half: the diagnostic (METHOD.md §8.6, P4-T11c-a).
@@ -553,7 +596,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
     })) as Reset;
   }
 
-  // Stages ten and eleven: learnings, drafts, decisions and actions
+  // Stages ten and eleven: learnings, decisions and actions
   // (METHOD.md §8.9 and §8.1 stage 11, P4-T11c-b).
   //
   // One read for both, because the two halves are one flow: what we learned,
@@ -568,24 +611,25 @@ export default async function SessionPage({ params }: SessionPageProps) {
       sessionId: id,
     })) as Forward;
   }
-  // Next-cycle drafts proposed from what the room carried (M-09). Asked only
-  // on the stage that shows the drafts, and only when a provider may write
-  // them; the panel then also needs a carried learning before it offers.
-  const forwardAssistAvailable =
-    forward !== null &&
-    (await assistOffered(
-      workspace.workspaceId,
-      REVIEW_ASSIST_KEYS.proposeObjectives,
-      "balanced",
-      session.user.id,
-    ));
 
   // Stage eight: the process-health survey (METHOD.md §8.5, P4-T11b).
   let processHealth: ProcessHealth | null = null;
+  // Who can own the improvement action the lowest statement becomes (§8.5,
+  // P9-T20d): the same people stage 11 offers for any action.
+  let improvementOwners: Array<{ id: string; label: string }> = [];
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[7]) {
     processHealth = (await callAction(context, "sessions.processHealth", {
       sessionId: id,
     })) as ProcessHealth;
+    const candidates = (
+      (await callAction(context, "sessions.forward", { sessionId: id })) as {
+        owners: Array<{ memberId: string; name: string }>;
+      }
+    ).owners;
+    improvementOwners = candidates.map((one) => ({
+      id: one.memberId,
+      label: one.name,
+    }));
   }
 
   if (isMonthly) {
@@ -634,7 +678,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
     sessionRow.kind === "weekly"
       ? WEEKLY_STAGE_KEYS
       : isQuarterly
-        ? REVIEW_STAGE_KEYS
+        ? reviewKeys
         : [];
   const currentStageIndex = sessionRow.stageKey
     ? stageKeys.indexOf(sessionRow.stageKey)
@@ -791,6 +835,15 @@ export default async function SessionPage({ params }: SessionPageProps) {
       )}
 
       {isRunning && diagnoseStage && (
+        <NextActionPanel
+          sessionId={id}
+          scores={diagnoseStage.scores}
+          owners={diagnoseStage.owners}
+          canWrite={isFacilitator}
+        />
+      )}
+
+      {isRunning && diagnoseStage && (
         <BlockerPanel
           sessionId={id}
           blockers={diagnoseStage.blockers}
@@ -822,6 +875,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
             keyResults={commitmentStage.keyResults}
             low={commitmentStage.low}
             high={commitmentStage.high}
+            wins={sessionRow.wins}
             canWrite={isFacilitator}
           />
         )}
@@ -868,7 +922,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
             reset !== null ||
             forward !== null
           }
-          stageKeys={REVIEW_STAGE_KEYS}
+          stageKeys={reviewKeys}
           currentStageKey={sessionRow.stageKey}
           stageStartedAt={sessionRow.stageStartedAt}
           elapsed={sessionRow.elapsed}
@@ -983,12 +1037,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
 
       {/* Stages ten and eleven (METHOD.md §8.9, §8.1 stage 11, P4-T11c-b) */}
       {forward ? (
-        <ForwardPanel
-          sessionId={id}
-          forward={forward}
-          canEdit={isRunning}
-          assistAvailable={forwardAssistAvailable}
-        />
+        <ForwardPanel sessionId={id} forward={forward} canEdit={isRunning} />
       ) : null}
 
       {/* Stage eight: process health (METHOD.md §8.5, P4-T11b) */}
@@ -997,6 +1046,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           sessionId={id}
           health={processHealth}
           canAnswer={isRunning}
+          owners={improvementOwners}
         />
       ) : null}
 
@@ -1007,6 +1057,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           shifts={monthly.shifts}
           trends={monthly.trends}
           untrended={monthly.untrended}
+          additions={monthly.additions}
+          stops={monthly.stops}
+          updates={monthly.updates}
           dependencies={monthly.dependencies}
           decisions={monthly.decisions}
           subjects={decisionSubjects}

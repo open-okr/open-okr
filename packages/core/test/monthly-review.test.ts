@@ -86,6 +86,13 @@ beforeEach(async () => {
   };
   cycleId = current.id;
 
+  // The absolute signal, so the key result that has not moved reads red on
+  // whatever day the suite runs. The pace-aware default (METHOD.md §3.7,
+  // P9-T15a) reads a young quarter as on pace, which is its point.
+  await call("practice.update", {
+    overrides: { "progress.signal": "absolute" },
+  });
+
   const goal = (await call("goals.create", {
     title: "Become the platform mid-market teams reach for first",
     cycleId,
@@ -199,6 +206,25 @@ describe("sessions.setTrend", () => {
     expect(record.trends[0]?.signal).toBe("red");
   });
 
+  it("reads the signal against the date by default, so a quarter one week old is not red for being young (P9-T15a)", async () => {
+    // Back to the default, and the quarter placed one week in: nothing has
+    // moved, and a week in nothing is expected to have much.
+    await call("practice.update", {
+      overrides: { "progress.signal": null },
+    });
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update cycles set starts_on = current_date - 7, ends_on = current_date + 84
+        where id = $1`,
+      [cycleId],
+    );
+    await call("sessions.setTrend", { sessionId, goalId, trend: "flat" });
+    const record = (await call("sessions.monthlyRecord", { sessionId })) as {
+      trends: { signal: string | null }[];
+    };
+    expect(record.trends[0]?.signal).toBe("green");
+  });
+
   it("does not ask for a trend on a closed objective", async () => {
     // A review asks where the work is going, and a finished objective is not
     // going anywhere. Leaving it in would mean a facilitator answering the
@@ -287,6 +313,37 @@ describe("sessions.recordDecision", () => {
     expect(record.decisions).toHaveLength(1);
     expect(record.decisions[0]?.id).toBe(decision.id);
     expect(record.decisions[0]?.keyResultId).toBe(keyResultId);
+  });
+});
+
+describe("a decision's date (P9-T22c-b-b)", () => {
+  it("is the day the review sat, when it is recorded after", async () => {
+    // A review held on 2 March and written up a week later: its decision
+    // belongs to 2 March, as the session's own record does.
+    const past = (await call("sessions.create", {
+      spaceId,
+      cycleId,
+      kind: "monthly",
+      title: "February monthly review",
+      scheduledFor: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+      facilitatorId: facilitatorMemberId,
+    })) as { id: string };
+    await call("sessions.open", { id: past.id });
+    await call("sessions.recordDecision", {
+      sessionId: past.id,
+      keyResultId,
+      text: "Hold the hiring plan until the April numbers are in",
+    });
+    const decisions = (await call("decisions.forGoal", { goalId })) as {
+      text: string;
+      at: string;
+    }[];
+    const recorded = decisions.find((one) =>
+      one.text.startsWith("Hold the hiring"),
+    );
+    expect(recorded?.at.slice(0, 10)).toBe(
+      new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10),
+    );
   });
 });
 
@@ -445,6 +502,117 @@ describe("decisions.forCycle", () => {
       id: string;
     }[];
     expect(decisions).toHaveLength(2);
+  });
+});
+
+describe("continue, update, start or stop (METHOD.md §7.5, P9-T19a-d-d)", () => {
+  interface Moves {
+    stops: { goalId: string; goalTitle: string; reason: string | null }[];
+    updates: {
+      keyResultId: string;
+      from: number;
+      to: number;
+      eased: boolean;
+      reason: string | null;
+    }[];
+    untrended: { goalId: string }[];
+  }
+
+  it("names a stop made from the review, with its reason, and asks no trend of it (acceptance)", async () => {
+    const reason = "The partner programme it served was cancelled in March";
+    await call("goals.stop", { id: goalId, reason });
+
+    // §2.9: "Closed as abandoned with a one-line reason".
+    const wb = await workerDb();
+    const closed = await wb.admin.query<{
+      success_status: string;
+      close_decision: string;
+      close_reason: string;
+    }>(
+      "select success_status, close_decision, close_reason from goals where id = $1",
+      [goalId],
+    );
+    expect(closed.rows[0]).toEqual({
+      success_status: "abandoned",
+      close_decision: "abandon",
+      close_reason: reason,
+    });
+
+    const record = (await call("sessions.monthlyRecord", {
+      sessionId,
+    })) as Moves;
+    expect(record.stops).toEqual([
+      {
+        goalId,
+        goalTitle: "Become the platform mid-market teams reach for first",
+        reason,
+        stoppedAt: expect.any(String),
+      },
+    ]);
+    expect(record.untrended.map((entry) => entry.goalId)).not.toContain(goalId);
+  });
+
+  it("drops a stop that was reopened, because there is no longer a close to show", async () => {
+    await call("goals.stop", { id: goalId, reason: "No longer matters" });
+    await call("goals.reopen", { id: goalId });
+    const record = (await call("sessions.monthlyRecord", {
+      sessionId,
+    })) as Moves;
+    expect(record.stops).toEqual([]);
+  });
+
+  it("does not read a close at the end of the work as a stop", async () => {
+    await call("goals.close", {
+      id: goalId,
+      successStatus: "achieved",
+      closeDecision: "keep",
+      retrospectiveBody: {
+        type: "doc" as const,
+        content: [
+          {
+            type: "paragraph" as const,
+            content: [{ type: "text" as const, text: "Delivered." }],
+          },
+        ],
+      },
+    });
+    const record = (await call("sessions.monthlyRecord", {
+      sessionId,
+    })) as Moves;
+    expect(record.stops).toEqual([]);
+  });
+
+  it("names a target updated once the plan was published, and not one changed while it was written", async () => {
+    // Before publication: the plan being written, not a move.
+    await call("goals.changeTarget", { id: keyResultId, targetValue: 320 });
+
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update cycles set published_at = now() where id = $1",
+      [cycleId],
+    );
+    await call("goals.changeTarget", {
+      id: keyResultId,
+      targetValue: 250,
+      reason: "Two of the three launch partners pushed to next quarter",
+    });
+
+    const record = (await call("sessions.monthlyRecord", {
+      sessionId,
+    })) as Moves;
+    expect(record.updates).toEqual([
+      {
+        goalId,
+        goalTitle: "Become the platform mid-market teams reach for first",
+        keyResultId,
+        keyResultTitle: "Raise weekly active teams from 120 to 300 by 31 March",
+        from: 320,
+        to: 250,
+        eased: true,
+        reason: "Two of the three launch partners pushed to next quarter",
+        changedAt: expect.any(String),
+      },
+    ]);
   });
 });
 

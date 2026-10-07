@@ -141,7 +141,9 @@ describe("booking the whole cycle", () => {
       "2030-01-28",
       "2030-02-25",
     ]);
-    expect(of("quarterly").map((row) => row.on)).toEqual(["2030-03-25"]);
+    // About two weeks before 31 March (§8, P9-T20a): the Monday of the week
+    // around the 17th.
+    expect(of("quarterly").map((row) => row.on)).toEqual(["2030-03-18"]);
     // The first week has no Monday inside the cycle, so its Tuesday.
     expect(of("weekly")[0]?.on).toBe("2030-01-01");
     // 09:30 where the workspace is, not 09:30 UTC.

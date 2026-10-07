@@ -70,6 +70,8 @@ One screen replaces S-13, the goals explorer, and absorbs S-16, the alignment st
 | Summary line | Counts, average progress, at risk and outdated |
 | Filters | Champion, space, health, kind, added mid-cycle. Kept in the address |
 
+**As built at P9-T07a-b.** The cycle switcher is P8-G12's picker, whose links carried no cycle until this task: its template was built on the server from a constant exported by a client component, which reaches the server as a reference rather than a string, so both placeholders now live in a plain module. Mine keeps `mine=1`, which the filter assist has always written; My team and Company are `scope=team` and `scope=company`, and Company is the company level whatever the level chips say. Mine follows the tree's own meaning (champion, reviewer or key result owner); following has no data yet. The view toggle is P8-G12's display group, `display=diagram` rather than `view=diagram`, because `view` already meant the Tree display's ordering. The champion and space filters are selects that navigate; kind and added mid-cycle arrive with P9-T11 and P9-T13. The summary counts caution and off track as at risk. "+ New objective" is P8-G12's button; its restricted-writing panel is P9-T07b's. The list says `aria-busy` while any change is on its way to the server.
+
 ## 4. The list view
 
 ### 4.1 Rows
@@ -81,6 +83,8 @@ One screen replaces S-13, the goals explorer, and absorbs S-16, the alignment st
 | Ghost rows | "+ Add key result" under each objective; "+ Add objective" at the end |
 
 Aligned child objectives show indented under their parent when the scope holds both, with a toggle to flatten.
+
+**As built at P9-T07a-a**, as far as the data reaches today: the objective row has its title with the OBJ-1 and OBJ-2 chips while it is typed (the stored flags otherwise), the champion picker, the reviewer, the next check-in, progress and health; the key result row has its title with KR-2 and KR-5 chips, the owner picker and due date under it, the value cluster (current, target and unit, with the baseline under them), progress and confidence as x in 10. The kind chip and icon come with P9-T11 and P9-T12, the added-mid-cycle mark with P9-T13, the pace with P9-T15, the grip with P9-T07b.
 
 ### 4.2 Editing in place
 
@@ -101,6 +105,10 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 | Milestone done | Checkbox | `goals.patchKeyResult {doneAt}` | |
 | Confidence | 0 to 10 stepper, shown as "x in 10" | Recorded with the next check-in, or as a quick confidence update | |
 
+**As built at P9-T11b-a, the kind.** A chip-coloured select rather than a two-state toggle, so the keyboard and a screen reader meet a named control ("Kind of …"). Choosing the other kind opens one line beside it asking why; Enter or Save sends it **with or without an answer**, because METHOD.md §2.8 asks for the change to be visible rather than justified, and Escape keeps the kind it had. The same control sits in the list's row, the drawer's details and the diagram card's header, where the question floats over the card because the layout has fixed its height. **Where the workspace uses one kind there is no chip, no picker and no filter**: every objective is that kind, and saying so on every row is noise. "+ New objective" and the cycle screen's drafting form offer the kind, starting at the workspace's default (D2); the list's add rows take the default and the chip changes it after. A closed objective shows its kind and does not offer a change.
+
+**As built at P9-T12c-a, the key result's kind.** A select in the row's meta line, beside the owner, rather than the icon §4.1 sketched: four words a reader can choose from with the keyboard, where an icon would have been a fifth thing to learn. The value cluster is the kind's question: a metric keeps value, target, unit and "from"; a maintain the same with "Band" for "from"; a milestone a done checkbox and nothing else; a baseline one field, "Record the baseline", empty until a value is recorded and then the value it found. The drawer's details and the diagram card's row follow the same rule, and both check-in composers tick a milestone instead of asking for a number. A key result added from the list is a metric, and its kind changes in the row; a kind the workspace has turned off is not offered, unless the key result already is one.
+
 ### 4.3 Adding
 
 - **No placeholder records.** "+ Add key result" inserts a client-side draft row with the cursor in its title.
@@ -111,14 +119,20 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 - **"+ Add objective"** does the same at the objective level, in the scope and cycle on screen, with the reader as champion and the kind defaulting per the workspace (decision D2). It opens with one empty key result draft row under it.
 - **Policy is asked on commit.** If the workspace has restricted writing, the server refuses with the reason. The draft row stays, showing the reason and the link that resolves it, so nothing typed is lost (UIUX-PLAN §1.7, "Never lose work").
 
+**As built at P9-T07b-a.** P8-G12's add rows already held a draft in the page and wrote on Enter; they now keep the typed title with the server's sentence on a refusal, and an objective just added opens one key result draft under it with the caret in it. A new key result is owned by the objective's champion and due on the cycle's last day; it is still a metric from 0 to 100 until P9-T12's kinds, and a key result saved without its target stays a draft only from P9-T13. Where writing is held back, "+ New objective" in the header and the add row at the foot of the list open the restricted-writing panel instead of a field: the policy's own sentences, read ahead of any write through `goals.creationPolicy`, with a link to the cycle where a phase or the window is the reason and to the practice for an administrator. The topbar's `+ New` links to the OKRs screen with "+ New objective" already open, and is not offered to a reader who cannot write.
+
 ### 4.4 Moving, deleting, checking in
 
 | Action | How |
 |---|---|
 | Reorder | Drag by the grip, within the same parent. The keyboard alternative is Alt+↑ and Alt+↓. The whole order is saved, never just the visible rows |
-| Delete a key result | More menu, then delete, with the six-second undo toast. A soft delete through `goals.deleteKeyResult`, restorable from deleted items |
-| Stop an objective | More menu, then stop, with a one-line reason. It closes as abandoned (§2.9 of the method) |
+| Delete a key result | More menu, then delete, with the six-second undo toast. A soft delete through `goals.removeKeyResult`, which P8-G12 built, restorable from deleted items (P9-T06b). One removal rather than a second action beside it |
+| Stop an objective | More menu, then stop, with a one-line reason. It closes as abandoned (§2.9 of the method). **As built at P9-T13-c-a**, the row has no more menu, so Stop sits with its open, check-in and delete controls, revealed on hover and reachable by keyboard, and asks the reason in place |
 | Check in | The row's check-in action opens the drawer on its check-in tab |
+
+**As built at P9-T07b-b.** Reordering is `goals.place` and `goals.placeKeyResult`: one row put after another, or first, and the whole set renumbered on the server in one statement, which is how a row a filter hides keeps its place: the screen names only the new neighbour, never the order it can see. Alt and an arrow anywhere in a row move it, and the keyboard goes back to the row's grip after each move so the next press needs no hunting; the grip also drags onto another row of the same set, landing above or below it by which half it is dropped on. Deleting an objective joined the cache: the row goes at once and the toast offers Undo for six seconds, which restores it through `goals.restore`. **Stopping moved to P9-T13**, which builds the stop as a close-abandoned with a reason; the list's control comes with it.
+
+**As built at P9-T08b.** The objective row's check-in action opens the drawer on its check-in tab, for somebody who may change the objective while it is open. The row's open control stays a link to the goal page (P9-T08a), and only a plain click opens the drawer.
 
 ### 4.5 States
 
@@ -127,8 +141,8 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 | Loading | Skeleton rows at the final layout |
 | Empty cycle | One sentence and the "+ Add objective" row. The phase checklist link only where phases are guided or binding |
 | Empty filter | "Nothing matches" with a clear-filters action |
-| Error | The row keeps the typed value, shows the server's sentence beneath it, and offers retry |
-| Read-only reader | No pencils, no ghost rows, no grips. Values are plain text |
+| Error | The row keeps the typed value, shows the server's sentence beneath it, and offers retry. **As built at P9-T07a-a:** the cell goes back to the stored value, and a line under the row reads "Not saved:" with the server's sentence, Retry (which sends the typed value again, as it was) and Discard. The typed value lives in that retry rather than in the cell, because a cell holding a value the server refused would read as saved |
+| Read-only reader | No pencils, no ghost rows, no grips. Values are plain text. **As built at P9-T07a-a:** every cell renders as text rather than a disabled control, and the champion picker is text for anybody below `full`, which naming a champion asks |
 | Stale write | The server refuses with the current value; the cell shows "Changed by Mei a moment ago" with the two values and keep-mine or take-theirs |
 
 ## 5. The diagram view
@@ -138,6 +152,8 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 **React Flow (`@xyflow/react`, MIT) with `@dagrejs/dagre` (MIT) for layout.** That is the same pairing FlowyLMS shipped with Vue Flow, so the layout code is proven.
 
 The two are new runtime dependencies, so this needs Akmal's approval (decision D1 in the companion document). Both are bundled at build time, so the air-gapped install is unaffected. The alternative is extending the hand-built `/goals/studio` canvas, which has pan, zoom and keyboard traversal but no drag-to-connect, minimap or node editing; about three tasks of work to reach the same place.
+
+**As built at P9-T09a: React Flow, and no dagre.** Alignment gives every objective one parent, so the picture is a forest: the cycle, and every parent from another cycle as a root of its own. A tidy tree laid out depth first in the list's own order puts siblings exactly where the list does and cannot cross an edge. dagre reorders siblings to reduce crossings, and its order would then have to be undone, which is the §5.2 "Order" step. So the layout is `apps/web/app/goals/okr-layout.ts`, a pure function with its own tests. dagre was approved and is not installed.
 
 ### 5.2 Layout
 
@@ -166,6 +182,10 @@ The two are new runtime dependencies, so this needs Akmal's approval (decision D
 - **Edges.** Alignment edges are solid. Dependencies are dashed and can be switched off.
 - **Collapse.** Objectives collapse one at a time, or all at once. Beyond the node budget (§7) the tree opens collapsed below company level.
 
+**As built at P9-T09a.** Cards are one width, and a row is as tall as its tallest card. A collapsed card folds its key results and says how many objectives it hides ("+9 below"). Dependencies are dashed and off until asked for. A parent from another cycle is a read-only card in the top row, and its title opens it in its own cycle with the drawer, because this cycle's cache does not hold it. A card opens the drawer; editing on the card is P9-T10's. The filters narrow the diagram as they narrow the list, and an objective whose parent a filter hides hangs from the cycle. Every line is named in words ("X aligns to Y"), and React Flow's own texts (its controls, minimap and keyboard description) are given in the reader's language, the last one saying what the arrow keys do here, which is follow lines rather than move cards. The studio's panel moves in at P9-T09b.
+
+**As built at P9-T09b.** The studio is the diagram. Its health and review tabs are a panel beside the canvas, a finding's objective opening in the drawer when this cycle holds it and in its own cycle otherwise; its link mode is on the toolbar (press one objective, then the one it depends on; Escape stops), saving at once and switching the dependencies on so the new line is seen; and its details tab is the drawer, whose alignment tab now removes a dependency too, which the studio's details panel used to answer (completeness review M-35). `/goals/studio` redirects to the diagram, keeping the cycle, and the cycle gates, the goal page's rail and the Work Map link straight to the diagram. The goals section's one remaining tab went with it.
+
 ### 5.3 Editing on the diagram
 
 | Action | How | Saved through |
@@ -180,6 +200,10 @@ The two are new runtime dependencies, so this needs Akmal's approval (decision D
 | Everything else | Click the node to open the shared drawer | |
 
 The studio's right-hand panel survives as a side panel of the diagram: alignment health with its gaps, and the coach's semantic findings with apply or dismiss.
+
+**As built at P9-T10a.** A card's title is edited with Enter on the focused card or with the small pencil beside it, rather than a double-click, which is two presses that each open the drawer; Space opens the drawer. A key result's value and target are typed into its row, and an eased target asks why in that same row. "+ KR" and "+ aligned" sit at the foot of an open card and draft in place, writing nothing before Enter; a new aligned objective takes the level below its parent where the cycle uses one, else its parent's own. The live verdict chips are the list's and the drawer's, not the card's, which has no room for them. Every card reads one memoised context rather than copies in its node data, and a folded card carries no add buttons: the footer on thirty folded cards cost about 150 ms on arrival, measured, and leaving it off kept three hundred objectives level with P9-T09b (947 and 1,035 ms against 923 and 932, run the same way). Re-parenting and sideways reordering are P9-T10b's.
+
+**As built at P9-T10b.** Each card has a small move handle at its top left. Dragged and let go over another card, a key result's row, a card in the annual band or the cycle, it re-parents the objective there; the drop is read from what is under the pointer, so anywhere on a card counts and a key result's row is told apart from its card. The line moves at once from the cache, the write is `goals.update`, which keeps the one-parent rule and refuses a loop, and a toast offers Undo for six seconds; an undo offers no undo of its own. The keyboard's way is "Move under…" at the foot of an open card: a list of every place the card may hang (the cycle, each objective and each key result, never itself or what already hangs below it), saved the moment one is chosen. A card dragged sideways is drawn where the pointer has it and, let go, takes the place its centre is in among its siblings, through the list's own `goals.place`; Alt with the left or right arrow does the same from the keyboard, as Alt with an arrow moves a row in the list. A refusal shows above the canvas with the server's sentence.
 
 ### 5.4 Accessibility
 
@@ -199,13 +223,13 @@ The flaw FlowyLMS has, two views drifting apart, is avoided by having one source
 
 | Piece | Design |
 |---|---|
-| Read | `goals.tree(cycleId, scope)` returns objectives, key results, alignment and dependencies in one call, shaped for both views, with every parent from another cycle as read-only context |
-| Cache | TanStack Query, already in the locked stack and installed. The key is `["okr-tree", cycleId, scope]`; both views read the same entry |
-| Write | Every mutation goes through one `useOkrMutation` hook: patch the cache at once, call the server action, on refusal roll back and show the server's sentence, on success merge the server's recomputed progress, health and verdicts |
+| Read | `goals.tree(cycleId, scope)` returns objectives, key results, alignment and dependencies in one call, shaped for both views, with every parent from another cycle as read-only context. **As built at P9-T06a:** a parent the scope left out of this cycle is context too, marked `otherCycle: false`; a parent the reader cannot see is left out, and the child still names it. "Mine" is what the reader champions, reviews or owns a key result under; following an objective has no data yet, so it is not part of the scope |
+| Cache | TanStack Query, already in the locked stack and installed. The key is `["okr-tree", cycleId, scope]`; both views read the same entry. **As built at P9-T06c:** read through a server action (`lib/okr-tree/actions.ts`), seeded by the server's own render so the first paint costs no second request, and kept in memory only: the provider persists every other query to local storage, and a workspace's plans with names in them should not outlive a sign-out on a shared machine. P8-G12's table is the first reader; the diagram still draws the server's render of the same tree until P9-T09 moves it onto the cache |
+| Write | Every mutation goes through one `useOkrMutation` hook: patch the cache at once, call the server action, on refusal roll back and show the server's sentence, on success merge the server's recomputed progress, health and verdicts. **As built at P9-T06c:** the server action takes six writes by name and no others (patch, patch a key result, a value, a target, remove and restore a key result); a write that returns no node, a value or a removal, re-reads the tree instead; a conflict rolls back and offers keep-mine, which sends the change again made from the stored values, or take-theirs, which re-reads. Adding a row and deleting an objective still re-render the page, because the header's count and the alignment score are the server's |
 | Undo | Deletes, stops, re-parents and reorders push an undo entry for six seconds (UIUX-PLAN §4) |
-| Concurrency | Every `goals.patch*` carries the token from the read; a stale write is refused with the current value (§4.5) |
-| Live updates | The existing realtime port invalidates the tree key when another member changes the same cycle |
-| Drawer | Reads and writes through the same cache, so a change in the drawer shows in the row and the node the moment it saves |
+| Concurrency | Every `goals.patch*` carries the token from the read; a stale write is refused with the current value (§4.5). **As built at P9-T06a, the token is the values read**: each patch sends `read` beside `set`, field by field, and is refused as a `conflict` (409) with `details.current`, `changedBy` and `changedAt` when a field it changes has moved. A revision column would need every write path to bump it, and `updated_at` moves with every roll-up, so a title edit would fail over a value somebody recorded. Comparing values conflicts only on the fields that moved |
+| Live updates | The existing realtime port invalidates the tree key when another member changes the same cycle. **As built at P9-T06c:** the workspace feed's stream does it, coalesced over 1.5 seconds as `FeedLive` coalesces it, because there is no channel per cycle. That stream deliberately never pings a member about their own write, so another tab of the same browser is told over a `BroadcastChannel` instead |
+| Drawer | Reads and writes through the same cache, so a change in the drawer shows in the row and the node the moment it saves. **As built at P9-T08a:** a Base UI dialog that is not modal, beside the list rather than over it, so the list stays usable. It lives in the address as `okr`, `tab` (details, history, alignment) and `kr`, changed through the history API so opening it renders nothing again on the server; a link naming an objective in another cycle opens that cycle. The cells are the list's own, and what each sends is written once in `okr-editing.ts` for both. History and Alignment come from one server action over four reads the registry already had (`goals.checkIns`, `goals.keyResultHistory`, `goals.targetHistory`, `goals.relations`), kept in memory under `["okr-detail", goalId, keyResultIds]` and read again after every write. Escape in a field puts the field back; Escape anywhere else closes the drawer. Kind waits for P9-T11 and re-parenting for P9-T10. **The check-in tab came at P9-T08b**: the composer's own fields held in the drawer until Publish, sent through `goals.publishDraftedCheckIn` so nothing is written before then, with only the values and confidences that moved; the status starts at the last check-in's, because health follows the latest status (METHOD §3.5), and with no check-in yet the reader chooses |
 
 ## 7. Performance
 
@@ -215,7 +239,9 @@ The flaw FlowyLMS has, two views drifting apart, is avoided by having one source
 | Inline commit to visible change | Immediate (optimistic); server confirmation within the §13.1 write budget | The cache patch happens before the request |
 | Diagram, 300 objectives | Interactive in under a second on the reference machine | React Flow renders only visible nodes; the tree opens collapsed below company level past 150 objectives |
 
-The P9-T09 task measures the diagram on the `pnpm db:seed:large` dataset and records the numbers, as P7-T01b did for the other screens.
+P9-T09a measures the diagram on the `pnpm db:seed:large` dataset and records the numbers, as P7-T01b did for the other screens.
+
+**Measured at P9-T09a.** Three hundred objectives in one cycle (thirty company objectives with nine aligned below each) opened collapsed below company level and answered a press **891 ms** after navigation, on the development machine against the standalone production build. `e2e/s13e-okr-diagram.spec.ts` repeats it on every run and prints the number, with a 15-second ceiling for whatever machine runs it. It was measured with the end-to-end dataset rather than `pnpm db:seed:large`: what this budget covers is the browser's work, laying out and drawing one cycle, and the server's read of a cycle's tree is TECHNICAL-PLAN §13.1's own row for the OKR tree, which `pnpm perf:budgets` measures on the large dataset. Only the cards on screen are drawn, which is what keeps a wide tree quick.
 
 ## 8. UIUX-PLAN and mockup changes, made with the tasks
 
@@ -224,10 +250,10 @@ The P9-T09 task measures the diagram on the `pnpm db:seed:large` dataset and rec
 | §3 shell | Sidebar regrouped per Agung's §3.1; "Goals" renamed "OKRs"; `+ New` in the topbar opens "+ New objective" | P9-T07a, P9-T07b |
 | S-13 | Rewritten as the OKRs screen, list view (§3 and §4 here) | P9-T07a |
 | S-14 goal detail | "+ Add key result" row; targets editable with the reason rule; the confidence control actually saved | P9-T08 |
-| S-16 | Becomes the OKRs screen's diagram view (§5) | P9-T09, P9-T10 |
+| S-16 | Becomes the OKRs screen's diagram view (§5) | P9-T09b, P9-T10 |
 | S-36 | A practice card group: profile and settings | P9-T05 |
 | Mockups 12 and 12b | Redrawn: no closed state by default; the restricted state shown only as the governed profile's | P9-T07b |
-| Mockup 05 | Redrawn as the diagram view with key result stacks | P9-T09 |
+| Mockup 05 | Redrawn as the diagram view with key result stacks | P9-T09b |
 
 ## 9. Acceptance criteria
 
@@ -250,9 +276,14 @@ Full text in IMPLEMENTATION-PLAN.md, Phase 9.
 
 | Task | Title | Delivers |
 |---|---|---|
-| P9-T06 | One tree, one cache | `goals.tree`, `goals.patch`, `goals.patchKeyResult`, `goals.changeTarget` (with history), `goals.deleteKeyResult`, the concurrency token, the TanStack Query cache and `useOkrMutation` with rollback and undo |
+| P9-T06a | One tree, and one-field writes that refuse a stale read | `goals.tree`, `goals.patch`, `goals.patchKeyResult`, the read values as the concurrency token, the `conflict` refusal |
+| P9-T06b | Target changes with their reason, and a key result removed and restored | `goals.changeTarget` (with history), the reason rule on every target write, a removed key result restorable from deleted items |
+| P9-T06c | The client cache and `useOkrMutation` | The TanStack Query cache, `useOkrMutation` with rollback, conflict and undo, live invalidation |
 | P9-T07a | The OKRs list, edited in place | §3, §4.1, §4.2, §4.5; sidebar regroup and rename; S-13 rewrite |
 | P9-T07b | Adding and reordering in the list | §4.3, §4.4; "+ New objective"; mockups 12 and 12b |
-| P9-T08 | The OKR drawer and the goal page | The shared drawer with edit, check-in, history and target changes; S-14's add-key-result row; the confidence control wired |
-| P9-T09 | The diagram view | React Flow and dagre, layout, nodes with key result stacks, toggle, collapse, the studio panel, keyboard, the performance measurement |
-| P9-T10 | Editing on the diagram | §5.3: in-place edits, + KR, + aligned, re-parent by drag with undo, sibling reorder |
+| P9-T08a | The OKR drawer | The shared drawer with edit, history and target changes, alignment, in the address |
+| P9-T08b | Checking in from the drawer, and the goal page | The drawer's check-in tab; S-14's add-key-result row; the confidence control wired |
+| P9-T09a | The diagram on the cache | React Flow and dagre, layout, nodes with key result stacks, toggle, collapse, keyboard, the context band, the performance measurement |
+| P9-T09b | The studio moves into the diagram | The studio's health and findings panel, the redirect, S-16 and mockup 05 |
+| P9-T10a | Editing and adding on the diagram | §5.3: in-place edits on the card, + KR and + aligned drafts |
+| P9-T10b | Moving on the diagram | §5.3: re-parent by drag and by keyboard with undo, sibling reorder |

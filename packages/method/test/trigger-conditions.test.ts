@@ -3,6 +3,7 @@ import { canonThresholds } from "../src/thresholds.ts";
 import {
   closeIsSandbagged,
   commitmentDueToday,
+  committedBelowFloor,
   confidenceIsCritical,
   draftIsSandbagged,
   objectivesOverCap,
@@ -19,6 +20,38 @@ describe("confidence.critical", () => {
     expect(confidenceIsCritical(0.1, thresholds)).toBe(true);
     expect(confidenceIsCritical(0.31, thresholds)).toBe(false);
     expect(confidenceIsCritical(null, thresholds)).toBe(false);
+  });
+});
+
+describe("quality.committed_floor (METHOD.md §3.2, P9-T11b-c)", () => {
+  it("fires on a committed key result below the floor, never on an aspirational one", () => {
+    expect(
+      committedBelowFloor(
+        [
+          { confidence: 0.9, kind: "committed" },
+          { confidence: 0.4, kind: "committed" },
+        ],
+        thresholds,
+      ),
+    ).toBe(true);
+    expect(
+      committedBelowFloor(
+        [{ confidence: 0.4, kind: "aspirational" }],
+        thresholds,
+      ),
+    ).toBe(false);
+  });
+
+  it("is quiet at the floor and on a key result nobody has given a confidence", () => {
+    expect(
+      committedBelowFloor([{ confidence: 0.7, kind: "committed" }], thresholds),
+    ).toBe(false);
+    expect(
+      committedBelowFloor(
+        [{ confidence: null, kind: "committed" }],
+        thresholds,
+      ),
+    ).toBe(false);
   });
 });
 
@@ -50,6 +83,27 @@ describe("streak.at_risk", () => {
     expect(streakAtRisk({ ...base, lastSessionOn: "2026-10-06" })).toBe(false);
     // Already broken: the last one was two weeks ago.
     expect(streakAtRisk({ ...base, lastSessionOn: "2026-09-24" })).toBe(false);
+  });
+  it("is quiet in a holiday week, and reads the week before a holiday as the last one (P9-T19b-a)", () => {
+    const holiday = [{ startsOn: "2026-10-05", endsOn: "2026-10-11" }];
+    // The Friday of the holiday itself: nothing can break.
+    expect(streakAtRisk({ ...base, holidays: holiday })).toBe(false);
+    // The Friday after it, with the last session the week before it.
+    expect(
+      streakAtRisk({
+        ...base,
+        today: "2026-10-16",
+        lastSessionOn: "2026-10-01",
+        holidays: holiday,
+      }),
+    ).toBe(true);
+    expect(
+      streakAtRisk({
+        ...base,
+        today: "2026-10-16",
+        lastSessionOn: "2026-10-01",
+      }),
+    ).toBe(false);
   });
 });
 
@@ -86,11 +140,65 @@ describe("quality.too_many_objectives", () => {
 });
 
 describe("the two sandbagging checks", () => {
-  it("fire above their §11 lines and ignore unanswered ones", () => {
-    expect(draftIsSandbagged([0.95, 0.92, null], thresholds)).toBe(true);
-    expect(draftIsSandbagged([0.9, 0.9], thresholds)).toBe(false);
-    expect(draftIsSandbagged([null], thresholds)).toBe(false);
-    expect(closeIsSandbagged([0.9, 0.95], thresholds)).toBe(true);
-    expect(closeIsSandbagged([0.7, 0.8], thresholds)).toBe(false);
+  const aspirational = (confidence: number | null) => ({
+    confidence,
+    kind: "aspirational" as const,
+  });
+  const committed = (confidence: number | null) => ({
+    confidence,
+    kind: "committed" as const,
+  });
+
+  it("fire above their §11 lines on aspirational key results and ignore unanswered ones", () => {
+    expect(
+      draftIsSandbagged(
+        [aspirational(0.95), aspirational(0.92), aspirational(null)],
+        thresholds,
+      ),
+    ).toBe(true);
+    expect(
+      draftIsSandbagged([aspirational(0.9), aspirational(0.9)], thresholds),
+    ).toBe(false);
+    expect(draftIsSandbagged([aspirational(null)], thresholds)).toBe(false);
+  });
+
+  it("leave committed key results out, where high confidence is right (P9-T11a)", () => {
+    expect(draftIsSandbagged([committed(0.95), committed(1)], thresholds)).toBe(
+      false,
+    );
+    expect(
+      draftIsSandbagged([committed(0.95), aspirational(0.5)], thresholds),
+    ).toBe(false);
+  });
+
+  it("at the close, three quarters or more of the aspirational key results at 1.0 is the pattern", () => {
+    const score = (value: number, kind: "aspirational" | "committed") => ({
+      score: value,
+      kind,
+    });
+    expect(
+      closeIsSandbagged(
+        [
+          score(1, "aspirational"),
+          score(1, "aspirational"),
+          score(1, "aspirational"),
+          score(0.6, "aspirational"),
+        ],
+        thresholds,
+      ),
+    ).toBe(true);
+    expect(
+      closeIsSandbagged(
+        [score(1, "aspirational"), score(0.7, "aspirational")],
+        thresholds,
+      ),
+    ).toBe(false);
+    // A row of commitments met is the point of them.
+    expect(
+      closeIsSandbagged(
+        [score(1, "committed"), score(1, "committed")],
+        thresholds,
+      ),
+    ).toBe(false);
   });
 });

@@ -21,6 +21,8 @@ import {
   checkIns,
   commitments,
   goals,
+  keyResultDependencies,
+  keyResults,
   kpis,
   okrSessions,
   proposedChanges,
@@ -66,6 +68,7 @@ const obligationSchema = z.object({
     "check_in",
     "acknowledgement",
     "blocker",
+    "dependency",
     "commitment",
     "session",
     "proposal",
@@ -440,6 +443,71 @@ export const reviewInbox = defineReadAction({
             daysPastDue: days,
             href: `/goals/${row.goalId}`,
             actionLabel: "Open the blocker",
+            subjectId: row.goalId,
+            checkInId: null,
+            proposal: null,
+          });
+        }
+
+        // Source 4b: dependencies escalated to this member as the cycle's
+        // sponsor (METHOD.md §5.4, P9-T16b-b), until the providing team
+        // confirms or somebody is named to carry the risk. No deadline is
+        // invented for the decision, so each one sits in today until it is
+        // made.
+        const escalatedToMe = await tx
+          .select({
+            id: keyResultDependencies.id,
+            keyResultTitle: keyResults.title,
+            goalId: keyResults.goalId,
+            goalTitle: goals.title,
+            providerSpaceName: spaces.name,
+            providerText: keyResultDependencies.providerText,
+            escalatedAt: keyResultDependencies.escalatedAt,
+          })
+          .from(keyResultDependencies)
+          .innerJoin(
+            keyResults,
+            eq(keyResults.id, keyResultDependencies.keyResultId),
+          )
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          .leftJoin(
+            spaces,
+            eq(spaces.id, keyResultDependencies.providerSpaceId),
+          )
+          .where(
+            and(
+              activeOnly(
+                keyResultDependencies,
+                eq(keyResultDependencies.workspaceId, context.workspaceId),
+                eq(keyResultDependencies.escalatedToId, memberId),
+                eq(keyResultDependencies.confirmed, false),
+                isNull(keyResultDependencies.riskOwnerId),
+              ),
+              isNull(keyResults.deletedAt),
+              isNull(goals.deletedAt),
+            ),
+          )
+          .orderBy(asc(keyResultDependencies.escalatedAt));
+
+        for (const row of escalatedToMe) {
+          if (
+            !(await canSeeGoal(tx, context.workspaceId, memberId, row.goalId))
+          ) {
+            continue;
+          }
+          const provider =
+            row.providerSpaceName ?? row.providerText ?? "another team";
+          obligations.push({
+            id: `dependency:${row.id}`,
+            kind: "dependency",
+            group: "today",
+            title: `Decide the dependency of "${row.keyResultTitle}" on ${provider}`,
+            meta: `Escalated to you as sponsor · ${row.goalTitle}`,
+            dueLabel: `Escalated ${dueLocalDate(row.escalatedAt, timeZone) ?? "today"}`,
+            dueOn: null,
+            daysPastDue: null,
+            href: "/cycle?phase=5",
+            actionLabel: "Open the register",
             subjectId: row.goalId,
             checkInId: null,
             proposal: null,

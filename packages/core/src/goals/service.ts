@@ -29,6 +29,7 @@ import {
   type CapacityVerdict,
   checkIns,
   type GoalCloseDecision,
+  type GoalKind,
   type GoalLevel,
   type GoalOwnerKind,
   type GoalSuccessStatus,
@@ -37,6 +38,7 @@ import {
   goals,
   type IndicatorType,
   type KeyResultDirection,
+  type KeyResultKind,
   keyResults,
   keyResultValues,
   newId,
@@ -88,11 +90,18 @@ export interface CreateGoalInput {
   readonly cycleId?: string | null;
   readonly timeframe?: GoalTimeframe | null;
   readonly level: GoalLevel;
+  /**
+   * Committed or aspirational (METHOD.md §2.8, P9-T11b-a). Left out, the
+   * column's default, aspirational: `goals.create` resolves the workspace's
+   * own default before it gets here.
+   */
+  readonly kind?: GoalKind;
   readonly ownerKind: GoalOwnerKind;
   readonly spaceId?: string | null;
   readonly memberId?: string | null;
   readonly championId: string;
-  readonly reviewerId: string;
+  /** Optional since P9-T04 (METHOD.md §2.5). */
+  readonly reviewerId: string | null;
   readonly parentGoalId?: string | null;
   readonly parentKeyResultId?: string | null;
   /** The §2.1 annual strategy this objective serves, or null (P6-G14b). */
@@ -102,6 +111,15 @@ export interface CreateGoalInput {
   /** True when a model wrote the words (P4-T15a). */
   readonly aiGenerated?: boolean;
   readonly position?: number;
+  /** When it was started mid-cycle (METHOD.md §2.9, P9-T13-a). */
+  readonly addedMidCycleAt?: Date | null;
+  /** Waiting for its owner, when the workspace starts additions so (P9-T13-b-b). */
+  readonly draftState?: "draft" | null;
+  /**
+   * The objective a kept or modified close pre-filled this one from
+   * (METHOD.md §8.9, P9-T20e-b). Absent for everything a person creates.
+   */
+  readonly carriedFromGoalId?: string | null;
   /**
    * The source-system identity, when an import created this row (P6-T01a).
    *
@@ -233,12 +251,14 @@ export async function createGoalInTx<
     input.championId,
     "champion",
   );
-  await requireActiveMember(
-    tx,
-    input.workspaceId,
-    input.reviewerId,
-    "reviewer",
-  );
+  if (input.reviewerId) {
+    await requireActiveMember(
+      tx,
+      input.workspaceId,
+      input.reviewerId,
+      "reviewer",
+    );
+  }
 
   // No loop check on create: a goal that does not exist yet cannot be its own
   // ancestor. `update` is where the walk matters, and it is where it runs.
@@ -266,6 +286,14 @@ export async function createGoalInTx<
       cycleId: input.cycleId ?? null,
       timeframe: input.timeframe ?? null,
       level: input.level,
+      ...(input.kind === undefined ? {} : { kind: input.kind }),
+      ...(input.addedMidCycleAt
+        ? { addedMidCycleAt: input.addedMidCycleAt }
+        : {}),
+      ...(input.draftState ? { draftState: input.draftState } : {}),
+      ...(input.carriedFromGoalId
+        ? { carriedFromGoalId: input.carriedFromGoalId }
+        : {}),
       ownerKind: input.ownerKind,
       spaceId,
       memberId: input.ownerKind === "member" ? (input.memberId ?? null) : null,
@@ -325,12 +353,14 @@ export async function createGoalInTx<
     memberId: input.championId,
     role: "champion",
   });
-  await bindRole(tx, {
-    workspaceId: input.workspaceId,
-    contextId,
-    memberId: input.reviewerId,
-    role: "reviewer",
-  });
+  if (input.reviewerId) {
+    await bindRole(tx, {
+      workspaceId: input.workspaceId,
+      contextId,
+      memberId: input.reviewerId,
+      role: "reviewer",
+    });
+  }
 
   // A goal that belongs to no space, a company or an individual goal, has no
   // space binding the built-in agents can see it through, so they are bound
@@ -388,8 +418,10 @@ export interface ReassignRoleInput {
   readonly goalId: string;
   readonly contextId: string;
   readonly role: GoalRole;
-  readonly fromMemberId: string;
-  readonly toMemberId: string;
+  /** Null when the goal had no reviewer (P9-T04). */
+  readonly fromMemberId: string | null;
+  /** Null takes the reviewer off; a champion is never null. */
+  readonly toMemberId: string | null;
 }
 
 /**
@@ -413,36 +445,46 @@ export async function reassignRoleInTx<
   if (input.fromMemberId === input.toMemberId) {
     return;
   }
-  await requireActiveMember(
-    tx,
-    input.workspaceId,
-    input.toMemberId,
-    input.role,
-  );
+  if (input.toMemberId === null && input.role === "champion") {
+    // A goal is never without a champion (§2.5), whatever the practice.
+    throw new Error("A champion cannot be removed, only moved.");
+  }
+  if (input.toMemberId) {
+    await requireActiveMember(
+      tx,
+      input.workspaceId,
+      input.toMemberId,
+      input.role,
+    );
+  }
 
-  const outgoingGroupId = await ensureMemberGroup(tx, {
-    workspaceId: input.workspaceId,
-    memberId: input.fromMemberId,
-  });
-  await unbindGroup(tx, {
-    workspaceId: input.workspaceId,
-    groupId: outgoingGroupId,
-    contextId: input.contextId,
-    tag: input.role,
-  });
-  await bindRole(tx, {
-    workspaceId: input.workspaceId,
-    contextId: input.contextId,
-    memberId: input.toMemberId,
-    role: input.role,
-  });
+  if (input.fromMemberId) {
+    const outgoingGroupId = await ensureMemberGroup(tx, {
+      workspaceId: input.workspaceId,
+      memberId: input.fromMemberId,
+    });
+    await unbindGroup(tx, {
+      workspaceId: input.workspaceId,
+      groupId: outgoingGroupId,
+      contextId: input.contextId,
+      tag: input.role,
+    });
+  }
+  if (input.toMemberId) {
+    await bindRole(tx, {
+      workspaceId: input.workspaceId,
+      contextId: input.contextId,
+      memberId: input.toMemberId,
+      role: input.role,
+    });
+  }
 
   // openokr:allow-mutation: the calling Operation's own transaction.
   await tx
     .update(goals)
     .set(
       input.role === "champion"
-        ? { championId: input.toMemberId, updatedAt: new Date() }
+        ? { championId: input.toMemberId as string, updatedAt: new Date() }
         : { reviewerId: input.toMemberId, updatedAt: new Date() },
     )
     .where(activeOnly(goals, eq(goals.id, input.goalId)));
@@ -450,7 +492,8 @@ export async function reassignRoleInTx<
   if (input.role === "reviewer") {
     // Step 4. A published check-in nobody has acknowledged is the only pending
     // obligation this role has today; blockers and commitments arrive at P3-T09
-    // and P4-T07 and will need their own line here.
+    // and P4-T07 and will need their own line here. Taking the reviewer off
+    // (P9-T04) takes the obligation with them: nobody owes it any more.
     // openokr:allow-mutation: the calling Operation's own transaction.
     await tx
       .update(checkIns)
@@ -610,10 +653,19 @@ export interface CreateKeyResultInput {
   readonly goalId: string;
   readonly title: string;
   readonly unit?: string | null;
+  /**
+   * Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). Left
+   * out, the column's default, metric.
+   */
+  readonly kind?: KeyResultKind;
   readonly direction: KeyResultDirection;
   readonly indicatorType: IndicatorType;
   readonly baselineValue: number;
-  readonly targetValue: number;
+  /**
+   * Null when nobody knows it yet (P9-T13-b-a): the key result fails KR-3
+   * until it is set, and reads no progress.
+   */
+  readonly targetValue: number | null;
   readonly currentValue?: number;
   readonly dueOn?: string | null;
   readonly ownerId?: string | null;
@@ -621,6 +673,8 @@ export interface CreateKeyResultInput {
   readonly kpiId?: string | null;
   readonly capacity?: CapacityVerdict | null;
   readonly authorMemberId?: string | null;
+  /** When it was started mid-cycle (METHOD.md §2.9, P9-T13-a). */
+  readonly addedMidCycleAt?: Date | null;
   /** The source-system identity, when an import created this row (P6-T01a). */
   readonly legacy?: LegacyKey;
 }
@@ -673,10 +727,15 @@ export async function createKeyResultInTx<
       goalId: input.goalId,
       title,
       unit: input.unit?.trim() || null,
+      ...(input.kind === undefined ? {} : { kind: input.kind }),
+      ...(input.addedMidCycleAt
+        ? { addedMidCycleAt: input.addedMidCycleAt }
+        : {}),
       direction: input.direction,
       indicatorType: input.indicatorType,
       baselineValue: String(input.baselineValue),
-      targetValue: String(input.targetValue),
+      targetValue:
+        input.targetValue === null ? null : String(input.targetValue),
       currentValue: String(current),
       dueOn: input.dueOn ?? null,
       ownerId: input.ownerId ?? null,
@@ -725,12 +784,23 @@ export interface RecordValueInput {
  * A KPI-linked key result refuses a manual value (§5.3): the value has one
  * source of truth, and letting somebody type over it would make the link a
  * suggestion.
+ *
+ * **A baseline key result is recorded by its first value** (METHOD.md §2.10,
+ * P9-T12b): the number nobody measured is now measured, so it becomes the
+ * baseline as well as the current value, and the key result is done. A later
+ * value moves the current value only; the baseline stays what was first
+ * found.
  */
 export async function recordValueInTx<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(tx: AnyTx<TSchema>, input: RecordValueInput): Promise<void> {
   const [keyResult] = await tx
-    .select({ id: keyResults.id, kpiId: keyResults.kpiId })
+    .select({
+      id: keyResults.id,
+      kpiId: keyResults.kpiId,
+      kind: keyResults.kind,
+      doneAt: keyResults.doneAt,
+    })
     .from(keyResults)
     .where(
       activeOnly(
@@ -764,10 +834,17 @@ export async function recordValueInTx<
     note: input.note?.trim() || null,
   });
 
+  const firstBaseline = keyResult.kind === "baseline" && !keyResult.doneAt;
   // openokr:allow-mutation: the calling Operation's own transaction.
   await tx
     .update(keyResults)
-    .set({ currentValue: String(input.value), updatedAt: now })
+    .set({
+      currentValue: String(input.value),
+      ...(firstBaseline
+        ? { baselineValue: String(input.value), doneAt: now }
+        : {}),
+      updatedAt: now,
+    })
     .where(activeOnly(keyResults, eq(keyResults.id, input.keyResultId)));
 }
 
@@ -893,4 +970,35 @@ export async function unlinkKpiInTx<
     source: "manual",
     note: "KPI unlinked. The value the KPI last reported is kept as a manual one",
   });
+}
+
+/**
+ * When a key result is done, after a write (METHOD.md §2.10, P9-T12b).
+ *
+ * Only a milestone or a baseline is ever done. Changing a key result to a
+ * metric or a maintain clears it, because those read their number. A done
+ * asked of one of them is refused, rather than stored where nothing reads it.
+ * Marking done again keeps the first moment, which is when it happened.
+ */
+export function doneAtFor(
+  kind: KeyResultKind,
+  stored: Date | null,
+  done: boolean | undefined,
+  /**
+   * When it was done: the check-in's own moment where a check-in marks it,
+   * so an imported one keeps its date (P9-T22c-b-b).
+   */
+  now: Date = new Date(),
+): Date | null {
+  const doneable = kind === "milestone" || kind === "baseline";
+  if (done === true && !doneable) {
+    throw new OperationError(
+      "forbidden",
+      "Only a milestone or a baseline key result is marked done. A metric or a maintain key result reads its number instead.",
+    );
+  }
+  if (!doneable || done === false) {
+    return null;
+  }
+  return done === true ? (stored ?? now) : stored;
 }

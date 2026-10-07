@@ -24,7 +24,8 @@ export interface WorkMapStats {
   readonly outdatedGoals: number;
   /** METHOD §5.4's alignment health, out of a hundred. Null before it is computable. */
   readonly alignmentScore: number | null;
-  readonly alignmentThreshold: number;
+  /** §5.2's reading of the share, which is what colours it. */
+  readonly alignmentBand: "healthy" | "watch" | "gap" | null;
 }
 
 export interface WorkMapContext {
@@ -256,14 +257,16 @@ export async function WorkMapHeader({
           unit={
             stats.alignmentScore === null
               ? t("workMapHeader.notScoredYet")
-              : "/100"
+              : "%"
           }
           tone={
-            stats.alignmentScore === null
+            stats.alignmentBand === null
               ? undefined
-              : stats.alignmentScore >= stats.alignmentThreshold
+              : stats.alignmentBand === "healthy"
                 ? "ok"
-                : "warn"
+                : stats.alignmentBand === "watch"
+                  ? "warn"
+                  : "bad"
           }
         />
       </div>

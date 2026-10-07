@@ -37,8 +37,23 @@ describe("planning the whole cycle", () => {
     expect(of("monthly")).toEqual(["2026-10-26", "2026-11-30"]);
   });
 
-  it("books the quarterly review on the last chosen weekday of the cycle", () => {
-    expect(of("quarterly")).toEqual(["2026-12-28"]);
+  it("books the quarterly review about two weeks before the cycle ends (P9-T20a)", () => {
+    // §8: "held about two weeks before the cycle ends", the §11 review
+    // preparation lead. Its week runs 14 to 20 December, around the 17th,
+    // and its Monday is the 14th: time to act on what it decides.
+    expect(of("quarterly")).toEqual(["2026-12-14"]);
+  });
+
+  it("books it at the lead a workspace chose", () => {
+    const oneWeek = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [],
+      reviewLeadWeeks: 1,
+    });
+    expect(
+      oneWeek.filter((row) => row.kind === "quarterly").map((row) => row.on),
+    ).toEqual(["2026-12-21"]);
   });
 
   it("reads as booked, and a second run books nothing", () => {
@@ -92,7 +107,7 @@ describe("reading whether a cycle is booked", () => {
     expect(coverage.missing).toEqual([
       "No weekly check-in is booked in 14 week(s): the weeks from 2026-10-01, 2026-10-05, 2026-10-12 and 11 more",
       "No monthly review is booked in 3 month(s): 2026-10, 2026-11, 2026-12",
-      "No quarterly review is booked at cycle close, between 2026-12-25 and 2027-01-07",
+      "No quarterly review is booked for the cycle's close, between 2026-12-14 and 2027-01-07",
     ]);
   });
 
@@ -136,5 +151,196 @@ describe("reading whether a cycle is booked", () => {
       { kind: "weekly", on: "2026-09-30" },
     ]);
     expect(coverage.booked).toBe(false);
+  });
+});
+
+/**
+ * §7.1 since METHOD v2 (P9-T19a-d-b): "Every two weeks and monthly are valid
+ * check-in frequencies. The streak and the escalation ladders follow
+ * whichever is chosen." Booking follows it too.
+ */
+describe("a space at its own frequency", () => {
+  it("books one check-in a fortnight for a space on every two weeks", () => {
+    const plan = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [],
+      frequency: "biweekly",
+    });
+    const weekly = plan.filter((row) => row.kind === "weekly");
+    // The streak's fortnights, from a fixed Monday: the cycle starts in the
+    // last days of one (21 September to 4 October), and ends in the first of
+    // another, so eight are touched.
+    expect(weekly).toHaveLength(8);
+    expect(weekly.map((row) => row.on).slice(0, 3)).toEqual([
+      "2026-10-01",
+      "2026-10-05",
+      "2026-10-19",
+    ]);
+    expect(cadenceCoverage(Q4, plan, { frequency: "biweekly" })).toEqual({
+      booked: true,
+      missing: [],
+    });
+    // The same plan read weekly is short of every week between.
+    expect(cadenceCoverage(Q4, plan, { frequency: "weekly" }).booked).toBe(
+      false,
+    );
+  });
+
+  it("books one check-in a month for a monthly space, and names a missing month", () => {
+    const plan = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [],
+      frequency: "monthly",
+    });
+    expect(plan.filter((row) => row.kind === "weekly")).toHaveLength(3);
+    const withoutNovember = plan.filter(
+      (row) => !(row.kind === "weekly" && row.on.startsWith("2026-11")),
+    );
+    expect(
+      cadenceCoverage(Q4, withoutNovember, { frequency: "monthly" }).missing,
+    ).toContain(
+      "No check-in is booked in 1 month(s): the periods from 2026-11-01",
+    );
+  });
+});
+
+/**
+ * No check-in is due in a holiday period, so none is booked there and none is
+ * missing (P9-T19b-a). The week of Monday 9 November is the holiday.
+ */
+describe("a holiday in the booking", () => {
+  const NOVEMBER = [{ startsOn: "2026-11-09", endsOn: "2026-11-15" }] as const;
+
+  it("books no check-in in the holiday week", () => {
+    const plan = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [],
+      holidays: NOVEMBER,
+    });
+    const weekly = plan.filter((ritual) => ritual.kind === "weekly");
+    expect(weekly.map((ritual) => ritual.on)).not.toContain("2026-11-09");
+    expect(weekly.map((ritual) => ritual.on)).toContain("2026-11-16");
+    expect(
+      cadenceCoverage(Q4, plan, { frequency: "weekly", holidays: NOVEMBER }),
+    ).toEqual({
+      booked: true,
+      missing: [],
+    });
+    // Without the holiday, the same plan has a week missing.
+    expect(cadenceCoverage(Q4, plan).booked).toBe(false);
+  });
+});
+
+/**
+ * §8: "A workspace may split it into a review session and a separate
+ * retrospective" (P9-T20b-a, NW-Q2-18).
+ */
+describe("the review and the retrospective apart", () => {
+  const split = planCycleCadence(Q4, {
+    weekday: 1,
+    from: Q4.startsOn,
+    existing: [],
+    reviewFormat: "split",
+  });
+  const reviews = split.filter((ritual) => ritual.kind === "quarterly");
+
+  it("books the review, and the retrospective two working days later", () => {
+    expect(reviews).toEqual([
+      { kind: "quarterly", on: "2026-12-14", part: "review" },
+      { kind: "quarterly", on: "2026-12-16", part: "retrospective" },
+    ]);
+    expect(cadenceCoverage(Q4, split, { reviewFormat: "split" })).toEqual({
+      booked: true,
+      missing: [],
+    });
+  });
+
+  it("names a missing retrospective on its own", () => {
+    const withoutRetro = split.filter(
+      (ritual) => ritual.part !== "retrospective",
+    );
+    expect(
+      cadenceCoverage(Q4, withoutRetro, { reviewFormat: "split" }).missing,
+    ).toEqual([
+      "No retrospective is booked after the review, between 2026-12-14 and 2027-01-07",
+    ]);
+  });
+
+  it("books only the retrospective beside a review already booked", () => {
+    const more = planCycleCadence(Q4, {
+      weekday: 1,
+      from: Q4.startsOn,
+      existing: [{ kind: "quarterly", on: "2026-12-15", part: "review" }],
+      reviewFormat: "split",
+    });
+    expect(more.filter((ritual) => ritual.kind === "quarterly")).toEqual([
+      { kind: "quarterly", on: "2026-12-17", part: "retrospective" },
+    ]);
+  });
+
+  it("counts a whole review as both halves", () => {
+    expect(
+      cadenceCoverage(
+        Q4,
+        [
+          ...split.filter((ritual) => !ritual.part),
+          { kind: "quarterly", on: "2026-12-14" },
+        ],
+        {
+          reviewFormat: "split",
+        },
+      ).missing,
+    ).toEqual([]);
+  });
+});
+
+/**
+ * §8: "An annual cycle closes with the same review over its annual OKRs,
+ * held before any of the next year's drafting" (P9-T20b-b, NW-Q4-06). The
+ * next year's Phase 4 opens three weeks before it starts, §2.4's own row:
+ * 11 December 2027 for 2028.
+ */
+describe("the annual review", () => {
+  const YEAR = { startsOn: "2027-01-01", endsOn: "2027-12-31" } as const;
+  const plan = planCycleCadence(YEAR, {
+    weekday: 3,
+    from: YEAR.startsOn,
+    existing: [],
+    cycleMode: "annual",
+  });
+
+  it("books the closing review the week before the next year's drafting, and nothing else (acceptance)", () => {
+    expect(plan).toEqual([{ kind: "quarterly", on: "2027-12-08" }]);
+    expect(cadenceCoverage(YEAR, plan, { cycleMode: "annual" })).toEqual({
+      booked: true,
+      missing: [],
+    });
+  });
+
+  it("does not count a review held after the drafting opened", () => {
+    expect(
+      cadenceCoverage(YEAR, [{ kind: "quarterly", on: "2027-12-15" }], {
+        cycleMode: "annual",
+      }).missing,
+    ).toEqual([
+      "No annual review is booked before the next year's drafting opens, between 2027-11-13 and 2027-12-10",
+    ]);
+  });
+
+  it("splits the same way a quarter's does", () => {
+    const split = planCycleCadence(YEAR, {
+      weekday: 3,
+      from: YEAR.startsOn,
+      existing: [],
+      cycleMode: "annual",
+      reviewFormat: "split",
+    });
+    expect(split).toEqual([
+      { kind: "quarterly", on: "2027-12-08", part: "review" },
+      { kind: "quarterly", on: "2027-12-10", part: "retrospective" },
+    ]);
   });
 });

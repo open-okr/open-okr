@@ -25,9 +25,9 @@ seven accounts by invitation, so the seeder does exactly that and nothing else.
 | Each one a member with edit access, joined through a real workspace invitation that is revoked afterwards | Titles and managers (M06) |
 | Addresses as plus-addresses on one inbox, `qa+priya@example.com` and so on | Spaces (M07), goals, KPIs, sessions and everything after |
 
-The full demo seed (`pnpm db:seed`) is **not** used here. It fills in the
-objectives, KPIs and sessions the workbook exists to test, and a tester who
-finds them already there tests nothing.
+The demo seed (`pnpm db:seed`, which builds the Northwind year) is **not**
+used here. It fills in the objectives, KPIs and sessions the workbook exists
+to test, and a tester who finds them already there tests nothing.
 
 ## Before you start
 

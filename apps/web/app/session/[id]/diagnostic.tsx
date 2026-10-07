@@ -5,7 +5,10 @@
  * METHOD.md §8.6, P4-T11c-a).
  *
  * §8.6 calls this the most valuable output of the review. Two numbers in, one
- * verdict and one prescription out.
+ * verdict and one prescription out: the cycle score over the aspirational key
+ * results, and since P9-T20d the rhythm measured from the check-ins that fell
+ * due, with process-health statements 2 and 5 beside it as the cross-check.
+ * A diagnostic read before then kept the survey's rhythm, and shows it.
  *
  * **Every word of it comes from `packages/method`.** The verdict, the diagnosis
  * and the prescription are `rhythmDiagnostic`'s, and the two thresholds it reads
@@ -31,6 +34,13 @@ import { narrateDiagnosticAction, recordDiagnosticAction } from "./actions";
 
 export interface Diagnostic {
   readonly cycleScore: number | null;
+  /** §3.4's committed half: the share of committed key results met. */
+  readonly committedMet: number | null;
+  /** The measured rhythm, and the counts it comes from (P9-T20d). */
+  readonly onTimeShare: number | null;
+  readonly dueCheckIns: number | null;
+  readonly onTimeCheckIns: number | null;
+  /** Process-health statements 2 and 5: the cross-check. */
   readonly rhythmScore: number | null;
   readonly verdict: string | null;
   readonly diagnosis: string | null;
@@ -38,6 +48,9 @@ export interface Diagnostic {
   readonly recorded: boolean;
   readonly readable: boolean;
 }
+
+/** A share as a whole percentage, the way §11 states the threshold. */
+const percent = (share: number): string => `${Math.round(share * 100)}%`;
 
 const VERDICT_TONE: Record<string, "ok" | "warn" | "bad"> = {
   results_delivered: "ok",
@@ -128,13 +141,43 @@ export function DiagnosticPanel({
                   {diagnostic.cycleScore?.toFixed(2)}
                 </span>
               </span>
-              <span className="text-xs text-ink-3">
-                {t("session.detail.diagnostic.rhythm")}{" "}
-                <span className="font-bold tabular-nums text-ink">
-                  {diagnostic.rhythmScore?.toFixed(1)}
-                </span>{" "}
-                {t("common.of5")}
-              </span>
+              {diagnostic.committedMet === null ? null : (
+                <span className="text-xs text-ink-3">
+                  {t("session.detail.diagnostic.committedMet", {
+                    share: percent(diagnostic.committedMet),
+                  })}
+                </span>
+              )}
+              {diagnostic.onTimeShare !== null ? (
+                <span className="text-xs text-ink-3">
+                  {t("session.detail.diagnostic.onTime", {
+                    share: percent(diagnostic.onTimeShare),
+                    onTime: String(diagnostic.onTimeCheckIns ?? 0),
+                    due: String(diagnostic.dueCheckIns ?? 0),
+                  })}
+                </span>
+              ) : diagnostic.rhythmScore !== null ? (
+                // Read before the rhythm was measured: the survey's, as the
+                // room was told it.
+                <span className="text-xs text-ink-3">
+                  {t("session.detail.diagnostic.rhythm")}{" "}
+                  <span className="font-bold tabular-nums text-ink">
+                    {diagnostic.rhythmScore.toFixed(1)}
+                  </span>{" "}
+                  {t("common.of5")}
+                </span>
+              ) : null}
+            </p>
+            {diagnostic.onTimeShare !== null &&
+            diagnostic.rhythmScore !== null ? (
+              <p className="text-xs text-ink-4">
+                {t("session.detail.diagnostic.surveyCrossCheck", {
+                  score: diagnostic.rhythmScore.toFixed(1),
+                })}
+              </p>
+            ) : null}
+            <p className="text-xs text-ink-4">
+              {t("session.detail.diagnostic.aHypothesis")}
             </p>
             <p className="text-sm font-medium text-ink">
               {diagnostic.prescription}
@@ -176,10 +219,14 @@ export function DiagnosticPanel({
         ) : diagnostic.readable ? (
           <>
             <p className="text-sm text-ink-2">
-              {t("session.detail.diagnostic.bothNumbersAreInA", {
-                cycleScore: diagnostic.cycleScore?.toFixed(2) ?? "",
-                rhythmScore: diagnostic.rhythmScore?.toFixed(1) ?? "",
-              })}
+              {diagnostic.onTimeShare === null
+                ? t("session.detail.diagnostic.deliveredReady", {
+                    cycleScore: diagnostic.cycleScore?.toFixed(2) ?? "",
+                  })
+                : t("session.detail.diagnostic.numbersReady", {
+                    cycleScore: diagnostic.cycleScore?.toFixed(2) ?? "",
+                    share: percent(diagnostic.onTimeShare),
+                  })}
             </p>
             {canRead ? (
               <span>

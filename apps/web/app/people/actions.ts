@@ -220,3 +220,47 @@ export async function updateMemberFields(
     };
   }
 }
+
+/**
+ * A member's leave, written whole (METHOD.md §7.4, P9-T19b-b). A member's own
+ * goes through `people.setLeave`; an administrator's write for somebody else
+ * through `people.setMemberLeave`, which is the self-versus-others split the
+ * profile already has.
+ */
+export async function setLeaveAction(
+  memberId: string,
+  self: boolean,
+  leave: readonly {
+    readonly startsOn: string;
+    readonly endsOn: string;
+    readonly delegateId: string;
+  }[],
+): Promise<ProfileResult> {
+  const { t } = await getTranslations();
+  try {
+    const ctx = await actionContext();
+    const spans = leave.map((span) => ({
+      startsOn: span.startsOn,
+      endsOn: span.endsOn,
+      delegateId: span.delegateId,
+    }));
+    if (self) {
+      await callAction(ctx, "people.setLeave", { leave: spans });
+    } else {
+      await callAction(ctx, "people.setMemberLeave", {
+        memberId,
+        leave: spans,
+      });
+    }
+    revalidatePath(`/people/${memberId}`);
+    return { ok: true, message: t("people.detail.leave.saved") };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : t("people.actions.updateFailed"),
+    };
+  }
+}

@@ -130,6 +130,14 @@ export function buildReport(input: {
             `--only did not name ${input.addedForDependencies.join(", ")}, and this run imported ${input.addedForDependencies.length === 1 ? "it" : "them"} anyway, because what you asked for depends on ${input.addedForDependencies.length === 1 ? "it" : "them"}. A domain already imported is a no-op, so the cost is one pass over rows that were already there.`,
           ]
         : []),
+      // FlowyTeam has no kind of objective or of key result (P9-T12c-b,
+      // reference/flowyteam-okr-kpi-tasks-model.md): there is nothing to map,
+      // so the report says what everything took.
+      ...(input.selected?.includes("objectives")
+        ? [
+            "FlowyTeam does not say what kind of promise an objective is, or what kind a key result is. Every objective arrives as the workspace's default kind, aspirational unless it uses committed OKRs only, and every key result as a metric, or as a maintain where its baseline and target are the same number (METHOD.md §2.8, §2.10). Mark the commitments, milestones and baselines in the product.",
+          ]
+        : []),
       ...(input.extraNotes ?? []),
       ...(input.company.timezone
         ? [

@@ -492,23 +492,36 @@ describe("the ladder over a fortnight", () => {
         seen.push(Math.max(...steps));
       }
     }
-    // §11's ladder is 1, 2, 3, 4, 5 and every step is reached. A ladder that
-    // jumped from the champion to the sponsor would still look like it was
-    // escalating while skipping the two people who could have fixed it.
+    // §11's ladder is 1, 2, 3, 4 and every step is reached; it stops at the
+    // coordinator unless the workspace puts the sponsor in it (P9-T19a-c-a).
+    // A ladder that jumped from the champion to the coordinator would still
+    // look like it was escalating while skipping the reviewer.
     const distinct = [...new Set(seen)].sort((a, b) => a - b);
-    expect(distinct).toEqual([1, 2, 3, 4, 5]);
+    expect(distinct).toEqual([1, 2, 3, 4]);
     // Monotonic: it never goes backwards on a later day.
     expect([...seen].sort((a, b) => a - b)).toEqual(seen);
   });
 
-  it("reaches the sponsor, which needs the cycle rather than the space", async () => {
+  it("reaches the sponsor only where the workspace puts the sponsor in its ladders, through the cycle", async () => {
     const wb = await workerDb();
-    // §11's last step is the sponsor, and a space has no sponsor: the cycle
-    // does. Without this the ladder stopped one step short and said so.
+    // A space has no sponsor: the cycle does.
     await callAction({ pool: wb.appPool, ...context() }, "cycles.update", {
       id: cycleId,
       sponsorId: secondMemberId,
     });
+    // By default the ladder stops at the coordinator, and the sponsor sees
+    // stale goals in the weekly digest instead (§11, P9-T19a-c-a).
+    // (The sponsor here is also the goal's reviewer, so it is the step that
+    // tells them apart.)
+    await runAt(14);
+    expect((await rows()).some((row) => row.escalation_step === 5)).toBe(false);
+
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "escalation.sponsorInLadders": "on" },
+    });
+    await wb.admin.query("delete from nudges where workspace_id = $1", [
+      workspaceId,
+    ]);
     await runAt(14);
     const found = await rows();
     expect(found.some((row) => row.escalation_step === 5)).toBe(true);
@@ -663,6 +676,9 @@ describe("a simulated month", () => {
               count(*)::text as sent
        from nudges
        where workspace_id = $1 and sent_at is not null
+         -- The morning summary carries what the ceiling holds back and is
+         -- not counted against it (P9-T19a-c-b).
+         and rule_key <> 'digest.daily'
        group by recipient_member_id, date_trunc('week', scheduled_for)
        order by count(*) desc`,
       [workspaceId],
@@ -802,11 +818,8 @@ describe("the per-rule escalation ladder (P6-G21b)", () => {
       "checkin.overdue",
     ]);
     const blocker = owners.find((rule) => rule.key === "blocker.escalated");
-    expect(blocker?.ladder?.canon).toEqual({
-      owner: 20,
-      coordinator: 24,
-      sponsor: 48,
-    });
+    // One rung since P9-T19a-a: the reminder's days before the check-in.
+    expect(blocker?.ladder?.canon).toEqual({ reminder: 1 });
     // Null while the workspace is on the canon, which is what lets the screen
     // show §11's numbers as placeholders rather than as something typed.
     expect(blocker?.ladder?.own).toBeNull();
@@ -828,8 +841,8 @@ describe("the per-rule escalation ladder (P6-G21b)", () => {
     // of order fires its top rung first and never reaches the ones below it.
     await expect(
       set({
-        ruleKey: "blocker.escalated",
-        escalationLadder: { owner: 30, coordinator: 24, sponsor: 48 },
+        ruleKey: "checkin.overdue",
+        escalationLadder: { championRepeat: 8, coordinator: 7, sponsor: 14 },
       }),
     ).rejects.toThrow(/must come after/);
   });
@@ -837,8 +850,9 @@ describe("the per-rule escalation ladder (P6-G21b)", () => {
   it("refuses a shape §11 would not recognise", async () => {
     await expect(
       set({
+        // The hour ladder this rule held until P9-T19a-a.
         ruleKey: "blocker.escalated",
-        escalationLadder: { owner: 20, coordinator: 24 },
+        escalationLadder: { owner: 20, coordinator: 24, sponsor: 48 },
       }),
     ).rejects.toThrow(/§11 would recognise/);
   });
@@ -846,15 +860,11 @@ describe("the per-rule escalation ladder (P6-G21b)", () => {
   it("stores one, hands it back, and returns to the canon when emptied", async () => {
     await set({
       ruleKey: "blocker.escalated",
-      escalationLadder: { owner: 4, coordinator: 8, sponsor: 12 },
+      escalationLadder: { reminder: 2 },
     });
     const stored = await read();
     const rule = stored.rules.find((one) => one.key === "blocker.escalated");
-    expect(rule?.ladder?.own).toEqual({
-      owner: 4,
-      coordinator: 8,
-      sponsor: 12,
-    });
+    expect(rule?.ladder?.own).toEqual({ reminder: 2 });
     expect(rule?.configured).toBe(true);
 
     // A row kept only to hold a copy of §11's numbers would survive a change

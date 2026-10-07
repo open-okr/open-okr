@@ -38,7 +38,7 @@ Published 14 October.
 
 ## The quarter, in date order
 
-**NW-Q4-01 · 3 to 27 Sep · Leadership · S-04 to S-10 · METHOD v2 §2.4, §8.9 · P9-T19a, P9-T20, P9-T03**
+**NW-Q4-01 · 3 to 27 Sep · Leadership · S-04 to S-10 · METHOD v2 §2.4, §8.9 · P9-T19a, P9-T20, P9-T03b**
 Q4 planning opens four weeks ahead, on 3 September. Phase 2 follows Q3's retrospective on 16 September:
 - **C8.** CS2's deferred expansion work becomes C8, now first on the issue list.
 - **CS3.** C2 becomes the merged team's committed objective in Customer Success.
@@ -93,7 +93,7 @@ The aspirational annual key results average 0.77. Committed: 2 of 6 annual key r
 
 *Test:* Given four cycles scored, when the scorecard is exported, then the CSV has a row per cycle with its averages.
 
-**NW-Q4-08 · 9 to 17 Dec · Leadership · S-09 drafting, S-10 publish · METHOD v2 §2.4 · Today, P9-T03**
+**NW-Q4-08 · 9 to 17 Dec · Leadership · S-09 drafting, S-10 publish · METHOD v2 §2.4 · Today, P9-T03b**
 The 2028 annual objectives are drafted from the annual review's decisions and the new strategy, and published on 17 December. Phase 2 of the 2028 cycle lists 2027's scored annual key results as its prior-cycle scoring.
 *Test:* Given the 2027 annual review completed on 8 December, when the 2028 annual cycle's Phase 2 is evaluated, then the prior cycle reads as scored.
 
@@ -147,9 +147,9 @@ Several settings changed during the year:
 None of these changes moves an earlier column. Q2's committed column reads 5 of 5 because C2 changed kind openly on 12 May, and the scorecard says so beside it.
 *Test:* Given four closed cycles graded under different settings, when the scorecard renders, then each column matches that cycle's snapshot, and it shows the mid-cycle additions, eased targets and kind changes it counts.
 
-**NW-Q4-13 · 17 Dec · Elena · S-36 practice settings · METHOD v2 §2.7, §12 · P9-T05, plus gap G-3**
-Department objectives had mostly restated a team's or the company's, so two levels are enough. Elena turns the department level off for cycles starting in 2028. 2027's cycles keep the levels they were graded under. The setting is declared at P9-T01, but no task yet makes the screens read it (gap G-3).
-*Test (once G-3 is built):* Given the department level turned off, when a 2028 cycle is drafted, then department is not offered as a level, and 2027's department objectives stay readable as they were.
+**NW-Q4-13 · 17 Dec · Elena · S-36 practice settings · METHOD v2 §2.7, §12 · P9-T05, P9-T07a, P9-T16**
+Department objectives had mostly restated a team's or the company's, so two levels are enough. Elena turns the department level off. The change applies to cycles that start after it, so 2027's cycles keep the levels they began with.
+*Test:* Given the department level turned off, when a 2028 cycle is drafted, then department is not offered as a level, and 2027's department objectives stay readable as they were.
 
 **NW-Q4-14 · 20 to 22 Dec · Leadership · S-09 drafting · METHOD v2 §2.4, §8.9 · P9-T20**
 Q1 2028's company objectives are drafted from the kept objectives, including C5 and C8, and from the new annual frame. They publish on 22 December. Team objectives follow in the first two weeks of January, as they did a year earlier.

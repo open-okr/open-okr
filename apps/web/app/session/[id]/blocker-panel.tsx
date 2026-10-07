@@ -28,13 +28,12 @@ import { type CommitmentState, NO_ERROR } from "./commitment-state.ts";
  * weekly ritual unfinishable from the browser whenever anything was going
  * badly.
  *
- * **The clock is §7.2's twenty-four hours and it is not configurable.** §7.2
- * states it in words as part of the ritual, which is why `packages/method`
- * holds it as a constant rather than a §11 entry, and why the age chip turns
- * on `overdue`, which the read already decided, rather than on a number
- * compared here.
+ * **The clock is the next check-in** (§7.3, P9-T19a-a). A blocker's next
+ * action is due by the next check-in of the goal it blocks, which the read
+ * returns as a date, and the age chip turns on `overdue`, which the read
+ * already decided, rather than on a number compared here.
  *
- * **The taxonomy comes from the canon.** §6.2's five types are
+ * **The taxonomy comes from the canon.** §7.3's seven types are
  * `BLOCKER_TYPE_DEFINITIONS`, so a type added to METHOD.md appears in this select with no
  * change here.
  */
@@ -45,6 +44,8 @@ export interface SessionBlocker {
   readonly keyResultTitle: string | null;
   readonly ownerName: string;
   readonly nextAction: string;
+  /** The check-in the next action is due by, in the workspace calendar. */
+  readonly dueOn: string;
   readonly hoursOpen: number;
   readonly overdue: boolean;
   readonly resolved: boolean;
@@ -104,7 +105,14 @@ function OneBlocker({
               })}
         </Chip>
       </div>
-      <p className="text-xs text-ink-2">{blocker.nextAction}</p>
+      <p className="text-xs text-ink-2">
+        {blocker.nextAction}
+        {blocker.resolved || blocker.dueOn === "" ? null : (
+          <span className="ml-1.5 text-ink-3">
+            {t("session.detail.blockerPanel.dueBy", { date: blocker.dueOn })}
+          </span>
+        )}
+      </p>
 
       {blocker.resolved || !canWrite ? null : (
         <div className="flex flex-wrap items-center gap-2">

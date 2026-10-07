@@ -1,9 +1,13 @@
 /**
  * The key results template (P6-T01a).
  *
- * **The baseline and the target are required and the current value is not.** A
- * measure with no baseline has no progress to compute, and a measure with no
- * target is not a measure. The current value defaults to the baseline, which is
+ * **A metric or a maintain key result needs its direction, baseline and
+ * target; a milestone or a baseline needs none** (METHOD.md §2.10, P9-T12c-b).
+ * They are asked of each row by its kind rather than of the file, so a file
+ * of milestones needs no number columns at all. A file with no kind column
+ * writes metrics, or maintains where the direction says so, and the report
+ * says that is what happened. A measure with no baseline has no progress to
+ * compute, and a measure with no target is not a measure. The current value defaults to the baseline, which is
  * what a key result created in the product does, and the create records it as
  * the first point of history.
  *
@@ -12,7 +16,11 @@
  * second finds the first by the source system's own identifiers rather than by
  * matching titles.
  */
-import { INDICATOR_TYPES, KEY_RESULT_DIRECTIONS } from "@openokr/db";
+import {
+  INDICATOR_TYPES,
+  KEY_RESULT_DIRECTIONS,
+  KEY_RESULT_KINDS,
+} from "@openokr/db";
 import { asDay, asEnum, asNumber, asText } from "./coerce.ts";
 import type { EntityTemplate, PlanContext, RowPlan } from "./types.ts";
 
@@ -45,10 +53,19 @@ export const keyResultsTemplate: EntityTemplate = {
       example: "Teams that finish their first check-in in week one",
     },
     {
+      field: "kind",
+      describe: `One of: ${KEY_RESULT_KINDS.join(", ")} (METHOD.md §2.10). A metric if the file does not say, or a maintain where the direction says maintain.`,
+      aliases: ["kind", "keyResultKind", "measureKind"],
+      required: false,
+      example: "metric",
+      whenAbsent:
+        "This file has no kind column, so every key result arrives as a metric, or as a maintain where its direction says maintain.",
+    },
+    {
       field: "direction",
-      describe: `One of: ${KEY_RESULT_DIRECTIONS.join(", ")}.`,
+      describe: `One of: ${KEY_RESULT_DIRECTIONS.join(", ")}. Needed for a metric or a maintain.`,
       aliases: ["direction", "movement"],
-      required: true,
+      required: false,
       example: "increase",
     },
     {
@@ -67,16 +84,16 @@ export const keyResultsTemplate: EntityTemplate = {
     },
     {
       field: "baselineValue",
-      describe: "Where it started.",
+      describe: "Where it started. Needed for a metric or a maintain.",
       aliases: ["baselineValue", "baseline", "startValue", "from"],
-      required: true,
+      required: false,
       example: "20",
     },
     {
       field: "targetValue",
-      describe: "Where it has to reach.",
+      describe: "Where it has to reach. Needed for a metric or a maintain.",
       aliases: ["targetValue", "target", "goalValue", "to"],
-      required: true,
+      required: false,
       example: "60",
     },
     {
@@ -116,16 +133,28 @@ export const keyResultsTemplate: EntityTemplate = {
     references,
   }: PlanContext): Promise<RowPlan> {
     const title = asText("title", values.title ?? "");
-    const direction = asEnum(
-      "direction",
-      values.direction ?? "",
-      KEY_RESULT_DIRECTIONS,
-    );
+    const kind = values.kind
+      ? asEnum("kind", values.kind, KEY_RESULT_KINDS)
+      : undefined;
+    // §2.10: only a metric and a maintain move a number, so only they must
+    // say which way, from where and to where. A milestone or a baseline may
+    // still carry them; they are then kept and not read.
+    const measured = kind !== "milestone" && kind !== "baseline";
+    const direction =
+      measured || values.direction
+        ? asEnum("direction", values.direction ?? "", KEY_RESULT_DIRECTIONS)
+        : undefined;
     const indicatorType = values.indicatorType
       ? asEnum("indicatorType", values.indicatorType, INDICATOR_TYPES)
       : "lagging";
-    const baselineValue = asNumber("baselineValue", values.baselineValue ?? "");
-    const targetValue = asNumber("targetValue", values.targetValue ?? "");
+    const baselineValue =
+      measured || values.baselineValue
+        ? asNumber("baselineValue", values.baselineValue ?? "")
+        : undefined;
+    const targetValue =
+      measured || values.targetValue
+        ? asNumber("targetValue", values.targetValue ?? "")
+        : undefined;
     const currentValue =
       values.currentValue === undefined || values.currentValue === ""
         ? undefined
@@ -141,10 +170,11 @@ export const keyResultsTemplate: EntityTemplate = {
 
     const shared = {
       title,
-      direction,
+      ...(kind ? { kind } : {}),
+      ...(direction ? { direction } : {}),
       indicatorType,
-      baselineValue,
-      targetValue,
+      ...(baselineValue === undefined ? {} : { baselineValue }),
+      ...(targetValue === undefined ? {} : { targetValue }),
       ...(values.unit ? { unit: asText("unit", values.unit, 60) } : {}),
       ...(dueOn ? { dueOn } : {}),
       ...(ownerId ? { ownerId } : {}),

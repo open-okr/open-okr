@@ -216,7 +216,12 @@ test("both seeded agents are in admin, with their schedules and an empty log", a
     page.getByRole("heading", { name: "Agents and runs" }),
   ).toBeVisible();
 
-  const champion = page
+  // **Inside the agents list, not the page.** The scheduler runs the
+  // Champion at :00, :15, :30 and :45, and a run row names its agent, so a
+  // page-wide filter matched twice whenever this test crossed one of those
+  // minutes (found on 2 October 2026, when it ran at 22:15).
+  const agents = page.getByRole("list", { name: "The agents" });
+  const champion = agents
     .getByRole("listitem")
     .filter({ hasText: "OKR Champion" });
   await expect(champion).toHaveCount(1);
@@ -227,14 +232,15 @@ test("both seeded agents are in admin, with their schedules and an empty log", a
   // chip is lower case and the button is not, which `exact` distinguishes.
   await expect(champion.getByText("propose", { exact: true })).toBeVisible();
 
-  const coach = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  const coach = agents.getByRole("listitem").filter({ hasText: "OKR Coach" });
   await expect(coach).toHaveCount(1);
   await expect(coach.getByText("On every write")).toBeVisible();
   await expect(coach.getByText("propose", { exact: true })).toBeVisible();
 
-  // Nothing schedules a run on this instance, and the page says so rather
-  // than showing an empty list that reads like a bug.
-  await expect(page.getByText(/No run yet/)).toBeVisible();
+  // The run log is on the page whether or not the scheduler has already
+  // run something. It used to assert "No run yet", which held only when no
+  // scheduled minute had passed since the workspace was created.
+  await expect(page.getByRole("heading", { name: "Recent runs" })).toBeVisible();
 });
 
 test("an administrator can run an agent, and the page says whether it can draft", async () => {
@@ -363,9 +369,12 @@ test("the cycle workspace computes the eight phases from the rows", async () => 
   await expect(
     page.getByRole("img", { name: "Phase 0 does not apply to this cycle" }),
   ).toBeVisible();
-  // Every word of the guidance comes from packages/method.
+  // Every word of the guidance comes from packages/method, and since P9-T21
+  // the conformance suite holds those words to METHOD.md §9.
   await expect(
-    page.getByText("Refuse to run Phase 4 without a complete input pack"),
+    page.getByText(
+      "Gather the inputs before the drafting session; drafting blind wastes the room",
+    ),
   ).toBeVisible();
 });
 
@@ -387,28 +396,27 @@ test("ticking a pack item moves the count", async () => {
   await expect(page.getByText("1 of 7", { exact: true })).toBeVisible();
 });
 
-test("opening phase 4 names what is blocking drafting", async () => {
-  // The acceptance criterion: "Given a quarterly cycle whose input pack has two
-  // items missing, when the facilitator opens Phase 4, then drafting is blocked
-  // with the two missing items named and a link to gather them."
+test("opening phase 4 names what earlier phases miss, and drafting stays open", async () => {
+  // REQUIREMENTS §3.1 as revised for Phase 9: "Given a quarterly cycle three
+  // weeks from its start with the input pack incomplete, when the facilitator
+  // opens the cycle, then Phase 1 is shown as incomplete with the exact
+  // missing items, and a member can still draft an objective, with the missing
+  // items shown beside the form." Until P9-T02 this phase refused drafting
+  // here (completeness review H-09); the phases now guide, and the binding
+  // half of §3.1 is `s04c-binding-phases.spec.ts`.
   await page.goto("/cycle?phase=4");
 
-  await expect(page.getByText("This phase is blocked by earlier work")).toBeVisible();
+  await expect(page.getByText("Earlier phases still have gaps")).toBeVisible();
   await expect(
     page.getByText(/Input pack item 4 is missing: Customer feedback/),
   ).toBeVisible();
   await expect(
     page.getByText(/Input pack item 7 is missing: Open risks/),
   ).toBeVisible();
-  // REQUIREMENTS §3.1: "drafting in Phase 4 is refused with the reason"
-  // (completeness review H-09). The form gives way to the reason, and the
-  // server refuses a guided draft regardless.
   await expect(
-    page.getByText("Drafting opens once the earlier phases are complete"),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add objective" })).toHaveCount(
-    0,
-  );
+    page.getByText("This phase is blocked by earlier work"),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add objective" })).toBeVisible();
   await page.getByRole("link", { name: "Go and gather what is missing" }).click();
   await expect(page).toHaveURL("/cycle?phase=1");
 });
@@ -418,11 +426,16 @@ test("opening phase 4 names what is blocking drafting", async () => {
  *
  * The sponsor, the facilitator, the planning dates, baseline health and the
  * quarterly revalidation had no control on any screen, so none of these phases
- * could turn green and drafting was never allowed. Every step below is a
- * control a facilitator uses.
+ * could turn green. Every step below is a control a facilitator uses, and once
+ * they are done the gaps the phase 4 view listed are gone.
  */
-test("the planning phases complete from the browser, and drafting opens", async () => {
+test("the planning phases complete from the browser, and the gaps clear", async () => {
   await page.goto("/cycle?phase=1");
+  // `count()` below does not wait, so counting before the phase has rendered
+  // reads nothing to gather and skips the loop; the gaps then never clear.
+  await expect(
+    page.getByRole("button", { name: "Confirm distribution" }),
+  ).toBeVisible({ timeout: 15_000 });
 
   // The rest of the input pack.
   const ungathered = page.getByRole("button", { name: /^Mark ".*" as gathered$/ });
@@ -478,6 +491,7 @@ test("the planning phases complete from the browser, and drafting opens", async 
   ).toHaveValue("Mobile activation");
 
   await page.goto("/cycle?phase=4");
+  await expect(page.getByText("Earlier phases still have gaps")).toHaveCount(0);
   await expect(
     page.getByText("This phase is blocked by earlier work"),
   ).toHaveCount(0);
@@ -550,7 +564,7 @@ test("drafting a goal with key results persists at zero percent and pending", as
  * suite because the thing worth proving is that the browser evaluates at all:
  * the same package, the workspace's own thresholds, and no round trip.
  */
-test("the coach fails a rule as you type, and the score moves with it", async () => {
+test("the coach flags a rule as you type, and the score moves with it", async () => {
   await page.goto("/cycle?phase=4");
 
   const title = page
@@ -573,7 +587,7 @@ test("the coach fails a rule as you type, and the score moves with it", async ()
   // The card carries the prompt, what was seen, and §4.6's pair.
   await chip.click();
   await expect(
-    page.getByText(/Your objective starts with a deliverable, not a destination/),
+    page.getByText(/Your objective starts with a deliverable\. If we do it/),
   ).toBeVisible();
   await expect(page.getByText(/What was seen\./)).toBeVisible();
   // The weak half of §4.6's pair, not the strong half: the strong half is the
@@ -592,7 +606,7 @@ test("the coach fails a rule as you type, and the score moves with it", async ()
   // hunts for.
   await page.getByRole("button", { name: "Dismiss" }).first().click();
   await expect(
-    page.getByText(/Your objective starts with a deliverable, not a destination/),
+    page.getByText(/Your objective starts with a deliverable\. If we do it/),
   ).toBeHidden();
   await chip.click();
 
@@ -724,7 +738,8 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
 
   await page.getByRole("button", { name: "Reopen this goal" }).click();
   // Exact: the page also explains that every goal reads pending until P3-T05.
-  await expect(page.getByText("pending", { exact: true })).toBeVisible();
+  // In words since P9-T15b-a, where it printed the stored code.
+  await expect(page.getByText("Pending", { exact: true })).toBeVisible();
   // The account of what happened survives the reopen.
   await expect(
     page.getByText("Activation moved. Onboarding did the work"),
@@ -844,8 +859,10 @@ test("the review inbox lists what this member owes, with an action on each", asy
   // Scoped to `main`: the sidebar's own nav item is also called "Check in", and
   // an unscoped role locator matches both. Worth keeping as a named collision
   // rather than renaming either, because both labels are the right words.
+  // Exact, because the header's own walker is "Check in on your objectives"
+  // since P9-T07a-b, and this is about each row's action.
   await expect(
-    page.getByRole("main").getByRole("link", { name: "Check in" }),
+    page.getByRole("main").getByRole("link", { name: "Check in", exact: true }),
   ).toBeVisible();
 
   // The same promise this spec has always made, now that it reads the other
@@ -861,7 +878,7 @@ test("the review action opens the composer for that goal", async () => {
   await page.goto("/review");
   await page
     .getByRole("main")
-    .getByRole("link", { name: "Check in" })
+    .getByRole("link", { name: "Check in", exact: true })
     .first()
     .click();
   // The goal id, not the bare walker: the row's action opens the goal it names.
@@ -910,22 +927,32 @@ test("a KPI recorded below the corridor reaches the recovery board", async () =>
   ).toBeVisible();
   // Sixty of a hundred is below the seventy percent watch floor.
   await expect(page.getByText("unhealthy").first()).toBeVisible();
+  // It asks for a decision and offers METHOD.md §6.5's three (P9-T18b).
+  const responses = page.getByTestId("kpi-responses");
+  await expect(responses.getByText("Fix it now", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Launch recovery" }),
+    responses.getByText("Add a key result", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    responses.getByText("Launch a recovery OKR", { exact: true }),
   ).toBeVisible();
 });
 
 test("launching recovery creates the objective and flips the KPI", async () => {
   await page.goto("/kpis/recovery");
+  await page.getByText("Launch a recovery OKR", { exact: true }).click();
   await page.getByRole("button", { name: "Launch recovery" }).click();
 
-  // The objective is named from the KPI and its target, per METHOD.md §6.5.
+  // The objective names what the KPI protects, with no number in it, per
+  // METHOD.md §6.5 (P9-T18a).
   await expect(
-    page.getByRole("link", { name: "Bring Operating margin back to 100" }),
+    page.getByRole("link", {
+      name: "Operating margin back where the business can rely on it",
+    }),
   ).toBeVisible();
   await expect(page.getByText("recovering").first()).toBeVisible();
-  // The subtree holds no leading driver yet, so §6.5's placeholder is the one
-  // key result rather than the product inventing a driver nobody named.
+  // The subtree holds no leading driver yet, so the KPI itself is the one key
+  // result rather than the product inventing a driver nobody named.
   await expect(page.getByText("1 key result")).toBeVisible();
 });
 

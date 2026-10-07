@@ -26,7 +26,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
-import { submitProcessHealthAction } from "./actions";
+import { addActionAction, submitProcessHealthAction } from "./actions";
 
 const SCORES = [1, 2, 3, 4, 5] as const;
 
@@ -50,12 +50,18 @@ export function ProcessHealthPanel({
   sessionId,
   health,
   canAnswer,
+  owners = [],
 }: {
   readonly sessionId: string;
   readonly health: ProcessHealth;
   readonly canAnswer: boolean;
+  /** Who can own the improvement action: the room (§8.5, P9-T20d). */
+  readonly owners?: readonly { readonly id: string; readonly label: string }[];
 }) {
   const { t } = useTranslations();
+  const [actionOwner, setActionOwner] = useState("");
+  const [actionDue, setActionDue] = useState("");
+  const [actionAdded, setActionAdded] = useState(false);
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -198,11 +204,89 @@ export function ProcessHealthPanel({
         )}
 
         {health.lowest === null ? null : (
-          <p className="text-xs text-ink-3">
-            {t("session.detail.processHealth.lowestStatement85Makes", {
-              statementKey: health.lowest.statementKey,
-            })}
-          </p>
+          // §8.5 (P9-T20d): "The lowest-scoring statement becomes an
+          // improvement action for the next cycle, with an owner and a date."
+          // Recorded with stage 11's actions, which already ask for both, so
+          // it is in the minutes and carried like any other action.
+          <div className="flex flex-col gap-2 rounded-md border border-line p-2.5">
+            <p className="text-xs text-ink-3">
+              {t("session.detail.processHealth.lowestBecomesAnAction", {
+                statementKey: health.lowest.statementKey,
+              })}
+            </p>
+            {canAnswer && !actionAdded ? (
+              <span className="flex flex-wrap items-end gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-ink-3">
+                    {t("session.detail.processHealth.whoOwnsIt")}
+                  </span>
+                  <select
+                    value={actionOwner}
+                    onChange={(event) => setActionOwner(event.target.value)}
+                    className="rounded-md border border-line bg-surface p-1.5 text-sm text-ink"
+                  >
+                    <option value="">
+                      {t("session.detail.processHealth.chooseAnOwner")}
+                    </option>
+                    {owners.map((owner) => (
+                      <option key={owner.id} value={owner.id}>
+                        {owner.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-ink-3">
+                    {t("session.detail.processHealth.byWhen")}
+                  </span>
+                  <input
+                    type="date"
+                    value={actionDue}
+                    onChange={(event) => setActionDue(event.target.value)}
+                    className="rounded-md border border-line bg-surface p-1.5 text-sm text-ink"
+                  />
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={pending || actionOwner === "" || actionDue === ""}
+                  onClick={() => {
+                    const lowest = health.lowest;
+                    if (!lowest) {
+                      return;
+                    }
+                    setProblem(null);
+                    startTransition(async () => {
+                      try {
+                        await addActionAction(
+                          sessionId,
+                          t("session.detail.processHealth.improve", {
+                            statement: lowest.statement,
+                          }),
+                          actionOwner,
+                          actionDue,
+                        );
+                        setActionAdded(true);
+                        router.refresh();
+                      } catch (error) {
+                        setProblem(
+                          error instanceof Error
+                            ? error.message
+                            : "That did not save.",
+                        );
+                      }
+                    });
+                  }}
+                >
+                  {t("session.detail.processHealth.makeItAnAction")}
+                </Button>
+              </span>
+            ) : actionAdded ? (
+              <span role="status" className="text-xs text-ok">
+                {t("session.detail.processHealth.actionAdded")}
+              </span>
+            ) : null}
+          </div>
         )}
       </CardBody>
     </Card>

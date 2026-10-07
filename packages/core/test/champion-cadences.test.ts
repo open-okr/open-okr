@@ -315,8 +315,12 @@ describe("the daily run: blocker aging", () => {
    * Nothing is inserted by hand and nothing is backdated: the blocker opens
    * now, and each run below is asked about a `now` further along its clock.
    * That is what makes this a test of the ladder rather than of a fixture.
+   *
+   * `checkInIn` sets the goal's next check-in that many days out first, the
+   * one thing the acceptance criterion needs fixed: a blocker opened on the
+   * day of a weekly check-in is due a week later.
    */
-  const openBlocker = async () => {
+  const openBlocker = async (checkInIn?: number) => {
     const wb = await workerDb();
     const goal = (await callAction(
       { pool: wb.appPool, ...context() },
@@ -387,6 +391,13 @@ describe("the daily run: blocker aging", () => {
       "sessions.advanceStage",
       { id: session.id },
     );
+    if (checkInIn !== undefined) {
+      await wb.admin.query(
+        `update goals set next_check_in_at = now() + make_interval(days => $2)
+          where id = $1`,
+        [goal.id, checkInIn],
+      );
+    }
     const blocker = (await callAction(
       { pool: wb.appPool, ...context() },
       "sessions.createBlocker",
@@ -398,25 +409,45 @@ describe("the daily run: blocker aging", () => {
         nextAction: "Get the vendor to confirm the date by Thursday",
       },
     )) as { id: string };
-    return { blockerId: blocker.id, goalId: goal.id };
+    const { rows } = await wb.admin.query<{ due_at: Date }>(
+      "select due_at from blockers where id = $1",
+      [blocker.id],
+    );
+    return {
+      blockerId: blocker.id,
+      goalId: goal.id,
+      dueAt: rows[0]?.due_at as Date,
+    };
   };
 
-  /** Hours from now, as an instant a run can be asked about. */
-  const inHours = (hours: number) => new Date(Date.now() + hours * 3_600_000);
+  /** An instant a number of days from another, as a run can be asked about. */
+  const daysFrom = (from: Date, days: number) =>
+    new Date(from.getTime() + days * 86_400_000);
+  const blockerNudges = async () =>
+    (await sentNudges()).filter((row) => row.rule_key.startsWith("blocker."));
 
-  it("says nothing before the twenty-hour warning", async () => {
-    await openBlocker();
-    await runAt("daily", inHours(19));
-    const sent = await sentNudges();
-    expect(sent.filter((row) => row.rule_key.startsWith("blocker."))).toEqual(
-      [],
-    );
+  it("acceptance: opened on Tuesday with weekly check-ins, nobody is escalated when Thursday passes (P9-T19a-a)", async () => {
+    // Opened at the day's check-in: the next is a week away, and the clock is
+    // that check-in rather than twenty-four hours.
+    const { dueAt } = await openBlocker(7);
+    const opened = daysFrom(dueAt, -7);
+    // Thursday has passed: two and a half days after Tuesday's opening.
+    await runAt("daily", daysFrom(opened, 2.5));
+    expect(await blockerNudges()).toEqual([]);
   });
 
-  it("warns the blocker's owner at twenty hours, before the deadline", async () => {
-    const { blockerId } = await openBlocker();
-    await runAt("daily", inHours(20.5));
+  it("is due by the goal's next check-in, not a day after opening", async () => {
+    const before = new Date();
+    const { dueAt } = await openBlocker(7);
+    expect(dueAt.getTime()).toBeGreaterThan(daysFrom(before, 6).getTime());
+  });
 
+  it("reminds the blocker's owner the day before its check-in", async () => {
+    const { blockerId, dueAt } = await openBlocker(7);
+    await runAt("daily", daysFrom(dueAt, -2.5));
+    expect(await blockerNudges()).toEqual([]);
+
+    await runAt("daily", daysFrom(dueAt, -1));
     const warnings = (await sentNudges()).filter(
       (row) => row.rule_key === "blocker.warning",
     );
@@ -428,9 +459,9 @@ describe("the daily run: blocker aging", () => {
     expect(warnings[0]?.recipient_member_id).toBe(secondMemberId);
   });
 
-  it("escalates past the owner at twenty-four hours (acceptance criterion)", async () => {
-    await openBlocker();
-    await runAt("daily", inHours(25));
+  it("tells the coordinator once the check-in passes with the action open", async () => {
+    const { dueAt } = await openBlocker(7);
+    await runAt("daily", daysFrom(dueAt, 0.5));
 
     const overdue = (await sentNudges()).filter(
       (row) => row.rule_key === "blocker.overdue",
@@ -443,10 +474,21 @@ describe("the daily run: blocker aging", () => {
     expect(overdue.every((row) => row.escalation_step === 2)).toBe(true);
   });
 
-  it("reaches the sponsor at forty-eight hours", async () => {
-    await openBlocker();
-    await runAt("daily", inHours(49));
+  it("never reaches the sponsor unless the workspace puts the sponsor in its ladders", async () => {
+    const wb = await workerDb();
+    const { dueAt } = await openBlocker(7);
+    // Two check-ins past, and still the coordinator by default.
+    await runAt("daily", daysFrom(dueAt, 8));
+    expect(
+      (await sentNudges()).filter(
+        (row) => row.rule_key === "blocker.escalated",
+      ),
+    ).toEqual([]);
 
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "escalation.sponsorInLadders": "on" },
+    });
+    await runAt("daily", daysFrom(dueAt, 9));
     const escalated = (await sentNudges()).filter(
       (row) => row.rule_key === "blocker.escalated",
     );
@@ -463,11 +505,12 @@ describe("the daily run: blocker aging", () => {
       { id: blockerId },
     );
 
-    await runAt("daily", inHours(49));
-    const sent = await sentNudges();
-    expect(sent.filter((row) => row.rule_key.startsWith("blocker."))).toEqual(
-      [],
+    const { rows } = await wb.admin.query<{ due_at: Date }>(
+      "select due_at from blockers where id = $1",
+      [blockerId],
     );
+    await runAt("daily", daysFrom(rows[0]?.due_at as Date, 9));
+    expect(await blockerNudges()).toEqual([]);
   });
 });
 
@@ -516,6 +559,128 @@ describe("the daily run: KPI corridors and the morning summary", () => {
     expect(unhealthy[0]?.subject_type).toBe("kpi");
     expect(unhealthy[0]?.subject_id).toBe(kpiId);
     expect(unhealthy[0]?.recipient_member_id).toBe(ownerMemberId);
+  });
+
+  it("says nothing about an unhealthy KPI whose recovery is under way (P9-T17b-a)", async () => {
+    // The state is the band now, so this KPI reads unhealthy; it was silent
+    // as `recovering` and stays silent with its recovery beside the band.
+    const kpiId = await kpiAt(60, 100);
+    const wb = await workerDb();
+    const cycle = await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.launchRecovery",
+      { kpiId, cycleId: cycle?.id as string },
+    );
+    await runAt("daily", new Date("2026-08-20T02:00:00Z"));
+    expect(
+      (await sentNudges()).filter((row) => row.rule_key === "kpi.unhealthy"),
+    ).toEqual([]);
+  });
+
+  it("tells the KPI's named owner, wherever the KPI lives (§6.2, P9-T17b-b)", async () => {
+    const wb = await workerDb();
+    const kpi = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.create",
+      {
+        title: "Net revenue retention",
+        ownerKind: "workspace",
+        ownerMemberId: secondMemberId,
+        frequency: "monthly",
+        indicatorType: "lagging",
+        aggregate: "sum",
+      },
+    )) as { id: string };
+    await callAction({ pool: wb.appPool, ...context() }, "kpis.record", {
+      kpiId: kpi.id,
+      on: new Date().toISOString().slice(0, 10),
+      targetValue: 100,
+      actualValue: 60,
+    });
+    await runAt("daily", new Date("2026-08-20T02:00:00Z"));
+    const unhealthy = (await sentNudges()).filter(
+      (row) => row.rule_key === "kpi.unhealthy" && row.subject_id === kpi.id,
+    );
+    // The named person, not the administrators a workspace KPI went to.
+    expect(unhealthy.map((row) => row.recipient_member_id)).toEqual([
+      secondMemberId,
+    ]);
+  });
+
+  /** The recoveries the runs have proposed, and what became of each. */
+  const recoveryProposals = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      subject_id: string;
+      status: string;
+      decided_by_member_id: string | null;
+    }>(
+      `select subject_id, status, decided_by_member_id
+         from proposed_changes
+        where workspace_id = $1 and action = 'kpis.launchRecovery'
+        order by created_at`,
+      [workspaceId],
+    );
+    return rows;
+  };
+
+  it("waits for the run of unhealthy periods, unless the practice drafts at once (§12, P9-T18b)", async () => {
+    const kpiId = await kpiAt(60, 100);
+    // One unhealthy period, not from healthy: §6.5 waits for a second.
+    await runAt("daily", new Date("2026-08-20T02:00:00Z"));
+    expect(await recoveryProposals()).toEqual([]);
+
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "kpi.unhealthyResponse": "draftRecovery" },
+    });
+    await runAt("daily", new Date("2026-08-21T02:00:00Z"));
+    expect(await recoveryProposals()).toEqual([
+      { subject_id: kpiId, status: "pending", decided_by_member_id: null },
+    ]);
+  });
+
+  it("settles the proposed recovery when the KPI is answered another way, and proposes no other (§6.5, P9-T18b)", async () => {
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "kpi.unhealthyResponse": "draftRecovery" },
+    });
+    const kpiId = await kpiAt(60, 100);
+    await runAt("daily", new Date("2026-08-20T02:00:00Z"));
+    expect(await recoveryProposals()).toHaveLength(1);
+
+    const task = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "tasks.create",
+      {
+        spaceId,
+        title: "Reprice the two loss-making plans",
+        dueOn: "2026-08-29",
+        assigneeIds: [ownerMemberId],
+      },
+    )) as { id: string };
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.recordResponse",
+      { kpiId, kind: "fix_now", taskId: task.id },
+    );
+    // Decided by whoever answered, as if they had pressed dismiss.
+    expect(await recoveryProposals()).toEqual([
+      {
+        subject_id: kpiId,
+        status: "dismissed",
+        decided_by_member_id: ownerMemberId,
+      },
+    ]);
+
+    // The next day's run asks nothing more while the fix is open.
+    await runAt("daily", new Date("2026-08-21T02:00:00Z"));
+    expect(await recoveryProposals()).toHaveLength(1);
   });
 
   it("says nothing about a KPI inside its corridor", async () => {
@@ -627,6 +792,74 @@ describe("the daily run: KPI corridors and the morning summary", () => {
     );
     expect(summary?.payload.subject?.startsWith("OKR Goal: ")).toBe(true);
     expect(JSON.stringify(summary?.payload)).not.toContain("OpenOKR");
+  });
+
+  /**
+   * P9-T19a-c-b's acceptance criterion: "Given a member who has had five
+   * nudges this week, when a sixth is due, then it is not sent and their next
+   * daily digest names it."
+   */
+  it("acceptance: a sixth nudge in a week is held, and the morning summary names it (§11, P9-T19a-c-b)", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set timezone = 'Asia/Jakarta' where id = $1",
+      [ownerMemberId],
+    );
+    const at = new Date("2026-08-20T01:00:00Z");
+    // Five already this week, on subjects of their own.
+    for (let i = 1; i <= 5; i += 1) {
+      await wb.admin.query(
+        `insert into nudges
+           (id, workspace_id, rule_key, kind, subject_type, subject_id,
+            recipient_member_id, channel, scheduled_for, sent_at)
+         values (gen_random_uuid(), $1, 'checkin.due', 'rhythm', 'goal',
+                 gen_random_uuid(), $2, 'in_app', $3, $3)`,
+        [
+          workspaceId,
+          ownerMemberId,
+          new Date(at.getTime() - i * 86_400_000).toISOString(),
+        ],
+      );
+    }
+    // The sixth: a check-in due today, the champion's own reminder, which is
+    // not an escalation and so does not get past the ceiling.
+    const goalId = await goalDueDaysAgo(
+      0,
+      "Become the default choice for mid-market teams",
+      at,
+    );
+    await wb.admin.query("update goals set champion_id = $2 where id = $1", [
+      goalId,
+      ownerMemberId,
+    ]);
+
+    // Check-in reminders are the hourly cadence's; the summary is the daily's.
+    await runAt("hourly", at);
+    await callAction(
+      { pool: wb.appPool, ...context(), baseUrl: "https://okr.example.com" },
+      "agents.runChampion",
+      { now: at.toISOString(), cadence: "daily" },
+    );
+
+    const held = await wb.admin.query<{ suppressed_reason: string | null }>(
+      `select suppressed_reason from nudges
+        where workspace_id = $1 and subject_id = $2
+          and recipient_member_id = $3 and rule_key = 'checkin.due'`,
+      [workspaceId, goalId, ownerMemberId],
+    );
+    expect(held.rows.map((row) => row.suppressed_reason)).toEqual(["ceiling"]);
+
+    // The summary went anyway, past the ceiling it reports on, and names it.
+    const { rows } = await wb.admin.query<{ payload: { text?: string } }>(
+      "select payload from channel_messages where workspace_id = $1 and member_id = $2",
+      [workspaceId, ownerMemberId],
+    );
+    const summary = rows.find((row) =>
+      String(row.payload.text).includes("Rule: digest.daily"),
+    );
+    expect(summary?.payload.text).toContain("Held back this week");
+    expect(summary?.payload.text).toContain("(checkin.due)");
+    expect(summary?.payload.text).toContain(`/goals/${goalId}`);
   });
 
   it("never sends the Champion its own morning summary", async () => {
@@ -793,9 +1026,16 @@ describe("the per-cycle run: the countdown", () => {
     ).toEqual([]);
   });
 
-  it("opens planning three weeks before a quarterly cycle starts", async () => {
+  it("opens planning four weeks before a quarterly cycle starts (§11, P9-T19a-d-a)", async () => {
     await cycleDates({ startsOn: "2026-10-01", endsOn: "2026-12-31" });
+    // Three weeks before is no longer the day.
     await runAt("cycle", new Date("2026-09-10T09:00:00Z"));
+    expect(
+      (await sentNudges()).filter(
+        (row) => row.rule_key === "cycle.planning_opens",
+      ),
+    ).toEqual([]);
+    await runAt("cycle", new Date("2026-09-03T09:00:00Z"));
     expect(
       (await sentNudges()).filter(
         (row) => row.rule_key === "cycle.planning_opens",

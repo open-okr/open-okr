@@ -28,6 +28,8 @@ type ObligationKind =
   | "check_in"
   | "acknowledgement"
   | "blocker"
+  // P9-T16b-b. A dependency escalated to this member as the cycle's sponsor.
+  | "dependency"
   | "commitment"
   | "session"
   | "proposal"

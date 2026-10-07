@@ -37,7 +37,7 @@ Published 14 July. Two per unit at most.
 | S1 | Sell to accounts that can onboard themselves (kept) | Sales | Aspirational | C1 | S1.1 New deals inside the target profile 79% → 84%, Jonas. S1.2 Days from signature to kickoff 4.5 → 4 (reduce), Jonas |
 | S3 | Win the late-stage deals against Brightline | Sales | Aspirational | C5 | S3.1 Late-stage win rate against Brightline 41% → 50%, Jonas |
 | CS1 | No customer is surprised by their own renewal (kept) | Customer Success | Aspirational | A2 | CS1.1 Renewals flagged 90 days out 80% → 95%, Tomás |
-| SU1 | Answer once, in the product (kept) | Support | Aspirational | C2 | SU1.1 Self-serve deflection 27% → 33%, Kofi |
+| SU1 | Answer once, in the product (kept) | Support, then Customer Success from 26 July | Aspirational | C2 | SU1.1 Self-serve deflection 27% → 33%, Kofi |
 | M1 | Brightline's buyers hear our story first (modified) | Marketing | Aspirational | C5 | M1.1 Target-profile opportunities that saw the comparison page 20% → 60%, Nadia |
 | F3 | Price for the margin we need | Finance | Committed | C6 | F3.1 Pricing review approved by 31 August (milestone), Hugo. F3.2 New price book live for renewals from 1 September (milestone), Hugo |
 | G1 | Trials turn into customers without a sales call | Growth, from 9 August | Aspirational | C1 | G1.1 Establish the self-serve trial-to-paid rate (baseline), Amara. G1.2, added on 23 August: self-serve trial-to-paid conversion 4.1% → 7%, Yuki |
@@ -98,28 +98,28 @@ While C6 runs, the operating margin KPI shows its real band beside the recovery'
 
 ## The organisation changes
 
-**NW-Q3-06 · 12 Jul to 27 Aug · Product space, everyone in Europe · S-22 weekly session, space settings · METHOD v2 §7.4 · P9-T19b, plus gap G-2**
+**NW-Q3-06 · 12 Jul to 27 Aug · Product space, everyone in Europe · S-22 weekly session, space settings · METHOD v2 §7.4 · P9-T19b**
 Northwind's offices in London, Madrid, Berlin and Stockholm take their summer holidays.
 - **Holidays.** On 12 July Sara marks the weeks of 9 and 16 August as holidays for the Product space. No check-in is due in those weeks, nobody is nudged for them, and the streak does not break.
-- **Personal leave.** Leave for one person also needs the Champion to hold that person's nudges and route their reviews to someone else. That is gap G-2 ([05-scenario-index.md](05-scenario-index.md) §3). Until it is built, members set quiet hours, and the coordinator checks in for a goal whose champion is away.
+- **Personal leave.** Anybody away outside those weeks marks their own leave, with a delegate. Sara is away from 23 to 27 August with Amara as her delegate: nobody nudges Sara, and Amara posts the Monday check-in on P4, the objective Sara champions.
 
-*Test:* Given the Product space with the weeks of 9 and 16 August marked as holidays, when no check-in is published in those weeks, then the streak continues, and no nudge is sent for them.
+*Test:* Given the Product space with the weeks of 9 and 16 August marked as holidays, when no check-in is published in those weeks, then the streak continues, and no nudge is sent for them. Given Sara on leave from 23 to 27 August with Amara as her delegate, when P4's check-in falls due, then Amara is nudged and Sara is not.
 
-**NW-Q3-07 · 26 Jul (W4) · Elena, Tomás, Kofi · S-33 people, spaces · Gap G-1**
-Support merges into Customer Success, and from 26 July Kofi reports to Tomás. Moving the members is a membership change, and it works today. SU1 should move with them, but no action moves a goal from one space to another (gap G-1). Until one exists:
-- SU1 stays in the Support space until it closes;
-- Tomás's team coordinates it from Customer Success;
-- in Q4 the merged team writes its own objectives in Customer Success.
+**NW-Q3-07 · 26 Jul (W4) · Elena, Tomás, Kofi · S-33 people, spaces, OKRs list · METHOD v2 §2.9 · Today (people), P9-T13a (the objective)**
+Support merges into Customer Success, and from 26 July Kofi reports to Tomás.
+- **The people.** Moving the members is a membership change, and it works today.
+- **The objective.** Elena moves SU1 to Customer Success from the list's row menu. Its key result, its check-ins, its dependency on Engineering and its alignment to C2 go with it, recorded as one dated change naming both spaces.
+- **The next cycle.** In Q4 the merged team writes its own objectives in Customer Success, rather than carrying both teams' sets.
 
 Writing new objectives for the merged team, rather than carrying both teams' sets, is what whatmatters advises: "A new team doesn't automatically inherit old OKRs."
-*Test (once G-1 is built):* Given SU1 in Support, when it is moved to Customer Success, then its check-ins, dependencies and alignment move with it, and the activity records the move.
+*Test:* Given SU1 in Support with its check-ins and a dependency, when it is moved to Customer Success, then its check-ins, dependencies and alignment read from Customer Success, and the activity records the move. Given a member with edit on Support but not on Customer Success, then the move is refused.
 
-**NW-Q3-08 · 30 Jul · Mei, Priya · S-14 roles · METHOD v2 §2.5 · Today, plus gap G-2**
-Mei's parental leave runs from 2 August to 25 October. Before she goes, she hands her roles over, and each reassignment is recorded in the activity:
-- the champion of E1 and C3, and the owner of C3.1, go to Leo;
-- reviewing her department's objectives goes to Priya.
+**NW-Q3-08 · 30 Jul · Mei, Priya · S-14 roles, people · METHOD v2 §2.5, §7.4 · Today (roles), P9-T19b (leave)**
+Mei's parental leave runs from 2 August to 25 October.
+- **Her roles.** Eleven weeks is long enough to hand them over, and each reassignment is recorded in the activity: the champion of E1 and C3, and the owner of C3.1, go to Leo.
+- **Her leave.** She marks the leave with Priya as her delegate, so anything still addressed to her, such as reviewing her department's objectives, goes to Priya, and nobody nudges Mei.
 
-*Test:* Given C3's champion reassigned to Leo, when the Champion runs, then Leo receives C3's check-in nudges, and Mei receives none.
+*Test:* Given C3's champion reassigned to Leo, when the Champion runs, then Leo receives C3's check-in nudges, and Mei receives none. Given Mei on leave with Priya as her delegate, when a check-in on an Engineering objective Mei reviews is published, then Priya owes the acknowledgement.
 
 **NW-Q3-09 · 9 Aug (W6) · Yuki, Priya · S-33 spaces, OKRs list and diagram · METHOD v2 §2.9, §2.10 · P9-T07b, P9-T10, P9-T12, P9-T13**
 The Growth team forms, with Yuki and four people from Product and Marketing. Priya creates the Growth space, and Yuki drafts G1 in the list.

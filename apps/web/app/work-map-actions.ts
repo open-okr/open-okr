@@ -47,7 +47,6 @@ export async function recordFromMap(
 
   revalidatePath("/");
   revalidatePath("/goals");
-  revalidatePath("/goals/studio");
   revalidatePath(`/goals/${goalId}`);
   revalidatePath("/cycle");
   return NO_ERROR;

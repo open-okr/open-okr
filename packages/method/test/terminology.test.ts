@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isTermKey,
   resolveTerminology,
+  suggestedTerm,
   TERM_KEYS,
   TERMINOLOGY,
   validateTerminology,
@@ -96,5 +97,15 @@ describe("renaming", () => {
     });
     expect(resolved.objective.singular).toBe("Ambition");
     expect(resolved.champion.singular).toBe("Champion");
+  });
+});
+
+describe("the suggested alternative (METHOD.md terms, D6, P9-T21)", () => {
+  it('offers "Owner" for "Champion", and nothing where the method names none', () => {
+    expect(suggestedTerm("champion")).toEqual({
+      singular: "Owner",
+      plural: "Owners",
+    });
+    expect(suggestedTerm("objective")).toBeUndefined();
   });
 });

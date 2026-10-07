@@ -72,7 +72,7 @@ The three company objectives are drafted.
 
 *Test:* Given C1 aspirational with key results at 0.5, 0.6 and 0.6, when the draft set is judged, then it reads "the sweet spot". Given every committed key result at 0.7 or above, then the committed-floor message is not sent.
 
-**NW-Q1-05 · 23 Dec 2026 · Elena · S-10 publish, first step · METHOD v2 §4.5 · P9-T03**
+**NW-Q1-05 · 23 Dec 2026 · Elena · S-10 publish, first step · METHOD v2 §4.5 · P9-T03b**
 The company set publishes: the first of the two steps. The gates run over the three company objectives, and gates 1 and 2 are green. The department and team sets will publish in the second step.
 *Test:* Given the three company objectives complete, when Elena publishes the company step, then they are live and readable by every member, and the cycle records its team step as still open.
 
@@ -88,11 +88,11 @@ She starts a second key result row, changes her mind, and presses Escape: the em
 Nobody measures onboarding NPS (NW-P-12). Amara adds P1.2 to Sara's objective: "Establish an onboarding NPS baseline", as a baseline key result. It passes KR-2 and KR-3. Under the old rules it failed both, and gate 2 would have blocked the set.
 *Test:* Given a key result of the baseline kind with no numbers, when it is checked, then KR-2 and KR-3 pass.
 
-**NW-Q1-08 · 5 Jan · Jonas · S-13 OKRs list · METHOD v2 §4.2 KR-5, §4.6 · P9-T03**
+**NW-Q1-08 · 5 Jan · Jonas · S-13 OKRs list · METHOD v2 §4.2 KR-5, §4.6 · P9-T03a**
 Jonas drafts the Sales team's objective with "Make 300 cold calls" and "Hold 40 demos". KR-5 warns beside each cell: "This measures activity volume. Ask why…". The strength score shows amber, 52%. Nothing is refused; the draft is saved.
 *Test:* Given the key result "Make 300 cold calls", when it is typed, then KR-5 warns with its prompt and the draft saves.
 
-**NW-Q1-09 · 6 Jan · Mei · S-13 OKRs list · METHOD v2 §2.7, OBJ-5 · P9-T03**
+**NW-Q1-09 · 6 Jan · Mei · S-13 OKRs list · METHOD v2 §2.7, OBJ-5 · P9-T03a**
 Engineering drafts five objectives. OBJ-5 warns: "a unit with more than 3 objectives". Mei leaves it for the peer review.
 *Test:* Given a fourth and a fifth objective in the Engineering space, when they are saved, then OBJ-5 warns on the space, and both save.
 
@@ -126,7 +126,7 @@ Dependencies are declared and confirmed:
 Alignment health reads 100%: every goal below company level is aligned or stands alone with a reason. GitLab's rule is the same: "KRs with dependencies should not be considered final until other teams have confirmed support."
 *Test:* Given every dependency confirmed and every goal aligned or standing alone, when the alignment score is read, then it is healthy, with no gaps listed.
 
-**NW-Q1-14 · 15 Jan · Elena · S-10 publish, second step · METHOD v2 §4.5, §5.5, §2.9 · P9-T03, P9-T11, P9-T13**
+**NW-Q1-14 · 15 Jan · Elena · S-10 publish, second step · METHOD v2 §4.5, §5.5, §2.9 · P9-T03b, P9-T11, P9-T13**
 The department and team sets publish, which is the second step. Gate 5 asks about capacity:
 - **E1.1, the in-product answers, is at "exceeds".** The facilitator asks what was cut, and Mei records "the knowledge-base rewrite".
 - **E1 is aspirational,** so it may exceed, and gate 5 raises nothing for it. Only a committed OKR at "exceeds" is a warning (METHOD v2 §5.5).

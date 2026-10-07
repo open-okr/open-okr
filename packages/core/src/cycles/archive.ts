@@ -16,16 +16,27 @@ import {
 } from "@openokr/db";
 import {
   lowestProcessHealthStatement,
+  type PortfolioVerdict,
   PROCESS_HEALTH_STATEMENTS,
   portfolioVerdictOf,
   type ResolvedThresholds,
   round2,
   type ScoreBand,
+  type ScoreColoursPractice,
   scoreBand,
 } from "@openokr/method";
 import { asc, count, desc, eq, gt, inArray, isNull, lt, ne } from "drizzle-orm";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { practiceFromRow } from "../practice/settings.ts";
+import {
+  CARRIED_DECISIONS,
+  carryKeptObjectivesInTx,
+  closeDecisionsInTx,
+  endRecoveriesInTx,
+  moveRecoveriesToDraftsInTx,
+} from "./carry.ts";
 import { resolveRhythm } from "./rhythm.ts";
+import { rulesSnapshot } from "./rules.ts";
 import { readRhythmRow } from "./service.ts";
 import { evaluateWorkflow, loadCycleForWorkflow } from "./workflow.ts";
 
@@ -54,6 +65,8 @@ interface Scored {
   readonly spaceId: string | null;
   readonly championId: string | null;
   readonly score: number;
+  /** Its objective's kind, which decides whether §3.4's verdict reads it. */
+  readonly kind: "committed" | "aspirational";
 }
 
 /** Every scored key result in the cycle, with the goal that owns it. */
@@ -68,6 +81,7 @@ async function loadScores(
       spaceId: goals.spaceId,
       championId: goals.championId,
       score: keyResults.score,
+      kind: goals.kind,
     })
     .from(keyResults)
     .innerJoin(goals, eq(goals.id, keyResults.goalId))
@@ -89,7 +103,32 @@ async function loadScores(
       spaceId: row.spaceId,
       championId: row.championId,
       score: Number(row.score),
+      kind: row.kind,
     }));
+}
+
+/**
+ * §3.4's verdict on a scope's aspirational scores (P9-T11b-b). Committed key
+ * results are judged by the share met rather than an average, because
+ * averaging the two hides both; null when nothing aspirational was scored.
+ */
+function aspirationalVerdict(
+  scored: readonly Scored[],
+  thresholds: ResolvedThresholds,
+): PortfolioVerdict | null {
+  const aspirational = scored
+    .filter((row) => row.kind === "aspirational")
+    .map((row) => row.score);
+  if (aspirational.length === 0) {
+    return null;
+  }
+  return portfolioVerdictOf(
+    round2(
+      aspirational.reduce((total, score) => total + score, 0) /
+        aspirational.length,
+    ),
+    thresholds,
+  );
 }
 
 interface Buckets {
@@ -102,6 +141,7 @@ interface Buckets {
 function bucketsOf(
   scores: readonly number[],
   thresholds: ResolvedThresholds,
+  practice: ScoreColoursPractice,
 ): Buckets {
   const counts: Record<ScoreBand, number> = {
     fully_achieved: 0,
@@ -110,7 +150,7 @@ function bucketsOf(
     little: 0,
   };
   for (const score of scores) {
-    counts[scoreBand(score, thresholds)] += 1;
+    counts[scoreBand(score, thresholds, practice)] += 1;
   }
   return counts;
 }
@@ -166,42 +206,59 @@ export async function archiveCycleInTx(
     ownerKind: "workspace" | "space" | "member";
     spaceId: string | null;
     memberId: string | null;
+    rows: Scored[];
     scores: number[];
   }[] = [
     {
       ownerKind: "workspace",
       spaceId: null,
       memberId: null,
+      rows: scored,
       scores: scored.map((row) => row.score),
     },
   ];
 
-  const bySpace = new Map<string, number[]>();
-  const byMember = new Map<string, number[]>();
+  const bySpace = new Map<string, Scored[]>();
+  const byMember = new Map<string, Scored[]>();
   for (const row of scored) {
     if (row.spaceId) {
       const list = bySpace.get(row.spaceId);
       if (list) {
-        list.push(row.score);
+        list.push(row);
       } else {
-        bySpace.set(row.spaceId, [row.score]);
+        bySpace.set(row.spaceId, [row]);
       }
     }
     if (row.championId) {
       const list = byMember.get(row.championId);
       if (list) {
-        list.push(row.score);
+        list.push(row);
       } else {
-        byMember.set(row.championId, [row.score]);
+        byMember.set(row.championId, [row]);
       }
     }
   }
-  for (const [spaceId, scores] of bySpace) {
-    scopes.push({ ownerKind: "space", spaceId, memberId: null, scores });
+  for (const [spaceId, rows] of bySpace) {
+    scopes.push({
+      ownerKind: "space",
+      spaceId,
+      memberId: null,
+      rows,
+      scores: rows.map((row) => row.score),
+    });
   }
-  for (const [memberId, scores] of byMember) {
-    scopes.push({ ownerKind: "member", spaceId: null, memberId, scores });
+  for (const [memberId, rows] of byMember) {
+    scopes.push({
+      ownerKind: "member",
+      spaceId: null,
+      memberId,
+      rows,
+      scores: rows.map((row) => row.score),
+    });
   }
+
+  // The colours the bands are counted in (METHOD.md §3.3, §12, P9-T14a).
+  const { practice } = practiceFromRow(await readRhythmRow(tx, workspaceId));
 
   let snapshots = 0;
   for (const scope of scopes) {
@@ -212,9 +269,10 @@ export async function archiveCycleInTx(
             scope.scores.reduce((total, score) => total + score, 0) /
               scope.scores.length,
           );
-    const buckets = bucketsOf(scope.scores, thresholds);
-    const verdict =
-      average === null ? null : portfolioVerdictOf(average, thresholds);
+    const buckets = bucketsOf(scope.scores, thresholds, practice);
+    // The result is the cycle score over every scored key result (§8.6);
+    // the verdict is §3.4's, over the aspirational ones alone.
+    const verdict = aspirationalVerdict(scope.rows, thresholds);
 
     const figures = {
       resultValue: average === null ? null : String(average),
@@ -293,7 +351,7 @@ export async function archiveCycleInTx(
   return {
     snapshots,
     resultValue: average,
-    verdict: average === null ? null : portfolioVerdictOf(average, thresholds),
+    verdict: aspirationalVerdict(workspaceScope?.rows ?? [], thresholds),
   };
 }
 
@@ -304,13 +362,17 @@ export interface FeedForwardResult {
   /** Rows of §8.9's mapping this build cannot fill, each naming its task. */
   readonly waiting: readonly string[];
   /**
-   * The process-health statement the next cycle holds as a Phase 3 priority,
-   * or null when the survey went unanswered (§8.5, §8.9; M-05). Reported
-   * whether this run wrote it or an earlier one did.
+   * The process-health statement the next cycle holds in Phase 3 as its
+   * improvement action, or null when the survey went unanswered (§8.5, §8.9;
+   * M-05). Reported whether this run wrote it or an earlier one did.
    */
   readonly processPriority: string | null;
   /** Whether the learnings reached the next cycle's input pack (P4-T12-b). */
   readonly packNote: boolean;
+  /** Kept and modified objectives pre-filled as drafts by this run (P9-T20e-b). */
+  readonly drafts: number;
+  /** Kept objectives not carried because their champion has left, by title. */
+  readonly notCarried: readonly string[];
 }
 
 /**
@@ -404,10 +466,10 @@ export async function feedForwardInTx(
       "A cycle cannot feed itself. Name the cycle that is closing and the one that is opening.",
     );
   }
+  const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
   // §8.9's impact for anything fed forward, as the workspace resolves it
   // (completeness review H-17). It was the literal 4 in three places.
-  const carriedImpact = resolveRhythm(await readRhythmRow(tx, workspaceId))
-    .thresholds["quality.carryForwardIssueImpact"];
+  const carriedImpact = thresholds["quality.carryForwardIssueImpact"];
 
   const [source] = await tx
     .select({ id: cycles.id, frameId: cycles.frameId })
@@ -602,14 +664,75 @@ export async function feedForwardInTx(
     issues += 1;
   }
 
-  // --- the lowest process-health statement becomes a Phase 3 priority ---
+  // --- a deferred objective joins them (§8.8, P9-T20e-a) ---
   //
-  // §8.9's table: "The lowest process-health statement | Phase 3, a process
-  // priority", and §8.5: it "becomes next cycle's process OKR". From P4-T12-b
-  // until M-05 it landed as a Phase 2 issue instead, on a reading of §8.9's
-  // closing line that the table itself does not support: that line is about
-  // carried work, and a process statement is not carried work. Changing the
-  // practice was never this file's to decide, so it follows the table.
+  // "Defer: still worth doing, not next cycle. It goes to the issue list."
+  // At the carry-forward impact, like every other carried item, so it has to
+  // survive the next prioritisation on its merits. Deferred at stage 9 or
+  // from the objective's own page, whichever was decided later (P9-T20e-b).
+  const decided = await closeDecisionsInTx(
+    tx,
+    workspaceId,
+    fromCycleId,
+    review?.id ?? null,
+  );
+  const deferred = decided
+    .filter((objective) => objective.decision === "defer")
+    .map((objective) => ({ text: objective.title }));
+  for (const objective of deferred) {
+    const [duplicate] = await tx
+      .select({ id: cycleIssues.id })
+      .from(cycleIssues)
+      .where(
+        activeOnly(
+          cycleIssues,
+          eq(cycleIssues.workspaceId, workspaceId),
+          eq(cycleIssues.cycleId, toCycleId),
+          eq(cycleIssues.source, "carry_forward"),
+          eq(cycleIssues.text, objective.text),
+        ),
+      )
+      .limit(1);
+    if (duplicate) {
+      continue;
+    }
+    // openokr:allow-mutation: same transaction.
+    await tx.insert(cycleIssues).values({
+      id: newId(),
+      workspaceId,
+      cycleId: toCycleId,
+      text: objective.text,
+      impact: carriedImpact,
+      source: "carry_forward",
+    });
+    issues += 1;
+  }
+
+  // --- kept and modified objectives pre-fill Phase 4 (§8.9, P9-T20e-b) ---
+  const keptDrafts = await carryKeptObjectivesInTx(tx, {
+    workspaceId,
+    toCycleId,
+    kept: decided,
+    thresholds,
+    now,
+  });
+  // A kept recovery goes on in its draft (§6.5, P9-T22c-e-b).
+  await moveRecoveriesToDraftsInTx(tx, {
+    workspaceId,
+    toCycleId,
+    decided,
+    now,
+  });
+
+  // --- the lowest process-health statement, Phase 3's improvement action ---
+  //
+  // §8.9's table: "The lowest process-health statement | Phase 3, an
+  // improvement action", and §8.5: it "becomes an improvement action for the
+  // next cycle, with an owner and a date". The owner and the date are stage
+  // 11's, where the review records it as an action (P9-T20d); this is where
+  // the next cycle's Phase 3 meets it, beside the priorities it is ranked
+  // with. From P4-T12-b until M-05 it landed as a Phase 2 issue instead, on a
+  // reading of a closing line about carried work that v2 removed.
   //
   // Matched on its text, because a priority has no source column. The text is
   // the canon statement, so a facilitator's own priority cannot collide with it
@@ -764,6 +887,8 @@ export async function feedForwardInTx(
     waiting: [],
     processPriority: lowest,
     packNote,
+    drafts: keptDrafts.drafts,
+    notCarried: keptDrafts.notCarried,
   };
 }
 
@@ -846,12 +971,38 @@ export async function closeCycleInTx(
     now,
   );
 
+  // A recovery the room did not carry ends with the close (§6.5,
+  // P9-T22c-e-b), whether or not there is a next cycle to feed. Before the
+  // cycle is marked closed, which freezes its objectives.
+  const closedReview = await findClosedReview(tx, workspaceId, cycleId);
+  await endRecoveriesInTx(tx, {
+    workspaceId,
+    decided: await closeDecisionsInTx(
+      tx,
+      workspaceId,
+      cycleId,
+      closedReview?.id ?? null,
+    ),
+    now,
+  });
+
+  // METHOD.md §12 (P9-T14b): the cycle keeps the rules it was graded under,
+  // so a band or a cap moved later does not rewrite its verdicts.
+  const { practice: inForce } = practiceFromRow(
+    await readRhythmRow(tx, workspaceId),
+  );
+
   // Phase 7 as well as closed, so the cycle opens on the phase that shows
   // how it closed rather than wherever the pointer was left.
   // openokr:allow-mutation: the calling Operation's own transaction.
   await tx
     .update(cycles)
-    .set({ status: "closed", phase: 7, updatedAt: now })
+    .set({
+      status: "closed",
+      phase: 7,
+      practiceSnapshot: rulesSnapshot(thresholds, inForce, now),
+      updatedAt: now,
+    })
     .where(
       activeOnly(
         cycles,
@@ -979,6 +1130,10 @@ export interface ClosureSummary {
   readonly nextCycle: { readonly id: string; readonly name: string } | null;
   readonly priorScores: number;
   readonly carriedIssues: number;
+  /** Kept and modified objectives the next cycle holds as drafts (P9-T20e-b). */
+  readonly carriedDrafts: number;
+  /** Kept objectives it could not carry, their champion having left. */
+  readonly notCarried: string[];
   readonly processPriority: string | null;
   readonly packNote: boolean;
 }
@@ -1054,6 +1209,8 @@ export async function readClosureInTx(
       nextCycle: null,
       priorScores: 0,
       carriedIssues: 0,
+      carriedDrafts: 0,
+      notCarried: [],
       processPriority: null,
       packNote: false,
     };
@@ -1122,11 +1279,39 @@ export async function readClosureInTx(
     )
     .limit(1);
 
+  // The drafts this cycle's kept objectives became, including one deleted
+  // since: it was handed on, and deleting it was the next cycle's decision.
+  const kept = (
+    await closeDecisionsInTx(tx, workspaceId, cycleId, review?.id ?? null)
+  ).filter((objective) => CARRIED_DECISIONS.includes(objective.decision));
+  const drafts =
+    kept.length === 0
+      ? []
+      : await tx
+          .select({ from: goals.carriedFromGoalId })
+          .from(goals)
+          .where(
+            includeDeleted(
+              goals,
+              eq(goals.workspaceId, workspaceId),
+              eq(goals.cycleId, next.id),
+              inArray(
+                goals.carriedFromGoalId,
+                kept.map((objective) => objective.goalId),
+              ),
+            ),
+          );
+  const handedOn = new Set(drafts.map((row) => row.from));
+
   return {
     ...figures,
     nextCycle: { id: next.id, name: next.name },
     priorScores: Number(scores?.total ?? 0),
     carriedIssues: Number(carried?.total ?? 0),
+    carriedDrafts: handedOn.size,
+    notCarried: kept
+      .filter((objective) => !handedOn.has(objective.goalId))
+      .map((objective) => objective.title),
     processPriority: priority?.text ?? null,
     packNote: Boolean(pack?.note),
   };

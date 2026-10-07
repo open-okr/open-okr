@@ -194,30 +194,37 @@ the ladder is golden-master tested with no channel, no queue and no clock.
 | 2 | One day overdue | champion |
 | 3 | The grace boundary is exceeded | champion, reviewer |
 | 4 | Seven days overdue | champion, reviewer, coordinator |
-| 5 | Fourteen days overdue | champion, reviewer, coordinator, sponsor |
+| 5 | Fourteen days overdue, only where the sponsor is in the ladders (P9-T19a-c-a) | champion, reviewer, coordinator, sponsor |
 
 Where a space has no coordinator, the target resolves to the space manager
 (TECHNICAL-PLAN.md §4.2). The engine returns the role; resolving the role to a
 member is the caller's job.
 
+Since P9-T19a-c-a the ladder stops at the coordinator. The sponsor is a step
+only where the workspace turns on "Sponsor in escalation ladders" (§12), at
+§11's fourteen days; without it a goal fourteen days late stays at step 4. The
+reviewer is reached only where the goal has one, which the caller resolves.
+
 <!-- golden: cadence.escalation -->
 
-| case | days_past_due | grace_days | expected_step | expected_targets |
-|---|---|---|---|---|
-| the day before it is due | -1 | 3 | 0 | champion |
-| two days before, nothing fires | -2 | 3 | | |
-| on the due date | 0 | 3 | 1 | champion |
-| one day overdue | 1 | 3 | 2 | champion |
-| still inside the grace | 2 | 3 | 2 | champion |
-| the last day of the grace | 3 | 3 | 2 | champion |
-| the grace is exceeded | 4 | 3 | 3 | champion,reviewer |
-| still with the reviewer | 6 | 3 | 3 | champion,reviewer |
-| a week overdue | 7 | 3 | 4 | champion,reviewer,coordinator |
-| still with the coordinator | 13 | 3 | 4 | champion,reviewer,coordinator |
-| a fortnight overdue | 14 | 3 | 5 | champion,reviewer,coordinator,sponsor |
-| long abandoned | 30 | 3 | 5 | champion,reviewer,coordinator,sponsor |
-| a longer grace delays the reviewer | 4 | 5 | 2 | champion |
-| a longer grace, then the reviewer | 6 | 5 | 3 | champion,reviewer |
+| case | days_past_due | grace_days | sponsor_in_ladders | expected_step | expected_targets |
+|---|---|---|---|---|---|
+| the day before it is due | -1 | 3 | no | 0 | champion |
+| two days before, nothing fires | -2 | 3 | no | | |
+| on the due date | 0 | 3 | no | 1 | champion |
+| one day overdue | 1 | 3 | no | 2 | champion |
+| still inside the grace | 2 | 3 | no | 2 | champion |
+| the last day of the grace | 3 | 3 | no | 2 | champion |
+| the grace is exceeded | 4 | 3 | no | 3 | champion,reviewer |
+| still with the reviewer | 6 | 3 | no | 3 | champion,reviewer |
+| a week overdue | 7 | 3 | no | 4 | champion,reviewer,coordinator |
+| still with the coordinator | 13 | 3 | no | 4 | champion,reviewer,coordinator |
+| a fortnight overdue, and the ladder stops at the coordinator | 14 | 3 | no | 4 | champion,reviewer,coordinator |
+| long abandoned, still the coordinator | 30 | 3 | no | 4 | champion,reviewer,coordinator |
+| a fortnight overdue, with the sponsor in the ladders | 14 | 3 | yes | 5 | champion,reviewer,coordinator,sponsor |
+| a week overdue, with the sponsor in the ladders, is still the coordinator | 7 | 3 | yes | 4 | champion,reviewer,coordinator |
+| a longer grace delays the reviewer | 4 | 5 | no | 2 | champion |
+| a longer grace, then the reviewer | 6 | 5 | no | 3 | champion,reviewer |
 
 ## 7b. The other two ladders (P4-T04c)
 
@@ -239,32 +246,40 @@ its messages are not about them.
 | three days, the coordinator is brought in | 3 | 2 | reviewer,coordinator |
 | a week later, no further | 7 | 2 | reviewer,coordinator |
 
-**Blocker.** §11: "owner warned at twenty hours, coordinator at twenty-four,
-sponsor at forty-eight. The warning arrives before the deadline, not after it."
-Hours rather than days, because a blocker's clock is twenty-four hours and a
-ladder measured in days could not fire twice inside it.
+**Blocker.** §11, as METHOD v2 has it since P9-T19a-a: "owner reminded 1 day
+before the next check-in, coordinator when the check-in passes with the action
+open". The clock is the check-in the next action is due by, stored on the
+blocker as `due_at` when it is opened: the goal's next check-in, or the one
+after it when that falls on the opening day or earlier. Counted in whole days
+of the workspace calendar, as the check-in ladder is. It was hours on a
+twenty-four hour clock, which told the coordinator about a blocker raised at a
+Tuesday check-in on the Wednesday.
 
-Nothing calls this yet: blockers are rows from P4-T07c. It is here so the ladder
-is tested beside the other two rather than written in a hurry beside the screen
-that first needs it.
+The sponsor is a rung only where the workspace turns on "Sponsor in escalation
+ladders" (§12), and then once the check-in after that one has passed too.
+`days_until_due` is 1 the day before the check-in, 0 on it, and negative once
+it has passed.
 
 <!-- golden: cadence.blocker -->
 
-| case | hours_since_opened | expected_step | expected_targets |
-|---|---|---|---|
-| just opened | 0 | | |
-| nineteen hours, still quiet | 19 | | |
-| the twenty-hour warning, before the deadline | 20 | 1 | champion |
-| the clock runs out | 24 | 2 | champion,coordinator |
-| a day and a half | 36 | 2 | champion,coordinator |
-| two days, the sponsor hears | 48 | 3 | champion,coordinator,sponsor |
-| a week | 168 | 3 | champion,coordinator,sponsor |
+| case | days_until_due | following_passed | sponsor_in_ladders | expected_step | expected_targets |
+|---|---|---|---|---|---|
+| opened on Tuesday, a week to go | 7 | no | no | | |
+| Thursday passes, nobody hears | 5 | no | no | | |
+| two days out, still quiet | 2 | no | no | | |
+| the day before, the owner is reminded | 1 | no | no | 1 | champion |
+| on the check-in day, still the owner | 0 | no | no | 1 | champion |
+| the check-in passes with the action open | -1 | no | no | 2 | champion,coordinator |
+| a week past, the coordinator still | -7 | no | no | 2 | champion,coordinator |
+| the next check-in passes too, no sponsor by default | -8 | yes | no | 2 | champion,coordinator |
+| with the sponsor in the ladders, one check-in past is the coordinator | -1 | no | yes | 2 | champion,coordinator |
+| with the sponsor in the ladders, two check-ins past is the sponsor | -8 | yes | yes | 3 | champion,coordinator,sponsor |
 
 ## 8. What resets the cadence
 
 | Event | Effect on `next_check_in_at` |
 |---|---|
-| Goal created | `firstDue(created_on, ...)` |
+| Goal created | `firstDue(created_on, ...)`, at its space's frequency where the space chose one (P9-T19a-d-a) |
 | Check-in published | `nextAfterPublication(...)` |
 | Latest check-in deleted | Recomputed from the previous check-in's publication date, or from the goal's creation date when there is none |
 | Frequency or anchor changed | `firstDue` from the later of the last publication date and today. A change never makes a goal instantly overdue |
@@ -272,6 +287,7 @@ that first needs it.
 | Goal reopened | `firstDue(reopened_on, ...)` |
 | Goal moved to another cycle | Unchanged. The rhythm belongs to the goal |
 | Workspace default frequency changed | Nothing. Goals hold their own frequency, seeded from the default at creation |
+| A space's frequency changed | The open goals following it, with no frequency of their own or the space's previous one, take the new one and `firstDue` from today; a goal set apart keeps its own (P9-T19a-d-a) |
 
 That last row is a deliberate choice. Changing the workspace default silently
 rewriting every existing goal's rhythm would move thousands of deadlines from

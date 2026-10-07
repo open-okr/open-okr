@@ -16,8 +16,9 @@
  * | `cycle.phase_blocked` | A planning phase's §2.4 window closes today and it is incomplete |
  * | `quality.no_not_doing` | Phase 3 is done and the frame has no not-doing list |
  * | `quality.too_many_objectives` | A level or a unit holds more objectives than its cap |
- * | `quality.sandbagging_draft` | An objective's average draft confidence is above `scoring.draftSandbagging` |
- * | `quality.sandbagging_close` | A cycle's scores average above `scoring.closeSandbagging` at the close |
+ * | `quality.sandbagging_draft` | An objective's average draft confidence on its aspirational key results is above `scoring.draftSandbagging` |
+ * | `quality.committed_floor` | A committed key result's confidence is below `scoring.committedConfidenceFloor`, drafted there or checked in there (P9-T11b-c) |
+ * | `quality.sandbagging_close` | Three quarters or more of a closed cycle's aspirational key results scored 1.0 (`scoring.closeTooSafeShare`) |
  * | `quality.no_cuts` | Capacity has verdicts and nothing is recorded as cut |
  * | `quality.trending_off` | A key result's stored forecast misses its target |
  * | `quality.process_health_low` | A quarterly review closed with process-health answers |
@@ -25,7 +26,20 @@
  * Dates are local `YYYY-MM-DD` strings in the workspace timezone.
  */
 import { SUGGESTED_TIMELINE } from "./guidance.ts";
-import type { ResolvedThresholds } from "./thresholds.ts";
+import {
+  belowCommittedFloor,
+  type KindedScore,
+  type OkrKind,
+  tooSafePattern,
+} from "./scoring.ts";
+import {
+  currentStreakOn,
+  type Holiday,
+  isHolidayPeriod,
+  lastWorkingDayOfPeriod,
+  periodStartOf,
+} from "./streak.ts";
+import type { CheckInFrequency, ResolvedThresholds } from "./thresholds.ts";
 
 const DAY_MS = 86_400_000;
 const toTime = (on: string): number => Date.parse(`${on}T00:00:00Z`);
@@ -47,7 +61,50 @@ const average = (values: readonly (number | null)[]): number | null => {
     : known.reduce((sum, value) => sum + value, 0) / known.length;
 };
 
-/** §3.2: "0.3 and below is raised with management the same day." */
+/**
+ * §3.2's committed rule: any committed key result below the floor. A key
+ * result nobody has given a confidence is not below anything yet, and an
+ * aspirational one is never judged by the floor.
+ */
+export function committedBelowFloor(
+  keyResults: readonly {
+    readonly confidence: number | null;
+    readonly kind: OkrKind;
+  }[],
+  thresholds: ResolvedThresholds,
+): boolean {
+  return keyResults.some(
+    (keyResult) =>
+      keyResult.confidence !== null &&
+      belowCommittedFloor(keyResult.confidence, keyResult.kind, thresholds),
+  );
+}
+
+/**
+ * §3.2, METHOD v2 (P9-T19a-c-a): "A drop matters more than a level. When a
+ * key result's confidence falls into the low band, the coordinator is told.
+ * A key result drafted low on purpose, such as an aspirational moonshot, does
+ * not escalate for staying where it started."
+ *
+ * So a fall, not a level: from at or above the low boundary to below it.
+ * With no earlier confidence there is nothing to have fallen from, which is
+ * what keeps a moonshot drafted at 0.2 quiet.
+ */
+export function confidenceFellIntoLow(
+  previous: number | null,
+  current: number | null,
+  thresholds: ResolvedThresholds,
+): boolean {
+  const low = thresholds["scoring.confidenceLow"];
+  return (
+    previous !== null && current !== null && previous >= low && current < low
+  );
+}
+
+/**
+ * §3.2: critical confidence, 0.3 and below. Since METHOD v2 it reaches the
+ * sponsor the same day only where the workspace turns critical escalation on.
+ */
 export function confidenceIsCritical(
   confidence: number | null,
   thresholds: ResolvedThresholds,
@@ -67,24 +124,47 @@ export function commitmentDueToday(weekStart: string, today: string): boolean {
 }
 
 /**
- * §7.2: "a rhythm streak that a skipped week breaks." At risk on the last
- * working day of a week that holds no session yet, when the week before did
- * hold one. Nothing to say when a session is still booked for later this week,
- * because the session's own reminders cover it.
+ * §7.4: "a skipped period breaks" the streak (P9-T19a-d-b). At risk on the
+ * last working day of a check-in period that holds no session yet, when the
+ * period before did hold one, counted in the space's own periods: a week, a
+ * fortnight or a month. Nothing to say when a session is still booked for
+ * later in the period, because the session's own reminders cover it.
  */
 export function streakAtRisk(input: {
   readonly today: string;
   readonly currentWeeks: number;
   readonly lastSessionOn: string | null;
   readonly bookedLaterThisWeek: boolean;
+  /** The space's frequency. Weekly where it is not given. */
+  readonly frequency?: CheckInFrequency;
+  /**
+   * The space's marked holidays (P9-T19b-a). A holiday period cannot break
+   * the streak, so it puts nothing at risk, and the holidays before it are
+   * not the gap that would.
+   */
+  readonly holidays?: readonly Holiday[];
 }): boolean {
   if (input.currentWeeks <= 0 || !input.lastSessionOn) {
     return false;
   }
-  const thisMonday = mondayOf(input.today);
+  const frequency = input.frequency ?? "weekly";
+  const holidays = input.holidays ?? [];
+  const thisPeriod = periodStartOf(input.today, frequency);
+  if (isHolidayPeriod(input.today, frequency, holidays)) {
+    return false;
+  }
+  const lastPeriod = periodStartOf(input.lastSessionOn, frequency);
   return (
-    input.today === lastWorkingDay(thisMonday) &&
-    mondayOf(input.lastSessionOn) === addDays(thisMonday, -7) &&
+    input.today === lastWorkingDayOfPeriod(input.today, frequency) &&
+    lastPeriod < thisPeriod &&
+    // The last one held was the last period that counted before this one:
+    // alive today, and broken tomorrow if this one passes too.
+    currentStreakOn(
+      { currentWeeks: 1, longestWeeks: 1, lastWeek: lastPeriod },
+      input.today,
+      frequency,
+      holidays,
+    ) > 0 &&
     !input.bookedLaterThisWeek
   );
 }
@@ -166,20 +246,33 @@ export function objectivesOverCap(
   return breaches;
 }
 
-/** §3.2: a set averaging above the draft threshold is business as usual. */
+/**
+ * §3.2: an aspirational set averaging above the near-certain threshold is
+ * business as usual. Committed key results are left out, because high
+ * confidence is right for a commitment (P9-T11a).
+ */
 export function draftIsSandbagged(
-  confidences: readonly (number | null)[],
+  keyResults: readonly {
+    readonly confidence: number | null;
+    readonly kind: OkrKind;
+  }[],
   thresholds: ResolvedThresholds,
 ): boolean {
-  const mean = average(confidences);
+  const mean = average(
+    keyResults
+      .filter((entry) => entry.kind === "aspirational")
+      .map((entry) => entry.confidence),
+  );
   return mean !== null && mean > thresholds["scoring.draftSandbagging"];
 }
 
-/** §3.4: scores clustering above the close threshold mean safe targets. */
+/**
+ * §3.3: three quarters or more of a closed cycle's aspirational key results
+ * at 1.0 means the targets were too safe. Committed ones are left out.
+ */
 export function closeIsSandbagged(
-  scores: readonly (number | null)[],
+  scored: readonly KindedScore[],
   thresholds: ResolvedThresholds,
 ): boolean {
-  const mean = average(scores);
-  return mean !== null && mean > thresholds["scoring.closeSandbagging"];
+  return tooSafePattern(scored, thresholds);
 }

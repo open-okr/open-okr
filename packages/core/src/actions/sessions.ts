@@ -24,9 +24,11 @@ import {
   decisions,
   digests,
   GOAL_CLOSE_DECISIONS,
+  GOAL_KINDS,
   goals,
   keyResultDependencies,
   keyResults,
+  keyResultTargetChanges,
   kudos,
   learnings,
   managementAnswers,
@@ -55,38 +57,55 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
-  afterWeeklyCheckIn,
+  afterCheckIn,
   CLOSE_DECISION_MEANINGS,
   cadenceCoverage,
+  committedShareMet,
   currentStreakOn,
   cycleScore,
+  diagnosisFor,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
+  needsRootCause,
   objectiveScore,
   PROCESS_HEALTH_STATEMENTS,
   planCycleCadence,
   portfolioVerdictOf,
   progressSignal,
-  REVIEW_STAGE_KEYS,
+  REVIEW_PARTS,
+  type ResolvedThresholds,
+  type ReviewPart,
   RITUALS,
   type RitualWeekday,
+  ROOT_CAUSE_OTHER,
   ROOT_CAUSES,
+  reviewStageKeysFor,
   rhythmDiagnostic,
   rhythmScore,
   roomPulseRead,
+  SCORE_BAND_TEXT,
+  SCORE_NOTE_TEXT,
+  type ScoreColoursPractice,
+  scoreBand,
+  scoreNote,
+  TOO_SAFE_TEXT,
+  tooSafePattern,
   WEEKLY_STAGE_KEYS,
   weekStartOf,
 } from "@openokr/method";
 import {
   and,
+  asc,
   avg,
   count,
   desc,
   eq,
   inArray,
+  isNotNull,
   isNull,
-  lt,
+  lte,
   ne,
+  or,
   sql,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -94,25 +113,34 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { nextCheckInDueAt } from "../cadence/blockers.ts";
 import { localInstant } from "../cadence/engine.ts";
+import { spaceHolidaysInTx } from "../cadence/holidays.ts";
+import { dueLocalDate } from "../cadence/service.ts";
+import { ritualFrequencyOf } from "../cadence/space-frequency.ts";
 import {
   addDays,
   formatLocalDate,
   localDateIn,
   parseLocalDate,
 } from "../cycles/generation.ts";
+import { paceInTx } from "../cycles/pace.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
+import { cycleRulesInTx } from "../cycles/rules.ts";
 import {
   findCurrentCycle,
   readRhythmRow,
   workspaceTimeZone,
 } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
+import { computedScoresInTx } from "../scoring/computed.ts";
 import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
 import { sessionChannel } from "../sessions/live.ts";
+import { measuredRhythmInTx } from "../sessions/measured-rhythm.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -155,15 +183,68 @@ async function actingMember(
  * a rail they advance. A `switch` here means adding a fifth ritual is one
  * change rather than a hunt.
  */
-function stageKeysFor(kind: string): readonly string[] | null {
+function stageKeysFor(
+  kind: string,
+  part: ReviewPart | null = null,
+): readonly string[] | null {
   switch (kind) {
     case "weekly":
       return WEEKLY_STAGE_KEYS;
     case "quarterly":
-      return REVIEW_STAGE_KEYS;
+      // A review held apart walks its own half (§8, P9-T20b-a).
+      return reviewStageKeysFor(part);
     default:
       return null;
   }
+}
+
+/**
+ * The two sessions a review's records live in (METHOD.md §8, P9-T20b-a).
+ *
+ * One session holds both halves. Held apart, stages 1 to 4 are recorded in
+ * the review session and 5 to 11 in the retrospective, which names its
+ * review session. Every read that crosses the boundary asks this rather than
+ * assuming one id: the root causes and the diagnostic read the scores, and
+ * the minutes read every stage. A review whose retrospective is not booked
+ * yet answers with its own id for both, so the later stages read as empty.
+ */
+async function reviewHalvesInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+): Promise<{ readonly review: string; readonly retrospective: string }> {
+  const [row] = await tx
+    .select({
+      reviewPart: sessions.reviewPart,
+      reviewSessionId: sessions.reviewSessionId,
+    })
+    .from(sessions)
+    .where(
+      activeOnly(
+        sessions,
+        eq(sessions.workspaceId, workspaceId),
+        eq(sessions.id, sessionId),
+      ),
+    )
+    .limit(1);
+  if (row?.reviewPart === "retrospective" && row.reviewSessionId) {
+    return { review: row.reviewSessionId, retrospective: sessionId };
+  }
+  if (row?.reviewPart === "review") {
+    const [retro] = await tx
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(
+        activeOnly(
+          sessions,
+          eq(sessions.workspaceId, workspaceId),
+          eq(sessions.reviewSessionId, sessionId),
+        ),
+      )
+      .limit(1);
+    return { review: sessionId, retrospective: retro?.id ?? sessionId };
+  }
+  return { review: sessionId, retrospective: sessionId };
 }
 
 /**
@@ -422,6 +503,15 @@ const sessionOutput = z.object({
   notes: z.record(z.string(), z.unknown()),
   /** Whole minutes added per stage by the facilitator (METHOD.md §8.1). */
   addedMinutes: z.record(z.string(), z.number()),
+  /** The week's wins a weekly session named (§7.2 step 3, P9-T19a-d-c). */
+  wins: z.array(z.string()),
+  /**
+   * Which half of a review this is, where the workspace holds them apart,
+   * or null for the whole review (§8, P9-T20b-a).
+   */
+  reviewPart: z.enum(REVIEW_PARTS).nullable(),
+  /** The review session a retrospective reads its scores from. */
+  reviewSessionId: z.uuid().nullable(),
   state: z.enum(SESSION_STATES),
   digestId: z.uuid().nullable(),
   createdAt: z.string(),
@@ -458,6 +548,9 @@ function toOutput(
     elapsed: (row.elapsed ?? {}) as Record<string, number>,
     notes: isFacilitator ? ((row.notes ?? {}) as Record<string, unknown>) : {},
     addedMinutes: (row.addedMinutes ?? {}) as Record<string, number>,
+    wins: (row.wins ?? []) as string[],
+    reviewPart: row.reviewPart ?? null,
+    reviewSessionId: row.reviewSessionId ?? null,
     state: row.state,
     digestId: row.digestId ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -515,6 +608,7 @@ async function requireOpenCycle(
       startsOn: cycles.startsOn,
       endsOn: cycles.endsOn,
       status: cycles.status,
+      mode: cycles.mode,
     })
     .from(cycles)
     .where(
@@ -575,6 +669,16 @@ export const createSession = defineWriteAction({
     title: z.string().trim().min(1).max(200),
     scheduledFor: z.iso.datetime({ offset: true, local: true }),
     facilitatorId: z.uuid(),
+    /**
+     * Which half of a review held apart (METHOD.md §8, §12 "Quarterly review
+     * format", P9-T22c-c-b).
+     *
+     * Booking a cycle writes both halves, and books nothing in the past, so a
+     * review scheduled by hand, or late, had no way to be split. The
+     * retrospective names the review scheduled before it for the same space
+     * and cycle, which is how booking links them.
+     */
+    part: z.enum(["review", "retrospective"]).optional(),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -589,6 +693,27 @@ export const createSession = defineWriteAction({
         workspaceId,
         input.spaceId,
       );
+      if (input.part && input.kind !== "quarterly") {
+        throw new OperationError(
+          "not_found",
+          "Only a quarterly review is held in two parts.",
+        );
+      }
+      if (input.part && !input.cycleId) {
+        throw new OperationError(
+          "not_found",
+          "A review held in two parts belongs to a cycle: name it.",
+        );
+      }
+      if (input.part) {
+        const rhythmRow = await readRhythmRow(tx, workspaceId);
+        if (practiceFromRow(rhythmRow).practice["review.format"] !== "split") {
+          throw new OperationError(
+            "forbidden",
+            'This workspace holds its review in one session ("Quarterly review format" in its practice settings), so it has no parts.',
+          );
+        }
+      }
 
       await getAccessScoped(tx, {
         workspaceId,
@@ -601,6 +726,25 @@ export const createSession = defineWriteAction({
       if (input.cycleId) {
         await requireOpenCycle(tx, workspaceId, input.cycleId);
       }
+      const timeZone = await workspaceTimeZone(tx, workspaceId);
+      const scheduledFor = scheduledInstant(input.scheduledFor, timeZone);
+      // The review scheduled before it, not one booked later for the same
+      // cycle (P9-T22c-d-b).
+      const reviewSessionId =
+        input.part === "retrospective" && input.cycleId
+          ? await bookedReviewSessionIdInTx(tx, {
+              workspaceId,
+              spaceId: input.spaceId,
+              cycleId: input.cycleId,
+              before: scheduledFor,
+            })
+          : null;
+      if (input.part === "retrospective" && !reviewSessionId) {
+        throw new OperationError(
+          "conflict",
+          "A retrospective follows its review: schedule the review first.",
+        );
+      }
 
       const id = crypto.randomUUID();
       await tx.insert(sessions).values({
@@ -610,12 +754,11 @@ export const createSession = defineWriteAction({
         cycleId: input.cycleId ?? null,
         kind: input.kind,
         title: input.title,
-        scheduledFor: scheduledInstant(
-          input.scheduledFor,
-          await workspaceTimeZone(tx, workspaceId),
-        ),
+        scheduledFor,
         facilitatorId: input.facilitatorId,
         state: "scheduled",
+        reviewPart: input.part ?? null,
+        reviewSessionId,
       });
 
       return {
@@ -631,7 +774,11 @@ export const createSession = defineWriteAction({
           action: "sessions.create",
           targetType: "session",
           targetId: id,
-          payload: { kind: input.kind, spaceId: input.spaceId },
+          payload: {
+            kind: input.kind,
+            spaceId: input.spaceId,
+            ...(input.part ? { part: input.part } : {}),
+          },
         },
       };
     },
@@ -735,15 +882,50 @@ export const bookCycleSessions = defineWriteAction({
             input.spaceId,
           ])
         ).get(input.spaceId) ?? [];
+      // One check-in per period of the space's own frequency (P9-T19a-d-b).
+      const rhythmRow = await readRhythmRow(tx, workspaceId);
+      const { thresholds: bookThresholds } = resolveRhythm(rhythmRow);
+      // One review, or the review and the retrospective (§8, §12, P9-T20b-a).
+      const reviewFormat =
+        practiceFromRow(rhythmRow).practice["review.format"] === "split"
+          ? ("split" as const)
+          : ("oneSession" as const);
+      const frequency = await ritualFrequencyOf(
+        tx,
+        workspaceId,
+        input.spaceId,
+        bookThresholds,
+      );
+      // No check-in is booked in a holiday period (§7.4, P9-T19b-a).
+      const holidays = await spaceHolidaysInTx(tx, workspaceId, input.spaceId);
       const plan = planCycleCadence(bounds, {
         weekday: input.weekday as RitualWeekday,
         from,
         existing,
+        frequency,
+        holidays,
+        // About two weeks before the end, at the workspace's own lead (§8).
+        reviewLeadWeeks: bookThresholds["cadence.reviewPreparationLeadWeeks"],
+        reviewFormat,
+        // A year books its closing review and nothing else (§8, P9-T20b-b).
+        cycleMode: cycle.mode,
       });
+      const annual = cycle.mode === "annual";
 
       const sessionIds: string[] = [];
+      // The retrospective names the review session it reads its scores from:
+      // the one booked just before it, or one already booked for this cycle.
+      let reviewSessionId: string | null = null;
       for (const ritual of plan) {
         const id = crypto.randomUUID();
+        const retrospective = ritual.part === "retrospective";
+        if (retrospective && !reviewSessionId) {
+          reviewSessionId = await bookedReviewSessionIdInTx(tx, {
+            workspaceId,
+            spaceId: input.spaceId,
+            cycleId: cycle.id,
+          });
+        }
         await tx.insert(sessions).values({
           id,
           workspaceId,
@@ -751,16 +933,33 @@ export const bookCycleSessions = defineWriteAction({
           cycleId: cycle.id,
           kind: ritual.kind,
           title:
-            RITUALS.find((entry) => entry.kind === ritual.kind)?.name ??
-            ritual.kind,
+            ritual.kind === "quarterly" && annual
+              ? retrospective
+                ? ANNUAL_RETROSPECTIVE_TITLE
+                : ANNUAL_REVIEW_TITLE
+              : retrospective
+                ? RETROSPECTIVE_TITLE
+                : (RITUALS.find((entry) => entry.kind === ritual.kind)?.name ??
+                  ritual.kind),
           scheduledFor: at(ritual.on),
           facilitatorId: input.facilitatorId,
           state: "scheduled",
+          reviewPart: ritual.part ?? null,
+          reviewSessionId: retrospective ? reviewSessionId : null,
         });
+        if (ritual.part === "review") {
+          reviewSessionId = id;
+        }
         sessionIds.push(id);
       }
 
-      const coverage = cadenceCoverage(bounds, [...existing, ...plan]);
+      const coverage = cadenceCoverage(bounds, [...existing, ...plan], {
+        frequency,
+        holidays,
+        reviewLeadWeeks: bookThresholds["cadence.reviewPreparationLeadWeeks"],
+        reviewFormat,
+        cycleMode: cycle.mode,
+      });
       return {
         result: {
           cycleId: cycle.id,
@@ -785,6 +984,49 @@ export const bookCycleSessions = defineWriteAction({
     },
   }),
 });
+
+/**
+ * A retrospective's title (§8, P9-T20b-a). The whole review and the review
+ * half keep §7.1's "Quarterly review".
+ */
+const RETROSPECTIVE_TITLE = "Quarterly retrospective";
+
+/**
+ * An annual cycle's closing review (§8, P9-T20b-b): "the same review" over
+ * the annual OKRs, so the same session kind under the year's own name.
+ */
+const ANNUAL_REVIEW_TITLE = "Annual review";
+const ANNUAL_RETROSPECTIVE_TITLE = "Annual retrospective";
+
+/** The review half already booked for a cycle in a space, if any. */
+async function bookedReviewSessionIdInTx(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly spaceId: string;
+    readonly cycleId: string;
+    /** Only a review scheduled at or before this moment. */
+    readonly before?: Date;
+  },
+): Promise<string | null> {
+  const [row] = await tx
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(
+      activeOnly(
+        sessions,
+        eq(sessions.workspaceId, input.workspaceId),
+        eq(sessions.spaceId, input.spaceId),
+        eq(sessions.cycleId, input.cycleId),
+        eq(sessions.kind, "quarterly"),
+        eq(sessions.reviewPart, "review"),
+        ...(input.before ? [lte(sessions.scheduledFor, input.before)] : []),
+      ),
+    )
+    .orderBy(desc(sessions.scheduledFor))
+    .limit(1);
+  return row?.id ?? null;
+}
 
 export const openSession = defineWriteAction({
   name: "sessions.open",
@@ -814,7 +1056,8 @@ export const openSession = defineWriteAction({
         );
       }
 
-      const firstStage = stageKeysFor(session.kind)?.[0] ?? null;
+      const firstStage =
+        stageKeysFor(session.kind, session.reviewPart)?.[0] ?? null;
       const now = new Date();
 
       await tx
@@ -893,7 +1136,7 @@ export const advanceStage = defineWriteAction({
       }
 
       let nextStageKey: string | null = null;
-      const stageKeys = stageKeysFor(session.kind);
+      const stageKeys = stageKeysFor(session.kind, session.reviewPart);
       if (stageKeys) {
         const stageIndex = session.stageKey
           ? stageKeys.indexOf(session.stageKey)
@@ -969,7 +1212,10 @@ export const advanceStage = defineWriteAction({
         }
 
         // Stage completion gate: diagnose → commitments requires every
-        // low-confidence KR to have a blocker with type, owner and action.
+        // low-confidence KR to have a next action with an owner, or an open
+        // blocker, whose action is the next action (§7.2 step 2, P9-T19a-b).
+        // It asked for a blocker on every one, which had a team inventing a
+        // blocker where there was only a next step.
         if (
           session.stageKey === "diagnose" &&
           nextStageKey === "commitments" &&
@@ -980,6 +1226,7 @@ export const advanceStage = defineWriteAction({
             .select({
               keyResultId: sessionConfidences.keyResultId,
               confidence: sessionConfidences.confirmedConfidence,
+              nextAction: sessionConfidences.nextAction,
             })
             .from(sessionConfidences)
             .where(
@@ -999,11 +1246,14 @@ export const advanceStage = defineWriteAction({
           // stop. Fixed at P6-G19a.
           const LOW_THRESHOLD = gateThresholds["scoring.confidenceLow"];
           const lowKrIds = confirmations
-            .filter((c) => Number(c.confidence) < LOW_THRESHOLD)
+            .filter(
+              (c) =>
+                Number(c.confidence) < LOW_THRESHOLD && c.nextAction === null,
+            )
             .map((c) => c.keyResultId);
 
           if (lowKrIds.length > 0) {
-            // Check that each low KR has at least one unresolved blocker.
+            // Each low KR with no next action of its own needs an open blocker.
             const existingBlockers = await tx
               .select({ keyResultId: blockers.keyResultId })
               .from(blockers)
@@ -1043,7 +1293,7 @@ export const advanceStage = defineWriteAction({
 
               throw new OperationError(
                 "not_found",
-                `Cannot advance: ${titles} scored below ${LOW_THRESHOLD} and has no blocker.`,
+                `Cannot advance: ${titles} scored below ${LOW_THRESHOLD} and has no next action. Name one and its owner, or raise a blocker where something is actually blocked.`,
               );
             }
           }
@@ -1093,6 +1343,30 @@ export const advanceStage = defineWriteAction({
                 `Cannot advance: at least ${MIN_COMMITMENTS} commitments are required, but only ${commitmentCount?.count ?? 0} were set.`,
               );
             }
+          }
+        }
+
+        // Stage completion gate: scoring closes on explanations (§8.3,
+        // P9-T20c). "A committed key result below 1.0 gets its short
+        // explanation, and the scoring stage does not close until every one
+        // has it." A grade carries its one line on why, so a committed key
+        // result graded below 1.0 is explained; one not graded is a miss
+        // nobody has explained unless §2.10's score says it was met.
+        if (
+          session.kind === "quarterly" &&
+          session.stageKey === "score" &&
+          nextStageKey === "narratives"
+        ) {
+          const unexplained = await unexplainedCommittedMissesInTx(
+            tx,
+            workspaceId,
+            session,
+          );
+          if (unexplained.length > 0) {
+            throw new OperationError(
+              "not_found",
+              `Cannot close scoring: ${unexplained.join(", ")} ${unexplained.length === 1 ? "is a committed key result" : "are committed key results"} below 1.0 with no explanation yet. Grade ${unexplained.length === 1 ? "it" : "each"} with a line on why.`,
+            );
           }
         }
       }
@@ -1386,17 +1660,27 @@ export const closeSession = defineWriteAction({
             ),
           )
           .limit(1);
-        const next = afterWeeklyCheckIn(
+        // Counted in the space's own periods (§7.4, P9-T19a-d-b): a week, a
+        // fortnight or a month. The stored start is read again at the
+        // current frequency, so it is passed as stored.
+        const streakFrequency = await ritualFrequencyOf(
+          tx,
+          workspaceId,
+          session.spaceId,
+          resolveRhythm(await readRhythmRow(tx, workspaceId)).thresholds,
+        );
+        const next = afterCheckIn(
           existing
             ? {
                 currentWeeks: existing.currentWeeks,
                 longestWeeks: existing.longestWeeks,
-                lastWeek: existing.lastSessionWeek
-                  ? weekStartOf(existing.lastSessionWeek)
-                  : null,
+                lastWeek: existing.lastSessionWeek ?? null,
               }
             : null,
           heldOn,
+          streakFrequency,
+          // A holiday between two check-ins is not a skipped period (§7.4).
+          await spaceHolidaysInTx(tx, workspaceId, session.spaceId),
         );
         if (existing) {
           // openokr:allow-mutation: streak is derived, not a domain change.
@@ -1443,6 +1727,7 @@ export const closeSession = defineWriteAction({
           .select({
             keyResultId: reviewScores.keyResultId,
             score: reviewScores.score,
+            reason: reviewScores.reason,
           })
           .from(reviewScores)
           .where(
@@ -1453,13 +1738,31 @@ export const closeSession = defineWriteAction({
             ),
           );
 
+        // §3.3 (P9-T14a): the score §2.10 computes at the close is kept
+        // beside the room's, and the room's reason with it where they differ.
+        const computed = await computedScoresInTx(
+          tx,
+          workspaceId,
+          graded.map((grade) => grade.keyResultId),
+          now,
+        );
         for (const grade of graded) {
+          const scoreComputed = computed.get(grade.keyResultId);
+          const adjusted =
+            scoreComputed !== undefined &&
+            Math.abs(Number(grade.score) - scoreComputed) >= 0.005;
           // openokr:allow-mutation: runs on the transaction this Operation
           // opened, so the score, the close, the audit row and the outbox row
           // commit together or not at all.
           await tx
             .update(keyResults)
-            .set({ score: grade.score, updatedAt: now })
+            .set({
+              score: grade.score,
+              scoreComputed:
+                scoreComputed === undefined ? null : String(scoreComputed),
+              scoreReason: adjusted ? grade.reason : null,
+              updatedAt: now,
+            })
             .where(
               activeOnly(
                 keyResults,
@@ -2470,7 +2773,7 @@ export const sessionConfidenceStatus = defineReadAction({
 export const createSessionBlocker = defineWriteAction({
   name: "sessions.createBlocker",
   summary:
-    "Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save.",
+    "Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in.",
   input: z.object({
     sessionId: z.uuid(),
     keyResultId: z.uuid(),
@@ -2507,14 +2810,20 @@ export const createSessionBlocker = defineWriteAction({
       }
 
       const now = new Date();
-      // The clock is the workspace's `cadence.blockerClockHours` (§11), not a
-      // literal 24 (completeness review H-17): a workspace that tuned it got
-      // a board and nudges on one clock and blockers due on another.
+      // Due by the goal's next check-in, at the goal's own frequency (§7.3,
+      // P9-T19a-a). It was twenty-four hours from now, which had the
+      // coordinator hearing about a blocker raised at Tuesday's check-in on
+      // Wednesday, days before the team met again to look at it.
       const { thresholds } = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
-      const clockHours = thresholds["cadence.blockerClockHours"];
-      const dueAt = new Date(now.getTime() + clockHours * 60 * 60 * 1000);
+      const dueAt = await nextCheckInDueAt(tx, {
+        workspaceId,
+        goalId,
+        now,
+        thresholds,
+        timeZone: await workspaceTimeZone(tx, workspaceId),
+      });
 
       const id = crypto.randomUUID();
       await tx.insert(blockers).values({
@@ -2556,6 +2865,299 @@ export const createSessionBlocker = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * A low score's next action (METHOD.md §7.2 step 2, P9-T19a-b).
+ *
+ * "Every low score gets a next action due by the next check-in, with an
+ * owner. Where something is actually blocked, it gets a blocker too." The
+ * session used to ask for a blocker on every low key result, which had a team
+ * inventing one where there was only a next step. This records the step on
+ * the key result's confirmed confidence for the session, due by the goal's
+ * next check-in as a blocker's action is; setting it again replaces it.
+ */
+export const setSessionNextAction = defineWriteAction({
+  name: "sessions.setNextAction",
+  summary:
+    "Names the next action for a key result scored in this session, with its owner, due by the goal's next check-in.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    nextAction: z.string().trim().min(1).max(500),
+    ownerId: z.uuid(),
+  }),
+  output: z.object({ id: z.uuid(), dueAt: z.string() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [confirmed] = await tx
+        .select({ id: sessionConfidences.id })
+        .from(sessionConfidences)
+        .where(
+          activeOnly(
+            sessionConfidences,
+            eq(sessionConfidences.workspaceId, workspaceId),
+            eq(sessionConfidences.sessionId, input.sessionId),
+            eq(sessionConfidences.keyResultId, input.keyResultId),
+          ),
+        )
+        .limit(1);
+      if (!confirmed) {
+        // A next action answers a score, and there is no score to answer
+        // until the confidence round has confirmed one.
+        throw new OperationError(
+          "forbidden",
+          "Confirm this key result's confidence first. A next action answers its score.",
+        );
+      }
+
+      // The owner must be a person in this workspace, as a blocker's is.
+      const [owner] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.ownerId),
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such member.");
+      }
+
+      const now = new Date();
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      const dueAt = await nextCheckInDueAt(tx, {
+        workspaceId,
+        goalId: await goalOfKeyResult(tx, workspaceId, input.keyResultId),
+        now,
+        thresholds,
+        timeZone: await workspaceTimeZone(tx, workspaceId),
+      });
+
+      // openokr:allow-mutation: the operation's own execute.
+      await tx
+        .update(sessionConfidences)
+        .set({
+          nextAction: input.nextAction,
+          nextActionOwnerId: input.ownerId,
+          nextActionDueAt: dueAt,
+          updatedAt: now,
+        })
+        .where(
+          activeOnly(
+            sessionConfidences,
+            eq(sessionConfidences.id, confirmed.id),
+          ),
+        );
+
+      return {
+        result: { id: confirmed.id, dueAt: dueAt.toISOString() },
+        activity: {
+          kind: "session.nextActionSet",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: { keyResultId: input.keyResultId },
+        },
+        audit: {
+          action: "sessions.setNextAction",
+          targetType: "session_confidence",
+          targetId: confirmed.id,
+          payload: {
+            keyResultId: input.keyResultId,
+            ownerId: input.ownerId,
+          },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * What step 2 discusses (METHOD.md §7.2, P9-T19a-b): every key result scored
+ * low in this session, and every one whose confidence fell since the last
+ * session that scored it, with its next action and whether a blocker is open
+ * on it here. A low one with neither holds the session at step 2.
+ */
+export const readSessionLowScores = defineReadAction({
+  name: "sessions.lowScores",
+  summary:
+    "The key results scored low or lower than last time in a session, with each one's next action and whether it is blocked.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      keyResultId: z.uuid(),
+      title: z.string(),
+      confidence: z.number(),
+      /** The last confidence an earlier session confirmed, or null. */
+      previousConfidence: z.number().nullable(),
+      /** Below §3.2's low boundary, which holds the session at step 2. */
+      low: z.boolean(),
+      /** Lower than the previous confirmed confidence. */
+      dropped: z.boolean(),
+      nextAction: z
+        .object({
+          text: z.string(),
+          ownerId: z.uuid(),
+          /** The check-in it is due by, in the workspace calendar. */
+          dueOn: z.string(),
+        })
+        .nullable(),
+      /** An unresolved blocker on it was raised in this session. */
+      blocked: z.boolean(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(
+          tx,
+          context.workspaceId,
+          context.actor.userId,
+        );
+        await requireSessionAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const low = thresholds["scoring.confidenceLow"];
+        const timeZone = await workspaceTimeZone(tx, context.workspaceId);
+
+        const rows = await tx
+          .select({
+            keyResultId: sessionConfidences.keyResultId,
+            title: keyResults.title,
+            confidence: sessionConfidences.confirmedConfidence,
+            createdAt: sessionConfidences.createdAt,
+            nextAction: sessionConfidences.nextAction,
+            nextActionOwnerId: sessionConfidences.nextActionOwnerId,
+            nextActionDueAt: sessionConfidences.nextActionDueAt,
+          })
+          .from(sessionConfidences)
+          .innerJoin(
+            keyResults,
+            eq(keyResults.id, sessionConfidences.keyResultId),
+          )
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.workspaceId, context.workspaceId),
+              eq(sessionConfidences.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(asc(keyResults.title));
+        if (rows.length === 0) {
+          return [];
+        }
+
+        // The confidence each one was last confirmed at, in any earlier
+        // session. One query for all of them, newest first, the first seen
+        // per key result kept.
+        const earlier = await tx
+          .select({
+            keyResultId: sessionConfidences.keyResultId,
+            confidence: sessionConfidences.confirmedConfidence,
+            createdAt: sessionConfidences.createdAt,
+          })
+          .from(sessionConfidences)
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.workspaceId, context.workspaceId),
+              ne(sessionConfidences.sessionId, input.sessionId),
+              inArray(
+                sessionConfidences.keyResultId,
+                rows.map((row) => row.keyResultId),
+              ),
+            ),
+          )
+          .orderBy(desc(sessionConfidences.createdAt));
+        const thisSession = new Map(
+          rows.map((row) => [row.keyResultId, row.createdAt]),
+        );
+        const previous = new Map<string, number>();
+        for (const row of earlier) {
+          const at = thisSession.get(row.keyResultId);
+          if (
+            at !== undefined &&
+            row.createdAt < at &&
+            !previous.has(row.keyResultId)
+          ) {
+            previous.set(row.keyResultId, Number(row.confidence));
+          }
+        }
+
+        const blocked = new Set(
+          (
+            await tx
+              .select({ keyResultId: blockers.keyResultId })
+              .from(blockers)
+              .where(
+                activeOnly(
+                  blockers,
+                  eq(blockers.workspaceId, context.workspaceId),
+                  eq(blockers.sessionId, input.sessionId),
+                  isNull(blockers.resolvedAt),
+                ),
+              )
+          ).map((row) => row.keyResultId),
+        );
+
+        return rows
+          .map((row) => {
+            const confidence = Number(row.confidence);
+            const before = previous.get(row.keyResultId) ?? null;
+            return {
+              keyResultId: row.keyResultId,
+              title: row.title,
+              confidence,
+              previousConfidence: before,
+              low: confidence < low,
+              dropped: before !== null && confidence < before,
+              nextAction:
+                row.nextAction !== null &&
+                row.nextActionOwnerId !== null &&
+                row.nextActionDueAt !== null
+                  ? {
+                      text: row.nextAction,
+                      ownerId: row.nextActionOwnerId,
+                      dueOn: dueLocalDate(row.nextActionDueAt, timeZone) ?? "",
+                    }
+                  : null,
+              blocked: blocked.has(row.keyResultId),
+            };
+          })
+          .filter((row) => row.low || row.dropped);
+      },
+    );
+  },
 });
 
 export const resolveSessionBlocker = defineWriteAction({
@@ -2710,6 +3312,11 @@ export const sessionBlockerStatus = defineReadAction({
       nextAction: z.string(),
       openedAt: z.string(),
       dueAt: z.string(),
+      /**
+       * The check-in the next action is due by, as a date in the workspace
+       * calendar (§7.3, P9-T19a-a).
+       */
+      dueOn: z.string(),
       resolvedAt: z.string().nullable(),
       hoursOpen: z.number(),
       overdue: z.boolean(),
@@ -2729,6 +3336,7 @@ export const sessionBlockerStatus = defineReadAction({
       nextAction: string;
       openedAt: string;
       dueAt: string;
+      dueOn: string;
       resolvedAt: string | null;
       hoursOpen: number;
       overdue: boolean;
@@ -2751,6 +3359,10 @@ export const sessionBlockerStatus = defineReadAction({
           );
 
         const now = new Date();
+        const timeZone = await workspaceTimeZone(
+          tx as OperationTx,
+          context.workspaceId,
+        );
         return rows.map((b) => {
           const hoursOpen =
             (now.getTime() - b.openedAt.getTime()) / (1000 * 60 * 60);
@@ -2763,8 +3375,10 @@ export const sessionBlockerStatus = defineReadAction({
             nextAction: b.nextAction,
             openedAt: b.openedAt.toISOString(),
             dueAt: b.dueAt.toISOString(),
+            dueOn: dueLocalDate(b.dueAt, timeZone) ?? "",
             resolvedAt: b.resolvedAt?.toISOString() ?? null,
             hoursOpen: Math.round(hoursOpen * 10) / 10,
+            // Past the end of the check-in's day, which is what `due_at` holds.
             overdue: now > b.dueAt && !b.resolvedAt,
           };
         });
@@ -2855,6 +3469,8 @@ export const closeSessionCommitments = defineWriteAction({
       z.object({
         id: z.uuid(),
         delivered: z.boolean(),
+        /** A line on why, where it helps (§7.2 step 3, P9-T19a-d-c). */
+        note: z.string().trim().max(300).optional(),
       }),
     ),
   }),
@@ -2902,6 +3518,8 @@ export const closeSessionCommitments = defineWriteAction({
           .update(commitments)
           .set({
             delivered: item.delivered,
+            closingNote:
+              item.note === undefined || item.note === "" ? null : item.note,
             closedAt: now,
             updatedAt: now,
           })
@@ -3279,18 +3897,30 @@ export const readStreak = defineReadAction({
           new Date(),
           await workspaceTimeZone(tx, context.workspaceId),
         );
+        // In the space's own periods (P9-T19a-d-b).
+        const frequency = await ritualFrequencyOf(
+          tx as OperationTx,
+          context.workspaceId,
+          input.spaceId,
+          resolveRhythm(await readRhythmRow(tx, context.workspaceId))
+            .thresholds,
+        );
         return {
           currentWeeks: currentStreakOn(
             row
               ? {
                   currentWeeks: row.currentWeeks,
                   longestWeeks: row.longestWeeks,
-                  lastWeek: row.lastSessionWeek
-                    ? weekStartOf(row.lastSessionWeek)
-                    : null,
+                  lastWeek: row.lastSessionWeek ?? null,
                 }
               : null,
             today,
+            frequency,
+            await spaceHolidaysInTx(
+              tx as OperationTx,
+              context.workspaceId,
+              input.spaceId,
+            ),
           ),
           longestWeeks: row?.longestWeeks ?? 0,
           lastSessionWeek: row?.lastSessionWeek ?? null,
@@ -3307,10 +3937,13 @@ export const readStreak = defineReadAction({
 /**
  * A monthly review has no stages, so nothing here advances one.
  *
- * §7.5 records four things and this module stores two of them. The dependency
+ * §7.5 records five things and this module stores three of them. The dependency
  * and risk log is a read of P3-T09's alignment register, returned by
  * `sessions.monthlyRecord` rather than copied into a table of its own, because
  * two copies of one dependency is two answers a facilitator has to reconcile.
+ * The moves are the same kind of read (P9-T19a-d-d): a start, an update and a
+ * stop are each the write §2.9 already keeps, made from the review or anywhere
+ * else, and the record reads them back from the objective.
  */
 /**
  * `2026-03-14` from an instant, as the workspace's own timezone sees it.
@@ -3519,6 +4152,75 @@ export const setShifts = defineWriteAction({
   }),
 });
 
+/**
+ * The week's wins (METHOD.md §7.2 step 3, P9-T19a-d-c): "Name the week's
+ * wins." A weekly session's own short list, written whole, and carried into
+ * the digest. A closed session keeps the wins it closed with.
+ */
+export const setSessionWins = defineWriteAction({
+  name: "sessions.setWins",
+  summary:
+    "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+  input: z.object({
+    sessionId: z.uuid(),
+    wins: z.array(z.string().trim().min(1).max(200)).max(10),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      if (session.kind !== "weekly") {
+        throw new OperationError(
+          "forbidden",
+          "Wins are named in a weekly check-in.",
+        );
+      }
+      if (session.state === "closed") {
+        throw new OperationError(
+          "forbidden",
+          "This check-in is closed, and its digest went out with the wins it had.",
+        );
+      }
+
+      // openokr:allow-mutation: the operation's own execute.
+      await tx
+        .update(sessions)
+        .set({ wins: input.wins, updatedAt: new Date() })
+        .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
+
+      return {
+        result: { id: input.sessionId },
+        activity: {
+          kind: "session.winsNamed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { count: input.wins.length },
+        },
+        audit: {
+          action: "sessions.setWins",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { count: input.wins.length },
+        },
+      };
+    },
+  }),
+});
+
 export const recordDecision = defineWriteAction({
   name: "sessions.recordDecision",
   summary:
@@ -3613,7 +4315,15 @@ export const recordDecision = defineWriteAction({
           goalId,
           keyResultId: input.keyResultId ?? null,
           text: input.text,
-          at: localDate(new Date(), await workspaceTimeZone(tx, workspaceId)),
+          // The day the review sat, or today while it has not passed: a
+          // decision recorded after the session belongs to the session's day
+          // (P9-T22c-b-b), as its diagnostic does.
+          at: localDate(
+            session.scheduledFor.getTime() < Date.now()
+              ? session.scheduledFor
+              : new Date(),
+            await workspaceTimeZone(tx, workspaceId),
+          ),
           authorMemberId: memberId,
         })
         .returning({ id: decisions.id });
@@ -3707,7 +4417,7 @@ const decisionColumns = {
 export const readMonthlyRecord = defineReadAction({
   name: "sessions.monthlyRecord",
   summary:
-    "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions.",
+    "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     shifts: z.string().nullable(),
@@ -3727,6 +4437,50 @@ export const readMonthlyRecord = defineReadAction({
     ),
     /** Objectives in the review's scope with no trend recorded yet. */
     untrended: z.array(z.object({ goalId: z.uuid(), goalTitle: z.string() })),
+    /**
+     * What was started mid-cycle in the review's scope, oldest first, so the
+     * review reads additions beside the decisions that made them (METHOD.md
+     * §2.9, §7.5, P9-T13-a).
+     */
+    additions: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        /** Null when the objective itself was added. */
+        keyResultId: z.uuid().nullable(),
+        keyResultTitle: z.string().nullable(),
+        addedAt: z.string(),
+      }),
+    ),
+    /**
+     * §2.9's stops in the review's scope, oldest first: objectives closed as
+     * abandoned, each with its one-line reason (METHOD.md §7.5, P9-T19a-d-d).
+     */
+    stops: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        reason: z.string().nullable(),
+        stoppedAt: z.string(),
+      }),
+    ),
+    /**
+     * §2.9's updates to a target once the plan was published, oldest first,
+     * each with the target it replaced and, where it eased, its reason.
+     */
+    updates: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        keyResultId: z.uuid(),
+        keyResultTitle: z.string(),
+        from: z.number(),
+        to: z.number(),
+        eased: z.boolean(),
+        reason: z.string().nullable(),
+        changedAt: z.string(),
+      }),
+    ),
     dependencies: z.array(
       z.object({
         id: z.uuid(),
@@ -3809,6 +4563,13 @@ export const readMonthlyRecord = defineReadAction({
             ),
           );
         const byGoal = new Map(trendRows.map((row) => [row.goalId, row.trend]));
+        // §3.7 (P9-T15a): against the progress expected for the date, where
+        // the workspace reads its signal that way.
+        const pace = await paceInTx(
+          tx,
+          context.workspaceId,
+          session.cycleId ?? null,
+        );
 
         const trends = goalRows.flatMap((goal) => {
           const trend = byGoal.get(goal.id);
@@ -3822,7 +4583,7 @@ export const readMonthlyRecord = defineReadAction({
               goalTitle: goal.title,
               trend,
               signal: Number.isFinite(progressPct)
-                ? progressSignal(progressPct, thresholds)
+                ? progressSignal(progressPct, thresholds, pace)
                 : null,
               progressPct,
             },
@@ -3832,6 +4593,125 @@ export const readMonthlyRecord = defineReadAction({
         const untrended = goalRows
           .filter((goal) => !byGoal.has(goal.id))
           .map((goal) => ({ goalId: goal.id, goalTitle: goal.title }));
+
+        // §2.9's starts, objectives and key results alike, in the scope the
+        // trends read.
+        const addedRows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            goalAddedAt: goals.addedMidCycleAt,
+            keyResultId: keyResults.id,
+            keyResultTitle: keyResults.title,
+            keyResultAddedAt: keyResults.addedMidCycleAt,
+          })
+          .from(goals)
+          .leftJoin(
+            keyResults,
+            and(
+              eq(keyResults.goalId, goals.id),
+              isNull(keyResults.deletedAt),
+              isNotNull(keyResults.addedMidCycleAt),
+            ),
+          )
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+              or(
+                isNotNull(goals.addedMidCycleAt),
+                isNotNull(keyResults.addedMidCycleAt),
+              ),
+            ),
+          );
+        const additions = [
+          ...new Map(
+            addedRows
+              .filter((row) => row.goalAddedAt !== null)
+              .map((row) => [
+                row.goalId,
+                {
+                  goalId: row.goalId,
+                  goalTitle: row.goalTitle,
+                  keyResultId: null,
+                  keyResultTitle: null,
+                  addedAt: new Date(row.goalAddedAt as Date).toISOString(),
+                },
+              ]),
+          ).values(),
+          ...addedRows.flatMap((row) =>
+            row.keyResultId && row.keyResultAddedAt
+              ? [
+                  {
+                    goalId: row.goalId,
+                    goalTitle: row.goalTitle,
+                    keyResultId: row.keyResultId,
+                    keyResultTitle: row.keyResultTitle,
+                    addedAt: new Date(row.keyResultAddedAt).toISOString(),
+                  },
+                ]
+              : [],
+          ),
+        ].sort((a, b) => a.addedAt.localeCompare(b.addedAt));
+
+        // §2.9's stops, in the scope the trends read. Abandoned is the outcome
+        // a stop closes with, and a reopened objective has no close to show.
+        const stopRows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            reason: goals.closeReason,
+            closedAt: goals.closedAt,
+          })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+              eq(goals.successStatus, "abandoned"),
+              isNotNull(goals.closedAt),
+            ),
+          )
+          .orderBy(asc(goals.closedAt));
+
+        // §2.9's updates. A change made before the plan was published is the
+        // plan being written, not a move, which is what `mid_cycle` records.
+        const updateRows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            keyResultId: keyResults.id,
+            keyResultTitle: keyResults.title,
+            from: keyResultTargetChanges.fromValue,
+            to: keyResultTargetChanges.toValue,
+            eased: keyResultTargetChanges.eased,
+            reason: keyResultTargetChanges.reason,
+            changedAt: keyResultTargetChanges.changedAt,
+          })
+          .from(keyResultTargetChanges)
+          .innerJoin(
+            keyResults,
+            and(
+              eq(keyResults.id, keyResultTargetChanges.keyResultId),
+              isNull(keyResults.deletedAt),
+            ),
+          )
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          .where(
+            activeOnly(
+              keyResultTargetChanges,
+              eq(keyResultTargetChanges.workspaceId, context.workspaceId),
+              eq(keyResultTargetChanges.midCycle, true),
+              isNull(goals.deletedAt),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+            ),
+          )
+          .orderBy(asc(keyResultTargetChanges.changedAt));
 
         // §7.5's dependency and risk log, read from P3-T09's register rather
         // than stored a second time here.
@@ -3882,6 +4762,24 @@ export const readMonthlyRecord = defineReadAction({
           shifts: session.shifts,
           trends,
           untrended,
+          additions,
+          stops: stopRows.map((row) => ({
+            goalId: row.goalId,
+            goalTitle: row.goalTitle,
+            reason: row.reason,
+            stoppedAt: new Date(row.closedAt as Date).toISOString(),
+          })),
+          updates: updateRows.map((row) => ({
+            goalId: row.goalId,
+            goalTitle: row.goalTitle,
+            keyResultId: row.keyResultId,
+            keyResultTitle: row.keyResultTitle,
+            from: Number(row.from),
+            to: Number(row.to),
+            eased: row.eased,
+            reason: row.reason,
+            changedAt: new Date(row.changedAt).toISOString(),
+          })),
           dependencies: dependencyRows.map((row) => ({
             id: row.id,
             keyResultId: row.keyResultId,
@@ -4526,6 +5424,32 @@ export const scoreKeyResult = defineWriteAction({
         requires: ACCESS_LEVELS.view as never,
       });
 
+      // §3.3 (P9-T14a): the score is computed from progress at the close,
+      // and a workspace may forbid adjusting it. Where it does, a grade that
+      // is not the computed number is refused, citing the setting.
+      const { practice } = practiceFromRow(
+        await readRhythmRow(tx, workspaceId),
+      );
+      if (practice["scoring.adjustment"] === "notAllowed") {
+        const computed = (
+          await computedScoresInTx(
+            tx,
+            workspaceId,
+            [input.keyResultId],
+            new Date(),
+          )
+        ).get(input.keyResultId);
+        if (
+          computed !== undefined &&
+          Math.abs(input.score - computed) >= 0.005
+        ) {
+          throw new OperationError(
+            "forbidden",
+            `This workspace scores by the computed number, ${computed}, and does not allow adjusting it (Score adjustment at close).`,
+          );
+        }
+      }
+
       const [existing] = await tx
         .select({ id: reviewScores.id })
         .from(reviewScores)
@@ -4620,13 +5544,100 @@ const narrativeBody = z
  * exactly the fail-open shape, so every caller spells `activeOnly(goals, ...)`
  * out loud and this only holds the three conditions that are easy to forget.
  */
+/**
+ * The committed key results in a review's scope that came in below 1.0 and
+ * have no explanation yet (§8.3, P9-T20c), by title.
+ *
+ * Graded is explained: a grade carries its one line on why. Ungraded is a
+ * miss unless §2.10's computed score already says it met the promise, which
+ * is the one case the room does not have to stop for.
+ */
+async function unexplainedCommittedMissesInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: {
+    id: string;
+    spaceId: string | null;
+    cycleId: string | null;
+  },
+): Promise<string[]> {
+  const committed = await tx
+    .select({ id: keyResults.id, title: keyResults.title })
+    .from(keyResults)
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        keyResults,
+        isNull(goals.deletedAt),
+        eq(goals.kind, "committed"),
+        ...reviewObjectiveConditions(workspaceId, session),
+      ),
+    )
+    .orderBy(goals.position, keyResults.position);
+  if (committed.length === 0) {
+    return [];
+  }
+  const graded = await tx
+    .select({
+      keyResultId: reviewScores.keyResultId,
+      score: reviewScores.score,
+      reason: reviewScores.reason,
+    })
+    .from(reviewScores)
+    .where(
+      activeOnly(
+        reviewScores,
+        eq(reviewScores.workspaceId, workspaceId),
+        eq(reviewScores.sessionId, session.id),
+      ),
+    );
+  const byKeyResult = new Map(graded.map((row) => [row.keyResultId, row]));
+  const ungraded = committed.filter((row) => !byKeyResult.has(row.id));
+  const computed = await computedScoresInTx(
+    tx,
+    workspaceId,
+    ungraded.map((row) => row.id),
+    new Date(),
+  );
+  return committed
+    .filter((row) => {
+      const grade = byKeyResult.get(row.id);
+      if (grade) {
+        return Number(grade.score) < 1 && grade.reason.trim() === "";
+      }
+      return (computed.get(row.id) ?? 0) < 1;
+    })
+    .map((row) => row.title);
+}
+
+/**
+ * The objectives a review covers: its space's, in its cycle, still open.
+ *
+ * **A review in the company space covers the whole cycle** (P9-T22c-b-b). The
+ * workspace's first space is the company's, as the Champion already reads it
+ * (P9-T19a), and a company objective belongs to no space: until this, no
+ * review anywhere could decide one. The company's review is where §8.8's
+ * "close every objective deliberately" is held for everyone; a team's own
+ * review still covers the team's own.
+ */
 function reviewObjectiveConditions(
   workspaceId: string,
   session: { spaceId: string | null; cycleId: string | null },
 ) {
   return [
     eq(goals.workspaceId, workspaceId),
-    session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+    session.spaceId
+      ? or(
+          eq(goals.spaceId, session.spaceId),
+          sql`${session.spaceId}::uuid = (
+            select first.id from spaces first
+             where first.workspace_id = ${workspaceId}
+               and first.deleted_at is null
+             order by first.created_at
+             limit 1
+          )`,
+        )
+      : sql`true`,
     session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
     isNull(goals.closedAt),
   ] as const;
@@ -5959,27 +6970,32 @@ export const readManagementRetro = defineReadAction({
 // ---------------------------------------------------------------------------
 
 /**
- * Every key result this review graded below the threshold.
+ * Every key result this review graded below its root-cause threshold.
  *
  * Read from `review_scores` rather than from `key_results.score`, because the
  * grades do not land on the key results until the session closes (P4-T10b-a) and
- * stage seven runs before that. Strictly below: §8.4 says "below 0.7", so a key
- * result that scored exactly the threshold met it, and asking a room to explain
- * a result it did not miss is how a stage loses its credibility.
+ * stage seven runs before that. Strictly below, and by kind since P9-T20c:
+ * §8.4 asks it of "every aspirational key result below 0.6, and every
+ * committed key result below 1.0". It held every key result to the
+ * aspirational line until then, so a committed one at 0.8 was never asked
+ * why it missed what it promised.
  */
 async function missedKeyResultsInTx(
   tx: OperationTx,
   workspaceId: string,
   sessionId: string,
-  threshold: number,
+  thresholds: ResolvedThresholds,
 ) {
-  return tx
+  // The grades live where the scoring stage ran (§8, P9-T20b-a).
+  const { review } = await reviewHalvesInTx(tx, workspaceId, sessionId);
+  const graded = await tx
     .select({
       keyResultId: keyResults.id,
       title: keyResults.title,
       goalTitle: goals.title,
       score: reviewScores.score,
       position: keyResults.position,
+      kind: goals.kind,
     })
     .from(reviewScores)
     .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
@@ -5988,28 +7004,52 @@ async function missedKeyResultsInTx(
       activeOnly(
         reviewScores,
         eq(reviewScores.workspaceId, workspaceId),
-        eq(reviewScores.sessionId, sessionId),
+        eq(reviewScores.sessionId, review),
         isNull(keyResults.deletedAt),
         isNull(goals.deletedAt),
-        lt(reviewScores.score, String(threshold)),
       ),
     )
     .orderBy(goals.position, keyResults.position);
+  return graded.filter((row) =>
+    needsRootCause(Number(row.score), row.kind, thresholds),
+  );
 }
 
 export const setRootCause = defineWriteAction({
   name: "sessions.setRootCause",
   summary:
-    "Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4).",
-  input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
-    // 1 to 8, indexing §8.4's taxonomy. The text is canon in
-    // `packages/method`; §11 lists the root-cause taxonomy among the structures
-    // a workspace cannot change.
-    causeKey: z.number().int().min(1).max(8),
-    detail: z.string().trim().max(1000).optional(),
-  }),
+    "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
+  input: z
+    .object({
+      sessionId: z.uuid(),
+      keyResultId: z.uuid(),
+      // 1 to 9, indexing §8.4's taxonomy. The text is canon in
+      // `packages/method`; §11 lists the root-cause taxonomy among the
+      // structures a workspace cannot change.
+      causeKey: z.number().int().min(1).max(ROOT_CAUSES.length),
+      /** §8.4: "and may name a second" (P9-T20c). Never the primary again. */
+      secondaryCauseKey: z
+        .number()
+        .int()
+        .min(1)
+        .max(ROOT_CAUSES.length)
+        .nullable()
+        .optional(),
+      detail: z.string().trim().max(1000).optional(),
+    })
+    .refine(
+      (value) =>
+        value.secondaryCauseKey == null ||
+        value.secondaryCauseKey !== value.causeKey,
+      { message: "A second cause is a different cause from the first." },
+    )
+    .refine(
+      (value) =>
+        (value.causeKey !== ROOT_CAUSE_OTHER &&
+          value.secondaryCauseKey !== ROOT_CAUSE_OTHER) ||
+        (value.detail ?? "").length > 0,
+      { message: "Other is described in a line. Say what it was." },
+    ),
   output: z.object({ keyResultId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -6032,11 +7072,12 @@ export const setRootCause = defineWriteAction({
       const { thresholds } = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
+      // Below its own kind's threshold (§8.4, P9-T20c).
       const missed = await missedKeyResultsInTx(
         tx,
         workspaceId,
         input.sessionId,
-        thresholds["scoring.rootCauseThreshold"],
+        thresholds,
       );
       const target = missed.find(
         (entry) => entry.keyResultId === input.keyResultId,
@@ -6047,7 +7088,7 @@ export const setRootCause = defineWriteAction({
         // something that needs none.
         throw new OperationError(
           "not_found",
-          "That key result did not come in under the threshold in this review.",
+          "That key result did not come in under its root-cause threshold in this review.",
         );
       }
 
@@ -6086,13 +7127,14 @@ export const setRootCause = defineWriteAction({
         .limit(1);
 
       if (existing) {
-        // Replaces rather than adding. §8.4's own word is "primary", and a key
-        // result with two causes has had the question dodged rather than
-        // answered.
+        // Replaces rather than adding: one primary, as §8.4 says, and the
+        // second is its own column rather than another row, so a key result
+        // never carries two primaries (P9-T20c).
         await tx
           .update(rootCauses)
           .set({
             causeKey: input.causeKey,
+            secondaryCauseKey: input.secondaryCauseKey ?? null,
             detail: input.detail ?? null,
             namedById: memberId,
             updatedAt: now,
@@ -6104,6 +7146,7 @@ export const setRootCause = defineWriteAction({
           sessionId: input.sessionId,
           keyResultId: input.keyResultId,
           causeKey: input.causeKey,
+          secondaryCauseKey: input.secondaryCauseKey ?? null,
           detail: input.detail ?? null,
           namedById: memberId,
         });
@@ -6135,26 +7178,39 @@ export const setRootCause = defineWriteAction({
 export const readRootCauses = defineReadAction({
   name: "sessions.rootCauses",
   summary:
-    "Every key result this review graded below the threshold, with its cause (METHOD.md §8.4).",
+    "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
-    /** §11's `scoring.rootCauseThreshold`, so the screen never states its own. */
-    threshold: z.number(),
+    /**
+     * §11's `scoring.rootCauseThreshold` for each kind, so the screen never
+     * states its own (P9-T20c): aspirational below 0.6, committed below 1.0.
+     */
+    thresholds: z.object({ aspirational: z.number(), committed: z.number() }),
     keyResults: z.array(
       z.object({
         keyResultId: z.uuid(),
         title: z.string(),
         goalTitle: z.string(),
+        /** Its objective's kind, which decides its threshold. */
+        kind: z.enum(GOAL_KINDS),
         score: z.number(),
         causeKey: z.number().int().nullable(),
         /** The canon label, from `packages/method`. Never stored on the row. */
         causeLabel: z.string().nullable(),
+        /** §8.4's optional second cause (P9-T20c). */
+        secondaryCauseKey: z.number().int().nullable(),
+        secondaryCauseLabel: z.string().nullable(),
         detail: z.string().nullable(),
       }),
     ),
     named: z.number().int(),
     /** Every missed key result has a cause. §8.1's condition for the stage. */
     complete: z.boolean(),
+    /**
+     * Whether this workspace asks for them (§12's "Root causes at the
+     * review", P9-T20c). Optional, the room may leave a miss without one.
+     */
+    required: z.boolean(),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -6178,21 +7234,23 @@ export const readRootCauses = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const { thresholds } = resolveRhythm(
-          await readRhythmRow(tx, context.workspaceId),
-        );
-        const threshold = thresholds["scoring.rootCauseThreshold"];
+        const rhythmRow = await readRhythmRow(tx, context.workspaceId);
+        const { thresholds } = resolveRhythm(rhythmRow);
         const missed = await missedKeyResultsInTx(
           tx,
           context.workspaceId,
           input.sessionId,
-          threshold,
+          thresholds,
         );
+        const required =
+          practiceFromRow(rhythmRow).practice["review.rootCauses"] !==
+          "optional";
 
         const named = await tx
           .select({
             keyResultId: rootCauses.keyResultId,
             causeKey: rootCauses.causeKey,
+            secondaryCauseKey: rootCauses.secondaryCauseKey,
             detail: rootCauses.detail,
           })
           .from(rootCauses)
@@ -6207,16 +7265,21 @@ export const readRootCauses = defineReadAction({
 
         const keyResultRows = missed.map((entry) => {
           const cause = byKeyResult.get(entry.keyResultId);
+          const secondary = cause?.secondaryCauseKey ?? null;
           return {
             keyResultId: entry.keyResultId,
             title: entry.title,
             goalTitle: entry.goalTitle,
+            kind: entry.kind,
             score: Number(entry.score),
             causeKey: cause?.causeKey ?? null,
             causeLabel:
               cause === undefined
                 ? null
                 : (ROOT_CAUSES[cause.causeKey - 1] ?? null),
+            secondaryCauseKey: secondary,
+            secondaryCauseLabel:
+              secondary === null ? null : (ROOT_CAUSES[secondary - 1] ?? null),
             detail: cause?.detail ?? null,
           };
         });
@@ -6225,11 +7288,12 @@ export const readRootCauses = defineReadAction({
         ).length;
 
         return {
-          threshold,
+          thresholds: thresholds["scoring.rootCauseThreshold"],
           keyResults: keyResultRows,
           named: withCause,
           complete:
             keyResultRows.length > 0 && withCause === keyResultRows.length,
+          required,
         };
       },
     );
@@ -6517,22 +7581,69 @@ export const readProcessHealth = defineReadAction({
  * (P4-T10b-b); by stage seven the room has seen everything, and a diagnostic
  * that ignored unrevealed grades would diagnose a quarter that did not happen.
  */
+/**
+ * What §8.6 combines (P9-T20d): the cycle score over the scored aspirational
+ * key results, the committed ones as the share met, the measured rhythm, and
+ * process-health statements 2 and 5 as the cross-check.
+ */
 async function diagnosticInputsInTx(
   tx: OperationTx,
   workspaceId: string,
-  sessionId: string,
+  session: {
+    id: string;
+    spaceId: string | null;
+    cycleId: string | null;
+    scheduledFor: Date;
+  },
+  thresholds: ResolvedThresholds,
 ) {
+  const sessionId = session.id;
+  // The grades from the review half, and process health from the session
+  // reading it, which is the retrospective where they are apart (P9-T20b-a).
+  const { review } = await reviewHalvesInTx(tx, workspaceId, sessionId);
   const graded = await tx
-    .select({ score: reviewScores.score })
+    .select({
+      score: reviewScores.score,
+      kind: goals.kind,
+      goalId: goals.id,
+    })
     .from(reviewScores)
+    .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
     .where(
       activeOnly(
         reviewScores,
         eq(reviewScores.workspaceId, workspaceId),
-        eq(reviewScores.sessionId, sessionId),
+        eq(reviewScores.sessionId, review),
       ),
     );
-  const cycle = cycleScore(graded.map((row) => Number(row.score)));
+  // §8.6: "the §3.4 average over every scored aspirational key result", with
+  // committed ones judged by the share met instead, because averaging the two
+  // hides both.
+  const cycle = cycleScore(
+    graded
+      .filter((row) => row.kind === "aspirational")
+      .map((row) => Number(row.score)),
+  );
+  const committedScores = graded
+    .filter((row) => row.kind === "committed")
+    .map((row) => Number(row.score));
+  const committed = committedShareMet(committedScores, thresholds);
+  const measured = await measuredRhythmInTx(tx, {
+    workspaceId,
+    spaceId: session.spaceId,
+    cycleId: session.cycleId,
+    // As of the day the room sits, or now while it has not (P9-T22c-b-b).
+    // Read later, the rhythm counted check-ins that fell due after the
+    // review as missed, so a review recorded the day after it was held read
+    // a different team.
+    asOf:
+      session.scheduledFor.getTime() < Date.now()
+        ? session.scheduledFor
+        : new Date(),
+    thresholds,
+    gradedGoalIds: [...new Set(graded.map((row) => row.goalId))],
+  });
 
   const responses = await tx
     .select({
@@ -6557,7 +7668,7 @@ async function diagnosticInputsInTx(
           forStatement.length;
   });
 
-  return { cycle, rhythm: rhythmScore(averages) };
+  return { cycle, committed, measured, survey: rhythmScore(averages) };
 }
 
 export const recordDiagnostic = defineWriteAction({
@@ -6568,7 +7679,11 @@ export const recordDiagnostic = defineWriteAction({
   output: z.object({
     verdict: z.enum(DIAGNOSIS_VERDICTS),
     cycleScore: z.number(),
-    rhythmScore: z.number(),
+    /**
+     * The measured share of due check-ins published on time (P9-T20d), or
+     * null for a delivered cycle read before anything fell due.
+     */
+    onTimeShare: z.number().nullable(),
   }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -6586,28 +7701,42 @@ export const recordDiagnostic = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
-      const { cycle, rhythm } = await diagnosticInputsInTx(
-        tx,
-        workspaceId,
-        input.sessionId,
-      );
-      if (cycle === null || rhythm === null) {
-        // §8.6 combines two numbers and neither is optional. A diagnostic built
-        // on a missing answer is worse than no diagnostic, because it reads as
-        // evidence.
-        throw new OperationError(
-          "not_found",
-          "The diagnostic needs both a cycle score and a rhythm score. Grade the key results and run the survey first.",
-        );
-      }
-
       const { thresholds } = resolveRhythm(
         await readRhythmRow(tx, workspaceId),
       );
+      const { cycle, measured, survey } = await diagnosticInputsInTx(
+        tx,
+        workspaceId,
+        session,
+        thresholds,
+      );
+      // §8.6 combines two numbers. The first row needs only the cycle score:
+      // a delivered cycle consults no rhythm. Below it, the measured rhythm
+      // decides, and with nothing fallen due there is no rhythm to read. A
+      // diagnostic built on a missing answer is worse than no diagnostic,
+      // because it reads as evidence.
+      if (cycle === null) {
+        throw new OperationError(
+          "not_found",
+          "The diagnostic needs a cycle score. Grade the aspirational key results first.",
+        );
+      }
+      const delivered = cycle >= thresholds["sessions.diagnosticCycleScore"];
+      if (!delivered && measured.share === null) {
+        throw new OperationError(
+          "not_found",
+          "The diagnostic needs a measured rhythm, and no check-in has fallen due in this cycle yet.",
+        );
+      }
+
       // The verdict, the diagnosis and the prescription all come from
       // `packages/method`. Nothing about which of the three cases applies is
       // decided here.
-      const diagnosis = rhythmDiagnostic(cycle, rhythm, thresholds);
+      const diagnosis = rhythmDiagnostic(
+        cycle,
+        measured.share ?? 0,
+        thresholds,
+      );
 
       const now = new Date();
       const [existing] = await tx
@@ -6624,7 +7753,12 @@ export const recordDiagnostic = defineWriteAction({
 
       const values = {
         cycleScore: String(cycle),
-        rhythmScore: String(rhythm),
+        // The two statements, kept as the cross-check, or null where the room
+        // has not answered them yet (P9-T20d).
+        rhythmScore: survey === null ? null : String(survey),
+        onTimeShare: measured.share === null ? null : String(measured.share),
+        dueCheckIns: measured.share === null ? null : measured.due,
+        onTimeCheckIns: measured.share === null ? null : measured.onTime,
         verdict: diagnosis.kind,
         narrative: diagnosis.prescription,
         recordedById: memberId,
@@ -6656,7 +7790,7 @@ export const recordDiagnostic = defineWriteAction({
         result: {
           verdict: diagnosis.kind,
           cycleScore: cycle,
-          rhythmScore: rhythm,
+          onTimeShare: measured.share,
         },
         activity: {
           kind: "session.diagnosticRead",
@@ -6688,13 +7822,24 @@ export const readDiagnostic = defineReadAction({
   output: z.object({
     /** The stored numbers when recorded, else what the room has so far. */
     cycleScore: z.number().nullable(),
+    /** §3.4's committed half: the share of committed key results met. */
+    committedMet: z.number().nullable(),
+    /**
+     * The measured rhythm (§8.6, P9-T20d): the share of due check-ins
+     * published within tolerance, and the two counts it comes from. Null on
+     * a diagnostic read before it, which was read on the survey.
+     */
+    onTimeShare: z.number().nullable(),
+    dueCheckIns: z.number().int().nullable(),
+    onTimeCheckIns: z.number().int().nullable(),
+    /** Process-health statements 2 and 5, shown beside it as a cross-check. */
     rhythmScore: z.number().nullable(),
     verdict: z.enum(DIAGNOSIS_VERDICTS).nullable(),
     /** §8.6's sentences, from `packages/method`. Never stored as the verdict's meaning. */
     diagnosis: z.string().nullable(),
     prescription: z.string().nullable(),
     recorded: z.boolean(),
-    /** Both numbers exist, so the room can read it. */
+    /** A cycle score and a measured rhythm both exist, so the room can read it. */
     readable: z.boolean(),
   }),
   access: ACCESS_LEVELS.view,
@@ -6711,7 +7856,7 @@ export const readDiagnostic = defineReadAction({
       async (rawTx) => {
         const tx = rawTx as unknown as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
-        await requireQuarterly(
+        const session = await requireQuarterly(
           tx,
           context.workspaceId,
           memberId,
@@ -6722,10 +7867,19 @@ export const readDiagnostic = defineReadAction({
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, context.workspaceId),
         );
+        const inputs = await diagnosticInputsInTx(
+          tx,
+          context.workspaceId,
+          session,
+          thresholds,
+        );
         const [stored] = await tx
           .select({
             cycleScore: reviewDiagnostics.cycleScore,
             rhythmScore: reviewDiagnostics.rhythmScore,
+            onTimeShare: reviewDiagnostics.onTimeShare,
+            dueCheckIns: reviewDiagnostics.dueCheckIns,
+            onTimeCheckIns: reviewDiagnostics.onTimeCheckIns,
             verdict: reviewDiagnostics.verdict,
           })
           .from(reviewDiagnostics)
@@ -6739,17 +7893,20 @@ export const readDiagnostic = defineReadAction({
           .limit(1);
 
         if (stored) {
-          // The sentences are recomputed from the stored numbers rather than
-          // stored twice, so a wording correction in METHOD.md reaches old
-          // records while the verdict they were read at does not move.
-          const diagnosis = rhythmDiagnostic(
-            Number(stored.cycleScore),
-            Number(stored.rhythmScore),
-            thresholds,
-          );
+          // The sentences come from the verdict the room was given, not from
+          // the numbers again (P9-T20d): a diagnostic read before then stored
+          // a survey rhythm out of five, which today's share threshold would
+          // misread, and a wording correction in METHOD.md still reaches it.
+          const diagnosis = diagnosisFor(stored.verdict);
+          const asNumber = (value: string | null) =>
+            value === null ? null : Number(value);
           return {
             cycleScore: Number(stored.cycleScore),
-            rhythmScore: Number(stored.rhythmScore),
+            committedMet: inputs.committed,
+            onTimeShare: asNumber(stored.onTimeShare),
+            dueCheckIns: stored.dueCheckIns,
+            onTimeCheckIns: stored.onTimeCheckIns,
+            rhythmScore: asNumber(stored.rhythmScore),
             verdict: stored.verdict,
             diagnosis: diagnosis.diagnosis,
             prescription: diagnosis.prescription,
@@ -6758,19 +7915,25 @@ export const readDiagnostic = defineReadAction({
           };
         }
 
-        const { cycle, rhythm } = await diagnosticInputsInTx(
-          tx,
-          context.workspaceId,
-          input.sessionId,
-        );
         return {
-          cycleScore: cycle,
-          rhythmScore: rhythm,
+          cycleScore: inputs.cycle,
+          committedMet: inputs.committed,
+          onTimeShare: inputs.measured.share,
+          dueCheckIns:
+            inputs.measured.share === null ? null : inputs.measured.due,
+          onTimeCheckIns:
+            inputs.measured.share === null ? null : inputs.measured.onTime,
+          rhythmScore: inputs.survey,
           verdict: null,
           diagnosis: null,
           prescription: null,
           recorded: false,
-          readable: cycle !== null && rhythm !== null,
+          // Readable on the cycle score alone when it was delivered (§8.6's
+          // first row), and otherwise once something has fallen due.
+          readable:
+            inputs.cycle !== null &&
+            (inputs.cycle >= thresholds["sessions.diagnosticCycleScore"] ||
+              inputs.measured.share !== null),
         };
       },
     );
@@ -6918,6 +8081,12 @@ export const readReset = defineReadAction({
         /** §8.8's meaning for the chosen decision, from `packages/method`. */
         meaning: z.string().nullable(),
         why: z.string().nullable(),
+        /**
+         * What the practice proposes, never what it chooses (§8.8, §12,
+         * P9-T20e-a): "An unfinished aspirational objective is proposed as
+         * Keep by default." Null where nothing is proposed.
+         */
+        proposed: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
       }),
     ),
     decided: z.number().int(),
@@ -6947,7 +8116,11 @@ export const readReset = defineReadAction({
         );
 
         const rows = await tx
-          .select({ goalId: goals.id, goalTitle: goals.title })
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            kind: goals.kind,
+          })
           .from(goals)
           .where(
             activeOnly(
@@ -6973,6 +8146,12 @@ export const readReset = defineReadAction({
           );
         const byGoal = new Map(decisions.map((row) => [row.goalId, row]));
 
+        // The grades from the review half (§8, P9-T20b-a).
+        const { review } = await reviewHalvesInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
         const graded = await tx
           .select({
             goalId: keyResults.goalId,
@@ -6985,25 +8164,35 @@ export const readReset = defineReadAction({
             activeOnly(
               reviewScores,
               eq(reviewScores.workspaceId, context.workspaceId),
-              eq(reviewScores.sessionId, input.sessionId),
+              eq(reviewScores.sessionId, review),
               isNull(keyResults.deletedAt),
             ),
           );
 
+        const proposesKeep =
+          practiceFromRow(await readRhythmRow(tx, context.workspaceId))
+            .practice["close.carryForward"] !== "notProposed";
         const objectives = rows.map((row) => {
           const decided = byGoal.get(row.goalId);
           const forGoal = graded.filter((entry) => entry.goalId === row.goalId);
+          // §3.2's weighting, from `packages/method`. Shown here as evidence
+          // beside the decision, which is what §8.8 asks a room to decide on.
+          const score = objectiveScore(
+            forGoal.map((entry) => ({
+              score: Number(entry.score),
+              weight: Number(entry.weight),
+            })),
+          );
           return {
             goalId: row.goalId,
             goalTitle: row.goalTitle,
-            // §3.2's weighting, from `packages/method`. Shown here as evidence
-            // beside the decision, which is what §8.8 asks a room to decide on.
-            score: objectiveScore(
-              forGoal.map((entry) => ({
-                score: Number(entry.score),
-                weight: Number(entry.weight),
-              })),
-            ),
+            score,
+            proposed:
+              proposesKeep &&
+              row.kind === "aspirational" &&
+              (score === null || score < 1)
+                ? ("keep" as const)
+                : null,
             decision: decided?.decision ?? null,
             meaning:
               decided === undefined
@@ -7162,10 +8351,19 @@ export const captureLearning = defineWriteAction({
   }),
 });
 
+/**
+ * **Deprecated since 0.2.0, removed in 0.3** (P9-T22d, PLAN.md §5.1).
+ *
+ * Stage ten is Learnings: the review no longer drafts the next cycle, and no
+ * screen calls this any more. A kept or modified objective reaches the next
+ * cycle's Phase 4 on its own, and an idea reaches its issue list as a carried
+ * learning. Kept for one release so a script or an agent that still calls it
+ * does not break on upgrade; what it writes still reads in the minutes.
+ */
 export const draftNextCycle = defineWriteAction({
   name: "sessions.draftNextCycle",
   summary:
-    "Notes an objective the next cycle might carry (METHOD.md §8.9 stage 10).",
+    "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
   input: z.object({
     sessionId: z.uuid(),
     title: z.string().trim().min(1).max(280),
@@ -7627,12 +8825,27 @@ export const readMinutes = defineReadAction({
     /** §8.10's executive summary, in its own words. */
     summary: z.object({
       cycleScore: z.number().nullable(),
+      /**
+       * Committed key results met, apart from the score (§8.10, P9-T20e-b):
+       * a commitment is met or it is not, and averaging it in hides both.
+       */
+      committed: z.object({
+        met: z.number().int(),
+        reviewed: z.number().int(),
+      }),
       verdict: z.string().nullable(),
       objectivesReviewed: z.number().int(),
       keyResultsReviewed: z.number().int(),
-      /** §8.4's threshold, so the count says what it counted. */
+      /**
+       * Key results below their root-cause threshold, each against its own
+       * kind's (§8.4, P9-T20c), with both thresholds so the count says what
+       * it counted.
+       */
       belowThreshold: z.number().int(),
-      threshold: z.number(),
+      thresholds: z.object({
+        aspirational: z.number(),
+        committed: z.number(),
+      }),
       teamPulse: z.number().nullable(),
       learningsCarried: z.number().int(),
       actionsAgreed: z.number().int(),
@@ -7714,11 +8927,17 @@ export const readMinutes = defineReadAction({
           input.sessionId,
           ACCESS_LEVELS.view,
         );
+        // Stages 1 to 4 from the review half and 5 to 11 from the
+        // retrospective, which are one session unless the workspace holds
+        // them apart (§8, P9-T20b-a). Either half's minutes are the whole
+        // review's.
+        const halves = await reviewHalvesInTx(tx, workspaceId, input.sessionId);
 
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, workspaceId),
         );
-        const threshold = thresholds["scoring.rootCauseThreshold"];
+        // Each key result against its own kind's threshold (§8.4, P9-T20c).
+        const causeThresholds = thresholds["scoring.rootCauseThreshold"];
 
         // --- the scored key results, which most of the summary counts ---
         const scoreRows = await tx
@@ -7729,6 +8948,7 @@ export const readMinutes = defineReadAction({
             score: reviewScores.score,
             reason: reviewScores.reason,
             position: goals.position,
+            kind: goals.kind,
           })
           .from(reviewScores)
           .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
@@ -7737,7 +8957,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewScores,
               eq(reviewScores.workspaceId, workspaceId),
-              eq(reviewScores.sessionId, input.sessionId),
+              eq(reviewScores.sessionId, halves.review),
               isNull(keyResults.deletedAt),
               isNull(goals.deletedAt),
             ),
@@ -7754,7 +8974,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewDiagnostics,
               eq(reviewDiagnostics.workspaceId, workspaceId),
-              eq(reviewDiagnostics.sessionId, input.sessionId),
+              eq(reviewDiagnostics.sessionId, halves.retrospective),
             ),
           )
           .limit(1);
@@ -7766,7 +8986,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               sessionParticipants,
               eq(sessionParticipants.workspaceId, workspaceId),
-              eq(sessionParticipants.sessionId, input.sessionId),
+              eq(sessionParticipants.sessionId, halves.review),
             ),
           );
 
@@ -7783,7 +9003,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewNarratives,
               eq(reviewNarratives.workspaceId, workspaceId),
-              eq(reviewNarratives.sessionId, input.sessionId),
+              eq(reviewNarratives.sessionId, halves.review),
               isNull(goals.deletedAt),
             ),
           )
@@ -7805,7 +9025,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               kudos,
               eq(kudos.workspaceId, workspaceId),
-              eq(kudos.sessionId, input.sessionId),
+              eq(kudos.sessionId, halves.review),
             ),
           )
           .orderBy(kudos.createdAt);
@@ -7822,7 +9042,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               retroNotes,
               eq(retroNotes.workspaceId, workspaceId),
-              eq(retroNotes.sessionId, input.sessionId),
+              eq(retroNotes.sessionId, halves.retrospective),
             ),
           )
           .orderBy(desc(retroNotes.votes), retroNotes.createdAt);
@@ -7861,7 +9081,7 @@ export const readMinutes = defineReadAction({
               activeOnly(
                 managementAnswers,
                 eq(managementAnswers.workspaceId, workspaceId),
-                eq(managementAnswers.sessionId, input.sessionId),
+                eq(managementAnswers.sessionId, halves.retrospective),
               ),
             )
             .orderBy(managementAnswers.questionKey);
@@ -7886,7 +9106,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               rootCauses,
               eq(rootCauses.workspaceId, workspaceId),
-              eq(rootCauses.sessionId, input.sessionId),
+              eq(rootCauses.sessionId, halves.retrospective),
               isNull(keyResults.deletedAt),
             ),
           );
@@ -7902,7 +9122,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               processHealthResponses,
               eq(processHealthResponses.workspaceId, workspaceId),
-              eq(processHealthResponses.sessionId, input.sessionId),
+              eq(processHealthResponses.sessionId, halves.retrospective),
             ),
           );
 
@@ -7919,7 +9139,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewDecisions,
               eq(reviewDecisions.workspaceId, workspaceId),
-              eq(reviewDecisions.sessionId, input.sessionId),
+              eq(reviewDecisions.sessionId, halves.retrospective),
               isNull(goals.deletedAt),
             ),
           )
@@ -7936,7 +9156,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               learnings,
               eq(learnings.workspaceId, workspaceId),
-              eq(learnings.sessionId, input.sessionId),
+              eq(learnings.sessionId, halves.retrospective),
             ),
           )
           .orderBy(learnings.createdAt);
@@ -7951,7 +9171,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               nextCycleDrafts,
               eq(nextCycleDrafts.workspaceId, workspaceId),
-              eq(nextCycleDrafts.sessionId, input.sessionId),
+              eq(nextCycleDrafts.sessionId, halves.retrospective),
             ),
           )
           .orderBy(nextCycleDrafts.createdAt);
@@ -7970,7 +9190,7 @@ export const readMinutes = defineReadAction({
             activeOnly(
               reviewActions,
               eq(reviewActions.workspaceId, workspaceId),
-              eq(reviewActions.sessionId, input.sessionId),
+              eq(reviewActions.sessionId, halves.retrospective),
             ),
           )
           .orderBy(reviewActions.dueOn);
@@ -7985,6 +9205,10 @@ export const readMinutes = defineReadAction({
           pulse?.average === null || pulse?.average === undefined
             ? null
             : Number(pulse.average);
+        const committedScores = scoreRows
+          .filter((row) => row.kind === "committed")
+          .map((row) => Number(row.score));
+        const committedShare = committedShareMet(committedScores, thresholds);
 
         return {
           title: session.title,
@@ -7996,13 +9220,21 @@ export const readMinutes = defineReadAction({
             // minutes.
             cycleScore:
               diagnostic === undefined ? null : Number(diagnostic.cycleScore),
+            committed: {
+              met:
+                committedShare === null
+                  ? 0
+                  : Math.round(committedShare * committedScores.length),
+              reviewed: committedScores.length,
+            },
             verdict: diagnostic?.verdict ?? null,
             objectivesReviewed: new Set(scoreRows.map((row) => row.goalId))
               .size,
             keyResultsReviewed: scores.length,
-            belowThreshold: scores.filter((row) => row.score < threshold)
-              .length,
-            threshold,
+            belowThreshold: scoreRows.filter((row) =>
+              needsRootCause(Number(row.score), row.kind, thresholds),
+            ).length,
+            thresholds: causeThresholds,
             teamPulse: pulseAverage,
             learningsCarried: learningRows.filter((row) => row.carryForward)
               .length,
@@ -8220,6 +9452,20 @@ export const revealObjectiveScore = defineWriteAction({
   }),
 });
 
+/** §3.3's note on one grade, with the method's sentence for it. */
+function noteFor(
+  score: number | null,
+  kind: "committed" | "aspirational",
+  thresholds: ResolvedThresholds,
+  practice?: ScoreColoursPractice,
+): { key: "explain_miss" | "root_cause"; text: string } | null {
+  if (score === null) {
+    return null;
+  }
+  const key = scoreNote(score, kind, thresholds, practice);
+  return key === "none" ? null : { key, text: SCORE_NOTE_TEXT[key] };
+}
+
 const scoringKeyResult = z.object({
   keyResultId: z.uuid(),
   title: z.string(),
@@ -8227,10 +9473,44 @@ const scoringKeyResult = z.object({
   /** §8.3's evidence, read from the key result rather than typed into the review. */
   baseline: z.number().nullable(),
   target: z.number().nullable(),
+  /**
+   * The target it started the cycle with, when it has moved since (METHOD.md
+   * §2.9, §7.6, P9-T13-c-b): "the original target stays on record so the
+   * close can see both". Null when it never moved, or moved back.
+   */
+  originalTarget: z.number().nullable(),
+  /** Why it was last eased, where it was. Null when it never was. */
+  easedBecause: z.string().nullable(),
   current: z.number().nullable(),
   unit: z.string().nullable(),
   score: z.number().nullable(),
   reason: z.string().nullable(),
+  /**
+   * What §2.10 computes from its progress now (METHOD.md §3.3, P9-T14a): the
+   * number the room starts from, and the one the close keeps beside theirs.
+   */
+  computed: z.number().nullable(),
+  /**
+   * What the grade means for its kind, in §3.3's words, under the workspace's
+   * score colours. Null while ungraded.
+   */
+  band: z
+    .object({
+      key: z.enum(["fully_achieved", "strong", "partial", "little"]),
+      text: z.string(),
+    })
+    .nullable(),
+  /** Its objective's kind (METHOD.md §2.8, P9-T11b-b). */
+  kind: z.enum(GOAL_KINDS),
+  /**
+   * §3.3's note on its grade, in the coach's words from `packages/method`:
+   * a committed key result short of 1.0 asks for the explanation of its
+   * miss, and little progress asks for its root cause. Null when ungraded or
+   * when nothing needs saying.
+   */
+  note: z
+    .object({ key: z.enum(["explain_miss", "root_cause"]), text: z.string() })
+    .nullable(),
 });
 
 export const readScoringStatus = defineReadAction({
@@ -8255,6 +9535,11 @@ export const readScoringStatus = defineReadAction({
         score: z.number().nullable(),
         /** Whether the room has revealed this objective's score. */
         revealed: z.boolean(),
+        /**
+         * When it was started mid-cycle, or null for the plan (METHOD.md
+         * §2.9, P9-T13-a), so the close can read additions as evidence.
+         */
+        addedMidCycleAt: z.string().nullable(),
         scored: z.number(),
         total: z.number(),
         keyResults: z.array(scoringKeyResult),
@@ -8272,12 +9557,33 @@ export const readScoringStatus = defineReadAction({
      * 26 August 2026, and p4-t00-session-design.md §4.3 is corrected to match.
      */
     cycleScore: z.number().nullable(),
-    /** §3.4's verdict on that average. */
+    /**
+     * §3.4's average over the revealed **aspirational** key results, and its
+     * verdict (P9-T11b-b). Committed key results are judged by the share met
+     * instead, because averaging the two hides both. Null with nothing
+     * aspirational revealed.
+     */
+    aspirationalAverage: z.number().nullable(),
     verdict: z
       .enum(["too_safe", "healthy", "partial", "outran_capacity"])
       .nullable(),
+    /** §3.4's committed half: how many revealed committed key results met it. */
+    committed: z
+      .object({ met: z.number().int(), scored: z.number().int() })
+      .nullable(),
+    /**
+     * §3.3's pattern, said out loud at the reveal (§8.3): three quarters or
+     * more of the revealed aspirational key results at 1.0. The method's
+     * sentence, or null.
+     */
+    tooSafe: z.string().nullable(),
     /** Every key result graded. §8.1's completion condition for stage two. */
     complete: z.boolean(),
+    /**
+     * Whether a grade may differ from the computed score (§3.3, §12 "Score
+     * adjustment at close", P9-T14a), so the slider is offered or not.
+     */
+    adjustment: z.enum(["withReason", "notAllowed"]),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -8306,6 +9612,7 @@ export const readScoringStatus = defineReadAction({
             goalId: goals.id,
             goalTitle: goals.title,
             goalPosition: goals.position,
+            goalAddedMidCycleAt: goals.addedMidCycleAt,
             keyResultId: keyResults.id,
             title: keyResults.title,
             weight: keyResults.weight,
@@ -8314,6 +9621,7 @@ export const readScoringStatus = defineReadAction({
             current: keyResults.currentValue,
             unit: keyResults.unit,
             position: keyResults.position,
+            kind: goals.kind,
           })
           .from(keyResults)
           .innerJoin(goals, eq(goals.id, keyResults.goalId))
@@ -8354,6 +9662,57 @@ export const readScoringStatus = defineReadAction({
           ]),
         );
 
+        // The rules this review's cycle is read under (§12, P9-T14b): the
+        // workspace's now while it is open, and the ones it closed with after,
+        // so a band moved later does not rewrite a closed cycle's verdicts.
+        const { thresholds, practice } = await cycleRulesInTx(
+          tx,
+          context.workspaceId,
+          session.cycleId,
+        );
+        const kindOf = new Map(rows.map((row) => [row.keyResultId, row.kind]));
+        const computed = await computedScoresInTx(
+          tx,
+          context.workspaceId,
+          rows.map((row) => row.keyResultId),
+          new Date(),
+        );
+
+        // Every target change, oldest first, so the first one names the
+        // target the cycle began with and the last easing names its reason.
+        const moves =
+          rows.length === 0
+            ? []
+            : await tx
+                .select({
+                  keyResultId: keyResultTargetChanges.keyResultId,
+                  fromValue: keyResultTargetChanges.fromValue,
+                  eased: keyResultTargetChanges.eased,
+                  reason: keyResultTargetChanges.reason,
+                })
+                .from(keyResultTargetChanges)
+                .where(
+                  activeOnly(
+                    keyResultTargetChanges,
+                    eq(keyResultTargetChanges.workspaceId, context.workspaceId),
+                    inArray(
+                      keyResultTargetChanges.keyResultId,
+                      rows.map((row) => row.keyResultId),
+                    ),
+                  ),
+                )
+                .orderBy(keyResultTargetChanges.changedAt);
+        const firstTarget = new Map<string, number>();
+        const easedBecause = new Map<string, string | null>();
+        for (const move of moves) {
+          if (!firstTarget.has(move.keyResultId)) {
+            firstTarget.set(move.keyResultId, Number(move.fromValue));
+          }
+          if (move.eased) {
+            easedBecause.set(move.keyResultId, move.reason);
+          }
+        }
+
         // Grouped in the order the rows came back, so the screen reads down the
         // cascade rather than in whatever order Postgres chose.
         const objectives: {
@@ -8361,6 +9720,7 @@ export const readScoringStatus = defineReadAction({
           goalTitle: string;
           score: number | null;
           revealed: boolean;
+          addedMidCycleAt: string | null;
           scored: number;
           total: number;
           keyResults: z.infer<typeof scoringKeyResult>[];
@@ -8375,6 +9735,9 @@ export const readScoringStatus = defineReadAction({
               goalTitle: row.goalTitle,
               score: null,
               revealed: false,
+              addedMidCycleAt: row.goalAddedMidCycleAt
+                ? new Date(row.goalAddedMidCycleAt).toISOString()
+                : null,
               scored: 0,
               total: 0,
               keyResults: [],
@@ -8398,10 +9761,26 @@ export const readScoringStatus = defineReadAction({
             weight: Number(row.weight),
             baseline: row.baseline === null ? null : Number(row.baseline),
             target: row.target === null ? null : Number(row.target),
+            originalTarget: (() => {
+              const first = firstTarget.get(row.keyResultId);
+              const now = row.target === null ? null : Number(row.target);
+              return first === undefined || first === now ? null : first;
+            })(),
+            easedBecause: easedBecause.get(row.keyResultId) ?? null,
             current: row.current === null ? null : Number(row.current),
             unit: row.unit ?? null,
             score: grade?.score ?? null,
             reason: grade?.reason ?? null,
+            computed: computed.get(row.keyResultId) ?? null,
+            band:
+              grade === undefined
+                ? null
+                : (() => {
+                    const key = scoreBand(grade.score, thresholds, practice);
+                    return { key, text: SCORE_BAND_TEXT[row.kind][key] };
+                  })(),
+            kind: row.kind,
+            note: noteFor(grade?.score ?? null, row.kind, thresholds, practice),
           });
         }
 
@@ -8423,30 +9802,54 @@ export const readScoringStatus = defineReadAction({
             : null;
         }
 
-        const { thresholds } = resolveRhythm(
-          await readRhythmRow(tx, context.workspaceId),
-        );
         // §8.6's own words: the §3.4 portfolio average over scored key results.
-        // A plain average over key results, not over objective scores.
+        // A plain average over key results, not over objective scores. It
+        // stays over every kind until P9-T20 moves §8 in; §3.4's verdict
+        // below already reads the aspirational ones alone.
         //
         // Over the revealed rows only, for the reason the output schema gives:
         // a running average that counted unrevealed grades would be the hidden
         // objective score wearing a different label on any review with one
         // objective and even weights.
-        const average = cycleScore(
-          [...byKeyResult.values()]
-            .filter((entry) => entry.revealed)
+        const revealed = [...byKeyResult.entries()]
+          .filter(([, entry]) => entry.revealed)
+          .map(([keyResultId, entry]) => ({
+            score: entry.score,
+            kind: kindOf.get(keyResultId) ?? ("aspirational" as const),
+          }));
+        const average = cycleScore(revealed.map((entry) => entry.score));
+        const aspirationalAverage = cycleScore(
+          revealed
+            .filter((entry) => entry.kind === "aspirational")
             .map((entry) => entry.score),
         );
+        const committedScores = revealed
+          .filter((entry) => entry.kind === "committed")
+          .map((entry) => entry.score);
 
         return {
           objectives,
           cycleScore: average,
+          aspirationalAverage,
           verdict:
-            average === null ? null : portfolioVerdictOf(average, thresholds),
+            aspirationalAverage === null
+              ? null
+              : portfolioVerdictOf(aspirationalAverage, thresholds),
+          committed:
+            committedScores.length === 0
+              ? null
+              : {
+                  met: committedScores.filter(
+                    (score) =>
+                      score >= thresholds["scoring.committedExpectedScore"],
+                  ).length,
+                  scored: committedScores.length,
+                },
+          tooSafe: tooSafePattern(revealed, thresholds) ? TOO_SAFE_TEXT : null,
           complete:
             objectives.length > 0 &&
             objectives.every((entry) => entry.scored === entry.total),
+          adjustment: practice["scoring.adjustment"],
         };
       },
     );

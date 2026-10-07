@@ -5,7 +5,14 @@
  * Stage seven's second half reads the cycle score against the rhythm score.
  * Stage nine closes every objective with one decision and a one-line why.
  */
-import { numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  integer,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
 import { GOAL_CLOSE_DECISIONS, goals } from "./goals.ts";
 import { sessions } from "./sessions.ts";
@@ -43,7 +50,16 @@ export const reviewDiagnostics = pgTable("review_diagnostics", {
    * a record must not do.
    */
   cycleScore: numeric("cycle_score").notNull(),
+  /** Process-health statements 2 and 5, averaged: the cross-check (§8.6). */
   rhythmScore: numeric("rhythm_score"),
+  /**
+   * The share of due check-ins published within tolerance, holiday periods
+   * left out, which the verdict is read on since P9-T20d (migration 0135).
+   * Null on a diagnostic read before it, which was read on the survey.
+   */
+  onTimeShare: numeric("on_time_share"),
+  dueCheckIns: integer("due_check_ins"),
+  onTimeCheckIns: integer("on_time_check_ins"),
   verdict: text("verdict", { enum: DIAGNOSIS_VERDICTS }).notNull(),
   /** The deterministic sentence, always present. */
   narrative: text("narrative").notNull(),

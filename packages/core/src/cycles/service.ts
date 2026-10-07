@@ -19,9 +19,11 @@ import {
   type WorkspaceTx,
   workspaces,
 } from "@openokr/db";
+import { levelsInUse } from "@openokr/method";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { LegacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import {
   type CyclePeriod,
   cyclePeriodFor,
@@ -169,6 +171,11 @@ export async function ensureCurrentCycleInTx<
       status: statusForDate(period, today, false),
       // Phase 1, Prepare. Phase 0 is annual-only and a quarterly cycle skips it.
       phase: period.mode === "annual" ? 0 : 1,
+      // The levels it begins with, kept when the practice later changes
+      // (METHOD v2 §2.7, P9-T07a-c).
+      levels: levelsInUse(
+        practiceFromRow(await readRhythmRow(tx, input.workspaceId)).practice,
+      ),
     })
     .returning({
       id: cycles.id,
@@ -317,6 +324,10 @@ export async function createCycleInTx<
       endsOn: input.period.endsOn,
       status: "planning",
       phase: input.period.mode === "annual" ? 0 : 1,
+      // The levels it begins with (METHOD v2 §2.7, P9-T07a-c).
+      levels: levelsInUse(
+        practiceFromRow(await readRhythmRow(tx, input.workspaceId)).practice,
+      ),
       firstCycle: input.firstCycle ?? false,
       sponsorId: input.sponsorId ?? null,
       facilitatorId: input.facilitatorId ?? null,

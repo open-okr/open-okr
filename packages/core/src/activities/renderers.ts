@@ -14,6 +14,15 @@ export type ActivityRenderer = (payload: Record<string, unknown>) => string;
 const asString = (value: unknown, fallback = ""): string =>
   typeof value === "string" ? value : fallback;
 
+/** §8.8's five decisions as a feed line says them (P9-T20e-a). */
+const CLOSE_DECISION_PHRASE: Readonly<Record<string, string>> = {
+  achieved: "nothing left to carry",
+  keep: "a decision to keep it",
+  modify: "a decision to modify it",
+  defer: "a decision to defer it to the issue list",
+  abandon: "a decision to abandon it",
+};
+
 export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "workspace.provisioned": (p) => `Workspace "${asString(p.name)}" created`,
   "workspace.renamed": (p) =>
@@ -49,6 +58,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `${asString(p.clientName, "A terminal")} was authorised to sign in`,
   "device.denied": (p) => `${asString(p.clientName, "A terminal")} was refused`,
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
+  "member.leaveSet": (p) =>
+    asString(p.count) === "0"
+      ? `${asString(p.name, "A member")} has no leave marked`
+      : `${asString(p.name, "A member")} marked their leave`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
   "member.restored": (p) => `${asString(p.name, "A member")} was restored`,
   "role.created": (p) => `Role "${asString(p.name, "a role")}" was added`,
@@ -92,6 +105,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : "A file was held back by the virus scan",
   "space.settingsChanged": (payload) =>
     `${(payload as { name: string }).name} changed its own settings`,
+  "space.holidaysChanged": (payload) => {
+    const { name, count } = payload as { name: string; count: number };
+    return count === 0
+      ? `${name} cleared its holidays`
+      : count === 1
+        ? `${name} marked one holiday`
+        : `${name} marked ${count} holidays`;
+  },
   "agent.autonomy_changed": (payload) => {
     const { from, to } = payload as { from: string; to: string };
     const words = (value: string) => value.replace(/_/g, " ");
@@ -230,6 +251,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Cycle "${asString(p.name, "a cycle")}" was archived`,
   "rhythm.updated": (p) =>
     `Rhythm settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "thresholds"})`,
+  "practice.updated": (p) =>
+    `Practice settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "settings"})`,
+  "practice.profile_applied": (p) =>
+    `The practice profile changed from ${String(p.from ?? "")} to ${String(p.to ?? "")}`,
   "cycle.pack_item_set": (p) =>
     `Input pack item ${Number(p.itemKey ?? 0)} was marked ${p.gathered ? "gathered" : "missing"}`,
   "cycle.pack_distributed": () => "The input pack was distributed",
@@ -251,7 +276,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Chose ${Number(p.count ?? 0)} of the year's key results to focus on`,
   "cycle.calibrated": () => "The cycle was calibrated mid-flight",
   "cycle.published": (p) =>
-    `Cycle "${asString(p.name, "a cycle")}" was published`,
+    p.published === "company"
+      ? `The company set of cycle "${asString(p.name, "a cycle")}" was published`
+      : `Cycle "${asString(p.name, "a cycle")}" was published`,
   // One line per run, not per nudge. A feed with an entry for every message
   // the product sent would bury everything a person actually did.
   "nudges.run": (p) =>
@@ -261,12 +288,26 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `sent ${String(p.claimed)} notification digest(s)`,
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
+  "frame.revised": (p) =>
+    `The agreed annual frame for ${asString(p.yearLabel, "the year")} was revised: ${asString(p.reason, "no reason recorded")}`,
   "goal.created": (p) =>
-    `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was created`,
+    p.addedMidCycle
+      ? `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was added mid-cycle`
+      : `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was created`,
   "goal.updated": (p) => `Goal "${asString(p.title, "a goal")}" was edited`,
+  "goal.draft_published": (p) =>
+    p.awaitingApproval
+      ? `The draft "${asString(p.title, "a goal")}" was published, and waits for its reviewer's approval`
+      : `The draft "${asString(p.title, "a goal")}" was published and is live`,
+  "goal.draft_approved": (p) =>
+    `The draft "${asString(p.title, "a goal")}" was approved and is live`,
   "goal.closed": (p) =>
-    `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
+    `The goal was closed as ${asString(p.successStatus, "closed")}, with ${CLOSE_DECISION_PHRASE[asString(p.closeDecision, "keep")] ?? "a decision to keep it"}`,
   "goal.reopened": () => "The goal was reopened",
+  "goal.moved_space": (p) =>
+    `The goal moved from ${asString(p.fromSpace, "one space")} to ${asString(p.toSpace, "another")}`,
+  "goal.stopped": (p) =>
+    `The goal was stopped, as it no longer matters: ${asString(p.reason, "no reason given")}`,
   "goal.deleted": (p) => `Removed the goal "${p.title}"`,
   "goal.restored": (p) => `Goal "${asString(p.title, "a goal")}" was restored`,
   "goal.role_reassigned": (p) =>
@@ -329,12 +370,26 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "task.deleted": (p) => `Task "${asString(p.title, "a task")}" was removed`,
   "task.restored": (p) => `Task "${asString(p.title, "a task")}" was restored`,
   "key_result.created": (p) =>
-    `Key result "${asString(p.title, "a key result")}" was added`,
+    p.addedMidCycle
+      ? `Key result "${asString(p.title, "a key result")}" was added mid-cycle`
+      : `Key result "${asString(p.title, "a key result")}" was added`,
   "key_result.updated": () => "A key result was edited",
   "key_result.value_recorded": (p) =>
     `A key result moved to ${Number(p.value ?? 0)}`,
   "key_result.removed": (p) =>
     `Key result "${asString(p.title, "a key result")}" was removed`,
+  "key_result.target_changed": (p) =>
+    p.from === null
+      ? `A key result's target was set to ${String(p.to)}`
+      : p.eased
+        ? `A key result's target was eased from ${String(p.from)} to ${String(p.to)}`
+        : `A key result's target moved from ${String(p.from)} to ${String(p.to)}`,
+  "key_result.placed": () => "A key result was moved in its objective's order",
+  "goal.placed": () => "An objective was moved in its cycle's order",
+  "goal.kind_changed": (p) =>
+    `The objective is now ${asString(p.to, "a different kind")}, where it was ${asString(p.from, "another kind")}`,
+  "key_result.restored": (p) =>
+    `Key result "${asString(p.title, "a key result")}" was brought back`,
   "key_result.kpi_linked": () =>
     "A key result was linked to a KPI and now reads its value from it",
   "key_result.kpi_unlinked": () =>
@@ -366,6 +421,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "The providing team confirmed a dependency",
   "alignment.register_risk_owned": () =>
     "A risk owner was named for an unconfirmed dependency",
+  "alignment.register_escalated": () =>
+    "An unconfirmed dependency was escalated to the cycle's sponsor",
   "alignment.register_removed": () =>
     "A dependency was removed from the register",
   "alignment.finding_dismissed": (p) =>
@@ -376,6 +433,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A KPI category "${String(p.name ?? "")}" was added`,
   "kpi.created": (p) =>
     `A ${String(p.frequency ?? "")} KPI "${String(p.title ?? "")}" was added`,
+  "kpi.responded": (p) =>
+    p.response === "fix_now"
+      ? "An unhealthy KPI is being fixed now, as a task with an owner and a date"
+      : "An unhealthy KPI was answered with a key result on an existing objective",
   "kpi.value_recorded": (p) =>
     p.created
       ? `A value was recorded for the period beginning ${String(p.periodStart ?? "")}`
@@ -433,6 +494,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.confidenceConfirmed": (p) =>
     `Confirmed confidence at ${asString(p.confidence)}`,
   // Blockers (P4-T07c)
+  "session.winsNamed": (p) =>
+    asString(p.count) === "1"
+      ? "Named one win for the week"
+      : `Named ${asString(p.count, "0")} wins for the week`,
+  "session.nextActionSet": () => "Named the next action for a low score",
   "session.blockerCreated": (p) => `Opened a ${asString(p.type)} blocker`,
   "session.blockerResolved": (p) => `Resolved a ${asString(p.type)} blocker`,
   "session.blockerReassigned": (p) =>

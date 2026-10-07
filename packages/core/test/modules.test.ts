@@ -103,13 +103,15 @@ describe("navigation blocks", () => {
     }
   });
 
-  it("the practice block holds the cycle, not the account pages", () => {
+  it("the OKR block holds the cycle, and the Work block the work (P9-T07a-b)", () => {
     const byId = new Map(
       navigationFor("sidebar", ACCESS_LEVELS.full).map((i) => [i.id, i.group]),
     );
-    expect(byId.get("cycle")).toBe("practice");
-    expect(byId.get("goals")).toBe("practice");
-    expect(byId.get("kpis")).toBe("practice");
+    expect(byId.get("cycle")).toBe("okr");
+    expect(byId.get("goals")).toBe("okr");
+    expect(byId.get("kpis")).toBe("okr");
+    expect(byId.get("initiatives")).toBe("work");
+    expect(byId.get("board")).toBe("work");
     expect(byId.get("overview")).toBe("primary");
     expect(byId.get("review")).toBe("primary");
     expect(byId.get("spaces")).toBe("spaces");

@@ -58,6 +58,8 @@ const diagnostic = async (userId = FACILITATOR) =>
   (await call("sessions.diagnostic", { sessionId }, userId)) as {
     cycleScore: number | null;
     rhythmScore: number | null;
+    onTimeShare: number | null;
+    dueCheckIns: number | null;
     verdict: string | null;
     diagnosis: string | null;
     prescription: string | null;
@@ -74,6 +76,7 @@ const reset = async (userId = FACILITATOR) =>
       decision: string | null;
       meaning: string | null;
       why: string | null;
+      proposed: string | null;
     }[];
     decided: number;
     total: number;
@@ -113,6 +116,120 @@ const gradeAndSurvey = async (
       score,
     })),
   });
+};
+
+/**
+ * The review moved to a quarter that has ended, so its check-ins have fallen
+ * due (§8.6, P9-T20d). The rhythm is measured from them now, not asked of the
+ * room: "kept" records a check-in on every Monday of the quarter, through the
+ * action an import uses to keep a check-in's own date, and "missed" records
+ * none. The objective moves with its key results, and the review is opened
+ * again in that quarter.
+ */
+/** Monday of a week counted from a quarter's first Monday, before its check-in. */
+const reviewDay = (startsOn: string, week: number): string => {
+  let on = startsOn;
+  while (new Date(`${on}T00:00:00Z`).getUTCDay() !== 1) {
+    on = new Date(Date.parse(`${on}T00:00:00Z`) + 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+  }
+  return new Date(Date.parse(`${on}T00:00:00Z`) + week * 7 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+};
+
+const inAPastQuarter = async (
+  rhythm: "kept" | "missed",
+  /**
+   * The week the review is held in, counted from the quarter's first Monday,
+   * when it is held before the quarter ends: the check-ins stop there.
+   */
+  reviewWeek?: number,
+) => {
+  const ago = new Date(Date.now() - 120 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const past = (await call("cycles.create", {
+    on: ago,
+    mode: "quarterly",
+  })) as {
+    id: string;
+    startsOn: string;
+    endsOn: string;
+  };
+  await call("goals.moveToCycle", { id: goalId, cycleId: past.id });
+  if (rhythm === "kept") {
+    let on = past.startsOn;
+    while (new Date(`${on}T00:00:00Z`).getUTCDay() !== 1) {
+      on = new Date(Date.parse(`${on}T00:00:00Z`) + 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+    }
+    for (
+      let week = 0;
+      on <= past.endsOn && (reviewWeek === undefined || week < reviewWeek);
+      week += 1
+    ) {
+      await call("goals.importCheckIn", {
+        goalId,
+        authorMemberId: facilitatorMemberId,
+        status: "on_track",
+        confidence: 0.6,
+        narrative: {
+          type: "doc",
+          content: [
+            { type: "paragraph", content: [{ type: "text", text: "Held." }] },
+          ],
+        },
+        publishedAt: `${on}T10:00:00.000Z`,
+        legacy: { type: "csv", id: `rhythm-${week}` },
+      });
+      on = new Date(Date.parse(`${on}T00:00:00Z`) + 7 * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+    }
+  }
+  const session = (await call("sessions.create", {
+    spaceId,
+    cycleId: past.id,
+    kind: "quarterly",
+    title: "Last quarter's review",
+    scheduledFor: new Date(
+      `${reviewWeek === undefined ? past.endsOn : reviewDay(past.startsOn, reviewWeek)}T09:00:00.000Z`,
+    ).toISOString(),
+    facilitatorId: facilitatorMemberId,
+  })) as { id: string };
+  sessionId = session.id;
+  await call("sessions.open", { id: sessionId });
+};
+
+/**
+ * The review held in next quarter, which has not started, so nothing in it
+ * has fallen due whatever day this runs on. The measure counts from a
+ * cycle's start (§8.6), so "a quarter where nothing has fallen due" written
+ * against the current quarter held only in that quarter's first week, and
+ * failed on its eighth day (7 October 2026, found at P9-T22a).
+ */
+const inANextQuarter = async () => {
+  const ahead = new Date(Date.now() + 120 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const next = (await call("cycles.create", {
+    on: ahead,
+    mode: "quarterly",
+  })) as { id: string; startsOn: string };
+  await call("goals.moveToCycle", { id: goalId, cycleId: next.id });
+  const session = (await call("sessions.create", {
+    spaceId,
+    cycleId: next.id,
+    kind: "quarterly",
+    title: "Next quarter's review",
+    scheduledFor: new Date(`${next.startsOn}T09:00:00.000Z`).toISOString(),
+    facilitatorId: facilitatorMemberId,
+  })) as { id: string };
+  sessionId = session.id;
+  await call("sessions.open", { id: sessionId });
 };
 
 beforeEach(async () => {
@@ -223,12 +340,14 @@ afterAll(async () => {
 
 describe("the rhythm diagnostic", () => {
   it("is not readable until the room has both numbers", async () => {
+    await inANextQuarter();
     const before = await diagnostic();
     expect(before.readable).toBe(false);
     expect(before.verdict).toBeNull();
 
-    // Graded but not surveyed: §8.6 needs the rhythm score too, and a
-    // diagnostic built on a missing answer reads as evidence.
+    // Graded below the cycle floor in a quarter where nothing has fallen due
+    // yet: §8.6 needs the measured rhythm too, and a diagnostic built on a
+    // missing answer reads as evidence.
     await call("sessions.scoreKeyResult", {
       sessionId,
       keyResultId: firstKeyResultId,
@@ -251,40 +370,62 @@ describe("the rhythm diagnostic", () => {
     expect(status.prescription).toContain("ambition was set high enough");
   });
 
-  it("reads a strategy or quality problem when the rhythm held and the cycle missed", async () => {
-    // Statements 2 and 5 are the rhythm, both at 5, so the rhythm score is 5.0
-    // and the cycle score is 0.35.
-    await gradeAndSurvey([0.2, 0.5], [1, 5, 1, 1, 5]);
-    await call("sessions.recordDiagnostic", { sessionId });
-
-    const status = await diagnostic();
-    expect(status.verdict).toBe("strategy_or_quality");
-    expect(status.prescription).toContain(
-      "Fix the key results before you push the team",
-    );
-  });
-
-  it("reads a rhythm problem when both are low", async () => {
+  it("reads a strategy or quality problem when the rhythm was kept and the cycle missed", async () => {
+    // Every check-in published on the day it fell due, and a cycle score of
+    // 0.35. The survey says the opposite of the record, and the record wins:
+    // statements 2 and 5 are the cross-check now (P9-T20d).
+    await inAPastQuarter("kept");
     await gradeAndSurvey([0.2, 0.5], [1, 1, 1, 1, 1]);
     await call("sessions.recordDiagnostic", { sessionId });
 
     const status = await diagnostic();
-    expect(status.verdict).toBe("rhythm");
-    expect(status.prescription).toContain("Restore the weekly check-in");
+    expect(status.verdict).toBe("strategy_or_quality");
+    expect(status.onTimeShare).toBe(1);
+    expect(status.rhythmScore).toBe(1);
+    expect(status.diagnosis).toBe("Likely a strategy or OKR-quality problem");
+    expect(status.prescription).toContain("before you push the team");
   });
 
-  it("stores exactly what the method package said, rather than a second opinion", async () => {
+  it("measures the rhythm as of the review's day, not the day it is recorded (P9-T22c-b-b)", async () => {
+    // A review held in week 8 of a quarter long over, read today. The weeks
+    // after the review had not fallen due when the room sat, so they are not
+    // missed check-ins: the rhythm the team kept up to the review was whole.
+    await inAPastQuarter("kept", 8);
+    await gradeAndSurvey([0.2, 0.5], [1, 1, 1, 1, 1]);
+    await call("sessions.recordDiagnostic", { sessionId });
+
+    const status = await diagnostic();
+    expect(status.onTimeShare).toBe(1);
+    expect(status.dueCheckIns).toBeLessThanOrEqual(8);
+    expect(status.verdict).toBe("strategy_or_quality");
+  });
+
+  it("reads a rhythm problem when nothing was published on time", async () => {
+    await inAPastQuarter("missed");
     await gradeAndSurvey([0.2, 0.5], [1, 5, 1, 1, 5]);
     await call("sessions.recordDiagnostic", { sessionId });
 
     const status = await diagnostic();
-    const expected = rhythmDiagnostic(0.35, 5, resolveThresholds() as never);
+    expect(status.verdict).toBe("rhythm");
+    expect(status.onTimeShare).toBe(0);
+    expect(status.dueCheckIns).toBeGreaterThan(0);
+    expect(status.prescription).toContain("Restore the weekly check-in");
+  });
+
+  it("stores exactly what the method package said, rather than a second opinion", async () => {
+    await inAPastQuarter("kept");
+    await gradeAndSurvey([0.2, 0.5], [1, 5, 1, 1, 5]);
+    await call("sessions.recordDiagnostic", { sessionId });
+
+    const status = await diagnostic();
+    const expected = rhythmDiagnostic(0.35, 1, resolveThresholds() as never);
     expect(status.verdict).toBe(expected.kind);
     expect(status.diagnosis).toBe(expected.diagnosis);
     expect(status.prescription).toBe(expected.prescription);
   });
 
   it("keeps the numbers it was read against, rather than recomputing later", async () => {
+    await inAPastQuarter("kept");
     await gradeAndSurvey([0.2, 0.5], [1, 5, 1, 1, 5]);
     await call("sessions.recordDiagnostic", { sessionId });
 
@@ -362,7 +503,45 @@ describe("keep, modify or abandon", () => {
     }
   });
 
-  it("refuses a decision outside the three", async () => {
+  it("records achieved and defer with §8.8's meanings (P9-T20e-a)", async () => {
+    await call("sessions.decideObjective", {
+      sessionId,
+      goalId,
+      decision: "achieved",
+      why: "Every key result landed.",
+    });
+    expect((await reset()).objectives[0]?.meaning).toBe("Done. Close it");
+    await call("sessions.decideObjective", {
+      sessionId,
+      goalId,
+      decision: "defer",
+      why: "Still worth it, not next quarter.",
+    });
+    expect((await reset()).objectives[0]?.meaning).toContain(
+      "It goes to the issue list",
+    );
+  });
+
+  it("proposes Keep for an unfinished aspirational objective, and chooses nothing (acceptance)", async () => {
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: firstKeyResultId,
+      score: 0.4,
+      reason: "Missed.",
+    });
+    const [row] = (await reset()).objectives;
+    expect(row?.proposed).toBe("keep");
+    expect(row?.decision).toBeNull();
+  });
+
+  it("proposes nothing where the workspace does not carry forward", async () => {
+    await call("practice.update", {
+      overrides: { "close.carryForward": "notProposed" },
+    });
+    expect((await reset()).objectives[0]?.proposed).toBeNull();
+  });
+
+  it("refuses a decision outside the five", async () => {
     await expect(
       call("sessions.decideObjective", {
         sessionId,
@@ -449,6 +628,79 @@ describe("keep, modify or abandon", () => {
     expect(
       status.objectives.find((entry) => entry.goalId === second.id)?.decision,
     ).toBeNull();
+  });
+});
+
+describe("which objectives a review covers (P9-T22c-b-b)", () => {
+  /** A space beyond the company's, with an objective of its own. */
+  const aTeamAndTheCompany = async () => {
+    const team = (await call("spaces.create", { name: "Sales" })) as {
+      id: string;
+    };
+    const teamGoal = (await call("goals.create", {
+      title: "Sell to accounts that can onboard themselves",
+      cycleId,
+      spaceId: team.id,
+      level: "team",
+      ownerKind: "space",
+      championId: facilitatorMemberId,
+      weight: 1,
+    })) as { id: string };
+    const companyGoal = (await call("goals.create", {
+      title: "New accounts reach value in their first week",
+      cycleId,
+      level: "company",
+      ownerKind: "workspace",
+      championId: facilitatorMemberId,
+      weight: 1,
+    })) as { id: string };
+    return {
+      team: team.id,
+      teamGoal: teamGoal.id,
+      companyGoal: companyGoal.id,
+    };
+  };
+
+  it("lets the company space's review decide every objective in the cycle", async () => {
+    // The company space is the workspace's first, and its review is the
+    // company's: a company objective belongs to no space, and was decided by
+    // no review at all until this.
+    const { teamGoal, companyGoal } = await aTeamAndTheCompany();
+    for (const goalId of [teamGoal, companyGoal]) {
+      await call("sessions.decideObjective", {
+        sessionId,
+        goalId,
+        decision: "keep",
+        why: "Still the bet.",
+      });
+    }
+    const decided = (await reset()).objectives.filter(
+      (row) => row.decision === "keep",
+    );
+    expect(decided.map((row) => row.goalId).sort()).toEqual(
+      [teamGoal, companyGoal].sort(),
+    );
+  });
+
+  it("keeps a team's review to the team's own objectives", async () => {
+    const { team, companyGoal } = await aTeamAndTheCompany();
+    const teamReview = (await call("sessions.create", {
+      spaceId: team,
+      cycleId,
+      kind: "quarterly",
+      title: "Sales review",
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      facilitatorId: facilitatorMemberId,
+    })) as { id: string };
+    await call("sessions.open", { id: teamReview.id });
+    await expect(
+      call("sessions.decideObjective", {
+        sessionId: teamReview.id,
+        goalId: companyGoal,
+        decision: "keep",
+        why: "Not ours to decide.",
+      }),
+    ).rejects.toThrow(/not in this review/);
   });
 });
 

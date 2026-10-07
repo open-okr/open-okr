@@ -15,6 +15,32 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { type ReactNode, useState } from "react";
 
+/**
+ * Whether a query may be written to the browser's storage.
+ *
+ * **A query that marks itself `meta: { persist: false }` is kept in memory
+ * only** (P9-T06c). An OKR tree is a workspace's own plans with names in
+ * them, and local storage outlives a sign-out on a shared machine; the server
+ * render hands a fresh copy to every page anyway, so persisting it would buy
+ * nothing a reader could see. Everything else keeps the library's default,
+ * which persists a query once it has succeeded.
+ */
+function persistable(query: {
+  readonly state: { readonly status: string };
+  readonly meta?: Record<string, unknown> | undefined;
+}): boolean {
+  return query.state.status === "success" && query.meta?.persist !== false;
+}
+
+export {
+  QueryClient,
+  QueryClientProvider,
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+
 export interface QueryProviderProps {
   readonly children: ReactNode;
   readonly buildId: string;
@@ -47,7 +73,11 @@ export function QueryProvider({ children, buildId }: QueryProviderProps) {
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister, buster: buildId }}
+      persistOptions={{
+        persister,
+        buster: buildId,
+        dehydrateOptions: { shouldDehydrateQuery: persistable },
+      }}
     >
       {children}
     </PersistQueryClientProvider>

@@ -72,10 +72,12 @@ describe("the two horizons", () => {
     }
   });
 
-  it("tells a quarterly facilitator the frame is not theirs to rewrite", () => {
-    // §2.1's closing sentence is the one a quarterly cycle most often ignores,
-    // so a mode note that dropped it would be missing the point of having one.
-    expect(HORIZONS.quarterly.note).toContain("does not rewrite it");
+  it("tells a quarterly facilitator the frame holds, or changes with a documented reason", () => {
+    // §2.1's closing sentence, as METHOD v2 rewrote it (P9-T13-c-c): the
+    // frame may change mid-year, but never without its reason.
+    expect(HORIZONS.quarterly.note).toContain(
+      "it holds, or it changes with a documented reason",
+    );
   });
 });
 

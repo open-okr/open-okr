@@ -106,8 +106,18 @@ export const keyResultDependencies = pgTable("key_result_dependencies", {
   confirmed: boolean("confirmed").notNull().default(false),
   confirmedById: uuid("confirmed_by_id").references(() => workspaceMembers.id),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
-  /** Required when unconfirmed, or publish gate 4 stays red (§5.4). */
+  /**
+   * Who carries the risk, when nobody has confirmed. With a confirmation or
+   * an escalation, one of the three ways §5.4 settles a dependency.
+   */
   riskOwnerId: uuid("risk_owner_id").references(() => workspaceMembers.id),
+  /**
+   * The sponsor it was escalated to, copied at the time (P9-T16b-b, §5.4).
+   * Present with `escalatedById` and `escalatedAt` or not at all.
+   */
+  escalatedToId: uuid("escalated_to_id").references(() => workspaceMembers.id),
+  escalatedById: uuid("escalated_by_id").references(() => workspaceMembers.id),
+  escalatedAt: timestamp("escalated_at", { withTimezone: true }),
   createdById: uuid("created_by_id")
     .notNull()
     .references(() => workspaceMembers.id),

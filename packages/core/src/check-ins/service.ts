@@ -23,6 +23,7 @@ import {
   checkInSnapshots,
   checkIns,
   goals,
+  type KeyResultKind,
   keyResults,
   keyResultValues,
   newId,
@@ -32,10 +33,19 @@ import {
 } from "@openokr/db";
 import type { ResolvedThresholds } from "@openokr/method";
 import { desc, eq, inArray, ne, sql } from "drizzle-orm";
-import { cadence, dueInstant, firstDue } from "../cadence/engine.ts";
+import {
+  cadence,
+  clearOfHolidays,
+  dueInstant,
+  firstDue,
+} from "../cadence/engine.ts";
+import { spaceHolidaysInTx } from "../cadence/holidays.ts";
 import { localDateIn } from "../cycles/generation.ts";
-import { workspaceTimeZone } from "../cycles/service.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { doneAtFor } from "../goals/service.ts";
 import { OperationError } from "../operations/operation.ts";
+import { standInOnInTx } from "../people/leave.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -54,6 +64,8 @@ interface ComposerValue {
   readonly keyResultId: string;
   readonly value?: number;
   readonly confidence?: number;
+  /** A milestone done or a baseline recorded with this check-in (P9-T12b). */
+  readonly done?: boolean;
 }
 
 export interface PublishInput {
@@ -119,6 +131,14 @@ async function buildSnapshot<
   });
 }
 
+/** What a key result held before this publication touched it. */
+interface Previous {
+  readonly value: number | null;
+  readonly confidence: number | null;
+  readonly kind: KeyResultKind;
+  readonly doneAt: Date | null;
+}
+
 /** What every key result held before this publication touched it. */
 async function readPrevious<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -126,12 +146,14 @@ async function readPrevious<
   tx: AnyTx<TSchema>,
   workspaceId: string,
   goalId: string,
-): Promise<Map<string, { value: number | null; confidence: number | null }>> {
+): Promise<Map<string, Previous>> {
   const rows = await tx
     .select({
       id: keyResults.id,
       currentValue: keyResults.currentValue,
       confidence: keyResults.confidence,
+      kind: keyResults.kind,
+      doneAt: keyResults.doneAt,
     })
     .from(keyResults)
     .where(
@@ -147,6 +169,8 @@ async function readPrevious<
       {
         value: asNumber(row.currentValue),
         confidence: asNumber(row.confidence),
+        kind: row.kind,
+        doneAt: row.doneAt,
       },
     ]),
   );
@@ -164,10 +188,7 @@ async function applyValues<
 >(
   tx: AnyTx<TSchema>,
   input: PublishInput,
-  previous: ReadonlyMap<
-    string,
-    { value: number | null; confidence: number | null }
-  >,
+  previous: ReadonlyMap<string, Previous>,
 ): Promise<number> {
   let written = 0;
   for (const entry of input.values) {
@@ -186,6 +207,24 @@ async function applyValues<
         .where(activeOnly(keyResults, eq(keyResults.id, entry.keyResultId)));
     }
 
+    // §2.10: a milestone is checked in as done or not done. The same rule
+    // as every other write, so a metric marked done is refused here too.
+    if (entry.done !== undefined) {
+      const doneAt = doneAtFor(
+        before.kind,
+        before.doneAt,
+        entry.done,
+        input.now,
+      );
+      if (doneAt !== before.doneAt) {
+        // openokr:allow-mutation: same transaction.
+        await tx
+          .update(keyResults)
+          .set({ doneAt, updatedAt: input.now })
+          .where(activeOnly(keyResults, eq(keyResults.id, entry.keyResultId)));
+      }
+    }
+
     if (entry.value === undefined || entry.value === before.value) {
       continue;
     }
@@ -200,10 +239,19 @@ async function applyValues<
       checkInId: input.checkInId,
       source: "check_in",
     });
+    // A baseline's first value is its baseline, and records it (§2.10), as
+    // `recordValueInTx` does for a value typed outside a check-in.
+    const firstBaseline = before.kind === "baseline" && !before.doneAt;
     // openokr:allow-mutation: same transaction.
     await tx
       .update(keyResults)
-      .set({ currentValue: String(entry.value), updatedAt: input.now })
+      .set({
+        currentValue: String(entry.value),
+        ...(firstBaseline
+          ? { baselineValue: String(entry.value), doneAt: input.now }
+          : {}),
+        updatedAt: input.now,
+      })
       .where(activeOnly(keyResults, eq(keyResults.id, entry.keyResultId)));
     written += 1;
   }
@@ -279,7 +327,8 @@ export interface PublishResult {
   readonly goalId: string;
   readonly snapshotId: string;
   readonly valuesWritten: number;
-  readonly reviewerMemberId: string;
+  /** Null where nobody owes an acknowledgement (P9-T04). */
+  readonly reviewerMemberId: string | null;
 }
 
 /** Publication, in §6.2's order. */
@@ -327,6 +376,7 @@ export async function publishCheckInInTx<
       championId: goals.championId,
       checkInFrequency: goals.checkInFrequency,
       nextCheckInAt: goals.nextCheckInAt,
+      spaceId: goals.spaceId,
     })
     .from(goals)
     .where(
@@ -340,6 +390,32 @@ export async function publishCheckInInTx<
   if (!goal) {
     throw new OperationError("not_found", "No such goal.");
   }
+
+  // Who owes the acknowledgement (METHOD.md §2.5, P9-T04): the goal's
+  // reviewer, unless it has none or the workspace has turned reviewers off,
+  // in which case nobody does. An existing reviewer stays on the goal either
+  // way; the practice decides only whether they are asked.
+  const reviewersOff =
+    practiceFromRow(await readRhythmRow(tx, input.workspaceId)).practice
+      .reviewer === "off";
+  // A reviewer on leave is answered for by whoever stands in for them (§7.4,
+  // P9-T19b-b), stamped now because publication is when the obligation is
+  // made. Where every link is away the reviewer keeps it, so it waits for
+  // them rather than vanishing.
+  const reviewerOfRecord =
+    reviewersOff || !goal.reviewerId
+      ? null
+      : ((await standInOnInTx(
+          tx,
+          input.workspaceId,
+          goal.reviewerId,
+          formatDate(
+            localDateIn(
+              input.now,
+              await workspaceTimeZone(tx, input.workspaceId),
+            ),
+          ),
+        )) ?? goal.reviewerId);
 
   const previous = await readPrevious(tx, input.workspaceId, goal.id);
   const valuesWritten = await applyValues(tx, input, previous);
@@ -371,7 +447,7 @@ export async function publishCheckInInTx<
       // goal later, because publication is the moment the obligation is created
       // and the goal's reviewer can change afterwards. An edit inside the window
       // re-publishes through this same path, so it never orphans the obligation.
-      reviewerMemberId: goal.reviewerId,
+      reviewerMemberId: reviewerOfRecord,
       updatedAt: input.now,
     })
     .where(activeOnly(checkIns, eq(checkIns.id, input.checkInId)));
@@ -385,15 +461,22 @@ export async function publishCheckInInTx<
   const anchor = input.thresholds["cadence.anchorDay"];
   const publishedOn = localDateIn(input.now, timeZone);
 
-  const nextDue = goal.nextCheckInAt
-    ? cadence.nextAfterPublication(
-        formatDate(localDateIn(new Date(goal.nextCheckInAt), timeZone)),
-        formatDate(publishedOn),
-        frequency,
-        anchor,
-        input.thresholds["cadence.toleranceDays"],
-      ).next
-    : formatDate(firstDue(publishedOn, frequency, anchor));
+  // Never due in a period the space marked as a holiday (§7.4, P9-T19b-a).
+  const holidays = await spaceHolidaysInTx(tx, input.workspaceId, goal.spaceId);
+  const nextDue = cadence.clearOfHolidays(
+    goal.nextCheckInAt
+      ? cadence.nextAfterPublication(
+          formatDate(localDateIn(new Date(goal.nextCheckInAt), timeZone)),
+          formatDate(publishedOn),
+          frequency,
+          anchor,
+          input.thresholds["cadence.toleranceDays"],
+        ).next
+      : formatDate(firstDue(publishedOn, frequency, anchor)),
+    frequency,
+    anchor,
+    holidays,
+  );
 
   // openokr:allow-mutation: same transaction.
   await tx
@@ -407,11 +490,11 @@ export async function publishCheckInInTx<
 
   // Step 6: the reviewer's obligation. Derived state, not a table of its own
   // (§6.5), so the notification is what tells them rather than what records it.
-  if (goal.reviewerId !== checkIn.authorMemberId) {
+  if (reviewerOfRecord && reviewerOfRecord !== checkIn.authorMemberId) {
     // openokr:allow-mutation: same transaction.
     await tx.insert(notifications).values({
       workspaceId: input.workspaceId,
-      recipientMemberId: goal.reviewerId,
+      recipientMemberId: reviewerOfRecord,
       // The goal, not the check-in: the obligation is to review a goal's
       // progress, and the goal is what the row links to and groups under
       // (migration 0074, P6-G07a). This producer had no activity id either.
@@ -426,7 +509,7 @@ export async function publishCheckInInTx<
     goalId: goal.id,
     snapshotId,
     valuesWritten,
-    reviewerMemberId: goal.reviewerId,
+    reviewerMemberId: reviewerOfRecord,
   };
 }
 
@@ -568,6 +651,7 @@ export async function deleteCheckInInTx<
       lastCheckInId: goals.lastCheckInId,
       checkInFrequency: goals.checkInFrequency,
       createdAt: goals.createdAt,
+      spaceId: goals.spaceId,
     })
     .from(goals)
     .where(
@@ -678,7 +762,15 @@ export async function deleteCheckInInTx<
     .update(goals)
     .set({
       lastCheckInId: previous?.id ?? null,
-      nextCheckInAt: dueInstant(firstDue(from, frequency, anchor), timeZone),
+      nextCheckInAt: dueInstant(
+        clearOfHolidays(
+          firstDue(from, frequency, anchor),
+          frequency,
+          anchor,
+          await spaceHolidaysInTx(tx, workspaceId, goal.spaceId),
+        ),
+        timeZone,
+      ),
       updatedAt: now,
     })
     .where(activeOnly(goals, eq(goals.id, goal.id)));

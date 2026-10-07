@@ -121,10 +121,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     caller: "packages/core/src/copilot/proposals.ts",
     why: "the pipeline calls it, when the copilot proposes a change the person then confirms",
   },
-  "goals.publishDraftedCheckIn": {
-    caller: "packages/core/src/review/proposals.ts",
-    why: "the pipeline calls it, when the person a drafted check-in is for applies it from the review inbox (M-08)",
-  },
   // M-05. A person records the result by closing the cycle, which runs the
   // same function inside `cycles.close`.
   "cycles.snapshot": {
@@ -142,6 +138,12 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
   "goals.reviewDecision": {
     answeredBy: "decisions.forGoal",
     why: "the goal page shows the decision log from `decisions.forGoal`, which carries the same answer with its author and its session",
+  },
+  // The studio drew the cascade from it until P9-T09b, when the studio
+  // became the OKRs screen's diagram, which draws from the tree.
+  "alignment.graph": {
+    answeredBy: "goals.tree",
+    why: "the OKRs screen's diagram draws the cascade from `goals.tree`, which carries the same objectives, alignment and dependencies with the key results they hang from",
   },
   "ai.updateCustomModel": {
     answeredBy: "ai.addCustomModel",
@@ -195,6 +197,17 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
   "cycles.feedForward": {
     apiOnly: true,
     why: "a person feeds the next cycle by closing this one with `cycles.close`; this is an idempotent re-run for the command line",
+  },
+  // Deprecated at P9-T22d and removed in 0.3 (PLAN.md §5.1): stage ten no
+  // longer drafts the next cycle, so its screen dropped them, and they stay
+  // one release so a script or an agent calling them does not break.
+  "sessions.draftNextCycle": {
+    apiOnly: true,
+    why: "deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle, and a kept objective reaches its Phase 4 on its own",
+  },
+  "sessions.proposeFromLearnings": {
+    apiOnly: true,
+    why: "deprecated since 0.2.0 and removed in 0.3 with `sessions.draftNextCycle`, whose form it filled",
   },
 };
 

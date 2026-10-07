@@ -5003,6 +5003,220 @@
       }
     },
     {
+      "name": "spaces.setHolidays",
+      "description": "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break (METHOD.md §7.4).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "holidays": {
+            "maxItems": 60,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "startsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "endsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 80
+                }
+              },
+              "required": [
+                "startsOn",
+                "endsOn"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "holidays"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "holidays": []
+      }
+    },
+    {
+      "name": "spaces.holidays",
+      "description": "The spans a space marks as holidays, oldest first (METHOD.md §7.4).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "people.setLeave",
+      "description": "Sets the signed-in member's own leave, each span with the delegate who stands in (METHOD.md §7.4).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "leave": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "startsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "endsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "delegateId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "startsOn",
+                "endsOn",
+                "delegateId"
+              ]
+            }
+          }
+        },
+        "required": [
+          "leave"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "leave": []
+      }
+    },
+    {
+      "name": "people.setMemberLeave",
+      "description": "Sets another member's leave, each span with the delegate who stands in (METHOD.md §7.4). For an administrator.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "leave": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "startsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "endsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "delegateId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "startsOn",
+                "endsOn",
+                "delegateId"
+              ]
+            }
+          }
+        },
+        "required": [
+          "memberId",
+          "leave"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "memberId": "00000000-0000-4000-8000-000000000000",
+        "leave": []
+      }
+    },
+    {
+      "name": "people.leave",
+      "description": "One member's leave, oldest first, with who stands in for each span (METHOD.md §7.4).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "memberId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "memberId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "spaces.archive",
       "description": "Archives a space. Its goals and history stay readable.",
       "inputSchema": {
@@ -5212,6 +5426,58 @@
         "idempotentHint": true
       },
       "example": {}
+    },
+    {
+      "name": "cycles.levelsInUse",
+      "description": "The OKR levels one cycle offers: the levels it began with, plus any its objectives already use.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "cycleId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "cycleId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "cycles.rules",
+      "description": "The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "cycleId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "cycleId": "00000000-0000-4000-8000-000000000000"
+      }
     },
     {
       "name": "cycles.current",
@@ -5537,7 +5803,7 @@
     },
     {
       "name": "cycles.feedForward",
-      "description": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
+      "description": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5570,7 +5836,7 @@
     },
     {
       "name": "cycles.close",
-      "description": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+      "description": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5596,7 +5862,7 @@
     },
     {
       "name": "cycles.scorecard",
-      "description": "Every archived cycle's result with its band counts and verdict, oldest first. Drives the scorecard.",
+      "description": "Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -5902,6 +6168,85 @@
       "example": {}
     },
     {
+      "name": "practice.read",
+      "description": "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "practice.update",
+      "description": "Changes some of this workspace's practice settings. A setting set to null goes back to its profile's value.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "overrides": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "required": [
+          "overrides"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "overrides": {}
+      }
+    },
+    {
+      "name": "practice.applyProfile",
+      "description": "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "recommended",
+              "googleStyle",
+              "radicalFocus",
+              "lightweight",
+              "governed"
+            ]
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "profile": "recommended"
+      }
+    },
+    {
       "name": "frame.annualObjectives",
       "description": "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
       "inputSchema": {
@@ -5918,7 +6263,7 @@
     },
     {
       "name": "frame.read",
-      "description": "The current annual frame and its strategic thrusts.",
+      "description": "The current annual frame, its strategic thrusts, and every revision made since it was agreed.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -5933,7 +6278,7 @@
     },
     {
       "name": "frame.set",
-      "description": "Creates or replaces the current annual frame. A replacement supersedes rather than edits.",
+      "description": "Creates or replaces the current annual frame. A replacement supersedes rather than edits. Revising an agreed frame within its year needs a written reason, and the revision is kept.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6017,6 +6362,11 @@
                 "text"
               ]
             }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
           }
         },
         "required": [
@@ -6426,8 +6776,8 @@
       }
     },
     {
-      "name": "workflow.calibrate",
-      "description": "Records the one mid-cycle calibration a cycle is allowed (METHOD.md §7.6).",
+      "name": "workflow.publish",
+      "description": "Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6436,38 +6786,12 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
-          "reason": {
+          "step": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
-          }
-        },
-        "required": [
-          "cycleId",
-          "reason"
-        ]
-      },
-      "scope": "write",
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": false
-      },
-      "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000",
-        "reason": "…"
-      }
-    },
-    {
-      "name": "workflow.publish",
-      "description": "Publishes the set, refusing while any of the six gates is red or cannot be evaluated.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "cycleId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            "enum": [
+              "company",
+              "teams"
+            ]
           },
           "override": {
             "type": "object",
@@ -8379,7 +8703,8 @@
               "off_track",
               "outdated",
               "achieved",
-              "missed"
+              "missed",
+              "abandoned"
             ]
           },
           "mine": {
@@ -8489,6 +8814,13 @@
               "individual"
             ]
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "committed",
+              "aspirational"
+            ]
+          },
           "ownerKind": {
             "default": "workspace",
             "type": "string",
@@ -8514,9 +8846,16 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "reviewerId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "parentGoalId": {
             "type": "string",
@@ -8567,6 +8906,11 @@
           },
           "guided": {
             "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
           }
         },
         "required": [
@@ -8649,6 +8993,17 @@
               }
             ]
           },
+          "standaloneReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "strategyId": {
             "anyOf": [
               {
@@ -8707,14 +9062,17 @@
             "type": "string",
             "enum": [
               "achieved",
-              "missed"
+              "missed",
+              "abandoned"
             ]
           },
           "closeDecision": {
             "type": "string",
             "enum": [
+              "achieved",
               "keep",
               "modify",
+              "defer",
               "abandon"
             ]
           },
@@ -8740,7 +9098,7 @@
       "example": {
         "id": "00000000-0000-4000-8000-000000000000",
         "successStatus": "achieved",
-        "closeDecision": "keep",
+        "closeDecision": "achieved",
         "retrospectiveBody": {}
       }
     },
@@ -8849,8 +9207,41 @@
       }
     },
     {
+      "name": "goals.stop",
+      "description": "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+          }
+        },
+        "required": [
+          "id",
+          "reason"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "reason": "…"
+      }
+    },
+    {
       "name": "goals.reassignRole",
-      "description": "Moves the champion or the reviewer to another member, rebinding access with it.",
+      "description": "Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8867,9 +9258,16 @@
             ]
           },
           "memberId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -8887,7 +9285,7 @@
       "example": {
         "id": "00000000-0000-4000-8000-000000000000",
         "role": "champion",
-        "memberId": "00000000-0000-4000-8000-000000000000"
+        "memberId": {}
       }
     },
     {
@@ -8942,6 +9340,15 @@
           "unit": {
             "type": "string",
             "maxLength": 60
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "metric",
+              "maintain",
+              "milestone",
+              "baseline"
+            ]
           },
           "direction": {
             "type": "string",
@@ -9017,15 +9424,17 @@
           },
           "guided": {
             "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
           }
         },
         "required": [
           "goalId",
           "title",
-          "direction",
-          "indicatorType",
-          "baselineValue",
-          "targetValue"
+          "indicatorType"
         ]
       },
       "scope": "write",
@@ -9037,15 +9446,12 @@
       "example": {
         "goalId": "00000000-0000-4000-8000-000000000000",
         "title": "…",
-        "direction": "increase",
-        "indicatorType": "leading",
-        "baselineValue": 0,
-        "targetValue": 0
+        "indicatorType": "leading"
       }
     },
     {
       "name": "goals.updateKeyResult",
-      "description": "Edits a key result's definition. The current value has its own action, because it is history.",
+      "description": "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9070,6 +9476,18 @@
               }
             ]
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "metric",
+              "maintain",
+              "milestone",
+              "baseline"
+            ]
+          },
+          "done": {
+            "type": "boolean"
+          },
           "direction": {
             "type": "string",
             "enum": [
@@ -9091,6 +9509,11 @@
           },
           "targetValue": {
             "type": "number"
+          },
+          "targetReason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
           },
           "dueOn": {
             "anyOf": [
@@ -9135,6 +9558,545 @@
           },
           "carryForward": {
             "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "goals.tree",
+      "description": "One cycle's objectives with their key results, alignment and dependencies, shaped for the OKR list and diagram, with parents outside the set as read-only context.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "mine"
+            ]
+          },
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "includeClosed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cycleId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "cycleId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "goals.creationPolicy",
+      "description": "Whether a new objective may be written in a cycle now, with the practice's reasons and the settings behind them when it may not.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "cycleId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "cycleId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "goals.place",
+      "description": "Puts an objective straight after another in its cycle, or first, and renumbers the cycle's whole order so a row a filter hides keeps its place.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "afterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "afterId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "afterId": {}
+      }
+    },
+    {
+      "name": "goals.placeKeyResult",
+      "description": "Puts a key result straight after another under its objective, or first, and renumbers the objective's key results.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "afterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "afterId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "afterId": {}
+      }
+    },
+    {
+      "name": "goals.patch",
+      "description": "Changes some of an objective's fields, refused with the current values if any of them changed since the caller read them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "set": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "contributionStatement": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "weight": {
+                "type": "number"
+              },
+              "championId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            }
+          },
+          "read": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "set",
+          "read"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "set": {},
+        "read": {}
+      }
+    },
+    {
+      "name": "goals.patchKeyResult",
+      "description": "Changes some of a key result's fields, refused with the current values if any of them changed since the caller read them. The target and the current value have their own actions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "set": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "baselineValue": {
+                "type": "number"
+              },
+              "dueOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ownerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "weight": {
+                "type": "number"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "metric",
+                  "maintain",
+                  "milestone",
+                  "baseline"
+                ]
+              },
+              "done": {
+                "type": "boolean"
+              }
+            }
+          },
+          "read": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "set",
+          "read"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "set": {},
+        "read": {}
+      }
+    },
+    {
+      "name": "goals.changeTarget",
+      "description": "Changes a key result's target and records the change. Easing it toward its baseline needs a reason where the workspace asks for one.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "targetValue": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "id",
+          "targetValue"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "targetValue": 0
+      }
+    },
+    {
+      "name": "goals.setKind",
+      "description": "Marks an objective committed or aspirational (METHOD.md §2.8), recording the change and its reason in the objective's activity.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "committed",
+              "aspirational"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "kind": "committed"
+      }
+    },
+    {
+      "name": "goals.moveToSpace",
+      "description": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id",
+          "spaceId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "spaceId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "goals.publishDraft",
+      "description": "Publishes an objective that waits as a draft (METHOD.md §2.9). Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "goals.approveDraft",
+      "description": "Approves a published draft, which only its reviewer does (METHOD.md §2.9). It goes live, and its check-in rhythm starts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "goals.targetHistory",
+      "description": "Every change to a key result's target, oldest first, with who made it and the reason given for easing it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "goals.restoreKeyResult",
+      "description": "Brings back a key result that was removed on its own, with its value history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
         "required": [
@@ -9628,6 +10590,9 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "done": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -9704,6 +10669,9 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "done": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -9813,6 +10781,9 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "done": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -9884,6 +10855,9 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "done": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -10217,6 +11191,32 @@
       }
     },
     {
+      "name": "goals.escalateDependency",
+      "description": "Escalates an unconfirmed dependency to the cycle's sponsor, whose review inbox lists it until it is confirmed or a risk owner is named.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "goals.removeKeyResultDependency",
       "description": "Removes an entry from the dependency register.",
       "inputSchema": {
@@ -10398,11 +11398,44 @@
             ]
           },
           "direction": {
-            "default": "higher_better",
             "type": "string",
             "enum": [
               "higher_better",
               "lower_better"
+            ]
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "at_least",
+              "at_most",
+              "increase_to",
+              "decrease_to",
+              "range"
+            ]
+          },
+          "greenLow": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "greenHigh": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "redLow": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "redHigh": {
+            "type": [
+              "number",
+              "null"
             ]
           },
           "indicatorType": {
@@ -10414,13 +11447,19 @@
             ]
           },
           "tier": {
-            "default": "output",
-            "type": "string",
-            "enum": [
-              "input",
-              "output",
-              "outcome",
-              "impact"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "input",
+                  "output",
+                  "outcome",
+                  "impact"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "aggregate": {
@@ -10431,7 +11470,9 @@
               "avg",
               "max",
               "min",
-              "count"
+              "count",
+              "last",
+              "first"
             ]
           },
           "ownerKind": {
@@ -10452,6 +11493,18 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "ownerMemberId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "categoryId": {
             "type": "string",
@@ -10715,6 +11768,51 @@
       }
     },
     {
+      "name": "kpis.recordResponse",
+      "description": "Records how an unhealthy KPI was answered: fixed now as a task, or by a key result on an existing objective.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kpiId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fix_now",
+              "key_result"
+            ]
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "keyResultId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "kpiId",
+          "kind"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "kpiId": "00000000-0000-4000-8000-000000000000",
+        "kind": "fix_now"
+      }
+    },
+    {
       "name": "kpis.recoveryDraft",
       "description": "The recovery objective a KPI would get, so it can be read before it is committed to.",
       "inputSchema": {
@@ -10875,6 +11973,40 @@
               "lower_better"
             ]
           },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "at_least",
+              "at_most",
+              "increase_to",
+              "decrease_to",
+              "range"
+            ]
+          },
+          "greenLow": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "greenHigh": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "redLow": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "redHigh": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "indicatorType": {
             "type": "string",
             "enum": [
@@ -10883,12 +12015,31 @@
             ]
           },
           "tier": {
-            "type": "string",
-            "enum": [
-              "input",
-              "output",
-              "outcome",
-              "impact"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "input",
+                  "output",
+                  "outcome",
+                  "impact"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ownerMemberId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "targetDefault": {
@@ -11674,6 +12825,13 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "part": {
+            "type": "string",
+            "enum": [
+              "review",
+              "retrospective"
+            ]
           }
         },
         "required": [
@@ -12135,8 +13293,118 @@
       }
     },
     {
+      "name": "sessions.setNextAction",
+      "description": "Names the next action for a key result scored in this session, with its owner, due by the goal's next check-in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "keyResultId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "nextAction": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "sessionId",
+          "keyResultId",
+          "nextAction",
+          "ownerId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "nextAction": "…",
+        "ownerId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "sessions.setWins",
+      "description": "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "wins": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "sessionId",
+          "wins"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "wins": []
+      }
+    },
+    {
+      "name": "sessions.lowScores",
+      "description": "The key results scored low or lower than last time in a session, with each one's next action and whether it is blocked.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "sessions.createBlocker",
-      "description": "Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save.",
+      "description": "Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -12157,7 +13425,9 @@
               "dependency",
               "clarity",
               "priority_conflict",
-              "external"
+              "external",
+              "approach_not_working",
+              "other"
             ]
           },
           "description": {
@@ -12407,6 +13677,10 @@
                 },
                 "delivered": {
                   "type": "boolean"
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 300
                 }
               },
               "required": [
@@ -13223,7 +14497,7 @@
     },
     {
       "name": "sessions.setRootCause",
-      "description": "Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4).",
+      "description": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13240,7 +14514,19 @@
           "causeKey": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 8
+            "maximum": 9
+          },
+          "secondaryCauseKey": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "detail": {
             "type": "string",
@@ -13267,7 +14553,7 @@
     },
     {
       "name": "sessions.rootCauses",
-      "description": "Every key result this review graded below the threshold, with its cause (METHOD.md §8.4).",
+      "description": "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13501,7 +14787,7 @@
     },
     {
       "name": "sessions.proposeFromLearnings",
-      "description": "Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
+      "description": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13570,8 +14856,10 @@
           "decision": {
             "type": "string",
             "enum": [
+              "achieved",
               "keep",
               "modify",
+              "defer",
               "abandon"
             ]
           },
@@ -13597,7 +14885,7 @@
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
         "goalId": "00000000-0000-4000-8000-000000000000",
-        "decision": "keep",
+        "decision": "achieved",
         "why": "…"
       }
     },
@@ -13671,7 +14959,7 @@
     },
     {
       "name": "sessions.draftNextCycle",
-      "description": "Notes an objective the next cycle might carry (METHOD.md §8.9 stage 10).",
+      "description": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -14049,7 +15337,7 @@
     },
     {
       "name": "sessions.monthlyRecord",
-      "description": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions.",
+      "description": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
       "inputSchema": {
         "type": "object",
         "properties": {

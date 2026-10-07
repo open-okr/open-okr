@@ -67,6 +67,7 @@ export const TRIGGER_NAME_KEYS: Readonly<Record<string, string>> = {
   "quality.too_many_objectives": "triggers.qualityTooManyObjectives",
   "quality.all_lagging": "triggers.qualityAllLagging",
   "quality.no_baseline": "triggers.qualityNoBaseline",
+  "quality.committed_floor": "triggers.qualityCommittedFloor",
   "quality.sandbagging_draft": "triggers.qualitySandbaggingDraft",
   "quality.sandbagging_close": "triggers.qualitySandbaggingClose",
   "quality.orphan_goal": "triggers.qualityOrphanGoal",

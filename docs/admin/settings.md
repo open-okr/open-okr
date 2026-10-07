@@ -22,6 +22,7 @@ no administrator overrides it.
 | `importRowLimit` | Set by the registry | An import is bigger than the default ceiling |
 | `messageLogRetentionDays` | Set by the registry | Your policy says chat message records live for a different span |
 | `agentRunCostCapUsd` | Set by the registry | You want a harder or softer ceiling on what an agent run may spend |
+| Practice: a profile and its settings | Recommended, nothing changed | Your organisation runs OKRs differently from the defaults: a formal planning process (Governed), tracking without the planning workflow (Lightweight), Google's playbook or Radical Focus. Admin, Practice shows what a profile changes before it is applied, keeps anything the workspace changed itself, and lets any one setting be changed or reset on its own card. A profile that sets a number, such as Lightweight's fortnightly check-ins, moves it on Rhythm and thresholds too |
 
 ### Trusted email domains
 
@@ -50,7 +51,7 @@ The seat limit still applies: a full workspace refuses the join and says so.
 | Setting | Default | What it does |
 |---|---|---|
 | `teamVoting` | On | The confidence round in the weekly session, with a vote per member |
-| `coachStrictness` | Set by the registry | How hard the Coach pushes on quality |
+| `coachStrictness` | The workspace's | `strict` raises every quality check on this space's goals to block. The workspace's own switch for the same is strict mode, under Admin, Practice |
 | `defaultCheckInFrequency` | Set by the registry | How often a new goal in this space expects a check-in |
 | `slackChannel`, `teamsChannel` | None | The channel the space's weekly digest is posted to, as Slack's or Teams' own channel ID rather than its name. Offered only for a provider the workspace has connected, and the bot has to be a member of the channel. The coordinator posts each closed week's digest from the session, once per channel |
 

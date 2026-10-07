@@ -6,13 +6,17 @@ import {
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   MID_CYCLE_CALIBRATION,
+  MONTHLY_REVIEW_ITEMS,
+  onTimeShare,
   PROCESS_HEALTH_STATEMENTS,
   REVIEW_STAGE_KEYS,
   REVIEW_STAGES,
   RHYTHM_STATEMENTS,
   RITUALS,
+  ROOT_CAUSE_OTHER,
   ROOT_CAUSES,
   reviewStageKey,
+  reviewStageKeysFor,
   reviewStages,
   rhythmDiagnostic,
   rhythmScore,
@@ -35,6 +39,45 @@ const method = readFileSync(
   "utf8",
 );
 
+describe("§7.5's monthly review", () => {
+  it("has the document's five rows, the moves among them (P9-T19a-d-d)", () => {
+    const table = method
+      .split("### 7.5 Monthly review")[1]
+      ?.split("### 7.6")[0]
+      ?.split("\n")
+      .filter((line) => line.startsWith("| ") && !line.startsWith("| Item"))
+      .map((line) => line.split("|").map((cell) => cell.trim()));
+    expect(
+      table?.map(([, item, recordedAs]) => ({ item, recordedAs })),
+    ).toEqual(MONTHLY_REVIEW_ITEMS);
+    expect(MONTHLY_REVIEW_ITEMS[3]).toEqual({
+      item: "Continue, update, start or stop",
+      recordedAs: "Each move recorded as §2.9 says",
+    });
+  });
+
+  it("names the moves in the ritual's purpose as well", () => {
+    expect(RITUALS.find((r) => r.kind === "monthly")?.purpose).toContain(
+      "continue, update, start or stop",
+    );
+  });
+});
+
+describe("the review and the retrospective apart (§8, P9-T20b-a)", () => {
+  it("gives the review stages 1 to 4 and the retrospective 5 to 11", () => {
+    expect(reviewStageKeysFor("review")).toEqual([
+      "open",
+      "score",
+      "narratives",
+      "recognition",
+    ]);
+    expect(reviewStageKeysFor("retrospective")).toEqual(
+      REVIEW_STAGE_KEYS.slice(4),
+    );
+    expect(reviewStageKeysFor(null)).toEqual(REVIEW_STAGE_KEYS);
+  });
+});
+
 describe("§8.1's eleven stages", () => {
   it("are all here, numbered in order", () => {
     expect(REVIEW_STAGES).toHaveLength(11);
@@ -43,16 +86,17 @@ describe("§8.1's eleven stages", () => {
     ]);
   });
 
-  it("sum to the sixty minutes §7.1 gives the quarterly review", () => {
+  it("sum to the ninety minutes §7.1 gives the quarterly review (P9-T20a)", () => {
     // The minutes come from §11's `sessions.quarterlyStageMinutes`, not from
     // this list. The list carries the order, which §11 says is canon.
     const total = reviewStages(thresholds).reduce(
       (sum, entry) => sum + entry.minutes,
       0,
     );
-    expect(total).toBe(60);
+    expect(total).toBe(90);
+    expect(total).toBe(thresholds["sessions.quarterlyMinutes"]);
     expect(RITUALS.find((r) => r.kind === "quarterly")?.length).toBe(
-      "60 minutes",
+      "90 minutes",
     );
   });
 
@@ -138,9 +182,12 @@ describe("§8.8's close decisions", () => {
     // themselves live in `packages/db` as GOAL_CLOSE_DECISIONS because a goal
     // stores which one it ended on; what belongs to the method is what each one
     // means, and a screen writing its own gloss on "modify" is drift.
+    // §8.8's five since P9-T20e-a, in its order.
     expect(Object.keys(CLOSE_DECISION_MEANINGS)).toEqual([
+      "achieved",
       "keep",
       "modify",
+      "defer",
       "abandon",
     ]);
     for (const meaning of Object.values(CLOSE_DECISION_MEANINGS)) {
@@ -149,17 +196,22 @@ describe("§8.8's close decisions", () => {
   });
 
   it("states the rule the stage exists for", () => {
-    // §8.8's closing line, and the reason no decision is pre-selected anywhere.
-    expect(method).toContain("Nothing carries over by default.");
+    // §8.8's closing line, and the reason no decision is pre-selected
+    // anywhere: a proposal is shown, never chosen. "By default" until P9-T21
+    // landed §1's revised seventh principle.
+    expect(method).toContain("Nothing carries over silently.");
   });
 });
 
 describe("§8.4's root causes", () => {
-  it("are the document's eight, word for word", () => {
+  it("are the document's nine, word for word", () => {
     // Read back out of METHOD.md rather than restated here, so editing either
     // one without the other fails the build. Same shape as the §8.5 statements
-    // and the §8.7 questions below.
-    expect(ROOT_CAUSES).toHaveLength(8);
+    // and the §8.7 questions below. Nine since P9-T20c, "Other" the last.
+    expect(ROOT_CAUSES).toHaveLength(9);
+    expect(ROOT_CAUSES[ROOT_CAUSE_OTHER - 1]).toBe(
+      "Other, described in a line",
+    );
     for (const cause of ROOT_CAUSES) {
       expect(method).toContain(cause);
     }
@@ -237,16 +289,16 @@ describe("§8.7's management retro", () => {
 
 describe("§8.6's rhythm diagnostic", () => {
   const cycleFloor = thresholds["sessions.diagnosticCycleScore"];
-  const rhythmFloor = thresholds["sessions.diagnosticRhythmScore"];
+  const rhythmFloor = thresholds["sessions.diagnosticRhythm"];
 
   it("reads a delivered cycle without consulting the rhythm at all", () => {
     // The first row is the whole answer when it holds. A delivered cycle raises
-    // a question about ambition, not about process, so a terrible rhythm score
+    // a question about ambition, not about process, so a terrible rhythm
     // must not change the verdict.
-    expect(rhythmDiagnostic(cycleFloor, 1, thresholds).kind).toBe(
+    expect(rhythmDiagnostic(cycleFloor, 0, thresholds).kind).toBe(
       "results_delivered",
     );
-    expect(rhythmDiagnostic(0.95, 5, thresholds).kind).toBe(
+    expect(rhythmDiagnostic(0.95, 1, thresholds).kind).toBe(
       "results_delivered",
     );
   });
@@ -254,9 +306,9 @@ describe("§8.6's rhythm diagnostic", () => {
   it("blames the OKRs when the team ran the rhythm and still missed", () => {
     const result = rhythmDiagnostic(cycleFloor - 0.01, rhythmFloor, thresholds);
     expect(result.kind).toBe("strategy_or_quality");
-    expect(result.prescription).toContain(
-      "Fix the key results before you push the team",
-    );
+    // A hypothesis for the room to test, not a verdict (§8.6, P9-T20d).
+    expect(result.diagnosis).toBe("Likely a strategy or OKR-quality problem");
+    expect(result.prescription).toContain("before you push the team");
   });
 
   it("blames the cadence when neither held", () => {
@@ -282,14 +334,64 @@ describe("§8.6's rhythm diagnostic", () => {
 
   it("reads every verdict and prescription out of the document", () => {
     for (const [cycle, rhythmValue] of [
-      [0.9, 5],
-      [0.5, 4],
-      [0.5, 2],
+      [0.9, 1],
+      [0.5, 0.8],
+      [0.5, 0.4],
     ] as const) {
       const result = rhythmDiagnostic(cycle, rhythmValue, thresholds);
       expect(method).toContain(result.diagnosis);
       expect(method).toContain(result.prescription);
     }
+  });
+});
+
+describe("§8.6's rhythm, measured (P9-T20d)", () => {
+  it("counts a due check-in published in its period and within tolerance", () => {
+    // Due on Mondays; published on time, then two days late inside a
+    // tolerance of two, then not at all.
+    const result = onTimeShare(
+      [
+        {
+          dueOn: ["2026-10-05", "2026-10-12", "2026-10-19"],
+          publishedOn: ["2026-10-05", "2026-10-14"],
+        },
+      ],
+      2,
+    );
+    expect(result).toEqual({ due: 3, onTime: 2, share: 2 / 3 });
+  });
+
+  it("does not count a check-in later than the tolerance", () => {
+    expect(
+      onTimeShare([{ dueOn: ["2026-10-05"], publishedOn: ["2026-10-08"] }], 2)
+        .onTime,
+    ).toBe(0);
+  });
+
+  it("reads 80% on time as likely a strategy or OKR-quality problem below the cycle floor (acceptance)", () => {
+    const measured = onTimeShare(
+      [
+        {
+          dueOn: [
+            "2026-10-05",
+            "2026-10-12",
+            "2026-10-19",
+            "2026-10-26",
+            "2026-11-02",
+          ],
+          publishedOn: ["2026-10-05", "2026-10-12", "2026-10-19", "2026-10-26"],
+        },
+      ],
+      2,
+    );
+    expect(measured.share).toBe(0.8);
+    expect(
+      rhythmDiagnostic(0.5, measured.share as number, thresholds).diagnosis,
+    ).toBe("Likely a strategy or OKR-quality problem");
+  });
+
+  it("is no share at all when nothing fell due", () => {
+    expect(onTimeShare([{ dueOn: [], publishedOn: [] }], 2).share).toBeNull();
   });
 });
 

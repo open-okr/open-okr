@@ -38,7 +38,8 @@ describe("the commitment stage", () => {
     // own bound, which is the failure the method rule exists to prevent, and
     // which the gate in `sessions.advanceStage` was committing until P6-G19a.
     const bounds = resolveThresholds()["sessions.weeklyCommitmentBounds"];
-    expect(bounds).toEqual({ low: 2, high: 3 });
+    // Three or four since P9-T19a-d-c.
+    expect(bounds).toEqual({ low: 3, high: 4 });
     expect(panel).not.toContain(`${bounds.low} to ${bounds.high} a week`);
     // The sentence is one catalogue message with named holes since P6-G22d-b,
     // so neither the words nor the numbers are in this file. What the test is

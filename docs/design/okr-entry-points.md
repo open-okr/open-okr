@@ -69,6 +69,11 @@ Moves, not deletions:
 | Sessions | A tab inside Cycle | Sessions belong to a cycle's cadence, phase 6 |
 | Scorecard | Shown only when the points layer is on | It is off by default (REQUIREMENTS.md) and today it is a permanent row for a feature most workspaces never enable |
 
+**Built at P9-T07a-b**, as decision D5 of the Phase 9 design adopted it.
+Scorecard has no points-layer setting to wait for, so it became a tab inside
+Cycle beside Sessions rather than a row that appears and disappears; Check in
+is a button on OKRs, on the goal page and on Review.
+
 **Risk to check before building:** `apps/web/test/reachability.test.ts` asserts
 the sidebar and the avatar menu agree with the registry. Every moved row needs
 its new door asserted there, or a screen goes dark and no test notices.

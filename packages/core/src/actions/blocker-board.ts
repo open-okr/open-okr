@@ -30,10 +30,12 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { RHYTHM_ASSIST_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { blockerClockOf, frequencyOf } from "../cadence/blockers.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
-import { readRhythmRow } from "../cycles/service.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { resolveRhythmWithLadders } from "../nudges/ladders.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 
 /** How many blockers a board returns, and a summary is shown. */
@@ -49,7 +51,7 @@ const rankedOutput = z.object({
   blockedHealth: z.string().nullable(),
   /** §11's ladder: none, owner, coordinator or sponsor. */
   escalation: z.string(),
-  /** True once past §7.3's own clock. */
+  /** True once the check-in its action was due by has passed (§7.3). */
   pastTheClock: z.boolean(),
 });
 
@@ -112,9 +114,11 @@ async function boardFor(
           type: blockers.type,
           nextAction: blockers.nextAction,
           openedAt: blockers.openedAt,
+          dueAt: blockers.dueAt,
           ownerName: workspaceMembers.name,
           goalTitle: goals.title,
           goalHealth: goals.health,
+          checkInFrequency: goals.checkInFrequency,
           keyResultTitle: keyResults.title,
         })
         .from(blockers)
@@ -140,7 +144,13 @@ async function boardFor(
           ),
         );
 
-      const now = Date.now();
+      // The check-in each one is due by (§7.3, P9-T19a-a), in the workspace
+      // calendar, and the sponsor a rung only where the workspace adds them.
+      const timeZone = await workspaceTimeZone(tx, context.workspaceId);
+      const { practice } = practiceFromRow(
+        await readRhythmRow(tx, context.workspaceId),
+      );
+      const now = new Date();
       return rankBlockers(
         rows.map((row) => ({
           id: row.id,
@@ -149,13 +159,20 @@ async function boardFor(
           ownerName: row.ownerName ?? null,
           ageHours: Math.max(
             0,
-            Math.floor((now - row.openedAt.getTime()) / 3_600_000),
+            Math.floor((now.getTime() - row.openedAt.getTime()) / 3_600_000),
           ),
+          clock: blockerClockOf({
+            dueAt: row.dueAt,
+            frequency: frequencyOf(row.checkInFrequency ?? null, thresholds),
+            anchor: thresholds["cadence.anchorDay"],
+            now,
+            timeZone,
+          }),
           blockedHealth: row.goalHealth ?? null,
           blockedTitle: row.keyResultTitle ?? row.goalTitle ?? null,
         })),
-        thresholds["cadence.blockerLadderHours"],
-        thresholds["cadence.blockerClockHours"],
+        thresholds,
+        practice["escalation.sponsorInLadders"] === "on",
       ).slice(0, BOARD_LIMIT);
     },
   );

@@ -8,9 +8,10 @@
  * public demo instance, where the visitor is nobody and the only way to see
  * the product as Priya sees it is to be Priya.
  *
- * So this gives each of the seven invented people an account, attaches it to
- * the member row the builder already wrote, puts both agents in sandbox, and
- * runs the Coach and the Champion once.
+ * So this gives each of the invented people an account, the seven of the
+ * one-quarter demo and the five the Northwind year adds, attaches it to the
+ * member row the builder already wrote, runs the Coach and the Champion once,
+ * and puts both agents in sandbox.
  *
  * **What it refuses to do, and why:**
  *
@@ -45,6 +46,7 @@ import { withProvisioningAuthority } from "../auth/provisioning-authority.ts";
 import { OperationError } from "../operations/errors.ts";
 import { runOperation } from "../operations/operation.ts";
 import { INVENTED_CAST } from "./cast.ts";
+import { YEAR_PEOPLE } from "./year/people.ts";
 
 type Auth = ReturnType<typeof createAuth>;
 
@@ -65,20 +67,38 @@ export interface DemoPersona {
 }
 
 /**
+ * The five the Northwind year adds to the cast (P9-T22c-e-c): Hugo, Nadia,
+ * Kofi, Leo and Yuki. Ben is not among them: he leaves in May and is
+ * suspended, so an account could never sign in.
+ */
+const YEAR_CAST: readonly DemoPersona[] = YEAR_PEOPLE.filter(
+  (person) =>
+    person.name !== "" &&
+    person.leaves === undefined &&
+    !INVENTED_CAST.some((member) => member.name === person.name),
+).map((person) => ({
+  name: person.name,
+  email: `${person.key}@northwind.example`,
+  title: person.title,
+}));
+
+/**
  * Who a visitor can be on a demo instance.
  *
- * The same seven the seed writes and `demo:prepare` gives accounts to, in the
- * cast's own order so the list reads top-down through the organisation. The
- * page that shows this cannot ask the database who has an account, because it
- * is rendered before anybody is signed in.
+ * The seven the one-quarter demo writes, then the five the Northwind year
+ * adds, which is what `pnpm db:seed` builds since P9-T22c-e-c. In the cast's
+ * own order so the list reads top-down through the organisation. The page
+ * that shows this cannot ask the database who has an account, because it is
+ * rendered before anybody is signed in.
  */
-export const DEMO_PERSONAS: readonly DemoPersona[] = INVENTED_CAST.map(
-  (person) => ({
+export const DEMO_PERSONAS: readonly DemoPersona[] = [
+  ...INVENTED_CAST.map((person) => ({
     name: person.name,
     email: person.email,
     title: person.title,
-  }),
-);
+  })),
+  ...YEAR_CAST,
+];
 
 export interface PrepareDemoPersonasInput {
   readonly pool: Pool;
@@ -147,7 +167,7 @@ export async function prepareDemoPersonas(
   const personas: PreparedPersona[] = [];
   let accountsCreated = 0;
 
-  for (const person of INVENTED_CAST) {
+  for (const person of DEMO_PERSONAS) {
     const member = await memberByName(
       input.pool,
       input.workspaceId,
@@ -155,7 +175,9 @@ export async function prepareDemoPersonas(
     );
     if (!member) {
       notes.push(
-        `${person.name} is not a member of this workspace. The demo seed writes them, so this workspace was seeded by an older version.`,
+        YEAR_CAST.includes(person)
+          ? `${person.name} joins the Northwind year, and this workspace holds the one-quarter demo or a year built before they arrived, so there is nobody to give an account to.`
+          : `${person.name} is not a member of this workspace. The demo seed writes them, so this workspace was seeded by an older version.`,
       );
       continue;
     }

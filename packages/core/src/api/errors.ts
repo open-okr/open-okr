@@ -31,6 +31,12 @@ export const API_ERROR_CODES = [
   /** Visible, but at a level below what the action requires. */
   "forbidden",
   "not_found",
+  /**
+   * The caller changed something from a value that is no longer the stored
+   * one (P9-T06a). `details` carries what is stored now and who changed it,
+   * so a screen can offer keep-mine or take-theirs.
+   */
+  "conflict",
   /** No action of that name on this surface. */
   "unknown_action",
   /** A read reached by POST, or a write by GET. */
@@ -50,6 +56,7 @@ const STATUS: Readonly<Record<ApiErrorCode, number>> = {
   insufficient_scope: 403,
   forbidden: 403,
   not_found: 404,
+  conflict: 409,
   unknown_action: 404,
   method_not_allowed: 405,
   invalid_input: 422,
@@ -72,6 +79,8 @@ export interface ApiError {
    * turns one limited tenant into a limited instance.
    */
   readonly retryAfterSeconds?: number;
+  /** What a `conflict` found instead, for `conflict` only. */
+  readonly details?: Readonly<Record<string, unknown>>;
 }
 
 export function statusFor(code: ApiErrorCode): number {
@@ -117,7 +126,9 @@ export function errorFor(thrown: unknown): ApiError {
     };
   }
   if (thrown instanceof OperationError) {
-    return apiError(thrown.code, thrown.message);
+    return thrown.details === undefined
+      ? apiError(thrown.code, thrown.message)
+      : { ...apiError(thrown.code, thrown.message), details: thrown.details };
   }
   if (thrown instanceof SSOConnectionRejected) {
     // A fourth refusal, and it is about the input like a Zod one is: a single
