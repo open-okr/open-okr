@@ -113,9 +113,11 @@ describe("planning Q2 (NW-Q2-01 to NW-Q2-07)", () => {
     if (!by("2027-04-15")) {
       return;
     }
+    // The plan: what was not started after it published (C5 is, on 12 May).
     const objectives = await rows<{ title: string; space: string | null }>(
       `select g.title, s.name as space from goals g left join spaces s on s.id = g.space_id
-        where g.workspace_id = $1 and g.cycle_id = $2 and g.deleted_at is null`,
+        where g.workspace_id = $1 and g.cycle_id = $2 and g.deleted_at is null
+          and g.added_mid_cycle_at is null`,
       [q2Id],
     );
     expect(objectives).toHaveLength(15);
@@ -131,13 +133,16 @@ describe("planning Q2 (NW-Q2-01 to NW-Q2-07)", () => {
     expect(build).toBeDefined();
   });
 
-  it("marks nothing as added mid-cycle, because all of it is the plan", async () => {
+  it("marks nothing in the plan as added mid-cycle, only what started after it", async () => {
     const marked = await rows<{ title: string }>(
       `select title from goals where workspace_id = $1 and cycle_id = $2
           and added_mid_cycle_at is not null and deleted_at is null`,
       [q2Id],
     );
-    expect(marked).toEqual([]);
+    // C5, started on 12 May (P9-T22c-c-b), is the one addition.
+    expect(marked.map((one) => one.title)).toEqual(
+      by("2027-05-12") ? ["Mid-market buyers choose us over Brightline"] : [],
+    );
   });
 
   it("records the override past OBJ-1 for F2, with Elena's reason (NW-Q2-06)", async () => {
@@ -215,8 +220,9 @@ describe("Q2's first five weeks (NW-Q2-08)", () => {
     const trends = await rows<{ title: string; trend: string }>(
       `select g.title, t.trend from objective_trends t join goals g on g.id = t.goal_id
         where t.workspace_id = $1 and g.cycle_id = $2 and t.deleted_at is null
+          and t.month = date_trunc('month', $3::date)::date
         order by g.title`,
-      [q2Id],
+      [q2Id, on("2027-05-03")],
     );
     expect(trends).toHaveLength(4);
     expect(

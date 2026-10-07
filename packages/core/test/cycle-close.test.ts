@@ -280,6 +280,36 @@ describe("closing a cycle", () => {
     expect(closed.fedInto?.packNote).toBe(true);
   });
 
+  it("closes past an objective stopped mid-cycle, whose key results are not scored (P9-T22c-c-b)", async () => {
+    const stopped = (await call("goals.create", {
+      title: "Expansion comes from accounts that reached value",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: memberId,
+      reviewerId: memberId,
+      weight: 1,
+    })) as { id: string };
+    await call("goals.addKeyResult", {
+      goalId: stopped.id,
+      title: "Raise expansion seats added from 138 to 170 a month",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 138,
+      targetValue: 170,
+      weight: 1,
+    });
+    await call("goals.stop", {
+      id: stopped.id,
+      reason: "Capacity moves to the competitive response",
+    });
+
+    await holdTheReview();
+    await close();
+    expect((await cycleRow(cycleId))?.status).toBe("closed");
+  });
+
   it("makes the lowest process-health statement Phase 3's improvement action, not an issue", async () => {
     const next = await createNext();
     await holdTheReview();
@@ -758,5 +788,29 @@ describe("the scorecard by cycle (P9-T14c)", () => {
       }),
     ]);
     expect(second?.moved.eased).toEqual([]);
+  });
+
+  it("shows the target the plan published with as the original, not an edit made while drafting (P9-T22c-c-b)", async () => {
+    // Drafting: 300 becomes 320 before anybody publishes.
+    await call("goals.changeTarget", { id: keyResultId, targetValue: 320 });
+    // Published, set directly as the mid-cycle tests do, because publishing
+    // through the gates is not what is under test.
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update cycles set published_at = now() where id = $1",
+      [cycleId],
+    );
+    await call("goals.changeTarget", {
+      id: keyResultId,
+      targetValue: 250,
+      reason: "The integration partner left the market",
+    });
+    await reviewIn(cycleId, keyResultId, sessionId, 0.65);
+
+    const scorecard = (await call("cycles.scorecard", {})) as { rows: Row[] };
+    const row = scorecard.rows.find((one) => one.cycleId === cycleId);
+    expect(row?.moved.eased).toEqual([
+      expect.objectContaining({ original: 320, target: 250 }),
+    ]);
   });
 });

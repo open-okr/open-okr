@@ -170,7 +170,10 @@ describe("running Q1 (NW-Q1-15 to NW-Q1-25)", () => {
       return;
     }
     const decisions = await rows<{ text: string }>(
-      "select text from decisions where workspace_id = $1 and deleted_at is null order by created_at",
+      `select d.text from decisions d join okr_sessions s on s.id = d.session_id
+        where d.workspace_id = $1 and s.cycle_id = $2 and d.deleted_at is null
+        order by d.created_at`,
+      [q1Id],
     );
     expect(decisions.map((one) => one.text)).toEqual([
       "C2.3 added against C2 for the January release regression; everything else continues.",
@@ -221,7 +224,10 @@ describe("closing Q1 (NW-Q1-26 to NW-Q1-32)", () => {
       return;
     }
     const [diagnostic] = await rows<{ verdict: string; share: string }>(
-      "select verdict, on_time_share as share from review_diagnostics where workspace_id = $1 and deleted_at is null",
+      `select d.verdict, d.on_time_share as share from review_diagnostics d
+         join okr_sessions s on s.id = d.session_id
+        where d.workspace_id = $1 and s.cycle_id = $2 and d.deleted_at is null`,
+      [q1Id],
     );
     expect(diagnostic?.verdict).toBe("results_delivered");
     // The two drafting weeks before the teams published are the misses:
@@ -235,13 +241,14 @@ describe("closing Q1 (NW-Q1-26 to NW-Q1-32)", () => {
       return;
     }
     const decisions = await rows<{ decision: string }>(
-      "select decision from review_decisions where workspace_id = $1 and deleted_at is null",
+      `select r.decision from review_decisions r join goals g on g.id = r.goal_id
+        where r.workspace_id = $1 and g.cycle_id = $2 and r.deleted_at is null`,
+      [q1Id],
     );
     expect(decisions).toHaveLength(14);
     const carried = await rows<{ title: string }>(
-      `select g.title from goals g join cycles c on c.id = g.cycle_id
-        where g.workspace_id = $1 and g.carried_from_goal_id is not null
-          and c.starts_on > (select ends_on from cycles where id = $2) and g.deleted_at is null`,
+      `select g.title from goals g join goals f on f.id = g.carried_from_goal_id
+        where g.workspace_id = $1 and f.cycle_id = $2 and g.deleted_at is null`,
       [q1Id],
     );
     expect(carried).toHaveLength(11);

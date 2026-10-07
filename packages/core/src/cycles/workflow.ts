@@ -59,6 +59,7 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   or,
 } from "drizzle-orm";
 import { practiceFromRow } from "../practice/settings.ts";
@@ -305,7 +306,8 @@ export async function loadWorkflowInput<
  *
  * **Scored** means `key_results.score` is set, which the quarterly review
  * writes back when it closes (P4-T10b-a). A cycle with no key results has
- * nothing scored, not everything.
+ * nothing scored, not everything. An objective stopped mid-cycle is left
+ * out, because its key results are not scored (P9-T22c-c-b).
  *
  * **The retrospective** is §8.1 stage five, the team retro, held in a
  * quarterly review of this cycle: one note in either column is a retro that
@@ -330,6 +332,9 @@ async function loadReviewAndLearn<
         eq(keyResults.workspaceId, workspaceId),
         eq(goals.cycleId, cycle.id),
         isNull(goals.deletedAt),
+        // A stopped objective's key results are not scored (§2.9, NW-Q2-19):
+        // it closed as abandoned before the review, so nothing waits on it.
+        or(isNull(goals.closeDecision), ne(goals.closeDecision, "abandon")),
       ),
     );
   const total = Number(tally?.total ?? 0);

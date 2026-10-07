@@ -36,6 +36,8 @@ interface YearIds {
   readonly dependencies: Map<string, string>;
   /** Blockers by the key result they block: "C1.3". */
   readonly blockers: Map<string, string>;
+  /** Sessions a later event comes back to: "q2:retrospective". */
+  readonly sessions: Map<string, string>;
   /** The annual frame's strategies, in the frame's order. */
   strategies: string[];
 }
@@ -91,6 +93,7 @@ export function yearContext(seed: YearSeed, today: string): YearContext {
       keyResults: new Map(),
       dependencies: new Map(),
       blockers: new Map(),
+      sessions: new Map(),
       strategies: [],
     },
     action: {

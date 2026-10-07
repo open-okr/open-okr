@@ -317,17 +317,18 @@ export async function markAddedOn(
       async execute({ tx }) {
         if ("goalId" in subject) {
           // openokr:allow-mutation: the builder's own audited operation.
-          await tx
+          const [goal] = await tx
             .update(goals)
             .set({ addedMidCycleAt: at })
-            .where(activeOnly(goals, eq(goals.id, subject.goalId)));
+            .where(activeOnly(goals, eq(goals.id, subject.goalId)))
+            .returning({ title: goals.title });
           return {
             result: subject.goalId,
             activity: {
               kind: "goal.updated" as const,
               subjectType: "goal" as const,
               subjectId: subject.goalId,
-              payload: {},
+              payload: { title: goal?.title ?? "" },
             },
             audit: {
               action: "demo.year.markAddedOn",

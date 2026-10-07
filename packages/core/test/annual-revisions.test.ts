@@ -160,6 +160,24 @@ describe("an agreed frame (NW-Q2-22)", () => {
     );
   });
 
+  it("keeps its strategies, and what is aligned to them, when only the not-doing list is revised (P9-T22c-c-b)", async () => {
+    await agreedFrame();
+    const ids = async () =>
+      (
+        await call<{ strategies: { id: string }[] }>("frame.read", {})
+      ).strategies.map((strategy) => strategy.id);
+    const before = await ids();
+    await call("frame.set", {
+      yearLabel: "2026",
+      agreed: true,
+      notDoing: NOT_DOING_REVISED,
+      strategies: STRATEGIES,
+      reason: REASON,
+    });
+    // The same rows, so an annual objective aligned to one still is.
+    expect(await ids()).toEqual(before);
+  });
+
   it("starts a new year without asking, which supersedes rather than revises", async () => {
     await agreedFrame();
     await call("frame.set", {

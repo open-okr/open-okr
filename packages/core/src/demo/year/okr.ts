@@ -27,6 +27,8 @@ export interface YearKeyResult {
   readonly dueOn?: string;
   readonly capacity?: "fits" | "tight" | "exceeds";
   readonly kpiKey?: YearKpiKey;
+  /** Why it is added after the plan published, where it is (§2.9). */
+  readonly reason?: string;
 }
 
 export interface YearObjective {
@@ -47,6 +49,8 @@ export interface YearObjective {
   /** Why it stands alone, when it does (METHOD.md §5.2). */
   readonly standaloneReason?: string;
   readonly description?: string;
+  /** Why it is started after the plan published, where it is (§2.9). */
+  readonly reason?: string;
   readonly keyResults: readonly YearKeyResult[];
 }
 
@@ -133,6 +137,7 @@ export async function addYearKeyResult(
     ownerId: need(context.ids.people, keyResult.ownerKey, "Owner"),
     ...(keyResult.capacity ? { capacity: keyResult.capacity } : {}),
     ...(kpiId ? { kpiId } : {}),
+    ...(keyResult.reason ? { reason: keyResult.reason } : {}),
     weight: 1,
   });
   context.ids.keyResults.set(keyResult.key, added.id);
@@ -187,6 +192,7 @@ export async function writeYearObjective(
           ),
         }
       : {}),
+    ...(objective.reason ? { reason: objective.reason } : {}),
     weight: 1,
   });
   context.ids.goals.set(objective.key, goal.id);

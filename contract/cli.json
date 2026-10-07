@@ -9275,6 +9275,16 @@
           "field": "facilitatorId",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "part",
+          "field": "part",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "review",
+            "retrospective"
+          ]
         }
       ],
       "pages": false

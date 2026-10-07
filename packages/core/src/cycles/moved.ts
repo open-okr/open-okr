@@ -131,6 +131,7 @@ export async function cycleMovesInTx(
             fromValue: keyResultTargetChanges.fromValue,
             eased: keyResultTargetChanges.eased,
             reason: keyResultTargetChanges.reason,
+            midCycle: keyResultTargetChanges.midCycle,
           })
           .from(keyResultTargetChanges)
           .where(
@@ -144,18 +145,26 @@ export async function cycleMovesInTx(
             ),
           )
           .orderBy(asc(keyResultTargetChanges.changedAt));
+  // The original is the target the plan published with: what the first
+  // change after publication moved it from. An edit made while drafting is
+  // the plan being written, not a promise moved (P9-T22c-c-b). A key result
+  // changed only before publication falls back to its first change.
   const first = new Map<string, number>();
+  const published = new Map<string, number>();
   const easedBecause = new Map<string, string | null>();
   for (const change of changes) {
     if (!first.has(change.keyResultId)) {
       first.set(change.keyResultId, Number(change.fromValue));
+    }
+    if (change.midCycle && !published.has(change.keyResultId)) {
+      published.set(change.keyResultId, Number(change.fromValue));
     }
     if (change.eased) {
       easedBecause.set(change.keyResultId, change.reason);
     }
   }
   const eased = children.flatMap((child) => {
-    const original = first.get(child.id);
+    const original = published.get(child.id) ?? first.get(child.id);
     if (original === undefined || !easedBecause.has(child.id)) {
       return [];
     }

@@ -1348,6 +1348,11 @@ export const setAnnualFrame = defineWriteAction({
       // `annual_frame_revisions` with what the changed fields held before.
       let frameId = current?.id;
       let revised: readonly FrameField[] = [];
+      // A new frame writes its strategies; the same year's frame only when
+      // they changed (P9-T22c-c-b). Replacing an unchanged list gave every
+      // strategy a new id, and the annual objectives aligned to the old ones
+      // lost their strategy when somebody revised only the not-doing list.
+      let replaceStrategies = true;
       if (current && current.yearLabel !== input.yearLabel) {
         await tx
           .update(annualFrames)
@@ -1391,6 +1396,7 @@ export const setAnnualFrame = defineWriteAction({
         ) {
           changed.push("strategies");
         }
+        replaceStrategies = changed.includes("strategies");
 
         // A draft keeps no history; an agreed frame keeps every revision.
         if (current.agreed && changed.length > 0) {
@@ -1492,28 +1498,30 @@ export const setAnnualFrame = defineWriteAction({
         frameId = inserted.id;
       }
 
-      // The strategy list is replaced wholesale. Soft-deleting the old rows
-      // rather than updating them keeps "what the year's thrusts were in March"
-      // answerable after they change in June.
-      await tx
-        .update(annualStrategies)
-        .set({ deletedAt: new Date() })
-        .where(
-          activeOnly(
-            annualStrategies,
-            eq(annualStrategies.workspaceId, workspaceId),
-            eq(annualStrategies.frameId, frameId),
-          ),
-        );
+      // The strategy list is replaced wholesale when it changes.
+      // Soft-deleting the old rows rather than updating them keeps "what the
+      // year's thrusts were in March" answerable after they change in June.
+      if (replaceStrategies) {
+        await tx
+          .update(annualStrategies)
+          .set({ deletedAt: new Date() })
+          .where(
+            activeOnly(
+              annualStrategies,
+              eq(annualStrategies.workspaceId, workspaceId),
+              eq(annualStrategies.frameId, frameId),
+            ),
+          );
 
-      for (const [index, strategy] of input.strategies.entries()) {
-        await tx.insert(annualStrategies).values({
-          workspaceId,
-          frameId,
-          text: strategy.text,
-          note: strategy.note ?? null,
-          position: index,
-        });
+        for (const [index, strategy] of input.strategies.entries()) {
+          await tx.insert(annualStrategies).values({
+            workspaceId,
+            frameId,
+            text: strategy.text,
+            note: strategy.note ?? null,
+            position: index,
+          });
+        }
       }
 
       const strategies = await tx

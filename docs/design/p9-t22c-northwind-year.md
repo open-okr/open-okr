@@ -120,13 +120,22 @@ Each part proves its own steps against a database as of the real today, and
 | P9-T22c-c-a | The first monthly review gives C3 a trend as well, "improving" | The chapter names three trends, and its test asks one for each company objective |
 | P9-T22c-c-a | Where the chapter gives no finish for a Q2 key result, one is chosen | Eight scores are given; the rest are chosen so the aspirational twenty-two average 0.59 with eleven below 0.6, and the five commitments are met, as NW-Q2-19 and NW-Q2-21 have it |
 
-### Four product changes the year found
+| P9-T22c-c-b | The emergency session of 12 May is a monthly review called early, and it records four decisions against the key results the moves touched | The chapter calls it that, and §7.5 keeps decisions in a monthly review |
+| P9-T22c-c-b | C4's stop, C2's change of kind and S2.1's eased target are dated 12 May by the builder's own audited operation, as are A4's eased target and its new key result on 21 June | The product stamps a stop's close, a kind change and a target change with the day they are written, and the close reads all three back ("committed until 12 May"). A kind change's one record is its activity, so that row is dated too; the audit rows still say when the seed ran |
+| P9-T22c-c-b | Elena's decision of 17 May is taken in a short leadership session of the monthly kind | A decision belongs to a monthly review (§7.5), and the chapter records it against C3.2 |
+| P9-T22c-c-b | Daniel's check-in drafted by his own assistant is a check-in by Daniel; the critical escalations and the coach's committed-floor message are not seeded | The external assistant is not connected to the demo (§5), and the agents send today's messages themselves |
+| P9-T22c-c-b | The grades are recorded in the review session on 16 June rather than on 14 and 15 June | A grade is recorded in the review that reveals it; the champions' preparation leaves nothing until then |
+| P9-T22c-c-b | Process health reads statement three lowest at 3, not 3.1 | 3.1 is a room's average; the seed submits one person's answers |
+| P9-T22c-c-b | Q3 is created on 3 June, four weeks ahead, with its sponsor and facilitator | So Q2's close has somewhere to feed, as Q2 did for Q1 |
+
+### Product changes the year found
 
 Building Q1's close against a database meant recording a review after its day,
 which no test had done. Four things read the clock where they should read the
 record's own day. Each is fixed in the product, with its own test, rather than
 worked around in the seed, because a team that writes up its review the
-morning after meets the same four.
+morning after meets the same four. Q2's close found four more, listed after
+them.
 
 | Change | Before | After | Test |
 |---|---|---|---|
@@ -135,7 +144,12 @@ morning after meets the same four.
 | An imported check-in that marks a milestone done dates it by the check-in | `done_at` was the day of the import | The check-in's own date, as its values already were | `measured-rhythm.test.ts`, "an imported check-in that marks a milestone done" |
 | **A review in the company space covers the whole cycle** | A review decided only the objectives of its own space, so the company's quarterly review could not decide a team's objective | The company space's review covers every objective in the cycle. A team's review still covers only its own | `review-reset.test.ts`, "which objectives a review covers" |
 
-**The fourth is for Akmal to confirm.** METHOD §8's ninth stage closes every
+| A review held apart can be scheduled by hand | Only booking a cycle wrote the review and the retrospective, and it books nothing in the past, so a review scheduled late could not be split | `sessions.create` takes a `part`; a retrospective names the review scheduled before it for the same space and cycle, and is refused without one, or where the workspace holds its review in one session | `review-split.test.ts`, "scheduling the halves by hand" |
+| Revising the frame keeps its strategies | `frame.set` replaced the strategy list on every call, so revising only the not-doing list gave each strategy a new id and the annual objectives aligned to them lost it | The list is replaced only when it changed, or for a new frame | `annual-revisions.test.ts`, "keeps its strategies" |
+| A stopped objective does not hold up the close | Phase 7 asked for every key result in the cycle to be scored, including a stopped objective's, which §2.9 leaves unscored | An objective closed as abandoned before the review is left out of the count | `cycle-close.test.ts`, "closes past an objective stopped mid-cycle" |
+| An eased target's original is the published one | The scorecard showed the target a key result had before its first ever change, which for a target set while drafting was the draft's | The first change after the plan published gives the original; one changed only while drafting keeps the old reading | `cycle-close.test.ts`, "shows the target the plan published with" |
+
+**The fourth of Q1's is for Akmal to confirm.** METHOD §8's ninth stage closes every
 objective deliberately, and the scenario holds one quarterly review, in the
 company space, that decides all fourteen.
 The product had no way to do that: each space's review saw only its own

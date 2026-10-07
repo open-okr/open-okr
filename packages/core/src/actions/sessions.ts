@@ -668,6 +668,16 @@ export const createSession = defineWriteAction({
     title: z.string().trim().min(1).max(200),
     scheduledFor: z.iso.datetime({ offset: true, local: true }),
     facilitatorId: z.uuid(),
+    /**
+     * Which half of a review held apart (METHOD.md §8, §12 "Quarterly review
+     * format", P9-T22c-c-b).
+     *
+     * Booking a cycle writes both halves, and books nothing in the past, so a
+     * review scheduled by hand, or late, had no way to be split. The
+     * retrospective names the review scheduled before it for the same space
+     * and cycle, which is how booking links them.
+     */
+    part: z.enum(["review", "retrospective"]).optional(),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -682,6 +692,27 @@ export const createSession = defineWriteAction({
         workspaceId,
         input.spaceId,
       );
+      if (input.part && input.kind !== "quarterly") {
+        throw new OperationError(
+          "not_found",
+          "Only a quarterly review is held in two parts.",
+        );
+      }
+      if (input.part && !input.cycleId) {
+        throw new OperationError(
+          "not_found",
+          "A review held in two parts belongs to a cycle: name it.",
+        );
+      }
+      if (input.part) {
+        const rhythmRow = await readRhythmRow(tx, workspaceId);
+        if (practiceFromRow(rhythmRow).practice["review.format"] !== "split") {
+          throw new OperationError(
+            "forbidden",
+            'This workspace holds its review in one session ("Quarterly review format" in its practice settings), so it has no parts.',
+          );
+        }
+      }
 
       await getAccessScoped(tx, {
         workspaceId,
@@ -693,6 +724,20 @@ export const createSession = defineWriteAction({
       await requireFacilitatorMember(tx, workspaceId, input.facilitatorId);
       if (input.cycleId) {
         await requireOpenCycle(tx, workspaceId, input.cycleId);
+      }
+      const reviewSessionId =
+        input.part === "retrospective" && input.cycleId
+          ? await bookedReviewSessionIdInTx(tx, {
+              workspaceId,
+              spaceId: input.spaceId,
+              cycleId: input.cycleId,
+            })
+          : null;
+      if (input.part === "retrospective" && !reviewSessionId) {
+        throw new OperationError(
+          "conflict",
+          "A retrospective follows its review: schedule the review first.",
+        );
       }
 
       const id = crypto.randomUUID();
@@ -709,6 +754,8 @@ export const createSession = defineWriteAction({
         ),
         facilitatorId: input.facilitatorId,
         state: "scheduled",
+        reviewPart: input.part ?? null,
+        reviewSessionId,
       });
 
       return {
@@ -724,7 +771,11 @@ export const createSession = defineWriteAction({
           action: "sessions.create",
           targetType: "session",
           targetId: id,
-          payload: { kind: input.kind, spaceId: input.spaceId },
+          payload: {
+            kind: input.kind,
+            spaceId: input.spaceId,
+            ...(input.part ? { part: input.part } : {}),
+          },
         },
       };
     },

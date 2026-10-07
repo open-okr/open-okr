@@ -150,6 +150,61 @@ describe("booking a quarter held apart (acceptance)", () => {
   });
 });
 
+describe("scheduling the halves by hand (P9-T22c-c-b)", () => {
+  const schedule = (part: "review" | "retrospective", inHours: number) =>
+    call<{ id: string }>("sessions.create", {
+      spaceId,
+      cycleId,
+      kind: "quarterly",
+      title: part === "review" ? "Q2 review" : "Q2 retrospective",
+      scheduledFor: new Date(Date.now() + inHours * 3_600_000).toISOString(),
+      facilitatorId,
+      part,
+    });
+
+  it("schedules a review and a retrospective that names it, as booking would", async () => {
+    // A review scheduled late, after the days booking could have used.
+    const review = await schedule("review", 1);
+    const retrospective = await schedule("retrospective", 49);
+    const [first, second, ...rest] = await reviews();
+    expect(rest).toEqual([]);
+    expect(first).toMatchObject({
+      id: review.id,
+      review_part: "review",
+      review_session_id: null,
+    });
+    expect(second).toMatchObject({
+      id: retrospective.id,
+      review_part: "retrospective",
+      review_session_id: review.id,
+    });
+  });
+
+  it("refuses a retrospective with no review before it", async () => {
+    await expect(schedule("retrospective", 49)).rejects.toThrow(
+      /schedule the review first/,
+    );
+  });
+
+  it("refuses a part where the workspace keeps one session, or on another kind", async () => {
+    await expect(
+      call("sessions.create", {
+        spaceId,
+        cycleId,
+        kind: "monthly",
+        title: "Monthly review",
+        scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+        facilitatorId,
+        part: "review",
+      }),
+    ).rejects.toThrow(/Only a quarterly review/);
+    await call("practice.update", { overrides: { "review.format": null } });
+    await expect(schedule("review", 1)).rejects.toThrow(
+      /Quarterly review format/,
+    );
+  });
+});
+
 describe("each half walks its own stages", () => {
   it("runs the review from the opening to recognition, and no further", async () => {
     await call("sessions.bookCycle", {
