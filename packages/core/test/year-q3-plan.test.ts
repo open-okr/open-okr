@@ -1,30 +1,24 @@
 /**
- * Q3's plan and the margin recovery, built against a database as of today
- * (P9-T22c-d-a).
- *
- * The acceptance: given today after 14 July, when Q3 is read, then C6 is
- * part of the plan rather than added mid-cycle, its first key result is the
- * operating margin KPI from 7.6% to 13.5%, and the expansion KPI's response
- * names C6.2. Each expectation waits for its own date on today's calendar,
- * so the file holds on any day it runs.
+ * Q3's plan and the margin recovery, built against a database on a year whose
+ * dates have passed (P9-T22c-d-a). The acceptance: given today after 14 July,
+ * when Q3 is read, then C6 is part of the plan rather than added mid-cycle,
+ * its first key result is the operating margin KPI from 7.6% to 13.5%, and
+ * the expansion KPI's response names C6.2. The year is placed where these
+ * dates have passed (year-placement.ts), so every expectation runs whatever
+ * day the suite does.
  */
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildNorthwindYear } from "../src/demo/year/build.ts";
-import { isoDay, toReal } from "../src/demo/year/calendar.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import { placeYear } from "./year-placement.ts";
 
 const OWNER = "year-q3-plan-owner";
-const today = isoDay(new Date());
-const realYear = Number(today.slice(0, 4));
-const on = (scenarioDate: string) => toReal(scenarioDate, realYear);
 /**
- * Built to the last day this file reads, or to today when that is earlier:
- * the whole year is the slowest thing the suite builds, and a file that
- * reads Q1 has no use for the rest.
+ * Placed on the latest real year whose 19 July has passed, and built to it
+ * (year-placement.ts).
  */
-const until = [on("2027-07-19"), today].sort()[0] as string;
-const by = (scenarioDate: string) => on(scenarioDate) <= until;
+const { until, on, by } = placeYear("2027-07-19");
 
 let workspaceId: string;
 let q3Id: string | undefined;

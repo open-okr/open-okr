@@ -18,6 +18,13 @@
  * written: a member who may change the objective but not add to the space it
  * is going to cannot move it there. A space member holds edit on their space;
  * an admin or an owner holds it on every one.
+ *
+ * **A company objective can be placed in a space** (P9-T22c-e-a, NW-Q4-01):
+ * a modified objective carried as a draft can belong to the team that will
+ * run it next, as C2 becomes Customer Success's CS3. It needs edit on the
+ * objective and on the space; who may see or edit it does not change, because
+ * neither depends on the space since P8-G13c. A person's objective stays
+ * theirs.
  */
 import { activeOnly, goals, spaces, workspaceMembers } from "@openokr/db";
 import { eq, isNull, ne } from "drizzle-orm";
@@ -134,10 +141,11 @@ export const moveGoalToSpace = defineWriteAction({
       if (!goal) {
         throw new OperationError("not_found", "No such objective.");
       }
-      if (goal.ownerKind !== "space" || goal.spaceId === null) {
+      const company = goal.ownerKind === "workspace";
+      if (!company && (goal.ownerKind !== "space" || goal.spaceId === null)) {
         throw new OperationError(
           "forbidden",
-          "Only an objective a space owns moves between spaces. This one belongs to the company or to a person.",
+          "Only an objective a space or the company owns moves into a space. This one belongs to a person.",
         );
       }
       if (goal.spaceId === input.spaceId) {
@@ -146,12 +154,10 @@ export const moveGoalToSpace = defineWriteAction({
           "This objective is already in that space.",
         );
       }
-      const fromName = await editableSpace(
-        tx,
-        workspaceId,
-        memberId,
-        goal.spaceId,
-      );
+      const fromName =
+        goal.spaceId === null
+          ? "the company"
+          : await editableSpace(tx, workspaceId, memberId, goal.spaceId);
       const toName = await editableSpace(
         tx,
         workspaceId,
@@ -163,7 +169,11 @@ export const moveGoalToSpace = defineWriteAction({
       // its activity, its audit row and the recomputes commit together.
       await tx
         .update(goals)
-        .set({ spaceId: input.spaceId, updatedAt: new Date() })
+        .set({
+          ownerKind: "space",
+          spaceId: input.spaceId,
+          updatedAt: new Date(),
+        })
         .where(
           activeOnly(
             goals,
@@ -182,7 +192,10 @@ export const moveGoalToSpace = defineWriteAction({
           activeOnly(
             goals,
             eq(goals.workspaceId, workspaceId),
-            eq(goals.spaceId, goal.spaceId),
+            goal.spaceId === null
+              ? isNull(goals.spaceId)
+              : eq(goals.spaceId, goal.spaceId),
+            eq(goals.ownerKind, goal.ownerKind),
             eq(goals.level, goal.level),
             isNull(goals.closedAt),
             ne(goals.id, input.id),

@@ -1,31 +1,25 @@
 /**
- * Q2's plan and its first five weeks, built against a database as of today
- * (P9-T22c-c-a).
- *
- * The acceptance: given today after 3 May, when Q2 is read, then the eleven
- * objectives Q1 kept or modified are there with each key result starting
- * where Q1 left it, both publish steps are done with F2's override on
- * record, nothing is marked as added mid-cycle, and the first monthly review
- * gave each company objective a trend. Each expectation waits for its own
- * date on today's calendar, so the file holds on any day it runs.
+ * Q2's plan and its first five weeks, built against a database on a year
+ * whose dates have passed (P9-T22c-c-a). The acceptance: given today after 3
+ * May, when Q2 is read, then the eleven objectives Q1 kept or modified are
+ * there with each key result starting where Q1 left it, both publish steps
+ * are done with F2's override on record, nothing is marked as added
+ * mid-cycle, and the first monthly review gave each company objective a
+ * trend. The year is placed where these dates have passed
+ * (year-placement.ts), so every expectation runs whatever day the suite does.
  */
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildNorthwindYear } from "../src/demo/year/build.ts";
-import { isoDay, toReal } from "../src/demo/year/calendar.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import { placeYear } from "./year-placement.ts";
 
 const OWNER = "year-q2-plan-owner";
-const today = isoDay(new Date());
-const realYear = Number(today.slice(0, 4));
-const on = (scenarioDate: string) => toReal(scenarioDate, realYear);
 /**
- * Built to the last day this file reads, or to today when that is earlier:
- * the whole year is the slowest thing the suite builds, and a file that
- * reads Q1 has no use for the rest.
+ * Placed on the latest real year whose 3 May has passed, and built to it
+ * (year-placement.ts).
  */
-const until = [on("2027-05-03"), today].sort()[0] as string;
-const by = (scenarioDate: string) => on(scenarioDate) <= until;
+const { until, on, by } = placeYear("2027-05-03");
 
 let workspaceId: string;
 let q2Id: string | undefined;

@@ -1,30 +1,24 @@
 /**
- * Q2's competitor and its close, built against a database as of today
- * (P9-T22c-c-b).
- *
- * The acceptance: given today after Q2's retrospective, when the scorecard
- * is read, then Q2 shows C2's change of kind, S2.1's eased target and the
- * additions. Each expectation waits for its own date on today's calendar,
- * so the file holds on any day it runs.
+ * Q2's competitor and its close, built against a database on a year whose
+ * dates have passed (P9-T22c-c-b). The acceptance: given today after Q2's
+ * retrospective, when the scorecard is read, then Q2 shows C2's change of
+ * kind, S2.1's eased target and the additions. The year is placed where these
+ * dates have passed (year-placement.ts), so every expectation runs whatever
+ * day the suite does.
  */
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { buildNorthwindYear } from "../src/demo/year/build.ts";
-import { isoDay, toReal } from "../src/demo/year/calendar.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import { placeYear } from "./year-placement.ts";
 
 const OWNER = "year-q2-close-owner";
-const today = isoDay(new Date());
-const realYear = Number(today.slice(0, 4));
-const on = (scenarioDate: string) => toReal(scenarioDate, realYear);
 /**
- * Built to the last day this file reads, or to today when that is earlier:
- * the whole year is the slowest thing the suite builds, and a file that
- * reads Q1 has no use for the rest.
+ * Placed on the latest real year whose 21 June has passed, and built to it
+ * (year-placement.ts).
  */
-const until = [on("2027-06-21"), today].sort()[0] as string;
-const by = (scenarioDate: string) => on(scenarioDate) <= until;
+const { until, on, by } = placeYear("2027-06-21");
 
 let workspaceId: string;
 let q2Id: string | undefined;
@@ -161,14 +155,20 @@ describe("the competitor (NW-Q2-09 to NW-Q2-17)", () => {
       return;
     }
     const [baseline] = await rows<{ done: string; value: string }>(
-      `select to_char(done_at, 'YYYY-MM-DD') as done, current_value as value from key_results
-        where workspace_id = $1 and title = 'Establish our win rate against Brightline'`,
+      `select to_char(k.done_at, 'YYYY-MM-DD') as done, k.current_value as value
+         from key_results k join goals g on g.id = k.goal_id
+        where k.workspace_id = $1 and g.cycle_id = $2 and k.deleted_at is null
+          and k.title = 'Establish our win rate against Brightline'`,
+      [q2Id],
     );
     expect(baseline?.done).toBe(on("2027-05-31"));
     expect(Number(baseline?.value)).toBe(31);
     const [added] = await rows<{ added: string }>(
-      `select to_char(added_mid_cycle_at, 'YYYY-MM-DD') as added from key_results
-        where workspace_id = $1 and title = 'Raise win rate against Brightline from 31% to 45%'`,
+      `select to_char(k.added_mid_cycle_at, 'YYYY-MM-DD') as added
+         from key_results k join goals g on g.id = k.goal_id
+        where k.workspace_id = $1 and g.cycle_id = $2 and k.deleted_at is null
+          and k.title = 'Raise win rate against Brightline from 31% to 45%'`,
+      [q2Id],
     );
     expect(added?.added).toBe(on("2027-05-31"));
   });

@@ -1,30 +1,24 @@
 /**
- * The pilot and Q1's plan, built against a database as of today
- * (P9-T22c-b-a).
- *
- * The acceptance: given today after 15 January, when Q1 is read, then both
- * publish steps are done, no objective is marked as added mid-cycle, and the
- * pilot is closed with its scores in Q1's prior-cycle list. Each expectation
- * is worked out from the scenario's dates placed on today's calendar, so the
- * file holds on any day it runs.
+ * The pilot and Q1's plan, built against a database on a year whose dates
+ * have passed (P9-T22c-b-a). The acceptance: given today after 15 January,
+ * when Q1 is read, then both publish steps are done, no objective is marked
+ * as added mid-cycle, and the pilot is closed with its scores in Q1's
+ * prior-cycle list. The year is placed where these dates have passed
+ * (year-placement.ts), so every expectation runs whatever day the suite does.
  */
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildNorthwindYear } from "../src/demo/year/build.ts";
-import { isoDay, toReal } from "../src/demo/year/calendar.ts";
+import { toReal } from "../src/demo/year/calendar.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import { placeYear } from "./year-placement.ts";
 
 const OWNER = "year-q1-plan-owner";
-const today = isoDay(new Date());
-const realYear = Number(today.slice(0, 4));
-const on = (scenarioDate: string) => toReal(scenarioDate, realYear);
 /**
- * Built to the last day this file reads, or to today when that is earlier:
- * the whole year is the slowest thing the suite builds, and a file that
- * reads Q1 has no use for the rest.
+ * Placed on the latest real year whose 15 January has passed, and built to it
+ * (year-placement.ts).
  */
-const until = [on("2027-01-15"), today].sort()[0] as string;
-const by = (scenarioDate: string) => on(scenarioDate) <= until;
+const { realYear, until, by } = placeYear("2027-01-15");
 
 let workspaceId: string;
 

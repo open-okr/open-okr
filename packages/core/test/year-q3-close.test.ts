@@ -1,28 +1,23 @@
 /**
- * Q3's summer and its close, built against a database as of today
- * (P9-T22c-d-b).
- *
- * The acceptance: given today after Q3's retrospective, when its diagnostic
- * is read, then the holiday weeks are not counted as missed check-ins. Each
- * expectation waits for its own date on today's calendar, so the file holds
- * on any day it runs.
+ * Q3's summer and its close, built against a database on a year whose dates
+ * have passed (P9-T22c-d-b). The acceptance: given today after Q3's
+ * retrospective, when its diagnostic is read, then the holiday weeks are not
+ * counted as missed check-ins. The year is placed where these dates have
+ * passed (year-placement.ts), so every expectation runs whatever day the
+ * suite does.
  */
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildNorthwindYear } from "../src/demo/year/build.ts";
-import { isoDay, toReal } from "../src/demo/year/calendar.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import { placeYear } from "./year-placement.ts";
 
 const OWNER = "year-q3-close-owner";
-const today = isoDay(new Date());
-const realYear = Number(today.slice(0, 4));
-const on = (scenarioDate: string) => toReal(scenarioDate, realYear);
 /**
- * Built to the last day this file reads, or to today when that is earlier:
- * the whole year is the slowest thing the suite builds.
+ * Placed on the latest real year whose 16 September has passed, and built to it
+ * (year-placement.ts).
  */
-const until = [on("2027-09-16"), today].sort()[0] as string;
-const by = (scenarioDate: string) => on(scenarioDate) <= until;
+const { until, on, by } = placeYear("2027-09-16");
 
 let workspaceId: string;
 let q3Id: string | undefined;

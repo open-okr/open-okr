@@ -61,7 +61,9 @@ several, and a few have none (§5).
 | **P9-T22c-c-b** | The competitor's moves, the eased target, the leaver, the escalated commitment, the baseline recorded and its target added, the June review, the split review and retrospective, the close, and the mid-year revision of the annual frame | NW-Q2-09 to NW-Q2-23 |
 | **P9-T22c-d-a** | Q3's plan: Phase 2's issues, the redrafts, S3 and F3, both steps; the margin recovery C6 launched inside the window with expansion answered by C6.2; weeks 1 to 4 with Sales every two weeks, and July's reading | NW-Q3-01 to NW-Q3-05 |
 | **P9-T22c-d-b** | The summer: holidays and leave with delegates, SU1 moved before Support is archived, Mei's handover, the Growth team's G1, the forecast, the milestones and the SOC 2 report; the grading, the split review and the close | NW-Q3-06 to NW-Q3-16 |
-| **P9-T22c-e** | Q4, the annual review, 2028's annual objectives and Q1 2028's drafts. The demo switches to the year: `pnpm db:seed` and the nightly reset build it, `demo:prepare` gives the added people accounts, and README §6 says what a visitor sees in each part of the year | NW-Q4-01 to NW-Q4-16 |
+| **P9-T22c-e-a** | Q4's plan: the redrafts, C7, C8, CS3 and F4, both steps; Mei's return, the outage answered with "fix it now", November's healthy margin and the dismissed proposal to close C6. Each year test placed on a year whose dates have passed | NW-Q4-01 to NW-Q4-05 |
+| **P9-T22c-e-b** | The annual review of 2027, the board's export, 2028's annual objectives; Q4 graded, reviewed and closed with C6 achieved; the scorecard; the department level off; Q1 2028's company set; the archive and the final digest | NW-Q4-06 to NW-Q4-16 |
+| **P9-T22c-e-c** | The demo switches to the year: `pnpm db:seed` and the nightly reset build it, `demo:prepare` gives every person in it an account, and README §6 says what a visitor sees in each part of the year | README §6 |
 
 ## 5. What a seed reproduces, and what it does not
 
@@ -142,6 +144,12 @@ Each part proves its own steps against a database as of the real today, and
 | P9-T22c-d-b | A quarter already over on the real calendar is not booked | Booking a quarter a few days after it ends books its missing review for today, which is right for a team booking late and wrong for a seed booking on the scenario's day. Q3's retrospective linked itself to that stray review before this |
 | P9-T22c-d-b | Q4 is created on 3 September with its sponsor and facilitator, and no monthly reviews are held in Q3 | Q4's planning opens four weeks ahead (NW-Q4-01), so Q3's close has somewhere to feed; the chapter names no monthly review in the summer |
 
+| P9-T22c-e-a | Every year test places the year on the latest real year whose dates it reads have passed, and builds to them (`year-placement.ts`) | The seed writes what happened by today, so a test reading Q4 in October would read nothing. Placed a year back, Q4 is checked whatever day the suite runs, and nothing writes ahead of the product's own clock |
+| P9-T22c-e-a | C2's carried draft is placed in Customer Success at team level on 22 September, before the company step publishes, rather than with the teams | The company step reads the company's drafts, and C2 is not one of the five it publishes |
+| P9-T22c-e-a | C6.1 starts Q4 from 10.4% and C8.1 from 158 at the drafting on 22 September | They are September's readings, which the KPIs record on 5 October; the chapter's table starts from them |
+| P9-T22c-e-a | December's uptime, 99.4%, is recorded on 3 December, and the failover task is linked to E2.1 | The frame records each month a few days after it ends; the outage is the story's reason to read December early |
+| P9-T22c-e-a | The coach's proposal to close C6 and Hugo's dismissal are not seeded | A proposal is an agent's message (§5); the Coach makes it on the running demo, where Hugo can dismiss it |
+
 ### Product changes the year found
 
 Building Q1's close against a database meant recording a review after its day,
@@ -164,6 +172,8 @@ them.
 | An eased target's original is the published one | The scorecard showed the target a key result had before its first ever change, which for a target set while drafting was the draft's | The first change after the plan published gives the original; one changed only while drafting keeps the old reading | `cycle-close.test.ts`, "shows the target the plan published with" |
 
 | A retrospective names the review before it | A retrospective scheduled by hand named the latest review in its cycle, which could be one booked after it | It names the review scheduled at or before it | `review-split.test.ts`, "names the review scheduled before it" (P9-T22c-d-b) |
+
+| A company objective can be placed in a space | `goals.moveToSpace` moved only an objective a space owned, so C2 could not become Customer Success's CS3 as NW-Q4-01 has it | A company objective moves into a space and becomes the space's, with edit on it and on the space; a person's objective is still refused. Who may see or edit it does not change | `goal-move.test.ts`, "places a company objective in a space" (P9-T22c-e-a) |
 
 **The fourth of Q1's is for Akmal to confirm.** METHOD §8's ninth stage closes every
 objective deliberately, and the scenario holds one quarterly review, in the

@@ -18,6 +18,8 @@ import { Q2_EARLY_EVENTS } from "./q2-run.ts";
 import { Q3_CLOSE_EVENTS } from "./q3-close.ts";
 import { Q3_PLAN_EVENTS } from "./q3-plan.ts";
 import { Q3_EARLY_EVENTS } from "./q3-run.ts";
+import { Q4_PLAN_EVENTS } from "./q4-plan.ts";
+import { Q4_EARLY_EVENTS } from "./q4-run.ts";
 import {
   runYear,
   type YearEvent,
@@ -37,6 +39,8 @@ const YEAR_EVENTS: readonly YearEvent[] = [
   ...Q3_PLAN_EVENTS,
   ...Q3_EARLY_EVENTS,
   ...Q3_CLOSE_EVENTS,
+  ...Q4_PLAN_EVENTS,
+  ...Q4_EARLY_EVENTS,
 ];
 
 export interface NorthwindYearResult {

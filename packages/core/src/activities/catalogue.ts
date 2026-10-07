@@ -358,7 +358,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // A move between spaces, both named (P9-T13a, METHOD.md §2.9).
   "goal.moved_space": z.object({
     title: z.string(),
-    fromSpaceId: z.uuid(),
+    // Null when it was the company's (P9-T22c-e-a).
+    fromSpaceId: z.uuid().nullable(),
     fromSpace: z.string(),
     toSpaceId: z.uuid(),
     toSpace: z.string(),

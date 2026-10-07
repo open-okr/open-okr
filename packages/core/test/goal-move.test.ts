@@ -214,7 +214,7 @@ describe("a move between spaces (NW-Q3-07)", () => {
     expect(read.spaceId).toBe(success);
   });
 
-  it("moves only an objective a space owns", async () => {
+  it("places a company objective in a space, as C2 becomes CS3 (P9-T22c-e-a)", async () => {
     const company = (
       await call<{ id: string }>("goals.create", {
         title: "Customers renew because the product keeps its promises",
@@ -222,8 +222,21 @@ describe("a move between spaces (NW-Q3-07)", () => {
         level: "company",
       })
     ).id;
-    await expect(
-      call("goals.moveToSpace", { id: company, spaceId: success }),
-    ).rejects.toThrow(/Only an objective a space owns/);
+    await call("goals.moveToSpace", { id: company, spaceId: success });
+    const read = await call<{ spaceId: string; ownerKind: string }>(
+      "goals.read",
+      { id: company },
+    );
+    expect(read).toMatchObject({ spaceId: success, ownerKind: "space" });
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ payload: Record<string, unknown> }>(
+      "select payload from activities where subject_id = $1 and kind = 'goal.moved_space'",
+      [company],
+    );
+    expect(rows[0]?.payload).toMatchObject({
+      fromSpaceId: null,
+      fromSpace: "the company",
+      toSpace: "Customer Success",
+    });
   });
 });
