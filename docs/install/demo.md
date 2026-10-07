@@ -10,14 +10,20 @@ worth nothing.
 
 ## What a visitor sees
 
-They arrive at the sign-in page, which names seven people and publishes the one
-password they share. They pick one, and they are that person: their goals,
+They arrive at the sign-in page, which names twelve people and publishes the
+one password they share. They pick one, and they are that person: their goals,
 their check-ins, their review inbox, their nudges.
 
-The workspace holds a quarter in flight and a quarter that is finished. The
-finished one has a scorecard row and a closing diagnostic. Both agents ran
-once to produce the nudges and proposals on screen, which are real, and then
-went to sandbox, so nothing they do afterwards is ever committed.
+The workspace holds Northwind Labs' year, the one written up in
+`docs/scenarios/northwind-year`, placed on the real calendar: the scenario's
+2027 is the year that holds today, every step dated on or before today has
+happened, and nothing after it exists. So the demo moves with the calendar. In
+January a visitor finds the pilot closed and Q1 being drafted; in May the week
+after a competitor's launch; in August the summer's holidays and the margin
+recovery; in December the year closed and 2028 begun. The scenario's README §6
+lists what is true at each point. Both agents ran once to produce the nudges
+and proposals on screen, which are real, and then went to sandbox, so nothing
+they do afterwards is ever committed.
 
 ## What you need
 
@@ -103,9 +109,13 @@ pnpm db:seed
 pnpm demo:prepare
 ```
 
-`pnpm db:seed` writes the organisation. `pnpm demo:prepare` gives the cast
-accounts, runs the Coach and the Champion once so the nudges on screen are ones
-the product produced, and then puts both agents in sandbox.
+`pnpm db:seed` writes the Northwind year as of today, which takes a minute or
+two. `pnpm demo:prepare` gives the cast accounts, the seven of the one-quarter
+demo and the five the year adds, runs the Coach and the Champion once so the
+nudges on screen are ones the product produced, and then puts both agents in
+sandbox. Ben, who leaves in May, is not given one: he is suspended, and could
+not sign in. `pnpm db:seed --quarter` builds the smaller one-quarter demo
+instead, which is what `docs/stakeholder/DEMO-SCRIPT.md` walks through.
 
 `pnpm demo:prepare` refuses a workspace the demo builder did not build, and
 never touches a member who already has a real person behind them.

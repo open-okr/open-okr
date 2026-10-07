@@ -156,6 +156,10 @@ Each part proves its own steps against a database as of the real today, and
 | P9-T22c-e-b | E2.1 is graded 0.67 as the chapter has it | Held in two of three months; where §2.10 computes another figure from December's 99.4%, the scorecard shows the grade beside it |
 | P9-T22c-e-b | Not seeded: the board's CSV and PDF exports and the workspace archive (NW-Q4-07, NW-Q4-15), and the Champion's final digest (NW-Q4-16) | Exports are downloads from the running app, and a digest is an agent's message (§5) |
 
+| P9-T22c-e-c | `pnpm db:seed` builds the year by default, and `--quarter` the one-quarter demo | The public demo and its nightly reset run the plain command; the walkthrough in `docs/stakeholder/DEMO-SCRIPT.md` follows the one-quarter organisation and now says `--quarter` |
+| P9-T22c-e-c | `demo:prepare` gives accounts to the seven of the one-quarter demo and the five the year adds; Ben gets none | He leaves in May and is suspended, so an account could never sign in, and the sign-in page should not offer one that fails |
+| P9-T22c-e-c | README §6's five dates stay as points the calendar passes through, not settings | Akmal chose the real clock (§1): the demo is the year as of today, so a README date is what a visitor sees when today reaches it |
+
 ### Product changes the year found
 
 Building Q1's close against a database meant recording a review after its day,

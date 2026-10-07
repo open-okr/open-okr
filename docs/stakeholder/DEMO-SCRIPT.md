@@ -21,15 +21,17 @@ pnpm db:migrate
 pnpm dev                          # the app on http://localhost:3000
 ```
 
-The compose stack ships no application database, which is why the `CREATE DATABASE` line is there. `pnpm db:migrate` and `pnpm db:seed` read the process environment rather than `apps/web/.env`, so either export `DATABASE_URL` as above or pass it inline on each command.
+The compose stack ships no application database, which is why the `CREATE DATABASE` line is there. `pnpm db:migrate` and `pnpm db:seed --quarter` read the process environment rather than `apps/web/.env`, so either export `DATABASE_URL` as above or pass it inline on each command.
 
 Open <http://localhost:3000>. An empty database sends you to the first-run wizard. Register yourself there: that account claims the instance and gets a workspace. **Use your real name.** The seed makes you the Chief Executive of the invented company, and a demo where the presenter cannot find themselves in the org chart is a worse demo.
 
 Then, in another terminal:
 
 ```sh
-pnpm db:seed
+pnpm db:seed --quarter
 ```
+
+This walkthrough follows the one-quarter demo, which `--quarter` builds. Without it, `pnpm db:seed` builds the Northwind year as of today, which is what the public demo shows (`docs/scenarios/northwind-year`).
 
 It prints what it wrote and a short list headed **"Worth knowing before you present it"**. Read that list. It is the same set of caveats as section 5 below, printed there so nobody meets one for the first time on stage.
 
@@ -195,7 +197,7 @@ If you have sixty seconds, do beat 3 only. Open `/cycle`, point at gate 5 naming
 
 Say these before somebody notices them. Each one is a consequence of a rule worth defending, and each is a better answer than a workaround would have been.
 
-**Nobody can sign in as Priya, unless you ran `pnpm demo:prepare`.** After `pnpm db:seed` the demo people are members with no user accounts: they own objectives, champion and review them, hold space roles and appear in the org chart, and there is nobody behind them. That is the right state for a seed on a laptop, where you are signed in and they are names on a screen. `pnpm demo:prepare` is the other state, built for a public demo instance where the visitor is nobody: it gives each of them an account at `@northwind.example` with a published password, puts both agents in sandbox, and runs the Coach and the Champion once. It refuses a workspace the demo builder did not build.
+**Nobody can sign in as Priya, unless you ran `pnpm demo:prepare`.** After `pnpm db:seed --quarter` the demo people are members with no user accounts: they own objectives, champion and review them, hold space roles and appear in the org chart, and there is nobody behind them. That is the right state for a seed on a laptop, where you are signed in and they are names on a screen. `pnpm demo:prepare` is the other state, built for a public demo instance where the visitor is nobody: it gives each of them an account at `@northwind.example` with a published password, puts both agents in sandbox, and runs the Coach and the Champion once. It refuses a workspace the demo builder did not build.
 
 **Every row was written by you.** An action resolves its author from the acting user, so the audit trail and the activity feed name you rather than naming Priya for something Priya did not do. The narratives are written in each person's voice; the authorship is honest about who typed them.
 
@@ -235,7 +237,7 @@ pnpm db:down && pnpm db:up
 docker exec openokr-test-postgres-1 psql -U postgres -c "CREATE DATABASE openokr;"
 pnpm db:migrate
 pnpm dev                          # register through the wizard again
-pnpm db:seed
+pnpm db:seed --quarter
 ```
 
 The builder's own tests are in `packages/core/test/demo.test.ts`. They assert the things this script promises: all four objective levels present, gates 2 and 5 each red for exactly one reason, every KPI state on the grid, a three-deep manager chain, a dependency register that passes gate 4 three different ways, and one value point per key result so no nonsense trend appears.

@@ -123,7 +123,9 @@ export BETTER_AUTH_URL
 BETTER_AUTH_SECRET=$(grep '^BETTER_AUTH_SECRET=' "$REPO/deploy/docker/secrets/app.env" | cut -d= -f2-)
 export BETTER_AUTH_SECRET
 
-log "seeding the demo organisation"
+# The Northwind year as of today (P9-T22c-e-c): every step of the scenario
+# dated on or before today, and nothing after it.
+log "seeding the Northwind year as of today"
 ( cd "$REPO" && pnpm db:seed ) || fail "the seed failed"
 
 log "giving the cast accounts and running the agents"

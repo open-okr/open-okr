@@ -11,9 +11,12 @@
  * same access bindings, activity row, audit row and outbox row a real one does.
  * Idempotent: a workspace that already has company objectives is left alone.
  *
- * **`--year` builds the Northwind year instead** (P9-T22c): the scenario in
- * `docs/scenarios/northwind-year` placed on the real calendar, with every
- * step dated before today true and nothing after it.
+ * **It builds the Northwind year** (P9-T22c, the default since P9-T22c-e-c):
+ * the scenario in `docs/scenarios/northwind-year` placed on the real
+ * calendar, with every step dated before today true and nothing after it.
+ * **`--quarter` builds the one-quarter demo instead**, the organisation the
+ * walkthrough in `docs/stakeholder/DEMO-SCRIPT.md` follows: a quarter in
+ * flight and a quarter finished, relative to today.
  */
 import { loadEnv } from "@openokr/config";
 import pg from "pg";
@@ -72,7 +75,7 @@ try {
     process.exit(1);
   }
 
-  if (process.argv.includes("--year")) {
+  if (!process.argv.includes("--quarter")) {
     write(`Building the Northwind year into "${row.name}".`);
     const year = await buildNorthwindYear({
       pool,

@@ -30,7 +30,12 @@ const overlay = at("../../../deploy/demo/compose.demo.yaml");
 
 describe("the persona list", () => {
   test("is the cast, with an address each on a reserved domain", () => {
-    expect(DEMO_PERSONAS).toHaveLength(7);
+    // The one-quarter demo's seven and the five the Northwind year adds
+    // (P9-T22c-e-c); Ben leaves in May, so he is not offered.
+    expect(DEMO_PERSONAS).toHaveLength(12);
+    expect(DEMO_PERSONAS.map((persona) => persona.name)).not.toContain(
+      "Ben Carter",
+    );
     for (const persona of DEMO_PERSONAS) {
       // RFC 2606 reserves `.example`, so none of these can ever be a real
       // person's address and none of them can receive mail.
