@@ -178,6 +178,34 @@ const inAPastQuarter = async (rhythm: "kept" | "missed") => {
   await call("sessions.open", { id: sessionId });
 };
 
+/**
+ * The review held in next quarter, which has not started, so nothing in it
+ * has fallen due whatever day this runs on. The measure counts from a
+ * cycle's start (§8.6), so "a quarter where nothing has fallen due" written
+ * against the current quarter held only in that quarter's first week, and
+ * failed on its eighth day (7 October 2026, found at P9-T22a).
+ */
+const inANextQuarter = async () => {
+  const ahead = new Date(Date.now() + 120 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const next = (await call("cycles.create", {
+    on: ahead,
+    mode: "quarterly",
+  })) as { id: string; startsOn: string };
+  await call("goals.moveToCycle", { id: goalId, cycleId: next.id });
+  const session = (await call("sessions.create", {
+    spaceId,
+    cycleId: next.id,
+    kind: "quarterly",
+    title: "Next quarter's review",
+    scheduledFor: new Date(`${next.startsOn}T09:00:00.000Z`).toISOString(),
+    facilitatorId: facilitatorMemberId,
+  })) as { id: string };
+  sessionId = session.id;
+  await call("sessions.open", { id: sessionId });
+};
+
 beforeEach(async () => {
   const wb = await workerDb();
   await wb.truncateAllTables();
@@ -286,6 +314,7 @@ afterAll(async () => {
 
 describe("the rhythm diagnostic", () => {
   it("is not readable until the room has both numbers", async () => {
+    await inANextQuarter();
     const before = await diagnostic();
     expect(before.readable).toBe(false);
     expect(before.verdict).toBeNull();

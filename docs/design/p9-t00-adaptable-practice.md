@@ -262,7 +262,9 @@ Each task copied the named sections of `p9-t00-method-v2.md` into METHOD.md, wit
 | P9-T20e-a | Achieved and defer | §8.8 | Close decisions and meanings; stage 9's title |
 | P9-T20e-b | Carrying forward, and the minutes | the rest of §8 | Stage 10's title |
 | P9-T21 | The coach's voice, and METHOD.md fully landed | The preamble and terms, §1, §9, §10, §11 framing, §13 | Trigger catalogue (AI-NATIVE-PLAN.md §6.4) and the P4-T00 coach watch list; deletes `p9-t00-method-v2.md` and METHOD.md's banner |
-| P9-T22 | Release 0.2.0 and the demo story, placeable at any date of the Northwind year (G-4) | none | None |
+| P9-T22a | Release 0.2.0 | none | None |
+| P9-T22b | The demo shows the practice | none | None |
+| P9-T22c | The Northwind year, placeable at any of its dates (G-4) | none | None |
 
 **Live or draft under "Live", as built at P9-T13-b-a** ([`addition.ts`](../../packages/method/src/addition.ts)):
 
