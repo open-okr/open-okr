@@ -55,7 +55,8 @@ several, and a few have none (§5).
 | Part | Builds | Steps |
 |---|---|---|
 | **P9-T22c-a** | The calendar, the step list, the timeline runner and `pnpm db:seed --year`. The fourteen people, with the dates they join and leave; the nine spaces, with Support and Growth on their own dates; "Team" in terminology; the year's practice settings changes; the eleven KPIs with their target types, thresholds and monthly readings, and the two driver trees; the 2027 annual frame and the four annual objectives, published | NW-P-01, NW-P-06, NW-P-08 to NW-P-10, NW-P-12, NW-P-14, and the settings and people rows of later steps |
-| **P9-T22c-b** | The pilot quarter, its review and close. Q1: planning, the company and team sets in two steps, the weekly check-ins, the mid-cycle key result, the blocker, the milestones, the monthly reviews, and the review graded and closed | NW-P-02 to NW-P-04, NW-P-13, NW-P-15, NW-Q1-01 to NW-Q1-32 |
+| **P9-T22c-b-a** | The pilot quarter, its check-ins, review and close. Q1's plan: planning, Phase 2 and 3, the rhythm booked, the company and team sets in two steps with the peer review's changes | NW-P-02 to NW-P-04, NW-P-13, NW-P-15, NW-Q1-01 to NW-Q1-14 |
+| **P9-T22c-b-b** | Q1's twelve weeks: the weekly check-ins, the mid-cycle key result, the blocker, the milestones, the monthly reviews; and the review graded and closed | NW-Q1-15 to NW-Q1-32 |
 | **P9-T22c-c** | Q2: the competitor's moves, the leaver, the new hire, the split review and the close, and the mid-year revision of the annual frame | NW-Q2-01 to NW-Q2-23 |
 | **P9-T22c-d** | Q3: the recovery, the holidays and the leave, the merger, the new team, the milestones, and the close | NW-Q3-01 to NW-Q3-16 |
 | **P9-T22c-e** | Q4, the annual review, 2028's annual objectives and Q1 2028's drafts. The demo switches to the year: `pnpm db:seed` and the nightly reset build it, `demo:prepare` gives the added people accounts, and README §6 says what a visitor sees in each part of the year | NW-Q4-01 to NW-Q4-16 |
@@ -94,3 +95,14 @@ Each part proves its own steps against a database as of the real today, and
 | Q2 W7, 17 May | Up to NW-Q2-15, with NW-Q2-12 under way: Ben's last day is 21 May | NW-Q2-16 |
 | Q3 W7, 16 August | Up to NW-Q3-10, with NW-Q3-05 and NW-Q3-06 under way | NW-Q3-11 |
 | 24 December | The whole year | |
+
+## 7. As built
+
+| Part | What the seed does that the story does not say | Why |
+|---|---|---|
+| P9-T22c-a | The company space is the workspace's first space, renamed nothing, with Priya its coordinator | The product reads the first space as the company's (P9-T19a); creating another would leave the real one unused |
+| P9-T22c-a | KPI readings carry six months of history from the day the KPIs are set up, and every later month appears on the day it is recorded | The scenario gives only the figures it needs; the months between are drawn to join them, and every stated figure is kept |
+| P9-T22c-b-a | The pilot's two objectives and their values | The scenario names the pilot's spaces, people, score and learnings, not its objectives. These end where Q1's baselines begin and grade to 0.55 |
+| P9-T22c-b-a | Check-ins are written through `goals.importCheckIn`, under a `csv` legacy key named `northwind-year:` | It is the one action that publishes a check-in on its own date, through the Operation pipeline, with its values and their history on that date. The key is what makes it idempotent |
+| P9-T22c-b-a | Jonas's rewrite of S2 removes the two activity key results and adds the two outcomes | A different measure is not an eased target, and §2.9 asks a reason of any easing, published or not |
+| P9-T22c-b-a | "P1 depends on E3, and Mei confirms it" is a dependency of P1.1 on Engineering, confirmed, beside the link between the two objectives | Confirmation belongs to a key result's dependency on a space (§5.4); a link between two objectives has nothing to confirm |

@@ -32,6 +32,8 @@ interface YearIds {
   /** Objectives and key results by the scenario's labels: "a1", "a3.soc2". */
   readonly goals: Map<string, string>;
   readonly keyResults: Map<string, string>;
+  /** Dependencies by a label the events choose: "P1-E3". */
+  readonly dependencies: Map<string, string>;
   /** The annual frame's strategies, in the frame's order. */
   strategies: string[];
 }
@@ -82,6 +84,7 @@ export function yearContext(seed: YearSeed, today: string): YearContext {
       cycles: new Map(),
       goals: new Map(),
       keyResults: new Map(),
+      dependencies: new Map(),
       strategies: [],
     },
     action: {

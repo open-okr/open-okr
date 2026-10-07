@@ -9,6 +9,8 @@
 import { callAction } from "../../actions/registry.ts";
 import { isoDay } from "./calendar.ts";
 import { FRAME_EVENTS } from "./frame.ts";
+import { PILOT_EVENTS } from "./pilot.ts";
+import { Q1_PLAN_EVENTS } from "./q1-plan.ts";
 import {
   runYear,
   type YearEvent,
@@ -17,7 +19,11 @@ import {
 } from "./timeline.ts";
 
 /** The year's events, frame first, each part's after it. */
-const YEAR_EVENTS: readonly YearEvent[] = [...FRAME_EVENTS];
+const YEAR_EVENTS: readonly YearEvent[] = [
+  ...FRAME_EVENTS,
+  ...PILOT_EVENTS,
+  ...Q1_PLAN_EVENTS,
+];
 
 export interface NorthwindYearResult {
   readonly alreadySeeded: boolean;
