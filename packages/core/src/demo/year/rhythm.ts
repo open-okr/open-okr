@@ -11,8 +11,13 @@ import { keyResultProgress, resolveThresholds } from "@openokr/method";
 import { eq } from "drizzle-orm";
 import { callAction } from "../../actions/registry.ts";
 import { runOperation } from "../../operations/operation.ts";
+import { isoDay } from "./calendar.ts";
 import { narrative } from "./okr.ts";
-import type { YearPersonKey } from "./people.ts";
+import {
+  YEAR_SPACES,
+  type YearPersonKey,
+  type YearSpaceKey,
+} from "./people.ts";
 import { need, type YearContext, type YearEvent } from "./timeline.ts";
 
 /** A key result as a quarter runs it: where it starts, aims and finishes. */
@@ -50,6 +55,8 @@ export interface RunningObjective {
   readonly until?: number;
   /** Every how many weeks it checks in: its space's frequency (§7.1). */
   readonly every?: number;
+  /** Weeks it does not check in: a holiday its space marked, or a miss. */
+  readonly skip?: readonly number[];
   readonly keyResults: readonly RunningKeyResult[];
 }
 
@@ -150,7 +157,8 @@ export const weeklyCheckIns = (
       if (
         week < from ||
         week > (objective.until ?? week) ||
-        (week - from) % (objective.every ?? 1) !== 0
+        (week - from) % (objective.every ?? 1) !== 0 ||
+        objective.skip?.includes(week)
       ) {
         continue;
       }
@@ -381,4 +389,45 @@ export async function markAddedOn(
       },
     },
   );
+}
+
+/**
+ * Books a quarter's whole rhythm in the spaces named, the way a coordinator
+ * does before it starts (§7.1).
+ *
+ * Booking books nothing in the past, and for a quarter that ended a few days
+ * ago it books the review it is missing, today, which a team booking late
+ * should get. The seed books every quarter on its scenario day, which for a
+ * quarter long over is long after it ended, so a quarter already over on the
+ * real calendar is left alone: its rituals are the ones the story holds.
+ */
+export async function bookRhythm(
+  context: YearContext,
+  cycleKey: string,
+  spaces: readonly YearSpaceKey[],
+): Promise<void> {
+  const cycleId = need(context.ids.cycles, cycleKey, "Cycle");
+  const cycle = (await callAction(context.action, "cycles.list", {})).find(
+    (one) => one.id === cycleId,
+  );
+  if (!cycle || cycle.endsOn < isoDay(new Date())) {
+    return;
+  }
+  for (const key of spaces) {
+    const space = YEAR_SPACES.find((one) => one.key === key);
+    if (!space) {
+      continue;
+    }
+    await callAction(context.action, "sessions.bookCycle", {
+      spaceId: need(context.ids.spaces, key, "Space"),
+      cycleId,
+      weekday: 1,
+      time: "09:30",
+      facilitatorId: need(
+        context.ids.people,
+        space.coordinatorKey,
+        "Coordinator",
+      ),
+    });
+  }
 }

@@ -134,6 +134,14 @@ Each part proves its own steps against a database as of the real today, and
 | P9-T22c-d-a | C6.1 and C6.2 read their KPIs, so the monthly readings move them and no check-in writes their values | A recovery's first key result is the KPI it is (P9-T18a), and C6.2 is expansion seats' answer |
 | P9-T22c-d-a | Three Q3 key results the chapter leaves free finish where they started: C5.2 at 1, P4.2 at 0.6 and E1.1 at 11 | Every other aspirational figure is fixed by NW-Q3-14 or by Q4's table, and together they already grade 0.66 |
 
+| P9-T22c-d-b | Product's holidays and Sara's leave are marked on 12 July; P4 and P2 check in nothing in the weeks of 9 and 16 August, and Amara posts P4's check-in on 23 August | The chapter has Sara mark both on 12 July. The product leaves holiday weeks out of the measured rhythm and sends a delegate what the person on leave owes |
+| P9-T22c-d-b | SU1 moves to Customer Success on 26 July before the frame archives Support last that day; Kofi joins Customer Success and reports to Tomás | A space is archived after its objectives move out (P9-T22c-a's order) |
+| P9-T22c-d-b | C5.1's values are drawn flat into August | The forecast that flags it is the product's own; the path is what makes its trend read 41% on 16 August |
+| P9-T22c-d-b | The four committed misses each name a root cause as well as their explanation | §8.4 asks a cause of a commitment below 1.0, and the retrospective will not close without one |
+| P9-T22c-d-b | The diagnostic reads 87% where the chapter says 86% | The product counts from the cycle's first Monday, so the twenty misses are the Mondays before each set began checking in. Product's holiday weeks would add four more, and the test proves they do not |
+| P9-T22c-d-b | A quarter already over on the real calendar is not booked | Booking a quarter a few days after it ends books its missing review for today, which is right for a team booking late and wrong for a seed booking on the scenario's day. Q3's retrospective linked itself to that stray review before this |
+| P9-T22c-d-b | Q4 is created on 3 September with its sponsor and facilitator, and no monthly reviews are held in Q3 | Q4's planning opens four weeks ahead (NW-Q4-01), so Q3's close has somewhere to feed; the chapter names no monthly review in the summer |
+
 ### Product changes the year found
 
 Building Q1's close against a database meant recording a review after its day,
@@ -154,6 +162,8 @@ them.
 | Revising the frame keeps its strategies | `frame.set` replaced the strategy list on every call, so revising only the not-doing list gave each strategy a new id and the annual objectives aligned to them lost it | The list is replaced only when it changed, or for a new frame | `annual-revisions.test.ts`, "keeps its strategies" |
 | A stopped objective does not hold up the close | Phase 7 asked for every key result in the cycle to be scored, including a stopped objective's, which §2.9 leaves unscored | An objective closed as abandoned before the review is left out of the count | `cycle-close.test.ts`, "closes past an objective stopped mid-cycle" |
 | An eased target's original is the published one | The scorecard showed the target a key result had before its first ever change, which for a target set while drafting was the draft's | The first change after the plan published gives the original; one changed only while drafting keeps the old reading | `cycle-close.test.ts`, "shows the target the plan published with" |
+
+| A retrospective names the review before it | A retrospective scheduled by hand named the latest review in its cycle, which could be one booked after it | It names the review scheduled at or before it | `review-split.test.ts`, "names the review scheduled before it" (P9-T22c-d-b) |
 
 **The fourth of Q1's is for Akmal to confirm.** METHOD §8's ninth stage closes every
 objective deliberately, and the scenario holds one quarterly review, in the

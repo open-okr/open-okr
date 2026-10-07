@@ -16,7 +16,7 @@ import {
   writeYearObjective,
   type YearObjective,
 } from "./okr.ts";
-import { YEAR_SPACES, type YearSpaceKey } from "./people.ts";
+import type { YearSpaceKey } from "./people.ts";
 import {
   type Carry,
   cycleEndsOn,
@@ -24,6 +24,7 @@ import {
   type Redraft,
   redraft,
 } from "./redraft.ts";
+import { bookRhythm } from "./rhythm.ts";
 import { need, type YearEvent } from "./timeline.ts";
 
 /** Q2's close carried into Q3. */
@@ -413,24 +414,7 @@ export const Q3_PLAN_EVENTS: readonly YearEvent[] = [
     on: "2027-06-29",
     label: "Q3's whole rhythm booked",
     async run(context) {
-      const cycleId = need(context.ids.cycles, "q3", "Cycle");
-      for (const key of RHYTHM_SPACES) {
-        const space = YEAR_SPACES.find((one) => one.key === key);
-        if (!space) {
-          continue;
-        }
-        await callAction(context.action, "sessions.bookCycle", {
-          spaceId: need(context.ids.spaces, key, "Space"),
-          cycleId,
-          weekday: 1,
-          time: "09:30",
-          facilitatorId: need(
-            context.ids.people,
-            space.coordinatorKey,
-            "Coordinator",
-          ),
-        });
-      }
+      await bookRhythm(context, "q3", RHYTHM_SPACES);
     },
   },
   {

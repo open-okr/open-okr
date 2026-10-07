@@ -103,6 +103,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lte,
   ne,
   or,
   sql,
@@ -725,12 +726,17 @@ export const createSession = defineWriteAction({
       if (input.cycleId) {
         await requireOpenCycle(tx, workspaceId, input.cycleId);
       }
+      const timeZone = await workspaceTimeZone(tx, workspaceId);
+      const scheduledFor = scheduledInstant(input.scheduledFor, timeZone);
+      // The review scheduled before it, not one booked later for the same
+      // cycle (P9-T22c-d-b).
       const reviewSessionId =
         input.part === "retrospective" && input.cycleId
           ? await bookedReviewSessionIdInTx(tx, {
               workspaceId,
               spaceId: input.spaceId,
               cycleId: input.cycleId,
+              before: scheduledFor,
             })
           : null;
       if (input.part === "retrospective" && !reviewSessionId) {
@@ -748,10 +754,7 @@ export const createSession = defineWriteAction({
         cycleId: input.cycleId ?? null,
         kind: input.kind,
         title: input.title,
-        scheduledFor: scheduledInstant(
-          input.scheduledFor,
-          await workspaceTimeZone(tx, workspaceId),
-        ),
+        scheduledFor,
         facilitatorId: input.facilitatorId,
         state: "scheduled",
         reviewPart: input.part ?? null,
@@ -1002,6 +1005,8 @@ async function bookedReviewSessionIdInTx(
     readonly workspaceId: string;
     readonly spaceId: string;
     readonly cycleId: string;
+    /** Only a review scheduled at or before this moment. */
+    readonly before?: Date;
   },
 ): Promise<string | null> {
   const [row] = await tx
@@ -1015,6 +1020,7 @@ async function bookedReviewSessionIdInTx(
         eq(sessions.cycleId, input.cycleId),
         eq(sessions.kind, "quarterly"),
         eq(sessions.reviewPart, "review"),
+        ...(input.before ? [lte(sessions.scheduledFor, input.before)] : []),
       ),
     )
     .orderBy(desc(sessions.scheduledFor))

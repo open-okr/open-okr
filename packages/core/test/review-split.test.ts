@@ -180,6 +180,16 @@ describe("scheduling the halves by hand (P9-T22c-c-b)", () => {
     });
   });
 
+  it("names the review scheduled before it, not one booked later for the cycle (P9-T22c-d-b)", async () => {
+    const held = await schedule("review", 1);
+    // A review booked afterwards for the same cycle, as booking a quarter
+    // late books its missing review.
+    await schedule("review", 100);
+    const retrospective = await schedule("retrospective", 49);
+    const linked = (await reviews()).find((one) => one.id === retrospective.id);
+    expect(linked?.review_session_id).toBe(held.id);
+  });
+
   it("refuses a retrospective with no review before it", async () => {
     await expect(schedule("retrospective", 49)).rejects.toThrow(
       /schedule the review first/,

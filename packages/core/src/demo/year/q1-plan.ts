@@ -16,7 +16,7 @@ import {
   type YearObjective,
 } from "./okr.ts";
 import type { YearSpaceKey } from "./people.ts";
-import { YEAR_SPACES } from "./people.ts";
+import { bookRhythm } from "./rhythm.ts";
 import { cycleHolding, need, type YearEvent } from "./timeline.ts";
 
 const Q1_COMPANY: readonly YearObjective[] = [
@@ -670,24 +670,7 @@ export const Q1_PLAN_EVENTS: readonly YearEvent[] = [
     step: "NW-P-15",
     label: "Q1's whole rhythm booked",
     async run(context) {
-      const cycleId = need(context.ids.cycles, "q1", "Cycle");
-      for (const key of RHYTHM_SPACES) {
-        const space = YEAR_SPACES.find((one) => one.key === key);
-        if (!space) {
-          continue;
-        }
-        await callAction(context.action, "sessions.bookCycle", {
-          spaceId: need(context.ids.spaces, key, "Space"),
-          cycleId,
-          weekday: 1,
-          time: "09:30",
-          facilitatorId: need(
-            context.ids.people,
-            space.coordinatorKey,
-            "Coordinator",
-          ),
-        });
-      }
+      await bookRhythm(context, "q1", RHYTHM_SPACES);
     },
   },
   {

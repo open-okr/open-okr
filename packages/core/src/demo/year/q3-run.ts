@@ -7,15 +7,18 @@
  * every two weeks from July (NW-Q3-02). Each key result moves from where Q2
  * left it towards where the grading on 13 September finds it (NW-Q3-14),
  * which is where Q4's table starts it; C6's first two key results read their
- * KPIs, so their monthly readings move them rather than a check-in.
+ * KPIs, so their monthly readings move them rather than a check-in. Product
+ * checks in nothing in its two holiday weeks, Amara stands in for Sara, Leo
+ * for Mei, and the Growth team's G1 joins from its second week.
  */
 import { addDays } from "./calendar.ts";
 import {
   type QuarterRun,
+  type RunningKeyResult,
   type RunningObjective,
   weeklyCheckIns,
 } from "./rhythm.ts";
-import type { YearEvent } from "./timeline.ts";
+import { need, type YearEvent } from "./timeline.ts";
 
 /** Q3's Mondays, week 1 to week 11 (5 July to 13 September). */
 const WEEKS = Array.from({ length: 11 }, (_unused, week) =>
@@ -28,7 +31,16 @@ const TEAMS = 2;
 /** Mei's leave starts on 2 August, week 5 (NW-Q3-08). */
 const MEI_AWAY = 4;
 
-const Q3_OBJECTIVES: readonly RunningObjective[] = [
+/** Product's holiday weeks, of 9 and 16 August (NW-Q3-06). */
+const PRODUCT_HOLIDAYS = [5, 6];
+
+/** Sara's leave, 23 to 27 August, with Amara standing in. */
+const SARA_AWAY = 7;
+
+/** Daniel's at-risk check-in, 16 August (NW-Q3-10). */
+const FORECAST = 6;
+
+export const Q3_OBJECTIVES: readonly RunningObjective[] = [
   {
     key: "q3:C1",
     authorKey: "priya",
@@ -96,6 +108,9 @@ const Q3_OBJECTIVES: readonly RunningObjective[] = [
         direction: "increase",
         baseline: 38,
         target: 45,
+        // Flat into August, so the trend projects 41% (NW-Q3-10); the
+        // battlecard refresh moves it after.
+        path: [38.5, 39, 39.5, 40, 40, 40.2, 40.4, 41, 42, 42.5, 43],
         finish: 43,
       },
       // Brightline still takes one late-stage deal a month.
@@ -152,6 +167,7 @@ const Q3_OBJECTIVES: readonly RunningObjective[] = [
     key: "q3:P4",
     authorKey: "sara",
     from: TEAMS,
+    skip: PRODUCT_HOLIDAYS,
     keyResults: [
       {
         key: "q3:P4.1",
@@ -174,6 +190,7 @@ const Q3_OBJECTIVES: readonly RunningObjective[] = [
     key: "q3:P2",
     authorKey: "amara",
     from: TEAMS,
+    skip: PRODUCT_HOLIDAYS,
     keyResults: [
       {
         key: "q3:P2.1",
@@ -311,26 +328,105 @@ const Q3_OBJECTIVES: readonly RunningObjective[] = [
       { key: "q3:F3.2", kind: "milestone", doneOn: "2027-09-01" },
     ],
   },
+  {
+    // Started on 9 August (NW-Q3-09); its first check-in is the Monday after.
+    key: "q3:G1",
+    authorKey: "yuki",
+    from: 6,
+    keyResults: [
+      { key: "q3:G1.1", kind: "baseline", doneOn: "2027-08-23", finish: 4.1 },
+    ],
+  },
 ];
+
+/** G1.2, added on 23 August once G1.1 had found its number (NW-Q3-11). */
+export const G1_2: RunningKeyResult & { readonly path: readonly number[] } = {
+  key: "q3:G1.2",
+  direction: "increase",
+  baseline: 4.1,
+  target: 7,
+  // Weeks 9 to 11.
+  path: [4.4, 4.8, 5.2],
+  finish: 5.2,
+};
+
+function reported(
+  objective: RunningObjective,
+  week: number,
+): {
+  status: "on_track" | "caution" | "off_track";
+  confidence: number;
+} {
+  if (objective.key === "q3:C5" && week >= FORECAST && week < FORECAST + 2) {
+    // At risk, ahead of his reviewer asking (NW-Q3-10).
+    return { status: "caution", confidence: 0.5 };
+  }
+  return objective.committed
+    ? { status: "on_track", confidence: 0.8 }
+    : { status: "on_track", confidence: 0.6 };
+}
+
+function said(objective: RunningObjective, monday: string): string {
+  const lines: Record<string, string> = {
+    "q3:C5:2027-08-16":
+      "At risk: the forecast puts the win rate at 41% against 45%. This week's commitment is the battlecard refresh.",
+    "q3:P4:2027-08-23":
+      "Posted by Amara while Sara is away. Setup in the first session keeps climbing after the holiday weeks.",
+    "q3:G1:2027-08-23":
+      "The self-serve trial-to-paid rate is 4.1%. G1.1 is done, and G1.2 sets the target from it.",
+    "q3:C3:2027-08-02":
+      "Leo from here on, while Mei is away. The audit evidence is all in; the report is due by 15 September.",
+  };
+  return (
+    lines[`${objective.key}:${monday}`] ??
+    "Moving as planned this week. Nothing new in the way."
+  );
+}
 
 const Q3_RUN: QuarterRun = {
   name: "Q3",
   weeks: WEEKS,
   firstWeek: 1,
   objectives: Q3_OBJECTIVES,
-  reported: (objective) =>
-    objective.committed
-      ? { status: "on_track", confidence: 0.8 }
-      : { status: "on_track", confidence: 0.6 },
-  said: () => "Moving as planned this week. Nothing new in the way.",
-  // Leo covers C3 and E1 from Mei's first day away.
-  authorOf: (objective, week) =>
-    (objective.key === "q3:C3" || objective.key === "q3:E1") && week >= MEI_AWAY
-      ? "leo"
-      : objective.authorKey,
+  reported,
+  said,
+  authorOf(objective, week) {
+    // Leo covers C3 and E1 from Mei's first day away.
+    if (
+      (objective.key === "q3:C3" || objective.key === "q3:E1") &&
+      week >= MEI_AWAY
+    ) {
+      return "leo";
+    }
+    // Amara stands in for Sara, and records G1's baseline.
+    if (
+      (objective.key === "q3:P4" || objective.key === "q3:G1") &&
+      week === SARA_AWAY
+    ) {
+      return "amara";
+    }
+    return objective.authorKey;
+  },
+  extraValues(context, objective, week) {
+    const value = G1_2.path[week - (WEEKS.length - G1_2.path.length)];
+    return objective.key === "q3:G1" && value !== undefined
+      ? [
+          {
+            keyResultId: need(context.ids.keyResults, G1_2.key, "Key result"),
+            value,
+            confidence: 0.6,
+          },
+        ]
+      : [];
+  },
 };
 
 /** Weeks 1 to 3, to the teams' first check-in (P9-T22c-d-a). */
 export const Q3_EARLY_EVENTS: readonly YearEvent[] = WEEKS.slice(0, 3).map(
   (monday, week) => weeklyCheckIns(Q3_RUN, week, monday),
+);
+
+/** Weeks 4 to 11, the summer to the grading (P9-T22c-d-b). */
+export const Q3_LATE_WEEKS: readonly YearEvent[] = WEEKS.slice(3).map(
+  (monday, index) => weeklyCheckIns(Q3_RUN, 3 + index, monday),
 );
