@@ -22,6 +22,7 @@ import {
   includeDeleted,
   type KeyResultKind,
   keyResults,
+  kpis,
   reviewDecisions,
   workspaceMembers,
 } from "@openokr/db";
@@ -428,4 +429,127 @@ export async function carryKeptObjectivesInTx(
   }
 
   return { drafts, notCarried };
+}
+
+/**
+ * A KPI's recovery follows its objective across a close (METHOD.md §6.5,
+ * P9-T22c-e-b, NW-Q4-11).
+ *
+ * Kept or modified, the recovery goes on in the next cycle's draft, so the
+ * KPI's link moves to the draft and the recovery board shows the plan being
+ * run. Before this the link stayed on last quarter's objective, which nobody
+ * was checking in on.
+ */
+export async function moveRecoveriesToDraftsInTx(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly toCycleId: string;
+    readonly decided: readonly ClosedObjective[];
+    readonly now: Date;
+  },
+): Promise<void> {
+  const carried = input.decided.filter((objective) =>
+    CARRIED_DECISIONS.includes(objective.decision),
+  );
+  if (carried.length === 0) {
+    return;
+  }
+  const drafts = await tx
+    .select({ id: goals.id, from: goals.carriedFromGoalId })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        eq(goals.workspaceId, input.workspaceId),
+        eq(goals.cycleId, input.toCycleId),
+        inArray(
+          goals.carriedFromGoalId,
+          carried.map((objective) => objective.goalId),
+        ),
+      ),
+    );
+  for (const draft of drafts) {
+    if (!draft.from) {
+      continue;
+    }
+    // openokr:allow-mutation: the calling Operation's own transaction.
+    await tx
+      .update(kpis)
+      .set({ recoveryGoalId: draft.id, updatedAt: input.now })
+      .where(
+        activeOnly(
+          kpis,
+          eq(kpis.workspaceId, input.workspaceId),
+          eq(kpis.recoveryGoalId, draft.from),
+        ),
+      );
+  }
+}
+
+/**
+ * The other half: a recovery the room closes without carrying it, achieved,
+ * abandoned or deferred, ends at the close. Its objective closes with that
+ * decision, so the KPI leaves the recovery board and stays in the grid as the
+ * health metric it always was (NW-Q4-11).
+ */
+export async function endRecoveriesInTx(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly decided: readonly ClosedObjective[];
+    readonly now: Date;
+  },
+): Promise<void> {
+  const ended = input.decided.filter(
+    (objective) => !CARRIED_DECISIONS.includes(objective.decision),
+  );
+  if (ended.length === 0) {
+    return;
+  }
+  const recoveries = await tx
+    .select({ goalId: kpis.recoveryGoalId })
+    .from(kpis)
+    .where(
+      activeOnly(
+        kpis,
+        eq(kpis.workspaceId, input.workspaceId),
+        inArray(
+          kpis.recoveryGoalId,
+          ended.map((objective) => objective.goalId),
+        ),
+      ),
+    );
+  for (const recovery of recoveries) {
+    const objective = ended.find((one) => one.goalId === recovery.goalId);
+    if (!objective) {
+      continue;
+    }
+    // Achieved is achieved; abandoned ends it unfinished; deferred, it is
+    // still worth doing and was not done, which §3.5 reads as missed.
+    const outcome =
+      objective.decision === "achieved"
+        ? ("achieved" as const)
+        : objective.decision === "abandon"
+          ? ("abandoned" as const)
+          : ("missed" as const);
+    // openokr:allow-mutation: the calling Operation's own transaction.
+    await tx
+      .update(goals)
+      .set({
+        closedAt: input.now,
+        successStatus: outcome,
+        closeDecision: objective.decision,
+        health: outcome,
+        updatedAt: input.now,
+      })
+      .where(
+        activeOnly(
+          goals,
+          eq(goals.workspaceId, input.workspaceId),
+          eq(goals.id, objective.goalId),
+          isNull(goals.closedAt),
+        ),
+      );
+  }
 }

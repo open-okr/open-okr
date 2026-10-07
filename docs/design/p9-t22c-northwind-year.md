@@ -150,6 +150,12 @@ Each part proves its own steps against a database as of the real today, and
 | P9-T22c-e-a | December's uptime, 99.4%, is recorded on 3 December, and the failover task is linked to E2.1 | The frame records each month a few days after it ends; the outage is the story's reason to read December early |
 | P9-T22c-e-a | The coach's proposal to close C6 and Hugo's dismissal are not seeded | A proposal is an agent's message (§5); the Coach makes it on the running demo, where Hugo can dismiss it |
 
+| P9-T22c-e-b | The annual objectives' latest values are written by one check-in on each on 6 December, and A3's SOC 2 milestone is ticked on 10 September | Only A2's margin reads its KPI; the annual review grades on the latest values, which nothing else in the year wrote |
+| P9-T22c-e-b | The annual review is one session on 8 December, graded as the chapter's table has it, with a cause for each of the four commitments below 1.0; the annual cycle closes and carries A1, A2 and A4 into 2028 | §8.4 asks a cause of a commitment below 1.0, and §8.9's close is what makes the review's decisions 2028's drafts |
+| P9-T22c-e-b | 2028's three priorities and their statements, the redrafted annual targets, A5's two key results, and Q1 2028's company targets are the seed's | The chapter names the decisions and the new strategy, not the words or the numbers |
+| P9-T22c-e-b | E2.1 is graded 0.67 as the chapter has it | Held in two of three months; where §2.10 computes another figure from December's 99.4%, the scorecard shows the grade beside it |
+| P9-T22c-e-b | Not seeded: the board's CSV and PDF exports and the workspace archive (NW-Q4-07, NW-Q4-15), and the Champion's final digest (NW-Q4-16) | Exports are downloads from the running app, and a digest is an agent's message (§5) |
+
 ### Product changes the year found
 
 Building Q1's close against a database meant recording a review after its day,
@@ -174,6 +180,8 @@ them.
 | A retrospective names the review before it | A retrospective scheduled by hand named the latest review in its cycle, which could be one booked after it | It names the review scheduled at or before it | `review-split.test.ts`, "names the review scheduled before it" (P9-T22c-d-b) |
 
 | A company objective can be placed in a space | `goals.moveToSpace` moved only an objective a space owned, so C2 could not become Customer Success's CS3 as NW-Q4-01 has it | A company objective moves into a space and becomes the space's, with edit on it and on the space; a person's objective is still refused. Who may see or edit it does not change | `goal-move.test.ts`, "places a company objective in a space" (P9-T22c-e-a) |
+
+| A recovery follows its objective across a close | A KPI's recovery stayed linked to last quarter's objective when the room kept it, and stayed "recovering" for good when the room closed it as achieved, because a cycle's close never closes its objectives | Kept or modified, the KPI's link moves to the next cycle's draft; achieved, abandoned or deferred, the recovery objective closes with that decision and the KPI leaves the recovery board | `kpis.test.ts`, "follows a kept recovery" and "ends a recovery the room closes as achieved" (P9-T22c-e-b) |
 
 **The fourth of Q1's is for Akmal to confirm.** METHOD §8's ninth stage closes every
 objective deliberately, and the scenario holds one quarterly review, in the

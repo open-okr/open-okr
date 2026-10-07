@@ -32,7 +32,7 @@ const MEI_BACK = 3;
 /** The outage of 3 December, reported on week 10's Monday (NW-Q4-04). */
 const OUTAGE = 9;
 
-const Q4_OBJECTIVES: readonly RunningObjective[] = [
+export const Q4_OBJECTIVES: readonly RunningObjective[] = [
   {
     key: "q4:C1",
     authorKey: "priya",
@@ -300,4 +300,9 @@ const Q4_RUN: QuarterRun = {
 /** Weeks 1 to 10, to the outage and November's margin (P9-T22c-e-a). */
 export const Q4_EARLY_EVENTS: readonly YearEvent[] = WEEKS.slice(0, 10).map(
   (monday, week) => weeklyCheckIns(Q4_RUN, week, monday),
+);
+
+/** Week 11, the Monday of the grading (P9-T22c-e-b). */
+export const Q4_LATE_WEEKS: readonly YearEvent[] = WEEKS.slice(10).map(
+  (monday, index) => weeklyCheckIns(Q4_RUN, 10 + index, monday),
 );

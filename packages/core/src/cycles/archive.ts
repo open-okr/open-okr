@@ -32,6 +32,8 @@ import {
   CARRIED_DECISIONS,
   carryKeptObjectivesInTx,
   closeDecisionsInTx,
+  endRecoveriesInTx,
+  moveRecoveriesToDraftsInTx,
 } from "./carry.ts";
 import { resolveRhythm } from "./rhythm.ts";
 import { rulesSnapshot } from "./rules.ts";
@@ -714,6 +716,13 @@ export async function feedForwardInTx(
     thresholds,
     now,
   });
+  // A kept recovery goes on in its draft (§6.5, P9-T22c-e-b).
+  await moveRecoveriesToDraftsInTx(tx, {
+    workspaceId,
+    toCycleId,
+    decided,
+    now,
+  });
 
   // --- the lowest process-health statement, Phase 3's improvement action ---
   //
@@ -961,6 +970,21 @@ export async function closeCycleInTx(
     thresholds,
     now,
   );
+
+  // A recovery the room did not carry ends with the close (§6.5,
+  // P9-T22c-e-b), whether or not there is a next cycle to feed. Before the
+  // cycle is marked closed, which freezes its objectives.
+  const closedReview = await findClosedReview(tx, workspaceId, cycleId);
+  await endRecoveriesInTx(tx, {
+    workspaceId,
+    decided: await closeDecisionsInTx(
+      tx,
+      workspaceId,
+      cycleId,
+      closedReview?.id ?? null,
+    ),
+    now,
+  });
 
   // METHOD.md §12 (P9-T14b): the cycle keeps the rules it was graded under,
   // so a band or a cap moved later does not rewrite its verdicts.

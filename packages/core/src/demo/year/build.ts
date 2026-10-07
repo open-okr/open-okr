@@ -7,6 +7,7 @@
  * timeline in its own part.
  */
 import { callAction } from "../../actions/registry.ts";
+import { ANNUAL_CLOSE_EVENTS } from "./annual-close.ts";
 import { isoDay } from "./calendar.ts";
 import { FRAME_EVENTS } from "./frame.ts";
 import { PILOT_EVENTS } from "./pilot.ts";
@@ -18,6 +19,7 @@ import { Q2_EARLY_EVENTS } from "./q2-run.ts";
 import { Q3_CLOSE_EVENTS } from "./q3-close.ts";
 import { Q3_PLAN_EVENTS } from "./q3-plan.ts";
 import { Q3_EARLY_EVENTS } from "./q3-run.ts";
+import { Q4_CLOSE_EVENTS } from "./q4-close.ts";
 import { Q4_PLAN_EVENTS } from "./q4-plan.ts";
 import { Q4_EARLY_EVENTS } from "./q4-run.ts";
 import {
@@ -41,6 +43,8 @@ const YEAR_EVENTS: readonly YearEvent[] = [
   ...Q3_CLOSE_EVENTS,
   ...Q4_PLAN_EVENTS,
   ...Q4_EARLY_EVENTS,
+  ...Q4_CLOSE_EVENTS,
+  ...ANNUAL_CLOSE_EVENTS,
 ];
 
 export interface NorthwindYearResult {

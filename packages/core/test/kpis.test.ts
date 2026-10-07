@@ -983,4 +983,104 @@ describe("recovery OKRs", () => {
     );
     expect(second.rows[0]?.recovery_close_proposed_at).toEqual(stamp);
   });
+
+  /** A review that scores the recovery, decides it, and closes its cycle. */
+  const closeWith = async (
+    cycleId: string,
+    goalId: string,
+    decision: "keep" | "achieved",
+  ) => {
+    const wb = await workerDb();
+    const ctx = { pool: wb.appPool, ...context() };
+    const [space] = await callAction(ctx, "spaces.list", {});
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    const session = await callAction(ctx, "sessions.create", {
+      spaceId: space?.id as string,
+      cycleId,
+      kind: "quarterly",
+      title: "Quarterly review",
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      facilitatorId: rows[0]?.id as string,
+    });
+    await callAction(ctx, "sessions.open", { id: session.id });
+    const goal = await callAction(ctx, "goals.read", { id: goalId });
+    for (const keyResult of goal.keyResults) {
+      await callAction(ctx, "sessions.scoreKeyResult", {
+        sessionId: session.id,
+        keyResultId: keyResult.id,
+        score: 0.5,
+        reason: "Half way.",
+      });
+    }
+    await callAction(ctx, "sessions.addRetroNote", {
+      sessionId: session.id,
+      columnKey: "worked",
+      text: "The recovery read the real number.",
+      anonymous: false,
+    });
+    await callAction(ctx, "sessions.decideObjective", {
+      sessionId: session.id,
+      goalId,
+      decision,
+      why: "The room decided it.",
+    });
+    await callAction(ctx, "sessions.close", { id: session.id });
+    await callAction(ctx, "cycles.close", { cycleId });
+  };
+
+  it("follows a kept recovery into the next cycle's draft (P9-T22c-e-b)", async () => {
+    const wb = await workerDb();
+    const ctx = { pool: wb.appPool, ...context() };
+    const root = await unhealthyTree();
+    const cycleId = await currentCycleId();
+    const launched = await callAction(ctx, "kpis.launchRecovery", {
+      kpiId: root.id,
+      cycleId,
+    });
+    await callAction(ctx, "cycles.create", {
+      on: new Date(Date.now() + 120 * 86_400_000).toISOString().slice(0, 10),
+      mode: "quarterly",
+      firstCycle: false,
+    });
+    await closeWith(cycleId, launched.goalId, "keep");
+
+    const { rows } = await wb.admin.query<{ linked: string; draft: string }>(
+      `select i.recovery_goal_id as linked, g.id as draft from kpis i
+         join goals g on g.carried_from_goal_id = $2
+        where i.id = $1`,
+      [root.id, launched.goalId],
+    );
+    // The KPI's link is on the draft now being run, not last cycle's.
+    expect(rows[0]?.linked).toBe(rows[0]?.draft);
+  });
+
+  it("ends a recovery the room closes as achieved, so the KPI leaves the board (NW-Q4-11)", async () => {
+    const wb = await workerDb();
+    const ctx = { pool: wb.appPool, ...context() };
+    const root = await unhealthyTree();
+    const cycleId = await currentCycleId();
+    const launched = await callAction(ctx, "kpis.launchRecovery", {
+      kpiId: root.id,
+      cycleId,
+    });
+    await closeWith(cycleId, launched.goalId, "achieved");
+
+    const { rows } = await wb.admin.query<{
+      closed: boolean;
+      outcome: string;
+    }>(
+      "select closed_at is not null as closed, success_status as outcome from goals where id = $1",
+      [launched.goalId],
+    );
+    expect(rows[0]).toEqual({ closed: true, outcome: "achieved" });
+    const board = await callAction(ctx, "kpis.recoveryBoard", {});
+    const card = board.cards.find((one) => one.kpiId === root.id);
+    expect(card).toMatchObject({
+      recovering: false,
+      recovery: { goalId: launched.goalId, closed: true },
+    });
+  });
 });
