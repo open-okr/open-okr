@@ -528,7 +528,7 @@ the machine-readable document.
 | `sessions.diagnostic`<br/>§8.6's verdict for this review, stored or still unreadable. | `GET /api/v1/sessions/diagnostic` | reads |
 | `sessions.digest`<br/>The weekly digest for one session, assembled from METHOD.md §7.2 step 4 with no provider involved. | `GET /api/v1/sessions/digest` | reads |
 | `sessions.draftMinutes`<br/>Drafts the review minutes as prose over the record the session already holds. | `GET /api/v1/sessions/draftMinutes` | reads |
-| `sessions.draftNextCycle`<br/>Notes an objective the next cycle might carry (METHOD.md §8.9 stage 10). | `POST /api/v1/sessions/draftNextCycle` | writes |
+| `sessions.draftNextCycle`<br/>Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead. | `POST /api/v1/sessions/draftNextCycle` | writes |
 | `sessions.forward`<br/>Stages ten and eleven: learnings, drafts, actions, and the retro themes worth promoting. | `GET /api/v1/sessions/forward` | reads |
 | `sessions.giveKudos`<br/>Names the effort that deserved to be seen (METHOD.md §8.1 stage 4). | `POST /api/v1/sessions/giveKudos` | writes |
 | `sessions.givePulse`<br/>Records one participant's pulse and their one word for the cycle (METHOD.md §8.2). | `POST /api/v1/sessions/givePulse` | writes |
@@ -547,7 +547,7 @@ the machine-readable document.
 | `sessions.passMic`<br/>Hands the mic to one objective's owner, or puts it down (METHOD.md §8.1 stage 3). | `POST /api/v1/sessions/passMic` | writes |
 | `sessions.postDigest`<br/>Posts a closed weekly session's digest to the Slack or Teams channel its space is linked to, once per channel. | `POST /api/v1/sessions/postDigest` | writes |
 | `sessions.processHealth`<br/>§8.5's five statements with the room's averages, and the reader's own answers. | `GET /api/v1/sessions/processHealth` | reads |
-| `sessions.proposeFromLearnings`<br/>Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning. | `GET /api/v1/sessions/proposeFromLearnings` | reads |
+| `sessions.proposeFromLearnings`<br/>Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning. | `GET /api/v1/sessions/proposeFromLearnings` | reads |
 | `sessions.read`<br/>One session by id. Returns not-found when the caller lacks access. | `GET /api/v1/sessions/read` | reads |
 | `sessions.readStreak`<br/>The rhythm streak for a space. | `GET /api/v1/sessions/readStreak` | reads |
 | `sessions.reassignBlocker`<br/>Moves a blocker to a different owner. | `POST /api/v1/sessions/reassignBlocker` | writes |

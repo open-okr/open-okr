@@ -14780,7 +14780,7 @@
     },
     {
       "name": "sessions.proposeFromLearnings",
-      "description": "Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
+      "description": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -14952,7 +14952,7 @@
     },
     {
       "name": "sessions.draftNextCycle",
-      "description": "Notes an objective the next cycle might carry (METHOD.md §8.9 stage 10).",
+      "description": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
       "inputSchema": {
         "type": "object",
         "properties": {

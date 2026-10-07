@@ -315,25 +315,6 @@ export async function captureLearningAction(
   revalidatePath(`/session/${sessionId}`);
 }
 
-/** A candidate objective for the next cycle (METHOD.md §8.9, P4-T11c-b). */
-export async function draftNextCycleAction(
-  sessionId: string,
-  title: string,
-  why: string,
-) {
-  const { session, workspace } = await requireWorkspace();
-  await callAction(
-    {
-      pool: getPool(),
-      workspaceId: workspace.workspaceId,
-      actor: { kind: "human", userId: session.user.id },
-    },
-    "sessions.draftNextCycle",
-    { sessionId, title, why },
-  );
-  revalidatePath(`/session/${sessionId}`);
-}
-
 /**
  * One action, with an owner and a date (METHOD.md §8.1 stage 11, P4-T11c-b).
  *
@@ -797,21 +778,6 @@ export async function clusterRetroAction(sessionId: string) {
     "sessions.clusterRetro",
     { sessionId },
   );
-}
-
-/**
- * Next-cycle objectives proposed from the learnings the room carried, each
- * citing its learning, or null (completeness review M-09).
- *
- * Writes nothing. A proposal the facilitator keeps goes into the draft form,
- * where they edit it and save it with `sessions.draftNextCycle` like any
- * other draft.
- */
-export async function proposeFromLearningsAction(sessionId: string) {
-  const { assistContext } = await import("../../../lib/assists");
-  return callAction(await assistContext(), "sessions.proposeFromLearnings", {
-    sessionId,
-  });
 }
 
 /** The review written up as prose from its own record, or null (M-09). */

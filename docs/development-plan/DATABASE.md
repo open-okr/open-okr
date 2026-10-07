@@ -445,7 +445,7 @@ Every table references `session_id` to sessions.
 | `process_health_responses` | `statement_key smallint` (1 to 5), `score smallint`, `respondent_hash` |
 | `review_decisions` | `goal_id`, `decision` (`achieved` / `keep` / `modify` / `defer` / `abandon`; achieved and defer since 0136, P9-T20e-a), `why`, `decided_by_id` |
 | `learnings` | `cycle_id`, `text`, `carry_forward bool`, `source`, `retro_note_id?`, `created_by_id` |
-| `next_cycle_drafts` | `title`, `why`, `promoted_to_goal_id?` |
+| `next_cycle_drafts` | `title`, `why`, `promoted_to_goal_id?`. No screen writes it since 0.2.0 (P9-T22d); removed in 0.3 |
 | `review_actions` | `what`, `owner_id`, `due_on`, `done bool`, `created_by_id` |
 | `review_diagnostics` | `cycle_score numeric` (the aspirational key results' average since P9-T20d), `rhythm_score numeric?` (process-health statements 2 and 5, the cross-check), `on_time_share numeric?`, `due_check_ins integer?`, `on_time_check_ins integer?` (the measured rhythm the verdict is read on, 0135, P9-T20d; null on a diagnostic read before it, or on a delivered cycle read before anything fell due), `verdict` (`results_delivered` / `strategy_or_quality` / `rhythm`), `narrative`, `ai_narrative?`, `recorded_by_id` |
 

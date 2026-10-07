@@ -8253,10 +8253,19 @@ export const captureLearning = defineWriteAction({
   }),
 });
 
+/**
+ * **Deprecated since 0.2.0, removed in 0.3** (P9-T22d, PLAN.md §5.1).
+ *
+ * Stage ten is Learnings: the review no longer drafts the next cycle, and no
+ * screen calls this any more. A kept or modified objective reaches the next
+ * cycle's Phase 4 on its own, and an idea reaches its issue list as a carried
+ * learning. Kept for one release so a script or an agent that still calls it
+ * does not break on upgrade; what it writes still reads in the minutes.
+ */
 export const draftNextCycle = defineWriteAction({
   name: "sessions.draftNextCycle",
   summary:
-    "Notes an objective the next cycle might carry (METHOD.md §8.9 stage 10).",
+    "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
   input: z.object({
     sessionId: z.uuid(),
     title: z.string().trim().min(1).max(280),

@@ -25,7 +25,6 @@ import {
   callAction,
   excerptRichText,
   OperationError,
-  REVIEW_ASSIST_KEYS,
 } from "@openokr/core";
 import {
   canonThresholds,
@@ -43,7 +42,6 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
-import { assistOffered } from "../../../lib/assists";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
@@ -598,7 +596,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
     })) as Reset;
   }
 
-  // Stages ten and eleven: learnings, drafts, decisions and actions
+  // Stages ten and eleven: learnings, decisions and actions
   // (METHOD.md §8.9 and §8.1 stage 11, P4-T11c-b).
   //
   // One read for both, because the two halves are one flow: what we learned,
@@ -613,17 +611,6 @@ export default async function SessionPage({ params }: SessionPageProps) {
       sessionId: id,
     })) as Forward;
   }
-  // Next-cycle drafts proposed from what the room carried (M-09). Asked only
-  // on the stage that shows the drafts, and only when a provider may write
-  // them; the panel then also needs a carried learning before it offers.
-  const forwardAssistAvailable =
-    forward !== null &&
-    (await assistOffered(
-      workspace.workspaceId,
-      REVIEW_ASSIST_KEYS.proposeObjectives,
-      "balanced",
-      session.user.id,
-    ));
 
   // Stage eight: the process-health survey (METHOD.md §8.5, P4-T11b).
   let processHealth: ProcessHealth | null = null;
@@ -1050,12 +1037,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
 
       {/* Stages ten and eleven (METHOD.md §8.9, §8.1 stage 11, P4-T11c-b) */}
       {forward ? (
-        <ForwardPanel
-          sessionId={id}
-          forward={forward}
-          canEdit={isRunning}
-          assistAvailable={forwardAssistAvailable}
-        />
+        <ForwardPanel sessionId={id} forward={forward} canEdit={isRunning} />
       ) : null}
 
       {/* Stage eight: process health (METHOD.md §8.5, P4-T11b) */}

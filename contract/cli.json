@@ -10589,7 +10589,7 @@
       "method": "GET",
       "path": "/sessions/proposeFromLearnings",
       "scope": "read",
-      "summary": "Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
+      "summary": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
       "flags": [
         {
           "name": "session-id",
@@ -10717,7 +10717,7 @@
       "method": "POST",
       "path": "/sessions/draftNextCycle",
       "scope": "write",
-      "summary": "Notes an objective the next cycle might carry (METHOD.md §8.9 stage 10).",
+      "summary": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
       "flags": [
         {
           "name": "session-id",

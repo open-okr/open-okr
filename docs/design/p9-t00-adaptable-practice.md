@@ -264,7 +264,8 @@ Each task copied the named sections of `p9-t00-method-v2.md` into METHOD.md, wit
 | P9-T21 | The coach's voice, and METHOD.md fully landed | The preamble and terms, §1, §9, §10, §11 framing, §13 | Trigger catalogue (AI-NATIVE-PLAN.md §6.4) and the P4-T00 coach watch list; deletes `p9-t00-method-v2.md` and METHOD.md's banner |
 | P9-T22a | Release 0.2.0 | none | None |
 | P9-T22b | The demo shows the practice | none | None |
-| P9-T22c | The Northwind year, placeable at any of its dates (G-4) | none | None |
+| P9-T22d | Stage ten drafts nothing | none | None |
+| P9-T22c | The Northwind year on the real calendar (G-4) | none | None |
 
 **Live or draft under "Live", as built at P9-T13-b-a** ([`addition.ts`](../../packages/method/src/addition.ts)):
 
@@ -385,6 +386,13 @@ Each task copied the named sections of `p9-t00-method-v2.md` into METHOD.md, wit
 | §10's "what the coach says" was a table nobody read: a nudge said only its rule's name | `COACH_LINES` in `packages/method` holds the twenty lines and the rule each cites, compared both ways with §10, and a nudge for one of those rules says the line under its headline |
 
 The P4-T00 watch list is rewritten from §10, with three rules cited differently and AL-3 and AL-6 off the default list, and AI-NATIVE-PLAN §6.4's wording follows §10. "At risk" had been the status label since P9-T15b-a; what remained of decision D6 is the terminology card offering "Owner" beside "Champion", which fills both fields and saves nothing by itself.
+
+**Two decisions Akmal took on 7 October 2026.**
+
+| Question | Decision | Why |
+|---|---|---|
+| Stage ten's free-form next-cycle drafts, left when it became "Learnings" | **Retired** (P9-T22d). The form and its assist leave the screen; the actions stay one release, deprecated, and go in 0.3 with the table | The method review found drafting in the review contradicting §8.10, the drafts reached nothing but the minutes, kept objectives now pre-fill Phase 4 on their own, and an idea has a home as a carried learning on the next cycle's issue list |
+| How the demo is placed at a date of the Northwind year (G-4) | **The real clock** (P9-T22c). The year sits on the real calendar, the scenario's 1 January on this year's, and the demo shows Northwind as of today | The product reads the real clock everywhere; a demo clock would be a platform change touching every place that asks what day it is, and the database stamps its own times besides. A demo that follows the real date is consistent, needs no explanation, and moves through the year by itself with the nightly reset. The five README dates become what a visitor sees in each part of the year |
 
 **Six questions the build raised, for a human to answer** (5 and 6 October 2026):
 - **An OKR written into a set still unpublished after its window** (P9-T13-a). §2.9 says what is created before the team publication window closes is the plan; it does not say what an OKR written after it, into a set nobody has published, is. The build reads it as the plan, late, unmarked and facing the publish gates, because there is no plan yet to add to. If it should be marked instead, `isMidCycleAddition` drops its second condition.

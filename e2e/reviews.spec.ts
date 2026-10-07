@@ -1022,7 +1022,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(reset).toContainText("Adjust the target or wording");
 
   // ---------------------------------------------------------------------------
-  // Stage ten: learnings and next-cycle drafts (METHOD.md section 8.9, P4-T11c-b)
+  // Stage ten: learnings (METHOD.md section 8.9, P4-T11c-b, P9-T22d)
   // ---------------------------------------------------------------------------
 
   await page.getByRole("button", { name: "Continue to next step" }).click();
@@ -1039,21 +1039,13 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(forward).toContainText("from the retro", { timeout: 10_000 });
   await expect(forward).toContainText("1 carried");
 
-  // A draft with no why is refused on the screen: without it the next cycle
-  // cannot prioritise the draft against anything.
-  await forward
-    .getByLabel("A candidate objective")
-    .fill("Make the platform something a team can adopt without us");
-  await forward.getByRole("button", { name: "Draft it" }).click();
-  await expect(forward).toContainText("needs a title and a why");
-
-  await forward
-    .getByLabel("Why", { exact: true })
-    .fill("Three of five losses last quarter were onboarding, not features.");
-  await forward.getByRole("button", { name: "Draft it" }).click();
-  await expect(
-    forward.getByText("Make the platform something a team can adopt without us"),
-  ).toBeVisible({ timeout: 10_000 });
+  // The review drafts nothing for the next cycle (P9-T22d): section 8.10
+  // holds the review before drafting. The stage says where an idea goes
+  // instead, and offers no draft form.
+  await expect(forward).toContainText("An idea for the next cycle?");
+  await expect(forward.getByRole("button", { name: "Draft it" })).toHaveCount(
+    0,
+  );
 
   // ---------------------------------------------------------------------------
   // Stage eleven: decisions and actions (METHOD.md section 8.1 stage 11)

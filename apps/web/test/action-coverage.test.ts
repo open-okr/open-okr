@@ -198,6 +198,17 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     apiOnly: true,
     why: "a person feeds the next cycle by closing this one with `cycles.close`; this is an idempotent re-run for the command line",
   },
+  // Deprecated at P9-T22d and removed in 0.3 (PLAN.md §5.1): stage ten no
+  // longer drafts the next cycle, so its screen dropped them, and they stay
+  // one release so a script or an agent calling them does not break.
+  "sessions.draftNextCycle": {
+    apiOnly: true,
+    why: "deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle, and a kept objective reaches its Phase 4 on its own",
+  },
+  "sessions.proposeFromLearnings": {
+    apiOnly: true,
+    why: "deprecated since 0.2.0 and removed in 0.3 with `sessions.draftNextCycle`, whose form it filled",
+  },
 };
 
 function sources(dir: string): string[] {

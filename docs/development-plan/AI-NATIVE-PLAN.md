@@ -76,7 +76,7 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Summarise blockers | Space home, above the blocker board | Nothing: it is a reading |
 | Draft the retrospective | Goal detail, the close form | Fills the retrospective field; closing is the person's |
 | Draft the review minutes | Minutes screen | A draft document on the session, private to its author |
-| Propose next-cycle objectives | Quarterly review, learnings stage | Fills the draft form; `sessions.draftNextCycle` is the person's |
+| Propose next-cycle objectives | **Retired from the screen at P9-T22d.** Stage ten is Learnings and the review no longer drafts the next cycle, so the form it filled is gone. `sessions.proposeFromLearnings` stays for one release, deprecated, and is removed in 0.3 | Nothing |
 | Summarise a thread (`comments.summarise`) | Goal detail, above the discussion | Nothing: it is a reading, refused if it quotes words nobody wrote |
 | Decompose a key result (`goals.decomposeKeyResult`, `deep` tier) | Goal detail, on each key result | `initiatives.create` and `tasks.create` for the rows left ticked, as the person, in the space they chose |
 
