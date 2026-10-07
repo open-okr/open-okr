@@ -9,7 +9,10 @@
  * **No coaching copy is written here.** The headline is the rule's own name
  * from `packages/method`'s catalogue, the same words the nudge volume page
  * shows; the rest is facts: what it is about, where to open it, and the rule
- * key every proactive message carries.
+ * key every proactive message carries. Where METHOD.md §10 gives the rule a
+ * line, the coach says it under the headline (P9-T21), in the document's own
+ * words from `packages/method`, so the voice is the method's rather than
+ * this file's.
  *
  * **The links are plain deep links, not sign-in tokens.** A link that signs
  * somebody in from an inbox is a credential in an email, and nothing here is
@@ -25,7 +28,7 @@ import {
   okrSessions,
   type WorkspaceTx,
 } from "@openokr/db";
-import { trigger } from "@openokr/method";
+import { coachLineFor, coachSentence, trigger } from "@openokr/method";
 import { eq } from "drizzle-orm";
 import type { MessageButton, MessageDraft } from "../channels/builder.ts";
 import type { ChannelProviderKey } from "../channels/capabilities.ts";
@@ -170,11 +173,13 @@ export async function nudgeDraft(
   }
 
   const headline = subject.name ? `${title}: ${subject.name}` : title;
+  const line = coachLineFor(input.ruleKey);
   return {
     subject: `${name}: ${headline}`,
     text: [
       headline,
       "",
+      ...(line ? [coachSentence(line), ""] : []),
       // The rule key, on this message as on every other proactive message.
       `Rule: ${input.ruleKey}`,
     ].join("\n"),

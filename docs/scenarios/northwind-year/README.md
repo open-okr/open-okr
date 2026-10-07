@@ -11,7 +11,7 @@ This is the reference for four kinds of work:
 | **Running the demo** | §6 lists the dates worth showing and what must be true on each. P9-T22 places the seed at any of them |
 | **Writing the user guide** | Each step names the screen and the practice rule it shows. A guide page explains the steps that cite it |
 
-Written on 2 October 2026, against METHOD.md as revised for Phase 9 ([p9-t00-method-v2.md](../../design/p9-t00-method-v2.md)) and the Phase 9 plan ([p9-t00-adaptable-practice.md](../../design/p9-t00-adaptable-practice.md), [p9-t00-okr-writing.md](../../design/p9-t00-okr-writing.md)). Where a step needs something not built yet, it says which task builds it.
+Written on 2 October 2026, against METHOD.md as revised for Phase 9 ([METHOD.md](../../development-plan/METHOD.md), which holds the whole revision since P9-T21) and the Phase 9 plan ([p9-t00-adaptable-practice.md](../../design/p9-t00-adaptable-practice.md), [p9-t00-okr-writing.md](../../design/p9-t00-okr-writing.md)). Where a step needs something not built yet, it says which task builds it.
 
 ## Chapters
 

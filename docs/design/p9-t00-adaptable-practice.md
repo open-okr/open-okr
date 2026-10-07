@@ -6,7 +6,7 @@ The design gate for Phase 9. Written on 1 October 2026 for Akmal and Agung to ap
 |---|---|
 | Asked for by | Akmal, 1 October 2026: "the 'open okr' need to be robust and allow different flavor of OKR implementation … many hard lock need to be remove and instead make it adjustable in the admin setting" |
 | Rests on | [METHOD-REVIEW.md](../METHOD-REVIEW.md), the review of every METHOD.md rule against public OKR practice |
-| Approved practice text | [p9-t00-method-v2.md](p9-t00-method-v2.md), the revised METHOD.md |
+| Approved practice text | [METHOD.md](../development-plan/METHOD.md) since P9-T21. Until then it was held in `p9-t00-method-v2.md`, deleted once every section had landed |
 | Companion design | [p9-t00-okr-writing.md](p9-t00-okr-writing.md), the list and diagram views with inline editing |
 | Decisions already made | Akmal, 1 October 2026: writing at any time by default, admin can restrict it; only structural publish checks block by default; committed and aspirational OKRs by default; Akmal's direction wins over [okr-entry-points.md](okr-entry-points.md) §2 ("keep every gate") |
 
@@ -204,7 +204,7 @@ Removed: the `guided` input on `goals.create` and `goals.addKeyResult`. The two-
 
 ## 6. The tasks, and which METHOD.md sections each carries
 
-Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md) into METHOD.md, with the code that makes `pnpm method:check` agree. The 67 differences the check reports today are all assigned below. Full task text is in IMPLEMENTATION-PLAN.md, Phase 9.
+Each task copied the named sections of `p9-t00-method-v2.md` into METHOD.md, with the code that makes `pnpm method:check` agree. The 67 differences the check reports today are all assigned below. Full task text is in IMPLEMENTATION-PLAN.md, Phase 9.
 
 | Task | Title | METHOD v2 sections | Conformance differences it closes |
 |---|---|---|---|
@@ -374,6 +374,15 @@ Each task copies the named sections of [p9-t00-method-v2.md](p9-t00-method-v2.md
 `goals.carried_from_goal_id` (migration 0137) names the source, unique per cycle whether or not the draft was deleted since, so **a carried draft somebody deletes stays deleted**: deleting it is a decision about the next cycle and a re-run must not overrule it. A champion who has left means the objective is named on the closed cycle rather than carried, because the product does not choose a new owner on the room's behalf. Into a cycle already running, the draft waits for a person (§2.9) rather than going live. The closed cycle's card reports the drafts beside the issues, and calls the lowest statement Phase 3's improvement action; it is the same `cycle_priorities` row as before, ranked with the rest, and its owner and date are stage 11's. The minutes report committed key results met as a count apart from the cycle score.
 
 **Left for a human.** Stage 10 is "Learnings" now, and still offers free-form next-cycle drafts beside the learnings, with the assist that proposes them. The method review asked only for the rename, and kept objectives now pre-fill Phase 4 on their own, so whether that panel retires or stays as a place for ideas is a product decision rather than this task's.
+
+**METHOD.md landed, and the coach's voice, as built at P9-T21.** METHOD.md is the revised text in full: the preamble with "Defaults, not dogma" and the four levels, the terms, the twelve principles with their sources, §2.9's closing paragraph, §3's "x in 10", KR-6 as Info, §9, §10, the §11 framing with what a workspace may and may not change, the three §11 rows that now say how strongly they apply, and §13's sources. The banner is gone and `p9-t00-method-v2.md` is deleted, with every link to it repointed. Two things the document says the product does and the product did not, found while landing it:
+
+| Found | Now |
+|---|---|
+| `guidance.ts` said the conformance suite compared its §9 sentences, and nothing did, so the phase rail went on telling a facilitator to refuse Phase 4 without a complete input pack | The guidance is §9's, and `pnpm method:check` compares the phases and the sentences both ways |
+| §10's "what the coach says" was a table nobody read: a nudge said only its rule's name | `COACH_LINES` in `packages/method` holds the twenty lines and the rule each cites, compared both ways with §10, and a nudge for one of those rules says the line under its headline |
+
+The P4-T00 watch list is rewritten from §10, with three rules cited differently and AL-3 and AL-6 off the default list, and AI-NATIVE-PLAN §6.4's wording follows §10. "At risk" had been the status label since P9-T15b-a; what remained of decision D6 is the terminology card offering "Owner" beside "Champion", which fills both fields and saves nothing by itself.
 
 **Six questions the build raised, for a human to answer** (5 and 6 October 2026):
 - **An OKR written into a set still unpublished after its window** (P9-T13-a). §2.9 says what is created before the team publication window closes is the plan; it does not say what an OKR written after it, into a set nobody has published, is. The build reads it as the plan, late, unmarked and facing the publish gates, because there is no plan yet to add to. If it should be marked instead, `isMidCycleAddition` drops its second condition.

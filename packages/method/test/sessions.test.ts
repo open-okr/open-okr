@@ -196,8 +196,10 @@ describe("§8.8's close decisions", () => {
   });
 
   it("states the rule the stage exists for", () => {
-    // §8.8's closing line, and the reason no decision is pre-selected anywhere.
-    expect(method).toContain("Nothing carries over by default.");
+    // §8.8's closing line, and the reason no decision is pre-selected
+    // anywhere: a proposal is shown, never chosen. "By default" until P9-T21
+    // landed §1's revised seventh principle.
+    expect(method).toContain("Nothing carries over silently.");
   });
 });
 

@@ -1,45 +1,69 @@
 # METHOD.md
 
-> **Being revised in Phase 9.** On 1 October 2026 every rule here was reviewed against public OKR practice ([METHOD-REVIEW.md](../METHOD-REVIEW.md)), and Akmal decided that locks become practice settings with best-practice defaults. The revised text is [p9-t00-method-v2.md](../design/p9-t00-method-v2.md). Each Phase 9 task moves its sections into this file together with the code that implements them, so the conformance suite stays green. Until a section has moved, this file still describes what the product does.
-
 The OKR practice canon. Every rule, threshold, band, ritual and diagnostic that OpenOKR encodes lives here.
 
-This document answers one question: **what does good OKR practice look like, precisely enough to build?** It is the authority for the Draft Coach rule engine, the OKR Coach and OKR Champion agents, the scoring and health engines, the session flows, and every nudge the product sends. Product scope lives in REQUIREMENTS.md. Schema and engines live in TECHNICAL-PLAN.md. When one of those needs to know *what the right practice is*, it cites this file.
+This document answers two questions: **what does good OKR practice look like, precisely enough to build, and what may an organisation change about it?** It is the authority for the Draft Coach rule engine, the OKR Coach and OKR Champion agents, the scoring and health engines, the session flows, the practice settings, and every nudge the product sends. Product scope lives in REQUIREMENTS.md. Schema and engines live in TECHNICAL-PLAN.md. When one of those needs to know *what the right practice is*, it cites this file.
+
+**Defaults, not dogma.** Revised on 1 October 2026 after a review of every rule against public OKR practice ([METHOD-REVIEW.md](../METHOD-REVIEW.md)), with Akmal's decisions of the same day:
+
+1. Anybody can create an objective or key result at any time, by default. An admin can restrict it.
+2. Only structural defects block publishing, by default.
+3. Committed and aspirational OKRs are adopted, by default.
+4. Locks become practice settings, each with the best-practice default.
+
+Every rule below is the recommended default. Each says how strongly the product applies it, whether a workspace may change it (§12), and the published practice it rests on (§13). Where no source was found, it says "OpenOKR default".
+
+**How strongly a rule applies:**
+
+| Level | Meaning |
+|---|---|
+| **Block** | The product refuses the action until the rule holds. The default only for structural defects |
+| **Warn** | The product shows the problem beside the work and coaches. Nothing is refused |
+| **Info** | A tip or a note, shown where it helps |
+| **Off** | Not evaluated |
+
+Unless a rule says otherwise, a workspace may move it between these levels in its practice settings (§12).
 
 Terms used throughout:
 
 | Term | Meaning |
 |---|---|
-| Objective | A qualitative statement of a desired future state. No numbers in it. |
-| Key result (KR) | A measurable outcome that proves the objective is being achieved. Written as "from X to Y by date". |
-| Cycle | The time box the OKRs are set and scored against. Usually a quarter, sometimes a year. |
-| Champion | The one person accountable for a goal. They post the check-in. |
-| Reviewer | The one person who acknowledges each check-in. |
-| Sponsor | The senior leader accountable for the whole cycle. |
-| Facilitator | The person who runs the sessions and guards quality. |
-| Check-in | A short written update on a goal, with a snapshot of every KR value at that moment. |
-| Confidence | A 0.0 to 1.0 belief that a KR will land. Forward-looking. |
-| Score | A 0.0 to 1.0 measure of what actually happened. Backward-looking. |
-| Leading indicator | An early signal you can act on this week. |
-| Lagging indicator | The result you ultimately want, visible late. |
+| Objective | A statement of a desired future state. Usually qualitative and memorable. Also called a goal in the product, and the two words mean the same thing here |
+| Key result (KR) | A verifiable result that proves the objective is being achieved. Usually a measured change from a baseline to a target by a date. It can also be a value held inside a band, a milestone that is done or not done, or a baseline still to be established (§2.10) |
+| Committed OKR | An OKR the team agrees will be achieved, adjusting schedules and resources to deliver it. Expected to score 1.0 (§2.8) |
+| Aspirational OKR | An OKR that describes how the team would like the world to look, without a clear path or all the resources. Expected to average around 0.7 (§2.8) |
+| Cycle | The time box the OKRs are set and scored against. Usually a quarter, sometimes a year |
+| Champion | The one person accountable for a goal. They post the check-in. The label is a terminology setting; "Owner" is a common alternative |
+| Key result owner | The one person who moves and reports a key result. Defaults to the goal's champion |
+| Reviewer | The person who acknowledges a goal's check-ins, where the workspace uses reviewers (§2.5) |
+| Sponsor | The senior leader accountable for the whole cycle |
+| Facilitator | The person who runs the sessions and guards quality |
+| Check-in | A short written update on a goal, with a snapshot of every KR value at that moment |
+| Confidence | A belief that a KR will land, forward-looking. Stored 0.0 to 1.0 and shown as "x in 10" by default |
+| Score | A 0.0 to 1.0 measure of what actually happened. Backward-looking |
+| Leading indicator | An early signal you can act on this week |
+| Lagging indicator | The result you ultimately want, visible late |
+| Practice setting | A workspace's choice about how strongly a rule applies, or which variant it uses (§12) |
+| Profile | A named bundle of practice settings a workspace starts from (§12) |
 
 ---
 
 ## 1. The operating principles
 
-These are not preferences. Every rule below serves one of them.
+Every rule below serves one of these. They are the practice's centre, and the part a workspace cannot switch off (§11).
 
-1. **Objectives are destinations, key results are the proof.** If the objective contains a number, it is a key result in disguise. If a key result has no baseline and target, it is an opinion.
-2. **Measure impact, not effort.** "Hold 12 interviews" is an output. "Raise activation from 41% to 60%" is an outcome. The output may be how you get there. It is never the goal.
-3. **Focus is a decision, not a wish.** A priority list that accommodates everything is a to-do list. The not-doing list is as valuable as the priority list, and it must be written down.
+1. **Objectives are destinations, key results are the proof.** An objective is usually qualitative; a number in it is usually a key result in disguise. A key result must be verifiable: if nobody can tell whether it happened, it is an opinion. *Source:* Wodtke; Doerr.
+2. **Prefer impact to effort.** "Hold 12 interviews" is an output. "Raise activation from 41% to 60%" is an outcome. Outputs are how you get there. Measure the change they are for wherever you can, and keep deliverables in initiatives or, for committed work, in milestone key results. *Source:* Google's OKR playbook: key results "must describe outcomes, not activities"; Cagan; Doerr's own milestone key results.
+3. **Focus is a decision.** Few objectives, few key results. Writing down what you will not do is strongly recommended. *Source:* Grove: "if we try to focus on everything, we focus on nothing"; Doerr.
 4. **Know what kind of promise you are making.** A committed OKR is expected to be delivered in full. An aspirational OKR is a stretch: about 5 in 10 confidence when drafted, and around 0.7 at the close, is healthy. *Source:* Google's OKR playbook; Wodtke.
-5. **The rhythm is the product.** OKRs reviewed only at quarter end are worse than no OKRs. Weekly check-ins, monthly reviews and a quarterly close are booked before the cycle starts.
-6. **Scores are planning data, never appraisal.** The moment a score feels like a performance review, candour dies and the numbers stop being useful.
-7. **Nothing carries over by default.** Every cycle starts with a blank sheet. An objective that survives should survive on purpose.
+5. **The rhythm is the product.** "Without frequent status updates, goals slide into irrelevance." Weekly check-ins are the default; the monthly review and the close are booked before the cycle starts. *Source:* Doerr; Wodtke.
+6. **Scores are planning data, not pay.** A score is never an input to compensation or a rating. It may inform a conversation about how the work went. *Source:* Doerr: "Divorce compensation (both raises and bonuses) from OKRs"; re:Work.
+7. **Nothing carries over silently.** Every objective gets a deliberate decision at the close. An unfinished aspirational OKR may carry forward on purpose. *Source:* Doerr; Google's OKR playbook.
 8. **Neglect must be visible.** A goal nobody has updated cannot quietly stay green.
 9. **Alignment is contribution, not copying.** A team's OKR states its own contribution to a goal above or beside it. It may turn a parent's key result into its own objective; it does not restate the parent's objective word for word. *Source:* whatmatters; Castro.
-10. **Diagnose before you prescribe.** A missed cycle with a strong rhythm is a strategy problem. A missed cycle with a weak rhythm is a cadence problem. They need opposite fixes.
+10. **Diagnose before you prescribe.** A missed cycle with a strong rhythm points at strategy. A missed cycle with a weak rhythm points at cadence. Treat the diagnosis as a hypothesis to test, not a verdict. *Source:* OpenOKR default.
 11. **Anybody can write.** A member who can edit a space can add or change its OKRs at any time. Coaching happens while they type. It never refuses them, unless the workspace has chosen to (§2.9). *Source:* Doerr: "Start: Launch a new OKR mid-cycle, whenever the need arises"; decided by Akmal on 1 October 2026.
+12. **Defaults, not dogma.** This is the recommended method. Organisations adapt OKRs to their own context, and the product lets them from settings, starting from a working default rather than from blank. *Source:* Google's OKR playbook, which says other organisations' approach may and should differ from Google's; Castro: "There is not a single way to adopt OKR"; Lamorte's deployment parameters.
 
 ---
 
@@ -210,6 +234,10 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 
 **When the organisation changes.** A team that merges, splits or is renamed takes its OKRs with it. An objective can move to another space at any time: its key results, check-ins, dependencies and alignment move with it, and the move is recorded as a dated change. A merged team writes its own objectives at the next cycle rather than carrying both teams' sets; until then, both sets run in the merged space. *Source:* whatmatters: "A new team doesn't automatically inherit old OKRs"; resetting after a reorganisation is "very similar to the end of a cycle".
 
+**Mid-cycle changes are evidence, not failure.** The close reads them. A cycle full of starts and stops says the planning inputs were weak, which Phase 2 of the next cycle should hear.
+
+*Source:* whatmatters: "OKRs are amendable and revisable", consider "adding an additional OKR or simply taking away one or two KRs" when "something out of your control changes or you become more aware of what the aggressively realistic goal should be"; re:Work: OKRs are "revisited a few times a quarter" to "adjust to new information, abandon objectives".
+
 ### 2.10 Kinds of key result
 
 | Kind | Written as | Progress | Scored |
@@ -230,7 +258,7 @@ Three different numbers. They are never mixed. Every numeric boundary in this se
 | Number | Range | Direction | Answers |
 |---|---|---|---|
 | Progress | 0 to the progress ceiling, 100% by default | Backward | How far has the value moved from baseline to target? |
-| Confidence | 0.0 to 1.0 | Forward | Do we believe this will land? |
+| Confidence | 0.0 to 1.0, shown as "x in 10" | Forward | Do we believe this will land? |
 | Score | 0.0 to 1.0 | Backward, final | What did we actually achieve, judged at the close? |
 
 ### 3.1 Progress
@@ -257,6 +285,8 @@ A metric key result whose baseline equals its target is not a metric. The coach 
 A goal's progress is the weighted average of its key results' progress. Including the progress of goals aligned beneath it is a practice setting, off by default, because a child's work usually also moves the parent's own key results and would be counted twice. *Source:* Perdoo (vendor): "By default, an Objective's progress is based on its Key Results only".
 
 ### 3.2 Confidence bands
+
+Confidence is asked every check-in, on every key result. It is shown as "x in 10" by default (§12). *Source:* Wodtke: "Adjust your confidence levels every single week."
 
 | Confidence | Band | What happens |
 |---|---|---|
@@ -469,7 +499,7 @@ The lower bound of four words was removed on 1 October 2026: whatmatters' own "A
 
 *Source:* Google's OKR playbook: key results "must describe outcomes, not activities"; Cagan on outcomes over output. Google's own sample "Launch xx feature to all users" and Intel's Operation Crush key results show outputs are sometimes the honest measure, which is why this warns.
 
-**KR-6 Ambitious but honest.** Aspirational key results only, judged on the set's average confidence (§3.2). For committed key results, see §3.2's committed rule.
+**KR-6 Ambitious but honest.** Info. Aspirational key results only, judged on the set's average confidence (§3.2). For committed key results, see §3.2's committed rule.
 
 **KR-7 Direction set.** Derived from the baseline and the target for a metric key result. Fail, which blocks, only when a metric key result has none and none can be derived. Not asked of the other kinds.
 
@@ -893,53 +923,76 @@ What a good coach says at each phase. The product surfaces these as notes to the
 | Phase | Guidance |
 |---|---|
 | 0 Annual strategy | Run this once a year with the most senior group in the room, before any quarterly cycle starts. Keep it to five annual objectives at most. If the annual set already contains everything, no quarter can choose |
-| 1 Prepare | Refuse to run Phase 4 without a complete input pack. This is the most common failure point. Timebox the gathering. An incomplete pack on time beats a complete pack late |
-| 2 Diagnose | Keep scoring factual. Scores are planning data, not appraisal. The moment they feel like appraisal, candour dies. If prior OKRs were never tracked, record that as a process issue to fix in Phase 6 |
-| 3 Set direction | Force trade-offs. A priority list that accommodates everything is a to-do list, not a strategy. Push until the not-doing list is written down. Quarterly revalidation takes 30 to 60 minutes, not a full strategy debate |
-| 4 Draft OKRs | The most frequent defect is the task-shaped key result. The tell is a leading verb like launch, complete or deliver. Ask "what changes if this succeeds?" and measure that. Missing baselines are second. If a baseline is unknown, establishing it can be the first key result. Run peer review between teams before leadership sees the drafts |
-| 5 Align and commit | Run alignment and dependencies as a joint session or a structured asynchronous review. Watch for silent overload. Teams rarely volunteer that the plan does not fit. Ask each team directly what they cut. If the answer is nothing, capacity was not checked |
-| 6 Run the cadence | Book every check-in and review for the whole cycle before it starts. Keep check-ins forward-looking. Status lives in the product, the meeting is for decisions |
-| 7 Review and learn | Hold the review before drafting the next cycle, never in the same session. A pattern of 1.0s on aspirational key results suggests sandbagging. Name it and address stretch explicitly in the next Phase 4 |
+| 1 Prepare | Gather the inputs before the drafting session; drafting blind wastes the room. Timebox the gathering. An incomplete pack on time beats a complete pack late |
+| 2 Diagnose | Keep scoring factual. Scores are planning data, not pay. If prior OKRs were never tracked, record that as a process issue to fix in Phase 6 |
+| 3 Set direction | Force trade-offs. A priority list that accommodates everything is a to-do list, not a strategy. Push for a written not-doing list. Quarterly revalidation takes 30 to 60 minutes, not a full strategy debate |
+| 4 Draft OKRs | Ask of every key result "what changes if this succeeds?" and measure that where you can. Ask whether each objective is committed or aspirational. Run peer review between teams before leadership sees the drafts |
+| 5 Align and commit | Run alignment and dependencies as a joint session or a structured asynchronous review. Teams rarely volunteer that the plan does not fit. Ask each team directly what they cut |
+| 6 Run the cadence | Book every check-in and review for the whole cycle before it starts. Keep check-ins forward-looking. Status lives in the product, the meeting is for decisions. Use the monthly review to continue, update, start or stop |
+| 7 Review and learn | Grade two weeks before the end and hold the review before drafting the next cycle. A pattern of 1.0s on aspirational key results suggests sandbagging. Name it and address stretch explicitly in the next Phase 4. A committed miss gets a postmortem, not blame |
 
 ---
 
 ## 10. What the coach watches for
 
-The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice behind it: the situations a real OKR coach spots, and what they say.
+The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice behind it: the situations a real OKR coach spots, and what they say. A situation whose rule a workspace has turned off is not raised.
 
 | Situation | What the coach says |
 |---|---|
-| Objective starts with an output verb | If we launch it and nothing changes, did we succeed? |
-| Objective contains numbers | Metrics belong in the key results |
-| Key result has no baseline | Where are you today? If you do not know, establishing it can be the first key result |
-| Key result measures activity volume | More calls, to what end? Name that impact and make it the key result |
-| All key results are lagging | You will only find out at the end. Add a leading indicator you can act on weekly |
+| Objective starts with an output verb | If we do it and nothing changes, did we succeed? |
+| Objective contains numbers | Metrics usually belong in the key results |
+| Metric key result has no baseline | Where are you today? If you do not know, establishing it can be its own key result |
+| Key result measures activity volume | More calls, to what end? If you can measure that impact, make it the key result |
+| Tagged key results are all lagging | You will only find out at the end. Add a leading indicator you can act on weekly |
 | Aspirational set near certain at draft | If this must be delivered, mark it committed. If it is a stretch, raise the targets |
 | Committed key result below 0.7 confidence, at drafting or at a check-in | A commitment nobody believes in is a risk. Escalate now, or make it aspirational |
 | More than five company objectives | If everything is a priority, nothing can be chosen. Which two would you drop? |
-| Not-doing list empty at Phase 3 exit | A list that accommodates everything is a to-do list, not a strategy |
-| Goal with no parent | This OKR is an island. Name the priority it moves forward |
-| Level skipped in the cascade | A team goal aligned straight to a company goal usually hides a missing department goal |
-| Department with no horizontal dependencies | No cross-team dependency anywhere in this branch. Possible silo |
-| Two goals double-counting a metric | These two claim the same movement. One of them is not real |
-| Dependency unconfirmed and unowned | Unconfirmed is a risk. Name a risk owner or get the confirmation |
-| Capacity check with nothing cut | If the answer is nothing, capacity was not checked |
+| Not-doing list empty at the end of an annual Phase 3 | A list that accommodates everything is a to-do list, not a strategy |
+| Goal with no parent and no stated reason | Which priority does this move forward? If it stands alone, say why |
+| Two goals may double-count a metric | These two claim the same movement. Check which one owns it |
+| Dependency unconfirmed | Unconfirmed is a risk. Get the confirmation, escalate, or name a risk owner |
+| Capacity check with nothing cut | What did you stop doing to make room? |
 | Check-in overdue past grace | This goal is stale. It cannot quietly stay green |
 | Blocker action past the next check-in | This blocker has not moved. Raising it with the coordinator |
-| Reported health disagrees with the data | Reported on track, but this key result has not moved in four weeks |
+| Confidence fell into the low band | What changed? Name the next action |
+| Reported health disagrees with the data | Reported on track, but this key result has not moved within the divergence window |
 | Trend forecast misses the target | On current trajectory this misses. Better to say it now than at the close |
-| KPI drops out of its corridor | This KPI is unhealthy. Here is a recovery OKR drafted from its leading drivers |
+| KPI turns unhealthy | This KPI is unhealthy. Fix it now, add a key result, or launch the drafted recovery OKR |
 | Pattern of 1.0s on aspirational key results at the close | Targets were too safe. Address stretch explicitly when drafting the next cycle |
 
-The coach never guesses at the situation. Every one maps to a rule in this document, and every message cites the rule so the recipient can argue with it.
+Under a stricter profile, level skips (AL-3) and silos (AL-6) join this list.
+
+The coach never guesses at the situation. Every one maps to a rule in this document, and every message cites the rule so the recipient can argue with it. The semantic review (§5.3) is advice, and says so.
 
 ---
 
 ## 11. The threshold registry
 
-The structure of the practice is canon and cannot be changed: which checks exist and how they judge, the six publish gates and their conditions, the blocker and root-cause taxonomies, the session agendas and their stage order, the process-health statements, the management-retro questions, the health precedence, the diagnostic verdicts and the feed-forward mapping. A workspace that needs a different structure is practising a different method, not configuring this one.
+**What a workspace cannot change.** The principles in §1 are the practice's centre:
+- outcomes over activity;
+- few objectives;
+- one owner per goal;
+- derived health and visible neglect;
+- scores kept out of pay;
+- deliberate closes;
+- every coaching message citing its rule.
 
-Every numeric value the product enforces, computes with or fires on is a parameter in this registry; the §2.4 planning timelines are guidance for humans, not machine thresholds. Each parameter ships as data in `packages/method` with the default shown here, and may be overridden per workspace in the rhythm settings. Nothing numeric is hardcoded anywhere else, and a value not in this registry is not a setting.
+These are not settings.
+
+**What a workspace may change.** Everything else, from settings, starting from the defaults in this document:
+- which checks and gates apply and how strongly;
+- whether phases bind;
+- who may write and when;
+- the kinds of OKR and key result in use;
+- the scales;
+- the cadence;
+- the escalation;
+- the session formats;
+- every number below.
+
+The practice settings are in §12. A workspace that changes them is still practising OKRs, adapted to its context.
+
+Every numeric value the product enforces, computes with or fires on is a parameter in this registry. The §2.4 timelines are guidance for humans, not machine thresholds. Each parameter ships as data in `packages/method` with the default shown here, and may be overridden per workspace. Nothing numeric is hardcoded anywhere else, and a value not in this registry is not a setting. Where no source was found for a value, it is an OpenOKR default.
 
 **Cadence and escalation**
 
@@ -993,16 +1046,16 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Coach strictness | Per check, as §4 sets out. Strict mode raises every check to block |
 | Strength score boundaries | Red below 45%, green at 75% and above |
 | Strength score warn weight | 0.5 |
-| Key results per objective | 2 to 5 |
+| Key results per objective | 2 to 5. Block at none, warn at one or above five |
 | Objective length limit | 18 words, warn above |
-| Company objective cap | 5 |
-| Objectives per unit cap | 3 |
+| Company objective cap | 5, warn above |
+| Objectives per unit cap | 3, warn above |
 | Contribution minimum | 3 words |
 | Strategic issue minimum | 3, ranked |
-| Priority bounds | 3 to 5, each with a 12-month success statement |
+| Priority bounds | 3 to 5, each with a 12-month success statement, annual cycles |
 | Annual strategy bounds | 2 to 5 |
 | Carry-forward issue impact | 4 |
-| Input pack lead time | 3 working days before session one |
+| Input pack lead time | 3 working days before session one, as guidance |
 | Quality word lists | The §4 lists. A workspace may add terms; the built-in terms remain |
 
 **Alignment**
@@ -1036,7 +1089,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Diagnostic cycle-score threshold | 0.6 |
 | Diagnostic rhythm threshold | 75% of due check-ins published on time |
 
-The registry's keys, types, valid ranges and defaults are data in `packages/method`. The workspace rhythm settings store only deviations, validated against that schema; an unset key reads the default. The conformance suite compares the defaults against this document.
+The registry's keys, types, valid ranges and defaults are data in `packages/method`. The workspace settings store only deviations, validated against that schema; an unset key reads the default. The conformance suite compares the defaults against this document.
 
 Every parameter has a default, so a workspace practises the full method correctly from the moment it is created. Tuning is an option, never a prerequisite.
 
@@ -1091,3 +1144,23 @@ A profile is a named starting point: choosing one sets the settings above, and e
 | **Governed** | Organisations that run a formal planning process | Phases binding. Writing in the planning window. New objectives mid-cycle as drafts approved by the reviewer. Reviewer required. Gates 1 to 5 block. AL-3 on. Sponsor in the escalation ladders |
 
 *Source:* Google's OKR playbook, Wodtke's Radical Focus, Castro's two levels, and the configuration Perdoo and Microsoft Viva Goals offer (vendor).
+
+---
+
+## 13. Sources
+
+The published practice this document rests on. The full review, with a verdict on every rule, is [METHOD-REVIEW.md](../METHOD-REVIEW.md).
+
+| Short name | Source |
+|---|---|
+| Google's OKR playbook | Google's internal OKR playbook, hosted by John Doerr: whatmatters.com/resources/google-okr-playbook |
+| re:Work | Google re:Work, "Set goals with OKRs": rework.withgoogle.com/en/guides/set-goals-with-okrs |
+| Doerr | John Doerr, *Measure What Matters* (2018) |
+| whatmatters | Doerr's site, whatmatters.com: changing OKRs, a typical OKR cycle, grading, alignment and KPIs |
+| Grove | Andy Grove, *High Output Management*, as quoted in *Measure What Matters* and on whatmatters.com |
+| Wodtke | Christina Wodtke, *Radical Focus*, eleganthack.com and cwodtke.com |
+| Castro | Felipe Castro, read.felipecastro.com and his published talks and interviews |
+| Lamorte | Ben Lamorte, *The OKRs Field Book* and okrs.com |
+| Cagan | Marty Cagan, svpg.com |
+| Klau | Rick Klau, "How Google sets goals: OKRs" |
+| Vendor documentation | Perdoo, Microsoft Viva Goals, Atlassian, Tability, Mooncamp, Workpath, Profit.co, Mixpanel and Intrafocus. Evidence of common practice, not authority |

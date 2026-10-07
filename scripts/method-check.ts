@@ -30,6 +30,7 @@ import {
   BLOCKER_TYPE_DEFINITIONS,
   canonThresholds,
   CLOSE_DECISION_MEANINGS,
+  COACH_LINES,
   CYCLE_CHECKS,
   END_STATE_SHAPES,
   isTriggerKey,
@@ -39,6 +40,7 @@ import {
   MID_CYCLE_CALIBRATION,
   MONTHLY_REVIEW_ITEMS,
   OBJECTIVE_CHECKS,
+  PHASE_GUIDANCE,
   PHASE_TITLES,
   PRACTICE,
   PROCESS_HEALTH_STATEMENTS,
@@ -448,7 +450,7 @@ for (const documentedRead of documentedReads) {
  * saying what it looked at is a suite nobody notices has stopped looking.
  * Raise it when you add a list.
  */
-const ENUMERATIONS_CHECKED = 21;
+const ENUMERATIONS_CHECKED = 25;
 
 // --- 5. The enumerations (P7-T07) -------------------------------------------
 //
@@ -601,6 +603,50 @@ compare(
   MANAGEMENT_RETRO_QUESTIONS,
   3,
 );
+
+// §9 (P9-T21). What a facilitator is told at each phase, sentence for
+// sentence. The phase rail shows it and the coach speaks from it. `guidance.ts`
+// has said since P3-T03 that this suite compared it, and nothing did: the
+// revised §9 landed and the package went on telling a facilitator to refuse
+// Phase 4 without a complete input pack, which the method no longer says.
+const guidanceRows = section(method, "## 9. Facilitator guidance", "## 10.");
+compare(
+  "the facilitator guidance phases",
+  tableColumn(guidanceRows, 0),
+  PHASE_GUIDANCE.map((entry) => `${entry.phase} ${entry.title}`),
+  8,
+);
+compare(
+  "the facilitator guidance",
+  tableColumn(guidanceRows, 1),
+  PHASE_GUIDANCE.map((entry) => entry.guidance.join(". ")),
+  8,
+);
+
+// §10 (P9-T21). The coach's lines, word for word, and the rule each cites.
+// They reach people in nudges, so a line the package carries and the
+// document does not is the coach saying something nobody approved.
+const coachRows = section(method, "## 10. What the coach watches for", "\n---");
+compare(
+  "the coach's situations",
+  tableColumn(coachRows, 0),
+  COACH_LINES.map((line) => line.situation),
+  20,
+);
+compare(
+  "the coach's lines",
+  tableColumn(coachRows, 1),
+  COACH_LINES.map((line) => line.says),
+  20,
+);
+for (const line of COACH_LINES) {
+  if (!isTriggerKey(line.ruleKey) && !CHECK_IDS.has(line.ruleKey)) {
+    fail(
+      "rule keys",
+      `the coach's line for "${line.situation}" cites \`${line.ruleKey}\`, which is neither a trigger nor a check the package defines`,
+    );
+  }
+}
 
 // §8.1. Eleven stages, in order, with the act each belongs to. The minutes
 // are not compared here: §11 lists "Quarterly stage minutes" as a parameter

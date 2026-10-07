@@ -334,34 +334,44 @@ P4-T01 does not change these.
 
 ## 11. The coach watch list (SS10)
 
-Twenty situations from METHOD.md SS10. Each maps to a check in SS4 or a trigger
-in AI-NATIVE-PLAN.md SS6.4. The package exports them as a data array keyed by
-the rule they cite.
+Twenty situations from METHOD.md SS10. Each maps to a check in SS4 or SS5, or a
+trigger in AI-NATIVE-PLAN.md SS6.4. The package exports them as `COACH_LINES`
+in `packages/method/src/coach.ts`, each with the line the coach says, and the
+conformance suite compares both columns with SS10 word for word (P9-T21).
+
+**Rewritten at P9-T21 from the revised SS10.** Three rows changed what they
+cite: a near-certain aspirational set is KR-6, a committed key result below
+0.7 confidence is `quality.committed_floor`, and a fall into the low band is
+`confidence.critical`. Level skips (AL-3) and silos (AL-6) left the list,
+because both are off by default and join it only under a stricter profile.
+"Check-in overdue past grace" cites `checkin.stale`, the trigger that fires
+when the grace runs out, rather than `checkin.overdue`, which fires the day
+after the due date.
 
 | # | Situation | Fires on | Rule key |
 |---|---|---|---|
-| 1 | Objective starts with output verb | OBJ-1 | `OBJ-1` |
+| 1 | Objective starts with an output verb | OBJ-1 | `OBJ-1` |
 | 2 | Objective contains numbers | OBJ-2 | `OBJ-2` |
-| 3 | Key result has no baseline | KR-2 | `KR-2` |
+| 3 | Metric key result has no baseline | KR-2 | `KR-2` |
 | 4 | Key result measures activity volume | KR-5 | `KR-5` |
-| 5 | All key results are lagging | KR-4 | `KR-4` |
-| 6 | Average confidence above 0.9 at draft | KR-6 | `KR-6` |
-| 7 | More than five company objectives | OBJ-5 | `OBJ-5` |
-| 8 | Not-doing list empty at Phase 3 exit | CY-5 | `CY-5` |
-| 9 | Goal with no parent | AL-1 | `AL-1` |
-| 10 | Level skip in the cascade | AL-3 | `AL-3` |
-| 11 | Department with no horizontal dependencies | AL-6 | `AL-6` |
-| 12 | Two goals double-counting a metric | Semantic (Coach) | `quality.conflict` |
-| 13 | Dependency unconfirmed and unowned | AL-5 | `AL-5` |
-| 14 | Capacity check with nothing cut | CY-6 | `CY-6` |
-| 15 | Check-in overdue past grace | Cadence engine | `checkin.overdue` |
-| 16 | Blocker past 24h clock | Cadence engine | `blocker.overdue` |
-| 17 | Reported health disagrees with data | Scoring engine | `quality.divergence` |
-| 18 | Trend forecast misses target | Scoring engine | `quality.trending_off` |
-| 19 | KPI drops out of corridor | KPI engine | `kpi.unhealthy` |
-| 20 | A pattern of 1.0s on aspirational key results at close | Scoring engine | `quality.sandbagging_close` |
+| 5 | Tagged key results are all lagging | KR-4 | `KR-4` |
+| 6 | Aspirational set near certain at draft | KR-6 | `KR-6` |
+| 7 | Committed key result below 0.7 confidence | Scoring engine | `quality.committed_floor` |
+| 8 | More than five company objectives | OBJ-5 | `OBJ-5` |
+| 9 | Not-doing list empty at the end of an annual Phase 3 | CY-5 | `CY-5` |
+| 10 | Goal with no parent and no stated reason | AL-1 | `AL-1` |
+| 11 | Two goals may double-count a metric | Semantic (Coach) | `quality.conflict` |
+| 12 | Dependency unconfirmed | AL-5 | `AL-5` |
+| 13 | Capacity check with nothing cut | CY-6 | `CY-6` |
+| 14 | Check-in overdue past grace | Cadence engine | `checkin.stale` |
+| 15 | Blocker action past the next check-in | Cadence engine | `blocker.overdue` |
+| 16 | Confidence fell into the low band | Scoring engine | `confidence.critical` |
+| 17 | Reported health disagrees with the data | Scoring engine | `quality.divergence` |
+| 18 | Trend forecast misses the target | Scoring engine | `quality.trending_off` |
+| 19 | KPI turns unhealthy | KPI engine | `kpi.unhealthy` |
+| 20 | Pattern of 1.0s on aspirational key results at the close | Scoring engine | `quality.sandbagging_close` |
 
-Items 12, 15-20 are triggers from AI-NATIVE-PLAN.md SS6.4 rather than SS4
+Items 7, 11 and 14 to 20 are triggers from AI-NATIVE-PLAN.md SS6.4 rather than
 quality checks. They fire at runtime, not at drafting time. Their rule keys
 must resolve inside the package (CLAUDE.md hard rule: "A message citing a
 rule the package does not define fails the build").

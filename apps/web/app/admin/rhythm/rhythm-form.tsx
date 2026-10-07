@@ -1,6 +1,7 @@
 "use client";
 
 import type { callAction } from "@openokr/core";
+import { isTermKey, suggestedTerm } from "@openokr/method";
 import {
   Button,
   Card,
@@ -862,8 +863,9 @@ export function RhythmForm({
         <div className="flex flex-col gap-2 text-sm">
           {Object.entries(rhythm.terminology).map(([term, label]) => {
             const value = label as { singular: string; plural: string };
+            const suggested = isTermKey(term) ? suggestedTerm(term) : undefined;
             return (
-              <div key={term} className="flex items-center gap-2">
+              <div key={term} className="flex flex-wrap items-center gap-2">
                 <span className="w-32 text-ink-3">{term}</span>
                 <input
                   name={`label:${term}:singular`}
@@ -877,6 +879,39 @@ export function RhythmForm({
                   defaultValue={value.plural}
                   className="w-40 rounded-md border border-line bg-bg px-2 py-1"
                 />
+                {suggested &&
+                canManage &&
+                value.singular !== suggested.singular ? (
+                  // METHOD.md's terms name a common alternative (D6, P9-T21).
+                  // Offered rather than applied: it fills both fields and the
+                  // card's own Save decides.
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={(event) => {
+                      const form = event.currentTarget.form;
+                      for (const [form_, word] of [
+                        ["singular", suggested.singular],
+                        ["plural", suggested.plural],
+                      ] as const) {
+                        const field = form?.elements.namedItem(
+                          `label:${term}:${form_}`,
+                        );
+                        if (field instanceof HTMLInputElement) {
+                          field.value = word;
+                          // The unsaved-changes tracker listens for input.
+                          field.dispatchEvent(
+                            new Event("input", { bubbles: true }),
+                          );
+                        }
+                      }
+                    }}
+                  >
+                    {t("admin.rhythm.rhythmForm.useSuggested", {
+                      singular: suggested.singular,
+                    })}
+                  </Button>
+                ) : null}
               </div>
             );
           })}

@@ -42,8 +42,7 @@ export const PHASE_GUIDANCE: readonly PhaseGuidance[] = [
     title: "Prepare",
     output: "Planning brief and a complete input pack",
     guidance: [
-      "Refuse to run Phase 4 without a complete input pack",
-      "This is the most common failure point",
+      "Gather the inputs before the drafting session; drafting blind wastes the room",
       "Timebox the gathering",
       "An incomplete pack on time beats a complete pack late",
     ],
@@ -54,8 +53,7 @@ export const PHASE_GUIDANCE: readonly PhaseGuidance[] = [
     output: "Scored prior OKRs and a ranked issue list",
     guidance: [
       "Keep scoring factual",
-      "Scores are planning data, not appraisal",
-      "The moment they feel like appraisal, candour dies",
+      "Scores are planning data, not pay",
       "If prior OKRs were never tracked, record that as a process issue to fix in Phase 6",
     ],
   },
@@ -66,7 +64,7 @@ export const PHASE_GUIDANCE: readonly PhaseGuidance[] = [
     guidance: [
       "Force trade-offs",
       "A priority list that accommodates everything is a to-do list, not a strategy",
-      "Push until the not-doing list is written down",
+      "Push for a written not-doing list",
       "Quarterly revalidation takes 30 to 60 minutes, not a full strategy debate",
     ],
   },
@@ -75,11 +73,8 @@ export const PHASE_GUIDANCE: readonly PhaseGuidance[] = [
     title: "Draft OKRs",
     output: "A draft OKR set with owners, passing every quality check",
     guidance: [
-      "The most frequent defect is the task-shaped key result",
-      "The tell is a leading verb like launch, complete or deliver",
-      'Ask "what changes if this succeeds?" and measure that',
-      "Missing baselines are second",
-      "If a baseline is unknown, establishing it can be the first key result",
+      'Ask of every key result "what changes if this succeeds?" and measure that where you can',
+      "Ask whether each objective is committed or aspirational",
       "Run peer review between teams before leadership sees the drafts",
     ],
   },
@@ -89,10 +84,8 @@ export const PHASE_GUIDANCE: readonly PhaseGuidance[] = [
     output: "A published, aligned OKR set",
     guidance: [
       "Run alignment and dependencies as a joint session or a structured asynchronous review",
-      "Watch for silent overload",
       "Teams rarely volunteer that the plan does not fit",
       "Ask each team directly what they cut",
-      "If the answer is nothing, capacity was not checked",
     ],
   },
   {
@@ -103,6 +96,7 @@ export const PHASE_GUIDANCE: readonly PhaseGuidance[] = [
       "Book every check-in and review for the whole cycle before it starts",
       "Keep check-ins forward-looking",
       "Status lives in the product, the meeting is for decisions",
+      "Use the monthly review to continue, update, start or stop",
     ],
   },
   {
@@ -110,9 +104,10 @@ export const PHASE_GUIDANCE: readonly PhaseGuidance[] = [
     title: "Review and learn",
     output: "Scores, learnings and the next cycle's inputs",
     guidance: [
-      "Hold the review before drafting the next cycle, never in the same session",
+      "Grade two weeks before the end and hold the review before drafting the next cycle",
       "A pattern of 1.0s on aspirational key results suggests sandbagging",
       "Name it and address stretch explicitly in the next Phase 4",
+      "A committed miss gets a postmortem, not blame",
     ],
   },
 ];

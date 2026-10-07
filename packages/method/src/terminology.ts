@@ -21,6 +21,11 @@ export interface TermDefinition {
   readonly plural: string;
   /** What the concept is, so a renaming admin knows what they are renaming. */
   readonly meaning: string;
+  /**
+   * A common alternative the terminology card offers, where METHOD.md names
+   * one (P9-T21, decision D6). Offered, never applied.
+   */
+  readonly suggested?: { readonly singular: string; readonly plural: string };
 }
 
 /**
@@ -32,13 +37,13 @@ export const TERMINOLOGY = {
     singular: "Objective",
     plural: "Objectives",
     meaning:
-      "A qualitative statement of a desired future state. No numbers in it.",
+      "A statement of a desired future state. Usually qualitative and memorable. Also called a goal in the product.",
   },
   keyResult: {
     singular: "Key result",
     plural: "Key results",
     meaning:
-      "A measurable outcome that proves the objective is being achieved, written from X to Y by a date.",
+      "A verifiable result that proves the objective is being achieved. Usually a measured change from a baseline to a target by a date; also a value held inside a band, a milestone done or not done, or a baseline still to be established.",
   },
   cycle: {
     singular: "Cycle",
@@ -56,11 +61,14 @@ export const TERMINOLOGY = {
     plural: "Champions",
     meaning:
       "The one person accountable for a goal. They post the check-in. Never a team, never a committee.",
+    // METHOD.md's terms: "'Owner' is a common alternative" (decision D6).
+    suggested: { singular: "Owner", plural: "Owners" },
   },
   reviewer: {
     singular: "Reviewer",
     plural: "Reviewers",
-    meaning: "The one person who acknowledges each check-in.",
+    meaning:
+      "The person who acknowledges a goal's check-ins, where the workspace uses reviewers.",
   },
   sponsor: {
     singular: "Sponsor",
@@ -93,7 +101,7 @@ export const TERMINOLOGY = {
     singular: "Confidence",
     plural: "Confidence",
     meaning:
-      "A 0.0 to 1.0 belief that a key result will land. Forward-looking.",
+      'A belief that a key result will land, forward-looking. Stored 0.0 to 1.0 and shown as "x in 10" by default.',
   },
   score: {
     singular: "Score",
@@ -124,6 +132,14 @@ export const TERM_KEYS = Object.keys(TERMINOLOGY) as TermKey[];
 
 export function isTermKey(key: string): key is TermKey {
   return Object.hasOwn(TERMINOLOGY, key);
+}
+
+/** The alternative METHOD.md names for a term, where it names one (D6). */
+export function suggestedTerm(
+  key: TermKey,
+): TermDefinition["suggested"] | undefined {
+  const definition: TermDefinition = TERMINOLOGY[key];
+  return definition.suggested;
 }
 
 /** One renamed term. Both forms are required: a plural nobody set reads wrong. */

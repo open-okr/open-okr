@@ -772,6 +772,7 @@
   "admin.rhythm.rhythmForm.terminology": "Terminology",
   "admin.rhythm.rhythmForm.theCheckInRhythm": "The check-in rhythm",
   "admin.rhythm.rhythmForm.theseTwoHaveTheir": "These two have their own home rather than living in the override map, so they are set here and nowhere else.",
+  "admin.rhythm.rhythmForm.useSuggested": "Use “{singular}”",
   "admin.rhythm.rhythmForm.youCanReadEvery": "You can read every threshold your goals are judged against, and\n              changing one needs the coaching permission. Ask a workspace admin.",
   "admin.rhythm.rhythmForm.yourOwnTerms": "Your own terms, separated by commas",
   "admin.roles.addRole": "Add role",

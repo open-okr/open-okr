@@ -262,7 +262,7 @@ Escalation is always visible to the person being escalated past. Nobody is repor
 
 ### 6.4 The full trigger catalogue
 
-Every proactive message the product sends. Each row is a rule key, and each writes a nudge record. The catalogue's keys, default recipients and default timings ship as data in `packages/method`; a message citing a key the package does not define fails the build.
+Every proactive message the product sends. Each row is a rule key, and each writes a nudge record. Where METHOD.md §10 gives a situation a line, the message carries it under its headline, in the document's words from `packages/method` (P9-T21). The catalogue's keys, default recipients and default timings ship as data in `packages/method`; a message citing a key the package does not define fails the build.
 
 **Rhythm triggers, owned by the Champion**
 
@@ -303,22 +303,22 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 |---|---|---|
 | `quality.draft_failing` | Live as a draft is written | The author, inline |
 | `quality.gate_blocked` | On a publish attempt | Facilitator |
-| `quality.no_not_doing` | Phase 3 completion without a not-doing list | Sponsor and facilitator |
+| `quality.no_not_doing` | The end of an annual Phase 3 without a not-doing list | Sponsor and facilitator |
 | `quality.too_many_objectives` | A level exceeds its cap | Facilitator |
 | `quality.all_lagging` | An objective's key results are all lagging | Champion |
 | `quality.no_baseline` | A key result lacks a baseline at Phase 4 exit | Champion |
 | `quality.committed_floor` | A committed key result drafted or checked in below 0.7 confidence (METHOD.md §3.2) | Champion |
 | `quality.sandbagging_draft` | Average draft confidence on an objective's aspirational key results above 0.9 | Champion and facilitator |
 | `quality.sandbagging_close` | Three quarters or more of a closed cycle's aspirational key results scored 1.0 | Sponsor |
-| `quality.orphan_goal` | A goal below company level has no parent | Champion |
-| `quality.level_skip` | Alignment skips a level | Champion |
-| `quality.silo` | A department subtree has no horizontal dependency | Department lead |
-| `quality.conflict` | Two goals double-count or oppose, from the semantic sweep | Both champions |
-| `quality.dependency_unowned` | A dependency is unconfirmed with no risk owner | Champion |
+| `quality.orphan_goal` | A goal below company level has no parent and no stated reason (METHOD.md §5.2) | Champion |
+| `quality.level_skip` | Alignment skips a level, under a stricter profile only: AL-3 is off by default | Champion |
+| `quality.silo` | A department subtree has no horizontal dependency, under a stricter profile only: AL-6 is off by default | Department lead |
+| `quality.conflict` | Two goals may double-count or oppose, from the semantic sweep. Advice, and it says so | Both champions |
+| `quality.dependency_unowned` | A dependency is unconfirmed, not escalated, and has no risk owner | Champion |
 | `quality.no_cuts` | Capacity checked with nothing cut | Facilitator |
-| `quality.divergence` | Reported health disagrees with the data | Champion and reviewer |
+| `quality.divergence` | Reported health disagrees with the data within the divergence window | Champion and reviewer |
 | `quality.trending_off` | The forecast misses the target | Champion |
-| `quality.process_health_low` | A process-health statement scores low at review | Sponsor, as next cycle's process priority |
+| `quality.process_health_low` | A process-health statement scores low at review | Sponsor, as next cycle's improvement action |
 
 ### 6.5 Agent definition and runs
 

@@ -278,3 +278,32 @@ test("a renamed term is what every screen calls it, and the canon comes back", a
     page.getByRole("heading", { level: 1, name: "Spaces" }).first(),
   ).toBeVisible({ timeout: 15_000 });
 });
+
+/**
+ * The terminology card offers "Owner" for "Champion" (METHOD.md terms,
+ * decision D6, P9-T21).
+ *
+ * Offered, never applied: the button fills both fields and the card's own
+ * Save decides. **Nothing is saved here**, because every later spec reads
+ * "Champion"; the page is left by navigating away, which the unsaved guard
+ * allows for a programmatic navigation.
+ */
+test('the terminology card offers "Owner" for "Champion", and saves nothing by itself', async () => {
+  await goTo(page, "/admin/rhythm");
+  const terminology = page.getByTestId("rhythm-card-terminology");
+  const singular = terminology.locator("input[name='label:champion:singular']");
+  const plural = terminology.locator("input[name='label:champion:plural']");
+  await expect(singular).toHaveValue("Champion", { timeout: 15_000 });
+
+  await terminology.getByRole("button", { name: "Use “Owner”" }).click();
+  await expect(singular).toHaveValue("Owner");
+  await expect(plural).toHaveValue("Owners");
+
+  // Nothing was stored: a fresh read still says Champion.
+  await goTo(page, "/admin/rhythm");
+  await expect(
+    page
+      .getByTestId("rhythm-card-terminology")
+      .locator("input[name='label:champion:singular']"),
+  ).toHaveValue("Champion", { timeout: 15_000 });
+});

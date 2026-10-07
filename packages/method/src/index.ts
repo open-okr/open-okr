@@ -43,6 +43,12 @@ export {
   type RitualWeekday,
 } from "./cadence-booking.ts";
 export {
+  COACH_LINES,
+  type CoachLine,
+  coachLineFor,
+  coachSentence,
+} from "./coach.ts";
+export {
   cycleClosingDue,
   cycleStartsDue,
   planningOpensDue,
@@ -374,6 +380,7 @@ export {
   isTermKey,
   type ResolvedTerminology,
   resolveTerminology,
+  suggestedTerm,
   TERM_KEYS,
   TERMINOLOGY,
   type TermDefinition,

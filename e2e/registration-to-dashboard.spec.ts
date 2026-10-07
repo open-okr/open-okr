@@ -369,9 +369,12 @@ test("the cycle workspace computes the eight phases from the rows", async () => 
   await expect(
     page.getByRole("img", { name: "Phase 0 does not apply to this cycle" }),
   ).toBeVisible();
-  // Every word of the guidance comes from packages/method.
+  // Every word of the guidance comes from packages/method, and since P9-T21
+  // the conformance suite holds those words to METHOD.md §9.
   await expect(
-    page.getByText("Refuse to run Phase 4 without a complete input pack"),
+    page.getByText(
+      "Gather the inputs before the drafting session; drafting blind wastes the room",
+    ),
   ).toBeVisible();
 });
 
