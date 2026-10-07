@@ -265,7 +265,7 @@ Each task copied the named sections of `p9-t00-method-v2.md` into METHOD.md, wit
 | P9-T22a | Release 0.2.0 | none | None |
 | P9-T22b | The demo shows the practice | none | None |
 | P9-T22d | Stage ten drafts nothing | none | None |
-| P9-T22c | The Northwind year on the real calendar (G-4) | none | None |
+| P9-T22c-a to e | The Northwind year on the real calendar (G-4), in five parts: its frame, the pilot and Q1, Q2, Q3, and Q4 with the demo | none | None |
 
 **Live or draft under "Live", as built at P9-T13-b-a** ([`addition.ts`](../../packages/method/src/addition.ts)):
 
