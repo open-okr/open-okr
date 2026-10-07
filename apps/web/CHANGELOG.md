@@ -1,5 +1,1122 @@
 # @openokr/web
 
+## 0.2.0
+
+### Minor Changes
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`d44d1d7`](https://github.com/open-okr/open-okr/commit/d44d1d7f700983c5e82a82c9e4d2eab5a7de9eae) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A member now hears at most five nudges a week, where it was ten (METHOD.md
+  §11). Anything past the ceiling is held and listed in the member's next
+  morning summary, with the rule it cites and a link to what it is about, so
+  nothing held back is lost. The morning summary itself is not held by the
+  ceiling and does not count against it, and an escalation about somebody
+  else's work still always gets through.
+
+- [#111](https://github.com/open-okr/open-okr/pull/111) [`70250f5`](https://github.com/open-okr/open-okr/commit/70250f51c36031b1bf16a99b2da10e1f7a3d6639) Thanks [@agungksidik](https://github.com/agungksidik)! - A cycle and an objective ask for less before they will accept anything.
+  
+  A cycle demanded a sponsor, a facilitator and a publication deadline before
+  phase one would read green, and every one of those is a question the person
+  making it could usually only answer with their own name or a guess. The
+  sponsor and the facilitator now default to whoever creates the cycle, and the
+  publication deadline to the day before it starts.
+  
+  Nothing in the method loosened. Phase one still asks that a sponsor and a
+  facilitator be named, and this names them; the publish gate still asks for a
+  date before day one, and the default is the latest date that satisfies it,
+  which is the only one the product can choose without making a judgement that
+  belongs to a facilitator. Any of the three is changed on the cycle screen.
+  
+  An objective can be created from a title alone. Champion and reviewer default
+  to whoever typed it, wherever an objective is created: the OKR screen, the
+  drafting surface, the annual frame, the command line and the API all behave
+  the same way, because the default sits in the one place they all pass
+  through. A reviewer who is also the champion is reported by the quality checks
+  rather than refused, which is what makes it something you can fix.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`af81a77`](https://github.com/open-okr/open-okr/commit/af81a77752342bd6bc939364608e58ffa9b7c7b2) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The weekly session's step 2 is now "Discuss what dropped" (METHOD.md §7.2).
+  It lists every key result scored low, and every one whose confidence fell
+  since the last session that scored it. A low score needs a next action and
+  its owner, due by the goal's next check-in, before the session moves on; a
+  blocker is raised beside it only where something is actually blocked, and a
+  blocker's own next action answers the score too. The session used to ask for
+  a blocker on every low score.
+  
+  Two new actions, `sessions.setNextAction` and `sessions.lowScores`, and three
+  columns on a session's confirmed confidences hold the next action, its owner
+  and when it is due (migration 0129).
+
+- [#111](https://github.com/open-okr/open-okr/pull/111) [`3ee286a`](https://github.com/open-okr/open-okr/commit/3ee286a6a8e50437155e532c99a453b89d391362) Thanks [@agungksidik](https://github.com/agungksidik)! - Roles and permissions have a screen.
+  
+  The matrix arrived in the previous release with five actions and no page, so
+  the only way to answer "who may edit an objective" was the command line. It is
+  at Admin, Roles and permissions now, and it takes the same level as
+  invitations and support access, because deciding what a role may do is
+  deciding who can change what.
+  
+  Two cards. The matrix says what each role may do in each domain: objectives,
+  KPIs, initiatives, tasks, comments, spaces and the workspace itself, each at
+  nothing, view, comment, edit or manage. The list below says who holds which
+  role, and offers "no role", which is a real answer: a member with none holds
+  exactly what their bindings give them.
+  
+  Owner is drawn and drawn as fixed, with the reason on the row. Hiding it would
+  leave somebody wondering where the most powerful role went.
+  
+  The screen says the rule that surprises people, rather than leaving them to
+  discover it: a role raises what somebody may do and never lowers it. Lowering
+  Member on objectives does not take away the edit a champion holds on their own
+  objective.
+  
+  A role somebody still holds cannot be removed, and the screen says who would
+  be stranded rather than moving them somewhere by itself.
+
+- [#111](https://github.com/open-okr/open-okr/pull/111) [`edc2863`](https://github.com/open-okr/open-okr/commit/edc2863e894ff931e3acc11d9530c75b987c6045) Thanks [@agungksidik](https://github.com/agungksidik)! - A space no longer decides who may edit an objective in it.
+  
+  It did, and that was the only answer to the question: every member of the
+  owning space held edit on every objective in it. The rule could be stated only
+  by reading the access tables, it could be changed only by moving people between
+  spaces, and no screen showed it.
+  
+  The workspace role answers it now, on the roles screen an administrator can
+  edit. That is what makes the screen mean anything: before this, lowering Member
+  on objectives changed no level anywhere, because the space binding still
+  granted the edit underneath it.
+  
+  Nobody loses the edit when this release lands. The role backfill runs first and
+  gives every active member the Member role, which grants edit on objectives, so
+  the level is the same number from a different source. What changes is that an
+  administrator can now change it.
+  
+  Who can **see** an objective is untouched. Every member of the workspace reads
+  every objective, as they always have.
+  
+  An initiative follows the same rule: its space no longer grants edit either,
+  and the role decides. The owner keeps full control of their own initiative.
+  
+  A space still decides its own membership, its session cadence and everything
+  that reads them.
+  
+  **A review is unchanged for everybody in the room.** Scoring a key result,
+  writing the narrative, taking the close decision and revealing the votes used
+  to ask for edit on the objective, which worked only because a space granted it
+  to everybody. They ask to see the objective now, and being in the room is what
+  says you may take part. Somebody outside the room still cannot, and somebody
+  holding the narrowest role can still score with their team, which is what the
+  method asks for.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`9d1b0e4`](https://github.com/open-okr/open-okr/commit/9d1b0e4a9f1234ffcc79df704bf23077d24f3ff1) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A space's check-in frequency now takes effect (METHOD.md §7.1). It was stored
+  and read by nothing, so a team that chose every two weeks went on being asked
+  every week. A goal created in the space takes the space's frequency, and
+  changing it moves the open goals that follow it, each with its next due date
+  counted from the new frequency; a goal set to a frequency of its own keeps it.
+  The space card no longer offers "quarterly", which no goal checks in at.
+  
+  A quarter's planning now opens four weeks before it starts, where it was
+  three.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`9172e0b`](https://github.com/open-okr/open-okr/commit/9172e0b4189661d644ef232c122428b49bf04189) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The rhythm streak now counts a space's own check-in periods (METHOD.md §7.4):
+  weeks, fortnights for a space on every two weeks, or months for a monthly
+  one. A team on every two weeks no longer breaks its streak in the week
+  between, and the streak-at-risk warning reads the same periods. Booking a
+  cycle's rhythm books one check-in per period, and whether the cycle is booked
+  is judged the same way.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`4e38c5a`](https://github.com/open-okr/open-okr/commit/4e38c5acb1c17e7c2e9d2f0c111524724e94f34d) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A key result may now be saved before its target is known, and an addition
+  says what it still lacks (METHOD.md §2.9). `goals.addKeyResult` no longer asks
+  a metric or a maintain key result for its `targetValue`; one saved without it
+  reads "no target yet", fails the completeness check, reads 0% progress and
+  forecasts nothing, and its first target asks for no reason. `targetValue` is
+  `null` in every read until it is set. An objective or a key result added
+  mid-cycle is live once it passes the checks set to block, and until then the
+  OKR list, the drawer and the diagram mark it "Draft: needs" what is missing,
+  such as a target or a due date. `goals.tree` answers the same as a `draft` on
+  each objective and key result, null when it is live.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`fecd1c1`](https://github.com/open-okr/open-okr/commit/fecd1c18556e938627c4f5094b22a751297aedca) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Stage 9 of the quarterly review is "Keep, modify, abandon or defer"
+  (METHOD.md §8.8). An objective now closes as one of five decisions:
+  achieved, keep, modify, defer or abandon, each with its meaning on the
+  screen. An unfinished aspirational objective shows "Proposed: Keep" where
+  the workspace carries forward, and the room still chooses.
+  
+  A deferred objective is fed forward to the next cycle's issue list when the
+  cycle is archived, at the carry-forward impact, once.
+  
+  Migration 0136 widens the close decision on goals and on review decisions.
+  Every stored decision stays valid.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`39c25e8`](https://github.com/open-okr/open-okr/commit/39c25e873ed707bbfef909b85396dd499db601b7) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - An objective or key result started mid-cycle now says so (METHOD.md §2.9).
+  Once the team publication window has closed and the cycle's set is published,
+  anything new is marked "Added mid-cycle" with its date in the OKR list, the
+  drawer, the diagram, the monthly review and the quarterly review's scoring
+  stage, and it is no longer judged by the set-level publish gates. Where the
+  workspace's "Reason when adding mid-cycle" is Required, the add rows and
+  "+ New objective" ask why before they save, and `goals.create` and
+  `goals.addKeyResult` refuse an addition without a `reason`; the reason is kept
+  in the objective's activity either way. Imports never mark anything.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`cf05f9d`](https://github.com/open-okr/open-okr/commit/cf05f9d7a9e82c6710c4d3fc36b11375ae9668b6) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A key result's score is now computed from its progress at the close, and the
+  review may adjust it with a reason; both numbers are kept (METHOD.md §3.3).
+  The quarterly review's scoring stage shows the computed score, starts the
+  slider there in hundredths, and says what each grade means for its kind. The
+  score bands are now 1.0, 0.6 and 0.3: an aspirational key result reads
+  achieved, on target, partial or little progress, and a committed one is met
+  or missed. A workspace may choose Doerr's score colours, 0.7 and 0.4, or
+  forbid adjusting a computed score, which is then refused. `sessions.scoringStatus`
+  answers `computed`, `band` and `adjustment`.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`336072f`](https://github.com/open-okr/open-okr/commit/336072ff81fe9e427082525c5248c8f9abd11b83) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Alignment health is now a share (METHOD.md §5.2): of the goals below company
+  level, how many align to a parent or say why they stand alone. 90% and above
+  is healthy, 80% to below 90% is watch, and below 80% is a gap; a cycle with no
+  company objective at the top reads as a gap whatever the share. The fixed
+  penalties are gone, so the same unaligned goals no longer cost the same points
+  in a small company and a large one.
+  
+  - A goal may now record why it stands alone, through `goals.update`
+    (`standaloneReason`), and then counts as aligned. Setting a parent clears the
+    reason, and setting a reason clears the parent.
+  - A parent in another space or another cycle, such as an annual objective,
+    aligns a goal, and an annual company objective anchors the quarter under it.
+  - `alignment.read` adds `band`, `watchThreshold`, `anchored`, `measured` and
+    `counted`. The score is a percentage, and the screens show it with "%".
+  - The "Alignment penalties" threshold is retired, and data change 0019 removes
+    it from stored settings. "Alignment watch threshold" (80) is new, and the
+    "Alignment healthy threshold" default moves from 75 to 90. A workspace that
+    set its own healthy threshold keeps that number, which now reads as a share.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`e51b714`](https://github.com/open-okr/open-okr/commit/e51b7143fd56843d5c4b4f7d3127e5804be30302) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The alignment checks now coach at the level METHOD.md §4.3 gives them. A
+  level skip (AL-3) and a possible silo (AL-6) are off by default, so neither
+  is listed nor sent as a nudge unless a workspace turns the check on in its
+  practice settings; a skip is measured over the levels the cycle uses, so a
+  cycle without departments never counts one. AL-1 warns rather than fails,
+  passes a goal that states its contribution, and warns on a contribution under
+  the new "Contribution minimum" (3 words). The health panel lists every goal the
+  share did not count, and the drawer's alignment tab asks an objective with no
+  parent why it stands alone. Publish gate 3 accepts that reason.
+  `alignment.read` adds `uncounted`, and an identical nudge raised twice in one
+  run is now sent once.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`ddd38dd`](https://github.com/open-okr/open-okr/commit/ddd38ddcba4b96f335bb4995976ca63e57181c07) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - An annual cycle closes with the same review a quarter gets (METHOD.md §8).
+  Booking an annual cycle books its "Annual review", over the annual
+  objectives, in the week before the next year's drafting opens, and books no
+  weekly check-ins or monthly reviews of its own: those belong to its quarters.
+  A review held after the next year's drafting began does not count as the
+  year's review.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`b400b98`](https://github.com/open-okr/open-okr/commit/b400b98a12cdddee585aa1ebfbca7c0894f4cbfe) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - An agreed annual frame can be revised within its year, with a written reason
+  (METHOD.md §2.1). Phase 0 asks why once the frame is agreed, refuses a revision
+  without a reason, and lists every revision beneath the frame with what changed
+  and why; `frame.set` takes the `reason` and `frame.read` answers `revisions`.
+  Editing the same year's mission, vision, strategy or not-doing list is now
+  saved: it used to be answered as saved and dropped.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`3496285`](https://github.com/open-okr/open-okr/commit/349628515a31a14323c1dd74c4ad69a33a42d593) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Anybody who can edit a space can now draft an objective or a key result at
+  any time. The cycle screen no longer refuses drafting while the input pack,
+  the diagnosis or the direction is incomplete; it lists what those phases
+  still miss beside the form instead.
+  
+  A workspace that runs a formal planning process can make the phases binding
+  with `practice.update` (`"phases.enforcement": "binding"`), or choose to
+  create new objectives only in the planning window. Either refusal now comes
+  from one place and reaches the cycle screen, the REST API, the `okr` command
+  line and the AI agents alike, with the reason and the setting that caused it.
+  Imports are never refused, because they record work that already happened.
+  
+  A workspace's first cycle no longer has to be declared: with no earlier cycle
+  of its kind, the prior-cycle condition of phase 2 is met on its own.
+  
+  Two §11 thresholds changed. "Team publication window", two weeks after a
+  cycle starts, is new. "Strategic issue bounds" (3 to 10) became "Strategic
+  issue minimum" (3): the upper bound was never checked. A workspace that had
+  raised the floor reads 3 until `pnpm db:change` runs, which carries the
+  raised floor onto the new minimum.
+  
+  The `guided` field on `goals.create` and `goals.addKeyResult` is accepted
+  and ignored for this release, and removed in the next.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`42559ce`](https://github.com/open-okr/open-okr/commit/42559ce57469a7efd73c90a6d434f99761364b9c) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A blocker's next action is now due by the next check-in of the goal it
+  blocks, not 24 hours after it is opened (METHOD.md §7.3). The owner is
+  reminded the day before that check-in, and the coordinator hears when it
+  passes with the action still open. The sponsor hears only where the
+  workspace turns on "Sponsor in escalation ladders", once the check-in after
+  that one has passed too. The board, the space home, the session and the
+  weekly digest all read the same clock, and the session shows each blocker's
+  due date.
+  
+  Blockers gain two types, "approach not working" and "other". The rhythm
+  settings lose "Blocker clock", and "Blocker ladder" is now one number: how
+  many days before the check-in the owner is reminded. A data change drops the
+  old hour-based values and moves each open blocker's deadline to its goal's
+  next check-in, never earlier. `sessions.blockerStatus` returns `dueOn`.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`bf256ef`](https://github.com/open-okr/open-okr/commit/bf256eff36f8e8b601559bc381c624b2fa2ad9eb) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Closing a cycle carries every kept or modified objective into the next one
+  as a draft (METHOD.md §8.9). Each key result starts from the last value it
+  recorded, with the same target. A milestone already done stays behind, and
+  a measured baseline comes back as a metric with its target to set. The
+  draft is an ordinary objective: it passes Phase 4's checks and Phase 5's
+  gates like any other, and one somebody deletes stays deleted. An objective
+  whose champion has left is named on the closed cycle instead of carried.
+  
+  A deferred objective reaches the issue list whether it was deferred at the
+  review or from its own page, whichever was decided later. The lowest
+  process-health statement is now called the next cycle's improvement action
+  in phase 3.
+  
+  Stage 10 of the quarterly review is "Learnings". The minutes report the
+  committed key results met apart from the cycle score, on the screen and in
+  both exports.
+  
+  Migration 0137 adds `goals.carried_from_goal_id`, nullable, with a unique
+  index per cycle. `cycles.feedForward` and `cycles.close` report `drafts`
+  and `notCarried`, and `workflow.read`'s closure reports `carriedDrafts` and
+  `notCarried`. `sessions.minutes` reports `summary.committed`.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`3095abb`](https://github.com/open-okr/open-okr/commit/3095abbc829ae8aea84ff6a4c947fd174ea13252) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The quality checks now coach rather than refuse, following METHOD.md §4 as
+  revised for Phase 9, and each one can be set to block, warn or off.
+  
+  - **Objectives.** An objective that starts with an action, such as "Launch
+    an Awesome MVP", is a warning rather than a failure: Doerr's and Wodtke's
+    own examples do it. "Cannot tell" now passes with a tip instead of warning
+    on most well-formed objectives. A four-digit year no longer counts as a
+    metric, there is no lower word limit, and going over five company
+    objectives warns.
+  - **Key results.** Six or more key results, a key result with no numbers in
+    its text, and an activity measure all warn. A key result tagged leading is
+    never flagged as activity. Tagging leading or lagging is optional, and an
+    all-lagging set is a note rather than a warning. A missing target, due date
+    or owner still blocks; a missing baseline warns.
+  - **Word lists.** "to" is no longer read as a reason, so "Increase revenue
+    from $2M to $3M" is flagged as a metric movement. "bring" counts as a
+    movement verb.
+  - **Levels.** `practice.update` sets any check to block, warn or off
+    (`"checks.OBJ-1": "block"`), and strict mode raises every check to block.
+    "Coach strictness" at strict still means the same.
+  
+  Two §11 thresholds changed: "Objective length bounds" (4 to 18) became
+  "Objective length limit" (18), and "Strength score warn weight" (0.5) is new.
+  A workspace that had changed the length bounds reads 18 until `pnpm
+  db:change` runs, which carries its upper bound across.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`fa5b9d2`](https://github.com/open-okr/open-okr/commit/fa5b9d2d03e12d93b22014facd8adb3d5de4d1d7) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - METHOD.md is the revised method in full. The facilitator notes on every
+  phase follow its §9, and a nudge for a situation METHOD.md §10 names now
+  carries the coach's line under its headline, in the document's own words:
+  a stale check-in says "This goal is stale. It cannot quietly stay green."
+  
+  The terminology card offers "Owner" beside "Champion". It fills both fields
+  and saves only when the card is saved. The terms' explanations follow the
+  revised method.
+  
+  `packages/method` exports `COACH_LINES`, `coachLineFor`, `coachSentence`
+  and `suggestedTerm`, and the conformance suite now compares §9's guidance
+  and §10's lines with the package, both ways.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`b54e3ae`](https://github.com/open-okr/open-okr/commit/b54e3ae0a87f73a55e5ee9bf18700e7a5e1a3f92) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The weekly check-in's third step is now "Commitments and wins" (METHOD.md
+  §7.2). Last week's commitments are closed with a line on why where it helps,
+  each with its own delivered or not-delivered answer; until now the form let
+  only one be answered per press. This week's are three or four, where it was
+  two or three, and the session names the week's wins.
+  
+  The weekly digest names the wins, lists open blockers with their next
+  actions, and names the space's stale goals when there are any, which is how
+  the sponsor sees them now that the check-in ladder stops at the coordinator.
+  
+  `sessions.setWins` names the wins, `sessions.closeCommitments` takes a note
+  per commitment, and `sessions.read` returns `wins` (migration 0130).
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`f9a01eb`](https://github.com/open-okr/open-okr/commit/f9a01eb31a4bce97b654094187326573755c503e) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A committed key result below the confidence floor, 7 in 10 by default
+  (METHOD.md §3.2), is now raised. The draft coach and both check-in composers
+  say "A commitment nobody believes in is a risk. Escalate now, or make it
+  aspirational" as soon as the confidence is set there, and the Coach sends the
+  same message to the objective's champion when such a commitment is drafted or
+  checked in, under the new rule `quality.committed_floor`. An aspirational key
+  result at the same confidence is told nothing.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`215eb6d`](https://github.com/open-okr/open-okr/commit/215eb6dd28650e0fe8165d1b6b4bc0d84ed719f3) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - An objective is now committed or aspirational (METHOD.md §2.8). A new one
+  starts aspirational, or committed where the workspace uses committed OKRs
+  only, and every existing objective reads as aspirational. The kind shows as a
+  chip in the OKR list, the drawer and the diagram, where a writer can change it
+  and is asked why; the change and its reason are kept in the objective's
+  activity. "+ New objective" and the cycle screen's drafting form offer the
+  kind, the list can be filtered by it, and `goals.setKind` is the new API
+  action. A workspace that uses one kind sees none of this.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`1654325`](https://github.com/open-okr/open-okr/commit/16543256eedb48cbc05835194ce936ea70777ab8) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A cycle keeps the OKR levels it began with.
+  
+  A cycle now takes the practice's levels in use (company, department, team,
+  and individual where it is on) when it is created. Turning a level on or off,
+  or choosing a profile that does, changes the cycles that have not started
+  and leaves a running or closed one as it was, so no objective is ever left at
+  a level that no longer exists.
+  
+  The level picker when drafting, the level chips on the OKRs screen and a new
+  objective added from the list offer only the levels the cycle uses, plus any
+  level an objective in it already has. Creating an objective at a level its
+  cycle does not use is refused with the reason, from every surface.
+  `cycles.levelsInUse` answers which levels a cycle offers.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`e25e80f`](https://github.com/open-okr/open-okr/commit/e25e80f28894092ec835baa581ad5754fe3f7f5e) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A closed cycle keeps the rules it was graded under (METHOD.md §12). Closing a
+  cycle records the practice settings and every threshold in force, and the
+  quarterly review and phase 7 read a closed cycle's bands from that record, so
+  changing the score bands or colours afterwards repaints only open cycles. A
+  cycle closed before this release reads today's canon. A new read,
+  `cycles.rules`, answers which rules a cycle is read under.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`a3bf087`](https://github.com/open-okr/open-okr/commit/a3bf0873f72572a82a51b3caf73977f21b3729d0) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The demo is now Northwind Labs' year. `pnpm db:seed` builds the scenario in
+  `docs/scenarios/northwind-year` as of today: every step dated before today
+  has happened and nothing after it exists, so a public demo moves through the
+  year with the calendar. `pnpm db:seed --quarter` builds the smaller
+  one-quarter demo the walkthrough follows. `pnpm demo:prepare` and the
+  demo sign-in page now offer twelve people, the year adding Hugo, Nadia,
+  Kofi, Leo and Yuki to the original seven.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`e2d2de2`](https://github.com/open-okr/open-okr/commit/e2d2de21d6f0ecc62bebdf86d379cfdd48b7e87e) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The quarterly review's diagnostic reads the rhythm a team actually kept
+  (METHOD.md §8.6). The rhythm is the share of due check-ins published on time,
+  measured from the check-ins with holiday weeks left out, where it was the
+  average of two survey answers; those two answers are shown beside it as a
+  cross-check. The cycle score averages the aspirational key results, with the
+  committed ones reported as the share met. The lines are 0.6 for the cycle
+  score and 75% on time for the rhythm, and the diagnoses read as hypotheses:
+  "Likely a strategy or OKR-quality problem", "Likely a rhythm problem". A
+  diagnostic read earlier keeps the verdict and numbers it was read on.
+  
+  The lowest process-health statement becomes an improvement action with an
+  owner and a date, recorded with the review's actions.
+  
+  `sessions.diagnostic` returns the measured share and its counts and the
+  committed share met (migration 0135). A workspace's own rhythm-score
+  threshold is removed by data change 0024, since its five-point number has no
+  meaning as a share.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`5146abd`](https://github.com/open-okr/open-okr/commit/5146abd463c6369deb76ae7004c7c18e8d9d8612) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The OKR Coach now says when a goal reported on track has a metric key result
+  that has not moved in four weeks (METHOD.md §3.5). The finding names the key
+  result and carries the existing `quality.divergence` rule, so it reaches the
+  champion and the reviewer the way every divergence does. The window is the
+  "Divergence window" threshold, four weeks by default.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`39e86fc`](https://github.com/open-okr/open-okr/commit/39e86fcc46b5e110f0ca81dc7f4611a4bedb159f) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - "New objectives mid-cycle start as" now does what it says (METHOD.md §2.9).
+  Under "Draft published by its owner" or "Draft approved by the reviewer", an
+  objective added after the team publication window starts as a draft that owes
+  no check-in. Its champion publishes it from the OKR list or the drawer, and it
+  goes live, or waits for its reviewer's approval where the workspace asks for
+  that; only the reviewer approves. Two new actions, `goals.publishDraft` and
+  `goals.approveDraft`, refuse anybody else with a reason that names the
+  setting. `goals.tree` answers each objective's `draftState` and the reader's
+  `viewerId`. Under the default, "Live", nothing changes.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`ac15b05`](https://github.com/open-okr/open-okr/commit/ac15b05329584d37bcbfcc52ea59b9f3cce18680) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A dependency nobody can confirm can now be escalated to the cycle's sponsor
+  (METHOD.md §5.4), from the dependency register or through
+  `goals.escalateDependency`. The sponsor's review inbox lists it until the
+  providing team confirms it or somebody is named to carry the risk. An
+  escalated dependency settles publish gate 4, as a confirmation or a risk owner
+  does, and no longer draws the unowned-dependency nudge. Nothing new is sent:
+  the inbox carries it. `alignment.read` adds who each entry was escalated to,
+  when, and the cycle's sponsor.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`7a7ca6b`](https://github.com/open-okr/open-okr/commit/7a7ca6b4617bf2321e4e654d235cd33e7ddb39fe) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Only structural defects hold a set back from publishing now, and a cycle can
+  publish its company OKRs first and its department and team OKRs after.
+  
+  - **Gate levels.** Each publish gate blocks, warns or is off. By default
+    gates 1 and 2 block (every objective has a title, a champion and key
+    results, and nothing fails a check set to block), gates 3 to 5 warn
+    (alignment, dependencies, capacity) and gate 6 (a publication date) is off.
+    A gate that warns is shown and coached on the publish screen and never holds
+    publication. The governed profile makes gates 3 to 5 block.
+  - **An empty set cannot be published.** With every other gate passing on an
+    empty set, gate 2 is what refuses a cycle with nothing drafted.
+  - **Two steps.** "Publish the company set first" publishes the company OKRs
+    on their own, judged on their own, before the cycle starts; "Publish the
+    department and team sets" follows. "Publish the set" still publishes
+    everything in one go. The REST API takes `step: "company"` or `"teams"`.
+  - **Override.** Publishing past a gate that blocks still needs an
+    administrator and a written reason, and a workspace can turn the override
+    off ("Gate override" in its practice settings).
+  - **Binding phases** also hold publishing until drafting is complete.
+  
+  A migration adds `cycles.company_published_at`. A cycle published before this
+  release reads as published in one go.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`c59b4ab`](https://github.com/open-okr/open-okr/commit/c59b4ab178ff413b03f6d91f3160d30d14c33b2a) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Health now says what happened (METHOD.md §3.5). An objective stopped
+  mid-cycle reads Abandoned rather than missed. The stored check-in status
+  `caution` reads "At risk", a term a workspace can rename. An outdated goal
+  shows the status it last reported beside it, such as "Outdated, last on
+  track". Health reads in words everywhere rather than as its stored code, and
+  `goals.tree` answers `reportedStatus` for an outdated goal.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`e680a06`](https://github.com/open-okr/open-okr/commit/e680a06755c98f8369522b33990b3f49420411c5) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The method now judges ambition by the kind of promise an objective makes,
+  committed or aspirational (METHOD.md §2.8). Every objective reads as
+  aspirational until the kind can be chosen, so what changes today is the
+  aspirational half: drafting confidence has four bands (near certain above
+  0.90, comfortable above 0.70, the sweet spot from 0.30, a moonshot below),
+  "too safe" at the close is three quarters or more of the key results at 1.0
+  rather than scores clustering above 0.85, and a quarterly review asks a root
+  cause below 0.6 instead of 0.7.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`2b93ce6`](https://github.com/open-okr/open-okr/commit/2b93ce66710f2c7c8819387918d47b14a18cec70) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Every key result now has a kind, metric, maintain, milestone or baseline
+  (METHOD.md §2.10), and existing key results written with a maintain direction
+  become maintain key results when the data changes run. A milestone or a
+  baseline can be added without numbers; a milestone is marked done through
+  `goals.updateKeyResult`, `goals.patchKeyResult` or a check-in, and a baseline
+  is done by its first recorded value, which becomes its baseline. Both read 0%
+  until then and 100% after. A kind the workspace has turned off is refused.
+  
+  **An objective's progress no longer counts the goals aligned beneath it by
+  default** (METHOD.md §3.1): a child's work usually also moves its parent's own
+  key results and would be counted twice. A workspace that wants the old
+  behaviour turns on "Progress roll-up from aligned goals" in its practice
+  settings.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`4440ee7`](https://github.com/open-okr/open-okr/commit/4440ee74b8d402d9358d3a29e0148667f62f7532) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The quality checks know the four kinds of key result in METHOD.md §2.10:
+  metric, maintain, milestone and baseline. KR-2 is now "Verifiable" and judged
+  by kind, so a milestone with a date or a baseline passes where a metric would
+  need its numbers. KR-3 asks a target only of a metric or a maintain key
+  result, and a baseline only of a metric. KR-7 derives a metric's direction from
+  its baseline and target, asks no other kind for one, and when the two numbers
+  are the same asks whether the key result is a maintain or a milestone. Every
+  existing key result is a metric until the kind can be stored, so the visible
+  change today is KR-7 no longer refusing a metric whose numbers give its
+  direction.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`72b004d`](https://github.com/open-okr/open-okr/commit/72b004d90ee01f702d194a0df28e4da6db4c19a8) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A key result's kind can be chosen where it is shown: in the OKR list, the
+  drawer and the diagram. A milestone asks only whether it is done, with a
+  checkbox there and in both check-in composers. A baseline asks for its first
+  value, which then reads as the value it found. A maintain key result shows
+  its band. The draft coach and the quality panel judge each key result by its
+  kind as the server does, and a kind the workspace has turned off is not
+  offered.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`4aa6381`](https://github.com/open-okr/open-okr/commit/4aa63814fa6bbe1365c1b653614f330b0f838953) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The spreadsheet templates have an optional kind column: committed or
+  aspirational for objectives, and metric, maintain, milestone or baseline for
+  key results, where a milestone or a baseline row needs no direction or
+  numbers. A file without the column is imported with the default kinds, and
+  the import's report now says so in a new "assumed" list, in the wizard and at
+  the command line. The FlowyTeam importer, whose source has no kind of either,
+  says the same in its notes. `imports.previewTable` and `imports.runTable`
+  answer the new `assumed` field.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`1f8a5d5`](https://github.com/open-okr/open-okr/commit/1f8a5d57b364ecba9873516bc9e33e52ce563d9d) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A KPI can now be judged in its own units (METHOD.md §6.2, §6.4). `kpis.create`
+  and `kpis.update` take a target type (stay at or above, stay at or below,
+  increase to, decrease to, stay within a range) and green and red values, or a
+  green band for a range. With them, inside green is healthy, past red is
+  unhealthy, and between is watch, so uptime at 95% against a red boundary of
+  99.5% now reads unhealthy where the ratio to target called it healthy. A KPI
+  with no thresholds keeps the ratio as before, and every read says which basis
+  it used. The grid colours each period by its own band. Two aggregates join:
+  last value and first value, for balances and headcounts. Existing KPIs take
+  the target type their direction implies.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`9fce422`](https://github.com/open-okr/open-okr/commit/9fce422767703bc5175770400d002fd687e0963d) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Escalation now stops at the coordinator (METHOD.md §11). A missed check-in
+  reaches the champion, the reviewer where the goal has one, and the
+  coordinator at seven days; the sponsor is a step at fourteen days only where
+  the workspace turns on "Sponsor in escalation ladders".
+  
+  Confidence escalates on a drop, not a level (§3.2). When a key result's
+  confidence falls into the low band, from a session or a check-in, its space's
+  coordinator is told the same day, and a company objective's goes to the
+  company space's coordinator. A key result drafted low that stays low no longer
+  escalates every week. At 0.3 and below the sponsor hears too, only where the
+  workspace turns on "Critical confidence escalation", which is off by default.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`aa557df`](https://github.com/open-okr/open-okr/commit/aa557df465a58afe6dc7b96d87cec2b5212a2582) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A member can mark their leave on their profile, with somebody to stand in
+  (METHOD.md §7.4). An administrator can mark anybody's. While somebody is away
+  nobody nudges them: the check-in on a goal they champion and the reviews they
+  would receive go to their delegate, and any other nudge is recorded and held
+  with the reason "leave". A check-in published while its reviewer is away is
+  the delegate's to acknowledge. Roles do not move; leave is not a
+  reassignment.
+  
+  `people.setLeave`, `people.setMemberLeave` and `people.leave` (migration
+  0132).
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`e512a2c`](https://github.com/open-okr/open-okr/commit/e512a2c995f4fa65b34d8f3bf84f0f8c6c73a848) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - An objective can move to another space, for a team that merges, splits or is
+  renamed (METHOD.md §2.9). The OKR list's row and the drawer show the space an
+  objective belongs to, and choosing another moves it there with its key
+  results, check-ins, dependencies and alignment, recorded as one dated change
+  naming both spaces. `goals.moveToSpace` needs edit on both spaces and refuses
+  otherwise; only an objective a space owns can move.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`7161203`](https://github.com/open-okr/open-okr/commit/7161203e535d2548d82b328cfaf7c0cc8da7befd) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Check in from the OKR drawer, opened by each objective's own check-in action, with nothing written before Publish. The goal page adds key results in place, and a confidence changed there is published as a check-in with its one line and status, rather than being ignored.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`1efd07d`](https://github.com/open-okr/open-okr/commit/1efd07dd35d523a4e59f03a4f45894c3eb30a8c4) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The OKR diagram's cards are edited where they are drawn: a title, a key result's value and target, and a new key result or a new aligned objective added from the card itself, with nothing written before Enter. Enter on a focused card edits its title and Space opens the drawer.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`ae0036f`](https://github.com/open-okr/open-okr/commit/ae0036f4c3d1bf4521c0dddb093704421c4f4d5b) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - An objective is moved on the OKR diagram: drag its card's handle onto another objective, a key result, the annual band or the cycle, with Undo for six seconds, or use "Move under…" from the keyboard. A card dragged sideways, or moved with Alt and an arrow, takes its place among its siblings in the list's order too.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`da29c34`](https://github.com/open-okr/open-okr/commit/da29c3482e18935aff91ff16f82c9a44fd4c5089) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The OKRs screen's Diagram view draws the cycle as a tree of cards from the same data as the list: key results inside each objective, objectives aligned to a key result hanging from it, parents from another cycle above, dependencies on a toggle, collapse, a minimap, and the keyboard. A card opens the drawer. Past 150 objectives it opens collapsed below company level.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`e27d866`](https://github.com/open-okr/open-okr/commit/e27d8662608a082c360e114ab6390258f21885bb) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Adding objectives and key results from the list, and being told why not.
+  
+  The topbar has a `+ New` that opens a new objective on the OKRs screen. An
+  objective added from the list opens with a key result draft under it, and a
+  new key result is owned by the objective's champion and due on the cycle's
+  last day. Nothing is written until Enter, Escape leaves nothing behind, and a
+  refusal keeps what was typed with the reason.
+  
+  Where the workspace holds new objectives back, for instance a Governed
+  workspace outside its planning window, "+ New objective" opens the reason
+  and a link to what resolves it instead of a field the server would refuse.
+  `goals.creationPolicy` answers whether a new objective may be written in a
+  cycle now.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`1efe0f8`](https://github.com/open-okr/open-okr/commit/1efe0f8b0c1db47d1ad8bb1b155ee0da6fdd64a7) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The OKRs list opens an objective in a drawer beside it: every field of the objective and its key results, the check-ins, the value and target history, and the alignment, kept in the address so a link opens it. A change in the drawer moves the row behind it at once.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`7887455`](https://github.com/open-okr/open-okr/commit/7887455a3f789bc557f89659f5dde5dac60ced45) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The OKR list changes as you type, and stays in step across tabs.
+  
+  Renaming an objective or a key result, typing a value, and removing a key
+  result on the OKRs screen now show at once, before the server answers. If the
+  server refuses, the row goes back to what it was and the reason is shown
+  beside the table. If somebody else changed the same title first, nothing is
+  overwritten: the list says who changed it and what it now reads, and offers
+  to keep yours or take theirs. Removing a key result offers Undo for six
+  seconds.
+  
+  A change made in one tab appears in your other tabs without a reload, and a
+  change another member makes appears shortly after they make it.
+  
+  "Mine" on the list and the diagram now also covers objectives where you own
+  a key result. The list's data is kept in memory and no longer written to the
+  browser's storage.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`cf96952`](https://github.com/open-okr/open-okr/commit/cf96952215657fb5caa6a33c3ba80cdfa3b6ae5a) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Every part of an OKR can be edited in the list where it is read.
+  
+  On the OKRs screen an objective's title, its champion, and a key result's
+  title, owner, current value, target, unit, baseline and due date are each
+  edited in place. Enter or leaving the field saves it, Escape puts it back,
+  and an unchanged value sends nothing. While a title is typed, the quality
+  checks that judge its wording show beside it, before anything is saved.
+  
+  Easing a target, moving it toward its baseline, asks for the reason under
+  the row before it is sent, where the workspace asks for one. A change the
+  server refuses shows its reason under the row with Retry and Discard. A
+  reader who cannot edit sees the values as plain text, with nothing that
+  looks editable.
+  
+  `goals.tree` returns each key result's `indicatorType`.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`e95bc74`](https://github.com/open-okr/open-okr/commit/e95bc7448bd0f4018f65ef905f798c3ab166cf6d) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Objectives and key results can be put in order on the OKRs screen.
+  
+  Each row has a grip: drag it onto another row of the same set, or press Alt
+  with the up or down arrow anywhere in the row, and the row moves at once and
+  stays there. The server keeps the whole order, so objectives a filter hides
+  keep their place. `goals.place` and `goals.placeKeyResult` put one row after
+  another, or first.
+  
+  Deleting an objective from the list now offers Undo for six seconds, like
+  removing a key result.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`2230f4a`](https://github.com/open-okr/open-okr/commit/2230f4a6dee8a94745a3b72a9edfdfb28003b458) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - One read for a cycle's OKRs, and edits that never overwrite somebody else's.
+  
+  `goals.tree` returns a cycle's objectives with their key results, their
+  owners, their alignment and the dependencies between them, in one call. A
+  parent outside what it returns, such as the annual objective a quarter's
+  objectives hang under, comes back as read-only context. `scope: "mine"`
+  narrows it to what the reader champions, reviews or owns a key result under.
+  
+  `goals.patch` and `goals.patchKeyResult` change a few fields at once. Each
+  sends the values it read beside the values it sets. If somebody changed one
+  of those fields in the meantime, nothing is saved and the call is refused as
+  a `conflict`, which the REST surface answers with 409 and the values stored
+  now, who changed them and when. A field the caller is not changing, or a
+  progress figure recomputed underneath it, never causes a conflict. The target
+  and the current value keep their own actions.
+
+- [#109](https://github.com/open-okr/open-okr/pull/109) [`3bc8548`](https://github.com/open-okr/open-okr/commit/3bc85482a6d238874d1f3f7b90f00e6aee15859e) Thanks [@agungksidik](https://github.com/agungksidik)! - OKRs can now be written on the screen where they are read.
+  
+  The goals screen listed objectives and refused to create one. The empty state
+  pointed at the cycle screen, the cycle screen's form refused while the planning
+  phases were incomplete, and a key result could only be added on the drafting
+  surface. Four steps to reach a form that might then say no.
+  
+  The set is now editable in place. An objective's title and a key result's title
+  are fields rather than text: click, type, press Enter. Add objective sits under
+  the set and Add key result under each objective's measures, and neither writes
+  anything until a title is typed, so a mis-click leaves nothing behind. Hover a
+  row, or reach it with the keyboard, and the open and delete controls are there.
+  
+  A value typed into the table is recorded as history by the same action a
+  check-in uses, so the progress beside it moves and the history behind it has no
+  hole where somebody used the quicker door.
+  
+  Three things deliberately did not move. Health is shown and never set: it is
+  derived from the check-ins and the confidence, and a second place to type it
+  would be a second opinion. Publishing still happens on the review screen, with
+  its gates. An objective added here is a draft, and the quality checks judge it
+  the moment it is saved rather than refusing it on the way in.
+  
+  Two further views of the same cycle. Diagram draws the cycle, its objectives
+  and their key results as a tree of cards that pans and zooms. Tree is the
+  previous table, which is the only one of the three that indents by the
+  alignment parent.
+  
+  The cycle on screen is chosen from a searchable picker beside the title rather
+  than from a row of chips that gained one every quarter, and a cycle can be
+  created from it. That creates the period's frame; the phases and their gates
+  are still set up on the cycle screen.
+  
+  One new action, `goals.removeKeyResult`, which takes a measure off a goal. It
+  soft-deletes, so the value history behind it survives for the audit.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`b4118d7`](https://github.com/open-okr/open-okr/commit/b4118d7c182350c759b1e8b89dfc2472a2a596dd) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The OKRs screen, and a sidebar grouped by what it holds.
+  
+  "Goals" is now "OKRs" in the sidebar and on its screen. The sidebar has an
+  OKR block (Cycle, OKRs, KPIs) and a Work block (Initiatives, Board). Sessions
+  and Scorecard are now tabs inside Cycle. Check in is a button on the OKRs
+  screen, on each goal, and on Review. The command palette still finds all
+  three.
+  
+  The OKRs screen gains scope tabs (All, Mine, My team, Company), a champion
+  and a space filter, and a summary line with objectives, key results, average
+  progress, how many are at risk and how many are outdated. Every choice is
+  kept in the address, so a link opens the same view.
+  
+  Choosing a cycle from the OKRs screen's cycle picker now opens it. Its links
+  had carried no cycle since the picker arrived.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`4ec4ef0`](https://github.com/open-okr/open-okr/commit/4ec4ef029d7db482e9a8306464173ca60674d14e) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The progress signal knows the date (METHOD.md §3.7). By default it compares a
+  goal's progress with the progress expected for the day of its cycle: on pace
+  is green, more than 10 points behind is amber, more than 25 behind is red, so
+  a goal is no longer red just because the quarter is young. A workspace may
+  choose the absolute signal instead, which reads 75% and 50% as before. The
+  trend forecast now waits for four values and is drawn only for metric key
+  results (§3.6).
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`2849172`](https://github.com/open-okr/open-okr/commit/2849172b724f596d4f0b035a0fcca30371db7cc7) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Every workspace now has a practice profile and practice settings, readable
+  and changeable through the API and the `okr` command line.
+  
+  METHOD.md §12 lists the choices an organisation makes about how it runs OKRs:
+  who may write and when, whether planning phases bind, how hard each quality
+  check and publish gate is, whether goals need a reviewer, which levels and
+  kinds of key result it uses, and how the quarterly review and close behave.
+  Five profiles set them as a group: Recommended, Google-style, Radical Focus,
+  Lightweight and Governed.
+  
+  Three new actions: `practice.read`, which any member may call, and
+  `practice.update` and `practice.applyProfile`, which need full access and are
+  recorded in the audit log. Every workspace starts on Recommended with nothing
+  changed, and a migration adds the two columns that hold the choice.
+  
+  Nothing in the product follows these settings yet, so this release behaves
+  exactly as the last one did. The settings screen and the behaviour arrive with
+  the rest of 0.2.0.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`f713518`](https://github.com/open-okr/open-okr/commit/f7135183dee9bab37161a523a84a765b42de6087) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - An admin can choose how the workspace runs its OKRs from the browser.
+  
+  Admin, Practice lists the five profiles: Recommended, Google-style, Radical
+  Focus, Lightweight and Governed. Choosing one shows what it would change
+  before anything is written, and what the workspace changed itself, which is
+  kept. Below it, every practice setting sits on its group's card with its own
+  save: who may write and when, phase enforcement, the model, each quality
+  check and publish gate, levels in use, scoring, the rhythm, the review and
+  KPIs. A setting the workspace changed is marked, with the profile's own value
+  beside it, and "Reset to profile" puts a card back.
+  
+  Choosing a profile now also sets the numbers it carries. Lightweight makes
+  check-ins fortnightly and Radical Focus caps objectives at one per team, and
+  switching away puts them back, unless the workspace had changed them itself.
+  `practice.applyProfile` returns the thresholds it changed and the ones it
+  kept, and `practice.read` returns each option's words as METHOD.md §12.1
+  writes them.
+  
+  Strict mode is now the one switch that makes every quality check refuse
+  rather than coach. "Coach strictness" has left the rhythm card, and a data
+  change turns strict mode on for every workspace that had set it to strict. A
+  space's own strictness is unchanged.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`f23b611`](https://github.com/open-okr/open-okr/commit/f23b6110023f1af56a3733fdbcd6a47c71353421) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A KPI under a recovery objective now shows its real band, with "recovering"
+  beside it, never instead of it (METHOD.md §6.4). The grid, the KPI page, the
+  recovery board and the driver trees all read the band, and the recovery's own
+  progress sits next to the reading rather than a projected "displayed health".
+  The board keeps a KPI on it for as long as its recovery is open, whatever its
+  band. `kpis.grid`, `kpis.detail`, `kpis.recoveryBoard` and the tree reads add
+  `recovering`, the stored state is never `recovering` any more, and existing
+  rows are rewritten to their band. Driver tree links say whether a KPI is part
+  of its parent's formula or believed to move it.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`31c92c6`](https://github.com/open-okr/open-okr/commit/31c92c69b8ee136e877949cd26f2f6fabb21a320) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A drafted recovery OKR now passes the product's own checks (METHOD.md §6.5).
+  It is committed; its objective names what the KPI protects with no number in
+  it ("Operating margin back where the business can rely on it"), and its
+  description names the KPI and leaves the why to its owner. The first key
+  result is the KPI itself, from its reading to its healthy boundary, and reads
+  the KPI. Then come up to three leading drivers that are below their own
+  targets and have an owner; a driver already at or past its target is skipped,
+  which removes the key result that asked a number to go the wrong way. The
+  "define the first leading driver to move" placeholder is gone. The coach now
+  proposes a recovery at once when a KPI falls from healthy to unhealthy in one
+  period, and after two unhealthy periods otherwise. `kpis.recoveryDraft` adds
+  `description`, `kind` and each key result's `kpiBacked`.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`5373fd8`](https://github.com/open-okr/open-okr/commit/5373fd8424de6e82b28bd4fde0d19038f7091190) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - **0.2.0: the practice becomes yours to adapt.** OpenOKR still ships one OKR
+  method, METHOD.md, and now ships it as defaults rather than as locks. Every
+  rule says how strongly it applies, every workspace starts on the
+  Recommended profile, and an administrator adapts it in Admin, Practice
+  (METHOD.md §12).
+  
+  What an upgraded workspace will notice, each described in its own entry
+  below:
+  
+  - Anybody can write an objective or a key result at any time; the planning
+    phases guide rather than refuse.
+  - Only structural defects block publishing: gates 1 and 2 block, gates 3
+    to 5 warn, gate 6 is off. The quality checks coach rather than refuse.
+  - Committed and aspirational objectives, and metric, maintain, milestone
+    and baseline key results. Existing objectives are aspirational and
+    existing key results metrics, or maintains where their direction said so.
+  - A reviewer per goal is optional.
+  - Additions, stops and eased targets mid-cycle are recorded with their
+    reasons, and the close reads them.
+  - "At risk" is the label for caution, health reads the pace of the cycle,
+    and a check-in that disagrees with the data is flagged.
+  - Scores can be adjusted with a reason, and a closed cycle keeps the rules
+    it was graded under.
+  - A space can set its own check-in frequency and holidays, and a member on
+    leave has a stand-in.
+  - The quarterly review is 90 minutes in four acts, about two weeks before
+    the end, with five close decisions; a kept objective arrives in the next
+    cycle as a draft.
+  - Nudges say the coach's line for the situation, in METHOD.md's words.
+  
+  **The way back is the Governed profile**, which binds the phases, blocks on
+  gates 1 to 5 and requires a reviewer, among the rest of 0.1's strictness.
+  Choose it in Admin, Practice.
+  
+  **Upgrading.** `./openokr upgrade` as usual, then run the data changes once
+  (`pnpm db:change`). The upgrade runbook's "0.1 to 0.2" section,
+  docs/runbooks/upgrade.md, has the whole list.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`5512a25`](https://github.com/open-okr/open-okr/commit/5512a2547be27e5f3a625e22cb7bbfb3503c4ae7) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The quarterly review is ninety minutes in four acts, Open, Review, Retro and
+  Reset (METHOD.md §8). Scoring has twenty minutes, narratives twelve, the team
+  retro ten and the management retro eight, so the review fits what it asks a
+  room to do. Stage minutes stay defaults a workspace can change.
+  
+  Booking a cycle now puts the review about two weeks before the cycle ends,
+  at the review preparation lead, so there is time to act on what it decides;
+  a review already booked at the close still counts as booked.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`7a8d6ed`](https://github.com/open-okr/open-okr/commit/7a8d6ed3910286d2a53c96cf57b0c7b95b1432aa) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The quarterly review can be held as two sessions (METHOD.md §8). With
+  "Quarterly review format" set to "Review and retrospective separately",
+  booking a quarter books the review, stages 1 to 4, and two working days later
+  the retrospective, stages 5 to 11. The retrospective reads the scores its
+  review recorded, so its root causes, diagnostic, close decisions and minutes
+  are the same as in one session. Each session's rail shows its own stages and
+  still counts them out of eleven.
+  
+  `sessions.read` returns `reviewPart` and `reviewSessionId` (migration 0133).
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`02e86cf`](https://github.com/open-okr/open-okr/commit/02e86cf21d3f8cc8a2cdeb2d030aaa36d2b1f3ea) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A goal no longer has to name a reviewer.
+  
+  The reviewer is now a practice setting: off, optional (the default) or
+  required. A goal without a reviewer owes no acknowledgement on its
+  check-ins, and no escalation ladder names one. With reviewers off, every
+  existing reviewer stays on their goals and is simply not asked to
+  acknowledge. With reviewers required, creating a goal without one, or taking
+  one off, is refused with the reason, from the screen, the API and the
+  command line alike.
+  
+  The drafting form offers "No reviewer" after the members, and the goal page
+  can take a reviewer off ("Nobody"). Taking a reviewer off clears the
+  acknowledgements they still owed. `goals.read` and `goals.list` return
+  `reviewer: null` for a goal without one, and `goals.reassignRole` accepts
+  `memberId: null` for the reviewer.
+  
+  A migration drops the database's requirement for a reviewer. Every existing
+  goal keeps the one it has.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`46a1d76`](https://github.com/open-okr/open-okr/commit/46a1d763f3929c90475e460d57f44e3483dd5295) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The quarterly review's scoring and root causes follow METHOD.md §8.3 and §8.4.
+  Scoring cannot close while a committed key result is below 1.0 with no
+  explanation; the refusal names each one. Root causes are asked of every
+  aspirational key result below 0.6 and every committed one below 1.0, where
+  every key result used to be held to 0.6. A ninth cause, "Other, described in
+  a line", is named with its line, and a second cause can be named beside the
+  first. Where a workspace makes root causes optional, the stage says so. The
+  minutes count key results below their own threshold.
+  
+  `sessions.setRootCause` takes `secondaryCauseKey`, and `sessions.rootCauses`
+  returns `thresholds`, each row's `kind` and second cause, and `required`
+  (migration 0134).
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`9d04c38`](https://github.com/open-okr/open-okr/commit/9d04c38eb156798859c981eec79ea8d7e46500fa) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The method's rules now read each objective's kind. KR-6 judges only the
+  aspirational key results; publish gate 5 and the cycle screen's capacity panel
+  hold back only committed work left at "exceeds", and an initiative counts as
+  committed when it serves a committed objective; the "too safe" nudges at
+  drafting and at the close leave committed key results out. The quarterly
+  review's scoring stage marks committed key results, asks a committed miss for
+  its explanation and little progress for its root cause, shows how many
+  committed key results were met, gives its verdict over the aspirational ones,
+  and says when the aspirational targets were too safe. The cycle archive's
+  verdict reads the aspirational key results too. `sessions.scoringStatus` and
+  `initiatives.capacity` gain the fields that carry this.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`266b234`](https://github.com/open-okr/open-okr/commit/266b23425109f0bcff5a483000f3e283054764bb) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The scorecard reads each closed cycle under the rules it was graded with
+  (METHOD.md §12): every row shows the bands it was graded on and colours its
+  result by them, and a new section lists what moved in each cycle, each
+  adjusted score beside its computed one, each eased target beside its
+  original, how many OKRs were added mid-cycle, and each change of kind with its
+  reason. `cycles.scorecard` answers `bands`, `resultBand` and `moved` per
+  cycle, and no longer lists a deleted cycle.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`0bffead`](https://github.com/open-okr/open-okr/commit/0bffead0a8dac8fa429af332f5b1b1a7c40d5a96) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A space can mark its holidays (METHOD.md §7.4). The space home lists them and
+  lets whoever manages the space add or remove one. No check-in is due in a
+  holiday: a goal that would have been due moves on to the period after it, on
+  the same weekday, including goals already open when the holiday is marked. A
+  check-in or commitment nudge about the space on a holiday is recorded and not
+  sent, with the reason "holiday". The streak does not break across a holiday,
+  and booking a cycle's sessions leaves holiday weeks out.
+  
+  A check-in period counts as a holiday when its last working day is inside a
+  marked span. `spaces.setHolidays` writes the list and `spaces.holidays` reads
+  it (migration 0131).
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`fe540d2`](https://github.com/open-okr/open-okr/commit/fe540d2beede8d9ea51d61faa2fb5e8865488bca) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Stage ten of the quarterly review, Learnings, no longer drafts the next
+  cycle (METHOD.md §8.10: hold the review before drafting). The draft form
+  and the assist that proposed drafts from the carried learnings are gone;
+  a line under the learning composer says an idea for the next cycle is a
+  learning marked to carry, which reaches the next cycle's issue list, and
+  kept or modified objectives reach its Phase 4 as drafts on their own.
+  Drafts written before still show, read-only, and in the minutes.
+  
+  `sessions.draftNextCycle` and `sessions.proposeFromLearnings` are
+  deprecated and will be removed in 0.3, with the `next_cycle_drafts`
+  table.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`f2d3100`](https://github.com/open-okr/open-okr/commit/f2d3100407ab47dce2b938569852e86760e2a3c9) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - An objective that no longer matters can be stopped (METHOD.md §2.9). The OKR
+  list's row has a Stop control that asks, in place, why it no longer matters;
+  the objective closes as abandoned with that one line as its account, owes no
+  further check-in, and a toast offers Undo, which reopens it. `goals.stop`
+  does the same from the API and the command line, and refuses a stop with no
+  reason. Until the abandoned outcome arrives, a stopped objective reads missed.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`55ccd3c`](https://github.com/open-okr/open-okr/commit/55ccd3ceeb1e8a67b9b39f8918e99399c091dde6) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The alignment studio is now the OKRs screen's diagram. Its health and review panel sits beside the canvas, linking two objectives into a dependency is on the diagram's toolbar, and a dependency is taken apart from the drawer's alignment tab. Old links to the studio open the diagram of the same cycle.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`61cf764`](https://github.com/open-okr/open-okr/commit/61cf7647efa144575057a3958c49b63c842273e3) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A target change is kept on record, and easing one asks why.
+  
+  Every change to a key result's target is now recorded with who made it, the
+  old and new values, and whether it eased the target, which means moving it
+  toward its baseline. Easing a target needs a written reason unless the
+  workspace made the reason optional in its practice settings. Making a target
+  harder never needs one. The rule applies the same way through the new
+  `goals.changeTarget`, through `goals.updateKeyResult` (which takes
+  `targetReason`), from the API and from the command line. An import is never
+  refused. `goals.targetHistory` lists the changes.
+  
+  A key result removed on its own now appears in Admin, Deleted items, with
+  who removed it, and Restore brings it back with its value history through
+  `goals.restoreKeyResult`. One deleted along with its objective still comes
+  back when the objective is restored.
+  
+  A migration adds the `key_result_target_changes` table.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`304c8f9`](https://github.com/open-okr/open-okr/commit/304c8f93a031619eebc16ea722eec4c241a1a99d) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A target now moves under one rule all cycle, and the once-a-cycle calibration
+  is retired (METHOD.md §2.9, §7.6). Phase 6 states the rule rather than
+  offering a calibration form, and `workflow.calibrate` is removed from the API,
+  the command line and the agent tools; a calibration recorded before still
+  shows, as history. The quarterly review's scoring stage now shows, beside a
+  key result whose target moved, the target it began the cycle with and the
+  reason it was eased, and `sessions.scoringStatus` answers both as
+  `originalTarget` and `easedBecause`.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`c1a6de2`](https://github.com/open-okr/open-okr/commit/c1a6de29f2e94f377df8a2a60cddc18f3151b184) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The KPI form now sets how a KPI is judged (METHOD.md §6.2, §6.4): its target
+  type, and green and red values or a green band for a range. Without them it
+  says what the ratio to target does not suit: uptime, ratings, NPS, or anything
+  that can go negative. The KPI page gains a "How it is judged" block to change
+  the type, the thresholds, the owner and the tier afterwards.
+  
+  A KPI can now name one person who owns it, separately from where it lives.
+  That person hears when it leaves its corridor; a KPI with nobody named keeps
+  the old recipients. The form names whoever adds the KPI, a KPI on a member's
+  own list is owned by that member, and `kpis.create` and `kpis.update` take
+  `ownerMemberId`. The tier is optional: `kpis.create` leaves it empty unless one
+  is given, and the reads return null for a KPI without one.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`64ab134`](https://github.com/open-okr/open-okr/commit/64ab134a476c1cf850fb95eb5c762e1730379f52) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The monthly review has a fifth panel, "Continue, update, start or stop"
+  (METHOD.md §7.5). It lists what was started mid-cycle, which key results had
+  their target updated once the plan was published, with the value each
+  replaced, and which objectives were stopped, with their reason. An objective
+  can be stopped from the review itself: it closes as abandoned with a line on
+  why, exactly as it does from its own page.
+  
+  `sessions.monthlyRecord` returns `stops` and `updates` beside `additions`.
+  Nothing new is stored.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`d3c6b4f`](https://github.com/open-okr/open-okr/commit/d3c6b4f8bf0ab57c2902934fa50c6d0b023302cf) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - An unhealthy KPI now asks for a decision (METHOD.md §6.5). Its card on the
+  recovery board offers three: fix it now, as a task with an owner, a date and a
+  space; add a key result for it to an open objective in the current cycle, or
+  name one that already answers it; or launch a recovery OKR, with the draft
+  shown first. Once answered, the card shows the answer until the task is done
+  or the objective closes, and then asks again if the KPI is still unhealthy.
+  
+  A new action, `kpis.recordResponse`, records which task or key result answers a
+  KPI (migration 0127), and `kpis.recoveryBoard` returns it with each card's space
+  and named owner. Answering a KPI another way settles a pending proposed
+  recovery for it, and the coach proposes none while that answer is open. A
+  proposed recovery in the review inbox links to the other two responses.
+  
+  The practice setting "Unhealthy KPI response" now takes effect: "Draft a
+  recovery OKR at once" has the coach propose on the first unhealthy period.
+
+- [#109](https://github.com/open-okr/open-okr/pull/109) [`2f59dd5`](https://github.com/open-okr/open-okr/commit/2f59dd5ead44863b1d186e18999592cf821c1551) Thanks [@agungksidik](https://github.com/agungksidik)! - Who may edit an objective now comes from a role, not from a space.
+  
+  A workspace has roles, and a role is a level per domain: objectives, KPIs,
+  initiatives, tasks, comments, spaces and the workspace itself, each at view,
+  comment, edit or manage. Four arrive with every workspace. Owner and Admin can
+  do everything, Member edits the work and comments, Viewer reads. An
+  administrator can change any of them except Owner, and can add their own.
+  
+  Before this, who could edit an objective was decided by membership of the space
+  that owned it. That rule could only be stated by reading the binding table, it
+  could only be changed by moving people between spaces, and it had no screen.
+  
+  **A role raises access and never lowers it.** A champion still holds their own
+  grant on their own objective, and no role takes it away. That is the same rule
+  two overlapping grants have always followed, and it is why this release changes
+  nothing for anybody: every member keeps what they had, and gains whatever their
+  role adds.
+  
+  Existing workspaces are given the four roles and their members a role each: the
+  oldest member becomes Owner, anybody managing or coordinating a space becomes
+  Admin, everybody else becomes Member. A guest keeps no role at all, because a
+  guest was invited into one space and a workspace-wide role would hand them the
+  workspace.
+  
+  The method is untouched. The phase gate before drafting and the six publish
+  gates are exactly where they were.
+
+### Patch Changes
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`214ffc7`](https://github.com/open-okr/open-okr/commit/214ffc717c27e4b123c2090a7ff0015f838caa36) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The demo shows what 0.2.0 ships. Its current quarter holds a milestone key
+  result beside the metrics, Amara's agreed definition of a 90-day renewal,
+  alongside its committed and aspirational objectives. Its finished quarter
+  has an objective started in week three, which the scorecard counts among
+  what moved and whose check-ins begin that week. The user guide describes
+  writing and changing OKRs, the kinds, the three responses to an unhealthy
+  KPI and the quarterly review as 0.2.0 has them.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`55ccd3c`](https://github.com/open-okr/open-okr/commit/55ccd3ceeb1e8a67b9b39f8918e99399c091dde6) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The OKR drawer underlines the tab that is open, which it did not do before.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`1aaf715`](https://github.com/open-okr/open-okr/commit/1aaf715b768d646ce6a0c3fce52ad0f763651dab) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:seed --year` now closes the year. 2028's planning opens in
+  November and its offsite replaces the achieved strategy; the annual review
+  of 2027 runs before 2028 is drafted, grades the annual objectives on their
+  latest values with A4's eased target beside its original, and closes the
+  year into 2028, whose annual set publishes in December. Q4 is graded,
+  reviewed and closed with the margin recovery achieved, and Q1 2028's
+  company set is drafted from what was kept and published.
+  
+  A KPI's recovery now follows its objective across a cycle's close: kept,
+  the recovery continues in the next cycle's draft; closed as achieved,
+  abandoned or deferred, it ends and the KPI leaves the recovery board.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`1766c7c`](https://github.com/open-okr/open-okr/commit/1766c7c2eb98858dface92e91495522949dcd27f) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:seed --year` builds the Northwind year: the scenario in
+  `docs/scenarios/northwind-year` placed on the real calendar, with every
+  event dated on or before today written and nothing after it. Each date
+  keeps its distance from its quarter's first Monday, so a Monday check-in
+  stays a Monday in any year.
+  
+  This first part writes the year's frame: fourteen people with the days they
+  arrive and leave, nine spaces with Support archived and Growth formed on
+  their own dates, "Team" in terminology, the year's practice settings
+  changes on their dates, eleven KPIs judged by their own thresholds with a
+  reading for every month as it is recorded, and the annual frame with its
+  four objectives, published. The quarters follow in later parts.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`43b8b6d`](https://github.com/open-okr/open-okr/commit/43b8b6db386387a900195c21f146e5b3547b4944) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:seed --year` now writes the pilot quarter and Q1's plan. The pilot
+  runs with Product and Customer Success, checks in every Monday from
+  October, takes Tomás's confidence down to 3 in 10 in week five, is reviewed
+  with two learnings for Q1's input pack, and closes at 0.55, its scores
+  landing in Q1's prior-cycle list. Q1 opens four weeks ahead, ranks four
+  issues, revalidates the frame, books its rhythm, publishes the company set
+  first and the teams' set on 15 January, with the peer review's rewrites,
+  its two objectives turned into initiatives, a deleted duplicate, two
+  confirmed dependencies and the capacity cut on record.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`8ff439e`](https://github.com/open-okr/open-okr/commit/8ff439e5cf01c77503d89f387f6218e02d3e758c) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:seed --year` now runs Q1 and closes it. Every objective checks in
+  weekly from the teams' publication to the week before the review, Marketing
+  once on a Wednesday, inside the grace. Tickets per account turns unhealthy
+  and C2.3 is added for it on 1 February as the KPI's answer. Two monthly
+  reviews each record a decision, a blocker on guided setup is raised and
+  resolved, and both milestones are ticked done on their own days. The review
+  on 18 March grades every key result, with one adjustment, names the causes,
+  reads "results delivered", decides all fourteen objectives and closes Q1
+  with eleven drafts in Q2.
+  
+  A review recorded after its day now reads that day. The diagnostic measures
+  the rhythm as of the review's day rather than when it was written up, so the
+  check-ins due since are not counted as missed. A decision is dated by its
+  session's day. A milestone that an imported check-in marks done is dated by
+  that check-in.
+  
+  The quarterly review in the company space now covers every objective in the
+  cycle, so one review can decide them all, as METHOD §8 has it. A team's
+  review still covers only its own.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`a0319a9`](https://github.com/open-okr/open-okr/commit/a0319a96071d699ca29ddd304de190f69b867806) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:seed --year` now runs Q2 to its close. Brightline launches in week
+  6; two days later a leadership session starts C5, stops C4, moves CS2 and
+  M1, makes C2 aspirational and eases S2.1, each with its reason and its day.
+  Ben leaves and S2.1 moves to Jonas, the questionnaires meet a decision and a
+  trust-centre page, and C5.1 finds the win rate C5.4 aims from. The review and
+  the retrospective are held two days apart, the diagnostic reads a strategy
+  or OKR-quality problem at 0.59 with the rhythm kept, and Q3's revalidation
+  eases A4's win rate and revises the not-doing list.
+  
+  `sessions.create` takes a `part`, so a review held in two sessions can be
+  scheduled by hand as booking schedules it. Revising the annual frame keeps
+  its strategies, and the objectives aligned to them, when the strategies did
+  not change. A stopped objective's key results no longer hold up a cycle's
+  close, and the scorecard shows an eased target beside the target the plan
+  published with rather than a draft's.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`330dac8`](https://github.com/open-okr/open-okr/commit/330dac8c9f5cbbc51c42d5e2a88ce99db9a2dd03) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:seed --year` now plans Q2 and runs it to its first monthly review.
+  The eleven objectives Q1 kept or modified come back as Q2's drafts, each key
+  result starting where Q1 left it, and are redrafted: retargeted, given Q2's
+  due dates and capacity verdicts, aligned again, and joined by four new
+  objectives. The company set publishes on 29 March and the teams' on
+  15 April, past OBJ-1 with the override reason on record. Engineering's third
+  objective becomes an initiative, Yuki follows Product's objective, and
+  Customer Success's dependency on Product is escalated and confirmed. The
+  company checks in from week 1, the teams from week 3, and the May review
+  gives each company objective a trend.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`2299409`](https://github.com/open-okr/open-okr/commit/229940932ba8624e2e81a45cd273370084c8f717) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:seed --year` now runs Q3 to its close. Product marks two holiday
+  weeks and checks in nothing in them, Amara stands in for Sara and Leo for
+  Mei, Support merges into Customer Success with SU1 moved first, and the
+  Growth team starts G1 with a baseline and sets its target once it is found.
+  F3's milestones and the SOC 2 report land on their days, and the review and
+  retrospective, held apart, grade 0.66 with seven of eleven commitments met
+  and read results delivered with the holiday weeks left out.
+  
+  A retrospective scheduled by hand now names the review scheduled before it,
+  rather than a review booked later for the same cycle.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`86ea55e`](https://github.com/open-okr/open-okr/commit/86ea55e61c0df2126f18bdf23a1203accc02c8b7) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:seed --year` now plans Q3 and launches the margin recovery. Q2's
+  kept and modified objectives are redrafted for Q3 beside the deferred
+  expansion on Phase 2's list, C2 is committed again, and the company step
+  publishes on 28 June. On 6 July C6 is launched from the operating margin
+  KPI, which has read unhealthy for two months: committed, at company level,
+  its first key result the KPI itself from 7.6% to 13.5%, with the renewal
+  discount in place of two drivers other objectives already own, and the
+  expansion KPI answered by C6.2. The teams add S3 and F3 and publish on
+  14 July, and Sales checks in every two weeks.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`2df3862`](https://github.com/open-okr/open-okr/commit/2df386225b3c25704dffe531e743eca74cdc0d72) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:seed --year` now plans Q4 and runs it to December. Expansion comes
+  back first on the issue list as C8, CS1 rises to company level as C7 for
+  renewal season, and C2 becomes Customer Success's CS3; both steps publish.
+  Mei returns and takes E1 back, the failover outage of 3 December turns
+  uptime unhealthy and is answered with a task rather than a recovery, and
+  November's margin reads healthy with the recovery still open.
+  
+  A company objective can now be moved into a space, where it becomes that
+  space's objective, as a modified objective carried to the team that will
+  run it next. A person's objective still cannot.
+
+- [#110](https://github.com/open-okr/open-okr/pull/110) [`da29c34`](https://github.com/open-okr/open-okr/commit/da29c3482e18935aff91ff16f82c9a44fd4c5089) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The roles screen lists its members by name, so a member's row stays where it was after their role changes rather than jumping to the end of the list.
+
+- [#116](https://github.com/open-okr/open-okr/pull/116) [`9a7d66c`](https://github.com/open-okr/open-okr/commit/9a7d66c7f39f3394630e4e33351f2379af76eb73) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A screen reader now hears what the rich text editor is for.
+  
+  The editor on a document and the bio on a profile were announced as a blank
+  text field. A document's editor is now named by the document's title, and the
+  bio by "Bio". Both say they take more than one line.
+- Updated dependencies [[`fecd1c1`](https://github.com/open-okr/open-okr/commit/fecd1c18556e938627c4f5094b22a751297aedca), [`bf256ef`](https://github.com/open-okr/open-okr/commit/bf256eff36f8e8b601559bc381c624b2fa2ad9eb), [`fa5b9d2`](https://github.com/open-okr/open-okr/commit/fa5b9d2d03e12d93b22014facd8adb3d5de4d1d7), [`214ffc7`](https://github.com/open-okr/open-okr/commit/214ffc717c27e4b123c2090a7ff0015f838caa36), [`a3bf087`](https://github.com/open-okr/open-okr/commit/a3bf0873f72572a82a51b3caf73977f21b3729d0), [`1aaf715`](https://github.com/open-okr/open-okr/commit/1aaf715b768d646ce6a0c3fce52ad0f763651dab), [`1766c7c`](https://github.com/open-okr/open-okr/commit/1766c7c2eb98858dface92e91495522949dcd27f), [`43b8b6d`](https://github.com/open-okr/open-okr/commit/43b8b6db386387a900195c21f146e5b3547b4944), [`8ff439e`](https://github.com/open-okr/open-okr/commit/8ff439e5cf01c77503d89f387f6218e02d3e758c), [`a0319a9`](https://github.com/open-okr/open-okr/commit/a0319a96071d699ca29ddd304de190f69b867806), [`330dac8`](https://github.com/open-okr/open-okr/commit/330dac8c9f5cbbc51c42d5e2a88ce99db9a2dd03), [`2299409`](https://github.com/open-okr/open-okr/commit/229940932ba8624e2e81a45cd273370084c8f717), [`86ea55e`](https://github.com/open-okr/open-okr/commit/86ea55e61c0df2126f18bdf23a1203accc02c8b7), [`2df3862`](https://github.com/open-okr/open-okr/commit/2df386225b3c25704dffe531e743eca74cdc0d72), [`fe540d2`](https://github.com/open-okr/open-okr/commit/fe540d2beede8d9ea51d61faa2fb5e8865488bca)]:
+  - @openokr/core@0.2.0
+  - @openokr/method@0.2.0
+  - @openokr/agents@0.2.0
+  - @openokr/ui@0.2.0
+  - @openokr/adapters@0.2.0
+  - @openokr/config@0.2.0
+
 ## 0.1.2
 
 ### Patch Changes
