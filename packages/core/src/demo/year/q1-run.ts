@@ -16,44 +16,20 @@
  * finished, so the scorecard shows exactly one adjustment, C1.2's, as the
  * scenario has it.
  */
-import { activeOnly, keyResults } from "@openokr/db";
-import { keyResultProgress, resolveThresholds } from "@openokr/method";
-import { eq } from "drizzle-orm";
 import { callAction } from "../../actions/registry.ts";
-import { runOperation } from "../../operations/operation.ts";
 import { addDays } from "./calendar.ts";
-import { addYearKeyResult, narrative } from "./okr.ts";
-import type { YearPersonKey } from "./people.ts";
+import { addYearKeyResult } from "./okr.ts";
 import {
-  cycleHolding,
-  need,
-  type YearContext,
-  type YearEvent,
-} from "./timeline.ts";
-
-/** A key result as Q1 runs it: where it starts, aims and finishes. */
-interface RunningKeyResult {
-  readonly key: string;
-  readonly kind?: "maintain" | "milestone" | "baseline";
-  readonly direction?: "increase" | "reduce" | "maintain";
-  readonly baseline?: number;
-  readonly target?: number;
-  /** Where it stands at week 11, which is what the review grades. */
-  readonly finish?: number;
-  /** Week by week, weeks 3 to 11, where the story gives the path. */
-  readonly path?: readonly number[];
-  /** The week it is done in, for a milestone or a baseline. */
-  readonly doneOn?: string;
-  /** The grade's line; committed misses need theirs (§8.3). */
-  readonly reason?: string;
-}
-
-interface RunningObjective {
-  readonly key: string;
-  readonly authorKey: YearPersonKey;
-  readonly committed?: boolean;
-  readonly keyResults: readonly RunningKeyResult[];
-}
+  computed,
+  markAddedOn,
+  milestoneDone,
+  monthlyReview,
+  type QuarterRun,
+  type RunningObjective,
+  sessionOn,
+  weeklyCheckIns,
+} from "./rhythm.ts";
+import { cycleHolding, need, type YearEvent } from "./timeline.ts";
 
 /** Q1's Mondays from week 3 to week 11 (18 January to 15 March). */
 const WEEKS = Array.from({ length: 9 }, (_unused, week) =>
@@ -335,26 +311,6 @@ const C2_3 = {
 /** Weeks 6 to 11, from the first check-in after it was added. */
 const C2_3_PATH = [16, 13, 11, 9, 7, 6];
 
-/** Where a key result stands in a given week, from its path or a straight line. */
-function valueIn(
-  keyResult: RunningKeyResult,
-  week: number,
-): number | undefined {
-  if (keyResult.path) {
-    return keyResult.path[week];
-  }
-  if (keyResult.finish === undefined || keyResult.baseline === undefined) {
-    return undefined;
-  }
-  if (keyResult.kind === "maintain") {
-    return keyResult.finish;
-  }
-  const share = (week + 1) / WEEKS.length;
-  const value =
-    keyResult.baseline + (keyResult.finish - keyResult.baseline) * share;
-  return Math.round(value * 100) / 100;
-}
-
 /** The status and confidence an objective reports in a given week. */
 function reported(
   objective: RunningObjective,
@@ -416,182 +372,40 @@ function publishedOn(objective: RunningObjective, monday: string): string {
   return monday;
 }
 
-const weeklyCheckIns = (week: number, monday: string): YearEvent => ({
-  on: monday,
-  ...(week === 0 ? { step: "NW-Q1-15" } : {}),
-  label: `Q1's check-ins, week ${week + 3}`,
-  async run(context) {
-    for (const objective of Q1_RUN) {
-      const { status, confidence } = reported(objective, week);
-      const values: {
-        keyResultId: string;
-        value?: number;
-        confidence?: number;
-        done?: boolean;
-      }[] = [];
-      for (const keyResult of objective.keyResults) {
-        const keyResultId = need(
-          context.ids.keyResults,
-          keyResult.key,
-          "Key result",
-        );
-        if (keyResult.kind === "milestone") {
-          continue;
-        }
-        if (keyResult.kind === "baseline") {
-          if (keyResult.doneOn === monday && keyResult.finish !== undefined) {
-            values.push({ keyResultId, value: keyResult.finish, done: true });
-          }
-          continue;
-        }
-        const value = valueIn(keyResult, week);
-        if (value !== undefined) {
-          values.push({
-            keyResultId,
-            value,
-            confidence:
-              keyResult.key === "C1.3" || keyResult.key === "C2.1"
-                ? confidence
-                : objective.committed
-                  ? 0.8
-                  : 0.6,
-          });
-        }
-      }
-      if (objective.key === "C2" && monday >= "2027-02-08") {
-        const value = C2_3_PATH[week - 3];
-        if (value !== undefined) {
-          values.push({
+const Q1_RUN_WEEKS: QuarterRun = {
+  name: "Q1",
+  weeks: WEEKS,
+  firstWeek: 3,
+  step: "NW-Q1-15",
+  objectives: Q1_RUN,
+  reported,
+  said,
+  publishedOn,
+  confidenceOf: (objective, keyResult, _week, reported) =>
+    keyResult.key === "C1.3" || keyResult.key === "C2.1"
+      ? reported.confidence
+      : objective.committed
+        ? 0.8
+        : 0.6,
+  extraValues(context, objective, week) {
+    if (objective.key !== "C2" || (WEEKS[week] ?? "") < "2027-02-08") {
+      return [];
+    }
+    const value = C2_3_PATH[week - 3];
+    return value === undefined
+      ? []
+      : [
+          {
             keyResultId: need(context.ids.keyResults, "C2.3", "Key result"),
             value,
             confidence: 0.8,
-          });
-        }
-      }
-      const on = publishedOn(objective, monday);
-      await callAction(context.action, "goals.importCheckIn", {
-        goalId: need(context.ids.goals, objective.key, "Objective"),
-        authorMemberId: need(context.ids.people, objective.authorKey, "Author"),
-        status,
-        confidence,
-        narrative: narrative(said(objective, monday)),
-        values,
-        publishedAt: `${context.real(on)}T10:00:00.000Z`,
-        legacy: {
-          type: "csv",
-          id: `northwind-year:${objective.key}:${monday}`,
-        },
-      });
-    }
+          },
+        ];
   },
-});
-
-/** A milestone ticked done on its own day, in a check-in of its own. */
-const milestoneDone = (
-  step: string,
-  objectiveKey: string,
-  keyResultKey: string,
-  doneOn: string,
-  authorKey: YearPersonKey,
-  text: string,
-): YearEvent => ({
-  on: doneOn,
-  step,
-  label: `${keyResultKey} done`,
-  async run(context) {
-    await callAction(context.action, "goals.importCheckIn", {
-      goalId: need(context.ids.goals, objectiveKey, "Objective"),
-      authorMemberId: need(context.ids.people, authorKey, "Author"),
-      status: "on_track",
-      confidence: 0.9,
-      narrative: narrative(text),
-      values: [
-        {
-          keyResultId: need(context.ids.keyResults, keyResultKey, "Key result"),
-          done: true,
-        },
-      ],
-      publishedAt: `${context.real(doneOn)}T15:00:00.000Z`,
-      legacy: { type: "csv", id: `northwind-year:${keyResultKey}:done` },
-    });
-  },
-});
-
-/** The company space's session of a kind on a real day, opened. */
-async function sessionOn(
-  context: YearContext,
-  kind: "weekly" | "monthly",
-  on: string,
-  title: string,
-): Promise<string> {
-  const spaceId = need(context.ids.spaces, "company", "Space");
-  const sessions = await callAction(context.action, "sessions.list", {
-    spaceId,
-  });
-  const booked = sessions.find(
-    (session) =>
-      session.kind === kind &&
-      session.scheduledFor.slice(0, 10) === on &&
-      session.endedAt === null,
-  );
-  const sessionId =
-    booked?.id ??
-    (
-      await callAction(context.action, "sessions.create", {
-        spaceId,
-        cycleId: need(context.ids.cycles, "q1", "Cycle"),
-        kind,
-        title,
-        scheduledFor: `${on}T09:30:00.000Z`,
-        facilitatorId: need(context.ids.people, "priya", "Person"),
-      })
-    ).id;
-  if (booked?.startedAt === null || !booked) {
-    await callAction(context.action, "sessions.open", { id: sessionId });
-  }
-  return sessionId;
-}
-
-const monthlyReview = (
-  step: string,
-  on: string,
-  trends: Readonly<Record<string, "improving" | "flat" | "declining">>,
-  decision: { readonly keyResult: string; readonly text: string },
-): YearEvent => ({
-  on,
-  step,
-  label: `The monthly review of ${on}`,
-  // After the day's check-ins.
-  order: 20,
-  async run(context) {
-    const sessionId = await sessionOn(
-      context,
-      "monthly",
-      context.real(on),
-      "Monthly review",
-    );
-    for (const [goalKey, trend] of Object.entries(trends)) {
-      await callAction(context.action, "sessions.setTrend", {
-        sessionId,
-        goalId: need(context.ids.goals, goalKey, "Objective"),
-        trend,
-      });
-    }
-    await callAction(context.action, "sessions.recordDecision", {
-      sessionId,
-      keyResultId: need(
-        context.ids.keyResults,
-        decision.keyResult,
-        "Key result",
-      ),
-      text: decision.text,
-    });
-    await callAction(context.action, "sessions.close", { id: sessionId });
-  },
-});
+};
 
 const Q1_EVENTS: readonly YearEvent[] = [
-  ...WEEKS.map((monday, week) => weeklyCheckIns(week, monday)),
+  ...WEEKS.map((monday, week) => weeklyCheckIns(Q1_RUN_WEEKS, week, monday)),
   {
     on: "2027-02-01",
     step: "NW-Q1-17",
@@ -613,7 +427,7 @@ const Q1_EVENTS: readonly YearEvent[] = [
       );
       // The product marks an addition with the day it is written, which for
       // a quarter long over is today; the story's day is 1 February.
-      await markAddedOn(context, keyResultId);
+      await markAddedOn(context, { keyResultId });
       await callAction(context.action, "kpis.recordResponse", {
         kpiId: need(context.ids.kpis, "tickets", "KPI"),
         kind: "key_result",
@@ -624,6 +438,7 @@ const Q1_EVENTS: readonly YearEvent[] = [
   monthlyReview(
     "NW-Q1-18",
     "2027-02-01",
+    "q1",
     { C1: "flat", C2: "declining", C3: "improving" },
     {
       keyResult: "C2.3",
@@ -638,6 +453,7 @@ const Q1_EVENTS: readonly YearEvent[] = [
     async run(context) {
       const sessionId = await sessionOn(
         context,
+        "q1",
         "weekly",
         context.real("2027-02-08"),
         "Weekly check-in",
@@ -709,6 +525,7 @@ const Q1_EVENTS: readonly YearEvent[] = [
   monthlyReview(
     "NW-Q1-23",
     "2027-03-01",
+    "q1",
     { C1: "declining", C2: "improving", C3: "improving" },
     {
       keyResult: "C1.2",
@@ -717,59 +534,7 @@ const Q1_EVENTS: readonly YearEvent[] = [
   ),
 ];
 
-/** Sets an addition's mark to the day the story made it. */
-async function markAddedOn(context: YearContext, keyResultId: string) {
-  await runOperation(
-    { pool: context.seed.pool },
-    {
-      action: "demo.year.markAddedOn",
-      workspaceId: context.seed.workspaceId,
-      actor: { kind: "human", userId: context.seed.adminUserId },
-      async execute({ tx }) {
-        // openokr:allow-mutation: the builder's own audited operation.
-        await tx
-          .update(keyResults)
-          .set({ addedMidCycleAt: new Date(`${context.on}T11:00:00.000Z`) })
-          .where(activeOnly(keyResults, eq(keyResults.id, keyResultId)));
-        return {
-          result: keyResultId,
-          activity: {
-            kind: "key_result.updated" as const,
-            subjectType: "key_result" as const,
-            subjectId: keyResultId,
-            payload: {},
-          },
-          audit: {
-            action: "demo.year.markAddedOn",
-            targetType: "key_result",
-            targetId: keyResultId,
-            payload: { on: context.on },
-          },
-        };
-      },
-    },
-  );
-}
-
 // ── The review on 18 March ───────────────────────────────────────────────
-
-/** The score §2.10 computes from where a key result finished. */
-function computed(keyResult: RunningKeyResult): number {
-  if (keyResult.kind === "milestone" || keyResult.kind === "baseline") {
-    return 1;
-  }
-  const progress = keyResultProgress(
-    {
-      direction: keyResult.direction ?? "increase",
-      baseline: keyResult.baseline ?? 0,
-      target: keyResult.target ?? 0,
-      current: keyResult.finish ?? keyResult.baseline ?? 0,
-      ...(keyResult.kind ? { kind: keyResult.kind } : {}),
-    },
-    resolveThresholds(),
-  );
-  return Math.round(Math.min(progress, 100)) / 100;
-}
 
 const C1_2_ADJUSTED = {
   score: 0.71,

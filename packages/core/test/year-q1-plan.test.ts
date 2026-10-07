@@ -164,13 +164,16 @@ describe("Q1's plan (NW-Q1-01 to NW-Q1-14)", () => {
     expect(goals.map((goal) => goal.title)).not.toContain(
       "Retire the legacy job runner",
     );
+    // Q2 adds one of its own (NW-Q2-04), so Q1's are looked for by name.
     const initiatives = await rows<{ title: string }>(
       "select title from initiatives where workspace_id = $1 and deleted_at is null order by title",
     );
-    expect(initiatives.map((one) => one.title)).toEqual([
-      "Retire the legacy job runner",
-      "Write a runbook for every alert",
-    ]);
+    expect(initiatives.map((one) => one.title)).toEqual(
+      expect.arrayContaining([
+        "Retire the legacy job runner",
+        "Write a runbook for every alert",
+      ]),
+    );
     // S2 measures outcomes now, and P1's duplicate of E3.1 is gone. Read
     // in Q1, because a kept objective comes back in Q2 under the same title.
     const s2 = await rows<{ title: string }>(
@@ -226,8 +229,12 @@ describe("Q1's plan (NW-Q1-01 to NW-Q1-14)", () => {
     if (!by("2027-01-13")) {
       return;
     }
+    const q1 = await cycleAt("2027-01-15");
     const dependencies = await rows<{ confirmed: boolean }>(
-      "select confirmed_at is not null as confirmed from key_result_dependencies where workspace_id = $1 and deleted_at is null",
+      `select d.confirmed_at is not null as confirmed from key_result_dependencies d
+         join key_results k on k.id = d.key_result_id join goals g on g.id = k.goal_id
+        where d.workspace_id = $1 and g.cycle_id = $2 and d.deleted_at is null`,
+      [q1?.id],
     );
     expect(dependencies).toHaveLength(2);
     expect(dependencies.every((one) => one.confirmed)).toBe(true);

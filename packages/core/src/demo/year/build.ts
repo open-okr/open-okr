@@ -12,6 +12,8 @@ import { FRAME_EVENTS } from "./frame.ts";
 import { PILOT_EVENTS } from "./pilot.ts";
 import { Q1_PLAN_EVENTS } from "./q1-plan.ts";
 import { Q1_RUN_EVENTS } from "./q1-run.ts";
+import { Q2_PLAN_EVENTS } from "./q2-plan.ts";
+import { Q2_EARLY_EVENTS } from "./q2-run.ts";
 import {
   runYear,
   type YearEvent,
@@ -25,6 +27,8 @@ const YEAR_EVENTS: readonly YearEvent[] = [
   ...PILOT_EVENTS,
   ...Q1_PLAN_EVENTS,
   ...Q1_RUN_EVENTS,
+  ...Q2_PLAN_EVENTS,
+  ...Q2_EARLY_EVENTS,
 ];
 
 export interface NorthwindYearResult {
