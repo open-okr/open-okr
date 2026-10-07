@@ -106,3 +106,30 @@ Each part proves its own steps against a database as of the real today, and
 | P9-T22c-b-a | Check-ins are written through `goals.importCheckIn`, under a `csv` legacy key named `northwind-year:` | It is the one action that publishes a check-in on its own date, through the Operation pipeline, with its values and their history on that date. The key is what makes it idempotent |
 | P9-T22c-b-a | Jonas's rewrite of S2 removes the two activity key results and adds the two outcomes | A different measure is not an eased target, and §2.9 asks a reason of any easing, published or not |
 | P9-T22c-b-a | "P1 depends on E3, and Mei confirms it" is a dependency of P1.1 on Engineering, confirmed, beside the link between the two objectives | Confirmation belongs to a key result's dependency on a space (§5.4); a link between two objectives has nothing to confirm |
+| P9-T22c-b-b | Each key result's weekly values are a path the scenario does not give: a straight line from the baseline to where it finished, or a drawn path where the story says how it moved (C1.2 behind pace, C2.1 up after the January release and back down, M1.1 flat) | The scenario gives where each one started and finished and the weeks that matter. The grades are the scores §2.10 computes from the finish, so the scorecard's one adjustment is C1.2's, as the story has it |
+| P9-T22c-b-b | Q2 is created on 4 March, four weeks before it starts, with Elena its sponsor and Priya its facilitator | A close feeds the next quarter that exists. Without Q2 it would feed the quarter provisioning made for today, and the eleven kept and modified objectives would land a year away |
+| P9-T22c-b-b | C2.3's mid-cycle mark is set to 1 February by the builder's own audited operation, and a key result's first value is dated the day it was added | The product stamps both with the day they are written, which for a quarter long over is today. The audit row says the builder did it |
+| P9-T22c-b-b | The monthly reviews, the weekly session holding the blocker and the quarter's review are all in the company space | The story holds them as company rituals, and the product needs a session to hold a decision and a blocker |
+
+### Four product changes the year found
+
+Building Q1's close against a database meant recording a review after its day,
+which no test had done. Four things read the clock where they should read the
+record's own day. Each is fixed in the product, with its own test, rather than
+worked around in the seed, because a team that writes up its review the
+morning after meets the same four.
+
+| Change | Before | After | Test |
+|---|---|---|---|
+| The diagnostic measures the rhythm as of the review's day | Measured as of the moment it was recorded, so a review written up later counted every check-in due since as missed | As of the session's day once it has passed, and now otherwise | `review-reset.test.ts`, "measures the rhythm as of the review's day" |
+| A decision is dated by its session's day | Dated the day it was typed | The session's day once it has passed, and today otherwise | `monthly-review.test.ts`, "a decision's date" |
+| An imported check-in that marks a milestone done dates it by the check-in | `done_at` was the day of the import | The check-in's own date, as its values already were | `measured-rhythm.test.ts`, "an imported check-in that marks a milestone done" |
+| **A review in the company space covers the whole cycle** | A review decided only the objectives of its own space, so the company's quarterly review could not decide a team's objective | The company space's review covers every objective in the cycle. A team's review still covers only its own | `review-reset.test.ts`, "which objectives a review covers" |
+
+**The fourth is for Akmal to confirm.** METHOD §8's ninth stage closes every
+objective deliberately, and the scenario holds one quarterly review, in the
+company space, that decides all fourteen.
+The product had no way to do that: each space's review saw only its own
+objectives. Widening the company space's review is the smallest change that
+matches §8, and it leaves a team's review as it was. If the intent is instead
+one review per space, the change comes out and the seed holds fourteen.

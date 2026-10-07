@@ -316,6 +316,37 @@ describe("sessions.recordDecision", () => {
   });
 });
 
+describe("a decision's date (P9-T22c-b-b)", () => {
+  it("is the day the review sat, when it is recorded after", async () => {
+    // A review held on 2 March and written up a week later: its decision
+    // belongs to 2 March, as the session's own record does.
+    const past = (await call("sessions.create", {
+      spaceId,
+      cycleId,
+      kind: "monthly",
+      title: "February monthly review",
+      scheduledFor: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+      facilitatorId: facilitatorMemberId,
+    })) as { id: string };
+    await call("sessions.open", { id: past.id });
+    await call("sessions.recordDecision", {
+      sessionId: past.id,
+      keyResultId,
+      text: "Hold the hiring plan until the April numbers are in",
+    });
+    const decisions = (await call("decisions.forGoal", { goalId })) as {
+      text: string;
+      at: string;
+    }[];
+    const recorded = decisions.find((one) =>
+      one.text.startsWith("Hold the hiring"),
+    );
+    expect(recorded?.at.slice(0, 10)).toBe(
+      new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10),
+    );
+  });
+});
+
 describe("the acceptance criterion", () => {
   it("shows a decision on the goal it affects, with its date and author", async () => {
     await call("sessions.recordDecision", {

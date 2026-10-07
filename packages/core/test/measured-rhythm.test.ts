@@ -118,6 +118,40 @@ afterAll(async () => {
   await wb.close();
 });
 
+describe("an imported check-in that marks a milestone done (P9-T22c-b-b)", () => {
+  it("dates it done by the check-in, not by the day it was imported", async () => {
+    const milestone = await call<{ id: string }>("goals.addKeyResult", {
+      goalId,
+      title: "Bulk import generally available",
+      kind: "milestone",
+      indicatorType: "leading",
+      weight: 1,
+    });
+    const doneOn = mondays()[2] as string;
+    await call("goals.importCheckIn", {
+      goalId,
+      authorMemberId: memberId,
+      status: "on_track",
+      confidence: 0.9,
+      narrative: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "Shipped." }] },
+        ],
+      },
+      values: [{ keyResultId: milestone.id, done: true }],
+      publishedAt: `${doneOn}T15:00:00.000Z`,
+      legacy: { type: "csv", id: "milestone-done" },
+    });
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ done_on: string }>(
+      "select to_char(done_at at time zone 'UTC', 'YYYY-MM-DD') as done_on from key_results where id = $1",
+      [milestone.id],
+    );
+    expect(rows[0]?.done_on).toBe(doneOn);
+  });
+});
+
 describe("the measured rhythm", () => {
   it("counts every Monday due, and the ones published on time", async () => {
     const due = mondays();

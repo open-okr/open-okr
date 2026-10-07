@@ -210,7 +210,12 @@ async function applyValues<
     // §2.10: a milestone is checked in as done or not done. The same rule
     // as every other write, so a metric marked done is refused here too.
     if (entry.done !== undefined) {
-      const doneAt = doneAtFor(before.kind, before.doneAt, entry.done);
+      const doneAt = doneAtFor(
+        before.kind,
+        before.doneAt,
+        entry.done,
+        input.now,
+      );
       if (doneAt !== before.doneAt) {
         // openokr:allow-mutation: same transaction.
         await tx

@@ -126,7 +126,27 @@ const gradeAndSurvey = async (
  * none. The objective moves with its key results, and the review is opened
  * again in that quarter.
  */
-const inAPastQuarter = async (rhythm: "kept" | "missed") => {
+/** Monday of a week counted from a quarter's first Monday, before its check-in. */
+const reviewDay = (startsOn: string, week: number): string => {
+  let on = startsOn;
+  while (new Date(`${on}T00:00:00Z`).getUTCDay() !== 1) {
+    on = new Date(Date.parse(`${on}T00:00:00Z`) + 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+  }
+  return new Date(Date.parse(`${on}T00:00:00Z`) + week * 7 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+};
+
+const inAPastQuarter = async (
+  rhythm: "kept" | "missed",
+  /**
+   * The week the review is held in, counted from the quarter's first Monday,
+   * when it is held before the quarter ends: the check-ins stop there.
+   */
+  reviewWeek?: number,
+) => {
   const ago = new Date(Date.now() - 120 * 86_400_000)
     .toISOString()
     .slice(0, 10);
@@ -146,7 +166,11 @@ const inAPastQuarter = async (rhythm: "kept" | "missed") => {
         .toISOString()
         .slice(0, 10);
     }
-    for (let week = 0; on <= past.endsOn; week += 1) {
+    for (
+      let week = 0;
+      on <= past.endsOn && (reviewWeek === undefined || week < reviewWeek);
+      week += 1
+    ) {
       await call("goals.importCheckIn", {
         goalId,
         authorMemberId: facilitatorMemberId,
@@ -171,7 +195,9 @@ const inAPastQuarter = async (rhythm: "kept" | "missed") => {
     cycleId: past.id,
     kind: "quarterly",
     title: "Last quarter's review",
-    scheduledFor: new Date(`${past.endsOn}T09:00:00.000Z`).toISOString(),
+    scheduledFor: new Date(
+      `${reviewWeek === undefined ? past.endsOn : reviewDay(past.startsOn, reviewWeek)}T09:00:00.000Z`,
+    ).toISOString(),
     facilitatorId: facilitatorMemberId,
   })) as { id: string };
   sessionId = session.id;
@@ -358,6 +384,20 @@ describe("the rhythm diagnostic", () => {
     expect(status.rhythmScore).toBe(1);
     expect(status.diagnosis).toBe("Likely a strategy or OKR-quality problem");
     expect(status.prescription).toContain("before you push the team");
+  });
+
+  it("measures the rhythm as of the review's day, not the day it is recorded (P9-T22c-b-b)", async () => {
+    // A review held in week 8 of a quarter long over, read today. The weeks
+    // after the review had not fallen due when the room sat, so they are not
+    // missed check-ins: the rhythm the team kept up to the review was whole.
+    await inAPastQuarter("kept", 8);
+    await gradeAndSurvey([0.2, 0.5], [1, 1, 1, 1, 1]);
+    await call("sessions.recordDiagnostic", { sessionId });
+
+    const status = await diagnostic();
+    expect(status.onTimeShare).toBe(1);
+    expect(status.dueCheckIns).toBeLessThanOrEqual(8);
+    expect(status.verdict).toBe("strategy_or_quality");
   });
 
   it("reads a rhythm problem when nothing was published on time", async () => {
@@ -588,6 +628,79 @@ describe("keep, modify or abandon", () => {
     expect(
       status.objectives.find((entry) => entry.goalId === second.id)?.decision,
     ).toBeNull();
+  });
+});
+
+describe("which objectives a review covers (P9-T22c-b-b)", () => {
+  /** A space beyond the company's, with an objective of its own. */
+  const aTeamAndTheCompany = async () => {
+    const team = (await call("spaces.create", { name: "Sales" })) as {
+      id: string;
+    };
+    const teamGoal = (await call("goals.create", {
+      title: "Sell to accounts that can onboard themselves",
+      cycleId,
+      spaceId: team.id,
+      level: "team",
+      ownerKind: "space",
+      championId: facilitatorMemberId,
+      weight: 1,
+    })) as { id: string };
+    const companyGoal = (await call("goals.create", {
+      title: "New accounts reach value in their first week",
+      cycleId,
+      level: "company",
+      ownerKind: "workspace",
+      championId: facilitatorMemberId,
+      weight: 1,
+    })) as { id: string };
+    return {
+      team: team.id,
+      teamGoal: teamGoal.id,
+      companyGoal: companyGoal.id,
+    };
+  };
+
+  it("lets the company space's review decide every objective in the cycle", async () => {
+    // The company space is the workspace's first, and its review is the
+    // company's: a company objective belongs to no space, and was decided by
+    // no review at all until this.
+    const { teamGoal, companyGoal } = await aTeamAndTheCompany();
+    for (const goalId of [teamGoal, companyGoal]) {
+      await call("sessions.decideObjective", {
+        sessionId,
+        goalId,
+        decision: "keep",
+        why: "Still the bet.",
+      });
+    }
+    const decided = (await reset()).objectives.filter(
+      (row) => row.decision === "keep",
+    );
+    expect(decided.map((row) => row.goalId).sort()).toEqual(
+      [teamGoal, companyGoal].sort(),
+    );
+  });
+
+  it("keeps a team's review to the team's own objectives", async () => {
+    const { team, companyGoal } = await aTeamAndTheCompany();
+    const teamReview = (await call("sessions.create", {
+      spaceId: team,
+      cycleId,
+      kind: "quarterly",
+      title: "Sales review",
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      facilitatorId: facilitatorMemberId,
+    })) as { id: string };
+    await call("sessions.open", { id: teamReview.id });
+    await expect(
+      call("sessions.decideObjective", {
+        sessionId: teamReview.id,
+        goalId: companyGoal,
+        decision: "keep",
+        why: "Not ours to decide.",
+      }),
+    ).rejects.toThrow(/not in this review/);
   });
 });
 

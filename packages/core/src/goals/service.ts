@@ -984,6 +984,11 @@ export function doneAtFor(
   kind: KeyResultKind,
   stored: Date | null,
   done: boolean | undefined,
+  /**
+   * When it was done: the check-in's own moment where a check-in marks it,
+   * so an imported one keeps its date (P9-T22c-b-b).
+   */
+  now: Date = new Date(),
 ): Date | null {
   const doneable = kind === "milestone" || kind === "baseline";
   if (done === true && !doneable) {
@@ -995,5 +1000,5 @@ export function doneAtFor(
   if (!doneable || done === false) {
     return null;
   }
-  return done === true ? (stored ?? new Date()) : stored;
+  return done === true ? (stored ?? now) : stored;
 }

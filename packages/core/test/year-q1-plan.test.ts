@@ -171,11 +171,13 @@ describe("Q1's plan (NW-Q1-01 to NW-Q1-14)", () => {
       "Retire the legacy job runner",
       "Write a runbook for every alert",
     ]);
-    // S2 measures outcomes now, and P1's duplicate of E3.1 is gone.
+    // S2 measures outcomes now, and P1's duplicate of E3.1 is gone. Read
+    // in Q1, because a kept objective comes back in Q2 under the same title.
     const s2 = await rows<{ title: string }>(
       `select k.title from key_results k join goals g on g.id = k.goal_id
         where k.workspace_id = $1 and g.title = 'Fill the pipeline with accounts that fit'
-          and k.deleted_at is null order by k.position`,
+          and g.cycle_id = $2 and k.deleted_at is null order by k.position`,
+      [q1?.id],
     );
     expect(s2.map((row) => row.title)).toEqual([
       "Raise call-to-meeting conversion from 8% to 12%",
@@ -184,7 +186,8 @@ describe("Q1's plan (NW-Q1-01 to NW-Q1-14)", () => {
     const p1 = await rows<{ title: string; kind: string }>(
       `select k.title, k.kind from key_results k join goals g on g.id = k.goal_id
         where k.workspace_id = $1 and g.title = 'Onboarding runs without us in the room'
-          and k.deleted_at is null order by k.position`,
+          and g.cycle_id = $2 and k.deleted_at is null order by k.position`,
+      [q1?.id],
     );
     expect(p1).toEqual([
       {

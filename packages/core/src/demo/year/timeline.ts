@@ -32,8 +32,10 @@ interface YearIds {
   /** Objectives and key results by the scenario's labels: "a1", "a3.soc2". */
   readonly goals: Map<string, string>;
   readonly keyResults: Map<string, string>;
-  /** Dependencies by a label the events choose: "P1-E3". */
+  /** Dependencies by a label the events choose: "P1.1-engineering". */
   readonly dependencies: Map<string, string>;
+  /** Blockers by the key result they block: "C1.3". */
+  readonly blockers: Map<string, string>;
   /** The annual frame's strategies, in the frame's order. */
   strategies: string[];
 }
@@ -44,6 +46,8 @@ export interface YearContext {
   readonly realYear: number;
   /** Today, `YYYY-MM-DD`. */
   readonly today: string;
+  /** The real date of the event being written, set by the runner. */
+  on: string;
   readonly ids: YearIds;
   /** The context every action is called with. */
   readonly action: {
@@ -77,6 +81,7 @@ export function yearContext(seed: YearSeed, today: string): YearContext {
     seed,
     realYear,
     today,
+    on: today,
     ids: {
       people: new Map(),
       spaces: new Map(),
@@ -85,6 +90,7 @@ export function yearContext(seed: YearSeed, today: string): YearContext {
       goals: new Map(),
       keyResults: new Map(),
       dependencies: new Map(),
+      blockers: new Map(),
       strategies: [],
     },
     action: {
@@ -129,6 +135,7 @@ export async function runYear(
 ): Promise<number> {
   const due = eventsDue(events, context.today);
   for (const event of due) {
+    context.on = context.real(event.on);
     try {
       await event.run(context);
     } catch (error) {

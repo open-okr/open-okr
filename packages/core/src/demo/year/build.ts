@@ -11,6 +11,7 @@ import { isoDay } from "./calendar.ts";
 import { FRAME_EVENTS } from "./frame.ts";
 import { PILOT_EVENTS } from "./pilot.ts";
 import { Q1_PLAN_EVENTS } from "./q1-plan.ts";
+import { Q1_RUN_EVENTS } from "./q1-run.ts";
 import {
   runYear,
   type YearEvent,
@@ -23,6 +24,7 @@ const YEAR_EVENTS: readonly YearEvent[] = [
   ...FRAME_EVENTS,
   ...PILOT_EVENTS,
   ...Q1_PLAN_EVENTS,
+  ...Q1_RUN_EVENTS,
 ];
 
 export interface NorthwindYearResult {

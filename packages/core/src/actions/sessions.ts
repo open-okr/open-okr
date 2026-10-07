@@ -4258,7 +4258,15 @@ export const recordDecision = defineWriteAction({
           goalId,
           keyResultId: input.keyResultId ?? null,
           text: input.text,
-          at: localDate(new Date(), await workspaceTimeZone(tx, workspaceId)),
+          // The day the review sat, or today while it has not passed: a
+          // decision recorded after the session belongs to the session's day
+          // (P9-T22c-b-b), as its diagnostic does.
+          at: localDate(
+            session.scheduledFor.getTime() < Date.now()
+              ? session.scheduledFor
+              : new Date(),
+            await workspaceTimeZone(tx, workspaceId),
+          ),
           authorMemberId: memberId,
         })
         .returning({ id: decisions.id });
@@ -5545,13 +5553,34 @@ async function unexplainedCommittedMissesInTx(
     .map((row) => row.title);
 }
 
+/**
+ * The objectives a review covers: its space's, in its cycle, still open.
+ *
+ * **A review in the company space covers the whole cycle** (P9-T22c-b-b). The
+ * workspace's first space is the company's, as the Champion already reads it
+ * (P9-T19a), and a company objective belongs to no space: until this, no
+ * review anywhere could decide one. The company's review is where §8.8's
+ * "close every objective deliberately" is held for everyone; a team's own
+ * review still covers the team's own.
+ */
 function reviewObjectiveConditions(
   workspaceId: string,
   session: { spaceId: string | null; cycleId: string | null },
 ) {
   return [
     eq(goals.workspaceId, workspaceId),
-    session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+    session.spaceId
+      ? or(
+          eq(goals.spaceId, session.spaceId),
+          sql`${session.spaceId}::uuid = (
+            select first.id from spaces first
+             where first.workspace_id = ${workspaceId}
+               and first.deleted_at is null
+             order by first.created_at
+             limit 1
+          )`,
+        )
+      : sql`true`,
     session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
     isNull(goals.closedAt),
   ] as const;
@@ -7503,7 +7532,12 @@ export const readProcessHealth = defineReadAction({
 async function diagnosticInputsInTx(
   tx: OperationTx,
   workspaceId: string,
-  session: { id: string; spaceId: string | null; cycleId: string | null },
+  session: {
+    id: string;
+    spaceId: string | null;
+    cycleId: string | null;
+    scheduledFor: Date;
+  },
   thresholds: ResolvedThresholds,
 ) {
   const sessionId = session.id;
@@ -7542,7 +7576,14 @@ async function diagnosticInputsInTx(
     workspaceId,
     spaceId: session.spaceId,
     cycleId: session.cycleId,
-    asOf: new Date(),
+    // As of the day the room sits, or now while it has not (P9-T22c-b-b).
+    // Read later, the rhythm counted check-ins that fell due after the
+    // review as missed, so a review recorded the day after it was held read
+    // a different team.
+    asOf:
+      session.scheduledFor.getTime() < Date.now()
+        ? session.scheduledFor
+        : new Date(),
     thresholds,
     gradedGoalIds: [...new Set(graded.map((row) => row.goalId))],
   });

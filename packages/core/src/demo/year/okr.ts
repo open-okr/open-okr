@@ -3,7 +3,10 @@
  * (P9-T22c-b-a). One shape for every quarter's tables, so a chapter reads as
  * the scenario's own table and the writing is in one place.
  */
+import { activeOnly, keyResultValues } from "@openokr/db";
+import { and, gt, inArray } from "drizzle-orm";
 import { callAction } from "../../actions/registry.ts";
+import { runOperation } from "../../operations/operation.ts";
 import { richTextFromPlainText } from "../../rich-text/from-text.ts";
 import type { YearKpiKey } from "./kpis.ts";
 import type { YearPersonKey, YearSpaceKey } from "./people.ts";
@@ -47,6 +50,62 @@ export interface YearObjective {
   readonly keyResults: readonly YearKeyResult[];
 }
 
+/**
+ * Dates key results' first values to the day the story wrote them.
+ *
+ * A key result's first value is recorded as it is created, stamped by the
+ * database as the seed runs. For a quarter long over that put the start of
+ * every chart after its end, months after the check-ins that moved it.
+ */
+async function dateFirstValues(
+  context: YearContext,
+  keyResultIds: readonly string[],
+): Promise<void> {
+  if (keyResultIds.length === 0) {
+    return;
+  }
+  const at = new Date(`${context.on}T09:00:00.000Z`);
+  await runOperation(
+    { pool: context.seed.pool },
+    {
+      action: "demo.year.dateFirstValues",
+      workspaceId: context.seed.workspaceId,
+      actor: { kind: "human", userId: context.seed.adminUserId },
+      async execute({ tx }) {
+        // openokr:allow-mutation: the builder's own audited operation.
+        const dated = await tx
+          .update(keyResultValues)
+          .set({ at })
+          .where(
+            activeOnly(
+              keyResultValues,
+              and(
+                inArray(keyResultValues.keyResultId, [...keyResultIds]),
+                gt(keyResultValues.at, at),
+              ),
+            ),
+          )
+          .returning({ id: keyResultValues.id });
+        return {
+          result: dated.length,
+          activity: {
+            kind: "key_result.updated" as const,
+            subjectType: "key_result" as const,
+            subjectId: keyResultIds[0] as string,
+            payload: {},
+          },
+          audit: {
+            action: "demo.year.dateFirstValues",
+            targetType: "key_result",
+            targetId: keyResultIds[0] as string,
+            payload: { keyResults: keyResultIds.length, on: context.on },
+          },
+        };
+      },
+    },
+  );
+}
+
 /** Adds one key result to an objective already written. */
 export async function addYearKeyResult(
   context: YearContext,
@@ -77,6 +136,7 @@ export async function addYearKeyResult(
     weight: 1,
   });
   context.ids.keyResults.set(keyResult.key, added.id);
+  await dateFirstValues(context, [added.id]);
   return added.id;
 }
 
