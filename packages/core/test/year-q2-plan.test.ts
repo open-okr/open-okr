@@ -19,7 +19,13 @@ const OWNER = "year-q2-plan-owner";
 const today = isoDay(new Date());
 const realYear = Number(today.slice(0, 4));
 const on = (scenarioDate: string) => toReal(scenarioDate, realYear);
-const by = (scenarioDate: string) => on(scenarioDate) <= today;
+/**
+ * Built to the last day this file reads, or to today when that is earlier:
+ * the whole year is the slowest thing the suite builds, and a file that
+ * reads Q1 has no use for the rest.
+ */
+const until = [on("2027-05-03"), today].sort()[0] as string;
+const by = (scenarioDate: string) => on(scenarioDate) <= until;
 
 let workspaceId: string;
 let q2Id: string | undefined;
@@ -60,6 +66,7 @@ beforeAll(async () => {
     pool: wb.appPool,
     workspaceId,
     adminUserId: OWNER,
+    today: new Date(`${until}T12:00:00.000Z`),
   });
   const [q2] = await rows<{ id: string }>(
     `select id from cycles where workspace_id = $1 and mode = 'quarterly'

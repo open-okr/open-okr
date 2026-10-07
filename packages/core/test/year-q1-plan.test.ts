@@ -17,7 +17,14 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 const OWNER = "year-q1-plan-owner";
 const today = isoDay(new Date());
 const realYear = Number(today.slice(0, 4));
-const by = (scenarioDate: string) => toReal(scenarioDate, realYear) <= today;
+const on = (scenarioDate: string) => toReal(scenarioDate, realYear);
+/**
+ * Built to the last day this file reads, or to today when that is earlier:
+ * the whole year is the slowest thing the suite builds, and a file that
+ * reads Q1 has no use for the rest.
+ */
+const until = [on("2027-01-15"), today].sort()[0] as string;
+const by = (scenarioDate: string) => on(scenarioDate) <= until;
 
 let workspaceId: string;
 
@@ -65,6 +72,7 @@ beforeAll(async () => {
     pool: wb.appPool,
     workspaceId,
     adminUserId: OWNER,
+    today: new Date(`${until}T12:00:00.000Z`),
   });
 }, 600_000);
 

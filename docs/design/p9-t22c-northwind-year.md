@@ -59,7 +59,8 @@ several, and a few have none (§5).
 | **P9-T22c-b-b** | Q1's twelve weeks: the weekly check-ins, the mid-cycle key result, the blocker, the milestones, the monthly reviews; and the review graded and closed | NW-Q1-15 to NW-Q1-32 |
 | **P9-T22c-c-a** | Q2's plan from the drafts Q1's close left: the redrafts, C3, C4, CS2 and F2, both publish steps with F2's override, Engineering's third objective as an initiative, Yuki following P1, CS2's dependency escalated and confirmed; weeks 1 to 5 and the first monthly review. The helpers for running a quarter, shared by Q1 and Q2 | NW-Q2-01 to NW-Q2-08 |
 | **P9-T22c-c-b** | The competitor's moves, the eased target, the leaver, the escalated commitment, the baseline recorded and its target added, the June review, the split review and retrospective, the close, and the mid-year revision of the annual frame | NW-Q2-09 to NW-Q2-23 |
-| **P9-T22c-d** | Q3: the recovery, the holidays and the leave, the merger, the new team, the milestones, and the close | NW-Q3-01 to NW-Q3-16 |
+| **P9-T22c-d-a** | Q3's plan: Phase 2's issues, the redrafts, S3 and F3, both steps; the margin recovery C6 launched inside the window with expansion answered by C6.2; weeks 1 to 4 with Sales every two weeks, and July's reading | NW-Q3-01 to NW-Q3-05 |
+| **P9-T22c-d-b** | The summer: holidays and leave with delegates, SU1 moved before Support is archived, Mei's handover, the Growth team's G1, the forecast, the milestones and the SOC 2 report; the grading, the split review and the close | NW-Q3-06 to NW-Q3-16 |
 | **P9-T22c-e** | Q4, the annual review, 2028's annual objectives and Q1 2028's drafts. The demo switches to the year: `pnpm db:seed` and the nightly reset build it, `demo:prepare` gives the added people accounts, and README §6 says what a visitor sees in each part of the year | NW-Q4-01 to NW-Q4-16 |
 
 ## 5. What a seed reproduces, and what it does not
@@ -127,6 +128,11 @@ Each part proves its own steps against a database as of the real today, and
 | P9-T22c-c-b | The grades are recorded in the review session on 16 June rather than on 14 and 15 June | A grade is recorded in the review that reveals it; the champions' preparation leaves nothing until then |
 | P9-T22c-c-b | Process health reads statement three lowest at 3, not 3.1 | 3.1 is a room's average; the seed submits one person's answers |
 | P9-T22c-c-b | Q3 is created on 3 June, four weeks ahead, with its sponsor and facilitator | So Q2's close has somewhere to feed, as Q2 did for Q1 |
+
+| P9-T22c-d-a | Four of Q2's finishes move to where Q3's table starts them (C5.2 at 1, E1.1 at 11, S1.2 at 4.5, CS1.1 at 80), and four free ones move to keep Q2 at 0.59 with eleven below 0.6 | A kept key result starts the next quarter from its last value (§8.9), so Q2's grading has to finish where Q3's table begins. Support cost is the exception: Q3 starts it from June's KPI reading, $109, which arrives after Q2's grading read May's $113 |
+| P9-T22c-d-a | C6 is launched from the margin KPI and then shaped: raised to company level, Hugo its champion and Elena its reviewer, aligned to A2, the two double-counted drivers removed and C6.2 and C6.3 added | The launch drafts §6.5's recovery as a team objective championed by whoever launches it. The semantic review that names the double counts needs a provider; the seed makes the change it leads to |
+| P9-T22c-d-a | C6.1 and C6.2 read their KPIs, so the monthly readings move them and no check-in writes their values | A recovery's first key result is the KPI it is (P9-T18a), and C6.2 is expansion seats' answer |
+| P9-T22c-d-a | Three Q3 key results the chapter leaves free finish where they started: C5.2 at 1, P4.2 at 0.6 and E1.1 at 11 | Every other aspirational figure is fixed by NW-Q3-14 or by Q4's table, and together they already grade 0.66 |
 
 ### Product changes the year found
 

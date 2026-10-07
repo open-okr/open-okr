@@ -9,39 +9,11 @@
  * 15 April. Labels are the chapter's, under `q2:` so they do not meet Q1's.
  */
 import { callAction } from "../../actions/registry.ts";
-import {
-  addYearKeyResult,
-  writeYearObjective,
-  type YearKeyResult,
-  type YearObjective,
-} from "./okr.ts";
-import type { YearPersonKey, YearSpaceKey } from "./people.ts";
+import { writeYearObjective, type YearObjective } from "./okr.ts";
+import type { YearSpaceKey } from "./people.ts";
 import { YEAR_SPACES } from "./people.ts";
-import { need, type YearContext, type YearEvent } from "./timeline.ts";
-
-/** A carried key result as Q2 redrafts it. */
-interface Redrafted {
-  /** Its Q2 label. */
-  readonly key: string;
-  readonly title: string;
-  readonly baselineValue?: number;
-  readonly targetValue?: number;
-  readonly ownerKey?: YearPersonKey;
-}
-
-/** A carried objective as Q2 redrafts it. */
-interface Redraft {
-  /** Its Q1 label; it becomes `q2:` the same. */
-  readonly key: string;
-  readonly title?: string;
-  /** A commitment's key results are given their capacity verdicts again. */
-  readonly committed?: boolean;
-  readonly parentGoal?: string;
-  readonly parentKeyResult?: string;
-  /** Carried key results by their Q1 label; one left out is removed. */
-  readonly keyResults: Readonly<Record<string, Redrafted>>;
-  readonly added?: readonly YearKeyResult[];
-}
+import { type Carry, nameCarried, type Redraft, redraft } from "./redraft.ts";
+import { need, type YearEvent } from "./timeline.ts";
 
 const COMPANY_REDRAFTS: readonly Redraft[] = [
   {
@@ -387,128 +359,8 @@ const RHYTHM_SPACES: readonly YearSpaceKey[] = [
   "finance",
 ];
 
-async function q2EndsOn(context: YearContext): Promise<string> {
-  const q2 = (await callAction(context.action, "cycles.list", {})).find(
-    (cycle) => cycle.id === need(context.ids.cycles, "q2", "Cycle"),
-  );
-  if (!q2) {
-    throw new Error("Q2 is not there to draft in.");
-  }
-  return q2.endsOn;
-}
-
-/**
- * Finds the drafts Q1's close carried into Q2 and names them `q2:` the same.
- *
- * A carried draft keeps its title and its key results' titles (§8.9), and is
- * the only objective of that title in Q2 when the close writes it.
- */
-async function nameCarried(
-  context: YearContext,
-  keys: readonly string[],
-): Promise<void> {
-  const q2 = need(context.ids.cycles, "q2", "Cycle");
-  const { goals: drafts } = await callAction(context.action, "goals.list", {
-    cycleId: q2,
-    includeClosed: false,
-    limit: 500,
-  });
-  const labels = new Map(
-    [...context.ids.keyResults].map(([label, id]) => [id, label]),
-  );
-  for (const key of keys) {
-    const source = await callAction(context.action, "goals.read", {
-      id: need(context.ids.goals, key, "Objective"),
-    });
-    const draft = drafts.find((goal) => goal.title === source.title);
-    if (!draft) {
-      throw new Error(`Q1's ${key} was not carried into Q2.`);
-    }
-    context.ids.goals.set(`q2:${key}`, draft.id);
-    for (const keyResult of source.keyResults) {
-      const label = labels.get(keyResult.id);
-      const carried = draft.keyResults.find(
-        (one) => one.title === keyResult.title,
-      );
-      if (label && carried) {
-        // The carried copy under its Q1 label, until the redraft renames it.
-        context.ids.keyResults.set(`q2-from:${label}`, carried.id);
-      }
-    }
-  }
-}
-
-/**
- * Applies a redraft to a carried objective.
- *
- * A carried key result leaves its due date and its capacity verdict behind
- * with the old cycle (§8.9, P9-T20e-b), so each is given Q2's again here, as
- * Phase 5 asks of the people redrafting.
- */
-async function redraft(context: YearContext, edit: Redraft): Promise<void> {
-  const goalId = need(context.ids.goals, `q2:${edit.key}`, "Objective");
-  const endsOn = await q2EndsOn(context);
-  await callAction(context.action, "goals.update", {
-    id: goalId,
-    ...(edit.title ? { title: edit.title } : {}),
-    ...(edit.parentGoal
-      ? { parentGoalId: need(context.ids.goals, edit.parentGoal, "Objective") }
-      : {}),
-    ...(edit.parentKeyResult
-      ? {
-          parentKeyResultId: need(
-            context.ids.keyResults,
-            edit.parentKeyResult,
-            "Key result",
-          ),
-        }
-      : {}),
-  });
-  const source = await callAction(context.action, "goals.read", {
-    id: need(context.ids.goals, edit.key, "Objective"),
-  });
-  const labels = new Map(
-    [...context.ids.keyResults].map(([label, id]) => [id, label]),
-  );
-  for (const keyResult of source.keyResults) {
-    const label = labels.get(keyResult.id);
-    if (!label) {
-      continue;
-    }
-    const carriedId = context.ids.keyResults.get(`q2-from:${label}`);
-    if (!carriedId) {
-      continue;
-    }
-    const kept = edit.keyResults[label];
-    if (!kept) {
-      await callAction(context.action, "goals.removeKeyResult", {
-        id: carriedId,
-      });
-      continue;
-    }
-    await callAction(context.action, "goals.updateKeyResult", {
-      id: carriedId,
-      title: kept.title,
-      ...(kept.baselineValue === undefined
-        ? {}
-        : { baselineValue: kept.baselineValue }),
-      ...(kept.targetValue === undefined
-        ? {}
-        : { targetValue: kept.targetValue }),
-      ...(kept.ownerKey
-        ? { ownerId: need(context.ids.people, kept.ownerKey, "Owner") }
-        : {}),
-      dueOn: endsOn,
-      ...(edit.committed ? { capacity: "fits" as const } : {}),
-    });
-    context.ids.keyResults.set(kept.key, carriedId);
-  }
-  if (edit.added?.length) {
-    for (const keyResult of edit.added) {
-      await addYearKeyResult(context, goalId, keyResult, endsOn);
-    }
-  }
-}
+/** Q1's close carried into Q2. */
+const INTO_Q2: Carry = { from: "", to: "q2" };
 
 export const Q2_PLAN_EVENTS: readonly YearEvent[] = [
   {
@@ -516,7 +368,7 @@ export const Q2_PLAN_EVENTS: readonly YearEvent[] = [
     step: "NW-Q2-01",
     label: "Q1's kept and modified objectives arrive in Q2 as drafts",
     async run(context) {
-      await nameCarried(context, [
+      await nameCarried(context, INTO_Q2, [
         "C1",
         "C2",
         "P1",
@@ -551,7 +403,7 @@ export const Q2_PLAN_EVENTS: readonly YearEvent[] = [
     label: "Q2's company objectives drafted",
     async run(context) {
       for (const edit of COMPANY_REDRAFTS) {
-        await redraft(context, edit);
+        await redraft(context, INTO_Q2, edit);
       }
       for (const objective of COMPANY_NEW) {
         await writeYearObjective(context, "q2", objective);
@@ -599,7 +451,7 @@ export const Q2_PLAN_EVENTS: readonly YearEvent[] = [
     label: "The teams redraft what Q1 left them, and add two",
     async run(context) {
       for (const edit of TEAM_REDRAFTS) {
-        await redraft(context, edit);
+        await redraft(context, INTO_Q2, edit);
       }
       for (const objective of TEAMS_NEW) {
         await writeYearObjective(context, "q2", objective);

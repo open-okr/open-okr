@@ -51,6 +51,7 @@ beforeAll(async () => {
     pool: wb.appPool,
     workspaceId,
     adminUserId: OWNER,
+    frameOnly: true,
   });
   expect(built.alreadySeeded).toBe(false);
 }, 300_000);

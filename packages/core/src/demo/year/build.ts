@@ -15,6 +15,8 @@ import { Q1_RUN_EVENTS } from "./q1-run.ts";
 import { Q2_CLOSE_EVENTS } from "./q2-close.ts";
 import { Q2_PLAN_EVENTS } from "./q2-plan.ts";
 import { Q2_EARLY_EVENTS } from "./q2-run.ts";
+import { Q3_PLAN_EVENTS } from "./q3-plan.ts";
+import { Q3_EARLY_EVENTS } from "./q3-run.ts";
 import {
   runYear,
   type YearEvent,
@@ -31,6 +33,8 @@ const YEAR_EVENTS: readonly YearEvent[] = [
   ...Q2_PLAN_EVENTS,
   ...Q2_EARLY_EVENTS,
   ...Q2_CLOSE_EVENTS,
+  ...Q3_PLAN_EVENTS,
+  ...Q3_EARLY_EVENTS,
 ];
 
 export interface NorthwindYearResult {
@@ -45,6 +49,12 @@ export async function buildNorthwindYear(
   seed: YearSeed & {
     /** Today; the real date unless a test places the year earlier. */
     readonly today?: Date;
+    /**
+     * Only the year's frame: its people, spaces, settings, KPIs and annual
+     * objectives. For a test that reads nothing a quarter writes, because the
+     * whole year is the slowest thing the suite builds.
+     */
+    readonly frameOnly?: boolean;
   },
 ): Promise<NorthwindYearResult> {
   const today = isoDay(seed.today ?? new Date());
@@ -60,6 +70,9 @@ export async function buildNorthwindYear(
     return { alreadySeeded: true, today, events: 0 };
   }
 
-  const events = await runYear(context, YEAR_EVENTS);
+  const events = await runYear(
+    context,
+    seed.frameOnly ? FRAME_EVENTS : YEAR_EVENTS,
+  );
   return { alreadySeeded: false, today, events };
 }

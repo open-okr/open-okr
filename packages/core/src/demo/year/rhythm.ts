@@ -30,6 +30,11 @@ export interface RunningKeyResult {
   readonly doneOn?: string;
   /** The grade's line; committed misses need theirs (§8.3). */
   readonly reason?: string;
+  /**
+   * It is a KPI's own key result, so the KPI's monthly reading moves it and a
+   * check-in does not (P9-T18a).
+   */
+  readonly readsKpi?: boolean;
 }
 
 export interface RunningObjective {
@@ -43,6 +48,8 @@ export interface RunningObjective {
   readonly from?: number;
   /** The last week it checks in, where it stops before the quarter ends. */
   readonly until?: number;
+  /** Every how many weeks it checks in: its space's frequency (§7.1). */
+  readonly every?: number;
   readonly keyResults: readonly RunningKeyResult[];
 }
 
@@ -79,6 +86,8 @@ export interface QuarterRun {
     week: number,
     reported: Reported,
   ): number | undefined;
+  /** Who writes it in a given week, where that is not its author: a leave. */
+  authorOf?(objective: RunningObjective, week: number): YearPersonKey;
   /** Values for key results added after the plan, which the objective's list does not hold. */
   extraValues?(
     context: YearContext,
@@ -137,7 +146,12 @@ export const weeklyCheckIns = (
   label: `${run.name}'s check-ins, week ${week + run.firstWeek}`,
   async run(context) {
     for (const objective of run.objectives) {
-      if (week < (objective.from ?? 0) || week > (objective.until ?? week)) {
+      const from = objective.from ?? 0;
+      if (
+        week < from ||
+        week > (objective.until ?? week) ||
+        (week - from) % (objective.every ?? 1) !== 0
+      ) {
         continue;
       }
       const reported = run.reported(objective, week);
@@ -148,7 +162,7 @@ export const weeklyCheckIns = (
           keyResult.key,
           "Key result",
         );
-        if (keyResult.kind === "milestone") {
+        if (keyResult.kind === "milestone" || keyResult.readsKpi) {
           continue;
         }
         if (keyResult.kind === "baseline") {
@@ -172,7 +186,11 @@ export const weeklyCheckIns = (
       const on = run.publishedOn?.(objective, monday) ?? monday;
       await callAction(context.action, "goals.importCheckIn", {
         goalId: need(context.ids.goals, objective.key, "Objective"),
-        authorMemberId: need(context.ids.people, objective.authorKey, "Author"),
+        authorMemberId: need(
+          context.ids.people,
+          run.authorOf?.(objective, week) ?? objective.authorKey,
+          "Author",
+        ),
         status: reported.status,
         confidence: reported.confidence,
         narrative: narrative(run.said(objective, monday)),

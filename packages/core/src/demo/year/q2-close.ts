@@ -204,14 +204,14 @@ const ROOT_CAUSES: readonly {
   { keyResult: "q2:C1.2", cause: 5 },
   { keyResult: "q2:C5.3", cause: 5 },
   { keyResult: "q2:C5.4", cause: 5 },
-  { keyResult: "q2:P1.1", cause: 5 },
-  { keyResult: "q2:S2.2", cause: 5 },
+  { keyResult: "q2:E1.1", cause: 5 },
   { keyResult: "q2:M1.1", cause: 5 },
-  { keyResult: "q2:C5.2", cause: 6 },
+  { keyResult: "q2:CS2.1", cause: 5 },
   { keyResult: "q2:S1.1", cause: 6 },
+  { keyResult: "q2:S1.2", cause: 6 },
   { keyResult: "q2:S2.1", cause: 6 },
   { keyResult: "q2:C2.2", cause: 4 },
-  { keyResult: "q2:CS2.1", cause: 4 },
+  { keyResult: "q2:CS1.1", cause: 4 },
 ];
 
 const DECISIONS: Readonly<
