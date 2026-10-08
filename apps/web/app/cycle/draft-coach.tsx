@@ -15,7 +15,7 @@ import {
   strengthScore,
 } from "@openokr/method";
 import { useTranslations } from "@openokr/ui";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   RuleVerdict,
   type RuleVerdictView,
@@ -115,6 +115,10 @@ export function DraftCoach({
   const { t } = useTranslations();
 
   const [title, setTitle] = useState(objective.title);
+  // One field per objective on the page, so the id cannot be a constant: a
+  // shared id pointed every label at the first field and left the others
+  // with no name (UAT BUG-004).
+  const fieldId = useId();
   const titles = useMemo(
     () => new Map(checkTitles.map((entry) => [entry.id, entry.title])),
     [checkTitles],
@@ -196,7 +200,7 @@ export function DraftCoach({
        * field's name. */}
       <div className="flex flex-col gap-1">
         <label
-          htmlFor="draft-coach-objective"
+          htmlFor={fieldId}
           className="text-xs font-semibold text-ink-2"
         >
           {t("cycle.draftCoach.objectiveCheckedAsYou")}
@@ -212,7 +216,7 @@ export function DraftCoach({
             className={`size-2.25 flex-none rounded-full ${WORST_DOT[worst]}`}
           />
           <input
-            id="draft-coach-objective"
+            id={fieldId}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             className="min-w-0 flex-1 bg-transparent text-lg font-semibold tracking-tight text-ink outline-none"
