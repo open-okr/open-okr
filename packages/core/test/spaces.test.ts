@@ -222,6 +222,31 @@ describe("workspace provisioning creates the default space", () => {
   });
 });
 
+describe("space names (UAT BUG-002)", () => {
+  it("refuses a name another live space holds, as a sentence, on create and on rename", async () => {
+    const wb = await workerDb();
+    const call = (action: string, input: unknown) =>
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        action as never,
+        input as never,
+      );
+    await call("spaces.create", { name: "Customer Success" });
+    await expect(
+      call("spaces.create", { name: "customer success" }),
+    ).rejects.toThrow(/already exists/);
+
+    const other = (await call("spaces.create", { name: "Sales" })) as {
+      id: string;
+    };
+    await expect(
+      call("spaces.update", { id: other.id, name: "Customer Success" }),
+    ).rejects.toThrow(/already exists/);
+    // Keeping its own name is not a clash with itself.
+    await call("spaces.update", { id: other.id, name: "Sales" });
+  });
+});
+
 describe("adding a member", () => {
   it("refuses a space name another space already holds", async () => {
     const wb = await workerDb();
