@@ -11,6 +11,7 @@
  * initiative, the task and the document gained theirs. The subject it is
  * about is its parent's business: `SubjectComments` binds the writes.
  */
+import type { RichTextDocument } from "@openokr/core";
 import { Button, useTranslations } from "@openokr/ui";
 // Rich text editor and mention extensions will be wired in once the
 // comment thread component uses the full TipTap editor. For now the
@@ -46,8 +47,8 @@ interface CommentThreadProps {
   readonly subjectId: string;
   readonly comments: readonly CommentData[];
   readonly currentMemberId: string;
-  readonly onPost: (body: unknown) => Promise<void>;
-  readonly onEdit: (commentId: string, body: unknown) => Promise<void>;
+  readonly onPost: (body: RichTextDocument) => Promise<void>;
+  readonly onEdit: (commentId: string, body: RichTextDocument) => Promise<void>;
   readonly onDelete: (commentId: string) => Promise<void>;
   readonly onReact: (
     subjectType: string,
@@ -75,7 +76,7 @@ export function CommentThread({
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const handleEdit = useCallback(
-    (commentId: string, body: unknown) => {
+    (commentId: string, body: RichTextDocument) => {
       startTransition(async () => {
         await onEdit(commentId, body);
         setEditingId(null);
@@ -303,7 +304,7 @@ function CommentBody({ body }: { body: unknown }) {
 
 interface CommentEditorProps {
   readonly initialBody?: unknown;
-  readonly onSave: (body: unknown) => void;
+  readonly onSave: (body: RichTextDocument) => void;
   readonly onCancel?: () => void;
   readonly saving?: boolean;
   readonly placeholder?: string;
@@ -318,7 +319,9 @@ function CommentEditor({
 }: CommentEditorProps) {
   const { t } = useTranslations();
 
-  const [body, setBody] = useState<unknown>(initialBody ?? null);
+  // Only what was typed here. An edit nobody has changed has nothing to save,
+  // so Save waits for a change rather than sending the stored body back.
+  const [body, setBody] = useState<RichTextDocument | null>(null);
 
   return (
     <div className="space-y-2">

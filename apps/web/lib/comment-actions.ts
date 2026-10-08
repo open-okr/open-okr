@@ -16,7 +16,11 @@
  * Nothing here decides who may write: `comments.*` and `reactions.*` ask
  * whether the caller reads the subject, and the refusal they return is shown.
  */
-import { callAction, OperationError } from "@openokr/core";
+import {
+  callAction,
+  OperationError,
+  type RichTextDocument,
+} from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { NO_ERROR, type WriteState } from "../app/cycle/write-state.ts";
 import { getPool } from "./auth";
@@ -61,7 +65,9 @@ async function run(
 export async function postComment(input: {
   readonly subjectType: CommentSubjectType;
   readonly subjectId: string;
-  readonly body: unknown;
+  // Typed rather than `unknown`, as the document action is: the composer
+  // hands back editor JSON, and the action validates it again at the boundary.
+  readonly body: RichTextDocument;
 }): Promise<WriteState> {
   return run(
     (context) =>
@@ -76,7 +82,7 @@ export async function postComment(input: {
 
 export async function editComment(
   commentId: string,
-  body: unknown,
+  body: RichTextDocument,
 ): Promise<WriteState> {
   return run(
     (context) => callAction(context, "comments.update", { commentId, body }),
