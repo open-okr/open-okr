@@ -10,6 +10,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { formNumber } from "../../lib/form-number";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
@@ -90,8 +91,8 @@ export async function addKeyResult(
   const goalId = String(formData.get("goalId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const unit = String(formData.get("unit") ?? "").trim();
-  const baselineValue = Number(formData.get("baselineValue"));
-  const targetValue = Number(formData.get("targetValue"));
+  const baselineValue = formNumber(formData, "baselineValue");
+  const targetValue = formNumber(formData, "targetValue");
   const { t } = await getTranslations();
 
   if (title === "") {
@@ -139,7 +140,7 @@ export async function recordValue(
   formData: FormData,
 ): Promise<WriteState> {
   const id = String(formData.get("id") ?? "");
-  const value = Number(formData.get("value"));
+  const value = formNumber(formData, "value");
   if (!Number.isFinite(value)) {
     const { t } = await getTranslations();
     return { error: t("cycle.actions.valueHasToBeANumber") };

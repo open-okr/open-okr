@@ -11,6 +11,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../lib/auth";
+import { formNumber } from "../lib/form-number";
 import { getTranslations } from "../lib/translations";
 import { requireWorkspace } from "../lib/workspace";
 import { NO_ERROR, type WriteState } from "./cycle/write-state.ts";
@@ -21,7 +22,7 @@ export async function recordFromMap(
 ): Promise<WriteState> {
   const goalId = String(formData.get("goalId") ?? "");
   const keyResultId = String(formData.get("keyResultId") ?? "");
-  const value = Number(formData.get("value"));
+  const value = formNumber(formData, "value");
   if (!Number.isFinite(value)) {
     const { t } = await getTranslations();
     return { error: t("cycle.actions.valueHasToBeANumber") };
