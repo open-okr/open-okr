@@ -1381,6 +1381,7 @@
   "cycle.actions.priorityNeedsASentence": "Keutamaan memerlukan satu ayat yang menyatakan apa keutamaan itu.",
   "cycle.actions.quarterlyObjectiveNeedsATitle": "Objektif suku tahunan memerlukan tajuk.",
   "cycle.actions.valueHasToBeANumber": "Nilai mestilah nombor.",
+  "cycle.admin.archiveConfirm": "Arkibkan {name}? Ia hilang daripada senarai kitaran, peta kerja dan skrin kitaran, dan tiada apa di sini yang dapat mengembalikannya.",
   "cycle.admin.archiveHelp": "Skor, keputusan dan retrospektif kekal boleh dibaca. Mengarkibkan menghentikan perancangan dalam kitaran itu, ia tidak membuang apa yang berlaku di dalamnya.",
   "cycle.admin.create": "Cipta",
   "cycle.admin.createAnnualHelp": "Mana-mana hari dalam tahun yang diliputinya. Kitaran tahunan berjalan dari Januari hingga Disember dan bermula pada fasa 0, strategi tahunan.",

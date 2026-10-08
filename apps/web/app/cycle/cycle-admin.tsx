@@ -161,9 +161,20 @@ export function CycleAdmin({
                   disabled={pending}
                   className="text-bad"
                   data-testid="archive-cycle"
-                  onClick={() =>
-                    run(() => archiveCycle({ id: currentCycleId }))
-                  }
+                  onClick={() => {
+                    // Archiving is not undone from any screen (UAT BUG-023),
+                    // so it asks once, naming what is being archived.
+                    if (
+                      !window.confirm(
+                        t("cycle.admin.archiveConfirm", {
+                          name: currentName ?? "",
+                        }),
+                      )
+                    ) {
+                      return;
+                    }
+                    run(() => archiveCycle({ id: currentCycleId }));
+                  }}
                 >
                   {t("common.archive")}
                 </Button>

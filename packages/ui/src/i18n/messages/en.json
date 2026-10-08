@@ -1381,6 +1381,7 @@
   "cycle.actions.priorityNeedsASentence": "A priority needs a sentence saying what it is.",
   "cycle.actions.quarterlyObjectiveNeedsATitle": "The quarterly objective needs a title.",
   "cycle.actions.valueHasToBeANumber": "A value has to be a number.",
+  "cycle.admin.archiveConfirm": "Archive {name}? It leaves the cycle list, the work map and the cycle screen, and nothing here brings it back.",
   "cycle.admin.archiveHelp": "The scores, the decisions and the retrospectives stay readable. Archiving stops the cycle being planned in, it does not remove what happened in it.",
   "cycle.admin.create": "Create",
   "cycle.admin.createAnnualHelp": "Any day in the year it covers. An annual cycle runs from January to December and starts at phase 0, the annual strategy.",
