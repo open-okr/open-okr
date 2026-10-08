@@ -2198,6 +2198,7 @@
   "kpis.detail.nothingThisIsA": "Tiada. Ini ialah akar, atau ia belum diletakkan.",
   "kpis.detail.records": "Rekod",
   "kpis.detail.recoveryObjective": "Objektif pemulihan",
+  "kpis.detail.shortId": "ID {shortId}, untuk import hamparan",
   "kpis.detail.thePeriodsAgainstThe": "Tempoh-tempoh, berbanding koridor",
   "kpis.detail.thisKpiIsCalculated": "KPI ini dikira daripada ukuran lain.",
   "kpis.detail.thisKpiIsEnteredByHand": "KPI ini dimasukkan secara manual.",

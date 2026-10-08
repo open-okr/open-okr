@@ -255,9 +255,12 @@ export function KpiGrid({
                   <tr key={kpi.id} className="border-t border-line">
                     <th className="sticky left-0 z-10 bg-surface p-2 text-left font-normal">
                       <span className="flex flex-col">
-                        <span className="font-semibold text-ink">
+                        <a
+                          href={`/kpis/${kpi.id}`}
+                          className="font-semibold text-ink hover:text-brand-text hover:underline"
+                        >
                           {kpi.title}
-                        </span>
+                        </a>
                         <span className="text-ink-4">
                           {kpi.frequency} · {kpi.direction.replace("_", " ")} ·{" "}
                           {kpi.indicatorType}

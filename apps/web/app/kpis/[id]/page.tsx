@@ -187,6 +187,11 @@ export default async function KpiDetailPage({
                   : kpi.indicatorType,
               ].join(" · ")}
             </p>
+            {/* What the kpi-records template's "kpi" column asks for, which
+                no screen showed (UAT BUG-019). */}
+            <p className="text-xs text-ink-4">
+              {t("kpis.detail.shortId", { shortId: kpi.shortId })}
+            </p>
           </div>
           <div className="flex flex-none flex-col items-end">
             <span className="text-lg font-bold text-ink tabular-nums">

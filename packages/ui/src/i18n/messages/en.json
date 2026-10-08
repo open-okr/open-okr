@@ -2198,6 +2198,7 @@
   "kpis.detail.nothingThisIsA": "Nothing. This is a root, or it has not been placed yet.",
   "kpis.detail.records": "Records",
   "kpis.detail.recoveryObjective": "Recovery objective",
+  "kpis.detail.shortId": "ID {shortId}, for spreadsheet imports",
   "kpis.detail.thePeriodsAgainstThe": "The periods, against the corridor",
   "kpis.detail.thisKpiIsCalculated": "This KPI is calculated from other measures.",
   "kpis.detail.thisKpiIsEnteredByHand": "This KPI is entered by hand.",
