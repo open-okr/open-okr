@@ -30,6 +30,7 @@ import type {
   ModelTier,
 } from "@openokr/db";
 import { revalidatePath } from "next/cache";
+import { testWorkspaceKey } from "../../../lib/ai-key-test";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
 import { getTranslations } from "../../../lib/translations";
@@ -116,7 +117,37 @@ export async function saveWorkspaceKey(
   } catch (error) {
     return { ok: false, message: await reason(error) };
   }
-  return done(t("admin.ai.actions.storedUnverified"));
+  // A stored key is tested at once (UAT BUG-026), so the chip says whether it
+  // works rather than "unverified" for ever.
+  return checkWorkspaceKey(provider);
+}
+
+/** Tests the stored workspace key now, and records what the provider said. */
+export async function testWorkspaceKeyAction(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
+  return checkWorkspaceKey(String(form.get("provider") ?? "") as Provider);
+}
+
+async function checkWorkspaceKey(provider: Provider): Promise<FormResult> {
+  const { t } = await getTranslations();
+  const ctx = await context();
+  const outcome = await testWorkspaceKey(ctx.workspaceId, provider);
+  if (outcome === "unreachable") {
+    return done(t("admin.ai.actions.keyNotReached"));
+  }
+  try {
+    await callAction(ctx, "ai.recordCredentialCheck", {
+      provider,
+      status: outcome,
+    });
+  } catch (error) {
+    return { ok: false, message: await reason(error) };
+  }
+  return outcome === "verified"
+    ? done(t("admin.ai.actions.keyVerified"))
+    : { ok: false, message: t("admin.ai.actions.keyInvalid") };
 }
 
 export async function removeWorkspaceKey(

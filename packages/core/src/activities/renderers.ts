@@ -180,6 +180,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A workspace key was set for ${asString(p.provider, "a provider")}`,
   "ai.workspace_credential_removed": (p) =>
     `The workspace key for ${asString(p.provider, "a provider")} was removed`,
+  "ai.workspace_credential_checked": (p) =>
+    `The workspace key for ${asString(p.provider, "a provider")} was tested: ${asString(p.status, "unknown")}`,
   "ai.personal_credential_set": (p) =>
     `A personal key was set for ${asString(p.provider, "a provider")}`,
   "ai.personal_credential_removed": (p) =>
