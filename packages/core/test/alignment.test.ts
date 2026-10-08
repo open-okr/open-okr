@@ -1011,14 +1011,15 @@ describe("the dependency register", () => {
     );
 
     // The other member holds nothing on the providing space, so they cannot
-    // confirm on its behalf.
+    // confirm on its behalf, and are told whose call it is rather than that
+    // the space does not exist (UAT BUG-009).
     await expect(
       callAction(
         { pool: wb.appPool, ...context(OTHER) },
         "goals.confirmDependency",
         { id: dependency.id },
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/Only the people of .+ can confirm/);
 
     const confirmed = await callAction(
       { pool: wb.appPool, ...context() },
