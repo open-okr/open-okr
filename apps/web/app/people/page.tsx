@@ -86,18 +86,16 @@ export default async function PeoplePage({
     callAction(context, "people.orgChart", {}),
   ]);
 
-  // Filter out agent-kind members from the directory display.
-  // Agents are shown in admin/agents, not here.
-  const visible = members.filter((m) => m.kind !== "agent");
-
-  // Client-side search filter.
+  // The Coach and the Champion are members, so they are listed here with an
+  // agent badge (UIUX-PLAN §2, "Agent presence"). Hiding them made the
+  // directory disagree with the org chart on the same screen.
   const filtered = query
-    ? visible.filter(
+    ? members.filter(
         (m) =>
           m.name.toLowerCase().includes(query) ||
           m.title?.toLowerCase().includes(query),
       )
-    : visible;
+    : members;
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -184,6 +182,9 @@ export default async function PeoplePage({
                             <span className="text-xs text-ink-4">
                               {member.timezone}
                             </span>
+                          ) : null}
+                          {member.kind === "agent" ? (
+                            <Chip tone="neutral">{t("common.agent")}</Chip>
                           ) : null}
                           {member.kind === "guest" ? (
                             <Chip tone="neutral">{t("common.guest")}</Chip>

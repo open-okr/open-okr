@@ -72,6 +72,17 @@ test("the directory lists the signed-in member", async () => {
   await expect(directoryLink).toBeVisible();
 });
 
+test("the directory lists the two agents as members, badged", async () => {
+  // UAT M06-05. The Coach and the Champion are seeded into every workspace
+  // and are members, so the directory names them as it names a person.
+  await goTo(page, "/people");
+  for (const name of ["OKR Coach", "OKR Champion"]) {
+    const entry = page.locator("a[href^='/people/']", { hasText: name });
+    await expect(entry).toBeVisible();
+    await expect(entry.getByText("Agent", { exact: true })).toBeVisible();
+  }
+});
+
 test("search filters the member list", async () => {
   await goTo(page, "/people");
   const searchInput = page.getByPlaceholder("Search by name or title");

@@ -147,6 +147,9 @@ export default async function MemberProfilePage({
               ) : null}
             </div>
             <div className="ml-auto flex items-center gap-2">
+              {member.kind === "agent" ? (
+                <Chip tone="neutral">{t("common.agent")}</Chip>
+              ) : null}
               {member.kind === "guest" ? (
                 <Chip tone="neutral">{t("common.guest")}</Chip>
               ) : null}
