@@ -100,6 +100,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
       "Recorded on every tenant this deployment provisions. Recorded and never routed on: a residency claim is a contract, not a column.",
   },
   {
+    key: "cloud.plans",
+    kind: "string",
+    fallback: "[]",
+    environment: "OPENOKR_CLOUD_PLANS",
+    summary:
+      'The plans an operator can put a workspace on, as a JSON list: [{"key":"team","name":"Team","seats":20,"aiMonthlyUsd":50}]. Seats null is unlimited. Without it the only plan is Free.',
+  },
+  {
     key: "cloud.closureRetentionDays",
     kind: "number",
     fallback: 0,

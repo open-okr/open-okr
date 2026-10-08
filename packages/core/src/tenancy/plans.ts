@@ -27,6 +27,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { z } from "zod";
 import { OperationError } from "../operations/errors.ts";
+import {
+  environmentValue,
+  getInstanceSetting,
+} from "../secrets/instance-registry.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
 import { readTenant, setTenantPlanInTx } from "./store.ts";
 
@@ -133,8 +137,29 @@ export async function seatState(
  */
 export async function readPlans(pool: Pool): Promise<readonly Plan[]> {
   const stored = await readSetting(pool, CLOUD_PLANS_KEY);
-  const parsed = plansSchema.safeParse(stored ?? []);
+  const parsed = plansSchema.safeParse(stored ?? plansFromEnvironment());
   return parsed.success ? parsed.data : [];
+}
+
+/**
+ * \`OPENOKR_CLOUD_PLANS\`, the bootstrap for a deployment that has no stored
+ * catalogue (UAT BUG-022). Nothing wrote \`cloud.plans\` and nothing documented
+ * it, so an operator could offer no plan but Free. A stored catalogue still
+ * wins, as every instance setting's stored value does.
+ */
+function plansFromEnvironment(): unknown {
+  const definition = getInstanceSetting(CLOUD_PLANS_KEY);
+  const raw = definition
+    ? environmentValue(definition, process.env)
+    : undefined;
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return [];
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
 }
 
 /** The usage snapshot, for the customer's own plan screen. */
