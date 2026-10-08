@@ -199,10 +199,7 @@ export function DraftCoach({
        * and the hint, so a screen reader would announce all three as the
        * field's name. */}
       <div className="flex flex-col gap-1">
-        <label
-          htmlFor={fieldId}
-          className="text-xs font-semibold text-ink-2"
-        >
+        <label htmlFor={fieldId} className="text-xs font-semibold text-ink-2">
           {t("cycle.draftCoach.objectiveCheckedAsYou")}
         </label>
         {/* `.field` from `03b-rule-card`: the worst verdict as a dot on the

@@ -106,7 +106,6 @@ export async function saveWorkspaceKey(
   _previous: FormResult,
   form: FormData,
 ): Promise<FormResult> {
-  const { t } = await getTranslations();
   const provider = String(form.get("provider") ?? "") as Provider;
   const apiKey = String(form.get("apiKey") ?? "");
   try {

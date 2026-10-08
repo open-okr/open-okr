@@ -184,6 +184,9 @@ async function requireFreeSpaceName(
 ): Promise<void> {
   const [taken] = await tx
     .select({ id: spaces.id })
+    // openokr:allow-raw-read: a uniqueness check inside the calling write's
+    // own transaction, which already authorised the caller. It answers only
+    // whether a live space holds the name, as the unique index does.
     .from(spaces)
     .where(
       activeOnly(
