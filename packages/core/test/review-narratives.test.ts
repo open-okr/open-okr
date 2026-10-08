@@ -1,6 +1,6 @@
 /**
  * Objective narratives and recognition (METHOD.md §8.1 stages 3 and 4,
- * p4-t00-session-design.md §4.4 and §4.5, P4-T10c).
+ * sessions.md §4.4 and §4.5, P4-T10c).
  *
  * The task's test plan:
  * - the mic passes to exactly one participant at a time

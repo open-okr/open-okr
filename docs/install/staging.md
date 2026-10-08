@@ -1,33 +1,27 @@
 # A staging instance for acceptance testing
 
-How to deploy the instance the [acceptance test workbook](../testing/OpenOKR-UAT.xlsx)
-runs on, with the persona seeder. It is the ordinary
+How to deploy an instance for manual acceptance testing, with the persona
+seeder. It is the ordinary
 [one-server install](compose.md) plus two things: a small Compose overlay, and
 one command that creates the seven test accounts after the setup wizard.
 
-Budget about an hour the first time, most of it the image build. Every step
-below was run end to end on Docker on 25 September 2026: build, start with the
-overlay, both wizards in a browser, the seeder, a second seeder run, a persona
-signing in, and a new round from nothing. The one-command script was run the
-same way on 27 September 2026: a first deploy, `--inbox` before and after the
-wizard, a redeploy of a new commit that kept every account, `run status`, and
-`run destroy`.
+Budget about an hour the first time, most of it the image build.
 
 ## What the seeder does, and what it does not
 
-The workbook starts from an empty database and has the testers build the
-organisation through the screens. The one part worth skipping is creating
+An acceptance test starts from an empty database and has the testers build
+the organisation through the screens. The one part worth skipping is creating
 seven accounts by invitation, so the seeder does exactly that and nothing else.
 
 | The seeder creates | The testers still build, through the UI |
 |---|---|
-| Seven accounts: Priya, Daniel, Tomás, Mei, Sara, Jonas, Amara | The first account and the welcome wizard (modules M01, M02) |
-| Each one a member with edit access, joined through a real workspace invitation that is revoked afterwards | Titles and managers (M06) |
-| Addresses as plus-addresses on one inbox, `qa+priya@example.com` and so on | Spaces (M07), goals, KPIs, sessions and everything after |
+| Seven accounts: Priya, Daniel, Tomás, Mei, Sara, Jonas, Amara | The first account and the welcome wizard |
+| Each one a member with edit access, joined through a real workspace invitation that is revoked afterwards | Titles and managers |
+| Addresses as plus-addresses on one inbox, `qa+priya@example.com` and so on | Spaces, goals, KPIs, sessions and everything after |
 
 The demo seed (`pnpm db:seed`, which builds the Northwind year) is **not**
-used here. It fills in the objectives, KPIs and sessions the workbook exists
-to test, and a tester who finds them already there tests nothing.
+used here. It fills in the objectives, KPIs and sessions the test exists to
+exercise, and a tester who finds them already there tests nothing.
 
 ## Before you start
 
@@ -39,7 +33,7 @@ to test, and a tester who finds them already there tests nothing.
 | Ports 80 and 443 free, or two others you choose | The bundled proxy answers on them |
 | A DNS name pointing at the host, for HTTPS | Optional. Without one the instance serves plain HTTP |
 | One mailbox that accepts plus-addresses | Gmail, Google Workspace and Microsoft 365 all do. Every persona's mail lands there |
-| An SMTP server, or Mailpit | Optional, but without it password resets (module M05) only reach the application log |
+| An SMTP server, or Mailpit | Optional, but without it password resets only reach the application log |
 
 **The checkout and the image must be the same version.** The seeder is code
 from the checkout talking to the database the image migrated. Build the image
@@ -59,7 +53,7 @@ corepack enable
 # Build and start. Prints the address, then tells you to run the wizards.
 OPENOKR_DOMAIN=staging.example.com sh deploy/staging/deploy-staging.sh --ref main
 
-# After M01 and M02 in the browser: the same command plus the inbox.
+# After the setup and welcome wizards in the browser: the same command plus the inbox.
 OPENOKR_DOMAIN=staging.example.com sh deploy/staging/deploy-staging.sh --inbox qa@example.com
 ```
 
@@ -105,7 +99,7 @@ docker build -f deploy/docker/Dockerfile -t openokr:staging .
 ## 2. Configure mail (optional, before the first start)
 
 Skip this and every mail is written to the application log instead, which is
-enough for everything except module M05.
+enough for everything except password resets.
 
 The first start creates `deploy/docker/secrets/app.env`. To add mail later,
 append these to that file and run step 3 again. `./openokr` keeps what you
@@ -157,12 +151,11 @@ drops the overlay and the seeder can no longer reach the database.
 
 `./openokr up` prints the address when the instance is healthy.
 
-## 4. Run modules M01 and M02 in the browser
+## 4. Run the two wizards in the browser
 
 This is the first part of the test, not a setup chore. A tester opens the
 address, creates the first account in the setup wizard, and walks the welcome
-wizard, choosing the **OKR starter cycle** template. Record the results in the
-workbook as they go.
+wizard, choosing the **OKR starter cycle** template.
 
 The seeder refuses to run before this: until the wizard has created a
 workspace there is nothing to add people to.
@@ -193,19 +186,18 @@ Password: northwind-uat-2026
 `--password <at least 12 characters>` sets a different shared password.
 Running the script again changes nothing and says who is already a member.
 
-This is workbook case **M02-04**. Case M02-05 then signs in as Priya to prove
-an account works.
+Sign in as Priya to prove an account works.
 
 ## 6. Hand over to the testers
 
 Give them:
 
-| What | Where it goes |
+| What | Why |
 |---|---|
-| The instance address | Read Me sheet, step 1 |
-| The inbox you passed to `--inbox` | Personas sheet, the yellow "Shared inbox" cell. The seven addresses fill themselves in and match what the seeder created |
-| The password | Personas sheet, "Shared password". Already filled with the default |
-| The first account's address and password | Kept by whoever ran M01. It is the only account with full access |
+| The instance address | Where the test runs |
+| The seven persona addresses | Each is the inbox you passed to `--inbox` with `+priya`, `+daniel` and so on added |
+| The password | Shared by all seven |
+| The first account's address and password | Kept by whoever ran the setup wizard. It is the only account with full access |
 
 ## Starting a new test round
 
@@ -247,7 +239,7 @@ And from `./openokr up`:
 
 ## Security
 
-- **The persona password is written in this repository and in the workbook.**
+- **The default persona password is written in this repository.**
   That is acceptable on a staging instance with no real data, and it is the
   reason the seeder refuses a workspace that has anybody else in it. Pass
   `--password` if the staging address is reachable from the internet.

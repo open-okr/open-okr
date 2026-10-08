@@ -9,7 +9,7 @@
  * and CS1 grow out of, with values that end where Q1's baselines begin.
  *
  * It ran on 0.1.2 and the instance does not, so what is seeded is what the
- * pilot left (`docs/design/p9-t22c-northwind-year.md` §5): a closed quarter
+ * pilot left (`docs/design/northwind-year-seed.md` §5): a closed quarter
  * with its check-ins and its review, not the lock it ran into.
  */
 import { callAction } from "../../actions/registry.ts";

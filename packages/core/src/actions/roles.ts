@@ -1,6 +1,6 @@
 /**
  * Workspace roles and their permission matrix (P8-G13a,
- * docs/design/p8-g13-workspace-roles.md).
+ * docs/design/workspace-roles.md).
  *
  * Five actions: read the matrix, move one cell, add a role, rename or remove
  * one, and give a member a role. Everything an administrator does to the

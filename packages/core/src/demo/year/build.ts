@@ -1,6 +1,6 @@
 /**
  * `buildNorthwindYear`: the Northwind year as of today (P9-T22c,
- * `docs/design/p9-t22c-northwind-year.md`).
+ * `docs/design/northwind-year-seed.md`).
  *
  * Every event of the year dated on or before today, on the real calendar, in
  * date order. The year's frame is P9-T22c-a's; each quarter joins the same

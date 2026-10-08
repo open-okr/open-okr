@@ -13,7 +13,7 @@ import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
 /**
  * The tenant lifecycle and the retention sweep (P8-T02c, design in
- * `docs/design/p8-t01a-tenant-lifecycle.md` §3 and §6).
+ * `docs/design/tenant-lifecycle.md` §3 and §6).
  *
  * The claim under test is that the lifecycle adds no second enforcement
  * point, and that the sweep destroys nothing until somebody sets a number.

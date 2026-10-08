@@ -11,7 +11,7 @@ import {
 /**
  * Public instance status, for external monitoring (P8-T06c).
  *
- * Design: `docs/design/p8-t06c-status-and-capacity.md` SS2.
+ * Design: `docs/design/status-and-capacity.md` SS2.
  *
  * Three components: database, relay and scheduler. Each reports
  * `operational`, `degraded` or `unavailable`. The overall status is the

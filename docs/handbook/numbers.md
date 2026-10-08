@@ -7,7 +7,7 @@ drift.
 
 An administrator can change many of them on **Admin, then Rhythm and
 thresholds**. The values below are the defaults, and each says where in
-[METHOD.md](../development-plan/METHOD.md) it comes from.
+[METHOD.md](../specification/METHOD.md) it comes from.
 
 ## Cadence
 

@@ -1,7 +1,7 @@
 /**
  * The OKR Champion: seeding and scope (P4-T05a).
  *
- * AI-NATIVE-PLAN.md §6.2 and `docs/design/p4-t00-agent-design.md` §2. One
+ * AI-NATIVE-PLAN.md §6.2 and `docs/design/agents.md` §2. One
  * Champion per workspace, created at provisioning, because §4.14's rule is that
  * a fresh workspace practises the full method with nothing configured. An agent
  * an admin has to create first is an agent that never speaks in the workspaces

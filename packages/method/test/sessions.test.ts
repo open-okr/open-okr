@@ -35,7 +35,7 @@ import { canonThresholds, resolveThresholds } from "../src/thresholds.ts";
 
 const thresholds = canonThresholds();
 const method = readFileSync(
-  join(import.meta.dirname, "../../../docs/development-plan/METHOD.md"),
+  join(import.meta.dirname, "../../../docs/specification/METHOD.md"),
   "utf8",
 );
 

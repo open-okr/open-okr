@@ -27,7 +27,7 @@ import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
  * accessibility defects: it cannot tell whether a label makes sense, whether
  * focus order is logical, or whether a screen reader's announcement is
  * useful. The keyboard walkthrough in `s43b-accessibility-keyboard.spec.ts` and the
- * screen-reader procedure in `docs/design/p7-t05-accessibility.md` are the
+ * screen-reader procedure in `docs/design/accessibility.md` are the
  * other two thirds, and neither is replaced by this file.
  */
 

@@ -4,7 +4,7 @@ import { users } from "./auth.ts";
 /**
  * The cloud operator (P8-T03a).
  *
- * Design: `docs/design/p8-t01b-operator-console.md`. An operator is a `users`
+ * Design: `docs/design/operator-console.md`. An operator is a `users`
  * row with a grant, not a `workspace_members` row: they are a member of
  * nothing, and giving them one in every workspace is the ambient authority
  * CLAUDE.md's least-privilege rule forbids.

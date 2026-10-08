@@ -1,6 +1,6 @@
 /**
  * The Northwind year on the real calendar (P9-T22c-a,
- * `docs/design/p9-t22c-northwind-year.md` §2).
+ * `docs/design/northwind-year-seed.md` §2).
  *
  * The scenario is written for 2027 and its "before the year" chapter for 2026.
  * Akmal chose on 7 October 2026 that the demo follows the real clock, so the

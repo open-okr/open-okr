@@ -9,7 +9,7 @@ import { latestKpiReading } from "./service.ts";
 
 /**
  * The key results that read a KPI, kept in step with it (TECHNICAL-PLAN §6.2,
- * design `p3-t00-kpi-engine.md` §10, completeness review M-07).
+ * design `kpi-engine.md` §10, completeness review M-07).
  *
  * "A KPI-backed key result reads the KPI's latest achievement." The scoring
  * cascade has always read it, but only when something else made it run, so a

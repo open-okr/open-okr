@@ -5,14 +5,13 @@ another, or from a FlowyTeam source to a fresh OpenOKR instance. Each phase
 has commands and a verification step. Do not proceed to the next phase until
 the current one's verification passes.
 
-## Known limitation
+## Before you freeze
 
-P6-G25 (the workspace freeze overlay) is not built yet. When the source
-workspace is frozen in phase 1, users in the browser see write failures as
-generic errors with no explanation. **Announce a maintenance window before
-freezing.** Tell users writes will be unavailable for the duration of the
-migration. Once P6-G25 ships, frozen workspaces will show an overlay naming
-the reason and the expected return.
+When the source workspace is frozen in phase 1, every screen shows a banner
+saying the workspace is frozen, and writes are refused. **Announce a
+maintenance window before freezing anyway.** Tell users when writes stop and
+when they expect them back, because the banner cannot say how long the
+migration will take.
 
 ## Prerequisites
 

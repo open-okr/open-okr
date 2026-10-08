@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The documentation gate (P8-T11a).
+ * The documentation gate.
  *
  * Documentation rots in three specific ways, and each one is worse than being
  * out of date because each one is invisible to the person who caused it:
@@ -20,10 +20,11 @@
  * the contract. A handbook quoting a number nobody uses is worse than one that
  * quotes none.
  *
- * **The plan set is out of scope on purpose.** `docs/development-plan/`,
- * `docs/design/` and `docs/stakeholder/` are working papers between the people
- * building this, not pages a reader is sent to, and they cross-reference each
- * other in ways an index would fight rather than help.
+ * **The specification is indexed by folder, not page by page.**
+ * `docs/specification/`, `docs/design/` and `docs/mockups/` are reference
+ * material for the people building this rather than pages a reader is sent
+ * to, and they cross-reference each other in ways an index would fight rather
+ * than help. Their links are still checked.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
@@ -45,11 +46,11 @@ const OWNED = [
 ];
 const INDEX = "docs/README.md";
 
-/** Working papers, linked from the index but not indexed page by page. */
+/** Reference material, linked from the index but not indexed page by page. */
 const NOT_INDEXED_PAGE_BY_PAGE = [
-  "docs/development-plan",
+  "docs/specification",
   "docs/design",
-  "docs/stakeholder",
+  "docs/mockups",
 ];
 
 const posix = (path: string): string => path.replace(/\\/g, "/");

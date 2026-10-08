@@ -1,7 +1,7 @@
 /**
  * Site messages (P8-T03c).
  *
- * Design: `docs/design/p8-t01b-operator-console.md` §4, corrected in two
+ * Design: `docs/design/operator-console.md` §4, corrected in two
  * places by migration 0088 and repeated here so a reader of this file meets
  * the correction rather than the original.
  *

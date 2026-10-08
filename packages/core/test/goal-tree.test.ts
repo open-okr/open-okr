@@ -7,7 +7,7 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
  * One tree, and one-field writes that refuse a stale read (P9-T06a,
- * docs/design/p9-t00-okr-writing.md §6).
+ * docs/design/okr-writing.md §6).
  *
  * The tree answers what both OKR views draw in one call, including the annual
  * objective a quarter hangs under. A patch carries the values it read and is

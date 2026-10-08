@@ -12,7 +12,7 @@ import type { OkrGoal, OkrTree } from "../lib/okr-tree/cache.ts";
 
 /**
  * One way to change the OKR tree, and what happens when the server says no
- * (P9-T06c, docs/design/p9-t00-okr-writing.md §6).
+ * (P9-T06c, docs/design/okr-writing.md §6).
  *
  * **Rendered for real in jsdom** with the query client, the translations and
  * the toasts the shell provides, because each claim is about what a reader

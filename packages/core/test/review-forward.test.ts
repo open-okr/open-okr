@@ -1,6 +1,6 @@
 /**
  * Learnings, next-cycle drafts, decisions and actions (METHOD.md §8.9 and §8.1
- * stage 11, p4-t00-session-design.md §4.10, P4-T11c-b).
+ * stage 11, sessions.md §4.10, P4-T11c-b).
  *
  * The task's test plan:
  * - a top-voted retro theme promotes into a learning

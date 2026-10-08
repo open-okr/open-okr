@@ -1,7 +1,7 @@
 /**
  * Gives every workspace provisioned before P8-G13a its four roles, and every
  * human member a role to hold (migration 0108,
- * docs/design/p8-g13-workspace-roles.md).
+ * docs/design/workspace-roles.md).
  *
  * | Who | Becomes |
  * |---|---|

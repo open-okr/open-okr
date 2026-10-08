@@ -2,7 +2,7 @@
  * The tenancy module (P8-T02a).
  *
  * The one place `tenants` may be read or written outside the operator
- * console. Design: `docs/design/p8-t01a-tenant-lifecycle.md`.
+ * console. Design: `docs/design/tenant-lifecycle.md`.
  *
  * Only what somebody actually calls is re-exported here. The types travel
  * with their own modules until a consumer outside this directory needs one,

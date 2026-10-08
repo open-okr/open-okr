@@ -1,6 +1,6 @@
 /**
  * KPI period normalisation, achievement and the corridor state (METHOD.md §6.4,
- * design `p3-t00-kpi-engine.md` §1 to §3, P3-T12).
+ * design `kpi-engine.md` §1 to §3, P3-T12).
  *
  * In `packages/method` for the reason the scoring and alignment engines are:
  * every function here is a §6 rule taking a §11 threshold as an argument. The

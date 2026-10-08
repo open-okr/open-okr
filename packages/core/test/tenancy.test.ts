@@ -17,7 +17,7 @@ import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
 /**
  * The tenant record (P8-T02a, design in
- * `docs/design/p8-t01a-tenant-lifecycle.md`).
+ * `docs/design/tenant-lifecycle.md`).
  *
  * The design's central claim is that the tenant is a sidecar: a self-hosted
  * instance has no row, and the product behaves identically either way. Most

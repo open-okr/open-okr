@@ -7,9 +7,8 @@ without one.
 
 That refusal is the whole shape of this document. Migrations are
 forward-only, so the moment one applies, the previous image is looking at a
-schema it does not know. **"Run the previous tag" is not a rollback.** It was
-printed by the helper until 11 September 2026 and it was wrong: starting the
-old image against the new database is a second failure on top of the first.
+schema it does not know. **"Run the previous tag" is not a rollback.** Starting the old image against
+the new database is a second failure on top of the first.
 
 ```
 cd deploy/docker
@@ -83,7 +82,7 @@ root key, and refuses to finish without it rather than report them sealed.
 instance already running. 0.1 enforced one way of running OKRs and refused
 much of what it did not like. 0.2 ships the same method as **defaults**: a
 best-practice starting point every workspace can adapt in **Admin, Practice**,
-with only structural defects refused. [METHOD.md](../development-plan/METHOD.md)
+with only structural defects refused. [METHOD.md](../specification/METHOD.md)
 §12 lists every setting and what it can be set to.
 
 **Every workspace arrives on the Recommended profile.** 0.1 stored no practice

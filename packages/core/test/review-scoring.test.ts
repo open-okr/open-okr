@@ -1,6 +1,6 @@
 /**
  * Scoring the key results and revealing them (METHOD.md §8.3,
- * p4-t00-session-design.md §4.3, P4-T10b-a and P4-T10b-b).
+ * sessions.md §4.3, P4-T10b-a and P4-T10b-b).
  *
  * P4-T10b-a's test plan:
  * - a score is refused outside 0.0 to 1.0 and refused without a reason

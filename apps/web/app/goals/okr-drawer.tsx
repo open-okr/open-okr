@@ -51,7 +51,7 @@ import {
 } from "./okr-editing.ts";
 
 /**
- * The OKR drawer (P9-T08a, docs/design/p9-t00-okr-writing.md §6).
+ * The OKR drawer (P9-T08a, docs/design/okr-writing.md §6).
  *
  * One objective opened beside the list, with everything the row has no room
  * for: every field of the objective and its key results, the value and target

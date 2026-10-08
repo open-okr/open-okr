@@ -115,7 +115,7 @@ demo and the five the year adds, runs the Coach and the Champion once so the
 nudges on screen are ones the product produced, and then puts both agents in
 sandbox. Ben, who leaves in May, is not given one: he is suspended, and could
 not sign in. `pnpm db:seed --quarter` builds the smaller one-quarter demo
-instead, which is what `docs/stakeholder/DEMO-SCRIPT.md` walks through.
+instead.
 
 `pnpm demo:prepare` refuses a workspace the demo builder did not build, and
 never touches a member who already has a real person behind them.

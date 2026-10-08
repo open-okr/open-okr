@@ -636,7 +636,7 @@ MANIFEST
     # (P8-T06d). Decrypts, loads into a temporary database, checks every
     # workspace, and drops the temporary database.
     #
-    # Design: docs/design/p8-t06d-backup-verification.md
+    # Design: docs/design/backup-verification.md
     #
     # Exit codes:
     #   0  every workspace passed every check

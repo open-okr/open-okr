@@ -1,35 +1,18 @@
 # OpenOKR on Kubernetes
 
-> **No version has been tagged yet.** The chart and the image are both
-> published by `.github/workflows/release.yml` on a `v*.*.*` tag, so
-> `oci://ghcr.io/open-okr/charts/openokr` and
-> `ghcr.io/open-okr/open-okr` do not exist today. Until the first release,
-> install the chart from a checkout and point it at an image you built
-> yourself:
->
-> ```sh
-> git clone https://github.com/open-okr/open-okr.git && cd open-okr
-> docker build -f deploy/docker/Dockerfile -t registry.example.com/openokr:local .
-> docker push registry.example.com/openokr:local
->
-> helm install openokr ./deploy/helm \
->   --namespace openokr --create-namespace \
->   --set image.repository=registry.example.com/openokr \
->   --set image.tag=local \
->   --set database.existingSecret=openokr-database \
->   --set ingress.enabled=true \
->   --set ingress.hosts[0].host=okr.example.com \
->   --set ingress.hosts[0].paths[0].path=/ \
->   --set ingress.hosts[0].paths[0].pathType=Prefix
-> ```
->
-> Everything below this box is the shape an install takes once a release
-> exists, and every value in it applies to the command above too.
+The chart is published to `oci://ghcr.io/open-okr/charts/openokr` with every
+release, versioned with the release, and its default image is that release's
+`ghcr.io/open-okr/open-okr`. Pin both with `--version` and `image.tag`.
 
 ```sh
+kubectl create namespace openokr
+kubectl -n openokr create secret generic openokr-database \
+  --from-literal=database-url='postgres://user:password@host:5432/openokr'
+
 helm install openokr oci://ghcr.io/open-okr/charts/openokr \
-  --namespace openokr --create-namespace \
-  --set database.url='postgres://user:password@host:5432/openokr' \
+  --version 0.2.0 \
+  --namespace openokr \
+  --set database.existingSecret=openokr-database \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=okr.example.com \
   --set ingress.hosts[0].paths[0].path=/ \
@@ -82,11 +65,10 @@ and skip generation entirely.
 ## Storage and replicas
 
 **The defaults keep files: one replica, one `ReadWriteOnce` volume at
-`/app/storage`.** They changed on 7 September 2026. They used to be two
-replicas with persistence off, which is the one combination that loses uploads
-without saying anything: the mount falls back to an `emptyDir`, so a file lands
-on whichever pod served the request, is missing from the other, and is gone when
-either restarts. The gap audit recorded it as B-11.
+`/app/storage`.** Two replicas with persistence off is the one combination
+that loses uploads without saying anything: the mount falls back to an
+`emptyDir`, so a file lands on whichever pod served the request, is missing
+from the other, and is gone when either restarts.
 
 `persistence.enabled=true` with `ReadWriteOnce` and more than one replica is
 refused at template time, with an explanation, because such a volume cannot be

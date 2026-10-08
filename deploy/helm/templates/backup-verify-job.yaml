@@ -6,7 +6,7 @@
 # newest backup into a temporary database, checks every workspace, and
 # drops the temporary database.
 #
-# Design: docs/design/p8-t06d-backup-verification.md §4.
+# Design: docs/design/backup-verification.md §4.
 apiVersion: batch/v1
 kind: Job
 metadata:

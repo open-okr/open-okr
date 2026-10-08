@@ -1,6 +1,6 @@
 /**
  * The Northwind year on the real calendar, with no database and no clock
- * (P9-T22c-a, `docs/design/p9-t22c-northwind-year.md` §2, §6).
+ * (P9-T22c-a, `docs/design/northwind-year-seed.md` §2, §6).
  *
  * The acceptance: given the README's five demo dates, when the steps are read
  * as of each, then the ones the README lists are done and the next is not.

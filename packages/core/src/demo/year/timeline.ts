@@ -1,6 +1,6 @@
 /**
  * The Northwind year's runner (P9-T22c-a,
- * `docs/design/p9-t22c-northwind-year.md` §3).
+ * `docs/design/northwind-year-seed.md` §3).
  *
  * The seed is a list of dated events. This runs every event whose date, on
  * the real calendar, is on or before today, **in date order**, so a setting

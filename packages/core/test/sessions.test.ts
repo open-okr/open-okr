@@ -1,6 +1,6 @@
 /**
  * Session actions against a real database (P4-T07a, METHOD.md §7.2,
- * p4-t00-session-design.md).
+ * sessions.md).
  *
  * Test plan from the task:
  * - a stage change reaches every connected client inside the budget (tested as:

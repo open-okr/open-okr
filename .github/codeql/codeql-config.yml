@@ -9,5 +9,4 @@ name: OpenOKR code scanning
 # because they are not product, and if any of them ever becomes a served page
 # it comes back into scope with this line removed.
 paths-ignore:
-  - docs/development-plan/tools
-  - docs/stakeholder/mockups
+  - docs/mockups

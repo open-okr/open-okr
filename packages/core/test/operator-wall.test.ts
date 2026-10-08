@@ -22,7 +22,7 @@ import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
 /**
  * The wall between an operator and the content (P8-T03a, design in
- * `docs/design/p8-t01b-operator-console.md` §1).
+ * `docs/design/operator-console.md` §1).
  *
  * The design's central claim is that the wall is the **absence of a policy**
  * rather than a check in application code. So the load-bearing test here is

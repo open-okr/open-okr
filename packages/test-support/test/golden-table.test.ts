@@ -23,7 +23,7 @@ const MANIFEST: Record<
   string,
   Record<string, { columns: string[]; minRows: number }>
 > = {
-  "p3-t00-scoring-and-health-engine.md": {
+  "scoring-and-health-engine.md": {
     "scoring.kr-progress": {
       columns: [
         "case",
@@ -101,7 +101,7 @@ const MANIFEST: Record<
       minRows: 10,
     },
   },
-  "p3-t00-cadence-engine.md": {
+  "cadence-engine.md": {
     "cadence.advance": {
       columns: ["case", "frequency", "anchor", "current_due", "expected_next"],
       minRows: 15,
@@ -165,7 +165,7 @@ const MANIFEST: Record<
       minRows: 10,
     },
   },
-  "p3-t00-kpi-engine.md": {
+  "kpi-engine.md": {
     "kpi.period": {
       columns: ["case", "frequency", "date", "expected_period_start"],
       minRows: 12,
@@ -247,7 +247,7 @@ const MANIFEST: Record<
       minRows: 6,
     },
   },
-  "p3-t00-alignment-engine.md": {
+  "alignment-engine.md": {
     "alignment.findings": {
       columns: ["finding", "rule_key", "severity", "fires", "in_the_share"],
       minRows: 5,
@@ -433,7 +433,7 @@ describe("the golden-table reader", () => {
   });
 
   it("names the tables it did find when the wanted one is absent", () => {
-    const path = designPath("p3-t00-alignment-engine.md");
+    const path = designPath("alignment-engine.md");
     expect(() => loadGoldenTable(path, "alignment.nope")).toThrow(
       /alignment\.band, alignment\.findings, alignment\.score/,
     );

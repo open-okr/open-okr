@@ -13,7 +13,7 @@ import { workspaces } from "./workspaces.ts";
  * **This table is the authority and the plugin's own `ssoProvider` table is
  * derived from it** (P8-T07c). Which identity provider a workspace trusts is
  * business data, so it belongs somewhere with `workspace_id` and a policy, and
- * the plugin's table has neither. `docs/design/p8-t07c-saml.md` records the
+ * the plugin's table has neither. `docs/design/saml.md` records the
  * decision and what the two alternatives cost.
  *
  * See migration 0091 for the RLS policy and the uniqueness constraint, and

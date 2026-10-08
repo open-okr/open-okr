@@ -1,5 +1,5 @@
 /**
- * The quarterly review's shell (METHOD.md §8.1, p4-t00-session-design.md §4,
+ * The quarterly review's shell (METHOD.md §8.1, sessions.md §4,
  * P4-T10a-a).
  *
  * The task's test plan:

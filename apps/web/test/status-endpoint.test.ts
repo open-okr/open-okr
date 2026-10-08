@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 /**
  * Status endpoint shape and exclusions (P8-T06c).
  *
- * Design: `docs/design/p8-t06c-status-and-capacity.md` §2 and §6.
+ * Design: `docs/design/status-and-capacity.md` §2 and §6.
  *
  * This test cannot call the route handler directly because it imports
  * `@openokr/adapters` (for `OutboxRelay.oldestPendingSeconds`) and the pool,
@@ -149,10 +149,7 @@ describe("the design document lists acceptance criteria", () => {
     const { readFile } = await import("node:fs/promises");
     const { join } = await import("node:path");
     const design = await readFile(
-      join(
-        import.meta.dirname,
-        "../../../docs/design/p8-t06c-status-and-capacity.md",
-      ),
+      join(import.meta.dirname, "../../../docs/design/status-and-capacity.md"),
       "utf8",
     );
     expect(design).toContain("/api/status");

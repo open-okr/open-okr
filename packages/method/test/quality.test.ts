@@ -19,7 +19,7 @@ import { canonThresholds, resolveThresholds } from "../src/thresholds.ts";
 /**
  * The objective half of METHOD.md §4's quality catalogue (P4-T01).
  *
- * The cases are the corpus entries in `docs/design/p4-t00-method-package.md`
+ * The cases are the corpus entries in `docs/design/method-package.md`
  * §15, which the human approved at the P4-T00 gate. They are the verdicts a
  * facilitator said were right, so they are what the engine has to produce.
  */

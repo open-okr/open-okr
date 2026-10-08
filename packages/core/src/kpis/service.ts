@@ -30,7 +30,7 @@ import type { OperationTx } from "../operations/operation.ts";
 
 /**
  * The KPI engine's half that needs rows (METHOD.md §6.4, design
- * `p3-t00-kpi-engine.md` §1 to §3, P3-T12).
+ * `kpi-engine.md` §1 to §3, P3-T12).
  *
  * The arithmetic is in `packages/method`. This normalises a period before the
  * unique index sees it, upserts the record, and recomputes the derived columns in

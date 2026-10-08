@@ -1,6 +1,6 @@
 /**
  * One tree and one-field writes for the OKR list, drawer and diagram
- * (P9-T06a, docs/design/p9-t00-okr-writing.md §6).
+ * (P9-T06a, docs/design/okr-writing.md §6).
  *
  * `goals.tree` reads a cycle's objectives, their key results, their alignment
  * and their dependencies in one call, shaped for both views, with every parent

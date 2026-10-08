@@ -1,7 +1,7 @@
 /**
  * The tenant lifecycle, and how it reaches the freeze overlay (P8-T02c).
  *
- * Design: `docs/design/p8-t01a-tenant-lifecycle.md` §3.
+ * Design: `docs/design/tenant-lifecycle.md` §3.
  *
  * **The lifecycle adds no second enforcement point.** `workspaces.state` and
  * the P2-T09 freeze overlay already refuse every write outside the recovery

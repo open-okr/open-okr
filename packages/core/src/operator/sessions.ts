@@ -2,7 +2,7 @@
  * Support access: the session an operator asks for and a customer grants
  * (P8-T04a).
  *
- * Design: `docs/design/p8-t01b-support-access.md`.
+ * Design: `docs/design/support-access.md`.
  *
  * **Consent is the only way in.** An operator asks; a member of the workspace
  * who can manage access says yes or no. There is no path here that an
@@ -19,7 +19,7 @@
  * workspace. There is no second authorisation path that could disagree with
  * the first.
  *
- * **A guest is not a seat** (`p8-t01b-plans-and-seats.md`), so support costs
+ * **A guest is not a seat** (`plans-and-seats.md`), so support costs
  * the customer nothing.
  */
 import {

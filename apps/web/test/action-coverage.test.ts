@@ -5,8 +5,7 @@ import { actionNames } from "@openokr/core";
 import { describe, expect, test } from "vitest";
 
 /**
- * Every registered action either has a browser caller or a written reason
- * (P6-G27b, GAP-AUDIT §5).
+ * Every registered action either has a browser caller or a written reason.
  *
  * **The audit found actions nobody could reach and nobody had decided about.**
  * P6-G27a and P6-G27b gave a screen to the ones that wanted one. This is the
@@ -33,7 +32,7 @@ const LIB = fileURLToPath(new URL("../lib", import.meta.url));
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 
 /**
- * The five kinds of reason, each with what it has to prove.
+ * The three kinds of reason, each with what it has to prove.
  *
  * - **`caller`**: code outside the browser calls it, and names it: an
  *   importer, a worker, the pipeline, an operator console that goes through a
@@ -44,22 +43,11 @@ const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
  * - **`apiOnly`**: offered on the REST surface, the command line and the agent
  *   endpoint, deliberately, with no screen. It must be in the committed
  *   OpenAPI document, which is those surfaces' own contract.
- * - **`notBuilt`**: a screen that should exist and does not. It must name the
- *   finding in `docs/COMPLETENESS-REVIEW.md` that owns building it, so a gap
- *   is a tracked gap and never a quiet one.
- * - **`plannedAs`**: the same thing for a screen the plan already owns rather
- *   than a review finding. It must name a task in
- *   `docs/development-plan/IMPLEMENTATION-PLAN.md`, which is the other place a
- *   gap is tracked. Added at P8-G13a, whose five role actions land one task
- *   before their screen: the gate's premise is that a gap is never quiet, and
- *   a planned task is as public as a finding.
  */
 type Reason =
   | { readonly caller: string; readonly why: string }
   | { readonly answeredBy: string; readonly why: string }
-  | { readonly apiOnly: true; readonly why: string }
-  | { readonly notBuilt: string; readonly why: string }
-  | { readonly plannedAs: string; readonly why: string };
+  | { readonly apiOnly: true; readonly why: string };
 
 const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
   "workspace.provision": {
@@ -249,12 +237,6 @@ const offeredOnTheApi = new Set(
   ),
 );
 
-const review = readFileSync(join(ROOT, "docs/COMPLETENESS-REVIEW.md"), "utf8");
-const plan = readFileSync(
-  join(ROOT, "docs/development-plan/IMPLEMENTATION-PLAN.md"),
-  "utf8",
-);
-
 const entries = Object.entries(NO_BROWSER_PATH);
 
 describe("action coverage", () => {
@@ -321,32 +303,6 @@ describe("action coverage", () => {
       )
       .map(([name]) => name);
     expect(false_).toEqual([]);
-  });
-
-  test("a screen not built yet is a finding somebody owns", () => {
-    const untracked = entries.flatMap(([name, reason]) => {
-      if (!("notBuilt" in reason)) {
-        return [];
-      }
-      return /^[HML]-\d{2}$/.test(reason.notBuilt) &&
-        review.includes(`| ${reason.notBuilt} |`)
-        ? []
-        : [`${name}: ${reason.notBuilt} is not a finding in the review`];
-    });
-    expect(untracked).toEqual([]);
-  });
-
-  test("a screen the plan owns names a task that exists", () => {
-    const untracked = entries.flatMap(([name, reason]) => {
-      if (!("plannedAs" in reason)) {
-        return [];
-      }
-      return /^P\d-[TG]\d{2}[a-z]?$/.test(reason.plannedAs) &&
-        plan.includes(`### ${reason.plannedAs}:`)
-        ? []
-        : [`${name}: ${reason.plannedAs} is not a task in the plan`];
-    });
-    expect(untracked).toEqual([]);
   });
 
   test("every action a reason names exists", () => {

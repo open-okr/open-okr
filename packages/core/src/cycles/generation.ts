@@ -14,7 +14,7 @@
  * **No fiscal-year offset.** The year is the calendar year. A workspace whose
  * financial year starts in April would need one, and nothing in REQUIREMENTS,
  * TECHNICAL-PLAN or METHOD asks for it, so it is recorded as a known
- * simplification in `docs/design/p3-t00-okr-core-domain.md` §3.3 rather than
+ * simplification in `docs/design/okr-core-domain.md` §3.3 rather than
  * half-built here.
  */
 import type { CycleCadence, CycleMode } from "@openokr/db";

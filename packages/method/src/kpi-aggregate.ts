@@ -1,6 +1,6 @@
 /**
  * Cross-frequency aggregation and the dependency cascade order (METHOD.md §6,
- * design `p3-t00-kpi-engine.md` §6 and §7, P3-T13).
+ * design `kpi-engine.md` §6 and §7, P3-T13).
  *
  * Pure. The caller loads the source records; this decides which of them belong to
  * the target period and how to fold them.

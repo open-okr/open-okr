@@ -23,7 +23,7 @@
  * never has to know which theme is active.
  *
  * The base text size deliberately deviates from the mockups
- * (docs/stakeholder/mockups/src/style.css), which use 13px where
+ * (docs/mockups/src/style.css), which use 13px where
  * UIUX-PLAN.md §2 names "12, 13, 14 (base), 16, 18, 24, 30". §10 says the
  * specification wins, so this file uses 14.
  */

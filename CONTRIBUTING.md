@@ -2,13 +2,13 @@
 
 Thank you for considering a contribution. This page explains how to set up the project, how work is organised, and what we need from you legally before a change can merge.
 
-## Project state
+## How the project is organised
 
-OpenOKR was built plan-first. The complete plan lives in `docs/development-plan/`, work proceeded one task at a time from `IMPLEMENTATION-PLAN.md`, and `STATUS.md` records all 200 of them, each now done. Read `README.md` for what the product is.
+OpenOKR is specified before it is built. [`docs/specification/`](docs/specification/README.md) holds what the product does, how it is architected, and the OKR practice it encodes, and [`docs/design/`](docs/design/) holds the detailed design of each engine and subsystem. When a change makes the code and one of those documents disagree, update the document in the same pull request. Read `README.md` for what the product is.
 
-**All eight phases are built, and no version has been tagged.** Nothing is published to a container registry, and nobody outside this repository has run it in anger. The most useful contribution right now is installing it somewhere that is not ours and reporting what broke, with what you ran and what it printed.
+**Reports from real installs are the most useful contribution.** Install a release somewhere, run a real cycle on it, and open an issue with what you ran and what it printed when something broke.
 
-Large unsolicited pull requests are still hard to land, because a change has to keep the plan set, the method canon and the generated contract in step with the code. Open an issue first and we will find a task-shaped piece of work together. [Good first issues](docs/runbooks/good-first-issues.md) says what makes one.
+Large unsolicited pull requests are hard to land, because a change has to keep the specification, the method canon and the generated contract in step with the code. Open an issue first and we will find a well-sized piece of work together. [Good first issues](docs/runbooks/good-first-issues.md) says what makes one.
 
 ## Setup
 
@@ -114,11 +114,12 @@ And the gates continuous integration runs, all of which you can run yourself:
 | `sh deploy/helm/check.sh` | What the chart refuses, and that no credential lands in a pod spec |
 
 Continuous integration also runs dependency review and code scanning, which
-need GitHub and have no local equivalent.
+need GitHub and have no local equivalent. [The gates](docs/specification/CI-GATES.md)
+lists every check, the order to run them in, and what each one catches.
 
 ## Environment
 
-Copy `.env.example` to `.env`. Only `DATABASE_URL` has to be set; everything else
+Copy `.env.example` to `apps/web/.env`. Only `DATABASE_URL` has to be set; everything else
 has a working default. The application validates its environment at boot and
 exits naming any variable that is wrong.
 
@@ -132,17 +133,18 @@ delete it.
 
 ## Where to start
 
-Issues labelled `good first issue` are real work with a named file to start in. [The list](docs/runbooks/good-first-issues.md) says what makes one and which are open.
+Issues labelled `good first issue` are real work with a named file to start in. [The guide](docs/runbooks/good-first-issues.md) says what makes one, with ideas worth opening.
 
 Nobody assigns them. Say on the issue that you are starting, so two people do not do it twice, and open the pull request when it is ready rather than when it is perfect.
-
-Tasks from `docs/development-plan/IMPLEMENTATION-PLAN.md` are deliberately never labelled that way. They have a Definition of Ready, design gates behind some of them, and an execution protocol; they are not an introduction to the project.
 
 ## Code rules
 
 - TypeScript strict mode everywhere. No loose types without a comment justifying them.
 - Formatting and linting are Biome's job. Run `pnpm exec biome check --write .` before committing.
 - Tests come with the change, not after it.
+- Every OKR rule, threshold and coaching message lives in `packages/method` and comes from `docs/specification/METHOD.md`. Changing one is a maintainer decision (see `GOVERNANCE.md`).
+- Every write goes through the Operation pipeline, and every read of a protected object through the access-aware getter. `pnpm check:boundaries` enforces the first.
+- A change that alters what a running instance does carries a changeset: `pnpm changeset`.
 - Plain English in documentation and messages. Short sentences.
 
 ## Sign-off on every commit

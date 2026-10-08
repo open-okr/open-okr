@@ -1,7 +1,7 @@
 /**
  * The OKR Coach: seeding and scope (P4-T06a).
  *
- * AI-NATIVE-PLAN.md §6.1 and `docs/design/p4-t00-agent-design.md` §1. One Coach
+ * AI-NATIVE-PLAN.md §6.1 and `docs/design/agents.md` §1. One Coach
  * per workspace, created at provisioning, for the reason the Champion is: §4.14
  * says a fresh workspace practises the full method with nothing configured, and
  * an agent an admin has to create first never speaks in the workspaces that

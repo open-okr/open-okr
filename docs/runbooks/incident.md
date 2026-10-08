@@ -4,7 +4,7 @@ A triage table. Find the symptoms, follow the row. Each scenario stands
 alone. Commands are for Docker Compose unless marked otherwise; the Helm
 equivalents use `kubectl` in place of `docker compose`.
 
-Written at P8-T06d. The `/api/status` endpoint (P8-T06c) is the first
+The `/api/status` endpoint is the first
 diagnostic in most rows, because it answers "which component is the
 problem" without authentication.
 

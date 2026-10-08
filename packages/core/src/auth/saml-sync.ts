@@ -4,7 +4,7 @@
  * **`sso_connections` is the authority and `sso_providers` is derived from
  * it.** Agung settled that on 18 September 2026 against two alternatives that
  * both put per-workspace provider configuration on a table with no
- * `workspace_id` and no policy. `docs/design/p8-t07c-saml.md` records why.
+ * `workspace_id` and no policy. `docs/design/saml.md` records why.
  *
  * So this is the one place that writes the derived table, and it writes it
  * from the authority rather than from its caller's arguments. A caller that

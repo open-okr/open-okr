@@ -5518,7 +5518,7 @@ export const scoreKeyResult = defineWriteAction({
 
 // ---------------------------------------------------------------------------
 // Stage three: objective narratives, and stage four: recognition (METHOD.md
-// §8.1, p4-t00-session-design.md §4.4 and §4.5, P4-T10c)
+// §8.1, sessions.md §4.4 and §4.5, P4-T10c)
 // ---------------------------------------------------------------------------
 
 /** Editor JSON for the current rich text schema, or null. */
@@ -6269,7 +6269,7 @@ export const readRecognition = defineReadAction({
 
 // ---------------------------------------------------------------------------
 // Stage five: the team retro, and stage six: the management retro (METHOD.md
-// §8.1, §8.7, p4-t00-session-design.md §4.6 and §4.7, P4-T11a)
+// §8.1, §8.7, sessions.md §4.6 and §4.7, P4-T11a)
 // ---------------------------------------------------------------------------
 
 /**
@@ -6966,7 +6966,7 @@ export const readManagementRetro = defineReadAction({
 });
 // ---------------------------------------------------------------------------
 // Stage seven: root causes, and stage eight: process health (METHOD.md §8.4 and
-// §8.5, p4-t00-session-design.md §4.8, P4-T11b)
+// §8.5, sessions.md §4.8, P4-T11b)
 // ---------------------------------------------------------------------------
 
 /**
@@ -7569,7 +7569,7 @@ export const readProcessHealth = defineReadAction({
 
 // ---------------------------------------------------------------------------
 // Stage seven's second half: the diagnostic, and stage nine: keep, modify or
-// abandon (METHOD.md §8.6 and §8.8, p4-t00-session-design.md §4.8, P4-T11c-a)
+// abandon (METHOD.md §8.6 and §8.8, sessions.md §4.8, P4-T11c-a)
 // ---------------------------------------------------------------------------
 
 /**
@@ -9554,7 +9554,7 @@ export const readScoringStatus = defineReadAction({
      * plain average and the weighted average are the same figure. Running
      * through the reveals also makes the acceptance criterion literal, because
      * revealing is then the thing that moves it. Agung decided this on
-     * 26 August 2026, and p4-t00-session-design.md §4.3 is corrected to match.
+     * 26 August 2026, and sessions.md §4.3 is corrected to match.
      */
     cycleScore: z.number().nullable(),
     /**

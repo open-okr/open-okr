@@ -22,7 +22,7 @@ import { upsertKpiRecord } from "./service.ts";
 
 /**
  * Calculated KPIs: the edge table, the cascade and the per-period evaluation
- * (design `p3-t00-kpi-engine.md` §5 to §7, P3-T13).
+ * (design `kpi-engine.md` §5 to §7, P3-T13).
  *
  * The grammar, the aggregation and the cascade order are all in
  * `packages/method`. This is the half that loads records, writes edges and walks

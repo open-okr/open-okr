@@ -1,5 +1,5 @@
 /**
- * The OKR diagram (P9-T09a, docs/design/p9-t00-okr-writing.md §5).
+ * The OKR diagram (P9-T09a, docs/design/okr-writing.md §5).
  *
  * Acceptance:
  *   Given a cycle, when the diagram opens, then its objectives are drawn with

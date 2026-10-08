@@ -59,10 +59,10 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...parts: string[]) => readFileSync(join(root, ...parts), "utf8");
 
-const method = read("docs", "development-plan", "METHOD.md");
-const aiPlan = read("docs", "development-plan", "AI-NATIVE-PLAN.md");
-const methodDesign = read("docs", "design", "p4-t00-method-package.md");
-const agentDesign = read("docs", "design", "p4-t00-agent-design.md");
+const method = read("docs", "specification", "METHOD.md");
+const aiPlan = read("docs", "specification", "AI-NATIVE-PLAN.md");
+const methodDesign = read("docs", "design", "method-package.md");
+const agentDesign = read("docs", "design", "agents.md");
 const qualityTests = read("packages", "method", "test", "quality.test.ts");
 
 const NEWLINE = String.fromCharCode(10);

@@ -33,7 +33,7 @@ const MIGRATIONS_DIR = fileURLToPath(
   new URL("../../db/migrations/", import.meta.url),
 );
 const PLAN = fileURLToPath(
-  new URL("../../../docs/development-plan/TECHNICAL-PLAN.md", import.meta.url),
+  new URL("../../../docs/specification/TECHNICAL-PLAN.md", import.meta.url),
 );
 
 /**

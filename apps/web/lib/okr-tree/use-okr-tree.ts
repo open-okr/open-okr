@@ -2,7 +2,7 @@
 
 /**
  * One cache for the OKR list, the drawer and the diagram (P9-T06c,
- * docs/design/p9-t00-okr-writing.md §6).
+ * docs/design/okr-writing.md §6).
  *
  * **`useOkrTree`** reads one cycle's tree into TanStack Query under
  * `["okr-tree", cycleId, scope]`, seeded by the server's own render so the

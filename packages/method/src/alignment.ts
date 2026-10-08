@@ -1,5 +1,5 @@
 /**
- * The alignment health score (METHOD.md §5.2, design `p3-t00-alignment-engine.md`,
+ * The alignment health score (METHOD.md §5.2, design `alignment-engine.md`,
  * P3-T09).
  *
  * **This landed in `packages/method`, not `packages/core` as the design document

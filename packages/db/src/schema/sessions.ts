@@ -1,7 +1,7 @@
 /**
  * Sessions: the three OKR rituals as records (TECHNICAL-PLAN §4, P4-T07a).
  *
- * Schema note: the session design document (p4-t00-session-design.md §1)
+ * Schema note: the session design document (sessions.md §1)
  * uses `current_stage integer`, `status: open` and `closed_at`. TECHNICAL-PLAN
  * §4 uses `stage_key text`, `state: running` and `ended_at`, and outranks the
  * design document per CLAUDE.md's authority order. The design document is

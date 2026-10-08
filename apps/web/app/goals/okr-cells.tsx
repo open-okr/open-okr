@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * The cells of the OKR list, each edited where it is read (P9-T07a-a,
- * docs/design/p9-t00-okr-writing.md §4.2).
+ * docs/design/okr-writing.md §4.2).
  *
  * Every cell follows UIUX-PLAN §4's inline edit: it reads as text until it is
  * clicked or reached with Tab, Enter or leaving it commits, Escape puts the

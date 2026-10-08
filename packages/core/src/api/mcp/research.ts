@@ -7,7 +7,7 @@
  * find and the registry has no single action for: one search across everything
  * rather than fifteen list calls, and one address resolver rather than a client
  * that has to know which action served which page. Design
- * p5-t00-agent-surface-design.md §5.3 names them as the exception.
+ * agent-surface.md §5.3 names them as the exception.
  *
  * **Neither is a second read path.** `search` is the one index read every
  * surface asks: the search page, the command palette and this tool all answer

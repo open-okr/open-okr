@@ -33,11 +33,12 @@ kernel a Windows workstation runs kind on.
 
 ## The shape of an install
 
-**Until the first version tag, there is no published chart and no published
-image.** Build the image, push it to a registry your cluster can reach, and
-install the chart from a checkout with `helm install openokr ./deploy/helm`.
-The chart's README has the whole command. Everything below is the same either
-way.
+The chart is published with every release at
+`oci://ghcr.io/open-okr/charts/openokr`, and its default image is the same
+release of `ghcr.io/open-okr/open-okr`. [The chart's README](../../deploy/helm/README.md)
+has the whole command. To run an image you built yourself, install the chart
+from a checkout with `helm install openokr ./deploy/helm` and set
+`image.repository` and `image.tag`.
 
 1. Have a PostgreSQL with the `pgvector` extension available, and a database
    for OpenOKR.

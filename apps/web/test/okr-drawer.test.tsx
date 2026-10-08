@@ -13,7 +13,7 @@ import type { OkrDetail } from "../lib/okr-tree/actions.ts";
 import type { OkrTree } from "../lib/okr-tree/cache.ts";
 
 /**
- * The OKR drawer (P9-T08a, docs/design/p9-t00-okr-writing.md §6).
+ * The OKR drawer (P9-T08a, docs/design/okr-writing.md §6).
  *
  * **The real list and drawer, rendered together in jsdom**, with the server
  * actions stubbed, because the claims here are about the two agreeing: a

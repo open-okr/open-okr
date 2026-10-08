@@ -1,6 +1,6 @@
 /**
  * The workspace role catalogue and its defaults (P8-G13a,
- * docs/design/p8-g13-workspace-roles.md).
+ * docs/design/workspace-roles.md).
  *
  * A role is a level per domain. It sits above the relationship model in
  * `contexts.ts` rather than replacing it: `can()` still takes the maximum, and

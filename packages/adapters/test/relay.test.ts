@@ -401,7 +401,7 @@ describe("OutboxRelay", () => {
 });
 
 /**
- * The fair read (P8-T06b). Design: `p8-t01a-tenant-limits.md` §5 and §8
+ * The fair read (P8-T06b). Design: `tenant-limits.md` §5 and §8
  * criteria 4 and 7.
  *
  * These insert `workspace_id` directly rather than through a tenant

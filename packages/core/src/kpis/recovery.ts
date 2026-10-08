@@ -19,7 +19,7 @@ import {
 
 /**
  * The recovery loop's half that needs rows (METHOD.md §6.5, design
- * `p3-t00-kpi-engine.md` §8, P3-T14).
+ * `kpi-engine.md` §8, P3-T14).
  *
  * The walk and every string it produces are in `packages/method`. This loads
  * the subtree, hands it over, and turns the draft into a real goal through the

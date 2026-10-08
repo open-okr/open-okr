@@ -22,7 +22,7 @@ While the project is young, the project owner has the final say on everything: s
 
 Two areas are held more tightly than the rest:
 
-- **The method canon.** `docs/development-plan/METHOD.md` defines the OKR practice the product enforces. Changes to its rules, thresholds and coaching messages are owner decisions, always.
+- **The method canon.** `docs/specification/METHOD.md` defines the OKR practice the product enforces. Changes to its rules, thresholds and coaching messages are owner decisions, always.
 - **Licensing.** The licence (AGPL-3.0) and the contributor licence agreement can only change by owner decision.
 
 ## The promise

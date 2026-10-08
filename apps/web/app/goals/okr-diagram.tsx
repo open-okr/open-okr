@@ -49,7 +49,7 @@ import {
 } from "./okr-layout.ts";
 
 /**
- * The OKRs drawn as a tree (P9-T09a, docs/design/p9-t00-okr-writing.md §5).
+ * The OKRs drawn as a tree (P9-T09a, docs/design/okr-writing.md §5).
  *
  * The cycle at the root, its objectives below it with their key results
  * stacked inside each card, an objective aligned to a key result hanging from

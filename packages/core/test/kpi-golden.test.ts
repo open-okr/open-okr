@@ -29,7 +29,7 @@ import { describe, expect, it } from "vitest";
 
 const tables = loadGoldenTables(
   new URL(
-    "../../../docs/design/p3-t00-kpi-engine.md",
+    "../../../docs/design/kpi-engine.md",
     import.meta.url,
   ).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
 );

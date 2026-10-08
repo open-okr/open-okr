@@ -2641,7 +2641,7 @@ export const linkKeyResultKpi = defineWriteAction({
       );
       // After the access check, so somebody who cannot edit the goal learns
       // nothing about its state. A closed goal takes no new values from a KPI
-      // (design `p3-t00-kpi-engine.md` §10), and linking one would pull the
+      // (design `kpi-engine.md` §10), and linking one would pull the
       // KPI's reading into a record of how the cycle ended.
       const [goal] = await tx
         .select({ closedAt: goals.closedAt })

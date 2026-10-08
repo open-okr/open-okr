@@ -299,7 +299,7 @@ export const createPersonalLink = defineWriteAction({
         // joins, and that is the one that must be right; this one exists so
         // the refusal reaches the administrator who caused it rather than the
         // colleague who clicked a link. A guest is not a seat
-        // (p8-t01b-plans-and-seats.md), so a guest invitation is never
+        // (plans-and-seats.md), so a guest invitation is never
         // refused for one.
         await requireSeatInTx(
           tx,

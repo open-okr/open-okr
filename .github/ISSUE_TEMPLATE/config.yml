@@ -4,7 +4,7 @@ contact_links:
     url: https://github.com/open-okr/open-okr/security/policy
     about: Report a vulnerability privately. Never in an issue.
   - name: How the product decides things
-    url: https://github.com/open-okr/open-okr/blob/main/docs/development-plan/METHOD.md
+    url: https://github.com/open-okr/open-okr/blob/main/docs/specification/METHOD.md
     about: The OKR practice canon. Every rule, threshold and gate the product runs.
   - name: Where to start contributing
     url: https://github.com/open-okr/open-okr/blob/main/CONTRIBUTING.md

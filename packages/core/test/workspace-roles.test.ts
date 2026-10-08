@@ -19,7 +19,7 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
  * Workspace roles and the matrix (P8-G13a,
- * docs/design/p8-g13-workspace-roles.md).
+ * docs/design/workspace-roles.md).
  *
  * The four things that matter and are easy to get wrong in different places:
  * a workspace is born with its roles and its founder holds Owner; a role

@@ -2,7 +2,7 @@ import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
 
 /**
  * Where everything on the OKR diagram goes (P9-T09a,
- * docs/design/p9-t00-okr-writing.md §5.2).
+ * docs/design/okr-writing.md §5.2).
  *
  * Pure: a tree and what is collapsed in, boxes and lines out, so the layout
  * is tested on its own and the canvas only draws it.

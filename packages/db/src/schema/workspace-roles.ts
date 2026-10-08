@@ -11,7 +11,7 @@ import { workspaces } from "./workspaces.ts";
 
 /**
  * Workspace roles and their permission matrix (P8-G13a, migration 0108,
- * docs/design/p8-g13-workspace-roles.md).
+ * docs/design/workspace-roles.md).
  *
  * A role is a level per domain and nothing else. It does not replace the
  * relationship model in `access.ts`: `can()` takes the maximum over the

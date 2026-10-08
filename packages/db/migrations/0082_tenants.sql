@@ -1,6 +1,6 @@
 -- The tenant record (TECHNICAL-PLAN §4.13, P8-T02a).
 --
--- Design: docs/design/p8-t01a-tenant-lifecycle.md.
+-- Design: docs/design/tenant-lifecycle.md.
 --
 -- Cloud only, and absent on every self-hosted instance. The table exists
 -- everywhere and holds no rows there, because one migration path for

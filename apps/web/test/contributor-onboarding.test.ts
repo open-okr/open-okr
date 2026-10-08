@@ -117,11 +117,12 @@ describe("contributing", () => {
     );
   });
 
-  test("refuses to call a plan task a good first issue", () => {
+  test("keeps a good first issue away from the pipeline and the method", () => {
     const list = at("../../../docs/runbooks/good-first-issues.md");
     expect(list).toContain(
-      "Never label a task from the implementation plan as a good first issue.",
+      "A change that touches the Operation pipeline, `can()`, or a migration",
     );
+    expect(list).toContain("which is a maintainer decision");
   });
 });
 

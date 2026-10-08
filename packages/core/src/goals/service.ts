@@ -334,7 +334,7 @@ export async function createGoalInTx<
   });
 
   // **A goal in a space used to grant every member of that space `edit`, and
-  // no longer does** (P8-G13c, docs/design/p8-g13-workspace-roles.md). That
+  // no longer does** (P8-G13c, docs/design/workspace-roles.md). That
   // binding was the only answer to "who may edit this objective", it could be
   // stated only by reading the binding table, it could be changed only by
   // moving people between spaces, and it had no screen. The workspace role
