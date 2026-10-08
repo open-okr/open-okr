@@ -324,7 +324,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 0 | `fix/*` ×6 | F1 to F6, one each | As listed in §5 |
 | 1a | `packages/formats` | The package, with the rules core already enforced moved into it unchanged: email, domain, local date, hex colour, timezone. Done 8 October 2026 | None. Nothing a person sees changes |
 | 1b | The base kit | `TextInput` on Base UI `Field`, `EmailInput`, `SecretInput`. Done 9 October 2026 | Sign-in, sign-up, forgot and reset password, setup, the welcome wizard. The auth `Field` helper is rebuilt on `TextInput`, so the backup code page and the single sign-on form take the same skin |
-| 1c | The ratchet gate | The gate below | None |
+| 1c | The ratchet gate | The gate below, with its first baseline: 336 raw fields in 111 screen files. Done 9 October 2026 | None |
 | 2 | `feat/code-input` | `CodeInput` | Sign-in second step, turning on the authenticator, backup code, terminal login |
 | 3 | `feat/timezone-select` | `TimezoneSelect`, the stricter `timezoneSchema` | Welcome wizard, Admin > General, profile |
 | 4 | `feat/compact-editor` | The `compact` variant, the toolbar, `RichTextField`, the length limit in `richTextSchema`. Underline step 1: every reader knows the mark, nothing writes it | Comments, check-in narrative ×3, retrospective, initiative description, review narrative |
@@ -342,7 +342,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 
 **Each part of the kit arrives with the change that first uses it.** Change 1 was planned with `TextArea`, `UrlInput` and the server field errors of §4.2, but none of the screens it moved has a textarea, a URL or a server action that reports a field: they talk to Better Auth or keep their own state. So `UrlInput` arrives with change 9, `TextArea` with change 10, and the field errors with the first change whose form is a server action, rather than shipping unused.
 
-**The ratchet gate.** A new check in `pnpm check:boundaries` counts the raw text-like `<input>`, `<textarea>` and `<select>` elements in each file of `apps/web`, and compares the counts with a committed baseline. A file's count may go down, never up. Change 10 brings every count to zero and deletes the baseline file, and from then on any raw text field in `apps/web` fails the gate.
+**The ratchet gate.** A pass in `pnpm check:boundaries` counts the raw text-like `<input>`, `<textarea>` and `<select>` elements in each screen file of `apps/web`, reading the syntax tree so a comment does not count, and compares the counts with `scripts/raw-fields-baseline.json`. A file's count may go down, never up, and a lower count has to be written into the baseline (`pnpm check:boundaries --update-field-baseline`), so the gain cannot be spent again. Change 10 brings every count to zero and deletes the baseline file, and from then on any raw text field in `apps/web` fails the gate.
 
 **Every change** carries the following:
 

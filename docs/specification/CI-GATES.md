@@ -179,6 +179,19 @@ await tx.update(table).set(...)
 The marker sits on the line **immediately above the statement**, and it needs
 the colon and a reason. A marker without them is invisible to the gate.
 
+**It also holds the raw-field ratchet** ([guided-inputs.md](../design/guided-inputs.md) §6).
+Every screen file in `apps/web` may draw as many raw `<input>`, `<textarea>`
+and `<select>` elements as `scripts/raw-fields-baseline.json` allows: hidden
+inputs, checkboxes, radios, file pickers and buttons are not counted.
+
+| It refuses | Because |
+|---|---|
+| A file drawing more raw fields than its entry, or a new file drawing any | A field drawn without the kit has no linked label and error and no format check shared with the server. Use the kit in `packages/ui` |
+| A file drawing fewer than its entry | The gain has to be recorded, or the next change could spend it again. Run `pnpm check:boundaries --update-field-baseline`, which writes the new counts and refuses while any file has gone up |
+
+The count reads the syntax tree, so a field mentioned in a comment does not
+count.
+
 ### `pnpm dead-code`
 
 Reports files nothing imports and exports nothing names. It is the only gate
