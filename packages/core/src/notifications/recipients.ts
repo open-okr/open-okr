@@ -3,11 +3,14 @@
  * from subscriptions and role obligations, access-checked at send time,
  * author excluded."
  *
- * Only the subscriptions half is built here. Role obligations — a
- * champion or reviewer binding implying interest on its own, with no
- * subscription row — has no concrete meaning yet: role tags exist (P2-T01)
- * but nothing ties one to a notification reason. Recorded in STATUS.md
- * rather than guessed at.
+ * **Role obligations are a goal's champion and reviewer** (UAT BUG-007). They
+ * hear about their goal without having pressed Watch, because a comment on an
+ * objective is addressed to the people who answer for it. They carry the
+ * \`joined\` reason a watcher carries: \`role\` is the inbox's "Role change",
+ * which would mislabel a comment. Resolved here, at send time, rather than written as
+ * subscription rows, so every existing goal is covered without a backfill.
+ * Turning the watch off still wins: a cancelled subscription on the goal
+ * keeps that person out, role or not.
  *
  * Access is checked per recipient against the list's own subject, through
  * `getAccessScoped`, not assumed from subscription alone: a member can stay
@@ -17,7 +20,9 @@
  */
 import {
   activeOnly,
+  goals,
   subscriptionLists,
+  subscriptions,
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
@@ -63,14 +68,16 @@ export async function resolveRecipients<
       ),
     )
     .limit(1);
-  if (!list) {
-    return [];
-  }
-
-  const subscribers = await listSubscribers(tx, input.workspaceId, list.id);
+  const subscribers = list
+    ? await listSubscribers(tx, input.workspaceId, list.id)
+    : [];
+  const candidates: Recipient[] = [
+    ...subscribers,
+    ...(await roleHolders(tx, input, list?.id ?? null, subscribers)),
+  ];
   const recipients: Recipient[] = [];
 
-  for (const subscriber of subscribers) {
+  for (const subscriber of candidates) {
     if (subscriber.memberId === input.excludeMemberId) {
       continue;
     }
@@ -104,4 +111,59 @@ export async function resolveRecipients<
   }
 
   return recipients;
+}
+
+/**
+ * A goal's champion and reviewer who are not already subscribed and have not
+ * turned the watch off. Every other subject type has no role obligation yet.
+ */
+export async function roleHolders<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: ResolveRecipientsInput,
+  listId: string | null,
+  subscribers: readonly Recipient[],
+): Promise<Recipient[]> {
+  if (input.subjectType !== "goal") {
+    return [];
+  }
+  const [goal] = await tx
+    .select({ championId: goals.championId, reviewerId: goals.reviewerId })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        eq(goals.workspaceId, input.workspaceId),
+        eq(goals.id, input.subjectId),
+      ),
+    )
+    .limit(1);
+  if (!goal) {
+    return [];
+  }
+  const declined = listId
+    ? new Set(
+        (
+          await tx
+            .select({ memberId: subscriptions.memberId })
+            .from(subscriptions)
+            .where(
+              activeOnly(
+                subscriptions,
+                eq(subscriptions.workspaceId, input.workspaceId),
+                eq(subscriptions.listId, listId),
+                eq(subscriptions.canceled, true),
+              ),
+            )
+        ).map((row) => row.memberId),
+      )
+    : new Set<string>();
+  const already = new Set(subscribers.map((one) => one.memberId));
+  const holders = [goal.championId, goal.reviewerId].filter(
+    (memberId): memberId is string => Boolean(memberId),
+  );
+  return [...new Set(holders)]
+    .filter((memberId) => !already.has(memberId) && !declined.has(memberId))
+    .map((memberId) => ({ memberId, reason: "joined" as const }));
 }

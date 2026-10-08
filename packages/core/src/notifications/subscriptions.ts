@@ -152,6 +152,28 @@ export async function cancelSubscription<
     );
 }
 
+/**
+ * Turning a watch back on. \`subscribeMember\` leaves an existing row alone,
+ * which kept a cancelled watch cancelled however often Watch was pressed again.
+ */
+export async function resumeSubscription<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: CancelSubscriptionInput): Promise<void> {
+  // openokr:allow-mutation: called only from inside an Operation's execute,
+  // on the transaction that Operation opened.
+  await tx
+    .update(subscriptions)
+    .set({ canceled: false, updatedAt: new Date() })
+    .where(
+      activeOnly(
+        subscriptions,
+        eq(subscriptions.listId, input.listId),
+        eq(subscriptions.memberId, input.memberId),
+        eq(subscriptions.canceled, true),
+      ),
+    );
+}
+
 export interface ReconcileMentionsInput {
   readonly workspaceId: string;
   readonly listId: string;

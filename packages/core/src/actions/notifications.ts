@@ -23,6 +23,7 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { renderActivity } from "../activities/renderers.ts";
 import { claimDueBatches } from "../notifications/drain.ts";
+import { roleHolders } from "../notifications/recipients.ts";
 import {
   getOrCreateNotificationSettings,
   updateNotificationSettings,
@@ -30,6 +31,7 @@ import {
 import {
   cancelSubscription,
   ensureSubscriptionList,
+  resumeSubscription,
   subscribeMember,
 } from "../notifications/subscriptions.ts";
 import { readerMaySeeSubject } from "../notifications/visibility.ts";
@@ -695,13 +697,29 @@ export const readSubscription = defineReadAction({
         )
         .limit(1);
 
+      // A goal's champion and reviewer hear about it without pressing Watch
+      // (UAT BUG-007), so the control has to say they are watching until they
+      // turn it off. \`roleHolders\` already leaves out who has.
+      const byRole = (
+        await roleHolders(
+          tx,
+          {
+            workspaceId: context.workspaceId,
+            subjectType: input.subjectType,
+            subjectId: input.subjectId,
+          },
+          list?.id ?? null,
+          [],
+        )
+      ).some((holder) => holder.memberId === memberId);
+
       if (!list) {
         // No list is not a missing row to repair: it means nobody has ever
         // subscribed, which is a complete answer.
         return {
-          watching: false,
-          reason: null,
-          watchers: 0,
+          watching: byRole,
+          reason: byRole ? ("joined" as const) : null,
+          watchers: byRole ? 1 : 0,
           everyone: false,
         };
       }
@@ -727,10 +745,11 @@ export const readSubscription = defineReadAction({
         );
 
       const mine = rows.find((row) => row.memberId === memberId);
+      const watching = mine !== undefined || byRole;
       return {
-        watching: mine !== undefined,
-        reason: mine?.reason ?? null,
-        watchers: rows.length,
+        watching,
+        reason: mine?.reason ?? (byRole ? ("joined" as const) : null),
+        watchers: rows.length + (mine === undefined && byRole ? 1 : 0),
         everyone: list.sendToEveryone,
       };
     });
@@ -765,7 +784,21 @@ export const toggleSubscription = defineWriteAction({
           memberId: actor.memberId,
           reason: "role",
         });
+        await resumeSubscription(tx, {
+          workspaceId,
+          listId,
+          memberId: actor.memberId,
+        });
       } else {
+        // A champion or reviewer may have no row at all and still be told
+        // about the goal (UAT BUG-007). Writing the row before cancelling it
+        // is what makes "stop telling me" stick for them too.
+        await subscribeMember(tx, {
+          workspaceId,
+          listId,
+          memberId: actor.memberId,
+          reason: "role",
+        });
         await cancelSubscription(tx, {
           workspaceId,
           listId,
