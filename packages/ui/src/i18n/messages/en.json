@@ -2726,6 +2726,7 @@
   "prompts.rewriteFailingRule": "Rewriting for a failing rule",
   "quickCheckIn.recordAValue": "Record a value{unit}",
   "quickCheckIn.statusAndConfidenceCome": "Status and confidence come from a check-in, where they arrive with a\n        narrative.",
+  "quickCheckIn.typeAValueFirst": "Type a value before saving.",
   "review.aRowAppearsHere": "A row appears here when a goal you champion is due a check-in, or\n              when a check-in you review is waiting on you.",
   "review.computedOnTheServer": "Computed on the server, overdue first. Notifications say what\n              happened. This says what you owe.",
   "review.everyMessageTheProduct": "Every message the product sent you, and every one it decided to\n              hold, with the rule behind it.",

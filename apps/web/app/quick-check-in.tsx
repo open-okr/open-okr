@@ -47,6 +47,7 @@ export async function QuickCheckIn({
           name="value"
           type="number"
           step="any"
+          required
           defaultValue={currentValue}
           // Nine digits fit. A measure in rupiah or impressions reaches them
           // and `w-24` hid half of what was being typed.

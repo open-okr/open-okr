@@ -21,7 +21,14 @@ export async function recordFromMap(
 ): Promise<WriteState> {
   const goalId = String(formData.get("goalId") ?? "");
   const keyResultId = String(formData.get("keyResultId") ?? "");
-  const value = Number(formData.get("value"));
+  // An empty box is asked about, not read: `Number("")` is 0, so a cleared
+  // box used to write a real value of 0 into the key result's history.
+  const typed = String(formData.get("value") ?? "").trim();
+  if (typed === "") {
+    const { t } = await getTranslations();
+    return { error: t("quickCheckIn.typeAValueFirst") };
+  }
+  const value = Number(typed);
   if (!Number.isFinite(value)) {
     const { t } = await getTranslations();
     return { error: t("cycle.actions.valueHasToBeANumber") };
