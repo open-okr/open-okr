@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         The OKR practice itself is specified in
-        `docs/development-plan/METHOD.md`. A change to a rule, a threshold, a
+        `docs/specification/METHOD.md`. A change to a rule, a threshold, a
         band, a corridor or a coaching message is a decision about the method
         rather than about the software, and it is made by a maintainer. Say so
         plainly if that is what you are asking for; it is a legitimate ask.

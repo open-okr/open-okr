@@ -31,7 +31,7 @@ import { describe, expect, it } from "vitest";
  * failure hid behind a cache replay for two tasks. The cadence golden masters
  * already sat here for the same reason.
  *
- * Every matrix here is read out of `docs/design/p3-t00-scoring-and-health-engine.md`
+ * Every matrix here is read out of `docs/design/scoring-and-health-engine.md`
  * at run time rather than retyped. That document is the fixture: changing a number
  * in it changes what this suite asserts, and deleting a table breaks the build
  * rather than silently testing nothing. Two copies of a correctness matrix is a
@@ -42,7 +42,7 @@ const thresholds = canonThresholds();
 
 const tables = loadGoldenTables(
   new URL(
-    "../../../docs/design/p3-t00-scoring-and-health-engine.md",
+    "../../../docs/design/scoring-and-health-engine.md",
     import.meta.url,
   ).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
 );

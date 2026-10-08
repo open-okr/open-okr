@@ -1,7 +1,7 @@
 /**
  * The three settings that make an instance a cloud one (P8-T02a).
  *
- * Design: `docs/design/p8-t01a-tenant-lifecycle.md` §4 and §6.
+ * Design: `docs/design/tenant-lifecycle.md` §4 and §6.
  *
  * They live at instance scope because they describe the deployment rather
  * than any customer, and every one of them defaults to the self-hosted

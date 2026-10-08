@@ -137,7 +137,7 @@ export const twoFactors = pgTable("two_factors", {
  * **Derived from `sso_connections`, which is the authority.** Better Auth owns
  * the shape and the writes here, the way it owns `passkeys` and `two_factors`;
  * the product feeds it and never reads it to answer a question. See migration
- * 0097 and `docs/design/p8-t07c-saml.md`.
+ * 0097 and `docs/design/saml.md`.
  *
  * The property names are Better Auth's field names, because its Drizzle
  * adapter looks columns up by them. The database columns are snake_case, the

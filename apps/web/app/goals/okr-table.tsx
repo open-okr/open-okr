@@ -12,6 +12,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import {
   filterGoals,
   type OkrFilters,
@@ -1335,7 +1336,7 @@ function AddRow({
           // because somebody just pressed the control that creates it, so the
           // caret belongs here, and the attribute that does it declaratively
           // also steals focus when a page loads with one of these already open.
-          ref={(node) => node?.focus()}
+          ref={focusOnMount}
           value={title}
           aria-label={label}
           placeholder={placeholder}

@@ -1,6 +1,6 @@
 /**
  * The two retros (METHOD.md §8.1 stages 5 and 6, §8.7,
- * p4-t00-session-design.md §4.6 and §4.7, P4-T11a).
+ * sessions.md §4.6 and §4.7, P4-T11a).
  *
  * The task's test plan:
  * - a dot vote cannot be spent twice by one member

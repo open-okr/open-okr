@@ -17,34 +17,30 @@ specs, and one that never has been, for the wizard specs.
 ## What a filename's prefix means
 
 Most specs are named `sNN-<subject>` where `NN` is the UIUX-PLAN.md §6 screen
-the spec drives. Five are not, and the prefix on those is the number the
-task-era label carried rather than a screen id:
+the spec drives. Five are not, and the prefix on those is an older label rather
+than a screen id:
 
 | File | Prefix reads as | Actually covers |
 |---|---|---|
-| `s12-blocker-board.spec.ts` | S-12, review and learn | The open-blocker board (P4-T15b-b, METHOD.md §7.3) |
-| `s26-session-entry.spec.ts` | S-26, initiatives | Reaching a session in two clicks (P5-T01c, screens S-22 to S-25) |
-| `s37-api-tokens.spec.ts` | S-37, the AI console | `/account/api-tokens` and the REST surface (P5-T07a) |
-| `s38-device-login.spec.ts` | S-38, agent detail | The device login flow (P5-T07c) |
-| `s41-mcp-transport.spec.ts` | S-41, which does not exist | The agent endpoint over its real transport (P5-T09b) |
+| `s12-blocker-board.spec.ts` | S-12, review and learn | The open-blocker board (METHOD.md §7.3) |
+| `s26-session-entry.spec.ts` | S-26, initiatives | Reaching a session in two clicks (screens S-22 to S-25) |
+| `s37-api-tokens.spec.ts` | S-37, the AI console | `/account/api-tokens` and the REST surface |
+| `s38-device-login.spec.ts` | S-38, agent detail | The device login flow |
+| `s41-mcp-transport.spec.ts` | S-41, which does not exist | The agent endpoint over its real transport |
 
-**They are not renamed on purpose.** Six documents cite these paths, including
-`docs/design/p5-t07-api-design.md`, `docs/design/p5-t00-agent-surface-design.md`
-and STATUS.md rows that are the audit trail for work already reviewed. A rename
-would make a historical record point at a file that does not exist, which is a
-worse defect than a prefix that needs this table. Each spec's own doc comment
-names its task and its plan section, so the file itself has never been
-ambiguous.
+**They are not renamed on purpose.** Design documents such as
+`docs/design/api-contract.md` and `docs/design/agent-surface.md` cite these
+paths, and each spec's own doc comment says what it covers, so the file itself
+is never ambiguous.
 
 **A new spec takes the screen number it drives**, or no prefix at all when it
-drives something with no screen. The gap audit of 7 September 2026 raised the
-drift; this is the answer to it.
+drives something with no screen.
 
 ## Coverage
 
 `apps/web/test/reachability.test.ts` asserts every route is findable in the
-interface. It does not assert every route has a spec here, and sixteen do not:
-that is P6-G29, and `docs/development-plan/GAP-AUDIT.md` G-10 lists them.
+interface, and `apps/web/test/route-coverage.test.ts` asserts every route is
+opened by a spec here or names the reason it is not.
 
 ## Failure artefacts are worth reading
 

@@ -2,7 +2,7 @@
  * What an operator does to a workspace, and how the customer sees it
  * (P8-T03b).
  *
- * Design: `docs/design/p8-t01b-operator-console.md` §4 and §6.
+ * Design: `docs/design/operator-console.md` §4 and §6.
  *
  * **An operator's action is recorded twice, and the second one is the point.**
  * The instance chain is the vendor's own trail. The workspace's own

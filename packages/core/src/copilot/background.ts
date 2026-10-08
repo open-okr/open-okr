@@ -24,7 +24,7 @@
  *
  * An instance whose serving process drains no queue answers inline exactly as
  * before, because enqueuing there would be enqueuing into nothing.
- * `docs/design/p4-t14b-b-copilot-background-runs.md` records the whole of it.
+ * `docs/design/copilot-background-runs.md` records the whole of it.
  *
  * **What is published is prose, and what is persisted is the finished
  * answer.** A chunk is not written to the database as it arrives: a write per

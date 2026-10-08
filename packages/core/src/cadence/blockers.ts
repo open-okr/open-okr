@@ -12,14 +12,14 @@
  * on the row when it is opened, and where an open one stands against that
  * date, which the nudges, the board and the digest all read the same way.
  */
-import { activeOnly, goals, type WorkspaceTx } from "@openokr/db";
+import { activeOnly, blockers, goals, type WorkspaceTx } from "@openokr/db";
 import type {
   BlockerClock,
   CheckInFrequency,
   Holiday,
   ResolvedThresholds,
 } from "@openokr/method";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, isNull, lt } from "drizzle-orm";
 import {
   formatLocalDate,
   localDateIn,
@@ -150,4 +150,59 @@ export function blockerClockOf(input: {
     daysUntilDue: Math.round(days),
     followingPassed: today > following,
   };
+}
+
+/**
+ * Moves a goal's pending blockers forward with the goal's own next check-in
+ * (§7.3, P9-T19a-a): a blocker is due by the next check-in, so when holidays
+ * or a new frequency move that check-in later, its blockers move with it.
+ *
+ * Only ever forward, and never one already past due: a blocker that has
+ * passed its check-in has been raised with the coordinator, and a holiday
+ * marked afterwards does not take that back. Returns how many moved.
+ */
+export async function followGoalDueInTx(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly goalId: string;
+    readonly now: Date;
+  },
+): Promise<number> {
+  const [goal] = await tx
+    .select({ nextCheckInAt: goals.nextCheckInAt })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        and(
+          eq(goals.workspaceId, input.workspaceId),
+          eq(goals.id, input.goalId),
+        ),
+      ),
+    )
+    .limit(1);
+  const next = goal?.nextCheckInAt ?? null;
+  if (next === null) {
+    return 0;
+  }
+  // openokr:allow-mutation: the calling Operation's own transaction, which
+  // moved the goal's check-in this follows.
+  const moved = await tx
+    .update(blockers)
+    .set({ dueAt: next, updatedAt: input.now })
+    .where(
+      activeOnly(
+        blockers,
+        and(
+          eq(blockers.workspaceId, input.workspaceId),
+          eq(blockers.goalId, input.goalId),
+          isNull(blockers.resolvedAt),
+          gte(blockers.dueAt, input.now),
+          lt(blockers.dueAt, next),
+        ),
+      ),
+    )
+    .returning({ id: blockers.id });
+  return moved.length;
 }

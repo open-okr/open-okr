@@ -17,7 +17,7 @@ import {
 /**
  * Per-tenant admission (P8-T06a).
  *
- * Design: `docs/design/p8-t01a-tenant-limits.md`, whose §8 is the test plan
+ * Design: `docs/design/tenant-limits.md`, whose §8 is the test plan
  * this file implements. Criteria 2, 3, 5 and 6 are here. Criterion 1 needs
  * two tenants and a load run and belongs to `pnpm perf:load`; criteria 4 and
  * 7 are the relay's and are P8-T06b's.

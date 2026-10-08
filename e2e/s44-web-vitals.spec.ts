@@ -21,7 +21,7 @@ import { goTo, signIn } from "./instance-account.ts";
  * standalone server on whatever hardware continuous integration gave us, with
  * the seeded database `prepare-database.ts` builds. That is smaller than
  * §13.1's own dataset, so a green result here is a floor and not a promise
- * about a hundred thousand goals: `p7-t05-accessibility.md` says so, and the
+ * about a hundred thousand goals: `accessibility.md` says so, and the
  * server-side half of the same rows is measured against the full dataset by
  * `pnpm perf:budgets`.
  */

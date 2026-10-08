@@ -20,6 +20,7 @@ import {
   type CycleFacts,
   decide,
   isMidCycleAddition,
+  type KeyResultDirection,
   type KeyResultKind,
   levelsInUse,
   OKR_LEVELS,
@@ -51,6 +52,12 @@ export type PolicyRequest =
     }
   /** Changing an objective's kind (P9-T11b-a). Needs no cycle. */
   | { readonly kind: "objective.kind"; readonly okrKind: OkrKind }
+  /** Moving an objective to another level, judged against its cycle's (§2.7). */
+  | {
+      readonly kind: "objective.level";
+      readonly cycleId: string | null;
+      readonly level: string;
+    }
   /** Writing a key result as one of §2.10's kinds (P9-T12b). Needs no cycle. */
   | { readonly kind: "keyResult.kind"; readonly keyResultKind: KeyResultKind }
   /** Taking the reviewer off an objective (P9-T04). */
@@ -77,6 +84,9 @@ export type PolicyRequest =
       readonly from: number;
       readonly to: number;
       readonly baseline: number;
+      /** Which way is easier depends on it (METHOD.md §2.9). */
+      readonly direction?: KeyResultDirection;
+      readonly keyResultKind?: KeyResultKind;
       readonly hasReason: boolean;
     };
 
@@ -98,6 +108,22 @@ export async function policyDecisionInTx<
   const { thresholds } = resolveRhythm(row);
   if (request.kind === "reviewer.remove") {
     return decide({ kind: "reviewer.remove" }, practice, thresholds);
+  }
+  if (request.kind === "objective.level") {
+    // §2.7: the cycle's own levels, or today's for an objective in no cycle.
+    const level = OKR_LEVELS.find((entry) => entry === request.level);
+    if (level === undefined) {
+      return { outcome: "allow", rules: [], reasons: [] };
+    }
+    const levels =
+      request.cycleId === null
+        ? levelsInUse(practice)
+        : await cycleLevelsInTx(tx, workspaceId, request.cycleId);
+    return decide(
+      { kind: "objective.level", level, levelsInUse: levels },
+      practice,
+      thresholds,
+    );
   }
   if (
     request.kind === "target.change" ||
@@ -200,6 +226,8 @@ export async function midCycleInTx<
   tx: WorkspaceTx<TSchema>,
   workspaceId: string,
   cycleId: string | null,
+  /** The moment asked about: a run replayed at a date asks at that date. */
+  now: Date = new Date(),
 ): Promise<boolean> {
   if (cycleId === null) {
     return false;
@@ -210,7 +238,7 @@ export async function midCycleInTx<
   }
   const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
   const today = formatLocalDate(
-    localDateIn(new Date(), await workspaceTimeZone(tx, workspaceId)),
+    localDateIn(now, await workspaceTimeZone(tx, workspaceId)),
   );
   return isMidCycleAddition(
     {

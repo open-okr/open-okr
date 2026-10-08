@@ -6677,7 +6677,7 @@
       "method": "POST",
       "path": "/goals/moveToCycle",
       "scope": "write",
-      "summary": "Moves a goal into another cycle, taking its check-in history with it.",
+      "summary": "Moves a goal into another cycle, taking its check-in history with it. Arriving in a running cycle is judged as starting it there.",
       "flags": [
         {
           "name": "id",
@@ -6690,6 +6690,12 @@
           "field": "cycleId",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false

@@ -303,7 +303,7 @@ the machine-readable document.
 | `goals.keyResultHistory`<br/>One key result's value history, newest first. Drives the sparkline. | `GET /api/v1/goals/keyResultHistory` | reads |
 | `goals.linkKpi`<br/>Links a KPI to a key result, which from then on reads its value and progress from it. | `POST /api/v1/goals/linkKpi` | writes |
 | `goals.list`<br/>Goals in a cycle, or the whole workspace, with their key results attached. | `GET /api/v1/goals/list` | reads |
-| `goals.moveToCycle`<br/>Moves a goal into another cycle, taking its check-in history with it. | `POST /api/v1/goals/moveToCycle` | writes |
+| `goals.moveToCycle`<br/>Moves a goal into another cycle, taking its check-in history with it. Arriving in a running cycle is judged as starting it there. | `POST /api/v1/goals/moveToCycle` | writes |
 | `goals.moveToSpace`<br/>Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces. | `POST /api/v1/goals/moveToSpace` | writes |
 | `goals.parseFilter`<br/>Turns a sentence into a validated goals filter, or refuses it with the reason. | `GET /api/v1/goals/parseFilter` | reads |
 | `goals.patch`<br/>Changes some of an objective's fields, refused with the current values if any of them changed since the caller read them. | `POST /api/v1/goals/patch` | writes |

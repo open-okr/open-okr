@@ -25,6 +25,7 @@ import {
   keyResults,
   type NudgeKind,
   type NudgeSubjectType,
+  notificationSettings,
   nudgeRules,
   nudges,
   proposedChanges,
@@ -54,6 +55,7 @@ import {
   eq,
   gt,
   gte,
+  inArray,
   isNotNull,
   isNull,
   ne,
@@ -71,6 +73,7 @@ import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError } from "../operations/errors.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
+import { releaseHeldInTx } from "./held.ts";
 
 /**
  * A change the agent would make, offered rather than made (P4-T05c-a).
@@ -491,6 +494,7 @@ export async function recordNudgesInTx(
     sent: boolean;
     proposalId: string | null;
   }[] = [];
+  const heldFor = new Map<string, string[]>();
   for (const { nudge, suppressedReason, deliverAt } of input.due) {
     if (!isTriggerKey(nudge.ruleKey)) {
       throw new OperationError(
@@ -548,6 +552,36 @@ export async function recordNudgesInTx(
         id: row.id,
         sent: suppressedReason === null,
         proposalId,
+      });
+      if (suppressedReason === "ceiling") {
+        const held = heldFor.get(nudge.recipientMemberId) ?? [];
+        held.push(row.id);
+        heldFor.set(nudge.recipientMemberId, held);
+      }
+    }
+  }
+
+  // §11: what the ceiling holds waits for the member's next summary. One who
+  // turned the summary off has no next one, so it goes in their inbox now.
+  if (heldFor.size > 0) {
+    const summaryOff = await tx
+      .select({ memberId: notificationSettings.memberId })
+      .from(notificationSettings)
+      .where(
+        activeOnly(
+          notificationSettings,
+          and(
+            inArray(notificationSettings.memberId, [...heldFor.keys()]),
+            eq(notificationSettings.dailySummary, false),
+          ),
+        ),
+      );
+    for (const { memberId } of summaryOff) {
+      await releaseHeldInTx(tx, {
+        workspaceId: input.workspaceId,
+        memberId,
+        now: input.at,
+        nudgeIds: heldFor.get(memberId) ?? [],
       });
     }
   }
@@ -652,7 +686,11 @@ export interface SuppressionContext {
     }
   >;
   /** How many nudges each member has already had in the last seven days. */
-  readonly sentThisWeek: ReadonlyMap<string, number>;
+  /**
+   * Messages each member has this week, counted on as a run decides, so one
+   * run cannot send a member past the ceiling on its own.
+   */
+  readonly sentThisWeek: Map<string, number>;
 }
 
 /**
@@ -701,6 +739,9 @@ export async function loadSuppressionContext(
     );
 
   const weekAgo = new Date(input.now.getTime() - 7 * 86_400_000);
+  // Every message this week that goes out: sent, or waiting out the member's
+  // quiet hours, which goes out all the same in the morning. Counting only
+  // what had been sent let a night's hourly runs each queue another.
   const weekRows = await tx
     .select({ memberId: nudges.recipientMemberId, sent: count(nudges.id) })
     .from(nudges)
@@ -709,7 +750,7 @@ export async function loadSuppressionContext(
         nudges,
         and(
           eq(nudges.workspaceId, input.workspaceId),
-          isNotNull(nudges.sentAt),
+          isNull(nudges.suppressedReason),
           gte(nudges.scheduledFor, weekAgo),
           // The daily digest carries what the ceiling holds back, so it is
           // not counted against it (§11, P9-T19a-c-b).
@@ -765,10 +806,11 @@ async function previousFor(
           eq(nudges.recipientMemberId, input.nudge.recipientMemberId),
           eq(nudges.subjectType, input.nudge.subjectType),
           eq(nudges.subjectId, input.nudge.subjectId),
-          // Only what was actually said counts. A nudge the product suppressed
-          // was never heard, so treating it as a previous message would silence
-          // the next one for a day on the strength of nothing.
-          isNotNull(nudges.sentAt),
+          // Only what is said counts: sent, or deferred past quiet hours and
+          // going out in the morning. A nudge the product suppressed was never
+          // heard, so treating it as a previous message would silence the
+          // next one for a day on the strength of nothing.
+          isNull(nudges.suppressedReason),
         ),
       ),
     )
@@ -865,7 +907,7 @@ export async function decideSuppression(
     now: input.now,
   });
 
-  return suppressionFor(
+  const reason = suppressionFor(
     {
       ruleKey: input.nudge.ruleKey,
       escalationStep: input.nudge.escalationStep,
@@ -894,6 +936,17 @@ export async function decideSuppression(
     },
     input.thresholds,
   );
+  // What this run lets through counts toward the ceiling for the rest of it,
+  // as it will for the next run once recorded. The summary carries what the
+  // ceiling holds, so it is not counted against it.
+  if (reason === null && input.nudge.ruleKey !== CEILING_CARRIER) {
+    const member = input.nudge.recipientMemberId;
+    input.context.sentThisWeek.set(
+      member,
+      (input.context.sentThisWeek.get(member) ?? 0) + 1,
+    );
+  }
+  return reason;
 }
 
 /**

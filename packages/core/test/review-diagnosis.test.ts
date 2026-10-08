@@ -1,6 +1,6 @@
 /**
  * Root causes and the process-health survey (METHOD.md §8.4 and §8.5,
- * p4-t00-session-design.md §4.8, P4-T11b).
+ * sessions.md §4.8, P4-T11b).
  *
  * The task's test plan:
  * - a process-health response cannot be attributed to a member

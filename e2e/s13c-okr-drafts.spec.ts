@@ -1,6 +1,6 @@
 /**
  * Adding objectives and key results from the OKR list (P9-T07b-a,
- * docs/design/p9-t00-okr-writing.md §4.3 and §3).
+ * docs/design/okr-writing.md §4.3 and §3).
  *
  * Acceptance:
  *   Given the list, when a member adds an objective with two key results

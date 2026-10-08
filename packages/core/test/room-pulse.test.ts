@@ -1,5 +1,5 @@
 /**
- * The room pulse (METHOD.md §8.2, p4-t00-session-design.md §4.2, P4-T10a-b).
+ * The room pulse (METHOD.md §8.2, sessions.md §4.2, P4-T10a-b).
  *
  * The task's test plan:
  * - the read comes from `sessions.roomPulseBands` and not from a literal

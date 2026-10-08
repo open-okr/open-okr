@@ -7,7 +7,7 @@ import { countSeats, seatState } from "../src/tenancy/index.ts";
 import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
 /**
- * Seats (P8-T05, design in `docs/design/p8-t01b-plans-and-seats.md`).
+ * Seats (P8-T05, design in `docs/design/plans-and-seats.md`).
  *
  * Three claims:
  *

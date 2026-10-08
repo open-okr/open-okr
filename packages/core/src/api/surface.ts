@@ -30,7 +30,7 @@
  * disagree. So the filter grammar here *is* the declared input, projected as
  * query parameters, with an undeclared parameter refused by name rather than
  * ignored. This is a deliberate reading of §14 and it is recorded in
- * `docs/design/p5-t07-api-design.md` §2 as one.
+ * `docs/design/api-contract.md` §2 as one.
  */
 
 import type { TokenScope } from "@openokr/db";

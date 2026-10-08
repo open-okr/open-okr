@@ -17,7 +17,7 @@ import type { OkrTree } from "../lib/okr-tree/cache.ts";
 
 /**
  * The OKR list's cells, each edited where it is read (P9-T07a-a,
- * docs/design/p9-t00-okr-writing.md §4.2 and §4.5).
+ * docs/design/okr-writing.md §4.2 and §4.5).
  *
  * **The real table, rendered in jsdom**, with the server action that writes
  * stubbed, because every claim here is about what one keystroke sends and

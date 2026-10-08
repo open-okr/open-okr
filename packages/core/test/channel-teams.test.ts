@@ -18,7 +18,7 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
  * The installation lookup, the command router, the access check and the audit
  * row are the same code Slack and Telegram reach; a third provider that needed
  * its own copies of any of them would mean the design in
- * `docs/design/p5-t00-channel-design.md` had not held. The acceptance criterion
+ * `docs/design/channels.md` had not held. The acceptance criterion
  * is the last test: the same command, refused or acted on the same way, with the
  * channel named on the audit row.
  *

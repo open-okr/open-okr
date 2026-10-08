@@ -3,7 +3,7 @@
 What this instance measures about itself, what leaves the host, and how to
 look at any of it.
 
-Written for P7-T06. The series names and the settings below are asserted
+The series names and the settings below are asserted
 against the code by `packages/adapters/test/telemetry.test.ts`, so a claim on
 this page that stops being true fails the build rather than misleading the
 next operator.
@@ -89,7 +89,7 @@ capacity gauge.
 | `openokr_ai_tokens_total` | provider, model, direction |
 | `openokr_ai_cost_total` | provider, model |
 
-**Capacity (P8-T06c)**
+**Capacity**
 
 | Series | Labels |
 |---|---|
@@ -174,7 +174,7 @@ and an edit in the browser is not silently kept.
   series, each with its budget drawn as a threshold line.
 - **Delivery and the background.** Queue lag, dead letters, nudges, channels,
   scheduled jobs, agent runs, AI spend, and authorisation refusals.
-- **Capacity and limits (P8-T06c).** Connection pool utilization, concurrent
+- **Capacity and limits.** Connection pool utilization, concurrent
   actions, admission refusals, outbox backpressure and relay throughput. The
   admission panels read zero on a self-hosted instance with limits at zero,
   which is the correct reading.
@@ -237,13 +237,12 @@ words, so the trail must not keep them.
 
 ### What is deliberately never swept
 
-**Nudge records and agent run logs.** An earlier draft of this feature
-covered all three. Two of them are not ordinary data: this product requires
+**Nudge records and agent run logs.** These two are not ordinary data: this product requires
 that every proactive message it sends is a recorded nudge row carrying a
 rule key, a channel, an escalation step and a suppression reason, and an
 agent run log is the record of what an agent did on the workspace's behalf.
 A retention sweep over either would delete the evidence the product is
-required to keep. Decided 11 September 2026.
+required to keep.
 
 **Everything else.** There is no general retention. Check-ins, comments,
 decisions, retro notes and every other thing a member wrote stay until

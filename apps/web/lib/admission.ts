@@ -9,7 +9,7 @@ import { getPool } from "./pool";
 /**
  * The instance's admission limits, resolved once at boot (P8-T06a).
  *
- * Design: `docs/design/p8-t01a-tenant-limits.md` §4 and §7.
+ * Design: `docs/design/tenant-limits.md` §4 and §7.
  *
  * **Resolved here rather than per call, because reading a setting is a
  * database read.** Admission runs on every action from every surface, so

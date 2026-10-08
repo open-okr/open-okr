@@ -1,7 +1,7 @@
 /**
  * Reading as a cloud operator (P8-T03a).
  *
- * Design: `docs/design/p8-t01b-operator-console.md`.
+ * Design: `docs/design/operator-console.md`.
  *
  * This directory and `packages/core/src/tenancy` are the only two the
  * boundary gate lets touch `tenants`. Everything here runs under

@@ -1,7 +1,7 @@
 /**
  * Reading and writing the tenant row (P8-T02a).
  *
- * Design: `docs/design/p8-t01a-tenant-lifecycle.md`.
+ * Design: `docs/design/tenant-lifecycle.md`.
  *
  * This module and the operator console are the only places allowed to touch
  * `tenants`, and `pnpm check:boundaries` is what enforces it. The rule is not

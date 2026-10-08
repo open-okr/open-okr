@@ -11,10 +11,11 @@ import {
 } from "@openokr/method";
 import { Chip, cn, useTranslations } from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
+import { focusOnMount } from "../../lib/focus-on-mount.ts";
 
 /**
  * The cells of the OKR list, each edited where it is read (P9-T07a-a,
- * docs/design/p9-t00-okr-writing.md §4.2).
+ * docs/design/okr-writing.md §4.2).
  *
  * Every cell follows UIUX-PLAN §4's inline edit: it reads as text until it is
  * clicked or reached with Tab, Enter or leaving it commits, Escape puts the
@@ -440,7 +441,7 @@ export function KindControl({
           )}
         >
           <input
-            ref={(node) => node?.focus()}
+            ref={focusOnMount}
             value={reason}
             aria-label={t("okrKind.why", {
               kind: name(pending).toLowerCase(),
@@ -738,7 +739,7 @@ export function ReasonField({
       <label className="flex min-w-0 flex-1 items-center gap-2">
         <span className="text-ink-2">{label}</span>
         <input
-          ref={(node) => node?.focus()}
+          ref={focusOnMount}
           value={reason}
           aria-label={label}
           placeholder={t("okrList.reasonPlaceholder")}

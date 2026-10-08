@@ -138,7 +138,7 @@ export const HORIZONS: Readonly<Record<"annual" | "quarterly", Horizon>> = {
     note: "Phases 0 to 5 happen before the cycle starts. Phase 6 runs through it. Phase 7 closes it and feeds the next one.",
   },
   quarterly: {
-    runs: "Four times a year, planning opens about 3 weeks before the quarter",
+    runs: "Four times a year, planning opens about 4 weeks before the quarter",
     sets: "Quarterly OKRs inside the annual frame",
     revisited: "Scored and closed at the end of the quarter",
     note: "The annual frame is reference material during a quarterly cycle. Phase 3 of a quarterly cycle revalidates it: it holds, or it changes with a documented reason.",
@@ -147,7 +147,10 @@ export const HORIZONS: Readonly<Record<"annual" | "quarterly", Horizon>> = {
 
 /** One row of §2.4's timeline: how long before day one, and what happens then. */
 export interface TimelineRow {
+  /** When, in §2.4's words: how many weeks before the start, or which weeks after it. */
   readonly weeksBefore: string;
+  /** A row that runs once the cycle has started, so no phase closes on it. */
+  readonly afterStart?: boolean;
   readonly activity: string;
 }
 
@@ -160,35 +163,52 @@ export const SUGGESTED_TIMELINE: Readonly<
   Record<"annual" | "quarterly", readonly TimelineRow[]>
 > = {
   annual: [
-    { weeksBefore: "6 to 5", activity: "Phase 1: scope, roles, input pack" },
-    { weeksBefore: "4", activity: "Phase 2: diagnosis session" },
     {
-      weeksBefore: "4 to 3",
+      weeksBefore: "6 to 5 weeks before",
+      activity: "Phase 1: scope, roles, input pack",
+    },
+    { weeksBefore: "4 weeks before", activity: "Phase 2: diagnosis session" },
+    {
+      weeksBefore: "4 to 3 weeks before",
       activity: "Phase 3: direction-setting session with leadership",
     },
     {
-      weeksBefore: "3 to 2",
+      weeksBefore: "3 to 2 weeks before",
+      activity: "Phase 4: annual OKRs drafted, then peer review between teams",
+    },
+    {
+      weeksBefore: "2 to 1 weeks before",
+      activity: "Phase 5: annual OKRs aligned and published",
+    },
+    {
+      weeksBefore: "1 to 0 weeks before",
       activity:
-        "Phase 4: drafting sessions per unit, then peer review between teams",
-    },
-    {
-      weeksBefore: "2 to 1",
-      activity: "Phase 5: alignment session, capacity check",
-    },
-    {
-      weeksBefore: "1 to 0",
-      activity: "Sign-off, publication, Phase 6 calendar booked",
+        "Company OKRs for the first quarter drafted inside the published frame. Phase 6 calendar booked",
     },
   ],
   quarterly: [
     {
-      weeksBefore: "3",
-      activity: "Phase 1 (light refresh) and Phase 2: input refresh, scoring",
+      weeksBefore: "4 weeks before",
+      activity: "Phase 1: light refresh of the input pack",
     },
     {
-      weeksBefore: "2",
-      activity: "Phase 3 (revalidation) and Phase 4: drafting",
+      weeksBefore: "2 weeks before",
+      activity:
+        "The ending quarter is graded and reviewed (§8). Phase 2: diagnosis with those scores",
     },
-    { weeksBefore: "1", activity: "Phase 5: alignment, sign-off, publication" },
+    {
+      weeksBefore: "2 to 1 weeks before",
+      activity: "Phase 3: revalidation. Phase 4: company OKRs drafted",
+    },
+    {
+      weeksBefore: "1 week before",
+      activity: "Phase 5: company OKRs aligned and published",
+    },
+    {
+      weeksBefore: "Weeks 1 to 2 of the quarter",
+      afterStart: true,
+      activity:
+        "Department and team OKRs drafted and published, the second publish step (§4.5)",
+    },
   ],
 };

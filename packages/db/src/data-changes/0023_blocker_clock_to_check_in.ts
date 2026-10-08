@@ -43,11 +43,23 @@ export const blockerClockToCheckIn: DataChangeScript = {
       dataType: "timestamp with time zone",
     },
     { table: "blockers", column: "goal_id", dataType: "uuid" },
+    { table: "blockers", column: "workspace_id", dataType: "uuid" },
     {
       table: "blockers",
       column: "resolved_at",
       dataType: "timestamp with time zone",
     },
+    {
+      table: "blockers",
+      column: "deleted_at",
+      dataType: "timestamp with time zone",
+    },
+    {
+      table: "blockers",
+      column: "updated_at",
+      dataType: "timestamp with time zone",
+    },
+    { table: "goals", column: "workspace_id", dataType: "uuid" },
     {
       table: "goals",
       column: "next_check_in_at",

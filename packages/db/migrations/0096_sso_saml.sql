@@ -10,7 +10,7 @@
 --
 -- **`sso_connections` stays the one authority, and the plugin's own
 -- `ssoProvider` table is derived from it.** Agung settled that on
--- 18 September 2026; `docs/design/p8-t07c-saml.md` records why and what the
+-- 18 September 2026; `docs/design/saml.md` records why and what the
 -- two alternatives cost. The short version: which identity provider a
 -- workspace trusts is business data, so it belongs on a table with
 -- `workspace_id` and a policy, and the plugin's table has neither.

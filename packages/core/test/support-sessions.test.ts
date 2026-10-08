@@ -14,7 +14,7 @@ import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
 /**
  * Support access (P8-T04a, design in
- * `docs/design/p8-t01b-support-access.md`).
+ * `docs/design/support-access.md`).
  *
  * Four claims, and the second is the one the whole design rests on:
  *

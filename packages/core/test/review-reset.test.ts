@@ -1,6 +1,6 @@
 /**
  * The diagnostic and the reset decisions (METHOD.md §8.6 and §8.8,
- * p4-t00-session-design.md §4.8 and §4.10, P4-T11c-a).
+ * sessions.md §4.8 and §4.10, P4-T11c-a).
  *
  * The task's test plan lines this row covers:
  * - the diagnostic verdict matches METHOD.md §8.6 across the three cases

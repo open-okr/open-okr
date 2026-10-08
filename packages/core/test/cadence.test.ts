@@ -16,7 +16,7 @@ import { parseLocalDate } from "../src/cycles/generation.ts";
 /**
  * The cadence engine against its own golden masters (P3-T06).
  *
- * Read out of `docs/design/p3-t00-cadence-engine.md` at run time, the same way the
+ * Read out of `docs/design/cadence-engine.md` at run time, the same way the
  * scoring matrices are. The daylight-saving table is the one that matters most:
  * two Berlin Mondays a week apart store instants 167 hours apart, and arithmetic
  * done on instants would have produced a Sunday deadline for half the year.
@@ -29,7 +29,7 @@ const thresholds = canonThresholds();
 
 const tables = loadGoldenTables(
   new URL(
-    "../../../docs/design/p3-t00-cadence-engine.md",
+    "../../../docs/design/cadence-engine.md",
     import.meta.url,
   ).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
 );

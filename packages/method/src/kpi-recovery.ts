@@ -200,7 +200,17 @@ export function draftRecovery(
     keyResults: [
       {
         title: `${root.title} from ${plain(root.current)} to ${plain(boundary)}`,
-        direction: rootDirection === "lower_better" ? "reduce" : "increase",
+        // The way back to the boundary, read from the two numbers: a range
+        // KPI above its band comes down to it, whatever direction its row
+        // was left with.
+        direction:
+          boundary < root.current
+            ? "reduce"
+            : boundary > root.current
+              ? "increase"
+              : rootDirection === "lower_better"
+                ? "reduce"
+                : "increase",
         baseline: root.current,
         target: boundary,
         ownerMemberId: root.owner ?? null,

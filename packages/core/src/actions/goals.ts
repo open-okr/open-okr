@@ -246,6 +246,47 @@ async function actingMember(
 }
 
 /**
+ * A member's manager, where they have one who is an active person and is not
+ * the goal's champion: the reviewer §2.5 prefers when one must be named.
+ */
+async function activeManagerOf(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  championId: string,
+): Promise<string | null> {
+  const [member] = await tx
+    .select({ managerId: workspaceMembers.managerId })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.id, memberId),
+      ),
+    )
+    .limit(1);
+  const managerId = member?.managerId ?? null;
+  if (managerId === null || managerId === championId) {
+    return null;
+  }
+  const [manager] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.id, managerId),
+        eq(workspaceMembers.status, "active"),
+        eq(workspaceMembers.kind, "human"),
+      ),
+    )
+    .limit(1);
+  return manager?.id ?? null;
+}
+
+/**
  * Recomputes the derived columns after a write, in the same transaction.
  *
  * Every write below that can move a number calls this, and nothing else writes
@@ -1132,12 +1173,16 @@ export const createGoal = defineWriteAction({
       const { practice } = practiceFromRow(
         await readRhythmRow(tx, workspaceId),
       );
-      // Where P8-G13d's default meets P9-T04's setting (STATUS, P9-T04).
+      // Where reviewers are required and none is named (P9-T04): §2.5 asks
+      // for a different person from the champion where possible, so the
+      // writer's manager where they have one, and the writer otherwise.
+      const championId = input.championId ?? memberId;
       const reviewerId =
         input.reviewerId !== undefined
           ? input.reviewerId
           : practice.reviewer === "required"
-            ? memberId
+            ? ((await activeManagerOf(tx, workspaceId, memberId, championId)) ??
+              memberId)
             : null;
       await requirePolicy(
         tx,
@@ -1233,7 +1278,7 @@ export const createGoal = defineWriteAction({
         ownerKind: input.ownerKind,
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
-        championId: input.championId ?? memberId,
+        championId,
         reviewerId,
         parentGoalId: input.parentGoalId ?? null,
         parentKeyResultId: input.parentKeyResultId ?? null,
@@ -1310,7 +1355,7 @@ export const createGoal = defineWriteAction({
 
 export const updateGoal = defineWriteAction({
   name: "goals.update",
-  // openokr:policy-exempt: changing an objective that exists stays open under every setting (METHOD.md §2.9); its target changes join the policy at P9-T06.
+  // openokr:policy-exempt: changing an objective that exists stays open under every setting (METHOD.md §2.9); a level it moves to asks the policy below (§2.7), and its target goes through goals.changeTarget.
   summary: "Edits a goal's own fields, including its alignment pointer.",
   input: z.object({
     id: z.uuid(),
@@ -1464,6 +1509,30 @@ export const updateGoal = defineWriteAction({
           input.description === null ? null : RICH_TEXT_SCHEMA_VERSION;
       }
       if (input.level !== undefined) {
+        // §2.7: only a level the objective's cycle uses, the rule creating
+        // one at that level meets (P9-T07a-c).
+        const [current] = await tx
+          .select({ level: goals.level, cycleId: goals.cycleId })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, workspaceId),
+              eq(goals.id, input.id),
+            ),
+          )
+          .limit(1);
+        if (current && current.level !== input.level) {
+          await requirePolicy(
+            tx,
+            { workspaceId, bulk: context.bulk },
+            {
+              kind: "objective.level",
+              cycleId: current.cycleId,
+              level: input.level,
+            },
+          );
+        }
         patch.level = input.level;
       }
       if (input.weight !== undefined) {
@@ -1968,10 +2037,14 @@ export const reassignGoalRole = defineWriteAction({
 
 export const moveGoalToCycle = defineWriteAction({
   name: "goals.moveToCycle",
-  // openokr:policy-exempt: moving an objective that exists is a change to it, and changes stay open under every setting (METHOD.md §2.9).
   summary:
-    "Moves a goal into another cycle, taking its check-in history with it.",
-  input: z.object({ id: z.uuid(), cycleId: z.uuid() }),
+    "Moves a goal into another cycle, taking its check-in history with it. Arriving in a running cycle is judged as starting it there.",
+  input: z.object({
+    id: z.uuid(),
+    cycleId: z.uuid(),
+    /** Why it starts in this cycle now, where the practice asks (§2.9). */
+    reason: z.string().trim().min(1).max(500).optional(),
+  }),
   output: z.object({ id: z.uuid(), cycleId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -2021,7 +2094,14 @@ export const moveGoalToCycle = defineWriteAction({
       // new values, and the cycle it left has one goal fewer to hang together,
       // so its own score has to be recomputed too (P3-T09).
       const [before] = await tx
-        .select({ cycleId: goals.cycleId })
+        .select({
+          cycleId: goals.cycleId,
+          level: goals.level,
+          kind: goals.kind,
+          reviewerId: goals.reviewerId,
+          addedMidCycleAt: goals.addedMidCycleAt,
+          draftState: goals.draftState,
+        })
         .from(goals)
         .where(
           activeOnly(
@@ -2032,9 +2112,51 @@ export const moveGoalToCycle = defineWriteAction({
         )
         .limit(1);
 
+      // Arriving in a cycle is starting there (§2.9): the same policy that
+      // judges an objective created in that cycle judges one moved into it,
+      // or an objective written with its own timeframe and then moved would
+      // land in a running cycle past the window, the levels and the reason.
+      const arrives = before !== undefined && before.cycleId !== input.cycleId;
+      let addedMidCycle = false;
+      let waits = false;
+      if (arrives) {
+        await requirePolicy(
+          tx,
+          { workspaceId, bulk: context.bulk },
+          {
+            kind: "objective.create",
+            cycleId: input.cycleId,
+            hasReviewer: before.reviewerId !== null,
+            level: before.level,
+            okrKind: before.kind,
+            hasReason: input.reason !== undefined,
+          },
+        );
+        const { practice } = practiceFromRow(
+          await readRhythmRow(tx, workspaceId),
+        );
+        addedMidCycle =
+          !context.bulk && (await midCycleInTx(tx, workspaceId, input.cycleId));
+        waits =
+          addedMidCycle &&
+          before.draftState === null &&
+          additionStartsAs(practice) === "draft";
+      }
+
       const [moved] = await tx
         .update(goals)
-        .set({ cycleId: input.cycleId, timeframe: null, updatedAt: new Date() })
+        .set({
+          cycleId: input.cycleId,
+          timeframe: null,
+          updatedAt: new Date(),
+          ...(addedMidCycle && before?.addedMidCycleAt === null
+            ? { addedMidCycleAt: new Date() }
+            : {}),
+          // A draft waiting for a person owes no check-in until it goes live.
+          ...(waits
+            ? { draftState: "draft" as const, nextCheckInAt: null }
+            : {}),
+        })
         .where(
           activeOnly(
             goals,
@@ -2059,7 +2181,13 @@ export const moveGoalToCycle = defineWriteAction({
           kind: "goal.moved_to_cycle",
           subjectType: "goal",
           subjectId: moved.id,
-          payload: { title: moved.title },
+          payload: {
+            title: moved.title,
+            ...(addedMidCycle
+              ? { addedMidCycle: true, reason: input.reason ?? null }
+              : {}),
+            ...(waits ? { draft: true } : {}),
+          },
         },
         audit: {
           action: "goals.moveToCycle",
@@ -2299,6 +2427,8 @@ export const updateKeyResult = defineWriteAction({
           goalId: keyResults.goalId,
           kind: keyResults.kind,
           doneAt: keyResults.doneAt,
+          baselineValue: keyResults.baselineValue,
+          direction: keyResults.direction,
         })
         .from(keyResults)
         .where(
@@ -2308,10 +2438,12 @@ export const updateKeyResult = defineWriteAction({
             eq(keyResults.id, input.id),
           ),
         )
+        .for("update")
         .limit(1);
       if (!owner) {
         throw new OperationError("not_found", "No such key result.");
       }
+      const baselineBefore = asNumber(owner.baselineValue) ?? 0;
       await requireGoalAccess(
         tx,
         workspaceId,
@@ -2388,8 +2520,9 @@ export const updateKeyResult = defineWriteAction({
             eq(keyResults.id, input.id),
           ),
         );
-      // After the rest, so an easing is judged against the baseline this
-      // same call may have just set.
+      // Judged against the key result as it stood before this call, so a
+      // baseline, direction or kind changed in the same call cannot make an
+      // easier target read as a harder one (METHOD.md §2.9).
       if (input.targetValue !== undefined) {
         await changeTargetInTx(tx, {
           workspaceId,
@@ -2397,10 +2530,22 @@ export const updateKeyResult = defineWriteAction({
           to: input.targetValue,
           reason: input.targetReason ?? null,
           actorMemberId: memberId,
+          before: {
+            baseline: baselineBefore,
+            direction: owner.direction,
+            kind: owner.kind,
+          },
           ...(context.bulk === undefined ? {} : { bulk: context.bulk }),
         });
         patch.targetValue = String(input.targetValue);
       }
+      // A baseline is a measured fact rather than a target, so moving it asks
+      // nothing, but the trail keeps what it was.
+      const baselineMoved =
+        input.baselineValue !== undefined &&
+        input.baselineValue !== baselineBefore
+          ? { baselineFrom: baselineBefore, baselineTo: input.baselineValue }
+          : {};
 
       await recompute(tx, workspaceId, owner.goalId);
       // Editing a key result changes its own verdicts and the set's.
@@ -2415,7 +2560,7 @@ export const updateKeyResult = defineWriteAction({
           kind: "key_result.updated",
           subjectType: "goal",
           subjectId: owner.goalId,
-          payload: {},
+          payload: { ...baselineMoved },
         },
         audit: {
           action: "goals.updateKeyResult",
@@ -2423,6 +2568,7 @@ export const updateKeyResult = defineWriteAction({
           targetId: input.id,
           payload: {
             keys: Object.keys(patch).filter((key) => key !== "updatedAt"),
+            ...baselineMoved,
           },
         },
       };
@@ -2641,7 +2787,7 @@ export const linkKeyResultKpi = defineWriteAction({
       );
       // After the access check, so somebody who cannot edit the goal learns
       // nothing about its state. A closed goal takes no new values from a KPI
-      // (design `p3-t00-kpi-engine.md` §10), and linking one would pull the
+      // (design `kpi-engine.md` §10), and linking one would pull the
       // KPI's reading into a record of how the cycle ended.
       const [goal] = await tx
         .select({ closedAt: goals.closedAt })

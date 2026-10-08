@@ -1,5 +1,5 @@
 /**
- * The OKR drawer (P9-T08a, docs/design/p9-t00-okr-writing.md §6).
+ * The OKR drawer (P9-T08a, docs/design/okr-writing.md §6).
  *
  * Acceptance:
  *   Given a key result edited in the drawer, when it saves, then its list row

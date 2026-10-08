@@ -25,7 +25,7 @@ sha256sum -c checksum.sha256
 
 If this fails, the backup is damaged. Do not proceed.
 
-**Database-level check (P8-T06d).** The checksum proves files are intact.
+**Database-level check.** The checksum proves files are intact.
 `verify-backup` proves the dump actually restores and every workspace's
 data is present. It loads the dump into a temporary database, runs
 per-workspace checks, and drops the temporary database without touching

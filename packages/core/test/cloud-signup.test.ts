@@ -8,7 +8,7 @@ import { isRegistrationOpen } from "../src/workspaces/registration.ts";
 
 /**
  * Cloud signup (P8-T02b, design in
- * `docs/design/p8-t01a-tenant-lifecycle.md` §4).
+ * `docs/design/tenant-lifecycle.md` §4).
  *
  * Two rules, and neither may change what a self-hosted instance does.
  */

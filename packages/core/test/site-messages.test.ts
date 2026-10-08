@@ -10,7 +10,7 @@ import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
 /**
  * Site messages (P8-T03c, design in
- * `docs/design/p8-t01b-operator-console.md` §4).
+ * `docs/design/operator-console.md` §4).
  *
  * Three claims: the window is required rather than optional, a targeted
  * message reaches only the workspaces it names, and a dismissal belongs to

@@ -223,7 +223,7 @@ export const METRIC = {
   // Capacity metrics (P8-T06c). The three series below answer "how much
   // room is left" and "are limits engaging", which is a different question
   // from "is each action inside its budget" (the existing sixteen).
-  // Design: docs/design/p8-t06c-status-and-capacity.md §3.2.
+  // Design: docs/design/status-and-capacity.md §3.2.
 
   /** Database connection pool utilization, by state (active, idle, waiting). */
   poolConnections: "openokr_pool_connections",

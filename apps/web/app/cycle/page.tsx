@@ -31,7 +31,7 @@ import { CycleSwitcher } from "./cycle-switcher.tsx";
 import { DependencyRegister } from "./dependency-register.tsx";
 import { Diagnose } from "./diagnose.tsx";
 import { Direction } from "./direction.tsx";
-import { Drafting } from "./drafting.tsx";
+import { Drafting, objectivesInUnit } from "./drafting.tsx";
 import { Gates } from "./gates.tsx";
 import { GuidanceRail } from "./guidance-rail.tsx";
 import { InputPack } from "./input-pack.tsx";
@@ -711,9 +711,7 @@ export default async function CyclePage({
                   hasTimeframe: false,
                   championId: goal.champion.id,
                   reviewerId: goal.reviewer?.id ?? null,
-                  objectivesInUnit: draft.goals.filter(
-                    (other) => other.level === goal.level,
-                  ).length,
+                  objectivesInUnit: objectivesInUnit(draft.goals, goal),
                   level: goal.level,
                   kind: goal.kind,
                 },

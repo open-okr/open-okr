@@ -469,12 +469,25 @@ export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
     // derived from its two numbers, and no other kind is asked for one.
     conditions: [
       {
-        // §3.1: "A metric key result whose baseline equals its target is not
-        // a metric. The coach asks whether it is a maintain or a milestone."
         condition: "No direction",
         status: "fail",
         prompt:
+          "Nothing says which way this number should move: no direction is set, and the baseline and the target cannot show one. Set its direction, or give it both numbers.",
+      },
+      {
+        // §3.1: "A metric key result whose baseline equals its target is not
+        // a metric. The coach asks whether it is a maintain or a milestone."
+        // With no direction either, nothing can be derived, which fails.
+        condition: "No direction, and the baseline equals the target",
+        status: "fail",
+        prompt:
           "The baseline and the target are the same, so this metric moves nothing. Is it a maintain key result, holding a number inside a band, or a milestone, done or not done? Otherwise set its direction.",
+      },
+      {
+        condition: "Baseline equals target",
+        status: "warn",
+        prompt:
+          "The baseline and the target are the same, so this metric moves nothing. Is it a maintain key result, holding a number inside a band, or a milestone, done or not done?",
       },
       {
         condition: "Direction set",
@@ -646,9 +659,13 @@ export function evaluateObjective(
   const obj5 = check("OBJ-5");
   const perUnit = thresholds["quality.objectivesPerUnitCap"];
   const companyCap = thresholds["quality.companyObjectiveCap"];
+  // §2.7: the company has its own cap, and the per-unit cap is for the units
+  // below it, so four company objectives are within bounds.
   const obj5Verdict =
-    input.level === "company" && input.objectivesInUnit > companyCap
-      ? verdictOf(obj5, "Company level above the company cap")
+    input.level === "company"
+      ? input.objectivesInUnit > companyCap
+        ? verdictOf(obj5, "Company level above the company cap")
+        : verdictOf(obj5, "Within the cap")
       : input.objectivesInUnit > perUnit
         ? verdictOf(obj5, "Above the per-unit cap")
         : verdictOf(obj5, "Within the cap");
@@ -923,14 +940,21 @@ export function evaluateKeyResults(
       if ((entry.keyResultKind ?? "metric") !== "metric") {
         return { index, condition: "Not asked of this kind" };
       }
-      const derivable =
+      const same =
         entry.baseline !== null &&
         entry.target !== null &&
-        entry.baseline !== entry.target;
+        entry.baseline === entry.target;
+      const derivable =
+        entry.baseline !== null && entry.target !== null && !same;
       return {
         index,
-        condition:
-          entry.direction || derivable ? "Direction set" : "No direction",
+        condition: same
+          ? entry.direction
+            ? "Baseline equals target"
+            : "No direction, and the baseline equals the target"
+          : entry.direction || derivable
+            ? "Direction set"
+            : "No direction",
       };
     }),
   );

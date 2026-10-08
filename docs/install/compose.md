@@ -27,33 +27,29 @@ git clone https://github.com/open-okr/open-okr.git
 cd open-okr/deploy/docker
 ```
 
-**2. Build the image.**
+Only `deploy/docker/` is needed on the server. Copying that directory across
+works as well as cloning, and is what an air-gapped install does, with the
+image loaded from a tar file.
+
+**2. Start it.**
 
 ```sh
-docker build -f deploy/docker/Dockerfile -t openokr:local .
+./openokr up
 ```
 
-This step exists because **no version has been tagged yet**, so nothing has
-been published to a container registry and
-`ghcr.io/open-okr/open-okr:latest` cannot be pulled. It takes a few minutes
-and produces one image of roughly 235 MB. Once the first release is tagged,
-skip this step and the default image is pulled instead.
-
-Because of that, the whole checkout is needed on the machine that builds. Once
-an image exists, only `deploy/docker/` is needed on the server that runs it.
-Copying that directory across works as well as cloning, and is what an
-air-gapped install does, with the image loaded from a tar file.
-
-**3. Start it.**
+This pulls the published image, `ghcr.io/open-okr/open-okr:latest`. To pin a
+release instead, which is the better habit on a server, name it:
 
 ```sh
-cd deploy/docker
-OPENOKR_IMAGE=openokr:local ./openokr up
+OPENOKR_IMAGE=ghcr.io/open-okr/open-okr:0.2.0 ./openokr up
 ```
 
-Drop `OPENOKR_IMAGE` once there is a published image to pull. A failed pull
-is not fatal, so a locally built image is a supported path rather than a
-workaround.
+Each release image is built for amd64 and arm64, signed with cosign, and ships
+with a software bill of materials on [its release page](https://github.com/open-okr/open-okr/releases).
+To run an image you built yourself, build it from the root of the checkout
+with `docker build -f deploy/docker/Dockerfile -t openokr:local .` and pass
+`OPENOKR_IMAGE=openokr:local`. A failed registry pull is not fatal, so a
+locally built image is a supported path.
 
 On the first run this generates every secret it needs, writes them to
 `./secrets/` with mode 600, pulls the image, starts PostgreSQL, runs the
@@ -63,13 +59,13 @@ prints the address to open when it is ready.
 For a real domain with an automatic certificate, name it:
 
 ```sh
-OPENOKR_DOMAIN=okr.example.com OPENOKR_IMAGE=openokr:local ./openokr up
+OPENOKR_DOMAIN=okr.example.com ./openokr up
 ```
 
 With no domain it serves plain HTTP on `http://localhost`, which is right for
 a laptop and wrong for a server anybody else reaches.
 
-**4. Finish setup in the browser.**
+**3. Finish setup in the browser.**
 
 Open the address it printed. The wizard asks for one thing: the account that
 owns the instance. Name, address, and a password of at least twelve
@@ -118,7 +114,7 @@ Every one of these has a working default, and none of them blocks the install.
 |---|---|---|
 | `OPENOKR_DOMAIN` | unset, plain HTTP on localhost | The instance has a real name |
 | `OPENOKR_HTTP_PORT`, `OPENOKR_HTTPS_PORT` | 80 and 443 | The machine already runs something on those ports. Automatic certificates need the standard ports, so moving them assumes your own proxy sits in front |
-| `OPENOKR_IMAGE` | `ghcr.io/open-okr/open-okr:latest` | Running an image you built yourself, which is required until the first release is tagged. Also for pinning a version, or running from a mirror |
+| `OPENOKR_IMAGE` | `ghcr.io/open-okr/open-okr:latest` | Pinning a release, running an image you built yourself, or running from a mirror |
 | Mail | The console driver: messages go to the log | You want invitations and reset links delivered. See [Settings](../admin/settings.md) |
 | AI | Off. Every AI affordance is hidden | You want drafting and rewriting. Bring your own key, or a local model |
 

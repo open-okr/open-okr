@@ -141,6 +141,7 @@ export const applyAgentProposal = defineWriteAction({
             userId: context.actor.userId,
             memberId: actor.memberId ?? undefined,
           },
+          proposalId: loaded.id,
         },
         loaded.action as never,
         loaded.payload as never,

@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
  * `packages/test-support`, which depends on core, so a method test that used it
  * would make the workspace graph circular.
  *
- * Every matrix is read out of `docs/design/p3-t00-alignment-engine.md` at run
+ * Every matrix is read out of `docs/design/alignment-engine.md` at run
  * time rather than retyped. That document is the fixture.
  */
 
@@ -32,7 +32,7 @@ const thresholds = canonThresholds();
 
 const tables = loadGoldenTables(
   new URL(
-    "../../../docs/design/p3-t00-alignment-engine.md",
+    "../../../docs/design/alignment-engine.md",
     import.meta.url,
   ).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
 );

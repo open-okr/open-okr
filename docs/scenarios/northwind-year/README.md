@@ -7,11 +7,11 @@ This is the reference for four kinds of work:
 | Used for | How |
 |---|---|
 | **Knowing how the product is meant to be used** | Read it straight through. Each quarter is a chapter |
-| **Testing the code** | Every step has an ID (`NW-Q2-07`) and a Given / When / Then. End-to-end specs and the manual acceptance workbook cite the ID they prove |
+| **Testing the code** | Every step has an ID (`NW-Q2-07`) and a Given / When / Then. End-to-end specs and manual tests cite the ID they prove |
 | **Running the demo** | §6 lists the dates worth showing and what is true on each. The demo seed builds the year as of today, so the public demo moves through them with the calendar |
 | **Writing the user guide** | Each step names the screen and the practice rule it shows. A guide page explains the steps that cite it |
 
-Written on 2 October 2026, against METHOD.md as revised for Phase 9 ([METHOD.md](../../development-plan/METHOD.md), which holds the whole revision since P9-T21) and the Phase 9 plan ([p9-t00-adaptable-practice.md](../../design/p9-t00-adaptable-practice.md), [p9-t00-okr-writing.md](../../design/p9-t00-okr-writing.md)). Where a step needs something not built yet, it says which task builds it.
+Written against [METHOD.md](../../specification/METHOD.md) and the designs it relies on, [adaptable-practice.md](../../design/adaptable-practice.md) and [okr-writing.md](../../design/okr-writing.md).
 
 ## Chapters
 
@@ -37,7 +37,7 @@ Written on 2 October 2026, against METHOD.md as revised for Phase 9 ([METHOD.md]
 | Operating margin | 9.1%, against a target of 15% | The seed's KPI |
 | Net revenue retention | 100%, against 110% | The seed's KPI |
 | Median time to first value | 9 days, against 5 | The seed's KPI |
-| What the company believes | Accounts that reach value inside a month renew; accounts that take longer than 90 days churn | The seed's story (DEMO-SCRIPT) |
+| What the company believes | Accounts that reach value inside a month renew; accounts that take longer than 90 days churn | The seed's story |
 | What hurts | Support cost per account has grown faster than revenue per account for three quarters, so it cannot hire its way out | The seed's story |
 
 ## 2. The cast
@@ -83,7 +83,7 @@ The two agent members, the **OKR Coach** and the **OKR Champion**, ship with the
 
 ## 4. Northwind's practice settings
 
-Northwind lands on the **Recommended** profile when it upgrades to 0.2.0 (NW-P-07), and makes eight changes during 2027. Each change is an audited admin action. None of them rewrites a closed cycle, because each cycle keeps the rules it was graded under (METHOD v2 §12).
+Northwind lands on the **Recommended** profile when it upgrades to 0.2.0 (NW-P-07), and makes eight changes during 2027. Each change is an audited admin action. None of them rewrites a closed cycle, because each cycle keeps the rules it was graded under (METHOD §12).
 
 | When | Setting | From → To | Why | Step |
 |---|---|---|---|---|
@@ -125,7 +125,7 @@ Quarters follow the calendar. Weekly check-ins are on Mondays. "W3" means week 3
 
 ## 6. Dates worth showing in the demo
 
-The demo is the year as of today (P9-T22c). `pnpm db:seed` places the scenario on the real calendar, its 2027 on the year that holds today and its autumn of 2026 on the year before, each date keeping its distance from its quarter's first Monday so a Monday check-in stays a Monday. Every step dated on or before today is written, and nothing after it, so whatever day a visitor arrives the organisation is exactly as far into its year as the calendar is. The rows below are what a visitor sees when today reaches each point; between them, the year is part of the way from one row to the next. `docs/design/p9-t22c-northwind-year.md` records what the seed writes and what it leaves to the running product, such as the agents' messages.
+The demo is the year as of today. `pnpm db:seed` places the scenario on the real calendar, its 2027 on the year that holds today and its autumn of 2026 on the year before, each date keeping its distance from its quarter's first Monday so a Monday check-in stays a Monday. Every step dated on or before today is written, and nothing after it, so whatever day a visitor arrives the organisation is exactly as far into its year as the calendar is. The rows below are what a visitor sees when today reaches each point; between them, the year is part of the way from one row to the next. `docs/design/northwind-year-seed.md` records what the seed writes and what it leaves to the running product, such as the agents' messages.
 
 | Demo date | What a visitor sees | Steps that must already be true |
 |---|---|---|
@@ -168,5 +168,4 @@ Two cautions:
 | `NW-Q1-01` to `NW-Q4-nn` | Steps in each quarter, in date order |
 | **Screen** | The UIUX-PLAN screen number and route, for example S-13 `/goals` |
 | **Rule** | The METHOD.md section (revised text) the step exercises |
-| **Status** | **Today**: works in the product now. **P9-Tnn**: arrives with that Phase 9 task. [05-scenario-index.md](05-scenario-index.md) §3 records the four gaps the year found and the tasks that now build them |
 | Numbers | Every value is consistent across chapters: a key result that ends Q1 at 7 days starts Q2 there |

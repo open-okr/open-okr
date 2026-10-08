@@ -184,6 +184,9 @@ export function phasesClosingToday(
 ): readonly number[] {
   const closing: number[] = [];
   for (const row of SUGGESTED_TIMELINE[mode]) {
+    if (row.afterStart) {
+      continue;
+    }
     const weeks = (row.weeksBefore.match(/\d+/g) ?? []).map(Number);
     if (weeks.length === 0) {
       continue;

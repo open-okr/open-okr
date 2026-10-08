@@ -26,7 +26,7 @@ import type { OperationTx } from "../operations/operation.ts";
 
 /**
  * The alignment engine's half that needs rows (METHOD.md §5, design
- * `p3-t00-alignment-engine.md` §6 and §7, P3-T09).
+ * `alignment-engine.md` §6 and §7, P3-T09).
  *
  * The arithmetic is in `packages/method`. This loads the graph, calls it, and
  * reconciles the findings table against the answer.

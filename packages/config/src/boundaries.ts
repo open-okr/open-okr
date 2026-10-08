@@ -630,7 +630,7 @@ const checkProtectedReads = (file: BoundarySourceFile): BoundaryViolation[] => {
 
 /**
  * The tenancy rule (P8-T02a, design in
- * docs/design/p8-t01a-tenant-lifecycle.md).
+ * docs/design/tenant-lifecycle.md).
  *
  * REQUIREMENTS §5 and PLAN.md risk row R8 both say the cloud is the same
  * release plus a thin overlay, with no forked code path. A plan key, a seat

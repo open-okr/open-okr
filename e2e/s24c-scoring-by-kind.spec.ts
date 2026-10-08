@@ -1,7 +1,7 @@
 /**
  * The scoring reveal, by kind (P9-T11b-b, METHOD.md §3.3 and §3.4).
  *
- * Acceptance A6 (docs/design/p9-t00-adaptable-practice.md):
+ * Acceptance A6 (docs/design/adaptable-practice.md):
  *   Given a committed key result scored 1.0, when the scoring reveal runs,
  *   then no "too safe" note appears, and a committed key result at 0.8 asks
  *   for its explanation.

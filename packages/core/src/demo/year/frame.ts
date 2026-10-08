@@ -61,12 +61,17 @@ const arrival = (person: YearPerson): YearEvent => ({
   async run(context) {
     if (person.key === "elena") {
       // The registrant plays Elena and keeps their own name (README §2).
+      // The member behind the registrant's own account, where the command
+      // knows it. The directory has no order, and lists the two agents, which
+      // are workspace members too: its first row could be the Champion.
       const directory = await callAction(
         context.action,
         "people.directory",
         {},
       );
-      const founder = directory[0];
+      const founder = context.seed.adminMemberId
+        ? directory.find((entry) => entry.id === context.seed.adminMemberId)
+        : directory.find((entry) => entry.kind === "human");
       if (!founder) {
         throw new Error("The workspace has no members. Run the wizard first.");
       }

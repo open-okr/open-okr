@@ -1018,7 +1018,11 @@ export function trendForecast(
       const high = Math.max(target.baseline, target.target);
       return projected < low || projected > high;
     }
-    if (target.direction === "reduce") {
+    // A move points whichever way its target lies from its baseline.
+    const lower =
+      target.direction === "reduce" ||
+      (target.direction === "move" && target.target < target.baseline);
+    if (lower) {
       return projected > target.target;
     }
     return projected < target.target;

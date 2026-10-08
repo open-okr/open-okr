@@ -862,6 +862,101 @@ describe("the daily run: KPI corridors and the morning summary", () => {
     expect(summary?.payload.text).toContain(`/goals/${goalId}`);
   });
 
+  it("puts what the ceiling held in the inbox with the summary, so an in-app reader sees it too", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set timezone = 'Asia/Jakarta' where id = $1",
+      [ownerMemberId],
+    );
+    const at = new Date("2026-08-20T01:00:00Z");
+    for (let i = 1; i <= 5; i += 1) {
+      await wb.admin.query(
+        `insert into nudges
+           (id, workspace_id, rule_key, kind, subject_type, subject_id,
+            recipient_member_id, channel, scheduled_for, sent_at)
+         values (gen_random_uuid(), $1, 'checkin.due', 'rhythm', 'goal',
+                 gen_random_uuid(), $2, 'in_app', $3, $3)`,
+        [
+          workspaceId,
+          ownerMemberId,
+          new Date(at.getTime() - i * 86_400_000).toISOString(),
+        ],
+      );
+    }
+    const goalId = await goalDueDaysAgo(0, "Make renewals boring", at);
+    await runAt("hourly", at);
+    const inboxFor = async () =>
+      (
+        await wb.admin.query<{ id: string }>(
+          `select n.id from notifications n
+             join nudges u on u.id = n.nudge_id
+            where u.subject_id = $1 and u.suppressed_reason = 'ceiling'`,
+          [goalId],
+        )
+      ).rows;
+    // Held, and not yet in the inbox: it waits for the summary.
+    expect(await inboxFor()).toHaveLength(0);
+    await runAt("daily", at);
+    expect(await inboxFor()).toHaveLength(1);
+    // A second summary does not write it twice.
+    await runAt("daily", new Date(at.getTime() + 86_400_000));
+    expect(await inboxFor()).toHaveLength(1);
+  });
+
+  it("puts a held nudge straight in the inbox of a member with no summary to wait for", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into notification_settings
+         (id, workspace_id, member_id, daily_summary)
+       values (gen_random_uuid(), $1, $2, false)`,
+      [workspaceId, ownerMemberId],
+    );
+    const at = new Date("2026-08-20T01:00:00Z");
+    for (let i = 1; i <= 5; i += 1) {
+      await wb.admin.query(
+        `insert into nudges
+           (id, workspace_id, rule_key, kind, subject_type, subject_id,
+            recipient_member_id, channel, scheduled_for, sent_at)
+         values (gen_random_uuid(), $1, 'checkin.due', 'rhythm', 'goal',
+                 gen_random_uuid(), $2, 'in_app', $3, $3)`,
+        [
+          workspaceId,
+          ownerMemberId,
+          new Date(at.getTime() - i * 86_400_000).toISOString(),
+        ],
+      );
+    }
+    const goalId = await goalDueDaysAgo(0, "Make renewals boring", at);
+    await runAt("hourly", at);
+    const { rows } = await wb.admin.query<{ id: string }>(
+      `select n.id from notifications n
+         join nudges u on u.id = n.nudge_id
+        where u.subject_id = $1 and u.suppressed_reason = 'ceiling'`,
+      [goalId],
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("does not let one run send a member past the ceiling on its own (§11)", async () => {
+    const wb = await workerDb();
+    const at = new Date("2026-08-20T03:00:00Z");
+    for (let i = 1; i <= 7; i += 1) {
+      await goalDueDaysAgo(0, `Objective number ${i} for the ceiling`, at);
+    }
+    await runAt("hourly", at);
+    const { rows } = await wb.admin.query<{ suppressed_reason: string | null }>(
+      `select suppressed_reason from nudges
+        where workspace_id = $1 and recipient_member_id = $2
+          and rule_key = 'checkin.due'`,
+      [workspaceId, ownerMemberId],
+    );
+    const going = rows.filter((row) => row.suppressed_reason === null);
+    expect(going.length).toBeLessThanOrEqual(5);
+    expect(
+      rows.filter((row) => row.suppressed_reason === "ceiling").length,
+    ).toBe(rows.length - going.length);
+  });
+
   it("never sends the Champion its own morning summary", async () => {
     const wb = await workerDb();
     await wb.admin.query(
@@ -1035,6 +1130,13 @@ describe("the per-cycle run: the countdown", () => {
         (row) => row.rule_key === "cycle.planning_opens",
       ),
     ).toEqual([]);
+    // Three weeks out is when phase 1 closes (§2.4), so that run said
+    // something else about the cycle. Cleared, because the next run goes back
+    // in time and the de-duplication would read it as said already.
+    const wb = await workerDb();
+    await wb.admin.query("delete from nudges where workspace_id = $1", [
+      workspaceId,
+    ]);
     await runAt("cycle", new Date("2026-09-03T09:00:00Z"));
     expect(
       (await sentNudges()).filter(

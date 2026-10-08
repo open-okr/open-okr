@@ -1,6 +1,6 @@
 /**
  * One tree and one-field writes for the OKR list, drawer and diagram
- * (P9-T06a, docs/design/p9-t00-okr-writing.md §6).
+ * (P9-T06a, docs/design/okr-writing.md §6).
  *
  * `goals.tree` reads a cycle's objectives, their key results, their alignment
  * and their dependencies in one call, shaped for both views, with every parent
@@ -1268,19 +1268,27 @@ export const patchKeyResult = defineWriteAction({
       await recomputeGoalQualityInTx(tx, { workspaceId, goalId: row.goalId });
 
       const keys = Object.keys(input.set);
+      // A baseline is a measured fact rather than a target, so moving it asks
+      // nothing, but the trail keeps what it was.
+      const before = asNumber(row.baselineValue);
+      const baselineMoved =
+        input.set.baselineValue !== undefined &&
+        input.set.baselineValue !== before
+          ? { baselineFrom: before, baselineTo: input.set.baselineValue }
+          : {};
       return {
         result: { goal: await treeNode(tx, workspaceId, row.goalId) },
         activity: {
           kind: "key_result.updated",
           subjectType: "goal",
           subjectId: row.goalId,
-          payload: { keys },
+          payload: { keys, ...baselineMoved },
         },
         audit: {
           action: "goals.patchKeyResult",
           targetType: "key_result",
           targetId: input.id,
-          payload: { keys },
+          payload: { keys, ...baselineMoved },
         },
       };
     },

@@ -2,7 +2,7 @@
  * Per-tenant admission, at the one door every surface comes through
  * (P8-T06a).
  *
- * Design: `docs/design/p8-t01a-tenant-limits.md` §3, §4, §6 and §7.
+ * Design: `docs/design/tenant-limits.md` §3, §4, §6 and §7.
  *
  * **The subject of this file is the other tenants.** P8-T06's acceptance
  * criterion says "when limits engage, then *other* tenants stay inside their

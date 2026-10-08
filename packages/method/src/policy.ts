@@ -29,7 +29,7 @@ import {
   type PracticeKey,
   type ResolvedPractice,
 } from "./practice.ts";
-import type { OkrKind } from "./scoring.ts";
+import type { KeyResultDirection, OkrKind } from "./scoring.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 import type { PhaseResult } from "./workflow.ts";
 
@@ -79,6 +79,15 @@ export type PolicyIntent =
   /** Changing an objective's kind (§2.8, P9-T11b-a). */
   | { readonly kind: "objective.kind"; readonly okrKind: OkrKind }
   /**
+   * Moving an objective that exists to another level (§2.7): only a level
+   * its cycle uses, the rule creating one at that level meets.
+   */
+  | {
+      readonly kind: "objective.level";
+      readonly level: OkrLevel;
+      readonly levelsInUse: readonly OkrLevel[];
+    }
+  /**
    * Writing a key result as one of §2.10's kinds, new or changed (P9-T12a).
    */
   | { readonly kind: "keyResult.kind"; readonly keyResultKind: KeyResultKind }
@@ -116,6 +125,10 @@ export type PolicyIntent =
       readonly from: number;
       readonly to: number;
       readonly baseline: number;
+      /** The key result's direction, which says which way is easier. */
+      readonly direction?: KeyResultDirection;
+      /** A maintain key result's target is a band edge, not a goal. */
+      readonly keyResultKind?: KeyResultKind;
       readonly hasReason: boolean;
     };
 
@@ -162,6 +175,7 @@ export function policyNeedsPhases(
 ): boolean {
   if (
     intent.kind === "reviewer.remove" ||
+    intent.kind === "objective.level" ||
     intent.kind === "target.change" ||
     intent.kind === "objective.kind" ||
     intent.kind === "keyResult.kind" ||
@@ -253,24 +267,34 @@ export function isMidCycleAddition(
 }
 
 /**
- * Whether a target change eases the key result, by moving its target closer
- * to the baseline (METHOD v2 §2.9).
+ * Whether a target change eases the key result (METHOD.md §2.9).
  *
- * Judged by distance rather than by direction, which says the same thing for
- * an increase and a reduce and still answers for a maintain or a move: on an
- * increase from 40, 100 to 80 eases and 100 to 110 does not; on a reduce
- * from 100, 50 to 70 eases. Equal distance is not easing, so a target moved
- * to the mirror side of its baseline asks for nothing.
+ * Judged by direction, as §2.9 words it: lowering the target of an increase
+ * eases it, and so does raising the target of a reduce, wherever the baseline
+ * sits. A maintain key result holds a band between its baseline and its target,
+ * so widening the band eases it and narrowing it does not. A move, or a key
+ * result with no direction, is judged by distance from the baseline, which
+ * says the same thing for both ways it can point. Equal distance is not
+ * easing.
  */
 export function isEasing(change: {
   readonly from: number;
   readonly to: number;
   readonly baseline: number;
+  readonly direction?: KeyResultDirection;
+  readonly keyResultKind?: KeyResultKind;
 }): boolean {
-  return (
-    Math.abs(change.to - change.baseline) <
-    Math.abs(change.from - change.baseline)
-  );
+  const distance = (value: number) => Math.abs(value - change.baseline);
+  if (change.keyResultKind === "maintain" || change.direction === "maintain") {
+    return distance(change.to) > distance(change.from);
+  }
+  if (change.direction === "increase") {
+    return change.to < change.from;
+  }
+  if (change.direction === "reduce") {
+    return change.to > change.from;
+  }
+  return distance(change.to) < distance(change.from);
 }
 
 /**
@@ -374,7 +398,9 @@ export function decide(
       outcome: "block",
       rules: ["reasons.easingTarget"],
       reasons: [
-        `Easing a target needs a written reason: ${intent.from} to ${intent.to} moves it toward its baseline of ${intent.baseline}. The original target stays on record, and "it got hard" is not a reason.`,
+        intent.keyResultKind === "maintain" || intent.direction === "maintain"
+          ? `Easing a target needs a written reason: ${intent.from} to ${intent.to} widens the band from its baseline of ${intent.baseline}. The original target stays on record, and "it got hard" is not a reason.`
+          : `Easing a target needs a written reason: ${intent.from} to ${intent.to} makes it easier to reach from its baseline of ${intent.baseline}. The original target stays on record, and "it got hard" is not a reason.`,
       ],
     };
   }
@@ -387,6 +413,17 @@ export function decide(
   }
   // §2.7: a cycle uses the levels it began with, so an objective at a level
   // it does not use would sit somewhere nothing reads.
+  if (intent.kind === "objective.level") {
+    return intent.levelsInUse.includes(intent.level)
+      ? ALLOW
+      : {
+          outcome: "block",
+          rules: [`levels.${intent.level}`],
+          reasons: [
+            `This cycle uses ${intent.levelsInUse.join(", ")} objectives, so a ${intent.level} objective has no place in it. A change to the levels in use applies to cycles that have not started.`,
+          ],
+        };
+  }
   if (
     intent.kind === "objective.create" &&
     intent.level !== undefined &&

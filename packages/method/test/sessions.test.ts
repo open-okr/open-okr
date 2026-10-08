@@ -35,7 +35,7 @@ import { canonThresholds, resolveThresholds } from "../src/thresholds.ts";
 
 const thresholds = canonThresholds();
 const method = readFileSync(
-  join(import.meta.dirname, "../../../docs/development-plan/METHOD.md"),
+  join(import.meta.dirname, "../../../docs/specification/METHOD.md"),
   "utf8",
 );
 
@@ -388,6 +388,53 @@ describe("§8.6's rhythm, measured (P9-T20d)", () => {
     expect(
       rhythmDiagnostic(0.5, measured.share as number, thresholds).diagnosis,
     ).toBe("Likely a strategy or OKR-quality problem");
+  });
+
+  it("does not reuse a late check-in as an early one for the next week", () => {
+    // A team due on Mondays that posts every Thursday is three days late every
+    // week, which the cadence engine records as twelve missed periods.
+    const mondays = Array.from({ length: 12 }, (_, week) =>
+      new Date(Date.UTC(2026, 9, 5 + week * 7)).toISOString().slice(0, 10),
+    );
+    const thursdays = mondays.map((on) =>
+      new Date(Date.parse(`${on}T00:00:00Z`) + 3 * 86_400_000)
+        .toISOString()
+        .slice(0, 10),
+    );
+    expect(
+      onTimeShare([{ dueOn: mondays, publishedOn: thursdays }], 1),
+    ).toEqual({ due: 12, onTime: 0, share: 0 });
+  });
+
+  it("counts a check-in early for its own due date, as the engine does", () => {
+    expect(
+      onTimeShare(
+        [
+          {
+            dueOn: ["2026-10-05", "2026-10-12"],
+            publishedOn: ["2026-10-01", "2026-10-09"],
+          },
+        ],
+        1,
+      ).onTime,
+    ).toBe(2);
+  });
+
+  it("leaves the periods nothing answered as missed, and answers the check-in's own", () => {
+    // Nothing for the 5th or the 12th, then 20 Oct: inside the tolerance of
+    // the 19th, which is the period it falls in, so a team that starts late is
+    // on time for the week it started in.
+    expect(
+      onTimeShare(
+        [
+          {
+            dueOn: ["2026-10-05", "2026-10-12", "2026-10-19", "2026-10-26"],
+            publishedOn: ["2026-10-20", "2026-10-26"],
+          },
+        ],
+        1,
+      ),
+    ).toEqual({ due: 4, onTime: 2, share: 0.5 });
   });
 
   it("is no share at all when nothing fell due", () => {

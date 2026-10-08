@@ -4,7 +4,8 @@ import type { GoalLevel } from "@openokr/db";
 import type { OkrKind } from "@openokr/method";
 import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import { addObjective } from "./editor-actions.ts";
 import {
   RestrictedWriting,
@@ -60,6 +61,14 @@ export function NewObjectiveButton({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(initiallyOpen === true);
+  // The topbar's `+ New` links here with `?new=objective`. Arriving from
+  // another screen mounts this open; arriving from this one keeps the mounted
+  // button, whose state was read once, so it is opened when the prop turns.
+  useEffect(() => {
+    if (initiallyOpen) {
+      setOpen(true);
+    }
+  }, [initiallyOpen]);
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<OkrKind>(defaultKind);
   const [reason, setReason] = useState("");
@@ -122,7 +131,7 @@ export function NewObjectiveButton({
         <input
           // Focused through a ref rather than `autoFocus`, which also steals
           // focus when a page loads with one of these already open.
-          ref={(node) => node?.focus()}
+          ref={focusOnMount}
           value={title}
           aria-label={t("goals.editor.newObjective")}
           placeholder={t("goals.editor.objectivePlaceholder")}

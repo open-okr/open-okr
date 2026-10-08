@@ -15,10 +15,7 @@ import { SETTINGS_REGISTRY } from "../src/settings/registry.ts";
  */
 const plan = readFileSync(
   fileURLToPath(
-    new URL(
-      "../../../docs/development-plan/TECHNICAL-PLAN.md",
-      import.meta.url,
-    ),
+    new URL("../../../docs/specification/TECHNICAL-PLAN.md", import.meta.url),
   ),
   "utf8",
 );

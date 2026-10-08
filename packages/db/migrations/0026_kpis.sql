@@ -1,5 +1,5 @@
 -- KPI categories, KPIs and their records (TECHNICAL-PLAN.md §4.6, METHOD.md §6,
--- design `p3-t00-kpi-engine.md`, P3-T12).
+-- design `kpi-engine.md`, P3-T12).
 --
 -- The metrics module. A KPI is a measure that runs continuously, unlike a key
 -- result which lives inside one cycle, and that difference is why it has its own

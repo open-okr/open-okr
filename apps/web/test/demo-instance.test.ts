@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DEMO_PERSONA_PASSWORD, DEMO_PERSONAS } from "@openokr/core";
+import {
+  DEMO_PERSONA_PASSWORD,
+  DEMO_PERSONAS,
+  demoPersonasOn,
+} from "@openokr/core";
 import { describe, expect, test } from "vitest";
 
 /**
@@ -43,6 +47,16 @@ describe("the persona list", () => {
       expect(persona.name.length).toBeGreaterThan(0);
       expect(persona.title.length).toBeGreaterThan(0);
     }
+  });
+
+  test("offers only who has joined the year by today", () => {
+    // Yuki joins in April, so in March there is no account to sign in to.
+    const march = demoPersonasOn("2027-03-01").map((persona) => persona.name);
+    expect(march).not.toContain("Yuki Tanaka");
+    expect(march).toContain("Priya Raman");
+    const may = demoPersonasOn("2027-05-01").map((persona) => persona.name);
+    expect(may).toContain("Yuki Tanaka");
+    expect(route).toContain("demoPersonasOn(");
   });
 
   test("is withheld unless the deployment says it is a demo", () => {

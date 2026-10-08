@@ -4,7 +4,7 @@ import { workspaces } from "./workspaces.ts";
 /**
  * The tenant record (TECHNICAL-PLAN §4.13, P8-T02a).
  *
- * Design: `docs/design/p8-t01a-tenant-lifecycle.md`. Cloud only. A
+ * Design: `docs/design/tenant-lifecycle.md`. Cloud only. A
  * self-hosted instance has this table and no rows in it, and every product
  * read behaves identically either way, because no product read asks.
  *

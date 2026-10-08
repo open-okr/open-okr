@@ -134,6 +134,31 @@ describe("an agreed frame (NW-Q2-22)", () => {
     );
   });
 
+  it("treats taking it back to draft as a revision, so it cannot be rewritten silently", async () => {
+    await agreedFrame();
+    await expect(
+      call("frame.set", {
+        yearLabel: "2026",
+        agreed: false,
+        notDoing: NOT_DOING,
+        strategies: STRATEGIES,
+      }),
+    ).rejects.toThrow(/needs a written reason/);
+    await call("frame.set", {
+      yearLabel: "2026",
+      agreed: false,
+      notDoing: NOT_DOING,
+      strategies: STRATEGIES,
+      reason: "Reopened for the board's strategy offsite",
+    });
+    const read = await frame();
+    expect(read.revisions).toHaveLength(1);
+    expect(read.revisions[0]).toMatchObject({
+      fields: ["agreed"],
+      reason: "Reopened for the board's strategy offsite",
+    });
+  });
+
   it("asks nothing when what is sent is what it holds", async () => {
     await agreedFrame();
     await call("frame.set", {

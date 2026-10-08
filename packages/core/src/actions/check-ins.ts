@@ -22,6 +22,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { standInFor } from "@openokr/method";
 import { desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -33,10 +34,12 @@ import {
   publishCheckInInTx,
   startDraftInTx,
 } from "../check-ins/service.ts";
+import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
-import { readRhythmRow } from "../cycles/service.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { leavesOnInTx } from "../people/leave.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
@@ -296,7 +299,14 @@ export const publishDraftedCheckIn = defineWriteAction({
           action: "goals.publishDraftedCheckIn",
           targetType: "check_in",
           targetId: draft.checkInId,
-          payload: { status: input.status, fromProposal: true },
+          // Whether a person accepted an agent's draft or wrote it
+          // themselves: the drawer and the goal page publish through this
+          // action too, and only an applied proposal says so.
+          payload: {
+            status: input.status,
+            fromProposal: context.proposalId !== undefined,
+            ...(context.proposalId ? { proposalId: context.proposalId } : {}),
+          },
         },
       };
     },
@@ -584,11 +594,27 @@ export const acknowledgeCheckIn = defineWriteAction({
       // reassignment moves both, and they part company the moment the loop is
       // closed: the acknowledged row keeps the member who actually closed it,
       // which is what makes the trail readable a year later.
+      //
+      // While the reviewer is on leave, their delegate answers for them
+      // (METHOD.md §7.4): the acknowledgement goes to whoever stands in
+      // today, and the row keeps that person as the one who closed it.
       if (checkIn && checkIn.reviewerMemberId !== memberId) {
-        throw new OperationError(
-          "forbidden",
-          "Only this goal's reviewer can acknowledge its check-ins. Reassign the reviewer first if that needs to change.",
+        const today = formatLocalDate(
+          localDateIn(new Date(), await workspaceTimeZone(tx, workspaceId)),
         );
+        const standingIn =
+          checkIn.reviewerMemberId !== null &&
+          standInFor(
+            checkIn.reviewerMemberId,
+            today,
+            await leavesOnInTx(tx, workspaceId, today),
+          ) === memberId;
+        if (!standingIn) {
+          throw new OperationError(
+            "forbidden",
+            "Only this goal's reviewer can acknowledge its check-ins, or whoever stands in while they are on leave. Reassign the reviewer first if that needs to change.",
+          );
+        }
       }
       if (checkIn?.state !== "published") {
         throw new OperationError(

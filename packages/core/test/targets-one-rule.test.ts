@@ -135,6 +135,18 @@ describe("A5: one rule for a target, all cycle", () => {
     });
   });
 
+  it("shows no original for a target raised while the plan was still a draft", async () => {
+    // The cycle here is unpublished: raising the target is the plan being
+    // written, not a promise moved, so the close has no "original" to show.
+    const keyResultId = await winRate();
+    await call("goals.changeTarget", { id: keyResultId, targetValue: 120 });
+    expect(await atTheClose(keyResultId)).toMatchObject({
+      target: 120,
+      originalTarget: null,
+      easedBecause: null,
+    });
+  });
+
   it("shows no original for a target that never moved", async () => {
     const keyResultId = await winRate();
     expect(await atTheClose(keyResultId)).toMatchObject({

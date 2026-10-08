@@ -82,7 +82,7 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   },
   // The cloud tenancy settings (P8-T02a). All three default to the
   // self-hosted answer, so an instance that never touches them is a
-  // self-hosted one. Design: docs/design/p8-t01a-tenant-lifecycle.md.
+  // self-hosted one. Design: docs/design/tenant-lifecycle.md.
   {
     key: "cloud.enabled",
     kind: "boolean",
@@ -118,7 +118,7 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   // The two admission limits (P8-T06a). Instance scope, because they
   // describe the deployment rather than any customer, and both default to
   // unlimited so a self-hosted instance is never limited by a number nobody
-  // chose. Design: docs/design/p8-t01a-tenant-limits.md §4.
+  // chose. Design: docs/design/tenant-limits.md §4.
   {
     key: "cloud.limits.actionsPerMinute",
     kind: "number",
@@ -241,7 +241,7 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   // checks compare their lag against these to decide whether a component
   // is operational, degraded or unavailable. All four default to a value
   // that fires on a stopped process and not on a busy one.
-  // Design: docs/design/p8-t06c-status-and-capacity.md §2.5 and §2.6.
+  // Design: docs/design/status-and-capacity.md §2.5 and §2.6.
   {
     key: "status.relayDegradedSeconds",
     kind: "number",

@@ -459,15 +459,26 @@ describe("what the product decides not to say", () => {
       `${dueOn}T07:00:00.000Z`,
     );
 
-    // And the next run inside the open window delivers it, without recording
-    // a second one: deduplication sees the row that is already waiting.
+    // And the next run inside the open window delivers it, and sends nothing
+    // more: deduplication sees the row that is already waiting, so the same
+    // reminder raised again is recorded as a duplicate rather than sent twice.
     const morning = await callAction(
       { pool: wb.appPool, ...context() },
       "nudges.run",
       { now: new Date(`${dueOn}T08:00:00Z`).toISOString() },
     );
     expect(morning.delivered).toBeGreaterThan(0);
-    expect((await rows())[0]?.sent_at).not.toBeNull();
+    const after = await rows();
+    const sent = after.filter((row) => row.sent_at !== null);
+    expect(sent).toHaveLength(1);
+    expect(new Date(sent[0]?.scheduled_for as string).toISOString()).toBe(
+      `${dueOn}T07:00:00.000Z`,
+    );
+    expect(
+      after
+        .filter((row) => row.sent_at === null)
+        .every((row) => row.suppressed_reason !== null),
+    ).toBe(true);
   });
 });
 

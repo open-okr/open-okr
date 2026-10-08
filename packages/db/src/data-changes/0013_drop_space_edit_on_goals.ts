@@ -1,6 +1,6 @@
 /**
  * Takes the `space_standard` binding off every goal that already has one
- * (P8-G13c, docs/design/p8-g13-workspace-roles.md).
+ * (P8-G13c, docs/design/workspace-roles.md).
  *
  * **What this removes, and what it does not.** A goal in a space granted every
  * member of that space `edit` on it. That was the only answer to "who may edit

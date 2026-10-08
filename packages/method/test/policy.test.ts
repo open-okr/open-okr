@@ -476,6 +476,36 @@ describe("changing a target (P9-T06b, METHOD v2 §2.9)", () => {
     expect(isEasing({ from: 100, to: 100, baseline: 40 })).toBe(false);
   });
 
+  it("judges an increase and a reduce by direction, wherever the baseline sits", () => {
+    // Increase from 40: a target moved past the baseline, 100 to -30, eases.
+    expect(
+      isEasing({ from: 100, to: -30, baseline: 40, direction: "increase" }),
+    ).toBe(true);
+    expect(
+      isEasing({ from: 100, to: 120, baseline: 40, direction: "increase" }),
+    ).toBe(false);
+    // Reduce: raising the target eases it, lowering it does not.
+    expect(
+      isEasing({ from: 50, to: 120, baseline: 100, direction: "reduce" }),
+    ).toBe(true);
+    expect(
+      isEasing({ from: 50, to: 40, baseline: 100, direction: "reduce" }),
+    ).toBe(false);
+  });
+
+  it("eases a maintain key result by widening its band, not by narrowing it", () => {
+    // Band 95 to 105: 120 widens it, 100 narrows it.
+    expect(
+      isEasing({ from: 105, to: 120, baseline: 95, keyResultKind: "maintain" }),
+    ).toBe(true);
+    expect(
+      isEasing({ from: 105, to: 100, baseline: 95, keyResultKind: "maintain" }),
+    ).toBe(false);
+    expect(
+      isEasing({ from: 105, to: 120, baseline: 95, direction: "maintain" }),
+    ).toBe(true);
+  });
+
   it("refuses easing without a reason by default, citing the setting", () => {
     const refused = decide(change(100, 80, 40), required, thresholds);
     expect(refused.outcome).toBe("block");

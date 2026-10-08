@@ -1,6 +1,6 @@
 -- Support access, and who said yes (P8-T04a).
 --
--- Design: docs/design/p8-t01b-support-access.md.
+-- Design: docs/design/support-access.md.
 --
 -- **Consent is the only way in, and break-glass is not built.** P8-T04's card
 -- asks for "an explicit grant", and that phrase has two opposite readings: the

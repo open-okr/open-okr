@@ -12,7 +12,7 @@ import type { OkrGoal, OkrTree } from "../lib/okr-tree/cache.ts";
 
 /**
  * One way to change the OKR tree, and what happens when the server says no
- * (P9-T06c, docs/design/p9-t00-okr-writing.md §6).
+ * (P9-T06c, docs/design/okr-writing.md §6).
  *
  * **Rendered for real in jsdom** with the query client, the translations and
  * the toasts the shell provides, because each claim is about what a reader
@@ -274,7 +274,9 @@ describe("useOkrMutation", () => {
       title: "Renamed",
       progressPct: 64,
     });
-    expect(FakeChannel.posted).toContainEqual({ cycleId: "c" });
+    expect(FakeChannel.posted).toContainEqual(
+      expect.objectContaining({ cycleId: "c" }),
+    );
   });
 
   test("offers an undo after a removal, which brings the key result back", async () => {
@@ -352,5 +354,30 @@ describe("useOkrLive", () => {
       listening?.onmessage?.({ data: { cycleId: "other" } } as MessageEvent),
     );
     expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  test("does not re-read for this tab's own write, which it already merged", async () => {
+    // What this tab's own mutation posts, played back to its own listener.
+    runOkrMutation.mockResolvedValue({ ok: true, goal: null });
+    FakeChannel.posted = [];
+    await act(async () => {
+      okr.mutate({
+        kind: "patchGoal",
+        id: "g",
+        set: { title: "T" },
+        read: { title: "t" },
+      } as never);
+    });
+    await act(async () => new Promise((done) => setTimeout(done)));
+    const own = FakeChannel.posted.at(-1) as { cycleId: string; from: string };
+    expect(own.from).toBeTruthy();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const listening = FakeChannel.open.find((one) => one.onmessage);
+    await act(async () =>
+      listening?.onmessage?.({ data: own } as MessageEvent),
+    );
+    expect(invalidate).not.toHaveBeenCalledWith({
+      queryKey: ["okr-tree", "c"],
+    });
   });
 });

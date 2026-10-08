@@ -8,7 +8,7 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
  * Key results that read a KPI (TECHNICAL-PLAN §6.2, design
- * `p3-t00-kpi-engine.md` §10, completeness review M-07).
+ * `kpi-engine.md` §10, completeness review M-07).
  *
  * "A KPI-backed key result reads the KPI's latest achievement." The scoring
  * cascade already read it, but only when something else asked it to run: a

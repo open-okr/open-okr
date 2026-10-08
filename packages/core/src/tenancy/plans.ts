@@ -1,7 +1,7 @@
 /**
  * Plans and seats (P8-T05).
  *
- * Design: `docs/design/p8-t01b-plans-and-seats.md`.
+ * Design: `docs/design/plans-and-seats.md`.
  *
  * **There is no field here that can name a feature, and there will not be
  * one.** REQUIREMENTS §5 says self-host is never feature-gated and PLAN.md §4

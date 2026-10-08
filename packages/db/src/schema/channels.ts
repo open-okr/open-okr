@@ -14,7 +14,7 @@ import { workspaceMembers, workspaces } from "./workspaces.ts";
  * Channels (AI-NATIVE-PLAN.md §5, TECHNICAL-PLAN §4.11, P5-T01b-a).
  *
  * Migration 0054 holds the row-level security policies and the four indexes
- * that make the constraints in `docs/design/p5-t00-channel-design.md` §2 the
+ * that make the constraints in `docs/design/channels.md` §2 the
  * only storable shapes.
  */
 

@@ -34,6 +34,7 @@ import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { primaryChannelSchema } from "../settings/registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { blockerDraft, isBlockerRule } from "./blocker-card.ts";
+import { releaseHeldInTx } from "./held.ts";
 import { nudgeDraft } from "./message.ts";
 
 export interface DeliveryResult {
@@ -347,6 +348,15 @@ export async function deliverDueNudges(
       channel: delivery.channel,
       sentAt: input.now,
     });
+    // The summary is where the weekly ceiling's held messages surface (§11),
+    // so they join the inbox with it, whichever channel it went by.
+    if (row.ruleKey === DAILY_DIGEST_RULE) {
+      await releaseHeldInTx(tx, {
+        workspaceId: input.workspaceId,
+        memberId: row.recipientMemberId,
+        now: input.now,
+      });
+    }
 
     if (delivery.channel !== "in_app") {
       const provider = delivery.channel as ChannelProviderKey;

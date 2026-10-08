@@ -1,5 +1,5 @@
 -- Workspace roles with a settable permission matrix (P8-G13a,
--- docs/design/p8-g13-workspace-roles.md).
+-- docs/design/workspace-roles.md).
 --
 -- **A role is a level per domain, not a second access model.** §4.1's
 -- relationship model is unchanged: contexts, groups and bindings all still

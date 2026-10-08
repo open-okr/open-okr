@@ -181,12 +181,11 @@ describe("the measured rhythm", () => {
   it("does not count a check-in published past the tolerance for the week it missed", async () => {
     const due = mondays();
     // One check-in, three days after the first Monday: past the tolerance, so
-    // the first week is missed. It falls before the second Monday, and a
-    // check-in early for its period is on time for it, as the cadence engine
-    // has always read one, so it counts once, for the second.
+    // the first week is missed. It answers the first Monday, late, so it is
+    // not counted again as early for the second week either.
     await publishOn([addDays(due[0] as string, 3)]);
     const measured = await measure();
     expect(measured.due).toBe(due.length);
-    expect(measured.onTime).toBe(1);
+    expect(measured.onTime).toBe(0);
   });
 });

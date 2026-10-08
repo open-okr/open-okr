@@ -8,7 +8,11 @@ import {
   thresholdsProblem,
 } from "../src/kpi.ts";
 import { aggregateForPeriod } from "../src/kpi-aggregate.ts";
-import { shouldProposeRecoveryClose } from "../src/kpi-recovery.ts";
+import {
+  draftRecovery,
+  shouldProposeRecoveryClose,
+} from "../src/kpi-recovery.ts";
+import { trendForecast } from "../src/scoring.ts";
 
 /**
  * A KPI judged in its own units, by its own kind of target (METHOD.md §6.2,
@@ -215,5 +219,68 @@ describe("where a KPI is healthy again (§6.5, P9-T18a)", () => {
     // may be up to a ninth above the target.
     expect(boundary("at_most", {}, 90)).toBe(100);
     expect(boundary("at_least", {}, null)).toBeNull();
+  });
+});
+
+describe("the recovery's first key result points back to the band", () => {
+  it("comes down to a range KPI's band from above, whatever direction its row holds", () => {
+    // Band 40 to 60, reading 90: the row was left at higher_better, and the
+    // way back is down.
+    const draft = draftRecovery(
+      {
+        root: {
+          id: "kpi",
+          title: "Queue length",
+          target: 50,
+          current: 90,
+          direction: "higher_better",
+          healthyBoundary: 60,
+          owner: "m1",
+        },
+        nodes: [],
+      },
+      4,
+    );
+    expect(draft.keyResults[0]).toMatchObject({
+      direction: "reduce",
+      baseline: 90,
+      target: 60,
+    });
+  });
+
+  it("goes up to the band from below", () => {
+    const draft = draftRecovery(
+      {
+        root: {
+          id: "kpi",
+          title: "Queue length",
+          target: 50,
+          current: 20,
+          direction: "lower_better",
+          healthyBoundary: 40,
+        },
+        nodes: [],
+      },
+      4,
+    );
+    expect(draft.keyResults[0]?.direction).toBe("increase");
+  });
+});
+
+describe("§3.6's forecast for a move that points down", () => {
+  it("flags a projection stuck above a target below the baseline", () => {
+    const points = [
+      { at: 0, value: 92 },
+      { at: 1, value: 91 },
+      { at: 2, value: 90 },
+      { at: 3, value: 89 },
+    ];
+    expect(
+      trendForecast(points, 10, {
+        direction: "move",
+        baseline: 100,
+        target: 50,
+      })?.trendingOffTrack,
+    ).toBe(true);
   });
 });

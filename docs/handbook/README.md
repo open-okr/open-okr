@@ -3,7 +3,7 @@
 For the person running the practice, not for the person building the product.
 
 Everything here is what OpenOKR actually enforces, taken from
-[METHOD.md](../development-plan/METHOD.md), which is the specification the code
+[METHOD.md](../specification/METHOD.md), which is the specification the code
 compiles from. When this page quotes a number, `pnpm check:docs` checks it
 against the registry that number lives in, so the handbook cannot drift from
 the product.

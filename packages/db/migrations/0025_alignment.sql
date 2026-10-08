@@ -1,5 +1,5 @@
 -- Alignment: horizontal links, the dependency register and the findings table
--- (TECHNICAL-PLAN.md §4.5, METHOD.md §5, design `p3-t00-alignment-engine.md`,
+-- (TECHNICAL-PLAN.md §4.5, METHOD.md §5, design `alignment-engine.md`,
 -- P3-T09).
 --
 -- Vertical alignment already exists: `goals.parent_goal_id` and

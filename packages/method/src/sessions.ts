@@ -592,11 +592,17 @@ export interface CheckInRecord {
 
 /**
  * §8.6's rhythm, measured (P9-T20d): "the share of due check-ins published
- * within tolerance". A due date is kept when a check-in was published after
- * the one before it fell due and no later than the tolerance after it, so an
- * early check-in counts for the period it was meant for and a late one past
- * the tolerance counts for nothing. Null when nothing fell due, because a
- * share of nothing is not a rhythm.
+ * within tolerance".
+ *
+ * Each check-in answers one due date, and each due date is answered once. A
+ * check-in answers the period it falls in: the latest due date on or before
+ * it, when that one is still open. Periods before it that nothing answered stay
+ * missed, so a team that starts in week three is on time for week three. When
+ * its own period is already answered it is early for the next one, which is
+ * never late, however early. It is on time when it is published no later than
+ * the tolerance after the date it answers, so one three days late for its own
+ * Monday is late, and is not counted again as early for the Monday after. Null
+ * when nothing fell due, because a share of nothing is not a rhythm.
  */
 export function onTimeShare(
   records: readonly CheckInRecord[],
@@ -616,23 +622,26 @@ export function onTimeShare(
   for (const record of records) {
     const dues = [...record.dueOn].sort();
     const published = [...record.publishedOn].sort();
-    // Each check-in answers one period: the first it can, so one published
-    // late is not counted again for the period after.
-    const used = new Set<number>();
-    let previous: string | null = null;
-    for (const on of dues) {
-      due += 1;
-      const latest = shift(on, toleranceDays);
-      const after = previous;
-      const index = published.findIndex(
-        (when, at) =>
-          !used.has(at) && (after === null || when > after) && when <= latest,
-      );
-      if (index >= 0) {
-        used.add(index);
+    due += dues.length;
+    // The first due date nothing has answered yet.
+    let open = 0;
+    for (const when of published) {
+      let own = -1;
+      for (let at = open; at < dues.length; at += 1) {
+        if ((dues[at] as string) > when) {
+          break;
+        }
+        own = at;
+      }
+      const answers = Math.max(open, own);
+      const answered = dues[answers];
+      if (answered === undefined) {
+        break;
+      }
+      if (when <= shift(answered, toleranceDays)) {
         onTime += 1;
       }
-      previous = on;
+      open = answers + 1;
     }
   }
   return { due, onTime, share: due === 0 ? null : onTime / due };

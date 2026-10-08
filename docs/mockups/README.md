@@ -1,0 +1,81 @@
+# Reference mockups
+
+Eleven hand-built screens showing what the specifications in [UIUX-PLAN.md](../specification/UIUX-PLAN.md) look like when they are drawn. They exist so that a person or an agent changing a screen can see the target before writing any code. The README's tour of the product uses them too.
+
+## What authority they have
+
+**None.** They are illustrations.
+
+| Question | Answer |
+|---|---|
+| The mockup and UIUX-PLAN.md disagree | **UIUX-PLAN.md wins.** Fix the mockup |
+| The mockup and METHOD.md disagree on a rule, band, threshold or key | **METHOD.md wins.** Fix the mockup |
+| The mockup shows a detail no document specifies (a spacing, a chip shape, a row density) | Treat it as a **proposed default**. Follow it unless there is a reason not to, and say so in the change if you deviate |
+| The implementation ends up looking different for a good reason | Fine. Update the mockup in the same change, or delete it if the screen has moved on |
+
+Never cite a mockup as the reason for a behaviour. Cite the specification.
+
+## The screens
+
+| Mockup | Screen specification | What it is there to show |
+|---|---|---|
+| [01-work-map](png/01-work-map.png) | S-01 | The uniform node contract at every row, the outdated badge overriding reported health, a KPI tile in the tree, the cycle strip |
+| [02-cycle-workspace](png/02-cycle-workspace.png) | S-04, S-06 | The eight-phase rail with computed completion, drafting blocked on an incomplete input pack, the facilitator guidance rail |
+| [03-draft-coach](png/03-draft-coach.png) | S-09 | Rule verdicts inline beside the field they judge, the strength meter, the quality panel, a passing set beside a failing one |
+| [03b-rule-card](png/03b-rule-card.png) | S-09 detail | One verdict opened: prompt, reason, weak-versus-strong pair, rewrite and dismiss |
+| [04-gates-capacity](png/04-gates-capacity.png) | S-10 | The six gates as a checklist with two unmet, the disabled publish control stating its reason, the capacity table and the mandatory cut, the dependency register |
+| [05-alignment-studio](png/05-alignment-studio.png) | S-16 | The OKRs screen's diagram, which the studio became: key results inside each objective's card, an objective hanging from the key result it aligns to, the annual objective in the band above, a dependency dashed, a collapsed card, and the alignment panel's health with each gap opening its objective |
+| [06-kpi-recovery](png/06-kpi-recovery.png) | S-18, S-19 | The driver tree with corridor bars and tier labels, a live recovery objective with one key result per leading driver at the edge of the unhealthy branch, effective health, the cross-tree recovery board with §6.5's three responses on a KPI nobody has answered and the answer on one somebody has |
+| [07-weekly-session](png/07-weekly-session.png) | S-22 | The four-step rail, the confidence dial with its bands, private votes revealed together, step 2 as what dropped, a low score with a next action and no blocker beside one that is actually blocked, due by the next check-in, the streak |
+| [08-quarterly-review](png/08-quarterly-review.png) | S-24 | The lap bar proportional to stage minutes, the stage rail grouped by act, the diagnostic card, the eight root causes, the five process-health statements |
+| [09-channels](png/09-channels.png) | AI-NATIVE-PLAN §5 | The same nudge in four channels, a conversational check-in capturing a typed blocker, and nudge provenance on every message |
+| [10-review-inbox](png/10-review-inbox.png) | S-02 | Overdue-first grouping, agent proposals in the queue, the five-step escalation ladder, the provenance panel with snooze and change-channel |
+
+## The OKRs screen, as first proposed
+
+These two drew the OKRs screen before UIUX-PLAN §6 S-13 described it. S-13 is
+now the authority, and the built screen adds a diagram view these do not show.
+The design is [docs/design/okr-entry-points.md](../design/okr-entry-points.md).
+
+| Mockup | What it shows |
+|---|---|
+| [12-okr-home](png/12-okr-home.png) | One OKR screen: level tabs, key results inline under the objective they belong to, a create action on the screen that lists them, and an add row under the key results |
+| [12b-okr-create](png/12b-okr-create.png) | The same create action in both states. Open: the rule verdicts answer as the member types. Closed: the panel names what the workspace's practice still needs |
+
+## Everything in them is a real value
+
+The mockups quote the canon rather than inventing numbers, because a developer will copy what they see. Where a mockup shows a rule key, a band, a corridor, a penalty or a threshold, it comes from a document:
+
+| Shown in the mockups | Source |
+|---|---|
+| `OBJ-1`, `KR-2`, `AL-1`, `CY-6` and the other quality rules | METHOD.md §4 |
+| Confidence bands: high 0.7 and above, medium 0.4 to below 0.7, low below 0.4, escalating at 0.3 | METHOD.md §3.2 |
+| Alignment as a share of goals below company level aligned or standing alone: healthy at 90%, watch from 80% (P9-T16a) | METHOD.md §5.2 |
+| Semantic finding types: relink, dependency, conflict, gap | METHOD.md §5.3 |
+| KPI corridors and tiers, and a recovery shown beside the real band  | METHOD.md §6.2, §6.4, §6.5 |
+| The five blocker types and the 24-hour clock | METHOD.md §7.3 |
+| The eleven quarterly stages and their minutes, the eight root causes, the five process statements | METHOD.md §8.1, §8.4, §8.5 |
+| `checkin.overdue`, `kpi.recovery_proposed`, `quality.conflict` and the other trigger keys | AI-NATIVE-PLAN.md §6.4 |
+| The escalation ladder steps and the blocker ladder | AI-NATIVE-PLAN.md §6.3 |
+| Colour, spacing, chips, badges and density | UIUX-PLAN.md §2, §4 |
+| The Friday check-in day | A workspace choice this fictional company made. The canon default is Monday (METHOD.md §11) |
+
+**When one of those changes, the mockup that quotes it is stale.** `pnpm method:check` cannot see these files, so treat them the way you would treat documentation: update them in the same change, or note them in the change as needing a follow-up.
+
+## Rebuilding
+
+```bash
+./render.sh          # src/*.html -> png/*.png at 1440 wide, 2x, palette-optimised
+```
+
+Needs a Chromium headless shell. It looks in the Playwright browser cache, falls back to Google Chrome, and `CHROME=/path/to/binary` overrides both. Each file declares its own size in a `window-width` / `window-height` comment.
+
+`src/style.css` carries the shared tokens, and they are deliberately the same values as UIUX-PLAN.md §2 describes: one brand hue, a neutral grey ramp, semantic tokens for success, warning, danger and info, and health or confidence colour never used without a label beside it.
+
+**Motion.** The HTML sources carry the motion language from UIUX-PLAN.md §2 so that opening one in a browser shows it: 120 to 200 millisecond ease-out micro-transitions on hover, an entrance stagger that settles inside half a second, progress bars that grow to their value, and the two deliberate exceptions, the vote reveal in the weekly session and the score reveal in the quarterly review. Everything is disabled under `prefers-reduced-motion`, and `render.sh` passes `--force-prefers-reduced-motion` so every PNG captures the settled state, never a mid-animation frame.
+
+The rendered PNGs are also the screenshots in the repository's README.
+
+## A note on 06-kpi-recovery
+
+`06-kpi-recovery` shows the recovery objective on **expansion revenue**, a KPI whose immediate children are leading. Per METHOD.md §6.5 the drafter walks the unhealthy KPI's subtree breadth-first for the leading drivers at the edge of the unhealthy branch, so for this KPI the key results are exactly its leading children, which is what the mockup draws.

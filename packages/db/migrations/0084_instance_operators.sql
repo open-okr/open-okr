@@ -1,6 +1,6 @@
 -- The cloud operator, and the wall between them and the content (P8-T03a).
 --
--- Design: docs/design/p8-t01b-operator-console.md.
+-- Design: docs/design/operator-console.md.
 --
 -- CLAUDE.md's least-privilege rule is written about agents: "there is no
 -- service account with ambient authority". An operator is the much larger

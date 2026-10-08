@@ -96,6 +96,9 @@ export const FRAME_FIELDS = [
   "strategy",
   "notDoing",
   "strategies",
+  // Taking an agreed frame back to draft is a revision too, so a frame cannot
+  // be unagreed silently, rewritten as a draft and agreed again.
+  "agreed",
 ] as const;
 export type FrameField = (typeof FRAME_FIELDS)[number];
 

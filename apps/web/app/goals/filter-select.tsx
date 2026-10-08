@@ -5,7 +5,7 @@ import { FILTER_PLACEHOLDER } from "./placeholders.ts";
 
 /**
  * A filter with more options than fit as chips: a champion, a space
- * (P9-T07a-b, docs/design/p9-t00-okr-writing.md §3).
+ * (P9-T07a-b, docs/design/okr-writing.md §3).
  *
  * Choosing one is a navigation, so the filter is in the address like every
  * other control on this toolbar and a link to the filtered list is a link to

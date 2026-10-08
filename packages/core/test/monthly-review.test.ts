@@ -1,5 +1,5 @@
 /**
- * The monthly review (METHOD.md §7.5, p4-t00-session-design.md §3, P4-T09).
+ * The monthly review (METHOD.md §7.5, sessions.md §3, P4-T09).
  *
  * The card carries no test plan line, so this is the one the deliverables and
  * the acceptance criterion imply:

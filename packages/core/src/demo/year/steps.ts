@@ -4,7 +4,7 @@
  *
  * A step is the scenario's own unit, NW-Q1-17, and is not the same thing as
  * the seed's events: one step can leave several rows and some leave none
- * (`docs/design/p9-t22c-northwind-year.md` §3, §5). This list answers one
+ * (`docs/design/northwind-year-seed.md` §3, §5). This list answers one
  * question with no database and no clock: as of a day, which steps are done,
  * under way or not yet. That is what lets the README's five demo dates be
  * tested on any day of the year.

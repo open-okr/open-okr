@@ -9,7 +9,7 @@ import { RoleMatrix } from "./role-matrix.tsx";
 
 /**
  * Roles and what each one may do (P8-G13b,
- * docs/design/p8-g13-workspace-roles.md).
+ * docs/design/workspace-roles.md).
  *
  * **Who may edit an objective used to be answerable only by reading the
  * binding table.** It came from membership of the space that owned it, through

@@ -77,6 +77,7 @@ async function waitingGoal(
       draftState: goals.draftState,
       championId: goals.championId,
       reviewerId: goals.reviewerId,
+      closedAt: goals.closedAt,
     })
     .from(goals)
     .where(
@@ -89,6 +90,14 @@ async function waitingGoal(
     .limit(1);
   if (!goal) {
     throw new OperationError("not_found", "No such objective.");
+  }
+  // A draft stopped or closed before anyone published it stays where it was
+  // left: going live now would give a closed objective a check-in to owe.
+  if (goal.closedAt !== null) {
+    throw new OperationError(
+      "conflict",
+      "This objective is closed, so its draft cannot go live. Reopen it first.",
+    );
   }
   return goal;
 }

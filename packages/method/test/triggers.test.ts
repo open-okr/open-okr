@@ -24,7 +24,7 @@ import {
  * never does.
  */
 
-const docs = join(import.meta.dirname, "../../../docs/development-plan");
+const docs = join(import.meta.dirname, "../../../docs/specification");
 const design = join(import.meta.dirname, "../../../docs/design");
 
 /** Every `rule.key` in a markdown table's first column. */
@@ -132,7 +132,7 @@ describe("METHOD.md §4.6's weak and strong pairs", () => {
 });
 
 describe("the design document's own trigger table", () => {
-  const doc = readFileSync(join(design, "p4-t00-agent-design.md"), "utf8");
+  const doc = readFileSync(join(design, "agents.md"), "utf8");
   const documented = keysInTables(
     doc,
     "## 3. The trigger catalogue",

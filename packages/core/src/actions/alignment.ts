@@ -1399,18 +1399,25 @@ export const readAlignment = defineReadAction({
               )
           ).map((row) => [row.id, row.name]),
         );
-        const memberNames = new Map(
-          (
-            await tx
-              .select({ id: workspaceMembers.id, name: workspaceMembers.name })
-              .from(workspaceMembers)
-              .where(
-                activeOnly(
-                  workspaceMembers,
-                  eq(workspaceMembers.workspaceId, context.workspaceId),
-                ),
-              )
-          ).map((row) => [row.id, row.name]),
+        const members = await tx
+          .select({
+            id: workspaceMembers.id,
+            name: workspaceMembers.name,
+            status: workspaceMembers.status,
+          })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+            ),
+          );
+        // Every name, so a register row still says who owned a risk after
+        // they left; only an active member is offered as somebody to escalate
+        // to, because the escalation refuses anybody else.
+        const memberNames = new Map(members.map((row) => [row.id, row.name]));
+        const activeMemberIds = new Set(
+          members.filter((row) => row.status === "active").map((row) => row.id),
         );
 
         const register = registerRows.flatMap((row) => {
@@ -1455,9 +1462,10 @@ export const readAlignment = defineReadAction({
             ),
           )
           .limit(1);
-        const sponsorName = cycle?.sponsorId
-          ? memberNames.get(cycle.sponsorId)
-          : undefined;
+        const sponsorName =
+          cycle?.sponsorId && activeMemberIds.has(cycle.sponsorId)
+            ? memberNames.get(cycle.sponsorId)
+            : undefined;
 
         const uncountedVisible = live.uncounted.filter((id) =>
           allowedGraphGoals.has(id),
@@ -1485,9 +1493,7 @@ export const readAlignment = defineReadAction({
           healthy: live.band === null ? null : live.band === "healthy",
           threshold: thresholds.healthy,
           watchThreshold: thresholds.watch,
-          anchored: !live.findings.some(
-            (finding) => finding.ruleKey === "AL-4",
-          ),
+          anchored: live.anchored,
           measured: live.measured,
           counted: live.counted,
           uncounted: uncountedVisible.flatMap((id) => {

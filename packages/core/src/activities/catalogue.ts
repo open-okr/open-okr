@@ -373,7 +373,14 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // reason: a feed line has to read as a sentence on its own (M-13).
   "goal.restored": z.object({ title: z.string() }),
   "goal.role_reassigned": z.object({ role: z.enum(["champion", "reviewer"]) }),
-  "goal.moved_to_cycle": z.object({ title: z.string() }),
+  // Arriving in a running cycle is a start mid-cycle, with its reason where
+  // one was given, and a draft where the practice holds additions (§2.9).
+  "goal.moved_to_cycle": z.object({
+    title: z.string(),
+    addedMidCycle: z.boolean().optional(),
+    reason: z.string().nullable().optional(),
+    draft: z.boolean().optional(),
+  }),
   // Initiatives (P5-T10a). The title travels for the same reason a goal's does:
   // "deleted Rebuild the activation flow" has to keep reading as a sentence
   // after the initiative is gone.
@@ -439,7 +446,14 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     addedMidCycle: z.boolean().optional(),
     reason: z.string().nullable().optional(),
   }),
-  "key_result.updated": z.object({}),
+  // Which fields moved, and a baseline's old and new value where it moved: a
+  // baseline is a fact rather than a target, so it asks no reason, but the
+  // trail keeps what it was.
+  "key_result.updated": z.object({
+    keys: z.array(z.string()).optional(),
+    baselineFrom: z.number().nullable().optional(),
+    baselineTo: z.number().optional(),
+  }),
   "key_result.value_recorded": z.object({ value: z.number() }),
   "key_result.removed": z.object({ title: z.string() }),
   // A target moved, and whether it eased (P9-T06b). The reason is in the

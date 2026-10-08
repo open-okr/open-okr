@@ -1,6 +1,6 @@
 /**
  * The calculated-KPI formula engine (METHOD.md §6, design
- * `p3-t00-kpi-engine.md` §5 to §7, P3-T13).
+ * `kpi-engine.md` §5 to §7, P3-T13).
  *
  * **A typed expression tree, validated with Zod. No string parsing at evaluation
  * time and no dynamic evaluation, ever.** A formula arrives from the interface's

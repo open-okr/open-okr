@@ -5,7 +5,7 @@ import { workspaceMembers, workspaces } from "./workspaces.ts";
 /**
  * Time-boxed, customer-granted operator access (P8-T04a).
  *
- * Design: `docs/design/p8-t01b-support-access.md`. See migration 0089 for the
+ * Design: `docs/design/support-access.md`. See migration 0089 for the
  * policies, the one-live-session index, and the two check constraints that
  * stop a grant half-applying.
  *

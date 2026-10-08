@@ -206,6 +206,8 @@ export function useKeyResultCells(
           from: keyResult.targetValue,
           to: targetValue,
           baseline: keyResult.baselineValue,
+          direction: keyResult.direction,
+          keyResultKind: keyResult.kind,
         })
       ) {
         setEasing(targetValue);

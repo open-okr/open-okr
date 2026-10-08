@@ -463,8 +463,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "a thousand transactions plus their reference lookups. A bigger file " +
       "is what `pnpm import:csv` is for, and it reads a path rather than " +
       "holding a table in a request, so the bound is on the wizard's two " +
-      "actions and not on the command. IMPLEMENTATION-PLAN asks for a bound " +
-      "and names no figure; P6-T01b-b picked this one. A file above it is " +
+      "actions and not on the command. A file above it is " +
       "refused with the number rather than truncated, because half an " +
       "import nobody asked for is worse than none. No S-36 card names it " +
       "yet, so it has none here.",

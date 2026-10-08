@@ -1,6 +1,6 @@
 # OKR entry points: where a member goes to see and write an OKR
 
-> **Partly superseded on 1 October 2026.** Akmal decided that anybody can write an objective or key result at any time by default, and that an admin may restrict it. So §2's "keep every gate, and move the door" no longer holds: the door stays open unless a workspace closes it. §3.1, the sidebar regroup and the "OKRs" rename, is adopted in P9-T07a. §3.2's screen is built in P9-T07a and P9-T07b, extended with a diagram view. See [p9-t00-okr-writing.md](p9-t00-okr-writing.md) and [p9-t00-adaptable-practice.md](p9-t00-adaptable-practice.md) decision D5.
+> **Partly superseded on 1 October 2026.** Akmal decided that anybody can write an objective or key result at any time by default, and that an admin may restrict it. So §2's "keep every gate, and move the door" no longer holds: the door stays open unless a workspace closes it. §3.1, the sidebar regroup and the "OKRs" rename, is adopted in P9-T07a. §3.2's screen is built in P9-T07a and P9-T07b, extended with a diagram view. See [okr-writing.md](okr-writing.md) and [adaptable-practice.md](adaptable-practice.md) decision D5.
 
 Written after a usability complaint on 30 September 2026: the OKR surface is
 hard to navigate, there is no single place called OKR, and nothing on the
@@ -78,10 +78,10 @@ is a button on OKRs, on the goal page and on Review.
 the sidebar and the avatar menu agree with the registry. Every moved row needs
 its new door asserted there, or a screen goes dark and no test notices.
 
-**Drawn.** [12-okr-home](../stakeholder/mockups/png/12-okr-home.png) is the
-list, [12b-okr-create](../stakeholder/mockups/png/12b-okr-create.png) is the
+**Drawn.** [12-okr-home](../mockups/png/12-okr-home.png) is the
+list, [12b-okr-create](../mockups/png/12b-okr-create.png) is the
 create action in both its states. Sources in
-`docs/stakeholder/mockups/src/`. They illustrate this proposal and nothing
+`docs/mockups/src/`. They illustrate this proposal and nothing
 else: no specification cites them, and they are deleted if this is rejected.
 
 ### 3.2 OKRs becomes the screen the complaint asked for
@@ -156,37 +156,11 @@ And every other screen in the registry is still reachable from the sidebar
 or the avatar menu, as reachability.test.ts asserts
 ```
 
-## 5. What changes in the plan set if this is approved
+## 5. What was built
 
-| Document | Change |
-|---|---|
-| UIUX-PLAN §3 | The sidebar table above replaces the ASCII block, and `+ New` is specified rather than implied |
-| UIUX-PLAN §6 S-13 | Rewritten around tabs, inline key results, the create action and the blocked-phase panel |
-| UIUX-PLAN §6 S-14 | Gains the add-a-key-result row |
-| IMPLEMENTATION-PLAN | New tasks. Four look right: the sidebar regroup with its reachability assertions, the OKRs screen, the create-and-blocked-panel behaviour, the goal detail row |
-| METHOD.md | Nothing. That is the point of this shape |
-
-## 6. Open questions for the human
-
-1. **Rename Goals to OKRs?** The product calls them goals everywhere, including
-   the workspace terminology settings that let a workspace rename them. A
-   sidebar row saying OKR and a screen saying goal is the kind of split that
-   makes people ask which is which.
-2. **Mine, My team, Company as tabs.** `level` has four values, the fourth
-   being `department`. Three tabs need a rule for where department objectives
-   appear. Suggestion: My team covers `team` and `department`.
-3. **Check in as a row or a button.** Removing the row is the biggest single
-   reduction and also the most likely to be missed by somebody who has learned
-   where it is.
-4. **Does this belong in v1 or after the first release?** It is interface work
-   with no schema change, so it can land late. The counter-argument is that
-   first impressions of an OKR product are formed on exactly this screen.
-
-## 7. What was built, 1 October 2026 (P8-G12)
-
-Section 3.2 of this document is now the screen, and sections 3.1 and 3.3 are
-not. The sidebar regroup, the rename and the goal detail's add row are still
-proposals, and the four questions in section 6 are still open.
+Section 3.2 of this document is the OKRs screen, and section 3.1's sidebar
+regroup and the rename from Goals to OKRs were adopted with it. UIUX-PLAN §3
+and §6 S-13 are now the specification.
 
 | Asked for | Built as |
 |---|---|

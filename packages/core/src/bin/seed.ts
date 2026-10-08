@@ -1,22 +1,20 @@
 #!/usr/bin/env node
 /**
- * `pnpm db:seed`: fills the first workspace with demo content (P3-T17).
+ * `pnpm db:seed`: fills the first workspace with demo content.
  *
  * Meant for a fresh install: register through the setup wizard, then run this,
- * and the instance has an organisation running a real quarter instead of an
- * empty shell. The walkthrough that goes with it is
- * `docs/stakeholder/DEMO-SCRIPT.md`.
+ * and the instance has an organisation running a real year instead of an
+ * empty shell. The story it tells is `docs/scenarios/northwind-year`.
  *
  * Everything is written through the action registry, so a demo goal gets the
  * same access bindings, activity row, audit row and outbox row a real one does.
  * Idempotent: a workspace that already has company objectives is left alone.
  *
- * **It builds the Northwind year** (P9-T22c, the default since P9-T22c-e-c):
- * the scenario in `docs/scenarios/northwind-year` placed on the real
- * calendar, with every step dated before today true and nothing after it.
- * **`--quarter` builds the one-quarter demo instead**, the organisation the
- * walkthrough in `docs/stakeholder/DEMO-SCRIPT.md` follows: a quarter in
- * flight and a quarter finished, relative to today.
+ * **It builds the Northwind year** by default: the scenario in
+ * `docs/scenarios/northwind-year` placed on the real calendar, with every
+ * step dated before today true and nothing after it. **`--quarter` builds the
+ * smaller one-quarter demo instead**: a quarter in flight and a quarter
+ * finished, relative to today.
  */
 import { loadEnv } from "@openokr/config";
 import pg from "pg";
@@ -55,9 +53,10 @@ try {
   const result = await pool.query<{
     workspace_id: string;
     user_id: string;
+    member_id: string;
     name: string;
   }>(
-    `select w.id as workspace_id, w.name, wm.user_id
+    `select w.id as workspace_id, w.name, wm.user_id, wm.id as member_id
        from workspaces w
        join workspace_members wm on wm.workspace_id = w.id
       where w.deleted_at is null
@@ -81,6 +80,7 @@ try {
       pool,
       workspaceId: row.workspace_id,
       adminUserId: row.user_id,
+      adminMemberId: row.member_id,
     });
     write("");
     write(
@@ -88,6 +88,7 @@ try {
         ? "This workspace already has company objectives, so nothing was written."
         : `Done. ${year.events} events of the year written, as of ${year.today}.`,
     );
+    write("The story is docs/scenarios/northwind-year/README.md.");
     process.exit(0);
   }
 
@@ -128,8 +129,6 @@ try {
     for (const note of outcome.notes) {
       write(bullet(note));
     }
-    write("");
-    write("The walkthrough is docs/stakeholder/DEMO-SCRIPT.md.");
   }
 } finally {
   await pool.end();

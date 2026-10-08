@@ -474,6 +474,9 @@ async function loadGoalSnapshots<
       contributionStatement: goals.contributionStatement,
       standaloneReason: goals.standaloneReason,
       kind: goals.kind,
+      ownerKind: goals.ownerKind,
+      spaceId: goals.spaceId,
+      memberId: goals.memberId,
     })
     .from(goals)
     .where(
@@ -555,6 +558,14 @@ async function loadGoalSnapshots<
     hasParent: Boolean(row.parentGoalId ?? row.parentKeyResultId),
     contributionStatement: row.contributionStatement,
     standaloneReason: row.standaloneReason,
+    // OBJ-5's unit, read the way the stored verdict reads it: the owning
+    // space, the owning member, or the company.
+    unit:
+      row.ownerKind === "space" && row.spaceId
+        ? `space:${row.spaceId}`
+        : row.ownerKind === "member" && row.memberId
+          ? `member:${row.memberId}`
+          : "company",
     keyResults: children
       .filter((child) => child.goalId === row.id)
       .map((child) => ({

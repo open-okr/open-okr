@@ -444,6 +444,22 @@ describe("goals.publishDraftedCheckIn", () => {
     expect(rows[0]?.reviewer_member_id).toBe(secondMemberId);
   });
 
+  it("audits a person's own check-in as theirs, not as an applied proposal", async () => {
+    const wb = await workerDb();
+    const { goalId } = await goalWithKeyResult();
+    const published = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.publishDraftedCheckIn",
+      { goalId, status: "on_track", confidence: 0.7, narrative, values: [] },
+    )) as { id: string };
+    const { rows } = await wb.admin.query<{ payload: Record<string, unknown> }>(
+      `select payload from audit_events
+        where action = 'goals.publishDraftedCheckIn' and target_id = $1`,
+      [published.id],
+    );
+    expect(rows[0]?.payload).toMatchObject({ fromProposal: false });
+  });
+
   it("reuses the author's open draft rather than opening a second one", async () => {
     const wb = await workerDb();
     const { goalId } = await goalWithKeyResult();

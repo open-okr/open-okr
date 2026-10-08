@@ -1,5 +1,5 @@
 import { loadEnv } from "@openokr/config";
-import { DEMO_PERSONA_PASSWORD, DEMO_PERSONAS } from "@openokr/core";
+import { DEMO_PERSONA_PASSWORD, demoPersonasOn } from "@openokr/core";
 import { NextResponse } from "next/server";
 
 /**
@@ -29,8 +29,10 @@ export async function GET(): Promise<NextResponse> {
     if (env.OPENOKR_DEMO !== "on") {
       return NextResponse.json({ personas: [], password: null });
     }
+    // Only who has joined the year by today, in UTC as the seed reads it:
+    // somebody the story brings in later has no account yet.
     return NextResponse.json({
-      personas: DEMO_PERSONAS,
+      personas: demoPersonasOn(new Date().toISOString().slice(0, 10)),
       password: DEMO_PERSONA_PASSWORD,
     });
   } catch {

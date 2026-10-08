@@ -1,6 +1,6 @@
 /**
  * The OKR tree in the client cache, and the changes made to it before the
- * server answers (P9-T06c, docs/design/p9-t00-okr-writing.md §6).
+ * server answers (P9-T06c, docs/design/okr-writing.md §6).
  *
  * Pure: every function takes a tree and returns a new one, so the hook can
  * keep the tree it had and put it back when the server refuses. Shared with

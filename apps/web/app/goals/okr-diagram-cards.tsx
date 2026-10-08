@@ -25,7 +25,7 @@ import { keyResultHandle, type moveTargets } from "./okr-layout.ts";
 
 /**
  * The diagram's cards (P9-T09a, edited in place since P9-T10a,
- * docs/design/p9-t00-okr-writing.md §5.3).
+ * docs/design/okr-writing.md §5.3).
  *
  * **The list's own cells and writes**, in a card's shape: a title edited
  * where it is read (double-click it, or Enter on the focused card), a value

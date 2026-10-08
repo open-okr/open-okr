@@ -26,6 +26,7 @@ import {
   GOAL_CLOSE_DECISIONS,
   GOAL_KINDS,
   goals,
+  includeDeleted,
   keyResultDependencies,
   keyResults,
   keyResultTargetChanges,
@@ -75,6 +76,7 @@ import {
   REVIEW_PARTS,
   type ResolvedThresholds,
   type ReviewPart,
+  type ReviewStageKey,
   RITUALS,
   type RitualWeekday,
   ROOT_CAUSE_OTHER,
@@ -1365,7 +1367,7 @@ export const advanceStage = defineWriteAction({
           if (unexplained.length > 0) {
             throw new OperationError(
               "not_found",
-              `Cannot close scoring: ${unexplained.join(", ")} ${unexplained.length === 1 ? "is a committed key result" : "are committed key results"} below 1.0 with no explanation yet. Grade ${unexplained.length === 1 ? "it" : "each"} with a line on why.`,
+              `Cannot close scoring: ${unexplained.join(", ")} ${unexplained.length === 1 ? "is a committed key result" : "are committed key results"} below what ${unexplained.length === 1 ? "it" : "they"} promised, with no explanation yet. Grade ${unexplained.length === 1 ? "it" : "each"} with a line on why.`,
             );
           }
         }
@@ -2425,6 +2427,22 @@ export const confirmSessionConfidence = defineWriteAction({
           );
         confirmId = existing.id;
       } else {
+        // What it held just before the room confirmed it, so a fall into the
+        // low band is seen here as it is in a check-in (§7.2 step 2). Read
+        // before the key result is updated below; a second confirmation in
+        // the same session keeps the first one's, which is the value the
+        // session started from.
+        const [before] = await tx
+          .select({ confidence: keyResults.confidence })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, workspaceId),
+              eq(keyResults.id, input.keyResultId),
+            ),
+          )
+          .limit(1);
         confirmId = crypto.randomUUID();
         await tx.insert(sessionConfidences).values({
           id: confirmId,
@@ -2432,6 +2450,7 @@ export const confirmSessionConfidence = defineWriteAction({
           sessionId: input.sessionId,
           keyResultId: input.keyResultId,
           confirmedConfidence: String(input.confidence),
+          previousConfidence: before?.confidence ?? null,
           teamAverage,
           whatChanged: input.whatChanged,
           confirmedById: memberId,
@@ -5345,6 +5364,13 @@ async function requireQuarterly(
   memberId: string,
   sessionId: string,
   requires: number,
+  /**
+   * The §8.1 stage a write belongs to. Where the review and the retrospective
+   * are held apart (P9-T20b-a), a write to the other half is refused: the
+   * minutes and the close read each stage from its own half, so a record
+   * written to the wrong one would never be read.
+   */
+  stage?: ReviewStageKey,
 ) {
   const session = await requireSessionAccess(
     tx,
@@ -5357,6 +5383,18 @@ async function requireQuarterly(
     throw new OperationError(
       "not_found",
       "Scoring belongs to a quarterly review.",
+    );
+  }
+  if (
+    stage !== undefined &&
+    session.reviewPart !== null &&
+    !reviewStageKeysFor(session.reviewPart).includes(stage)
+  ) {
+    throw new OperationError(
+      "forbidden",
+      session.reviewPart === "review"
+        ? "That stage belongs to the retrospective, which this workspace holds as a session of its own. Record it there."
+        : "That stage belongs to the review, which this workspace holds as a session of its own. Record it there.",
     );
   }
   return session;
@@ -5389,6 +5427,7 @@ export const scoreKeyResult = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "score",
       );
 
       // The key result is authorised through its objective, which is where
@@ -5518,7 +5557,7 @@ export const scoreKeyResult = defineWriteAction({
 
 // ---------------------------------------------------------------------------
 // Stage three: objective narratives, and stage four: recognition (METHOD.md
-// §8.1, p4-t00-session-design.md §4.4 and §4.5, P4-T10c)
+// §8.1, sessions.md §4.4 and §4.5, P4-T10c)
 // ---------------------------------------------------------------------------
 
 /** Editor JSON for the current rich text schema, or null. */
@@ -5545,8 +5584,8 @@ const narrativeBody = z
  * out loud and this only holds the three conditions that are easy to forget.
  */
 /**
- * The committed key results in a review's scope that came in below 1.0 and
- * have no explanation yet (§8.3, P9-T20c), by title.
+ * The committed key results in a review's scope that came in below what a
+ * commitment promised and have no explanation yet (§8.3, P9-T20c), by title.
  *
  * Graded is explained: a grade carries its one line on why. Ungraded is a
  * miss unless §2.10's computed score already says it met the promise, which
@@ -5599,13 +5638,17 @@ async function unexplainedCommittedMissesInTx(
     ungraded.map((row) => row.id),
     new Date(),
   );
+  // What a committed key result promised (§2.8), under the rules this cycle
+  // is read by, the same figure the scoring screen calls met.
+  const { thresholds } = await cycleRulesInTx(tx, workspaceId, session.cycleId);
+  const expected = thresholds["scoring.committedExpectedScore"];
   return committed
     .filter((row) => {
       const grade = byKeyResult.get(row.id);
       if (grade) {
-        return Number(grade.score) < 1 && grade.reason.trim() === "";
+        return Number(grade.score) < expected && grade.reason.trim() === "";
       }
-      return (computed.get(row.id) ?? 0) < 1;
+      return (computed.get(row.id) ?? 0) < expected;
     })
     .map((row) => row.title);
 }
@@ -5677,6 +5720,7 @@ export const passMic = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "narratives",
       );
       // §4.4 gives the pass-the-mic control to the facilitator. The write-access
       // floor here is `edit` for every active member (P3-T16), so `edit` alone
@@ -5842,6 +5886,7 @@ export const setNarrative = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "narratives",
       );
       // Not the facilitator's alone. §8.1 stage 3 is owner by owner, and an
       // objective's champion is often not the person running the review: a
@@ -5991,6 +6036,7 @@ export const giveKudos = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "recognition",
       );
 
       if (input.toMemberId === memberId) {
@@ -6269,7 +6315,7 @@ export const readRecognition = defineReadAction({
 
 // ---------------------------------------------------------------------------
 // Stage five: the team retro, and stage six: the management retro (METHOD.md
-// §8.1, §8.7, p4-t00-session-design.md §4.6 and §4.7, P4-T11a)
+// §8.1, §8.7, sessions.md §4.6 and §4.7, P4-T11a)
 // ---------------------------------------------------------------------------
 
 /**
@@ -6393,6 +6439,7 @@ export const addRetroNote = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "team_retro",
       );
 
       const [row] = await tx
@@ -6455,6 +6502,7 @@ export const removeRetroNote = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "team_retro",
       );
 
       const [note] = await tx
@@ -6553,6 +6601,7 @@ export const castRetroVote = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "team_retro",
       );
       await requireTeamVoting(tx, workspaceId, session.spaceId);
 
@@ -6966,7 +7015,7 @@ export const readManagementRetro = defineReadAction({
 });
 // ---------------------------------------------------------------------------
 // Stage seven: root causes, and stage eight: process health (METHOD.md §8.4 and
-// §8.5, p4-t00-session-design.md §4.8, P4-T11b)
+// §8.5, sessions.md §4.8, P4-T11b)
 // ---------------------------------------------------------------------------
 
 /**
@@ -7067,6 +7116,7 @@ export const setRootCause = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "root_cause",
       );
 
       const { thresholds } = resolveRhythm(
@@ -7226,7 +7276,7 @@ export const readRootCauses = defineReadAction({
       async (rawTx) => {
         const tx = rawTx as unknown as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
-        await requireQuarterly(
+        const session = await requireQuarterly(
           tx,
           context.workspaceId,
           memberId,
@@ -7234,17 +7284,20 @@ export const readRootCauses = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const rhythmRow = await readRhythmRow(tx, context.workspaceId);
-        const { thresholds } = resolveRhythm(rhythmRow);
+        // The rules the review's cycle is read by (§12, P9-T14b): a closed
+        // cycle keeps the ones it closed with.
+        const { thresholds, practice } = await cycleRulesInTx(
+          tx,
+          context.workspaceId,
+          session.cycleId,
+        );
         const missed = await missedKeyResultsInTx(
           tx,
           context.workspaceId,
           input.sessionId,
           thresholds,
         );
-        const required =
-          practiceFromRow(rhythmRow).practice["review.rootCauses"] !==
-          "optional";
+        const required = practice["review.rootCauses"] !== "optional";
 
         const named = await tx
           .select({
@@ -7357,6 +7410,7 @@ export const submitProcessHealth = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "process_health",
       );
 
       const keys = new Set(input.scores.map((entry) => entry.statementKey));
@@ -7569,7 +7623,7 @@ export const readProcessHealth = defineReadAction({
 
 // ---------------------------------------------------------------------------
 // Stage seven's second half: the diagnostic, and stage nine: keep, modify or
-// abandon (METHOD.md §8.6 and §8.8, p4-t00-session-design.md §4.8, P4-T11c-a)
+// abandon (METHOD.md §8.6 and §8.8, sessions.md §4.8, P4-T11c-a)
 // ---------------------------------------------------------------------------
 
 /**
@@ -7699,12 +7753,15 @@ export const recordDiagnostic = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "root_cause",
       );
 
-      const { thresholds } = resolveRhythm(
-        await readRhythmRow(tx, workspaceId),
+      const { thresholds } = await cycleRulesInTx(
+        tx,
+        workspaceId,
+        session.cycleId,
       );
-      const { cycle, measured, survey } = await diagnosticInputsInTx(
+      const { cycle, committed, measured, survey } = await diagnosticInputsInTx(
         tx,
         workspaceId,
         session,
@@ -7716,9 +7773,14 @@ export const recordDiagnostic = defineWriteAction({
       // diagnostic built on a missing answer is worse than no diagnostic,
       // because it reads as evidence.
       if (cycle === null) {
+        // §8.6's cycle score is the aspirational key results' alone. A review
+        // that graded only commitments has no such score to read, which is
+        // not the same as one still waiting for its grades.
         throw new OperationError(
           "not_found",
-          "The diagnostic needs a cycle score. Grade the aspirational key results first.",
+          committed !== null
+            ? `The diagnostic reads the aspirational key results' scores (METHOD.md §8.6), and this review graded only committed ones. Their result is the share of commitments met: ${Math.round(committed * 100)}%.`
+            : "The diagnostic needs a cycle score. Grade the aspirational key results first.",
         );
       }
       const delivered = cycle >= thresholds["sessions.diagnosticCycleScore"];
@@ -7864,8 +7926,10 @@ export const readDiagnostic = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const { thresholds } = resolveRhythm(
-          await readRhythmRow(tx, context.workspaceId),
+        const { thresholds } = await cycleRulesInTx(
+          tx,
+          context.workspaceId,
+          session.cycleId,
         );
         const inputs = await diagnosticInputsInTx(
           tx,
@@ -7967,6 +8031,7 @@ export const decideObjective = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "keep_modify_abandon",
       );
 
       const [inScope] = await tx
@@ -8170,7 +8235,7 @@ export const readReset = defineReadAction({
           );
 
         const proposesKeep =
-          practiceFromRow(await readRhythmRow(tx, context.workspaceId))
+          (await cycleRulesInTx(tx, context.workspaceId, session.cycleId))
             .practice["close.carryForward"] !== "notProposed";
         const objectives = rows.map((row) => {
           const decided = byGoal.get(row.goalId);
@@ -8260,6 +8325,7 @@ export const captureLearning = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "learnings",
       );
       if (!session.cycleId) {
         // A learning belongs to a cycle: §8.9 feeds it into the next one's input
@@ -8453,6 +8519,7 @@ export const addReviewAction = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "actions",
       );
 
       // Active only. An action owned by a suspended member is an action with
@@ -8532,6 +8599,7 @@ export const completeReviewAction = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "actions",
       );
 
       const [action] = await tx
@@ -8933,8 +9001,12 @@ export const readMinutes = defineReadAction({
         // review's.
         const halves = await reviewHalvesInTx(tx, workspaceId, input.sessionId);
 
-        const { thresholds } = resolveRhythm(
-          await readRhythmRow(tx, workspaceId),
+        // A closed cycle's minutes read the rules it closed with (§12,
+        // P9-T14b), so a threshold moved later does not rewrite them.
+        const { thresholds } = await cycleRulesInTx(
+          tx,
+          workspaceId,
+          session.cycleId,
         );
         // Each key result against its own kind's threshold (§8.4, P9-T20c).
         const causeThresholds = thresholds["scoring.rootCauseThreshold"];
@@ -9307,6 +9379,7 @@ export const revealObjectiveScore = defineWriteAction({
         memberId,
         input.sessionId,
         ACCESS_LEVELS.edit,
+        "score",
       );
       // §8.3 has the room grading and the room revealing *together*, which in
       // practice is the facilitator saying now. The write-access floor here is
@@ -9554,7 +9627,7 @@ export const readScoringStatus = defineReadAction({
      * plain average and the weighted average are the same figure. Running
      * through the reveals also makes the acceptance criterion literal, because
      * revealing is then the thing that moves it. Agung decided this on
-     * 26 August 2026, and p4-t00-session-design.md §4.3 is corrected to match.
+     * 26 August 2026, and sessions.md §4.3 is corrected to match.
      */
     cycleScore: z.number().nullable(),
     /**
@@ -9629,9 +9702,10 @@ export const readScoringStatus = defineReadAction({
             activeOnly(
               keyResults,
               eq(keyResults.workspaceId, context.workspaceId),
-              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
-              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
-              isNull(goals.closedAt),
+              isNull(goals.deletedAt),
+              // The same objectives the stage's own close judges, so a
+              // company review lists every key result it then asks about.
+              ...reviewObjectiveConditions(context.workspaceId, session),
             ),
           )
           .orderBy(goals.position, goals.createdAt, keyResults.position);
@@ -9689,6 +9763,7 @@ export const readScoringStatus = defineReadAction({
                   fromValue: keyResultTargetChanges.fromValue,
                   eased: keyResultTargetChanges.eased,
                   reason: keyResultTargetChanges.reason,
+                  midCycle: keyResultTargetChanges.midCycle,
                 })
                 .from(keyResultTargetChanges)
                 .where(
@@ -9702,11 +9777,22 @@ export const readScoringStatus = defineReadAction({
                   ),
                 )
                 .orderBy(keyResultTargetChanges.changedAt);
+        // The original is read as the scorecard reads it: the target the plan
+        // published with, from the first change after publication, or the
+        // first change of all where none came after. It is shown only where
+        // the promise moved: after publication, or eased at any point. An
+        // edit made while drafting that eased nothing is the plan being
+        // written, and a close that called its first draft "the original"
+        // would be inventing a change.
         const firstTarget = new Map<string, number>();
+        const publishedTarget = new Map<string, number>();
         const easedBecause = new Map<string, string | null>();
         for (const move of moves) {
           if (!firstTarget.has(move.keyResultId)) {
             firstTarget.set(move.keyResultId, Number(move.fromValue));
+          }
+          if (move.midCycle && !publishedTarget.has(move.keyResultId)) {
+            publishedTarget.set(move.keyResultId, Number(move.fromValue));
           }
           if (move.eased) {
             easedBecause.set(move.keyResultId, move.reason);
@@ -9762,9 +9848,16 @@ export const readScoringStatus = defineReadAction({
             baseline: row.baseline === null ? null : Number(row.baseline),
             target: row.target === null ? null : Number(row.target),
             originalTarget: (() => {
-              const first = firstTarget.get(row.keyResultId);
+              const moved =
+                publishedTarget.has(row.keyResultId) ||
+                easedBecause.has(row.keyResultId);
+              const first =
+                publishedTarget.get(row.keyResultId) ??
+                firstTarget.get(row.keyResultId);
               const now = row.target === null ? null : Number(row.target);
-              return first === undefined || first === now ? null : first;
+              return !moved || first === undefined || first === now
+                ? null
+                : first;
             })(),
             easedBecause: easedBecause.get(row.keyResultId) ?? null,
             current: row.current === null ? null : Number(row.current),
@@ -9811,12 +9904,34 @@ export const readScoringStatus = defineReadAction({
         // a running average that counted unrevealed grades would be the hidden
         // objective score wearing a different label on any review with one
         // objective and even weights.
+        // A grade whose key result is no longer on the screen, because its
+        // objective closed or was removed after it was graded, keeps the kind
+        // it was graded as rather than being counted as aspirational.
+        const offScreen = [...byKeyResult.keys()].filter(
+          (keyResultId) => !kindOf.has(keyResultId),
+        );
+        if (offScreen.length > 0) {
+          const kinds = await tx
+            .select({ keyResultId: keyResults.id, kind: goals.kind })
+            .from(keyResults)
+            .innerJoin(goals, eq(goals.id, keyResults.goalId))
+            .where(
+              includeDeleted(
+                keyResults,
+                eq(keyResults.workspaceId, context.workspaceId),
+                inArray(keyResults.id, offScreen),
+              ),
+            );
+          for (const row of kinds) {
+            kindOf.set(row.keyResultId, row.kind);
+          }
+        }
         const revealed = [...byKeyResult.entries()]
           .filter(([, entry]) => entry.revealed)
-          .map(([keyResultId, entry]) => ({
-            score: entry.score,
-            kind: kindOf.get(keyResultId) ?? ("aspirational" as const),
-          }));
+          .flatMap(([keyResultId, entry]) => {
+            const kind = kindOf.get(keyResultId);
+            return kind === undefined ? [] : [{ score: entry.score, kind }];
+          });
         const average = cycleScore(revealed.map((entry) => entry.score));
         const aspirationalAverage = cycleScore(
           revealed

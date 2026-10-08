@@ -5,7 +5,7 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
  * Alignment against a real database (P3-T09, METHOD.md §5, design
- * `p3-t00-alignment-engine.md` §6 to §8).
+ * `alignment-engine.md` §6 to §8).
  *
  * The arithmetic is covered by the golden masters in `alignment-golden.test.ts`,
  * which read their matrices out of the design document. What is checked here is

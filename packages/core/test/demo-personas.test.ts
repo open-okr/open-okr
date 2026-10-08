@@ -90,6 +90,19 @@ describe("a workspace that is not a demo", () => {
     );
     expect(rows[0]?.n).toBe(0);
   });
+
+  it("is refused though it holds company objectives of its own", async () => {
+    // A real organisation's plan: company objectives, none of them the demo's.
+    const goal = await callAction(await context(), "goals.create", {
+      title: "Win the public sector tender this year",
+      timeframe: { startsOn: "2027-01-01", endsOn: "2027-12-31" },
+      level: "company",
+      ownerKind: "workspace",
+      weight: 1,
+    });
+    await expect(prepare()).rejects.toBeInstanceOf(OperationError);
+    await callAction(await context(), "goals.delete", { id: goal.id });
+  });
 });
 
 describe("a seeded demo workspace", () => {

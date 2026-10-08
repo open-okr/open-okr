@@ -2,7 +2,12 @@
 
 import "@xyflow/react/dist/style.css";
 import type { GoalLevel } from "@openokr/db";
-import { useIsMutating, useQueryClient, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  useIsMutating,
+  useQueryClient,
+  useTranslations,
+} from "@openokr/ui";
 import {
   Background,
   Controls,
@@ -49,7 +54,7 @@ import {
 } from "./okr-layout.ts";
 
 /**
- * The OKRs drawn as a tree (P9-T09a, docs/design/p9-t00-okr-writing.md §5).
+ * The OKRs drawn as a tree (P9-T09a, docs/design/okr-writing.md §5).
  *
  * The cycle at the root, its objectives below it with their key results
  * stacked inside each card, an objective aligned to a key result hanging from
@@ -688,6 +693,39 @@ function LiveDiagram({
           >
             {t("okrList.discard")}
           </button>
+        </div>
+      ) : null}
+      {okr.problem ? (
+        <p
+          role="alert"
+          className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"
+        >
+          {okr.problem}
+        </p>
+      ) : null}
+      {/* An edit made here can meet a change made elsewhere, as one made in
+          the list can, and the reader decides which stands rather than
+          watching their own quietly roll back. */}
+      {okr.conflict ? (
+        <div
+          role="alert"
+          data-testid="okr-conflict"
+          className="flex flex-wrap items-center gap-2 rounded-control border border-warn-dot bg-warn-bg px-3 py-2 text-xs text-ink-2"
+        >
+          <span className="min-w-0 flex-1">
+            {t("okrTree.changedSinceYouRead", {
+              name: okr.conflict.conflict.changedBy ?? t("okrTree.somebody"),
+              value: Object.values(okr.conflict.conflict.current)
+                .map((value) => String(value ?? ""))
+                .join(", "),
+            })}
+          </span>
+          <Button type="button" size="sm" onClick={okr.keepMine}>
+            {t("okrTree.keepMine")}
+          </Button>
+          <Button type="button" size="sm" onClick={okr.takeTheirs}>
+            {t("okrTree.takeTheirs")}
+          </Button>
         </div>
       ) : null}
       {linkProblem ? (

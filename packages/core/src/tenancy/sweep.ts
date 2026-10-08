@@ -1,7 +1,7 @@
 /**
  * The closure retention sweep (P8-T02c).
  *
- * Design: `docs/design/p8-t01a-tenant-lifecycle.md` §6.
+ * Design: `docs/design/tenant-lifecycle.md` §6.
  *
  * **It deletes nothing by default, and that is the whole design.** P7-T08c
  * set the precedent for every retention decision in this product:

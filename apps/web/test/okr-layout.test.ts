@@ -13,7 +13,7 @@ import {
 import type { OkrTree } from "../lib/okr-tree/cache.ts";
 
 /**
- * The OKR diagram's layout (P9-T09a, docs/design/p9-t00-okr-writing.md §5.2).
+ * The OKR diagram's layout (P9-T09a, docs/design/okr-writing.md §5.2).
  *
  * The claims the design makes of the picture, each checked on the boxes the
  * layout returns: siblings in the list's order, an objective aligned to a key

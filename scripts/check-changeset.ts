@@ -36,7 +36,7 @@ const head = process.argv[3] ?? "HEAD";
  * **Every entry is something a running instance cannot observe.** Tests,
  * plans, runbooks, the editor's own configuration. A path is on this list
  * because changing it cannot alter what a customer sees, not because
- * changing it is unimportant: `docs/development-plan` is where this product
+ * changing it is unimportant: `docs/specification` is where this product
  * is decided and it still ships nothing.
  *
  * Deliberately short. A long exemption list is a gate that has been argued

@@ -5,7 +5,7 @@ import { getTranslations } from "../lib/translations";
 /**
  * The Work Map's context strip, title block and scope tabs (S-01, P3-T11).
  *
- * The mockup at `docs/stakeholder/mockups/png/01-work-map.png` is what this
+ * The mockup at `docs/mockups/png/01-work-map.png` is what this
  * matches. Reference, not authority: every figure here is read from an action,
  * and the two the mockup shows that no table can answer yet, the streak and the
  * blocker text, are absent rather than invented.

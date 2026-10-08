@@ -13,7 +13,7 @@ import type { OkrDetail } from "../lib/okr-tree/actions.ts";
 import type { OkrTree } from "../lib/okr-tree/cache.ts";
 
 /**
- * The OKR drawer (P9-T08a, docs/design/p9-t00-okr-writing.md §6).
+ * The OKR drawer (P9-T08a, docs/design/okr-writing.md §6).
  *
  * **The real list and drawer, rendered together in jsdom**, with the server
  * actions stubbed, because the claims here are about the two agreeing: a
@@ -523,6 +523,30 @@ describe("checking in", () => {
       expect.objectContaining({
         kind: "checkIn",
         values: [{ keyResultId: "k", done: true }],
+      }),
+    );
+  });
+
+  test("records a first baseline of zero, though the key result already reads zero (§2.10)", async () => {
+    await render({
+      address: "?okr=g&tab=check-in",
+      keyResults: [
+        keyResult({ kind: "baseline", doneAt: null, currentValue: 0 }),
+      ],
+    });
+    await fill(
+      inDrawer(`Value for ${KR} in this check-in`) as HTMLInputElement,
+      "0",
+    );
+    await fill(
+      form()?.querySelector("textarea") as HTMLTextAreaElement,
+      "Measured the backlog for the first time: none waiting.",
+    );
+    await submit();
+    expect(runOkrMutation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "checkIn",
+        values: [{ keyResultId: "k", value: 0 }],
       }),
     );
   });

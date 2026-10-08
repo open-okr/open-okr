@@ -288,6 +288,48 @@ describe("the Champion's five", () => {
     expect(said(nudges, "confidence.critical")).toEqual([secondMemberId]);
   });
 
+  it("reads a fall in the first session from what the key result held before it", async () => {
+    const wb = await workerDb();
+    const goalId = await goal({ cycleId: planningCycleId, inSpace: true });
+    const krId = await keyResult(goalId);
+    // Drafted at 0.8, then scored at 0.2 in the first session it meets.
+    await wb.admin.query(
+      "update key_results set confidence = 0.8 where id = $1",
+      [krId],
+    );
+    const session = (await call("sessions.create", {
+      spaceId,
+      kind: "weekly",
+      title: "Weekly check-in",
+      scheduledFor: new Date().toISOString(),
+      facilitatorId: ownerMemberId,
+    })) as { id: string };
+    await call("sessions.open", { id: session.id });
+    await call("sessions.castVote", {
+      sessionId: session.id,
+      keyResultId: krId,
+      confidence: 0.2,
+    });
+    await call("sessions.revealVotes", {
+      sessionId: session.id,
+      keyResultId: krId,
+    });
+    await call("sessions.confirmConfidence", {
+      sessionId: session.id,
+      keyResultId: krId,
+      confidence: 0.2,
+      whatChanged: "The launch partner pulled out",
+    });
+    const nudges = await read((tx) =>
+      dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: new Date(),
+        thresholds,
+      }),
+    );
+    expect(said(nudges, "confidence.critical")).toEqual([ownerMemberId]);
+  });
+
   it("reads a fall from a check-in's snapshot", async () => {
     const goalId = await goal({ cycleId: planningCycleId, inSpace: true });
     const krId = await keyResult(goalId);
@@ -434,20 +476,22 @@ describe("the Champion's five", () => {
   });
 
   it("cycle.phase_blocked tells the facilitator when a window closes on an unfinished phase", async () => {
-    // Q1 2030 starts on 1 January; phases 1 and 2 are due two weeks before.
+    // Q1 2030 starts on 1 January; §2.4 runs phase 2 two weeks before, so it
+    // is due one week before, on 25 December.
     const closing = await read((tx) =>
       duePhaseBlockedNudges(tx, {
         workspaceId,
-        now: new Date("2029-12-18T10:00:00Z"),
+        now: new Date("2029-12-25T10:00:00Z"),
         timeZone: "UTC",
         thresholds,
       }),
     );
     expect(said(closing, "cycle.phase_blocked")).toEqual([ownerMemberId]);
+    // Two weeks out closes nothing any more.
     const otherDay = await read((tx) =>
       duePhaseBlockedNudges(tx, {
         workspaceId,
-        now: new Date("2029-12-16T10:00:00Z"),
+        now: new Date("2029-12-18T10:00:00Z"),
         timeZone: "UTC",
         thresholds,
       }),
