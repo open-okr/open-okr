@@ -655,6 +655,34 @@ describe("a snooze", () => {
   });
 });
 
+describe("Nudge volume", () => {
+  it("counts a nudge held for quiet hours under why it stayed quiet (UAT BUG-015)", async () => {
+    const wb = await workerDb();
+    // One delivered now, one waiting five hours for the member's night to end:
+    // the shape a run inside quiet hours writes (see "defers an ordinary
+    // nudge" above), on the real clock the volume card reads.
+    await wb.admin.query(
+      `insert into nudges
+         (id, workspace_id, kind, subject_type, subject_id,
+          recipient_member_id, rule_key, channel, scheduled_for, sent_at)
+       values (gen_random_uuid(), $1, 'rhythm', 'goal', $2, $3,
+               'checkin.due', 'in_app', now(), now()),
+              (gen_random_uuid(), $1, 'rhythm', 'goal', $2, $3,
+               'checkin.overdue', 'in_app', now() + interval '5 hours', null)`,
+      [workspaceId, goalId, ownerMemberId],
+    );
+    const volume = await callAction(
+      { pool: wb.appPool, ...context() },
+      "nudges.volume",
+      { days: 30 },
+    );
+    expect(volume.suppressionReasons).toContainEqual({
+      reason: "quiet_hours",
+      count: 1,
+    });
+  });
+});
+
 describe("a simulated month", () => {
   it("stays under the §11 weekly ceiling for every member", async () => {
     const wb = await workerDb();

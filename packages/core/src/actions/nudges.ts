@@ -14,7 +14,7 @@ import {
   type ResolvedThresholds,
   TRIGGER_CATALOGUE,
 } from "@openokr/method";
-import { and, count, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNotNull, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -440,6 +440,26 @@ export const nudgeVolume = defineReadAction({
           )
           .groupBy(nudges.suppressedReason);
 
+        // **Held for quiet hours** (UAT BUG-015). A nudge inside the member's
+        // quiet hours is not suppressed: it is recorded now and delivered when
+        // the window ends, so it carries no reason and only its later
+        // \`scheduled_for\` says it waited. Counted here so the card that
+        // explains the silence names quiet hours too.
+        const [deferred] = await tx
+          .select({ total: count(nudges.id) })
+          .from(nudges)
+          .where(
+            activeOnly(
+              nudges,
+              and(
+                eq(nudges.workspaceId, context.workspaceId),
+                gte(nudges.scheduledFor, since),
+                isNull(nudges.suppressedReason),
+                sql`${nudges.scheduledFor} > ${nudges.createdAt} + interval '1 minute'`,
+              ),
+            ),
+          );
+
         const byMember = await tx
           .select({
             memberId: nudges.recipientMemberId,
@@ -483,11 +503,21 @@ export const nudgeVolume = defineReadAction({
               sentThisWeek: row.sent,
             }))
             .sort((a, b) => b.sentThisWeek - a.sentThisWeek),
-          suppressionReasons: byReason
-            .map((row) => ({
-              reason: row.reason ?? "unknown",
-              count: row.total,
-            }))
+          suppressionReasons: [
+            ...[
+              ...byReason,
+              ...(deferred && deferred.total > 0
+                ? [{ reason: "quiet_hours", total: deferred.total }]
+                : []),
+            ]
+              .reduce((tally, row) => {
+                const reason = row.reason ?? "unknown";
+                tally.set(reason, (tally.get(reason) ?? 0) + row.total);
+                return tally;
+              }, new Map<string, number>())
+              .entries(),
+          ]
+            .map(([reason, total]) => ({ reason, count: total }))
             .sort((a, b) => b.count - a.count),
         };
       },
