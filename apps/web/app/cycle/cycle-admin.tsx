@@ -75,7 +75,7 @@ export function CycleAdmin({
   };
 
   return (
-    <Card>
+    <Card id="cycle-admin">
       <CardHeader>
         <div className="flex min-w-0 flex-col">
           <h2 className="text-sm font-bold text-ink">
