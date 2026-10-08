@@ -230,6 +230,12 @@ async function CheckInForGoal({
       ? await callAction(context, "goals.startCheckIn", { goalId })
       : null;
 
+  // Due by the goal's own date, not only by the reader's due list (UAT
+  // BUG-012). \`stillDue\` asks whether the goal is in the reader's walker,
+  // which only ever holds goals they champion, so anybody else opening a due
+  // goal was told "This goal is not due" about a date that had passed.
+  const dueHere = stillDue || (goal.daysPastDue ?? -1) >= 0;
+
   const votes: VoteState[] = [];
   for (const keyResult of goal.keyResults) {
     const state = await callAction(context, "goals.readVotes", {
@@ -256,13 +262,13 @@ async function CheckInForGoal({
         <Card>
           <CardHeader className="justify-between">
             <h2 className="text-sm font-bold text-ink">{goal.title}</h2>
-            <Chip tone={stillDue ? "neutral" : "ok"}>
-              {stillDue ? t("checkIn.notYoursToReport") : t("checkIn.reported")}
+            <Chip tone={dueHere ? "neutral" : "ok"}>
+              {dueHere ? t("checkIn.notYoursToReport") : t("checkIn.reported")}
             </Chip>
           </CardHeader>
           <CardBody className="flex flex-col gap-1.5">
             <p className="text-sm text-ink-3">
-              {stillDue
+              {dueHere
                 ? t("checkIn.youCanReadNotPost")
                 : goal.nextCheckInOn
                   ? t("checkIn.notDueNextOn", { date: goal.nextCheckInOn })
