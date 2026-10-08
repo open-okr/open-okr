@@ -53,6 +53,8 @@ export async function createGoal(
   // Absent where the workspace uses one kind; `goals.create` then uses its
   // default. Anything but the two words is left to that default too.
   const kind = String(formData.get("kind") ?? "");
+  // "" is "No space": the objective belongs to the workspace (UAT BUG-014).
+  const spaceId = String(formData.get("spaceId") ?? "");
 
   if (title === "") {
     const { t } = await getTranslations();
@@ -64,7 +66,9 @@ export async function createGoal(
       cycleId,
       title,
       level: level as "company" | "department" | "team" | "individual",
-      ownerKind: "workspace",
+      ...(spaceId === ""
+        ? { ownerKind: "workspace" as const }
+        : { ownerKind: "space" as const, spaceId }),
       // Omitted rather than sent empty when nobody was chosen (P8-G13d):
       // `goals.create` then names whoever is drafting, and an empty string
       // would fail the uuid schema instead.
