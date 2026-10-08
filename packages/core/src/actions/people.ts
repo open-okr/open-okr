@@ -14,6 +14,7 @@
  * restore, all refuse to act on the workspace's last full-access holder
  * (`isLastFullAccessHolder` in `../people/lifecycle.ts`).
  */
+
 import {
   accessBindings,
   activeOnly,
@@ -22,6 +23,7 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
+import { EMAIL_PATTERN } from "@openokr/formats";
 import { and, eq, isNull, type SQL, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -1213,7 +1215,7 @@ export const importMember = defineWriteAction({
   input: z.object({
     name: z.string().trim().min(1).max(200),
     /** The address the source system knew them by. */
-    email: z.email().max(320),
+    email: z.email({ pattern: EMAIL_PATTERN }).max(320),
     title: z.string().trim().max(200).optional(),
     timezone: z.string().trim().max(64).optional(),
     /** Required: this action exists for imports and for nothing else. */

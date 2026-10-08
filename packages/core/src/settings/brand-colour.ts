@@ -1,3 +1,5 @@
+import { HEX_COLOUR_PATTERN } from "@openokr/formats";
+
 /**
  * A workspace's brand colour, turned into the brand token family (completeness
  * review M-14, UIUX-PLAN §2, docs/design/colour-system.md).
@@ -32,7 +34,7 @@
  * Pure: no database, no DOM. The web app turns the palette into CSS.
  */
 
-const HEX = /^#[0-9a-fA-F]{6}$/;
+const HEX = HEX_COLOUR_PATTERN;
 
 /** The tokens a workspace's colour sets, in `tokens.css` order. */
 export const BRAND_TOKENS = [

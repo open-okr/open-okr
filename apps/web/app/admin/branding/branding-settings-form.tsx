@@ -1,5 +1,6 @@
 "use client";
 
+import { HEX_COLOUR_HTML_PATTERN } from "@openokr/formats";
 import { Button, Card, CardBody, useTranslations } from "@openokr/ui";
 import { type FormEvent, startTransition, useActionState } from "react";
 import { submitBranding } from "./actions.ts";
@@ -98,7 +99,7 @@ export function BrandingSettingsForm({ status }: { status: BrandingStatus }) {
                 name="primaryColor"
                 placeholder="#336699"
                 defaultValue={stored ?? ""}
-                pattern="#[0-9a-fA-F]{6}"
+                pattern={HEX_COLOUR_HTML_PATTERN}
                 title={t("admin.branding.brandingSettingsForm.sixHexDigits")}
                 spellCheck={false}
                 autoComplete="off"

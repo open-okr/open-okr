@@ -30,6 +30,7 @@
     "@better-auth/sso": "catalog:",
     "@openokr/config": "workspace:*",
     "@openokr/db": "workspace:*",
+    "@openokr/formats": "workspace:*",
     "@openokr/method": "workspace:*",
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",

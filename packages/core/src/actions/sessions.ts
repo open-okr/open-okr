@@ -57,6 +57,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { LOCAL_DATE_PATTERN } from "@openokr/formats";
 import {
   afterCheckIn,
   CLOSE_DECISION_MEANINGS,
@@ -8502,7 +8503,7 @@ export const addReviewAction = defineWriteAction({
      * exact thing the stage exists to prevent.
      */
     ownerId: z.uuid(),
-    dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    dueOn: z.string().regex(LOCAL_DATE_PATTERN),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,

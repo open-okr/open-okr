@@ -12,6 +12,7 @@
  * That comment is widened alongside this file rather than left describing
  * only the first of its two callers.
  */
+
 import {
   activeOnly,
   INVITE_MEMBER_KINDS,
@@ -22,6 +23,7 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
+import { EMAIL_PATTERN } from "@openokr/formats";
 import { desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -272,7 +274,7 @@ export const createPersonalLink = defineWriteAction({
   summary:
     "Invite one email address, usable once, as a member or as a guest of one space.",
   input: z.object({
-    email: z.string().trim().toLowerCase().email(),
+    email: z.string().trim().toLowerCase().email({ pattern: EMAIL_PATTERN }),
     expiresInDays: z.number().int().positive().optional(),
     /**
      * Makes the invitation a guest's, of this space and nothing else. Absent

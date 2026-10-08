@@ -18,6 +18,7 @@
  * stored needs nothing of any other write path and conflicts only on the
  * fields that actually moved.
  */
+
 import {
   activeOnly,
   activities,
@@ -36,6 +37,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { LOCAL_DATE_PATTERN } from "@openokr/formats";
 import {
   ADDITION_FIELDS,
   type AdditionDraft,
@@ -76,7 +78,7 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const localDate = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Give the date as YYYY-MM-DD.");
+  .regex(LOCAL_DATE_PATTERN, "Give the date as YYYY-MM-DD.");
 
 const person = z.object({ id: z.uuid(), name: z.string() });
 

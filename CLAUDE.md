@@ -173,6 +173,8 @@ Add interface components through the component registries into `packages/ui` at 
 apps/web            Next.js app: interface, internal API, public REST, agent
                     endpoint, channel webhooks
 packages/method     The METHOD.md canon as data and pure functions. No I/O
+packages/formats    The format rules the browser and the server share: email,
+                    domain, date, colour, timezone. Pure, imports nothing
 packages/core       Domain logic, the Operation pipeline, the action registry,
                     can() and the access getter, the engines, rich text, the
                     spreadsheet import engine, the demo seeds

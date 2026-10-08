@@ -11,6 +11,7 @@
  * does not exist yet, so there is no context to check. That is the same shape
  * `spaces.create` already uses.
  */
+
 import {
   activeOnly,
   CAPACITY_VERDICTS,
@@ -36,6 +37,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { LOCAL_DATE_PATTERN } from "@openokr/formats";
 import {
   additionStartsAs,
   defaultOkrKind,
@@ -118,7 +120,7 @@ const GOAL_PAGE = 200;
 /** A key result's due date: a local calendar date, never a free string. */
 const localDate = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Give the date as YYYY-MM-DD.");
+  .regex(LOCAL_DATE_PATTERN, "Give the date as YYYY-MM-DD.");
 
 const richText = z
   .unknown()

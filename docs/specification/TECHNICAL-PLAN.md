@@ -23,14 +23,15 @@ Authority: below PLAN.md and METHOD.md. Where this document and PLAN.md disagree
 | Package | Owns | May depend on |
 |---|---|---|
 | `packages/method` | The METHOD.md canon as data and pure functions: the quality rule catalogue, score and confidence bands, KPI corridors, blocker and root-cause taxonomies, publish gates, session definitions, phase completion rules, diagnostics | nothing |
+| `packages/formats` | The format rules the browser and the server share: an email address, a domain, a local date, a hex colour, a timezone. Pure functions and patterns with no I/O, so a field checks a value with the same rule its action refuses it with ([guided-inputs.md](../design/guided-inputs.md) §4.1) | nothing |
 | `packages/db` | Schema, migrations, row-level security policies, seed, data-change runner, soft-delete scope | nothing app-specific |
-| `packages/core` | Domain services, the Operation pipeline, the action contract registry, `can()` and the access-aware getter, the stateful engines (scoring, cadence, KPI formulas, alignment, streaks), rich text, the typed event registry, the spreadsheet import engine (§7.1's readers, entity templates, mapping and runner) | `db`, `method` |
+| `packages/core` | Domain services, the Operation pipeline, the action contract registry, `can()` and the access-aware getter, the stateful engines (scoring, cadence, KPI formulas, alignment, streaks), rich text, the typed event registry, the spreadsheet import engine (§7.1's readers, entity templates, mapping and runner) | `db`, `method`, `formats` |
 | `packages/adapters` | Ports and drivers, the only place vendor SDKs live, plus the outbox relay | `config` |
 | `packages/agents` | The Coach and Champion runtimes, the trigger catalogue and scheduler, run state machines, proposal envelopes, prompt assembly | `core`, `method`, `adapters` |
 | `packages/importer` | The import command line, and the FlowyTeam MySQL reader with its mappers | `db`, `core` |
 | `packages/ui` | Shared components | `method` (for labels and bands only) |
 | `packages/test-support` | The factory that builds through core services, the test database harness | `core`, `db` |
-| `apps/web` | Routes, API endpoints, the MCP endpoint, channel webhooks, React UI | `core`, `agents`, `adapters`, `ui`, `method` |
+| `apps/web` | Routes, API endpoints, the MCP endpoint, channel webhooks, React UI | `core`, `agents`, `adapters`, `ui`, `method`, `formats` |
 
 **The spreadsheet engine sits in `packages/core` and the command line in `packages/importer`, and the seam is deliberate** (chosen from three options). The import wizard on S-36 needs the same readers, templates, mapping and runner the command uses, and `apps/web` may not depend on `packages/importer`: duplicating the engine would be two implementations of one report, and widening the table to let an application reach the importer would put P6-T02's MySQL client in the web application's dependency graph. What stays in `packages/importer` is what only a terminal has: argument parsing, the report as printed lines, and the entry point that opens a pool. The registry actions that write are in core anyway, which is where every write in this product is declared.
 

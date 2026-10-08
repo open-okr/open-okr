@@ -1,3 +1,8 @@
+import {
+  DOMAIN_PATTERN,
+  HEX_COLOUR_PATTERN,
+  isKnownTimezone,
+} from "@openokr/formats";
 import type { CheckInFrequency, CoachStrictness } from "@openokr/method";
 import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
 import { z } from "zod";
@@ -121,30 +126,15 @@ export const DEFAULT_DAILY_SUMMARY_TIME = "08:00";
  */
 const DEFAULT_SPACE_TEAM_VOTING = true;
 
-/**
- * Is this a timezone the runtime actually knows?
- *
- * The value arrives from the browser, so it is untrusted input reaching a
- * stored field. Asking `Intl` is the only honest check: a hand-written list
- * would rot, and a regular expression would accept plausible nonsense.
- */
-export function isKnownTimezone(timezone: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en-GB", { timeZone: timezone });
-    return true;
-  } catch {
-    return false;
-  }
-}
+// The format rules live in `packages/formats`, where the browser checks a
+// field with the same function this refuses it with. Still exported from here,
+// because callers have always asked core for it.
+export { isKnownTimezone };
 
 const resolveTimezone = (context: ProvisioningContext): string => {
   const candidate = context.timezone?.trim();
   return candidate && isKnownTimezone(candidate) ? candidate : "UTC";
 };
-
-/** A DNS-shaped domain, lower-cased: `mail.example.co`, not an email address. */
-const DOMAIN_PATTERN =
-  /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
 
 export const timezoneSchema = z
   .string()
@@ -158,7 +148,7 @@ export const brandingSchema = z
   .object({
     primaryColor: z
       .string()
-      .regex(/^#[0-9a-fA-F]{6}$/, "not a hex colour")
+      .regex(HEX_COLOUR_PATTERN, "not a hex colour")
       // Refused here rather than by the card, so the REST surface, the
       // command line and an agent cannot store one either (M-14). A green
       // brand puts a green pixel that does not mean on track on every screen.

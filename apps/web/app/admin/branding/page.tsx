@@ -1,4 +1,5 @@
 import { callAction, deriveBrandPalette } from "@openokr/core";
+import { HEX_COLOUR_PATTERN } from "@openokr/formats";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -12,7 +13,7 @@ import {
  * `style` as the swatch, and a colour that has not been matched against this
  * is a string from the database going into CSS.
  */
-const HEX = /^#[0-9a-fA-F]{6}$/;
+const HEX = HEX_COLOUR_PATTERN;
 
 export default async function BrandingSettingsPage() {
   const { t } = await getTranslations();
