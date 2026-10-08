@@ -12,6 +12,7 @@ import { markRead, mute, snooze } from "./actions.ts";
 import { InboxLive } from "./inbox-live.tsx";
 import { SNOOZE_CHOICES } from "./snooze-choices.ts";
 import {
+  REASON_FALLBACK_KEYS,
   REASON_LABEL_KEYS,
   subjectLink,
   subjectNameKey,
@@ -284,7 +285,7 @@ async function NotificationRow({
     row.rendered ??
     (rule ? rule.fires : null) ??
     (ruleName === null
-      ? t("inbox.somethingHappenedHere")
+      ? t(REASON_FALLBACK_KEYS[row.reason] ?? "inbox.somethingHappenedHere")
       : t("inbox.reminder", { rule: ruleName }));
 
   return (
