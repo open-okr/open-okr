@@ -1272,6 +1272,7 @@
   "common.progress": "Kemajuan",
   "common.progress2": "Kemajuan {progressPct}%",
   "common.quarterly": "suku tahunan",
+  "common.quietHoursNeedBothTimes": "Tetapkan kedua-dua masa, atau kosongkan kedua-duanya untuk mematikan waktu senyap.",
   "common.reassign": "Tugaskan semula",
   "common.recentRuns": "Larian terkini",
   "common.record": "Rekod",

@@ -20,7 +20,7 @@
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
-import { goTo, signIn } from "./instance-account.ts";
+import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
 
 const BOT_TOKEN = "xoxb-a-token-nobody-should-ever-see-on-a-screen";
 const SIGNING_SECRET = "8f742231b10e8888abcd99yyyzzz85a5";
@@ -199,12 +199,74 @@ test("quiet hours save, and the copy says a reminder waits rather than vanishes"
   // The confirmation is the saved value coming back, not a message: a write
   // revalidates and can unmount the form a message would be rendered in. The
   // card's own copy carries the meaning, permanently.
+  //
+  // **The reload is retried.** It began 38 ms after the save was sent while the
+  // save took 183 ms, so the page could be drawn from the window before the
+  // write committed, and on 8 October the spec read "19:00" back. Waiting on
+  // the save's response instead hung on the streamed answer.
+  await expect(async () => {
+    await goTo(page, "/account/channels");
+    await expect(page.locator('input[name="quietStart"]')).toHaveValue(
+      "22:00",
+      { timeout: 1_000 },
+    );
+  }).toPass({ timeout: 20_000 });
+  await expect(page.locator('input[name="quietEnd"]')).toHaveValue("07:00");
+  await expect(page.getByText("waits until it ends")).toBeVisible();
+});
+
+test("saving your profile keeps the quiet hours set here", async () => {
+  // The profile form's quiet-hours boxes were always empty, and an empty pair
+  // means "off", so saving anything on the profile deleted this window.
+  await goTo(page, "/people");
+  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
+  await page.waitForURL(/\/people\//);
+  const profile = page
+    .locator("form")
+    .filter({ has: page.locator('input[name="quietStart"]') });
+  await expect(profile.locator('input[name="quietStart"]')).toHaveValue(
+    "22:00",
+    { timeout: 10_000 },
+  );
+  await expect(profile.locator('input[name="quietEnd"]')).toHaveValue("07:00");
+
+  await profile.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Profile updated.")).toBeVisible({
+    timeout: 10_000,
+  });
+
   await goTo(page, "/account/channels");
   await expect(page.locator('input[name="quietStart"]')).toHaveValue("22:00", {
     timeout: 10_000,
   });
   await expect(page.locator('input[name="quietEnd"]')).toHaveValue("07:00");
-  await expect(page.getByText("waits until it ends")).toBeVisible();
+});
+
+test("one time without the other is refused, and the window stays", async () => {
+  await goTo(page, "/account/channels");
+  const delivery = page
+    .locator("form")
+    .filter({ has: page.locator('input[name="quietStart"]') });
+  // Retried for the same reason as the fill above: an uncontrolled input
+  // filled before hydration goes back to what the server rendered.
+  await expect(async () => {
+    await delivery.locator('input[name="quietEnd"]').fill("");
+    await expect(delivery.locator('input[name="quietEnd"]')).toHaveValue("", {
+      timeout: 1_000,
+    });
+  }).toPass({ timeout: 20_000 });
+  await delivery.getByRole("button", { name: "Save" }).click();
+
+  await expect(delivery.getByRole("alert")).toContainText(
+    "Set both times, or clear both",
+    { timeout: 10_000 },
+  );
+
+  await goTo(page, "/account/channels");
+  await expect(page.locator('input[name="quietStart"]')).toHaveValue("22:00", {
+    timeout: 10_000,
+  });
+  await expect(page.locator('input[name="quietEnd"]')).toHaveValue("07:00");
 });
 
 test("disconnecting removes the provider and leaves nothing behind", async () => {

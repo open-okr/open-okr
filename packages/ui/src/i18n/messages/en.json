@@ -1272,6 +1272,7 @@
   "common.progress": "Progress",
   "common.progress2": "Progress {progressPct}%",
   "common.quarterly": "quarterly",
+  "common.quietHoursNeedBothTimes": "Set both times, or clear both to turn quiet hours off.",
   "common.reassign": "Reassign",
   "common.recentRuns": "Recent runs",
   "common.record": "Record",

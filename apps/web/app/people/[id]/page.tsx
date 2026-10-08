@@ -96,6 +96,12 @@ export default async function MemberProfilePage({
   );
   const isAdmin = level >= ACCESS_LEVELS.full;
   const isSelf = id === workspace.memberId;
+  // The member's own window, so the profile form shows it. Its boxes were
+  // empty, and an empty pair means "off", so saving a new timezone here
+  // deleted the quiet hours set on /account/channels.
+  const ownDelivery = isSelf
+    ? await callAction(context, "channels.mySettings", {})
+    : null;
   // Whether the member on this page is an administrator, for the handover
   // control (completeness review H-14). Only read for somebody who could act
   // on the answer.
@@ -332,6 +338,7 @@ export default async function MemberProfilePage({
           memberId={id}
           timezone={member.timezone}
           primaryChannel={member.primaryChannel}
+          quietHours={ownDelivery?.quietHours ?? null}
           bio={member.bio}
           updateProfile={updateProfile}
         />

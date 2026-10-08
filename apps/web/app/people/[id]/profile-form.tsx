@@ -29,12 +29,15 @@ export function ProfileForm({
   memberId,
   timezone,
   primaryChannel,
+  quietHours,
   bio,
   updateProfile,
 }: {
   readonly memberId: string;
   readonly timezone: string | null;
   readonly primaryChannel: string | null;
+  /** The saved window, shown so a save that does not touch it keeps it. */
+  readonly quietHours: { readonly start: string; readonly end: string } | null;
   /** The stored document, or null for no bio. */
   readonly bio: unknown;
   readonly updateProfile: (
@@ -125,6 +128,7 @@ export function ProfileForm({
               <input
                 name="quietStart"
                 type="time"
+                defaultValue={quietHours?.start ?? ""}
                 aria-label={t("people.detail.profileForm.quietStart")}
                 className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
               />
@@ -134,6 +138,7 @@ export function ProfileForm({
               <input
                 name="quietEnd"
                 type="time"
+                defaultValue={quietHours?.end ?? ""}
                 aria-label={t("people.detail.profileForm.quietEnd")}
                 className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
               />
