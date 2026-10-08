@@ -29,7 +29,7 @@ Authority: below PLAN.md and METHOD.md. Where this document and PLAN.md disagree
 | `packages/adapters` | Ports and drivers, the only place vendor SDKs live, plus the outbox relay | `config` |
 | `packages/agents` | The Coach and Champion runtimes, the trigger catalogue and scheduler, run state machines, proposal envelopes, prompt assembly | `core`, `method`, `adapters` |
 | `packages/importer` | The import command line, and the FlowyTeam MySQL reader with its mappers | `db`, `core` |
-| `packages/ui` | Shared components | `method` (for labels and bands only) |
+| `packages/ui` | Shared components, and the field kit that checks a value as it is typed ([guided-inputs.md](../design/guided-inputs.md) §4) | `method` (for labels and bands only), `formats` |
 | `packages/test-support` | The factory that builds through core services, the test database harness | `core`, `db` |
 | `apps/web` | Routes, API endpoints, the MCP endpoint, channel webhooks, React UI | `core`, `agents`, `adapters`, `ui`, `method`, `formats` |
 

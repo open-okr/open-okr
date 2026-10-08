@@ -1,4 +1,4 @@
-import { Card, CardBody } from "@openokr/ui";
+import { Card, CardBody, FIELD_CONTROL_CLASS, TextInput } from "@openokr/ui";
 import type { InputHTMLAttributes, ReactNode } from "react";
 
 /**
@@ -67,31 +67,26 @@ export function FormError({ children }: { children: ReactNode }) {
 }
 
 /**
- * The one input skin every authentication field wears. Exported so a field
- * that has to build its own input (the password reveal in
- * `password-field.tsx`) cannot drift from this one.
+ * The one input skin every field wears, now the field kit's own
+ * (docs/design/guided-inputs.md §4.3). Still exported here for the single
+ * sign-on screen, which draws a select and a textarea of its own beside its
+ * fields.
  */
-export const fieldInputClass =
-  "h-7.5 w-full rounded-control border border-line-2 bg-surface px-2.5 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line";
+export const fieldInputClass = FIELD_CONTROL_CLASS;
 
+/**
+ * A labelled text field, as the kit's `TextInput` draws it. Kept under this
+ * name so the screens that grew up on it move to the kit together: the label,
+ * the description and the error are linked by Base UI `Field` rather than by
+ * an id this function made up.
+ */
 export function Field({
   label,
-  className,
   ...input
-}: {
-  label: string;
-  className?: string;
-} & InputHTMLAttributes<HTMLInputElement>) {
+}: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
   // A caller's own id wins, so one screen can hold two forms that ask for
   // the same field, as the single sign-on screen does while a connection is
   // being edited beside the add form.
   const id = input.id ?? `field-${input.name}`;
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-ink-2">
-        {label}
-      </label>
-      <input id={id} className={fieldInputClass} {...input} />
-    </div>
-  );
+  return <TextInput label={label} {...input} id={id} />;
 }

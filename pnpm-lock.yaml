@@ -617,6 +617,9 @@ importers:
       '@base-ui-components/react':
         specifier: 'catalog:'
         version: 1.0.0-rc.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@openokr/formats':
+        specifier: workspace:*
+        version: link:../formats
       '@openokr/method':
         specifier: workspace:*
         version: link:../method

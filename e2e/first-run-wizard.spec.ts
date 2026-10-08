@@ -81,19 +81,23 @@ test("creating the first account finishes setup", async ({ page }) => {
   ).toHaveValue("OKR Goal");
   await page.getByLabel("Your name").fill(ADMIN.name);
   await page.getByLabel("Email").fill(ADMIN.email);
-  // Exact, because the reveal toggle beside it is named "Show password".
   const password = page.getByLabel("Password", { exact: true });
   await password.fill(ADMIN.password);
 
   // The reveal toggle. Somebody typing a 12-character minimum passphrase they
   // cannot see is the person most likely to mistype it and lock themselves out
-  // of an instance that has no other admin yet.
+  // of an instance that has no other admin yet. One name and `aria-pressed`
+  // for its state, since the field kit's SecretInput: a name that changed with
+  // the state said the state twice.
+  const reveal = page.getByRole("button", { name: "Show what you typed" });
   await expect(password).toHaveAttribute("type", "password");
-  await page.getByRole("button", { name: "Show password" }).click();
+  await expect(reveal).toHaveAttribute("aria-pressed", "false");
+  await reveal.click();
   await expect(password).toHaveAttribute("type", "text");
+  await expect(reveal).toHaveAttribute("aria-pressed", "true");
   // The value survives the switch, so the form still submits what was typed.
   await expect(password).toHaveValue(ADMIN.password);
-  await page.getByRole("button", { name: "Hide password" }).click();
+  await reveal.click();
   await expect(password).toHaveAttribute("type", "password");
 
   await page.getByRole("button", { name: "Finish setup" }).click();

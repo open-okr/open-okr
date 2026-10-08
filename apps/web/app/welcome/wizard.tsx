@@ -1,11 +1,14 @@
 "use client";
 
+import { isEmailAddress } from "@openokr/formats";
 import type { CheckInFrequency } from "@openokr/method";
 import {
   Button,
   Card,
   CardBody,
   CardHeader,
+  EmailInput,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -165,25 +168,22 @@ export function Wizard({
       <CardBody className="flex flex-col gap-3.5">
         {step === "basics" ? (
           <div className="flex flex-col gap-2.5" data-testid="step-basics">
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("welcome.basics.name")}
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("welcome.basics.timezone")}
-              <input
-                value={zone}
-                onChange={(event) => setZone(event.target.value)}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-              />
-              <span className="text-ink-3">
-                {t("welcome.basics.timezoneHelp")}
-              </span>
-            </label>
+            <TextInput
+              label={t("welcome.basics.name")}
+              value={name}
+              // The rename action's own limit, so the box stops where the
+              // server would.
+              maxLength={200}
+              onChange={(event) => setName(event.target.value)}
+            />
+            {/* A list of zones replaces this box in its own change (docs/
+                design/guided-inputs.md §4.6). */}
+            <TextInput
+              label={t("welcome.basics.timezone")}
+              description={t("welcome.basics.timezoneHelp")}
+              value={zone}
+              onChange={(event) => setZone(event.target.value)}
+            />
           </div>
         ) : null}
 
@@ -218,17 +218,13 @@ export function Wizard({
 
         {step === "people" ? (
           <div className="flex flex-col gap-2.5" data-testid="step-people">
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("welcome.people.invite")}
-              <input
-                type="email"
-                value={email}
-                placeholder={t("welcome.people.placeholder")}
-                onChange={(event) => setEmail(event.target.value)}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-              />
-              <span className="text-ink-3">{t("welcome.people.help")}</span>
-            </label>
+            <EmailInput
+              label={t("welcome.people.invite")}
+              description={t("welcome.people.help")}
+              value={email}
+              placeholder={t("welcome.people.placeholder")}
+              onChange={(event) => setEmail(event.target.value)}
+            />
           </div>
         ) : null}
 
@@ -293,7 +289,15 @@ export function Wizard({
                   saveRhythm({ defaultCheckInFrequency: frequency }),
                 );
               } else if (step === "people") {
-                advance(() => inviteSomebody({ email }));
+                // These fields are not in a form, so the browser never
+                // stops a malformed address on its own. Asked here with the
+                // server's own rule, before anything is sent.
+                const address = email.trim();
+                if (address !== "" && !isEmailAddress(address)) {
+                  setProblem(t("fields.email.invalid"));
+                  return;
+                }
+                advance(() => inviteSomebody({ email: address }));
               } else if (step === "template") {
                 advance(() => applyStartingTemplate({ template }));
               } else {

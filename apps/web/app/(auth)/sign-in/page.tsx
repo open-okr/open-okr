@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, EmailInput, SecretInput, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -230,10 +230,9 @@ export default function SignInPage() {
       }
     >
       <form onSubmit={signIn} className="flex flex-col gap-3">
-        <Field
+        <EmailInput
           label={t("people.detail.profileForm.email")}
           name="email"
-          type="email"
           autoComplete="username webauthn"
           required
           onBlur={(event) => {
@@ -243,10 +242,9 @@ export default function SignInPage() {
             }
           }}
         />
-        <Field
+        <SecretInput
           label={t("auth.signIn.password")}
           name="password"
-          type="password"
           autoComplete="current-password"
           required
         />

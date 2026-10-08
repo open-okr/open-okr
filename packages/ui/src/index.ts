@@ -1,7 +1,8 @@
+import { PACKAGE_NAME as FORMATS } from "@openokr/formats";
 import { PACKAGE_NAME as METHOD } from "@openokr/method";
 
 export const PACKAGE_NAME = "@openokr/ui";
-export const DEPENDS_ON = [METHOD] as const;
+export const DEPENDS_ON = [FORMATS, METHOD] as const;
 
 export * from "./components/avatar.tsx";
 export * from "./components/bar.tsx";
@@ -11,6 +12,9 @@ export * from "./components/chip.tsx";
 export * from "./components/kbd.tsx";
 export * from "./components/verdict-dot.tsx";
 export * from "./feedback/toast.tsx";
+export * from "./fields/email-input.tsx";
+export * from "./fields/secret-input.tsx";
+export * from "./fields/text-input.tsx";
 export * from "./forms/unsaved-changes.tsx";
 export * from "./forms/use-form-dirty.ts";
 export * from "./forms/use-submit-shortcut.ts";

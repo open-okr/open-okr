@@ -6,6 +6,8 @@
  * in `packages/ui` checks a value with the same function the action schema in
  * `packages/core` refuses it with, so the two cannot disagree.
  */
+export const PACKAGE_NAME = "@openokr/formats";
+
 export {
   HEX_COLOUR_HTML_PATTERN,
   HEX_COLOUR_PATTERN,

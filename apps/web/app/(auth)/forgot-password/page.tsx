@@ -1,10 +1,10 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, EmailInput, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
-import { AuthCard, Field, FormError } from "../auth-card";
+import { AuthCard, FormError } from "../auth-card";
 
 /**
  * Forgot password (screen S-35).
@@ -68,11 +68,9 @@ export default function ForgotPasswordPage() {
       }
     >
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field
+        <EmailInput
           label={t("people.detail.profileForm.email")}
           name="email"
-          type="email"
-          autoComplete="email"
           required
         />
         <Button type="submit" variant="primary" disabled={pending}>

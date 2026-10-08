@@ -1,11 +1,11 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, SecretInput, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
-import { AuthCard, Field, FormError } from "../auth-card";
+import { AuthCard, FormError } from "../auth-card";
 
 function ResetPasswordForm() {
   const { t } = useTranslations();
@@ -56,12 +56,12 @@ function ResetPasswordForm() {
   return (
     <AuthCard title={t("auth.resetPassword.chooseANewPassword")}>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field
+        <SecretInput
           label={t("auth.resetPassword.newPassword")}
           name="password"
-          type="password"
           autoComplete="new-password"
           minLength={12}
+          maxLength={128}
           required
         />
         <Button type="submit" variant="primary" disabled={pending}>
