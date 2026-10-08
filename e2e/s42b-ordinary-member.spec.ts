@@ -229,13 +229,22 @@ test("a goal detail opens for them, which had two separate causes", async () => 
   // chip it used to click is now on the `display=tree` table. Following the
   // control this screen actually offers is also the stronger test: it proves
   // an ordinary member can reach a goal from the screen they are given.
+  //
+  // **Through the drawer since P9-T08a.** A plain click on the row's open
+  // link puts the objective in the drawer beside the list, and the drawer
+  // links to the page, so the path is one press longer and still the
+  // screen's own.
   await memberPage.goto("/goals");
-  const link = memberPage
+  const open = memberPage
     .getByRole("link", { name: "Open this objective" })
     .first();
-  await expect(link).toBeVisible({ timeout: 20_000 });
+  await expect(open).toBeVisible({ timeout: 20_000 });
 
-  await link.click();
+  await open.click();
+  await memberPage
+    .getByTestId("okr-drawer")
+    .getByRole("link", { name: "Open the full page" })
+    .click();
   await memberPage.waitForURL(/\/goals\/[0-9a-f-]{20,}/, { timeout: 20_000 });
   await expect(memberPage.getByText(COULD_NOT_LOAD)).toHaveCount(0);
   await expect(
@@ -302,8 +311,10 @@ async function proposeRecoveryTo(title: string): Promise<string> {
   }
   const kpi = (
     await pool.query<{ id: string }>(
-      `insert into kpis (id, workspace_id, short_id, title, owner_kind, member_id, frequency)
-       values (gen_random_uuid(), $1, $2, $3, 'member', $4, 'monthly')
+      // Unhealthy, as every KPI the Champion proposes a recovery for is, so
+      // it is on the recovery board the proposal links to (P9-T18b).
+      `insert into kpis (id, workspace_id, short_id, title, owner_kind, member_id, frequency, state)
+       values (gen_random_uuid(), $1, $2, $3, 'member', $4, 'monthly', 'unhealthy')
        returning id`,
       [
         member.workspace_id,
@@ -369,8 +380,21 @@ test("a recovery proposal addressed to them is decided on the review screen", as
   ).toBeVisible();
   await expect(card.getByRole("button", { name: "Apply" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Dismiss" })).toBeVisible();
-  // No link away to a screen that would refuse them.
-  await expect(card.getByRole("link")).toHaveCount(0);
+  // One link, to the other two responses on the KPI's own card (METHOD.md
+  // §6.5, P9-T18b), and nothing to a screen that would refuse them: this
+  // member holds edit, and the board offers them all three.
+  const links = card.getByRole("link");
+  await expect(links).toHaveCount(1);
+  const href = (await links.getAttribute("href")) ?? "";
+  expect(href).toMatch(/^\/kpis\/recovery#kpi-/);
+  await memberPage.goto(href);
+  await expect(
+    memberPage.locator(href.slice(href.indexOf("#"))).getByTestId(
+      "kpi-responses",
+    ),
+  ).toBeVisible({ timeout: 20_000 });
+  await memberPage.goto("/review");
+  await expect(card).toBeVisible({ timeout: 20_000 });
 });
 
 test("applying it launches the recovery in their name", async () => {

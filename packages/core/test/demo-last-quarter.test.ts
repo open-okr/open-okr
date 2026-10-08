@@ -1,3 +1,4 @@
+import { resolveThresholds } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
 import { beforeAll, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
@@ -22,8 +23,9 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
  * the scorecard, and §8.6's verdict with the two numbers behind it.
  *
  * **The verdict is asserted as derived, not as written.** The test computes
- * what the catalogue's own grades average and what its own survey answers make
- * of the two rhythm statements, and checks the product agreed. A test that
+ * what the catalogue's own grades average, reads the rhythm measured from the
+ * quarter's recorded check-ins, and checks the product agreed; the survey's
+ * two rhythm statements are kept beside it as the cross-check (P9-T20d). A test that
  * hardcoded "strategy_or_quality" would pass just as well if somebody typed
  * the verdict into the seed.
  */
@@ -102,6 +104,16 @@ describe("the closed cycle", () => {
     expect(row?.resultValue).not.toBeNull();
     expect(row?.verdict).not.toBeNull();
   });
+
+  it("counts the objective started in week three among what moved (§2.9, P9-T22b)", async () => {
+    // Mid-cycle changes are evidence, not failure, and the close reads them:
+    // the demo's last quarter has one, so the scorecard has one to show.
+    expect(
+      LAST_QUARTER.filter((objective) => objective.startedInWeek),
+    ).toHaveLength(1);
+    const scorecard = await callAction(await context(), "cycles.scorecard", {});
+    expect(scorecard.rows[0]?.moved?.addedMidCycle).toBe(1);
+  });
 });
 
 describe("§8.6's diagnostic", () => {
@@ -130,7 +142,7 @@ describe("§8.6's diagnostic", () => {
   it("is derived from the grades and the survey, not written into the seed", async () => {
     const wb = await workerDb();
     const { rows } = await wb.admin.query(
-      `select cycle_score, rhythm_score, verdict
+      `select cycle_score, rhythm_score, on_time_share, verdict
          from review_diagnostics
         where workspace_id = $1 and deleted_at is null`,
       [workspaceId],
@@ -140,13 +152,19 @@ describe("§8.6's diagnostic", () => {
     expect(Number(rows[0]?.cycle_score)).toBeCloseTo(expectedCycleScore, 4);
     expect(Number(rows[0]?.rhythm_score)).toBeCloseTo(expectedRhythmScore, 4);
 
-    // The case the demo is built to show: under §8.6's cycle floor of 0.7 and
-    // over its rhythm floor of 3.5, which is "the team ran the rhythm and
-    // still missed". The thresholds are asserted here rather than assumed,
-    // because the whole value of the screen is that the verdict follows from
-    // them.
-    expect(expectedCycleScore).toBeLessThan(0.7);
-    expect(expectedRhythmScore).toBeGreaterThanOrEqual(3.5);
+    // The case the demo is built to show: under §8.6's cycle floor of 0.6 and
+    // over its rhythm floor of 75% on time, which is "the team ran the rhythm
+    // and still missed". The thresholds are read from the registry rather than
+    // assumed, because the whole value of the screen is that the verdict
+    // follows from them. One objective missed one week in four, so the share
+    // is high and not perfect.
+    const canon = resolveThresholds();
+    const share = Number(rows[0]?.on_time_share);
+    expect(expectedCycleScore).toBeLessThan(
+      canon["sessions.diagnosticCycleScore"],
+    );
+    expect(share).toBeGreaterThanOrEqual(canon["sessions.diagnosticRhythm"]);
+    expect(share).toBeLessThan(1);
     expect(rows[0]?.verdict).toBe("strategy_or_quality");
   });
 });

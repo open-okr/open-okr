@@ -26,9 +26,9 @@ Never cite a mockup as the reason for a behaviour. Cite the specification.
 | [03-draft-coach](png/03-draft-coach.png) | S-09 | P4-T02 | Rule verdicts inline beside the field they judge, the strength meter, the quality panel, a passing set beside a failing one |
 | [03b-rule-card](png/03b-rule-card.png) | S-09 detail | P4-T02 | One verdict opened: prompt, reason, weak-versus-strong pair, rewrite and dismiss |
 | [04-gates-capacity](png/04-gates-capacity.png) | S-10 | P4-T03, P3-T09 | The six gates as a checklist with two unmet, the disabled publish control stating its reason, the capacity table and the mandatory cut, the dependency register |
-| [05-alignment-studio](png/05-alignment-studio.png) | S-16 | P3-T10, P3-T09, P4-T06 | Contribution as solid connectors and dependencies as dashed, an unaligned goal, the health score with each gap and its penalty, the Coach's typed findings |
-| [06-kpi-recovery](png/06-kpi-recovery.png) | S-18, S-19 | P3-T14 | The driver tree with corridor bars and tier labels, a live recovery objective with one key result per leading driver at the edge of the unhealthy branch, effective health, the cross-tree recovery board |
-| [07-weekly-session](png/07-weekly-session.png) | S-22 | P4-T07 | The four-step rail, the confidence dial with its bands, private votes revealed together, a low score becoming a typed blocker on a clock, the streak |
+| [05-alignment-studio](png/05-alignment-studio.png) | S-16 | P3-T10, P3-T09, P4-T06, redrawn at P9-T09b | The OKRs screen's diagram, which the studio became: key results inside each objective's card, an objective hanging from the key result it aligns to, the annual objective in the band above, a dependency dashed, a collapsed card, and the alignment panel's health with each gap opening its objective |
+| [06-kpi-recovery](png/06-kpi-recovery.png) | S-18, S-19 | P3-T14 | The driver tree with corridor bars and tier labels, a live recovery objective with one key result per leading driver at the edge of the unhealthy branch, effective health, the cross-tree recovery board with §6.5's three responses on a KPI nobody has answered and the answer on one somebody has (P9-T18b) |
+| [07-weekly-session](png/07-weekly-session.png) | S-22 | P4-T07 | The four-step rail, the confidence dial with its bands, private votes revealed together, step 2 as what dropped, a low score with a next action and no blocker beside one that is actually blocked, due by the next check-in (P9-T19a-a, P9-T19a-b), the streak |
 | [08-quarterly-review](png/08-quarterly-review.png) | S-24 | P4-T10, P4-T11 | The lap bar proportional to stage minutes, the stage rail grouped by act, the diagnostic card, the eight root causes, the five process-health statements |
 | [09-channels](png/09-channels.png) | AI-NATIVE-PLAN §5 | P5-T02 to P5-T05 | The same nudge in four channels, a conversational check-in capturing a typed blocker, and nudge provenance on every message |
 | [10-review-inbox](png/10-review-inbox.png) | S-02 | P3-T08, P4-T04 | Overdue-first grouping, agent proposals in the queue, the five-step escalation ladder, the provenance panel with snooze and change-channel |
@@ -58,9 +58,9 @@ The mockups quote the canon rather than inventing numbers, because a developer w
 |---|---|
 | `OBJ-1`, `KR-2`, `AL-1`, `CY-6` and the other quality rules | METHOD.md §4 |
 | Confidence bands: high 0.7 and above, medium 0.4 to below 0.7, low below 0.4, escalating at 0.3 | METHOD.md §3.2 |
-| Alignment penalties: 12 orphan, 8 silo, 4 no key results, 3 level skip, healthy at 75 | METHOD.md §5.2 |
+| Alignment as a share of goals below company level aligned or standing alone: healthy at 90%, watch from 80% (P9-T16a; the penalties it replaced are gone) | METHOD.md §5.2 |
 | Semantic finding types: relink, dependency, conflict, gap | METHOD.md §5.3 |
-| KPI corridors, tiers and the effective-health projection | METHOD.md §6.2, §6.4, §6.5 |
+| KPI corridors and tiers, and a recovery shown beside the real band (P9-T17b-a: the effective-health projection is no longer shown) | METHOD.md §6.2, §6.4, §6.5 |
 | The five blocker types and the 24-hour clock | METHOD.md §7.3 |
 | The eleven quarterly stages and their minutes, the eight root causes, the five process statements | METHOD.md §8.1, §8.4, §8.5 |
 | `checkin.overdue`, `kpi.recovery_proposed`, `quality.conflict` and the other trigger keys | AI-NATIVE-PLAN.md §6.4 |

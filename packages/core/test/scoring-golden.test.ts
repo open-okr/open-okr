@@ -9,8 +9,8 @@ import {
   keyResultProgress,
   portfolioVerdictOf,
   progressSignal,
-  scoreAnnotation,
   scoreBand,
+  scoreNote,
   trendForecast,
   weightedProgress,
 } from "@openokr/method";
@@ -322,12 +322,17 @@ describe("the trend forecast", () => {
   }
 });
 
-describe("score bands and annotations", () => {
+describe("score bands and notes", () => {
   for (const row of table("scoring.score-bands").rows) {
     it(`${row.case}`, () => {
       const score = num(row, "score");
       expect(scoreBand(score, thresholds)).toBe(row.expected_band);
-      expect(scoreAnnotation(score, thresholds)).toBe(row.expected_annotation);
+      expect(scoreNote(score, "aspirational", thresholds)).toBe(
+        row.aspirational_note,
+      );
+      expect(scoreNote(score, "committed", thresholds)).toBe(
+        row.committed_note,
+      );
     });
   }
 });

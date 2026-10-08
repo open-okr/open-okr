@@ -10,8 +10,8 @@
  * This instance has no AI provider, so no summary is offered; what the summary
  * would be written about is the board, and the board is what this asserts: four
  * blockers of different ages, ranked by §11's ladder rather than by age alone,
- * with the ones past §7.3's clock marked. The summary and its refusal to name a
- * blocker off the board are proved in
+ * with the ones past their check-in, §7.3's clock, marked. The summary and
+ * its refusal to name a blocker off the board are proved in
  * `packages/core/test/blocker-board.test.ts` against a scripted drafter.
  *
  * **The file name carries the run order:** specs run alphabetically against one
@@ -102,21 +102,30 @@ test("four blockers of different ages are open in a space", async () => {
 
   // Deliberately out of age order on insert, so the board is doing the ranking
   // rather than the database's own order doing it by accident.
-  const ages: readonly [string, number][] = [
-    ["Chase the design review", 21],
-    ["Chase the billing team", 60],
-    ["Chase nobody in particular", 3],
-    ["Chase the legal team", 26],
+  // Each with its age, and the check-in its next action is due by, in days
+  // from now: negative once it has passed (§7.3, P9-T19a-a).
+  const blockers: readonly [string, number, number][] = [
+    ["Chase the design review", 21, 1],
+    ["Chase the billing team", 60, -2],
+    ["Chase nobody in particular", 3, 5],
+    ["Chase the legal team", 26, -1],
   ];
-  for (const [nextAction, ageHours] of ages) {
+  for (const [nextAction, ageHours, dueInDays] of blockers) {
     await pool.query(
       `insert into blockers
          (id, workspace_id, type, owner_id, next_action, opened_at, due_at, session_id)
        values (gen_random_uuid(), $1, 'dependency', $2, $3,
                now() - ($4 || ' hours')::interval,
-               now() - ($4 || ' hours')::interval + interval '24 hours',
+               now() + make_interval(days => $6),
                $5)`,
-      [member.workspace_id, member.id, nextAction, String(ageHours), session?.id],
+      [
+        member.workspace_id,
+        member.id,
+        nextAction,
+        String(ageHours),
+        session?.id,
+        dueInDays,
+      ],
     );
   }
 });
@@ -130,24 +139,26 @@ test("the board ranks them by the ladder, not by age alone", async () => {
   const items = board.getByRole("listitem");
   await expect(items).toHaveCount(4);
 
-  // §11's ladder: sponsor at forty-eight hours, coordinator at twenty-four,
-  // owner at twenty. Sixty hours outranks twenty-six even though both are past
-  // the clock, and three hours is last.
+  // §11's ladder: the coordinator once the check-in has passed, the owner the
+  // day before it. Billing and legal are both past theirs, so the older one
+  // leads; design is due tomorrow; nobody's is five days off.
   await expect(items.nth(0)).toContainText("Chase the billing team");
   await expect(items.nth(1)).toContainText("Chase the legal team");
   await expect(items.nth(2)).toContainText("Chase the design review");
   await expect(items.nth(3)).toContainText("Chase nobody in particular");
 });
 
-test("the ones past §7.3's clock say so, and the newest does not", async () => {
+test("the ones past their check-in say so, and the others do not", async () => {
   const board = page.getByRole("list", { name: "Open blockers" });
   const items = board.getByRole("listitem");
 
-  await expect(items.nth(0)).toContainText("past the clock");
-  await expect(items.nth(0)).toContainText("escalated to sponsor");
+  await expect(items.nth(0)).toContainText("past its check-in");
+  await expect(items.nth(0)).toContainText("escalated to coordinator");
+  await expect(items.nth(1)).toContainText("past its check-in");
   await expect(items.nth(1)).toContainText("escalated to coordinator");
   await expect(items.nth(2)).toContainText("escalated to owner");
-  await expect(items.nth(3)).not.toContainText("past the clock");
+  await expect(items.nth(2)).not.toContainText("past its check-in");
+  await expect(items.nth(3)).not.toContainText("past its check-in");
   await expect(items.nth(3)).not.toContainText("escalated");
 });
 

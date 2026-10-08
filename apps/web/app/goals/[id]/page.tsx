@@ -11,12 +11,14 @@ import type { ResolvedThresholds } from "@openokr/method";
 import {
   Bar,
   Button,
+  buttonVariants,
   Card,
   CardBody,
   CardHeader,
   Chip,
   formatMeasure,
 } from "@openokr/ui";
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -26,6 +28,7 @@ import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { readConversation } from "../../../lib/conversation.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { healthWord } from "../../../lib/health-words.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
@@ -36,16 +39,11 @@ import {
   readSubjectDocuments,
   SubjectDocuments,
 } from "../../documents/subject-documents.tsx";
-import {
-  closeGoal,
-  editGoal,
-  reassignRole,
-  recordValue,
-  reopenGoal,
-} from "./actions.ts";
+import { closeGoal, editGoal, reassignRole, reopenGoal } from "./actions.ts";
 import { CoachStrip } from "./coach-strip";
 import { DecomposeKeyResult } from "./decompose.tsx";
 import { GoalWrites } from "./goal-writes.tsx";
+import { AddKeyResult, KeyResultUpdate } from "./key-result-update.tsx";
 import { Rail } from "./rail.tsx";
 import { RetrospectiveField } from "./retrospective-field.tsx";
 import { Sparkline } from "./sparkline.tsx";
@@ -166,11 +164,11 @@ export default async function GoalPage({
   // `ai.readProviderConfig`, which is declared `full` because it carries every
   // provider's admin configuration and a masked key hint, so the whole screen
   // failed for any member who did not create the workspace.
-  // The strength bands the coach strip colours its score by (H-17).
-  const strengthBands = (
-    (await callAction(context, "rhythm.read", {}))
-      .thresholds as unknown as ResolvedThresholds
-  )["quality.strengthScoreBands"];
+  // The strength bands the coach strip colours its score by (H-17), and the
+  // values a forecast waits for (§3.6, P9-T15a).
+  const pageThresholds = (await callAction(context, "rhythm.read", {}))
+    .thresholds as unknown as ResolvedThresholds;
+  const strengthBands = pageThresholds["quality.strengthScoreBands"];
   const { available: drafting } = await callAction(
     context,
     "ai.readAvailability",
@@ -257,6 +255,17 @@ export default async function GoalPage({
       }))
     : [];
 
+  // What the last check-in said, which a confidence changed here carries
+  // forward as its status unless the reader changes it (P9-T08b).
+  const lastStatus = open
+    ? ((
+        await callAction(context, "goals.checkIns", {
+          goalId: id,
+          includeDrafts: false,
+        })
+      ).checkIns[0]?.status ?? null)
+    : null;
+
   const cycles = await callAction(context, "cycles.list", {});
   const cycleEndsOn =
     cycles.find((cycle) => cycle.id === goal.cycleId)?.endsOn ?? null;
@@ -273,12 +282,18 @@ export default async function GoalPage({
             <div className="flex min-w-0 flex-col">
               <h1 className="text-lg font-bold text-ink">{goal.title}</h1>
               <p className="text-xs text-ink-3">
-                {t("common.championsItReviewsItWeight", {
-                  level: goal.level,
-                  name: goal.champion.name,
-                  name2: goal.reviewer.name,
-                  weight: goal.weight,
-                })}
+                {goal.reviewer
+                  ? t("common.championsItReviewsItWeight", {
+                      level: goal.level,
+                      name: goal.champion.name,
+                      name2: goal.reviewer.name,
+                      weight: goal.weight,
+                    })
+                  : t("common.championsItNoReviewerWeight", {
+                      level: goal.level,
+                      name: goal.champion.name,
+                      weight: goal.weight,
+                    })}
               </p>
             </div>
             <Chip tone={closed ? "neutral" : "brand"}>
@@ -286,9 +301,19 @@ export default async function GoalPage({
                 ? t("goals.detail.closedStatus", {
                     status: String(goal.successStatus),
                   })
-                : goal.health.replace("_", " ")}
+                : healthWord(t, goal.health)}
             </Chip>
             <WatchControl subjectType="goal" subjectId={id} initial={watch} />
+            {/* Check in's door on the goal itself, now that it has left the
+             * sidebar (P9-T07a-b, okr-entry-points.md §3.1). */}
+            {open ? (
+              <Link
+                href={`/check-in?goal=${id}`}
+                className={buttonVariants({ size: "sm" })}
+              >
+                {t("common.checkIn")}
+              </Link>
+            ) : null}
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
@@ -387,7 +412,10 @@ export default async function GoalPage({
                           direction: keyResult.direction,
                           indicatorType: keyResult.indicatorType,
                           baselineValue: formatMeasure(keyResult.baselineValue),
-                          targetValue: formatMeasure(keyResult.targetValue),
+                          targetValue:
+                            keyResult.targetValue === null
+                              ? t("common.noTargetYet")
+                              : formatMeasure(keyResult.targetValue),
                           unit: keyResult.unit ? ` ${keyResult.unit}` : "",
                           weight: keyResult.weight,
                         })}
@@ -396,8 +424,16 @@ export default async function GoalPage({
                         history={histories.get(keyResult.id) ?? []}
                         direction={keyResult.direction}
                         baseline={keyResult.baselineValue}
-                        target={keyResult.targetValue}
+                        // Only a metric is projected (§3.6, P9-T15a).
+                        target={
+                          keyResult.kind === "metric"
+                            ? keyResult.targetValue
+                            : null
+                        }
                         horizonAt={horizonFor(keyResult.dueOn)}
+                        minimumValues={
+                          pageThresholds["scoring.forecastMinimumValues"]
+                        }
                       />
                       {decomposeOffered ? (
                         <DecomposeKeyResult
@@ -424,63 +460,17 @@ export default async function GoalPage({
                       >
                         {t("goals.detail.workBoard")}
                       </Link>
-                      {canEdit && !closed && keyResult.kpiId === null ? (
-                        <ActionForm
-                          action={recordValue}
-                          className="flex items-center gap-1"
-                        >
-                          {/* The goal, so the write knows which page to
-                              revalidate. The key result alone would leave the
-                              action guessing. */}
-                          <input type="hidden" name="goalId" value={goal.id} />
-                          <input
-                            type="hidden"
-                            name="keyResultId"
-                            value={keyResult.id}
-                          />
-                          <label
-                            className="sr-only"
-                            htmlFor={`value-${keyResult.id}`}
-                          >
-                            {t("common.newValueFor4", {
-                              title: keyResult.title,
-                            })}
-                          </label>
-                          <input
-                            id={`value-${keyResult.id}`}
-                            name="value"
-                            type="number"
-                            step="any"
-                            defaultValue={keyResult.currentValue}
-                            // `w-20` held five digits. A key result measuring
-                            // rupiah or impressions runs to nine, and a person
-                            // cannot check what they typed if the field hides
-                            // half of it. No `max`: the ceiling on a measure is
-                            // the unit's, not the product's.
-                            className="w-32 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
-                          />
-                          <label
-                            className="sr-only"
-                            htmlFor={`confidence-${keyResult.id}`}
-                          >
-                            {t("goals.detail.confidenceFor", {
-                              title: keyResult.title,
-                            })}
-                          </label>
-                          <input
-                            id={`confidence-${keyResult.id}`}
-                            name="confidence"
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            defaultValue={keyResult.confidence ?? 0.5}
-                            className="w-20"
-                          />
-                          <Button type="submit" size="sm">
-                            {t("common.save")}
-                          </Button>
-                        </ActionForm>
+                      {open && keyResult.kpiId === null ? (
+                        <KeyResultUpdate
+                          goalId={goal.id}
+                          keyResult={{
+                            id: keyResult.id,
+                            title: keyResult.title,
+                            currentValue: keyResult.currentValue,
+                            confidence: keyResult.confidence,
+                          }}
+                          lastStatus={lastStatus}
+                        />
                       ) : keyResult.kpiId ? (
                         <Chip tone="info">{t("common.fromAKpi")}</Chip>
                       ) : null}
@@ -489,13 +479,15 @@ export default async function GoalPage({
                 ))}
               </ul>
             )}
-            <p className="text-xs text-ink-4">
-              {t("goals.detail.keyResultsAreAdded")}{" "}
-              <a className="underline" href="/cycle?phase=4">
-                {t("goals.detail.phase4OfThe")}
-              </a>
-              .
-            </p>
+            {/* S-14's "+ Add key result" (P9-T08b), owned by the champion and
+             * due at the cycle's end, as a row added from the list is. */}
+            {open ? (
+              <AddKeyResult
+                goalId={goal.id}
+                ownerId={goal.champion.id}
+                dueOn={cycleEndsOn}
+              />
+            ) : null}
           </CardBody>
         </Card>
 
@@ -589,7 +581,6 @@ export default async function GoalPage({
                 <select
                   id="reassign-member"
                   name="memberId"
-                  required
                   className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
                 >
                   {members.map((member) => (
@@ -597,6 +588,12 @@ export default async function GoalPage({
                       {member.name}
                     </option>
                   ))}
+                  {/* Takes the reviewer off (P9-T04). Refused for the
+                   * champion, who is always somebody, and where the
+                   * workspace requires reviewers, each with the reason. */}
+                  <option value="">
+                    {t("goals.detail.nobodyReviewerOnly")}
+                  </option>
                 </select>
                 <Button type="submit" variant="ghost">
                   {t("common.reassign")}
@@ -716,8 +713,13 @@ export default async function GoalPage({
                       defaultValue="keep"
                       className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
                     >
+                      {/* §8.8's five, in its order (P9-T20e-a). */}
+                      <option value="achieved">
+                        {t("goals.detail.decisionAchieved")}
+                      </option>
                       <option value="keep">{t("goals.detail.keep")}</option>
                       <option value="modify">{t("goals.detail.modify")}</option>
+                      <option value="defer">{t("goals.detail.defer")}</option>
                       <option value="abandon">
                         {t("goals.detail.abandon")}
                       </option>

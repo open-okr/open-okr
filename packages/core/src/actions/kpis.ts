@@ -22,16 +22,29 @@ import {
   KPI_TIERS,
   keyResults,
   kpiCategories,
+  kpiDependencies,
   kpis,
   kpiTrees,
   newId,
+  proposedChanges,
   spaces,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { type KpiFrequency, normalisePeriod } from "@openokr/method";
-import { asc, eq, inArray, isNull, ne } from "drizzle-orm";
+import {
+  directionOfTargetType,
+  KPI_TARGET_TYPES,
+  type KpiDirection,
+  type KpiFrequency,
+  type KpiTargetType,
+  type KpiThresholds,
+  normalisePeriod,
+  targetTypeOfDirection,
+  thresholdsProblem,
+} from "@openokr/method";
+import { and, asc, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ensureContext } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -52,12 +65,219 @@ import {
 import { followKpisInTx } from "../kpis/linked.ts";
 import { draftRecoveryForKpi, launchRecoveryInTx } from "../kpis/recovery.ts";
 import {
+  isRecovering,
+  KPI_RULE_COLUMNS,
+  type KpiRule,
+  kpiResponsesInTx,
   loadKpiRecords,
+  readingOf,
   recomputeKpi,
+  shownState,
+  targetTypeOf,
+  thresholdsOf,
   upsertKpiRecord,
 } from "../kpis/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+
+/**
+ * §6.2's target type and thresholds, as `kpis.create` and `kpis.update` take
+ * them (P9-T17a). Each threshold is in the KPI's own units; null clears one,
+ * and none at all leaves the KPI on the ratio fallback.
+ */
+const ruleFields = {
+  targetType: z.enum(KPI_TARGET_TYPES).optional(),
+  greenLow: z.number().nullable().optional(),
+  greenHigh: z.number().nullable().optional(),
+  redLow: z.number().nullable().optional(),
+  redHigh: z.number().nullable().optional(),
+};
+
+type RuleInput = {
+  readonly direction?: KpiDirection;
+  readonly targetType?: KpiTargetType;
+  readonly greenLow?: number | null;
+  readonly greenHigh?: number | null;
+  readonly redLow?: number | null;
+  readonly redHigh?: number | null;
+};
+
+const FLIPPED: Readonly<Record<KpiTargetType, KpiTargetType>> = {
+  at_least: "at_most",
+  at_most: "at_least",
+  increase_to: "decrease_to",
+  decrease_to: "increase_to",
+  range: "range",
+};
+
+/**
+ * The columns a create or an update writes for a KPI's rule, refused in words
+ * when they cannot be judged (§6.2, P9-T17a).
+ *
+ * A direction alone still works, for a caller written before target types: it
+ * picks the type that faces that way. `direction` keeps being written beside
+ * the type, because the release before this one reads only that.
+ *
+ * A type uses only its own thresholds, so changing the type drops the stored
+ * ones it does not use. One given explicitly that the type does not use is
+ * refused rather than dropped, because the caller meant something by it.
+ */
+interface RuleColumns {
+  readonly targetType: KpiTargetType;
+  readonly direction: KpiDirection;
+  readonly greenLow: string | null;
+  readonly greenHigh: string | null;
+  readonly redLow: string | null;
+  readonly redHigh: string | null;
+}
+
+function ruleWrite(input: RuleInput, existing: KpiRule | null): RuleColumns {
+  const before = existing ? targetTypeOf(existing) : null;
+  let type: KpiTargetType;
+  if (input.targetType !== undefined) {
+    type = input.targetType;
+  } else if (input.direction !== undefined) {
+    type =
+      before === null
+        ? targetTypeOfDirection(input.direction)
+        : directionOfTargetType(before) === input.direction ||
+            before === "range"
+          ? before
+          : FLIPPED[before];
+  } else {
+    type = before ?? "at_least";
+  }
+
+  const stored = existing
+    ? thresholdsOf(existing)
+    : { greenLow: null, greenHigh: null, redLow: null, redHigh: null };
+  const merged: { -readonly [K in keyof KpiThresholds]: number | null } = {
+    greenLow: input.greenLow !== undefined ? input.greenLow : stored.greenLow,
+    greenHigh:
+      input.greenHigh !== undefined ? input.greenHigh : stored.greenHigh,
+    redLow: input.redLow !== undefined ? input.redLow : stored.redLow,
+    redHigh: input.redHigh !== undefined ? input.redHigh : stored.redHigh,
+  };
+  const facing = directionOfTargetType(type);
+  const unused: readonly (keyof KpiThresholds)[] =
+    facing === "higher_better"
+      ? ["greenHigh", "redHigh"]
+      : facing === "lower_better"
+        ? ["greenLow", "redLow"]
+        : [];
+  for (const key of unused) {
+    if (input[key] !== undefined && input[key] !== null) {
+      throw new OperationError(
+        "forbidden",
+        facing === "higher_better"
+          ? "A KPI that should stay high has a green value and a red value below it, not above."
+          : "A KPI that should stay low has a green value and a red value above it, not below.",
+      );
+    }
+    merged[key] = null;
+  }
+  const problem = thresholdsProblem(type, merged);
+  if (problem) {
+    throw new OperationError("forbidden", problem);
+  }
+
+  const text = (value: number | null) =>
+    value === null ? null : String(value);
+  return {
+    targetType: type,
+    direction:
+      facing ??
+      input.direction ??
+      (existing?.direction as KpiDirection | undefined) ??
+      "higher_better",
+    greenLow: text(merged.greenLow),
+    greenHigh: text(merged.greenHigh),
+    redLow: text(merged.redLow),
+    redHigh: text(merged.redHigh),
+  };
+}
+
+/**
+ * The recovery goal beside a KPI, for `isRecovering` (P9-T17b-a). Read with
+ * the left join `recoveryJoin` gives.
+ */
+const RECOVERY_COLUMNS = {
+  recoveryGoalId: kpis.recoveryGoalId,
+  recoveryGoalLive: goals.id,
+  recoveryGoalClosedAt: goals.closedAt,
+} as const;
+
+const recoveryJoin = and(
+  eq(goals.id, kpis.recoveryGoalId),
+  isNull(goals.deletedAt),
+);
+
+/** The named owner, joined beside where a KPI lives (P9-T17b-b). */
+const namedOwners = alias(workspaceMembers, "named_owner");
+
+/** The rule as every KPI read reports it (P9-T17a). */
+const ruleOutput = {
+  targetType: z.enum(KPI_TARGET_TYPES),
+  greenLow: z.number().nullable(),
+  greenHigh: z.number().nullable(),
+  redLow: z.number().nullable(),
+  redHigh: z.number().nullable(),
+  /**
+   * What decides this KPI's band: its own thresholds, or the ratio of current
+   * to target where it has none (§6.4). The ratio suits a positive number
+   * counted from zero and nothing else, so a screen says which it is reading.
+   */
+  basis: z.enum(["thresholds", "ratio"]),
+};
+
+function ruleOf(rule: KpiRule) {
+  const thresholds = thresholdsOf(rule);
+  return {
+    targetType: targetTypeOf(rule),
+    ...thresholds,
+    basis: readingOf(rule, null, null).basis,
+  };
+}
+
+/**
+ * A named owner, checked: an active person in this workspace, or nobody
+ * (§6.2, P9-T17b-b). An agent is a member too, and is refused, because §6.2
+ * says a person.
+ */
+async function namedOwner(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string | null,
+): Promise<string | null> {
+  if (memberId === null) {
+    return null;
+  }
+  const [member] = await tx
+    .select({ id: workspaceMembers.id, kind: workspaceMembers.kind })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.id, memberId),
+        eq(workspaceMembers.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (!member) {
+    throw new OperationError(
+      "not_found",
+      "No such member. A KPI's owner is a person who is still here.",
+    );
+  }
+  if (member.kind !== "human") {
+    throw new OperationError(
+      "forbidden",
+      "A KPI is owned by a person, not an agent.",
+    );
+  }
+  return member.id;
+}
 
 async function actingMember(
   tx: OperationTx,
@@ -151,13 +371,22 @@ export const createKpi = defineWriteAction({
   input: z.object({
     title: z.string().trim().min(1).max(500),
     frequency: z.enum(KPI_FREQUENCY_VALUES),
-    direction: z.enum(KPI_DIRECTION_VALUES).default("higher_better"),
+    /** Kept for callers written before target types; a type wins over it. */
+    direction: z.enum(KPI_DIRECTION_VALUES).optional(),
+    ...ruleFields,
     indicatorType: z.enum(["leading", "lagging"]).default("lagging"),
-    tier: z.enum(KPI_TIERS).default("output"),
+    /** Optional since P9-T17b-b (METHOD.md §6.2): none unless one is chosen. */
+    tier: z.enum(KPI_TIERS).nullable().optional(),
     aggregate: z.enum(KPI_AGGREGATES).default("sum"),
     ownerKind: z.enum(KPI_OWNER_KINDS).default("workspace"),
     spaceId: z.uuid().optional(),
     memberId: z.uuid().optional(),
+    /**
+     * The one named person who owns it (§6.2, P9-T17b-b), and who hears when
+     * it leaves its corridor. Where it lives is `ownerKind`. A KPI on a
+     * member's own list is owned by that member unless another is named.
+     */
+    ownerMemberId: z.uuid().nullable().optional(),
     categoryId: z.uuid().optional(),
     parentKpiId: z.uuid().optional(),
     unit: z.string().trim().max(60).optional(),
@@ -193,6 +422,8 @@ export const createKpi = defineWriteAction({
         );
       }
 
+      const rule = ruleWrite(input, null);
+
       const id = newId();
       const short = shortId();
       // openokr:allow-mutation: same transaction.
@@ -202,10 +433,16 @@ export const createKpi = defineWriteAction({
         shortId: short,
         title: input.title,
         frequency: input.frequency,
-        direction: input.direction,
+        ...rule,
         indicatorType: input.indicatorType,
-        tier: input.tier,
+        tier: input.tier ?? null,
         aggregate: input.aggregate,
+        ownerMemberId: await namedOwner(
+          tx,
+          workspaceId,
+          input.ownerMemberId ??
+            (input.ownerKind === "member" ? (input.memberId ?? null) : null),
+        ),
         ownerKind: input.ownerKind,
         spaceId: input.spaceId ?? null,
         memberId: input.memberId ?? null,
@@ -400,12 +637,16 @@ export const readKpiGrid = defineReadAction({
         unit: z.string().nullable(),
         direction: z.string(),
         indicatorType: z.string(),
-        tier: z.string(),
+        tier: z.string().nullable(),
+        /** The band, or no data. Never `recovering` since P9-T17b-a. */
         state: z.string(),
+        /** An open recovery objective, shown beside the band (§6.4). */
+        recovering: z.boolean(),
         achievementPct: z.number().nullable(),
         targetDefault: z.number().nullable(),
         healthyPct: z.number(),
         watchPct: z.number(),
+        ...ruleOutput,
         isCalculated: z.boolean(),
         /**
          * Who answers for this KPI, so the grid can filter by owner (P6-G30).
@@ -416,6 +657,9 @@ export const readKpiGrid = defineReadAction({
          */
         ownerId: z.uuid().nullable(),
         ownerName: z.string().nullable(),
+        /** The one named person who owns it (§6.2), when somebody is named. */
+        namedOwnerId: z.uuid().nullable(),
+        namedOwnerName: z.string().nullable(),
         /**
          * The expression behind a calculated cell (P6-G30).
          *
@@ -430,6 +674,12 @@ export const readKpiGrid = defineReadAction({
             actualValue: z.number().nullable(),
             targetValue: z.number().nullable(),
             remark: z.string().nullable(),
+            /**
+             * This period's own band, by the KPI's rule (P9-T17a), so a cell
+             * is coloured the way its state would be read rather than by a
+             * ratio the KPI may not use. Null with no value to judge.
+             */
+            band: z.enum(["healthy", "watch", "unhealthy"]).nullable(),
           }),
         ),
       }),
@@ -467,14 +717,12 @@ export const readKpiGrid = defineReadAction({
             categoryId: kpis.categoryId,
             frequency: kpis.frequency,
             unit: kpis.unit,
-            direction: kpis.direction,
             indicatorType: kpis.indicatorType,
             tier: kpis.tier,
             state: kpis.state,
             achievementPct: kpis.achievementPct,
             targetDefault: kpis.targetDefault,
-            healthyPct: kpis.healthyPct,
-            watchPct: kpis.watchPct,
+            ...KPI_RULE_COLUMNS,
             isCalculated: kpis.isCalculated,
             // **The owner is a kind and one of two columns**, not a single
             // id: a KPI belongs to the workspace, a space or a member
@@ -486,10 +734,15 @@ export const readKpiGrid = defineReadAction({
             spaceId: kpis.spaceId,
             spaceName: spaces.name,
             formula: kpis.formula,
+            ...RECOVERY_COLUMNS,
+            namedOwnerId: kpis.ownerMemberId,
+            namedOwnerName: namedOwners.name,
           })
           .from(kpis)
           .leftJoin(workspaceMembers, eq(workspaceMembers.id, kpis.memberId))
           .leftJoin(spaces, eq(spaces.id, kpis.spaceId))
+          .leftJoin(goals, recoveryJoin)
+          .leftJoin(namedOwners, eq(namedOwners.id, kpis.ownerMemberId))
           .where(activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)))
           .orderBy(asc(kpis.position), asc(kpis.title));
 
@@ -503,6 +756,9 @@ export const readKpiGrid = defineReadAction({
           );
           out.push({
             ...kpi,
+            ...ruleOf(kpi),
+            state: shownState(kpi),
+            recovering: isRecovering(kpi),
             achievementPct:
               kpi.achievementPct === null ? null : Number(kpi.achievementPct),
             targetDefault:
@@ -524,14 +780,28 @@ export const readKpiGrid = defineReadAction({
                   ? kpi.formula
                   : JSON.stringify(kpi.formula),
             watchPct: Number(kpi.watchPct),
-            records: records.map((record) => ({
-              periodStart: String(record.periodStart),
-              actualValue:
-                record.actualValue === null ? null : Number(record.actualValue),
-              targetValue:
-                record.targetValue === null ? null : Number(record.targetValue),
-              remark: record.remark,
-            })),
+            records: records.map((record) => {
+              const actual =
+                record.actualValue === null ? null : Number(record.actualValue);
+              const target =
+                record.targetValue === null ? null : Number(record.targetValue);
+              return {
+                periodStart: String(record.periodStart),
+                actualValue: actual,
+                targetValue: target,
+                remark: record.remark,
+                // A period with no target of its own is read against the
+                // standing one, as the recompute reads it.
+                band: readingOf(
+                  kpi,
+                  actual,
+                  target ??
+                    (kpi.targetDefault === null
+                      ? null
+                      : Number(kpi.targetDefault)),
+                ).band,
+              };
+            }),
           });
         }
 
@@ -718,8 +988,12 @@ export const updateKpi = defineWriteAction({
     title: z.string().trim().min(1).max(500).optional(),
     unit: z.string().trim().max(60).nullable().optional(),
     direction: z.enum(KPI_DIRECTION_VALUES).optional(),
+    ...ruleFields,
     indicatorType: z.enum(["leading", "lagging"]).optional(),
-    tier: z.enum(KPI_TIERS).optional(),
+    /** Null takes the tier away, which §6.2 allows. */
+    tier: z.enum(KPI_TIERS).nullable().optional(),
+    /** The named owner (§6.2); null leaves it unnamed. */
+    ownerMemberId: z.uuid().nullable().optional(),
     targetDefault: z.number().nullable().optional(),
     /** Null detaches it, which makes it a root of its own. */
     parentKpiId: z.uuid().nullable().optional(),
@@ -745,8 +1019,7 @@ export const updateKpi = defineWriteAction({
       const [existing] = await tx
         .select({
           id: kpis.id,
-          healthyPct: kpis.healthyPct,
-          watchPct: kpis.watchPct,
+          ...KPI_RULE_COLUMNS,
         })
         .from(kpis)
         .where(
@@ -812,14 +1085,28 @@ export const updateKpi = defineWriteAction({
       if (input.unit !== undefined) {
         set.unit = input.unit;
       }
-      if (input.direction !== undefined) {
-        set.direction = input.direction;
+      const ruleTouched =
+        input.direction !== undefined ||
+        input.targetType !== undefined ||
+        input.greenLow !== undefined ||
+        input.greenHigh !== undefined ||
+        input.redLow !== undefined ||
+        input.redHigh !== undefined;
+      if (ruleTouched) {
+        Object.assign(set, ruleWrite(input, existing));
       }
       if (input.indicatorType !== undefined) {
         set.indicatorType = input.indicatorType;
       }
       if (input.tier !== undefined) {
         set.tier = input.tier;
+      }
+      if (input.ownerMemberId !== undefined) {
+        set.ownerMemberId = await namedOwner(
+          tx,
+          workspaceId,
+          input.ownerMemberId,
+        );
       }
       if (input.targetDefault !== undefined) {
         set.targetDefault =
@@ -968,7 +1255,9 @@ export const launchKpiRecovery = defineWriteAction({
     goalId: z.uuid(),
     keyResultIds: z.array(z.uuid()),
     startedPct: z.number().nullable(),
+    /** The KPI's band, which the launch does not change (P9-T17b-a). */
     state: z.string(),
+    recovering: z.boolean(),
   }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -996,7 +1285,8 @@ export const launchKpiRecovery = defineWriteAction({
           goalId: launched.goalId,
           keyResultIds: [...launched.keyResultIds],
           startedPct: launched.startedPct,
-          state: "recovering",
+          state: launched.state,
+          recovering: true,
         },
         activity: {
           kind: "kpi.recovery_launched" as const,
@@ -1018,6 +1308,172 @@ export const launchKpiRecovery = defineWriteAction({
   }),
 });
 
+/**
+ * How an unhealthy KPI was answered, when it was not with a recovery
+ * (METHOD.md §6.5, P9-T18b).
+ *
+ * §6.5 offers three responses. A recovery has its own launch. The other two
+ * are work created through their own writes, which keep their own rules: a
+ * task fixed now is `tasks.create`, with its owner and its date, and a key
+ * result for it on an existing objective is `goals.addKeyResult`, which marks
+ * one added mid-cycle and asks the practice. This records which one answers
+ * the KPI, so the recovery board shows the answer instead of offering the
+ * three again, and the coach does not propose a recovery for a KPI somebody
+ * has already answered.
+ */
+export const recordKpiResponse = defineWriteAction({
+  name: "kpis.recordResponse",
+  summary:
+    "Records how an unhealthy KPI was answered: fixed now as a task, or by a key result on an existing objective.",
+  input: z.object({
+    kpiId: z.uuid(),
+    kind: z.enum(["fix_now", "key_result"]),
+    /** The task that fixes it, for `fix_now`. */
+    taskId: z.uuid().optional(),
+    /** The key result that answers it, for `key_result`. */
+    keyResultId: z.uuid().optional(),
+  }),
+  output: z.object({
+    kpiId: z.uuid(),
+    kind: z.enum(["fix_now", "key_result"]),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [kpi] = await tx
+        .select({ id: kpis.id, title: kpis.title })
+        .from(kpis)
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        )
+        .limit(1);
+      if (!kpi) {
+        throw new OperationError("not_found", "No such KPI.");
+      }
+
+      let subjectId: string;
+      if (input.kind === "fix_now") {
+        if (!input.taskId) {
+          throw new OperationError(
+            "forbidden",
+            "Fixing it now needs the task that does it.",
+          );
+        }
+        // The task must be one this member can see: a response pointing at
+        // work they cannot open would answer nothing they could follow.
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "task",
+          resourceId: input.taskId,
+          requires: ACCESS_LEVELS.view,
+        });
+        subjectId = input.taskId;
+      } else {
+        if (!input.keyResultId) {
+          throw new OperationError(
+            "forbidden",
+            "Answering it with a key result needs the key result.",
+          );
+        }
+        const [keyResult] = await tx
+          .select({ goalId: keyResults.goalId })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, workspaceId),
+              eq(keyResults.id, input.keyResultId),
+            ),
+          )
+          .limit(1);
+        if (!keyResult) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "goal",
+          resourceId: keyResult.goalId,
+          requires: ACCESS_LEVELS.view,
+        });
+        subjectId = input.keyResultId;
+      }
+
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(kpis)
+        .set({
+          responseKind: input.kind,
+          responseTaskId: input.kind === "fix_now" ? subjectId : null,
+          responseKeyResultId: input.kind === "key_result" ? subjectId : null,
+          respondedByMemberId: memberId,
+          respondedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        );
+
+      // A recovery the coach proposed for it is answered too: the decision
+      // was made another way, and leaving the proposal in the inbox would ask
+      // for it twice. Settled as dismissed by whoever answered, which is what
+      // the inbox would have recorded had they pressed dismiss.
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      const settled = await tx
+        .update(proposedChanges)
+        .set({
+          status: "dismissed",
+          decidedByMemberId: memberId,
+          decidedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(proposedChanges.workspaceId, workspaceId),
+            eq(proposedChanges.status, "pending"),
+            eq(proposedChanges.action, "kpis.launchRecovery"),
+            eq(proposedChanges.subjectType, "kpi"),
+            eq(proposedChanges.subjectId, input.kpiId),
+          ),
+        )
+        .returning({ id: proposedChanges.id });
+
+      return {
+        result: { kpiId: input.kpiId, kind: input.kind },
+        activity: {
+          kind: "kpi.responded" as const,
+          subjectType: "kpi" as const,
+          subjectId: input.kpiId,
+          payload: { response: input.kind },
+        },
+        audit: {
+          action: "kpis.recordResponse",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: {
+            response: input.kind,
+            subjectId,
+            settledProposalIds: settled.map((row) => row.id),
+          },
+        },
+      };
+    },
+  }),
+});
+
 export const readRecoveryBoard = defineReadAction({
   name: "kpis.recoveryBoard",
   summary:
@@ -1031,12 +1487,38 @@ export const readRecoveryBoard = defineReadAction({
         title: z.string(),
         treeId: z.uuid().nullable(),
         treeName: z.string().nullable(),
+        /** The real band. Never `recovering` since P9-T17b-a. */
         state: z.string(),
+        /** An open recovery objective, shown beside the band (§6.4). */
+        recovering: z.boolean(),
+        /**
+         * How it was answered other than by a recovery (§6.5, P9-T18b): a
+         * task fixing it now, or a key result on an existing objective, and
+         * whether that answer is still open. Null when nobody has answered.
+         */
+        response: z
+          .object({
+            kind: z.enum(["fix_now", "key_result"]),
+            /** Null with the title when the reader cannot open it. */
+            subjectId: z.uuid().nullable(),
+            title: z.string().nullable(),
+            dueOn: z.string().nullable(),
+            goalId: z.uuid().nullable(),
+            goalTitle: z.string().nullable(),
+            open: z.boolean(),
+          })
+          .nullable(),
         achievementPct: z.number().nullable(),
         effectivePct: z.number().nullable(),
         healthyPct: z.number(),
         watchPct: z.number(),
         unit: z.string().nullable(),
+        /**
+         * Where it lives and who owns it, so fixing it now can default the
+         * task's space and owner (§6.5, P9-T18b).
+         */
+        spaceId: z.uuid().nullable(),
+        ownerMemberId: z.uuid().nullable(),
         recovery: z
           .object({
             goalId: z.uuid(),
@@ -1077,25 +1559,52 @@ export const readRecoveryBoard = defineReadAction({
             healthyPct: kpis.healthyPct,
             watchPct: kpis.watchPct,
             unit: kpis.unit,
+            spaceId: kpis.spaceId,
+            ownerMemberId: kpis.ownerMemberId,
             recoveryGoalId: kpis.recoveryGoalId,
             recoveryStartedPct: kpis.recoveryStartedPct,
             recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
             goalTitle: goals.title,
             goalProgress: goals.progressPct,
             goalClosedAt: goals.closedAt,
+            recoveryGoalLive: goals.id,
+            recoveryGoalClosedAt: goals.closedAt,
+            responseKind: kpis.responseKind,
+            responseTaskId: kpis.responseTaskId,
+            responseKeyResultId: kpis.responseKeyResultId,
           })
           .from(kpis)
           .leftJoin(kpiTrees, eq(kpiTrees.id, kpis.treeId))
-          .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
+          .leftJoin(goals, recoveryJoin)
           .where(
-            activeOnly(
-              kpis,
-              eq(kpis.workspaceId, context.workspaceId),
-              inArray(kpis.state, ["unhealthy", "recovering"]),
+            and(
+              activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)),
+              // Unhealthy, or under an open recovery whatever its band now
+              // (P9-T17b-a): a recovery that has lifted the KPI into watch is
+              // still in flight, and dropping it from the board the day the
+              // band moved would lose the thing being watched. A stored
+              // `recovering` from before the change counts as the latter.
+              or(
+                eq(kpis.state, "unhealthy"),
+                eq(kpis.state, "recovering"),
+                and(isNotNull(goals.id), isNull(goals.closedAt)),
+              ),
             ),
           )
           .orderBy(asc(kpis.title));
 
+        const responses = await kpiResponsesInTx(
+          tx as OperationTx,
+          context.workspaceId,
+          rows,
+          {
+            memberId: await actingMember(
+              tx as OperationTx,
+              context.workspaceId,
+              userId,
+            ),
+          },
+        );
         const counts = new Map<string, number>();
         const goalIds = rows
           .map((row) => row.recoveryGoalId)
@@ -1123,7 +1632,9 @@ export const readRecoveryBoard = defineReadAction({
             title: row.title,
             treeId: row.treeId,
             treeName: row.treeName,
-            state: row.state,
+            state: shownState(row),
+            recovering: isRecovering(row),
+            response: responses.get(row.id) ?? null,
             achievementPct:
               row.achievementPct === null ? null : Number(row.achievementPct),
             effectivePct:
@@ -1131,6 +1642,8 @@ export const readRecoveryBoard = defineReadAction({
             healthyPct: Number(row.healthyPct),
             watchPct: Number(row.watchPct),
             unit: row.unit,
+            spaceId: row.spaceId,
+            ownerMemberId: row.ownerMemberId,
             recovery:
               row.recoveryGoalId && row.goalTitle
                 ? {
@@ -1160,9 +1673,12 @@ const kpiTreeNode = z.object({
   title: z.string(),
   unit: z.string().nullable(),
   indicatorType: z.string(),
-  tier: z.string(),
+  tier: z.string().nullable(),
   direction: z.string(),
+  /** The band, or no data. Never `recovering` since P9-T17b-a. */
   state: z.string(),
+  /** An open recovery objective, shown beside the band (§6.4). */
+  recovering: z.boolean(),
   achievementPct: z.number().nullable(),
   effectivePct: z.number().nullable(),
   healthyPct: z.number(),
@@ -1170,6 +1686,13 @@ const kpiTreeNode = z.object({
   targetDefault: z.number().nullable(),
   recoveryGoalId: z.uuid().nullable(),
   recoveryProgressPct: z.number().nullable(),
+  /**
+   * How this KPI drives its parent (§6.3, P9-T17b-a): `formula` when it is
+   * part of the parent's calculation, `influence` when it is believed to move
+   * it. Read from the parent's formula rather than stored, so the two cannot
+   * disagree. Null for a root or a KPI that stands alone.
+   */
+  link: z.enum(["formula", "influence"]).nullable(),
 });
 type TreeNode = z.infer<typeof kpiTreeNode>;
 
@@ -1194,31 +1717,68 @@ const KPI_TREE_NODE_COLUMNS = {
   watchPct: kpis.watchPct,
   targetDefault: kpis.targetDefault,
   recoveryGoalId: kpis.recoveryGoalId,
+  recoveryGoalLive: goals.id,
+  recoveryGoalClosedAt: goals.closedAt,
   recoveryProgress: goals.progressPct,
   position: kpis.position,
 };
+
+/**
+ * Every parent-to-child pair where the parent's formula reads the child, as
+ * `parent child` (§6.3, P9-T17b-a). One query over the nodes a read returns.
+ */
+async function formulaLinksInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  parentIds: readonly string[],
+): Promise<ReadonlySet<string>> {
+  if (parentIds.length === 0) {
+    return new Set();
+  }
+  const rows = await tx
+    .select({
+      dependentKpiId: kpiDependencies.dependentKpiId,
+      dependsOnKpiId: kpiDependencies.dependsOnKpiId,
+    })
+    .from(kpiDependencies)
+    .where(
+      activeOnly(
+        kpiDependencies,
+        eq(kpiDependencies.workspaceId, workspaceId),
+        inArray(kpiDependencies.dependentKpiId, [...new Set(parentIds)]),
+      ),
+    );
+  return new Set(
+    rows.map((row) => `${row.dependentKpiId} ${row.dependsOnKpiId}`),
+  );
+}
 
 /** A numeric column as a number, or null when it holds none. */
 const numberOrNull = (value: string | null): number | null =>
   value === null ? null : Number(value);
 
-function toTreeNode(row: {
-  readonly id: string;
-  readonly parentKpiId: string | null;
-  readonly title: string;
-  readonly unit: string | null;
-  readonly indicatorType: string;
-  readonly tier: string;
-  readonly direction: string;
-  readonly state: string;
-  readonly achievementPct: string | null;
-  readonly effectivePct: string | null;
-  readonly healthyPct: string;
-  readonly watchPct: string;
-  readonly targetDefault: string | null;
-  readonly recoveryGoalId: string | null;
-  readonly recoveryProgress: string | null;
-}): TreeNode {
+function toTreeNode(
+  formulaLinks: ReadonlySet<string>,
+  row: {
+    readonly id: string;
+    readonly parentKpiId: string | null;
+    readonly title: string;
+    readonly unit: string | null;
+    readonly indicatorType: string;
+    readonly tier: string | null;
+    readonly direction: string;
+    readonly state: string;
+    readonly achievementPct: string | null;
+    readonly effectivePct: string | null;
+    readonly healthyPct: string;
+    readonly watchPct: string;
+    readonly targetDefault: string | null;
+    readonly recoveryGoalId: string | null;
+    readonly recoveryGoalLive: string | null;
+    readonly recoveryGoalClosedAt: Date | null;
+    readonly recoveryProgress: string | null;
+  },
+): TreeNode {
   return {
     id: row.id,
     parentKpiId: row.parentKpiId,
@@ -1227,7 +1787,8 @@ function toTreeNode(row: {
     indicatorType: row.indicatorType,
     tier: row.tier,
     direction: row.direction,
-    state: row.state,
+    state: shownState(row),
+    recovering: isRecovering(row),
     achievementPct: numberOrNull(row.achievementPct),
     effectivePct: numberOrNull(row.effectivePct),
     healthyPct: Number(row.healthyPct),
@@ -1235,6 +1796,12 @@ function toTreeNode(row: {
     targetDefault: numberOrNull(row.targetDefault),
     recoveryGoalId: row.recoveryGoalId,
     recoveryProgressPct: numberOrNull(row.recoveryProgress),
+    link:
+      row.parentKpiId === null
+        ? null
+        : formulaLinks.has(`${row.parentKpiId} ${row.id}`)
+          ? "formula"
+          : "influence",
   };
 }
 
@@ -1280,7 +1847,7 @@ export const readKpiTree = defineReadAction({
         const rows = await tx
           .select(KPI_TREE_NODE_COLUMNS)
           .from(kpis)
-          .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
+          .leftJoin(goals, recoveryJoin)
           .where(
             activeOnly(
               kpis,
@@ -1290,7 +1857,16 @@ export const readKpiTree = defineReadAction({
           )
           .orderBy(asc(kpis.position), asc(kpis.title));
 
-        return { trees, treeId, nodes: rows.map(toTreeNode) };
+        const links = await formulaLinksInTx(
+          tx,
+          context.workspaceId,
+          rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
+        );
+        return {
+          trees,
+          treeId,
+          nodes: rows.map((row) => toTreeNode(links, row)),
+        };
       },
     );
   },
@@ -1360,7 +1936,7 @@ export const readSpaceKpiTrees = defineReadAction({
             treePosition: kpiTrees.position,
           })
           .from(kpis)
-          .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
+          .leftJoin(goals, recoveryJoin)
           .leftJoin(
             kpiTrees,
             activeOnly(
@@ -1383,6 +1959,11 @@ export const readSpaceKpiTrees = defineReadAction({
             asc(kpis.title),
           );
 
+        const links = await formulaLinksInTx(
+          tx,
+          context.workspaceId,
+          rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
+        );
         // A tree that was deleted leaves its KPIs pointing at nothing live, so
         // they are grouped with the unfiled ones rather than under a name
         // nobody can open.
@@ -1397,7 +1978,7 @@ export const readSpaceKpiTrees = defineReadAction({
             name: key === null ? null : row.treeName,
             nodes: [],
           };
-          group.nodes.push(toTreeNode(row));
+          group.nodes.push(toTreeNode(links, row));
           groups.set(key, group);
         }
         const unfiled = groups.get(null);
@@ -1425,22 +2006,31 @@ export const readKpiDetail = defineReadAction({
       title: z.string(),
       categoryName: z.string().nullable(),
       ownerName: z.string().nullable(),
+      /** The one named person who owns it (§6.2), when somebody is named. */
+      namedOwnerId: z.uuid().nullable(),
+      namedOwnerName: z.string().nullable(),
       frequency: z.string(),
       unit: z.string().nullable(),
       direction: z.string(),
       indicatorType: z.string(),
-      tier: z.string(),
+      tier: z.string().nullable(),
+      /** The band, or no data. Never `recovering` since P9-T17b-a. */
       state: z.string(),
+      /** An open recovery objective, shown beside the band (§6.4). */
+      recovering: z.boolean(),
       achievementPct: z.number().nullable(),
       effectivePct: z.number().nullable(),
       healthyPct: z.number(),
       watchPct: z.number(),
+      ...ruleOutput,
       targetDefault: z.number().nullable(),
       isCalculated: z.boolean(),
       formula: z.unknown(),
       treeId: z.uuid().nullable(),
       treeName: z.string().nullable(),
       recoveryGoalId: z.uuid().nullable(),
+      /** How far the recovery objective has got, shown beside the reading. */
+      recoveryProgressPct: z.number().nullable(),
       recoveryStartedPct: z.number().nullable(),
     }),
     parent: z
@@ -1488,29 +2078,32 @@ export const readKpiDetail = defineReadAction({
             title: kpis.title,
             categoryName: kpiCategories.name,
             ownerName: workspaceMembers.name,
+            namedOwnerId: kpis.ownerMemberId,
+            namedOwnerName: namedOwners.name,
             frequency: kpis.frequency,
             unit: kpis.unit,
-            direction: kpis.direction,
             indicatorType: kpis.indicatorType,
             tier: kpis.tier,
             state: kpis.state,
             achievementPct: kpis.achievementPct,
             effectivePct: kpis.effectivePct,
-            healthyPct: kpis.healthyPct,
-            watchPct: kpis.watchPct,
+            ...KPI_RULE_COLUMNS,
             targetDefault: kpis.targetDefault,
             isCalculated: kpis.isCalculated,
             formula: kpis.formula,
             treeId: kpis.treeId,
             treeName: kpiTrees.name,
             parentKpiId: kpis.parentKpiId,
-            recoveryGoalId: kpis.recoveryGoalId,
+            ...RECOVERY_COLUMNS,
+            recoveryProgress: goals.progressPct,
             recoveryStartedPct: kpis.recoveryStartedPct,
           })
           .from(kpis)
           .leftJoin(kpiCategories, eq(kpiCategories.id, kpis.categoryId))
           .leftJoin(workspaceMembers, eq(workspaceMembers.id, kpis.memberId))
           .leftJoin(kpiTrees, eq(kpiTrees.id, kpis.treeId))
+          .leftJoin(goals, recoveryJoin)
+          .leftJoin(namedOwners, eq(namedOwners.id, kpis.ownerMemberId))
           .where(
             activeOnly(
               kpis,
@@ -1604,18 +2197,22 @@ export const readKpiDetail = defineReadAction({
             title: kpi.title,
             categoryName: kpi.categoryName,
             ownerName: kpi.ownerName,
+            namedOwnerId: kpi.namedOwnerId,
+            namedOwnerName: kpi.namedOwnerName,
             frequency: kpi.frequency,
             unit: kpi.unit,
             direction: kpi.direction,
             indicatorType: kpi.indicatorType,
             tier: kpi.tier,
-            state: kpi.state,
+            state: shownState(kpi),
+            recovering: isRecovering(kpi),
             achievementPct:
               kpi.achievementPct === null ? null : Number(kpi.achievementPct),
             effectivePct:
               kpi.effectivePct === null ? null : Number(kpi.effectivePct),
             healthyPct: Number(kpi.healthyPct),
             watchPct: Number(kpi.watchPct),
+            ...ruleOf(kpi),
             targetDefault:
               kpi.targetDefault === null ? null : Number(kpi.targetDefault),
             isCalculated: kpi.isCalculated,
@@ -1623,6 +2220,10 @@ export const readKpiDetail = defineReadAction({
             treeId: kpi.treeId,
             treeName: kpi.treeName,
             recoveryGoalId: kpi.recoveryGoalId,
+            recoveryProgressPct:
+              kpi.recoveryProgress === null
+                ? null
+                : Number(kpi.recoveryProgress),
             recoveryStartedPct:
               kpi.recoveryStartedPct === null
                 ? null
@@ -1660,6 +2261,9 @@ export const readRecoveryDraft = defineReadAction({
   output: z
     .object({
       objective: z.string(),
+      /** Names the KPI and leaves the why to its owner (§6.5, P9-T18a). */
+      description: z.string(),
+      kind: z.enum(["committed"]),
       keyResults: z.array(
         z.object({
           title: z.string(),
@@ -1668,6 +2272,8 @@ export const readRecoveryDraft = defineReadAction({
           target: z.number(),
           ownerMemberId: z.uuid().nullable(),
           sourceKpiId: z.uuid().nullable(),
+          /** The first key result reads the KPI it is. */
+          kpiBacked: z.boolean(),
         }),
       ),
     })
@@ -1692,7 +2298,12 @@ export const readRecoveryDraft = defineReadAction({
           Number(rhythm.thresholds["kpi.recoveryKeyResultCap"]),
         );
         return draft
-          ? { objective: draft.objective, keyResults: [...draft.keyResults] }
+          ? {
+              objective: draft.objective,
+              description: draft.description,
+              kind: draft.kind,
+              keyResults: [...draft.keyResults],
+            }
           : null;
       },
     );

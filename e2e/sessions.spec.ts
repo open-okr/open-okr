@@ -166,7 +166,7 @@ test("scheduled state — step rail and controls visible", async () => {
   // page gains a second mention of a word.
   const rail = page.locator("ol").first();
   await expect(rail.getByText("Confidence round")).toBeVisible();
-  await expect(rail.getByText("Diagnose what is low")).toBeVisible();
+  await expect(rail.getByText("Discuss what dropped")).toBeVisible();
   await expect(rail.getByText("Commitments")).toBeVisible();
   await expect(rail.getByText("Digest")).toBeVisible();
 
@@ -192,7 +192,7 @@ test("facilitator opens the session — stage 1 becomes active", async () => {
 /**
  * **Un-skipped at P5-T01a, and rewritten, because it could not fail before.**
  *
- * It asserted that the second client shows "Diagnose what is low" after the
+ * It asserted that the second client shows "Discuss what dropped" after the
  * advance. That is a weekly step title, and the rail renders all four titles at
  * every stage, so the assertion held before the advance as well as after it.
  * P4-T07a's acceptance criterion was never actually proven.
@@ -246,7 +246,7 @@ test("acceptance criterion: second context sees stage advance without reload", a
   // in this context at all: the only thing that touched it was the event the
   // relay delivered.
   await expect(secondPage.locator("li[aria-current=\"step\"]")).toContainText(
-    "Diagnose what is low",
+    "Discuss what dropped",
     { timeout: 8_000 },
   );
 
@@ -260,7 +260,7 @@ test("acceptance criterion: second context sees stage advance without reload", a
 /**
  * §7.2 step 2, which rendered nothing at all before P6-G19b.
  *
- * The rail is at "Diagnose what is low" when this starts, left there by the
+ * The rail is at "Discuss what dropped" when this starts, left there by the
  * test above.
  *
  * **The raise is not exercised end to end here, and the fixture is why.** This
@@ -278,10 +278,13 @@ test("the diagnose stage offers the blocker controls", async () => {
   await expect(page.getByRole("heading", { name: "Blockers" })).toBeVisible();
   await expect(page.getByText("Nothing raised in this session yet")).toBeVisible();
 
-  // §6.2's five types, from the method package rather than from a list typed
-  // into the component.
+  // §7.3's seven types since P9-T19a-a, from the method package rather than
+  // from a list typed into the component.
   const types = page.locator("select[name='type'] option");
-  await expect(types).toHaveCount(6); // the five, plus "What kind"
+  await expect(types).toHaveCount(8); // the seven, plus "What kind"
+  await expect(types.filter({ hasText: "Approach not working" })).toHaveCount(
+    1,
+  );
   await expect(page.getByRole("button", { name: "Raise a blocker" })).toBeVisible();
 });
 
@@ -292,7 +295,7 @@ test("the diagnose stage offers the blocker controls", async () => {
 /**
  * §7.2 step 3, which had no surface until P6-G19a.
  *
- * The rail is at "Diagnose what is low" when this starts, because the test
+ * The rail is at "Discuss what dropped" when this starts, because the test
  * above advanced it there. One more step reaches the commitments stage rather
  * than hunting for it, which keeps this test about the stage and not about
  * navigation.
@@ -319,16 +322,19 @@ test("the commitment stage closes last week and sets this week", async () => {
 
   // The bounds are stated, and they come from the workspace's resolved §11
   // numbers rather than from a sentence written into the component.
-  await expect(page.getByText("2 to 3 a week")).toBeVisible();
+  // Three or four since P9-T19a-d-c.
+  await expect(page.getByText("3 to 4 a week")).toBeVisible();
 
-  // Two commitments, each with an owner. The owner select lists the session's
-  // participants.
+  // Three commitments, each with an owner. The owner select lists the
+  // session's participants.
   const texts = page.locator("input[name='text']");
   const owners = page.locator("select[name='ownerId']");
   await texts.nth(0).fill("Ship the onboarding flow");
   await owners.nth(0).selectOption({ index: 1 });
   await texts.nth(1).fill("Review the pipeline");
   await owners.nth(1).selectOption({ index: 1 });
+  await texts.nth(2).fill("Call the two stalled accounts");
+  await owners.nth(2).selectOption({ index: 1 });
 
   await page
     .getByRole("button", { name: "Set this week's commitments" })
@@ -341,6 +347,15 @@ test("the commitment stage closes last week and sets this week", async () => {
   // Set, and the form now offers one more row rather than the whole set again,
   // because the action appends.
   await expect(page.getByRole("button", { name: "Add one more" })).toBeVisible();
+
+  // The week's wins (§7.2 step 3, P9-T19a-d-c), kept on the session for its
+  // digest.
+  await expect(
+    page.getByRole("heading", { name: "The week's wins" }),
+  ).toBeVisible();
+  await page.getByLabel("Win 1").fill("Pricing page live");
+  await page.getByRole("button", { name: "Save the wins" }).click();
+  await expect(page.getByText("1 named")).toBeVisible({ timeout: 10_000 });
 });
 
 // ---------------------------------------------------------------------------

@@ -18,7 +18,13 @@
  * nudge rows, the inbox rows and the audit row commit together or not at all.
  */
 import { activeOnly, blockers, cycles, type WorkspaceTx } from "@openokr/db";
-import { deferralFor, type SuppressionReason } from "@openokr/method";
+import {
+  DELEGATED_TRIGGERS,
+  deferralFor,
+  leaveOn,
+  type SuppressionReason,
+  standInFor,
+} from "@openokr/method";
 import {
   desc,
   eq,
@@ -33,8 +39,10 @@ import { sweepDivergenceInTx } from "../alignment/divergence.ts";
 import { sweepSemanticInTx } from "../alignment/semantic.ts";
 import { sweepStaleness } from "../cadence/service.ts";
 import { localTimeIn } from "../channels/members.ts";
+import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { leavesOnInTx } from "../people/leave.ts";
 import { deliverDueNudges, unreachableRecipients } from "./deliver.ts";
 import { resolveRhythmWithLadders } from "./ladders.ts";
 import { dueQualityNudges } from "./quality.ts";
@@ -45,6 +53,7 @@ import {
 } from "./quality-triggers.ts";
 import {
   dueCommitmentNudges,
+  dueCommittedFloorNudges,
   dueCriticalConfidenceNudges,
   duePhaseBlockedNudges,
   dueStreakNudges,
@@ -239,6 +248,13 @@ export async function runDueNudgesInTx(
         thresholds,
         ...scoped,
       })),
+      // §3.2's committed floor at a check-in (P9-T11b-c), beside it.
+      ...(await dueCommittedFloorNudges(tx, {
+        workspaceId,
+        now: at,
+        thresholds,
+        ...scoped,
+      })),
       ...(await dueWeeklyDigestNudges(tx, {
         workspaceId,
         now: at,
@@ -369,12 +385,32 @@ export async function runDueNudgesInTx(
     );
   }
 
+  // Somebody on leave is nudged about nothing (§7.4, P9-T19b-b). The check-in
+  // on a goal they champion and the acknowledgement they would owe go to
+  // whoever stands in for them; everything else is recorded and held.
+  const today = formatLocalDate(localDateIn(at, timeZone));
+  const leaves = await leavesOnInTx(tx, workspaceId, today);
+  const routed =
+    leaves.length === 0
+      ? due
+      : due.map((entry) => {
+          if (!leaveOn(entry.recipientMemberId, today, leaves)) {
+            return entry;
+          }
+          const standIn = DELEGATED_TRIGGERS.includes(entry.ruleKey)
+            ? standInFor(entry.recipientMemberId, today, leaves)
+            : null;
+          return standIn
+            ? { ...entry, recipientMemberId: standIn }
+            : { ...entry, onLeave: true };
+        });
+
   // A suspended member is never nudged. §4.3's access getter excludes them from
   // every read, and a nudge to somebody who cannot open the product is an email
   // to a former colleague.
   const active = await activeMemberIds(tx, workspaceId);
-  const deliverable = due.filter((entry) =>
-    active.has(entry.recipientMemberId),
+  const deliverable = onePerSubject(
+    routed.filter((entry) => active.has(entry.recipientMemberId)),
   );
 
   // Suppression decided before anything is written, so a swallowed nudge is a
@@ -568,4 +604,34 @@ export async function runAgentNudgesInTx(
     throw new Error("The sandboxed run produced no result.");
   }
   return simulated;
+}
+
+/**
+ * One due nudge per recipient, subject and rule within a run, at the highest
+ * escalation step any source asked for (P9-T16b-a).
+ *
+ * Suppression is decided for the whole batch before anything is written, so
+ * the deduplication window cannot see a twin raised in the same run. One was:
+ * an alignment finding is stored once per scope, workspace and space, and the
+ * reader turned each row into a nudge, so a level skip reached its champion
+ * twice in the same minute.
+ */
+function onePerSubject<
+  T extends {
+    readonly ruleKey: string;
+    readonly subjectType: string;
+    readonly subjectId: string;
+    readonly recipientMemberId: string;
+    readonly escalationStep: number;
+  },
+>(due: readonly T[]): T[] {
+  const kept = new Map<string, T>();
+  for (const entry of due) {
+    const key = `${entry.recipientMemberId} ${entry.subjectType} ${entry.subjectId} ${entry.ruleKey}`;
+    const seen = kept.get(key);
+    if (!seen || entry.escalationStep > seen.escalationStep) {
+      kept.set(key, entry);
+    }
+  }
+  return [...kept.values()];
 }

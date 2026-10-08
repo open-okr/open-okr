@@ -338,6 +338,16 @@ export function ImportWizard({
                 })}
               </p>
             ) : null}
+            {/* What the file did not say, so what every row took. */}
+            {report.assumed.map((sentence) => (
+              <p
+                key={sentence}
+                data-testid="import-assumed"
+                className="text-xs text-ink-3"
+              >
+                {sentence}
+              </p>
+            ))}
             <RowTable report={report} />
             {step === "preview" ? (
               <div className="flex gap-2">

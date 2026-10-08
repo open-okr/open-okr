@@ -77,8 +77,15 @@ const MANIFEST: Record<
       minRows: 12,
     },
     "scoring.score-bands": {
-      columns: ["case", "score", "expected_band", "expected_annotation"],
-      minRows: 13,
+      // Notes by kind since P9-T11a (METHOD.md §3.3).
+      columns: [
+        "case",
+        "score",
+        "expected_band",
+        "aspirational_note",
+        "committed_note",
+      ],
+      minRows: 10,
     },
     "scoring.portfolio": {
       columns: ["case", "average", "expected"],
@@ -89,8 +96,9 @@ const MANIFEST: Record<
       minRows: 8,
     },
     "scoring.draft-confidence": {
+      // Four bands since P9-T11a (METHOD.md §3.2), so two fewer boundaries.
       columns: ["case", "average", "expected"],
-      minRows: 12,
+      minRows: 10,
     },
   },
   "p3-t00-cadence-engine.md": {
@@ -123,15 +131,17 @@ const MANIFEST: Record<
       columns: ["case", "timezone", "due_date", "expected_instant"],
       minRows: 12,
     },
+    // The sponsor an opt-in step since P9-T19a-c-a.
     "cadence.escalation": {
       columns: [
         "case",
         "days_past_due",
         "grace_days",
+        "sponsor_in_ladders",
         "expected_step",
         "expected_targets",
       ],
-      minRows: 14,
+      minRows: 16,
     },
     "cadence.acknowledgement": {
       columns: [
@@ -142,14 +152,17 @@ const MANIFEST: Record<
       ],
       minRows: 5,
     },
+    // On the check-in's clock since P9-T19a-a, with the sponsor setting.
     "cadence.blocker": {
       columns: [
         "case",
-        "hours_since_opened",
+        "days_until_due",
+        "following_passed",
+        "sponsor_in_ladders",
         "expected_step",
         "expected_targets",
       ],
-      minRows: 7,
+      minRows: 10,
     },
   },
   "p3-t00-kpi-engine.md": {
@@ -176,6 +189,7 @@ const MANIFEST: Record<
         "healthy_pct",
         "watch_pct",
         "expected",
+        "expected_recovering",
       ],
       minRows: 14,
     },
@@ -217,10 +231,10 @@ const MANIFEST: Record<
       ],
       minRows: 8,
     },
-    "kpi.recovery-draft": { columns: ["case", "tree", "expected"], minRows: 6 },
+    "kpi.recovery-draft": { columns: ["case", "tree", "expected"], minRows: 9 },
     "kpi.recovery-proposal": {
       columns: ["case", "period_states", "expected_propose"],
-      minRows: 8,
+      minRows: 10,
     },
     "kpi.recovery-close": {
       columns: [
@@ -234,8 +248,8 @@ const MANIFEST: Record<
     },
   },
   "p3-t00-alignment-engine.md": {
-    "alignment.penalties": {
-      columns: ["finding", "penalty", "rule_key", "severity", "fires"],
+    "alignment.findings": {
+      columns: ["finding", "rule_key", "severity", "fires", "in_the_share"],
       minRows: 5,
     },
     "alignment.score": {
@@ -244,13 +258,14 @@ const MANIFEST: Record<
         "scope",
         "graph",
         "expected_score",
+        "expected_band",
         "expected_findings",
       ],
-      minRows: 16,
+      minRows: 24,
     },
-    "alignment.health": {
-      columns: ["case", "score", "threshold", "expected"],
-      minRows: 6,
+    "alignment.band": {
+      columns: ["case", "score", "anchored", "healthy", "watch", "expected"],
+      minRows: 8,
     },
   },
 };
@@ -420,7 +435,7 @@ describe("the golden-table reader", () => {
   it("names the tables it did find when the wanted one is absent", () => {
     const path = designPath("p3-t00-alignment-engine.md");
     expect(() => loadGoldenTable(path, "alignment.nope")).toThrow(
-      /alignment\.health, alignment\.penalties, alignment\.score/,
+      /alignment\.band, alignment\.findings, alignment\.score/,
     );
   });
 });

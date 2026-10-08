@@ -131,6 +131,56 @@ test("linking it to a key result is done from the initiative itself", async () =
   });
 });
 
+/** The objective the initiative now serves, read from the link it made. */
+async function servedObjective(): Promise<{ id: string; title: string }> {
+  const { rows } = await pool.query<{ id: string; title: string }>(
+    `select g.id, g.title from initiative_key_results ik
+       join initiatives i on i.id = ik.initiative_id
+       join key_results k on k.id = ik.key_result_id
+       join goals g on g.id = k.goal_id
+      where i.workspace_id = $1 and i.title = $2
+        and ik.deleted_at is null and i.deleted_at is null
+      limit 1`,
+    [workspaceId, TITLE],
+  );
+  const served = rows[0];
+  if (!served) {
+    throw new Error("The initiative serves no key result. Did linking run?");
+  }
+  return served;
+}
+
+/** Marks the objective's kind in its drawer, the way a person would. */
+async function markKind(kind: "committed" | "aspirational") {
+  const served = await servedObjective();
+  await goTo(page, `/goals?okr=${served.id}`);
+  const drawer = page.getByTestId("okr-drawer");
+  const picker = drawer.getByRole("combobox", {
+    name: `Kind of ${served.title}`,
+  });
+  await expect(picker).toBeVisible({ timeout: 15_000 });
+  if ((await picker.inputValue()) === kind) {
+    return;
+  }
+  await picker.selectOption(kind);
+  await drawer
+    .getByRole("textbox", { name: `Marking it ${kind}. Why?` })
+    .press("Enter");
+  await expect(async () => {
+    const { rows } = await pool.query<{ kind: string }>(
+      "select kind from goals where id = $1",
+      [served.id],
+    );
+    expect(rows[0]?.kind).toBe(kind);
+  }).toPass({ timeout: 15_000 });
+}
+
+test("the objective it serves is a commitment", async () => {
+  // Gate five holds back only work a commitment depends on (METHOD.md §5.5,
+  // P9-T11b-b); work serving an aspirational OKR may exceed capacity.
+  await markKind("committed");
+});
+
 test("acceptance: the red gate names the initiative and one click reaches it", async () => {
   await goTo(page, "/cycle?phase=5");
 
@@ -165,6 +215,9 @@ test("clearing the verdict takes it back out of the gate", async () => {
   });
   // Unjudged is its own state, not a blank: §5.5 exists to end exactly this.
   await expect(page.getByText("no capacity verdict yet")).toBeVisible();
+
+  // Put back as found: the objective was aspirational before this spec.
+  await markKind("aspirational");
 });
 
 test("a filter that matches nothing says so, and says it differently", async () => {

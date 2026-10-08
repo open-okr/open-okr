@@ -5,9 +5,7 @@ import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { addCycle } from "./editor-actions.ts";
-
-/** What the explorer substitutes a cycle id for when it builds the template. */
-export const CYCLE_PLACEHOLDER = "__cycle__";
+import { CYCLE_PLACEHOLDER } from "./placeholders.ts";
 
 /**
  * Which cycle is on screen, and how another one is created (S-13, P8-G12).

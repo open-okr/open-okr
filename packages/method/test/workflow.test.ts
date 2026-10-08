@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolvePractice } from "../src/practice.ts";
 import { canonThresholds } from "../src/thresholds.ts";
 import {
   type CycleWorkflowInput,
@@ -254,7 +255,7 @@ describe("phase 2, diagnose", () => {
     // The floor is read from the registry, not written here: hardcoding it
     // made this test fail when the canon moved from 5 to 3 on 2026-08-17, which
     // is the test asserting the number rather than the behaviour.
-    const floor = canonThresholds()["quality.strategicIssueBounds"].low;
+    const floor = canonThresholds()["quality.strategicIssueMinimum"];
     expect(result?.missing.join(" ")).toMatch(
       new RegExp(`2 strategic issue\\(s\\).*at least ${floor}`),
     );
@@ -441,24 +442,32 @@ describe("the six publish gates", () => {
     expect(gates.find((entry) => entry.gateKey === 1)?.passed).toBe(true);
   });
 
-  it("names the goal missing a champion or a reviewer", () => {
-    const gates = publishGates(
-      base({
-        goals: [
-          goal({ championId: null }),
-          goal({ id: "g2", title: "Second", reviewerId: null }),
-        ],
-      }),
+  it("names the goal missing a champion, and a reviewer only where one is required", () => {
+    const goals = [
+      goal({ championId: null }),
+      goal({ id: "g2", title: "Second", reviewerId: null }),
+    ];
+    const optional = publishGates(base({ goals })).find(
+      (entry) => entry.gateKey === 1,
     );
-    const gate = gates.find((entry) => entry.gateKey === 1);
-    expect(gate?.passed).toBe(false);
-    expect(gate?.detail.missing.join(" ")).toMatch(/has no champion/);
-    expect(gate?.detail.missing.join(" ")).toMatch(/"Second" has no reviewer/);
+    expect(optional?.passed).toBe(false);
+    expect(optional?.detail.missing.join(" ")).toMatch(/has no champion/);
+    // Optional by default (METHOD.md §2.5, P9-T04): no reviewer is no defect.
+    expect(optional?.detail.missing.join(" ")).not.toMatch(/has no reviewer/);
+    const required = publishGates(
+      base({
+        goals,
+        practice: resolvePractice("recommended", { reviewer: "required" }),
+      }),
+    ).find((entry) => entry.gateKey === 1);
+    expect(required?.detail.missing.join(" ")).toMatch(
+      /"Second" has no reviewer/,
+    );
   });
 
   it("gate 3 accepts a stated contribution in place of a parent", () => {
     // §4.3's AL-1 and §4.5's gate 3 both accept a contribution statement, which
-    // is what makes them different from §5.2's structural orphan penalty.
+    // is what makes them different from §5.2's share, which does not.
     const gates = publishGates(
       base({
         goals: [
@@ -478,6 +487,23 @@ describe("the six publish gates", () => {
     const gate = gates.find((entry) => entry.gateKey === 3);
     expect(gate?.passed).toBe(false);
     expect(gate?.detail.missing.join(" ")).toMatch(/states no contribution/);
+  });
+
+  it("gate 3 accepts a reason to stand alone (P9-T16b-a)", () => {
+    // §4.5: "Each objective states what it contributes to, or why it stands
+    // alone." Finance's month-end close supports no strategy on purpose.
+    const gates = publishGates(
+      base({
+        goals: [
+          goal({
+            hasParent: false,
+            contributionStatement: null,
+            standaloneReason: "Finance operating cadence the board relies on",
+          }),
+        ],
+      }),
+    );
+    expect(gates.find((entry) => entry.gateKey === 3)?.passed).toBe(true);
   });
 
   it("gate 4 accepts a risk owner where confirmation is missing", () => {
@@ -514,28 +540,55 @@ describe("the six publish gates", () => {
     );
     expect(gate?.passed).toBe(false);
     expect(gate?.detail.missing.join(" ")).toMatch(
-      /neither confirmed nor risk-owned/,
+      /neither confirmed, escalated nor risk-owned/,
     );
   });
 
-  it("gate 5 refuses anything left exceeding capacity", () => {
-    const exceeding = goal({
+  it("gate 4 accepts a dependency escalated to the sponsor (P9-T16b-b)", () => {
+    const escalated = goal({
       keyResults: [
         {
           id: "k1",
-          title: "Ship the migration",
-          capacity: "exceeds",
-          dependencies: [],
+          title: "Cut first response from 9h to 2h",
+          capacity: "fits",
+          dependencies: [
+            { confirmed: false, riskOwnerId: null, escalatedToId: "m5" },
+          ],
         },
       ],
     });
-    const gate = publishGates(base({ goals: [exceeding] })).find(
-      (g) => g.gateKey === 5,
+    const gate = publishGates(base({ goals: [escalated] })).find(
+      (g) => g.gateKey === 4,
     );
-    expect(gate?.detail.missing.join(" ")).toMatch(/still exceeds capacity/);
+    expect(gate?.passed).toBe(true);
   });
 
-  it("gate 5 refuses an initiative left exceeding capacity, and names it", () => {
+  it("gate 5 warns on a committed key result left exceeding capacity, and lets an aspirational one exceed (P9-T11a)", () => {
+    const exceeding = (kind: "committed" | "aspirational") =>
+      goal({
+        keyResults: [
+          {
+            id: "k1",
+            title: "Ship the migration",
+            capacity: "exceeds",
+            kind,
+            dependencies: [],
+          },
+        ],
+      });
+    const gateFor = (kind: "committed" | "aspirational") =>
+      publishGates(base({ goals: [exceeding(kind)] })).find(
+        (g) => g.gateKey === 5,
+      );
+    expect(gateFor("committed")?.detail.missing.join(" ")).toMatch(
+      /committed and still exceeds capacity/,
+    );
+    expect(gateFor("aspirational")?.detail.missing.join(" ")).not.toMatch(
+      /exceeds capacity/,
+    );
+  });
+
+  it("gate 5 refuses an initiative of a committed OKR left exceeding capacity, and names it", () => {
     // The other half of §5.5's one sentence (P5-T10a). Two different problems
     // with two different fixes, so the gate has to say which one it found.
     const gate = publishGates(
@@ -546,13 +599,14 @@ describe("the six publish gates", () => {
             id: "i1",
             title: "Rebuild the activation flow",
             capacity: "exceeds",
+            kind: "committed",
           },
         ],
       }),
     ).find((g) => g.gateKey === 5);
     expect(gate?.passed).toBe(false);
     expect(gate?.detail.missing).toContain(
-      '"Rebuild the activation flow" still exceeds capacity',
+      '"Rebuild the activation flow" serves a committed OKR and still exceeds capacity',
     );
   });
 
@@ -589,22 +643,49 @@ describe("the six publish gates", () => {
     expect(gate?.detail.missing).toContain("What was cut is not recorded");
   });
 
-  it("gate 6 needs a deadline before day one", () => {
+  it("gate 6 is off by default, and judges the deadline where a workspace turns it on", () => {
+    // Off by default since P9-T03b (METHOD.md §4.5): the countdown reminders
+    // run either way, and a missing date is not a defect in the set.
     expect(
-      publishGates(base({ publicationDeadline: null }))
+      publishGates(base({ publicationDeadline: null })).find(
+        (g) => g.gateKey === 6,
+      ),
+    ).toMatchObject({ level: "off", passed: true });
+    const on = resolvePractice("recommended", { "gates.6": "block" });
+    expect(
+      publishGates(base({ publicationDeadline: null, practice: on }))
         .find((g) => g.gateKey === 6)
         ?.detail.missing.join(" "),
     ).toMatch(/No publication deadline/);
     expect(
-      publishGates(base({ publicationDeadline: "2026-07-05" }))
+      publishGates(base({ publicationDeadline: "2026-07-05", practice: on }))
         .find((g) => g.gateKey === 6)
         ?.detail.missing.join(" "),
     ).toMatch(/not before day one/);
     expect(
-      publishGates(base({ publicationDeadline: "2026-06-24" })).find(
-        (g) => g.gateKey === 6,
-      )?.passed,
+      publishGates(
+        base({ publicationDeadline: "2026-06-24", practice: on }),
+      ).find((g) => g.gateKey === 6)?.passed,
     ).toBe(true);
+  });
+
+  it("holds publication only on a gate set to block", () => {
+    // Gate 5 at its default, warn: the set is not green and still publishes.
+    const warned = base({
+      goals: [goal()],
+      qualityChecksPass: true,
+      initiatives: [],
+      hasCapacityNotes: false,
+    });
+    const gates = publishGates(warned);
+    const five = gates.find((gate) => gate.gateKey === 5);
+    expect(five).toMatchObject({ level: "warn", passed: false });
+    expect(canPublish(gates)).toBe(true);
+    const governed = publishGates({
+      ...warned,
+      practice: resolvePractice("governed"),
+    });
+    expect(canPublish(governed)).toBe(false);
   });
 
   it("goes green on all six, and only then allows publication", () => {
@@ -722,11 +803,12 @@ describe("the conditions tally the rail draws its bar from", () => {
     expect(phase(base(), 4)?.conditions).toEqual({ met: 0, total: 0 });
   });
 
-  it("counts only the gates that can be judged, plus publication", () => {
-    // No goals table, so gates 1 to 5 are unevaluable and only gate 6 counts.
+  it("counts only the blocking gates that can be judged, plus publication", () => {
+    // No goals table, so gates 1 to 5 are unevaluable, and gate 6 is off by
+    // default, so publication is the only condition that counts.
     const result = phase(base(), 5);
-    expect(result?.conditions.total).toBe(2);
-    expect(result?.conditions.met).toBe(1);
+    expect(result?.conditions.total).toBe(1);
+    expect(result?.conditions.met).toBe(0);
   });
 
   it("drops prior scoring from phase 2 when this is a first cycle", () => {
@@ -837,9 +919,22 @@ describe("phase 4 and gate 2 over the drafted set", () => {
     expect(four?.conditions).toEqual({ met: 1, total: 1 });
   });
 
-  it("holds phase 4 on an objective that names an output, and says which", () => {
+  it("passes phase 4 on an objective that names an output, which only warns by default", () => {
+    // METHOD.md §4, P9-T03a: OBJ-1 warns, and phase 4 waits only for what
+    // fails a check set to block.
     const four = phase(
       base({ goals: [judged("Launch the new mobile app by end of Q3")] }),
+      4,
+    );
+    expect(four?.state).toBe("pass");
+  });
+
+  it("holds phase 4 on that objective where the workspace sets OBJ-1 to block, and says which", () => {
+    const four = phase(
+      base({
+        goals: [judged("Launch the new mobile app by end of Q3")],
+        practice: resolvePractice("recommended", { "checks.OBJ-1": "block" }),
+      }),
       4,
     );
     expect(four?.state).toBe("todo");
@@ -883,9 +978,12 @@ describe("phase 4 and gate 2 over the drafted set", () => {
     ]);
   });
 
-  it("refuses publication on a failing OBJ-1", () => {
+  it("refuses publication on OBJ-1 where the workspace sets it to block", () => {
     const gates = publishGates(
-      base({ goals: [judged("Launch the new mobile app by end of Q3")] }),
+      base({
+        goals: [judged("Launch the new mobile app by end of Q3")],
+        practice: resolvePractice("recommended", { "checks.OBJ-1": "block" }),
+      }),
       thresholds,
     );
     const two = gates.find((entry) => entry.gateKey === 2);
@@ -900,6 +998,27 @@ describe("phase 4 and gate 2 over the drafted set", () => {
     const five = phase(base({ goals: [judged(goal().title)] }), 5);
     expect(five?.blocked).toEqual([]);
     expect(five?.missing).toEqual(["The set is not published"]);
+  });
+
+  it("judges only what each step publishes", () => {
+    const company = { ...judged(goal().title), level: "company" };
+    const team = {
+      ...judged("A team objective"),
+      id: "g2",
+      level: "team",
+      keyResults: [],
+    };
+    const input = base({ goals: [company, team] });
+    // The team objective has no key results, so gate 2 is red for the rest
+    // of the set and green for the company step alone.
+    expect(
+      publishGates(input, thresholds, "company").find((g) => g.gateKey === 2)
+        ?.passed,
+    ).toBe(true);
+    expect(
+      publishGates(input, thresholds, "teams").find((g) => g.gateKey === 2)
+        ?.detail.missing,
+    ).toEqual(['"A team objective" has no key results']);
   });
 });
 

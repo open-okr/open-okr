@@ -64,9 +64,13 @@ measures gives the weekly session nothing to talk about until it is too late.
 
 ## Confidence at drafting
 
-Above 0.9 is sandbagging and the Coach says so: a goal everybody is already
-confident about was not worth setting as an OKR. Below 0.25 is ambitious, which
-is allowed, and flagged so that it is a choice rather than an accident.
+First decide what kind of promise this is. A **committed** objective is one
+the team will deliver in full, moving schedules and people to do it, so high
+confidence is right; a committed key result below 0.7 is a risk to escalate
+now, or a sign it should be aspirational. An **aspirational** objective is a
+stretch: about 5 in 10 is the aim. Above 0.9 on average is near certain and
+the Coach says so. Below 0.3 is a moonshot, which is allowed, and flagged so
+that it is a choice rather than an accident.
 
 ## Alignment: contribute, do not copy
 

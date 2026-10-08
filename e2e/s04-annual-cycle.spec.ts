@@ -1,13 +1,15 @@
 /**
- * The annual cycle can be made and opened from the cycle screen, and the
- * mid-cycle calibration recorded on it (completeness review M-06, UIUX-PLAN
- * S-04 and S-11, METHOD.md §2.1 and §7.6).
+ * The annual cycle can be made and opened from the cycle screen, and phase 6
+ * shows how a target moves (completeness review M-06, UIUX-PLAN S-04 and
+ * S-11, METHOD.md §2.1 and §7.6).
  *
  * **Three things no browser could do.** The page read the quarter and nothing
  * else, so an annual cycle could exist and never be opened. The create control
  * passed no cadence, so it only ever made the quarter. And
  * `workflow.calibrate` had no caller, while phase 6 read "not calibrated" from
- * a hardcoded null.
+ * a hardcoded null. METHOD v2 has since retired the calibration (P9-T13-c-b):
+ * a target moves at any time under §2.9's one rule, so phase 6 states the
+ * rule and records nothing.
  *
  * **The file name carries the run order.** Specs run alphabetically against
  * one instance and `registration-to-dashboard.spec.ts` claims it, so this one
@@ -17,19 +19,16 @@
  * annual cycle is the current year's, which starts on or before the quarter
  * containing today, and the cadence a bare create or "ensure current" takes
  * reads the quarterly cycles first (M-06), so nothing that asks for "this
- * quarter" is moved. The calibration is on the annual cycle, not the quarter.
+ * quarter" is moved.
  *
  * **Retry-safe on purpose.** Continuous integration retries once, and a year
- * and a calibration can each be made only once. So each step makes its thing
- * when it is missing and asserts on it either way.
+ * can be made only once. So the step makes it when it is missing and asserts
+ * on it either way.
  */
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
-const REASON =
-  "The regulator moved the launch window from September to November.";
-
-test("the annual cycle is made, opened and calibrated from the cycle screen", async ({
+test("the annual cycle is made and opened from the cycle screen, and phase 6 states how a target moves", async ({
   page,
 }) => {
   await signIn(page);
@@ -78,31 +77,13 @@ test("the annual cycle is made, opened and calibrated from the cycle screen", as
 
   const calibration = page.getByTestId("calibration");
   await expect(calibration).toBeVisible();
-  // §7.6 itself, from packages/method, above the form.
+  // §7.6 itself, from packages/method: the one rule a target moves by.
   await expect(page.getByTestId("calibration-rule")).toHaveText(
-    /^Once per cycle, optional\. .* Not for difficulty, not for mood\. /,
+    /^A target may be changed at any time in the cycle, as §2\.9 says\. Making a target harder needs no reason\. /,
   );
-  if ((await page.getByTestId("calibration-reason").count()) === 0) {
-    await calibration
-      .getByLabel("What changed outside, and how somebody could check it")
-      .fill(REASON);
-    await calibration
-      .getByRole("button", { name: "Record the calibration" })
-      .click();
-  }
-
-  // What the calibration recorded, in place of the form. §7.6 allows one,
-  // so the form is gone once it is used.
-  await expect(page.getByTestId("calibration-reason")).toHaveText(REASON, {
-    timeout: 15_000,
-  });
-  await expect(calibration).toContainText(
-    "This cycle has used its one calibration",
-  );
-  await expect(
-    calibration.getByRole("button", { name: "Record the calibration" }),
-  ).toHaveCount(0);
-  await expect(page.getByText(/^calibrated \d{4}-\d{2}-\d{2}$/)).toBeVisible();
+  // Nothing to record once a cycle any more.
+  await expect(calibration.getByRole("button")).toHaveCount(0);
+  await expect(calibration.getByRole("textbox")).toHaveCount(0);
 
   // And the toggle goes back to the quarter.
   await page.getByTestId("cycle-mode-quarterly").click();

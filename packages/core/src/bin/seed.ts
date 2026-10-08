@@ -10,10 +10,18 @@
  * Everything is written through the action registry, so a demo goal gets the
  * same access bindings, activity row, audit row and outbox row a real one does.
  * Idempotent: a workspace that already has company objectives is left alone.
+ *
+ * **It builds the Northwind year** (P9-T22c, the default since P9-T22c-e-c):
+ * the scenario in `docs/scenarios/northwind-year` placed on the real
+ * calendar, with every step dated before today true and nothing after it.
+ * **`--quarter` builds the one-quarter demo instead**, the organisation the
+ * walkthrough in `docs/stakeholder/DEMO-SCRIPT.md` follows: a quarter in
+ * flight and a quarter finished, relative to today.
  */
 import { loadEnv } from "@openokr/config";
 import pg from "pg";
 import { buildDemoWorkspace } from "../demo/builder.ts";
+import { buildNorthwindYear } from "../demo/year/build.ts";
 
 const env = loadEnv();
 const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
@@ -65,6 +73,22 @@ try {
       "No workspace found. Open the app and finish the setup wizard first.\n",
     );
     process.exit(1);
+  }
+
+  if (!process.argv.includes("--quarter")) {
+    write(`Building the Northwind year into "${row.name}".`);
+    const year = await buildNorthwindYear({
+      pool,
+      workspaceId: row.workspace_id,
+      adminUserId: row.user_id,
+    });
+    write("");
+    write(
+      year.alreadySeeded
+        ? "This workspace already has company objectives, so nothing was written."
+        : `Done. ${year.events} events of the year written, as of ${year.today}.`,
+    );
+    process.exit(0);
   }
 
   write(`Seeding demo content into "${row.name}".`);

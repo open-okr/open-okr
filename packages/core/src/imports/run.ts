@@ -89,6 +89,11 @@ export interface RunReport {
   readonly skipped: number;
   /** Headers the mapping did not claim. Not an error, and worth saying. */
   readonly unmappedHeaders: readonly string[];
+  /**
+   * What the file did not say and the import assumed, one sentence each
+   * (P9-T12c-b): a kind every row took by default, for instance.
+   */
+  readonly assumed: readonly string[];
   readonly rows: readonly RowOutcome[];
 }
 
@@ -149,6 +154,13 @@ export async function runTable(options: TableRunOptions): Promise<RunResult> {
         file: options.name,
         dryRun: options.dryRun,
         unmappedHeaders: mapping.unmapped,
+        assumed: template.columns
+          .filter(
+            (column) =>
+              column.whenAbsent !== undefined &&
+              mapping.fieldToIndex[column.field] === undefined,
+          )
+          .map((column) => column.whenAbsent as string),
       },
     );
 
@@ -190,6 +202,7 @@ async function loadRows(
     file: string;
     dryRun: boolean;
     unmappedHeaders: readonly string[];
+    assumed: readonly string[];
   },
 ): Promise<RunReport> {
   const references = referencesFor({
@@ -310,6 +323,7 @@ async function loadRows(
     updated,
     skipped,
     unmappedHeaders: about.unmappedHeaders,
+    assumed: about.assumed,
     rows: outcomes,
   };
 }

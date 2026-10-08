@@ -26,15 +26,16 @@ import { resolveThresholds } from "../src/thresholds.ts";
 
 const thresholds = resolveThresholds({});
 
-describe("the planning-open lead (§11: 6 weeks annual, 3 weeks quarterly)", () => {
+describe("the planning-open lead (§11: 6 weeks annual, 4 weeks quarterly)", () => {
   it("opens an annual cycle six weeks out, to the day", () => {
     expect(planningOpensDue(42, "annual", thresholds)).toBe(true);
     expect(planningOpensDue(43, "annual", thresholds)).toBe(false);
     expect(planningOpensDue(41, "annual", thresholds)).toBe(false);
   });
 
-  it("opens a quarterly cycle three weeks out", () => {
-    expect(planningOpensDue(21, "quarterly", thresholds)).toBe(true);
+  it("opens a quarterly cycle four weeks out (three until P9-T19a-d-a)", () => {
+    expect(planningOpensDue(28, "quarterly", thresholds)).toBe(true);
+    expect(planningOpensDue(21, "quarterly", thresholds)).toBe(false);
     expect(planningOpensDue(42, "quarterly", thresholds)).toBe(false);
   });
 
@@ -47,11 +48,11 @@ describe("the planning-open lead (§11: 6 weeks annual, 3 weeks quarterly)", () 
 
   it("moves with the parameter rather than with a number in here", () => {
     const moved = resolveThresholds({
-      "cadence.planningOpenLeadWeeks": { annual: 8, quarterly: 4 },
+      "cadence.planningOpenLeadWeeks": { annual: 8, quarterly: 5 },
     });
     expect(planningOpensDue(56, "annual", moved)).toBe(true);
     expect(planningOpensDue(42, "annual", moved)).toBe(false);
-    expect(planningOpensDue(28, "quarterly", moved)).toBe(true);
+    expect(planningOpensDue(35, "quarterly", moved)).toBe(true);
   });
 });
 

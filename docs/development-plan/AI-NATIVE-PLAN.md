@@ -76,7 +76,7 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Summarise blockers | Space home, above the blocker board | Nothing: it is a reading |
 | Draft the retrospective | Goal detail, the close form | Fills the retrospective field; closing is the person's |
 | Draft the review minutes | Minutes screen | A draft document on the session, private to its author |
-| Propose next-cycle objectives | Quarterly review, learnings stage | Fills the draft form; `sessions.draftNextCycle` is the person's |
+| Propose next-cycle objectives | **Retired from the screen at P9-T22d.** Stage ten is Learnings and the review no longer drafts the next cycle, so the form it filled is gone. `sessions.proposeFromLearnings` stays for one release, deprecated, and is removed in 0.3 | Nothing |
 | Summarise a thread (`comments.summarise`) | Goal detail, above the discussion | Nothing: it is a reading, refused if it quotes words nobody wrote |
 | Decompose a key result (`goals.decomposeKeyResult`, `deep` tier) | Goal detail, on each key result | `initiatives.create` and `tasks.create` for the rows left ticked, as the person, in the space they chose |
 
@@ -180,7 +180,7 @@ Generated from the action registry, so a chat command is the same action as a bu
 | Command | Does |
 |---|---|
 | Check in | Walks the member through their due check-ins: status, confidence, one line of narrative, key result values. Conversational on WhatsApp and Telegram, a modal on Slack and Teams |
-| Blocker | Logs a blocker on a key result: type, owner, next action. Starts the 24-hour clock |
+| Blocker | Logs a blocker on a key result: type, owner, next action, due by the next check-in |
 | Status | Returns a goal, a key result, a space or the member's own review inbox |
 | Ack | Acknowledges a check-in awaiting the member's review |
 | Commit | Sets or closes a weekly commitment |
@@ -238,7 +238,7 @@ What it does:
 
 1. **Chases check-ins.** Reminds before the due date, on the day, and daily after, escalating up the ladder.
 2. **Chases acknowledgements.** A published check-in with no acknowledgement after a day is a reviewer nudge, and after three days an escalation.
-3. **Runs the blocker clock.** At twenty hours it warns the owner. At twenty-four it escalates to the coordinator, then to the sponsor. It never re-opens a discussion, it moves the clock.
+3. **Runs the blocker clock.** A blocker's next action is due by the next check-in of the goal it blocks (METHOD.md §7.3). The day before, it reminds the owner. When the check-in passes with the action open, it tells the coordinator, and the sponsor only where the workspace puts the sponsor in its ladders. It never re-opens a discussion, it moves the clock.
 4. **Opens and closes the weekly session.** Posts the agenda, collects confidence from members who cannot attend, marks the session held or skipped, updates the streak, publishes the digest.
 5. **Watches the KPI corridors.** When a KPI drops out of the healthy corridor it tells the owner. When it stays unhealthy for two consecutive periods it drafts the recovery OKR and proposes it.
 6. **Prepares the sessions.** Before a quarterly review it assembles the pack: scores ready to confirm, missed key results awaiting a cause, retro prompts, the process-health survey, and the draft minutes skeleton.
@@ -252,17 +252,17 @@ Configurable per workspace. The defaults are canon in METHOD.md §11:
 |---|---|---|
 | 1 | Due date reached | The champion or the owner |
 | 2 | 1 day overdue | The champion again, on their primary channel |
-| 3 | Grace exceeded (3 days by default) | The reviewer, and the goal renders outdated |
+| 3 | Grace exceeded (3 days by default) | The reviewer where the goal has one, and the goal renders outdated |
 | 4 | 7 days overdue | The space coordinator |
-| 5 | 14 days overdue | The cycle sponsor |
+| 5 | 14 days overdue | The cycle sponsor, only where the workspace puts the sponsor in its ladders (P9-T19a-c-a). Otherwise the ladder stops at the coordinator, and the sponsor sees stale goals in the weekly digest |
 
-Blockers run a faster ladder against their 24-hour clock: owner at 20 hours, coordinator at 24, sponsor at 48. Confidence at or below 0.3 escalates to the coordinator immediately.
+Blockers run their ladder against the next check-in, the clock METHOD.md §7.3 gives them since P9-T19a-a: the owner the day before it, the coordinator once it passes with the action open, and the sponsor only where the workspace adds them, once the check-in after that passes too. A key result whose confidence falls into the low band is raised with the coordinator the same day, and at 0.3 and below with the sponsor only where the workspace turns critical escalation on.
 
 Escalation is always visible to the person being escalated past. Nobody is reported behind their back.
 
 ### 6.4 The full trigger catalogue
 
-Every proactive message the product sends. Each row is a rule key, and each writes a nudge record. The catalogue's keys, default recipients and default timings ship as data in `packages/method`; a message citing a key the package does not define fails the build.
+Every proactive message the product sends. Each row is a rule key, and each writes a nudge record. Where METHOD.md §10 gives a situation a line, the message carries it under its headline, in the document's words from `packages/method` (P9-T21). The catalogue's keys, default recipients and default timings ship as data in `packages/method`; a message citing a key the package does not define fails the build.
 
 **Rhythm triggers, owned by the Champion**
 
@@ -274,10 +274,10 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `checkin.stale` | Grace exceeded | Champion and reviewer. The goal renders outdated |
 | `ack.owed` | 1 day after publication | Reviewer |
 | `ack.overdue` | 3 days after publication | Reviewer, then the ladder |
-| `blocker.warning` | 20 hours after opening | Blocker owner |
-| `blocker.overdue` | 24 hours after opening | Coordinator |
-| `blocker.escalated` | 48 hours after opening | Sponsor |
-| `confidence.critical` | A key result scored at or below 0.3 | Coordinator, same day |
+| `blocker.warning` | 1 day before the check-in the next action is due by | Blocker owner |
+| `blocker.overdue` | That check-in passes with the action open | Coordinator |
+| `blocker.escalated` | The check-in after it passes too, where the sponsor is in the ladders | Sponsor |
+| `confidence.critical` | A key result's confidence falls into the low band, and not a key result drafted low that stays there; at or below 0.3, the sponsor too, only where critical escalation is on (P9-T19a-c-a) | Coordinator, same day: the company space's coordinator for a company objective. The sponsor where critical escalation is on |
 | `commitment.due` | End of the commitment week | Owner |
 | `session.due_soon` | 1 day before the weekly session | Coordinator and space |
 | `session.open` | At the scheduled start | Space |
@@ -303,21 +303,22 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 |---|---|---|
 | `quality.draft_failing` | Live as a draft is written | The author, inline |
 | `quality.gate_blocked` | On a publish attempt | Facilitator |
-| `quality.no_not_doing` | Phase 3 completion without a not-doing list | Sponsor and facilitator |
+| `quality.no_not_doing` | The end of an annual Phase 3 without a not-doing list | Sponsor and facilitator |
 | `quality.too_many_objectives` | A level exceeds its cap | Facilitator |
 | `quality.all_lagging` | An objective's key results are all lagging | Champion |
 | `quality.no_baseline` | A key result lacks a baseline at Phase 4 exit | Champion |
-| `quality.sandbagging_draft` | Average draft confidence above 0.9 | Champion and facilitator |
-| `quality.sandbagging_close` | Scores cluster above 0.85 at the close | Sponsor |
-| `quality.orphan_goal` | A goal below company level has no parent | Champion |
-| `quality.level_skip` | Alignment skips a level | Champion |
-| `quality.silo` | A department subtree has no horizontal dependency | Department lead |
-| `quality.conflict` | Two goals double-count or oppose, from the semantic sweep | Both champions |
-| `quality.dependency_unowned` | A dependency is unconfirmed with no risk owner | Champion |
+| `quality.committed_floor` | A committed key result drafted or checked in below 0.7 confidence (METHOD.md §3.2) | Champion |
+| `quality.sandbagging_draft` | Average draft confidence on an objective's aspirational key results above 0.9 | Champion and facilitator |
+| `quality.sandbagging_close` | Three quarters or more of a closed cycle's aspirational key results scored 1.0 | Sponsor |
+| `quality.orphan_goal` | A goal below company level has no parent and no stated reason (METHOD.md §5.2) | Champion |
+| `quality.level_skip` | Alignment skips a level, under a stricter profile only: AL-3 is off by default | Champion |
+| `quality.silo` | A department subtree has no horizontal dependency, under a stricter profile only: AL-6 is off by default | Department lead |
+| `quality.conflict` | Two goals may double-count or oppose, from the semantic sweep. Advice, and it says so | Both champions |
+| `quality.dependency_unowned` | A dependency is unconfirmed, not escalated, and has no risk owner | Champion |
 | `quality.no_cuts` | Capacity checked with nothing cut | Facilitator |
-| `quality.divergence` | Reported health disagrees with the data | Champion and reviewer |
+| `quality.divergence` | Reported health disagrees with the data within the divergence window | Champion and reviewer |
 | `quality.trending_off` | The forecast misses the target | Champion |
-| `quality.process_health_low` | A process-health statement scores low at review | Sponsor, as next cycle's process priority |
+| `quality.process_health_low` | A process-health statement scores low at review | Sponsor, as next cycle's improvement action |
 
 ### 6.5 Agent definition and runs
 
@@ -410,5 +411,5 @@ Task bodies for the AI and agent work live in IMPLEMENTATION-PLAN.md alongside e
 | A4 | Evaluation pass bar per capability | Set with the design documents |
 | A5 | Agent default autonomy | Propose and approve. Scoped direct writes require admin opt-in per agent |
 | A6 | Embedding model and dimension | Decide at the retrieval task. Keep the column swappable |
-| A7 | Nudge volume ceiling per member per week | A workspace setting in the METHOD.md §11 registry, default ten. Measure in the pilots |
+| A7 | Nudge volume ceiling per member per week | **Decided: five**, by Akmal on 2 October 2026, and built at P9-T19a-c-b. A workspace setting in the METHOD.md §11 registry; anything past it waits for the member's next daily digest, which is not itself held or counted. It was ten. Measure in the pilots |
 | A8 | Outbound MCP, meaning the copilot calling external tools | Later. The registry is designed so it bolts on |

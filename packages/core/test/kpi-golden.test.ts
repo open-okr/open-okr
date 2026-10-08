@@ -3,6 +3,7 @@ import {
   type KpiDirection,
   type KpiFrequency,
   kpiAchievement,
+  kpiRecovering,
   kpiState,
   normalisePeriod,
   type RecoveryLink,
@@ -92,13 +93,13 @@ describe("the corridor state", () => {
         throw new Error("A state row needs both thresholds.");
       }
       const corridor: KpiCorridor = { healthyPct, watchPct };
-      expect(
-        kpiState(
-          cellNumber(row, "achievement_pct"),
-          row.recovery as RecoveryLink,
-          corridor,
-        ),
-      ).toBe(row.expected);
+      expect(kpiState(cellNumber(row, "achievement_pct"), corridor)).toBe(
+        row.expected,
+      );
+      // Beside the state, never in its place (P9-T17b-a).
+      expect(kpiRecovering(row.recovery as RecoveryLink)).toBe(
+        row.expected_recovering === "yes",
+      );
     });
   }
 });

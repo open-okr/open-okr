@@ -335,3 +335,34 @@ describe("one domain's reconciliation", () => {
     expect(lossy.finish().clean).toBe(false);
   });
 });
+
+describe("the kinds FlowyTeam cannot say (P9-T12c-b, METHOD.md §2.8, §2.10)", () => {
+  const withObjectives = buildReport({
+    connectedTo: "root@db.example/flowyteam",
+    introspection: INTROSPECTION,
+    company: COMPANY,
+    counts: { objectives: 2, key_results: 3 },
+    mode: "dry_run",
+    selected: ["organisation", "objectives"],
+  });
+  const without = buildReport({
+    connectedTo: "root@db.example/flowyteam",
+    introspection: INTROSPECTION,
+    company: COMPANY,
+    counts: { objectives: 2 },
+    mode: "dry_run",
+    selected: ["organisation"],
+  });
+  const kindNote = (notes: readonly string[]) =>
+    notes.find((note) => note.includes("what kind of promise"));
+
+  it("says once what every objective and key result arrives as, when objectives are imported", () => {
+    expect(kindNote(withObjectives.notes)).toContain(
+      "every key result as a metric, or as a maintain",
+    );
+  });
+
+  it("says nothing of kinds when no objective is imported", () => {
+    expect(kindNote(without.notes)).toBeUndefined();
+  });
+});

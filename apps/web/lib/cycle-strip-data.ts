@@ -75,6 +75,11 @@ export async function loadCycleStrip(
     if (workflow.daysToDeadline === null) {
       return null;
     }
+    // "Hidden" phases mean OKRs are written and tracked without the planning
+    // workflow, so the strip that walks it is not shown (METHOD.md §2.3).
+    if (workflow.practice.phaseEnforcement === "hidden") {
+      return null;
+    }
 
     // What is blocking the phase the facilitator is on, in one line. The panel
     // on the cycle page lists every reason; the strip has room for the first and

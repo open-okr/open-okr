@@ -343,6 +343,9 @@ describe("goals.restore", () => {
 
 describe("initiatives.restore", () => {
   it("brings the initiative back with its links, and gate five counts it again", async () => {
+    // Gate five counts only work a commitment depends on (METHOD.md §5.5,
+    // P9-T11b-b), so the objective it serves is committed.
+    await call("goals.setKind", { id: goalId, kind: "committed" });
     const created = await createInitiative({
       keyResultIds: [firstKeyResult, secondKeyResult],
       capacity: "exceeds",

@@ -67,6 +67,9 @@ export async function setFrame(
     }));
 
   const horizon = String(form.get("horizonLabel") ?? "").trim();
+  // Asked only once the frame is agreed (METHOD.md §2.1, P9-T13-c-c); an
+  // empty field sends nothing, and the action says when one was needed.
+  const reason = String(form.get("reason") ?? "").trim();
 
   try {
     await callAction(
@@ -85,6 +88,7 @@ export async function setFrame(
         strategy: asDocument(String(form.get("strategy") ?? "")),
         notDoing: asDocument(String(form.get("notDoing") ?? "")),
         strategies,
+        ...(reason === "" ? {} : { reason }),
       },
     );
   } catch (error) {

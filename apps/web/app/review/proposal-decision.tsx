@@ -1,4 +1,5 @@
 import { Button, Chip } from "@openokr/ui";
+import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { decideProposal } from "./actions.ts";
@@ -21,12 +22,22 @@ import { decideProposal } from "./actions.ts";
  * **Offered whether or not the change itself is allowed**, like the copilot's
  * card. Applying runs the proposed action in the member's name, and an action
  * they may not perform refuses with its own reason, which the form shows.
+ *
+ * **A proposed recovery carries the other two responses** (METHOD.md §6.5,
+ * P9-T18b). The coach proposes the recovery because it is the one it can
+ * draft, not because it is the only answer: fixing the KPI now or adding a key
+ * result to an objective that exists are on its card on the recovery board,
+ * and choosing either settles this proposal.
  */
 export async function ProposalDecision({
   proposal,
+  subjectId,
 }: {
+  /** What the proposal is about: the KPI, for a proposed recovery. */
+  readonly subjectId: string;
   readonly proposal: {
     readonly id: string;
+    readonly action: string;
     readonly aiGenerated: boolean;
     readonly preview: readonly {
       readonly label: string;
@@ -68,6 +79,17 @@ export async function ProposalDecision({
           </span>
         </span>
       </ActionForm>
+      {proposal.action === "kpis.launchRecovery" ? (
+        <p className="text-xs text-ink-3">
+          {t("review.proposalDecision.orAnswerItAnotherWay")}{" "}
+          <Link
+            href={`/kpis/recovery#kpi-${subjectId}`}
+            className="font-semibold text-brand-text hover:underline"
+          >
+            {t("review.proposalDecision.otherResponses")}
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

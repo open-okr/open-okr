@@ -23,6 +23,7 @@ import {
 } from "@openokr/db";
 import {
   closeIsSandbagged,
+  committedBelowFloor,
   draftIsSandbagged,
   isTriggerKey,
   objectivesOverCap,
@@ -94,6 +95,7 @@ export async function dueObjectiveQualityNudges(
       goalId: goals.id,
       championId: goals.championId,
       cycleId: goals.cycleId,
+      kind: goals.kind,
       published: cycles.publishedAt,
       facilitatorId: cycles.facilitatorId,
       confidence: keyResults.confidence,
@@ -129,9 +131,12 @@ export async function dueObjectiveQualityNudges(
     if (
       drafting &&
       draftIsSandbagged(
-        keyResultRows.map((row) =>
-          row.confidence === null ? null : Number(row.confidence),
-        ),
+        // Only the aspirational key results are judged (METHOD.md §3.2):
+        // high confidence is right for a commitment.
+        keyResultRows.map((row) => ({
+          confidence: row.confidence === null ? null : Number(row.confidence),
+          kind: row.kind,
+        })),
         input.thresholds,
       )
     ) {
@@ -148,6 +153,29 @@ export async function dueObjectiveQualityNudges(
           }),
         );
       }
+    }
+    // §3.2's committed rule at drafting (P9-T11b-c): a commitment drafted
+    // below the floor is a risk to raise now, not at the first check-in. The
+    // check-in half is `dueCommittedFloorNudges`, hourly.
+    if (
+      drafting &&
+      first.championId &&
+      committedBelowFloor(
+        keyResultRows.map((row) => ({
+          confidence: row.confidence === null ? null : Number(row.confidence),
+          kind: row.kind,
+        })),
+        input.thresholds,
+      )
+    ) {
+      due.push(
+        qualityNudge({
+          ruleKey: "quality.committed_floor",
+          subjectType: "goal",
+          subjectId: goalId,
+          recipientMemberId: first.championId,
+        }),
+      );
     }
     const offTrack = keyResultRows.some(
       (row) =>
@@ -228,6 +256,7 @@ export async function dueCycleQualityNudges(
       .select({
         id: goals.id,
         level: goals.level,
+        kind: goals.kind,
         spaceId: goals.spaceId,
         spaceName: spaces.name,
       })
@@ -287,8 +316,9 @@ export async function dueCycleQualityNudges(
     }
 
     if (row.endsOn < today && cycleGoals.length > 0) {
+      const kindOf = new Map(cycleGoals.map((goal) => [goal.id, goal.kind]));
       const scored = await tx
-        .select({ score: keyResults.score })
+        .select({ score: keyResults.score, goalId: keyResults.goalId })
         .from(keyResults)
         .where(
           activeOnly(
@@ -303,7 +333,12 @@ export async function dueCycleQualityNudges(
         );
       if (
         closeIsSandbagged(
-          scored.map((keyResult) => Number(keyResult.score)),
+          // §3.3's pattern is over the aspirational key results: a
+          // commitment met in full is a promise kept, not a target set low.
+          scored.map((keyResult) => ({
+            score: Number(keyResult.score),
+            kind: kindOf.get(keyResult.goalId) ?? "aspirational",
+          })),
           input.thresholds,
         )
       ) {

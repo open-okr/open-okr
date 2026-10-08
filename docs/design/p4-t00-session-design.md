@@ -89,36 +89,46 @@ Given / When / Then:
   to advance, then it is refused naming the unscored KR.
 - Given all KRs scored, when the facilitator advances, then stage 2 begins.
 
-### 2.3 Stage 2: Diagnose what is low
+### 2.3 Stage 2: Discuss what dropped
 
-Every key result with confidence below the low boundary (SS11
-`scoring.confidenceLow`, default 0.4) requires three things.
+Since P9-T19a-b, METHOD v2's step 2: any key result whose confidence fell
+since the last session that scored it gets a short discussion, and every one
+below the low boundary (SS11 `scoring.confidenceLow`, default 0.4) gets a next
+action with an owner, due by the goal's next check-in. A blocker is raised as
+well only where something is actually blocked; its own next action answers
+the score. Until P9-T19a-b every low score needed a blocker, which had a team
+inventing one where there was only a next step.
 
 | Field | Rule |
 |---|---|
-| Blocker type | One of the five in SS7.3 (resource, dependency, clarity, priority_conflict, external) |
-| Blocker owner | A named person, not a team |
-| Next action | One concrete action within 24 hours |
+| Next action | One concrete action, with a named owner, due by the goal's next check-in (`session_confidences.next_action`) |
+| Blocker, where blocked | A type from the seven in SS7.3, a named owner, and its own next action, due by the same check-in |
 
 At or below the critical threshold (SS11 `scoring.confidenceCritical`, 0.3):
 the coordinator raises it with management the same day, and the escalation
 fires immediately (trigger `confidence.critical`).
 
-**Completion condition:** Every low-confidence KR has a blocker type, a named
-owner, and a next action.
+**Completion condition:** Every low-confidence KR has a next action and an
+owner, or an open blocker raised in this session.
 
 Given / When / Then:
-- Given a KR scored 0.3, when the coordinator tries to continue without a
-  blocker type, owner and action, then it is refused.
-- Given a KR scored 0.3 with all three fields set, when the step completes,
-  then the blocker's 24-hour clock starts and the escalation fires.
+- Given a KR scored 0.3 with neither, when the coordinator tries to continue,
+  then it is refused, naming the key result.
+- Given a KR scored 0.3 with nothing blocking it, when the team names a next
+  action and its owner, then the session moves on without a blocker, and the
+  action is due by the next check-in.
+- Given a KR scored 0.5 that was 0.7 last time, when step 2 is read, then it
+  is listed as having fallen, and nothing holds the session for it.
 
-### 2.4 Stage 3: Commitments
+### 2.4 Stage 3: Commitments and wins
+
+METHOD v2's step 3, since P9-T19a-d-c.
 
 | Element | Behaviour |
 |---|---|
-| Last week | Close each commitment: delivered or not. No negotiation |
-| This week | 2 to 3 concrete actions (SS11 `sessions.weeklyCommitmentBounds`), each with an owner and a linked key result |
+| Last week | Close each commitment: delivered or not, with a line on why where it helps (`commitments.closing_note`) |
+| This week | 3 to 4 concrete actions (SS11 `sessions.weeklyCommitmentBounds`; it was 2 to 3), each with an owner and a linked key result |
+| Wins | The week's wins, one line each, kept on the session (`okr_sessions.wins`) and carried into the digest |
 
 Closing a session rolls this week's commitments into next week's list to close.
 
@@ -135,16 +145,19 @@ The product assembles:
 | Headline average | Average confidence, change from last week |
 | On track | KRs with high confidence |
 | At risk | KRs with low confidence, with owners |
-| Blockers | On the 24-hour clock |
+| Stale goals | The space's goals that read outdated, only when there are some: how the sponsor sees them now that the check-in ladder stops at the coordinator (P9-T19a-c-a) |
+| Blockers | Open, with their next actions, and whether their check-in has passed |
 | Commitment count | This week's commitments |
+| Wins | The week's wins, or that none were named (P9-T19a-d-c) |
 | Coordinator note | Free text from the coordinator for leadership |
 
 Posts to the team's channel (in-app and email now; chat channels in Phase 5).
 
 ### 2.6 The streak (SS7.4)
 
-Consecutive weeks a space held its check-in. A skipped week breaks it.
-Shown on the space home.
+Consecutive check-in periods a space held its check-in, at the space's own
+frequency since P9-T19a-d-b: weeks, fortnights or months. A skipped period
+breaks it. Shown on the space home.
 
 | Event | Effect |
 |---|---|
@@ -176,6 +189,7 @@ as the meeting progresses.
 | Trend per objective | `improving`, `flat`, `declining` | One per objective |
 | Dependency and risk log | Status per dependency | From the alignment register |
 | Resource or priority shifts | Free text | |
+| Continue, update, start or stop | Each move recorded as METHOD.md §2.9 says | Read from the objective, not stored again (P9-T19a-d-d) |
 | Decisions | Decision record: text, affected KR/goal, date, author | The artifact that survives |
 
 The decision table is surfaced on:
@@ -202,9 +216,26 @@ objective as evidence and no button starts selected. §7.5 records the trend as
 a judgement, and a judgement that arrives pre-answered is a judgement most
 rooms stop making.
 
+*The moves are read, not recorded twice* (P9-T19a-d-d). A start is an
+objective or key result marked added mid-cycle, an update is a target change
+made once the cycle's plan was published (`key_result_target_changes.mid_cycle`),
+and a stop is an objective closed as abandoned with its reason. Each is the
+write §2.9 already keeps, so `sessions.monthlyRecord` reads them back in the
+review's space and cycle, and the stop the room makes goes through `goals.stop`
+like any other.
+
+| Move | Read from | Made in the review |
+|---|---|---|
+| Continue | Nothing | Nothing to record |
+| Update | `key_result_target_changes` where `mid_cycle` | No: on the objective, where easing asks its reason |
+| Start | `added_mid_cycle_at` on the objective or key result | No: written as on any day |
+| Stop | `goals` closed with outcome `abandoned` | Yes: `goals.stop`, with its one-line reason |
+
 Given / When / Then:
 - Given a monthly review recording a decision against a key result, when the
   goal page is opened, then the decision appears in its history.
+- Given a monthly review, when an objective is stopped from it, then it closes
+  as abandoned with its reason and the review's record names it.
 
 ## 4. The quarterly review (SS8)
 
@@ -719,7 +750,7 @@ Assembles after the weekly session closes.
 | Change | Delta from last week's average |
 | On track | KRs where confidence >= high boundary |
 | At risk | KRs where confidence < low boundary, with owners |
-| Blockers | Open blockers on the 24-hour clock |
+| Blockers | Open blockers, and whether their check-in has passed |
 | Commitments | Count and list for this week |
 | Coordinator note | Free text |
 

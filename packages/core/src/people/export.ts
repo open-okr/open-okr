@@ -197,6 +197,18 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     label: "Values you recorded",
   },
   {
+    table: "annual_frame_revisions",
+    column: "author_member_id",
+    // A revision somebody made to the year's frame, with their reason (P9-T13-c-c).
+    label: "Annual frame revisions you made",
+  },
+  {
+    table: "key_result_target_changes",
+    column: "actor_member_id",
+    // A change somebody made, with the reason they gave, is theirs (P9-T06b).
+    label: "Key result targets you changed",
+  },
+  {
     table: "kpi_records",
     column: "author_member_id",
     label: "KPI values you recorded",
@@ -212,6 +224,20 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     column: "member_id",
     skip: "structural",
     because: "Ownership of a KPI. The readings are exported from kpi_records.",
+  },
+  {
+    table: "kpis",
+    column: "responded_by_member_id",
+    skip: "structural",
+    because:
+      "Who chose how an unhealthy KPI was answered (P9-T18b). The task or key result that answers it is exported with its own rows.",
+  },
+  {
+    table: "kpis",
+    column: "owner_member_id",
+    skip: "structural",
+    because:
+      "Who a KPI's named owner is (P9-T17b-b), the same kind of fact as where it lives. The readings are exported from kpi_records.",
   },
   { table: "kudos", column: "from_member_id", label: "Kudos you gave" },
   {
@@ -296,6 +322,17 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     column: "member_id",
     skip: "structural",
     because: "Which spaces they belong to. A membership fact.",
+  },
+  {
+    table: "member_leave",
+    column: "member_id",
+    // The dates somebody marked themselves away, and who stood in (P9-T19b-b).
+    label: "Leave you marked",
+  },
+  {
+    table: "member_leave",
+    column: "delegate_member_id",
+    label: "Leave you stood in for",
   },
   {
     table: "subscriptions",

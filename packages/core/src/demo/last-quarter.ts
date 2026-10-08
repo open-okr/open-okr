@@ -52,6 +52,12 @@ export interface LastQuarterObjective {
   readonly title: string;
   readonly description: string;
   readonly championKey: "priya" | "daniel";
+  /**
+   * The week it was started, when it was not part of the plan (METHOD.md
+   * §2.9, P9-T22b). Its check-ins begin that week, and the scorecard counts
+   * it among what moved in the quarter.
+   */
+  readonly startedInWeek?: number;
   readonly keyResults: readonly LastQuarterKeyResult[];
 }
 
@@ -112,6 +118,10 @@ export const LAST_QUARTER: readonly LastQuarterObjective[] = [
     description:
       "Pipeline was never the problem. The bet was that qualifying harder at the top would raise what survives to renewal.",
     championKey: "daniel",
+    // Started in week three, once the first renewal numbers showed accounts
+    // sold outside the profile churning. Mid-cycle changes are evidence, not
+    // failure (§2.9), and the close reads them.
+    startedInWeek: 3,
     keyResults: [
       {
         title: "Raise mid-market win rate from 22% to 32%",

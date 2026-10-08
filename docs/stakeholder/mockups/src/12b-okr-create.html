@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- window-width:1180 window-height:470 -->
 <meta charset="utf-8">
-<title>Creating an objective, open and closed</title>
+<title>Creating an objective, by default and under the Governed profile</title>
 <link rel="stylesheet" href="style.css">
 <style>
   html, body { width: 1180px; height: 470px; background: var(--raised); }
@@ -40,11 +40,11 @@
 
 <div class="stage">
   <div>
-    <div class="lab">Drafting open · the form answers as you type</div>
+    <div class="lab">The default · anybody who can edit a space writes, and the form answers as they type</div>
     <div class="pop">
       <div class="pop-h">
         <div class="h3">New objective</div>
-        <span class="chip brand" style="margin-left:auto">Q3 2026 · phase 4</span>
+        <span class="chip brand" style="margin-left:auto">Q3 2026</span>
       </div>
       <div class="pop-b">
         <div class="field">
@@ -69,38 +69,35 @@
           <div class="btn p" style="margin-left:auto">Add objective</div>
           <div class="btn">Cancel</div>
         </div>
-        <div class="note">Saved as a draft. Publishing is phase 5, and the six gates decide it.</div>
+        <div class="note">Saved on the first Enter. Publishing the set is a separate step, and only a gate set to block holds it.</div>
       </div>
     </div>
   </div>
 
   <div>
-    <div class="lab">Drafting closed · the same button, and a reason</div>
+    <div class="lab">Governed profile, outside its planning window · the same button, and a reason</div>
     <div class="pop">
       <div class="pop-h">
         <div class="h3">New objective</div>
-        <span class="chip warn" style="margin-left:auto"><span class="dot"></span>drafting not open yet</span>
+        <span class="chip warn" style="margin-left:auto"><span class="dot"></span>held back here now</span>
       </div>
       <div class="pop-b">
         <div class="blocked">
-          <div class="ttl">Phase 2, diagnose, is not finished</div>
-          <div class="miss"><span class="b">•</span><div>The prior cycle is not scored, and this is not declared a first cycle</div></div>
-          <div class="miss"><span class="b">•</span><div>Baseline health is not recorded</div></div>
-          <div class="miss"><span class="b">•</span><div>1 strategic issue ranked, and METHOD.md §2.3 asks for at least 3</div></div>
+          <div class="ttl">This workspace holds new objectives back here now</div>
+          <div class="miss"><span class="b">•</span><div>This workspace creates new objectives in the planning window, from 2026-06-08 to 2026-07-14. Changes to objectives that already exist stay open.</div></div>
           <div class="row" style="padding-top:2px">
-            <div class="btn p sm">Go and finish phase 2</div>
-            <div class="btn sm">What is a phase?</div>
+            <div class="btn p sm">See what the cycle still needs</div>
+            <div class="btn sm">Change who may write, and when</div>
           </div>
         </div>
         <div class="note">
-          Drafting opens once phases 0 to 3 pass. That order is the method, not a
-          setting: an objective written before the diagnosis is a guess with a
-          deadline. METHOD.md §2.
+          Shown only because this workspace chose to write in a planning
+          window. By default anybody who can edit a space writes at any time,
+          and nothing here is in their way. METHOD.md §2.9.
         </div>
         <hr class="rule">
         <div class="actions">
-          <div class="btn dis" style="margin-left:auto">Add objective</div>
-          <div class="btn">Close</div>
+          <div class="btn" style="margin-left:auto">Close</div>
         </div>
       </div>
     </div>

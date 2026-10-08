@@ -103,6 +103,7 @@ export function ProfileForm({
             </legend>
             <div className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm">
               <RichTextEditor
+                label={t("people.detail.bio")}
                 content={bio ?? null}
                 placeholder={t("people.detail.profileForm.aFewLinesAbout")}
                 onUpdate={(json) => setEditedBio(JSON.stringify(json))}

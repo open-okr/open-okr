@@ -303,7 +303,7 @@ The second row is the criterion in P3-T05's test plan: the key result is at 12
 of a 100 target with a positive slope, so nothing about its current status looks
 wrong, and the forecast already says it will land at 73.
 
-## 7. Score bands and annotations
+## 7. Score bands and notes
 
 METHOD.md §3.3. Scored at the close against the key result as written.
 
@@ -312,26 +312,30 @@ the facilitator through the scoring surface until the cycle closes. It is never
 recomputed after an edit, because a score is a judgement and progress is a
 measurement.
 
-Annotation rows are evaluated in the canon's order, first match wins, which
-leaves 0.3 to below 0.6 deliberately unannotated.
+Notes are judged by the objective's kind (METHOD.md §2.8, P9-T11a), in the
+canon's order, first match wins. A committed key result short of 1.0 asks for
+the explanation of its miss, whatever its band. An aspirational one below the
+bands' lowest boundary asks for its root cause. Nothing else gets a note: "too
+safe" is a pattern across a closed cycle's aspirational key results, judged by
+`tooSafePattern`, and is never said of one score. The root-cause boundary is
+the bands' own, so it moves to 0.3 with them at P9-T14.
 
 <!-- golden: scoring.score-bands -->
 
-| case | score | expected_band | expected_annotation |
-|---|---|---|---|
-| perfect | 1 | fully_achieved | too_safe |
-| nearly perfect | 0.95 | fully_achieved | intended |
-| exactly at the achieved boundary | 0.9 | fully_achieved | intended |
-| just below achieved | 0.89 | strong | intended |
-| exactly at the strong boundary | 0.7 | strong | intended |
-| just below strong | 0.69 | partial | intended |
-| exactly at the annotation boundary | 0.6 | partial | intended |
-| just below the annotation boundary | 0.59 | partial | none |
-| exactly at the partial boundary | 0.4 | partial | none |
-| just below partial | 0.39 | little | none |
-| exactly at the disconnected boundary | 0.3 | little | none |
-| just below disconnected | 0.29 | little | disconnected |
-| nothing achieved | 0 | little | disconnected |
+| case | score | expected_band | aspirational_note | committed_note |
+|---|---|---|---|---|
+| perfect | 1 | fully_achieved | none | none |
+| just short of the target | 0.99 | strong | none | explain_miss |
+| nearly perfect | 0.95 | strong | none | explain_miss |
+| Doerr's green under Google's colours | 0.7 | strong | none | explain_miss |
+| exactly at the strong boundary | 0.6 | strong | none | explain_miss |
+| just below strong | 0.59 | partial | none | explain_miss |
+| exactly at the partial boundary | 0.3 | partial | none | explain_miss |
+| just below partial | 0.29 | little | root_cause | explain_miss |
+| little progress | 0.1 | little | root_cause | explain_miss |
+| nothing achieved | 0 | little | root_cause | explain_miss |
+
+Rewritten at P9-T14a for METHOD v2's bands, 1.0, 0.6 and 0.3: a key result is achieved only at its target, and 0.6 to below 1.0 is the expected range for a stretch.
 
 ## 8. The portfolio verdict
 
@@ -378,33 +382,31 @@ engine at P4-T05 consumes this flag; P3-T05 only computes it.
 
 ## 10. The draft set verdict
 
-METHOD.md §3.2, second table. Judged on the **set** average at drafting time,
-never on one key result.
+METHOD.md §3.2's drafting table. Judged on the **set** average of the
+aspirational key results at drafting time, never on one key result. A committed
+key result is judged by the confidence floor instead, where high confidence is
+right (P9-T11a).
 
 <!-- golden: scoring.draft-confidence -->
 
 | case | average | expected |
 |---|---|---|
-| near certain | 0.95 | sandbagging |
-| just above the sandbagging line | 0.9001 | sandbagging |
-| exactly at the sandbagging line | 0.9 | comfortable |
+| near certain | 0.95 | near_certain |
+| just above the near-certain line | 0.9001 | near_certain |
+| exactly at the near-certain line | 0.9 | comfortable |
 | comfortable | 0.8 | comfortable |
-| just above the comfortable floor | 0.7501 | comfortable |
-| exactly at the comfortable floor | 0.75 | sweet_spot |
-| the middle of the sweet spot | 0.6 | sweet_spot |
-| exactly at the sweet spot floor | 0.4 | sweet_spot |
-| just below the sweet spot | 0.399 | ambitious |
-| exactly at the ambitious floor | 0.25 | ambitious |
-| just below ambitious | 0.2499 | moonshot |
+| just above the comfortable floor | 0.7001 | comfortable |
+| exactly at the comfortable floor | 0.7 | sweet_spot |
+| the middle of the sweet spot | 0.5 | sweet_spot |
+| exactly at the moonshot boundary | 0.3 | sweet_spot |
+| just below the moonshot boundary | 0.2999 | moonshot |
 | pure fantasy | 0 | moonshot |
 
 Both upper bands are worded "above" in §3.2, so each excludes its own boundary
-and 0.75 belongs to the sweet spot rather than to comfortable. §11 holds three of
-the four boundaries this table needs: 0.90, 0.75 and 0.25. The fourth, the sweet
-spot floor at 0.40, is read from `scoring.confidenceLow`, the same number in the
-same section, rather than written down twice. If the two are ever meant to move
-apart, §11 needs a `scoring.draftSweetSpot` parameter, and that is a METHOD.md
-decision.
+and 0.70 belongs to the sweet spot rather than to comfortable. §11 holds all
+three boundaries: 0.90, 0.70 and 0.30. METHOD v2 folded the old "ambitious"
+band into the sweet spot, so the floor that used to be read from
+`scoring.confidenceLow` is gone.
 
 ## 11. Acceptance criteria
 

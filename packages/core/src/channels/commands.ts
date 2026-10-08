@@ -111,7 +111,7 @@ export const CHAT_COMMANDS: readonly ChatCommand[] = [
       },
       {
         name: "type",
-        hint: "one of resource, dependency, clarity, priority_conflict, external",
+        hint: "one of resource, dependency, clarity, priority_conflict, external, approach_not_working, other",
         required: true,
       },
       { name: "nextAction", hint: "what happens next", required: true },

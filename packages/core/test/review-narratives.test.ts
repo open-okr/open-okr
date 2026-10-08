@@ -250,14 +250,22 @@ describe("sessions.passMic", () => {
     expect((await narratives()).micGoalId).toBeNull();
   });
 
-  it("refuses an objective outside the review's space and cycle", async () => {
-    const otherSpace = (await call("spaces.create", {
-      name: "Another space",
+  it("refuses an objective outside the review's cycle", async () => {
+    // This review is in the company space, which covers every space's
+    // objectives in its cycle (P9-T22c-b-b); a team review refusing another
+    // space's objective is in review-reset.test.ts. The cycle still bounds it.
+    const later = new Date(Date.now() + 120 * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const nextCycle = (await call("cycles.create", {
+      on: later,
+      mode: "quarterly",
+      firstCycle: false,
     })) as { id: string };
     const outside = (await call("goals.create", {
       title: "Something this review does not cover",
-      cycleId,
-      spaceId: otherSpace.id,
+      cycleId: nextCycle.id,
+      spaceId,
       level: "team",
       ownerKind: "space",
       championId: facilitatorMemberId,
@@ -265,7 +273,7 @@ describe("sessions.passMic", () => {
       weight: 1,
     })) as { id: string };
 
-    // The mic names a goal, and a goal from another space would put the stage
+    // The mic names a goal, and a goal from another cycle would put the stage
     // on an objective the room is not reviewing.
     await expect(
       call("sessions.passMic", { sessionId, goalId: outside.id }),

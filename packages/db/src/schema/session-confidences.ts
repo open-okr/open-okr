@@ -2,7 +2,8 @@
  * Session confidence confirmations (METHOD.md §7.2, P4-T07b).
  *
  * After the vote reveal the champion confirms a final confidence and writes
- * a what-changed note for each key result. One row per KR per session.
+ * a what-changed note for each key result. One row per KR per session, and a
+ * low one carries its next action (P9-T19a-b).
  */
 import { numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
@@ -27,6 +28,16 @@ export const sessionConfidences = pgTable("session_confidences", {
   confirmedById: uuid("confirmed_by_id")
     .notNull()
     .references(() => workspaceMembers.id),
+  /**
+   * The next action a low score gets, with its owner, due by the goal's next
+   * check-in (METHOD.md §7.2 step 2, P9-T19a-b, migration 0129). A blocker
+   * only where something is actually blocked; the three are set together.
+   */
+  nextAction: text("next_action"),
+  nextActionOwnerId: uuid("next_action_owner_id").references(
+    () => workspaceMembers.id,
+  ),
+  nextActionDueAt: timestamp("next_action_due_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

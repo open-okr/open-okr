@@ -173,7 +173,7 @@ the build.
 | `blocker.warning` | 20h after opening | Blocker owner | No | Yes |
 | `blocker.overdue` | 24h after opening | Coordinator | Yes | Yes |
 | `blocker.escalated` | 48h after opening | Sponsor | Yes | Yes |
-| `confidence.critical` | KR scored <= 0.3 | Coordinator, same day | Yes | Yes |
+| `confidence.critical` | A KR's confidence falls into the low band; at <= 0.3, the sponsor too where critical escalation is on (P9-T19a-c-a) | Coordinator, same day; sponsor where critical escalation is on | Yes | Yes |
 | `commitment.due` | End of commitment week | Owner | No | Yes |
 | `session.due_soon` | 1 day before weekly session | Coordinator + space | No | Yes |
 | `session.open` | Scheduled start | Space | No | Yes |
@@ -203,8 +203,9 @@ the build.
 | `quality.too_many_objectives` | Level exceeds cap | Facilitator | No | Yes |
 | `quality.all_lagging` | All KRs lagging | Champion | No | Yes |
 | `quality.no_baseline` | KR lacks baseline at Phase 4 exit | Champion | No | Yes |
-| `quality.sandbagging_draft` | Avg draft confidence > 0.9 | Champion + facilitator | No | Yes |
-| `quality.sandbagging_close` | Scores cluster > 0.85 at close | Sponsor | No | Yes |
+| `quality.committed_floor` | Committed KR confidence < 0.7 at draft or check-in (P9-T11b-c) | Champion | No | Yes |
+| `quality.sandbagging_draft` | Avg aspirational draft confidence > 0.9 | Champion + facilitator | No | Yes |
+| `quality.sandbagging_close` | 3/4 or more of aspirational KRs at 1.0 at close | Sponsor | No | Yes |
 | `quality.orphan_goal` | Goal below company has no parent | Champion | No | Yes |
 | `quality.level_skip` | Alignment skips a level | Champion | No | Yes |
 | `quality.silo` | Dept subtree has no horizontal dep | Department lead | No | Yes |
@@ -250,9 +251,11 @@ Already implemented in `packages/method/src/escalation.ts`.
 | 2 | 1 day overdue | Champion (repeat) | `cadence.checkInLadderDays.championRepeat` |
 | 3 | Grace exceeded (3 days) | Champion + reviewer | `cadence.stalenessGraceDays` |
 | 4 | 7 days | Champion + reviewer + coordinator | `cadence.checkInLadderDays.coordinator` |
-| 5 | 14 days | All four roles | `cadence.checkInLadderDays.sponsor` |
+| 5 | 14 days, only where the sponsor is in the ladders (P9-T19a-c-a) | All four roles | `cadence.checkInLadderDays.sponsor`, and §12's "Sponsor in escalation ladders" |
 
-Targets accumulate. The champion is never dropped.
+Targets accumulate. The champion is never dropped. The reviewer is reached
+only where the goal has one. Without the sponsor in its ladders, a workspace's
+ladder stops at the coordinator at step 4.
 
 ### 4.2 Acknowledgement ladder
 
@@ -263,11 +266,14 @@ Targets accumulate. The champion is never dropped.
 
 ### 4.3 Blocker ladder
 
-| Step | After | Goes to | SS11 parameter |
+Against the check-in the next action is due by (METHOD.md §7.3), since
+P9-T19a-a. It was hours on a 24-hour clock.
+
+| Step | After | Goes to | SS11 parameter or setting |
 |---|---|---|---|
-| 1 | 20 hours | Blocker owner | `cadence.blockerLadderHours.owner` |
-| 2 | 24 hours | Coordinator | `cadence.blockerLadderHours.coordinator` |
-| 3 | 48 hours | Sponsor | `cadence.blockerLadderHours.sponsor` |
+| 1 | 1 day before that check-in | Blocker owner | `cadence.blockerLadderDays.reminder` |
+| 2 | That check-in passes with the action open | Coordinator | The check-in itself |
+| 3 | The check-in after it passes too | Sponsor | Only where §12's "Sponsor in escalation ladders" is on |
 
 ## 5. Deduplication rules
 
@@ -277,7 +283,7 @@ From SS11 `cadence.nudgeDeduplicationHours` (24h) and the trigger catalogue.
 |---|---|
 | Window | 1 nudge per subject per member per day (24h) |
 | Exception | An escalation step increase bypasses deduplication |
-| Volume ceiling | SS11 `cadence.nudgeCeilingPerWeek` (10 per member per week) |
+| Volume ceiling | SS11 `cadence.nudgeCeilingPerWeek` (5 per member per week since P9-T19a-c-b; it was 10). Anything past it waits for the member's next daily digest, `digest.daily`, which is neither held by the ceiling nor counted against it |
 | Enforcement | The nudge engine checks before inserting. A suppressed nudge writes a suppression record with the reason |
 
 ## 6. Quiet hours
@@ -345,8 +351,8 @@ The instructions are versioned like prompts (AI-NATIVE-PLAN.md SS6.5).
 Given a champion who misses their check-in, when the engine runs over the
 following fortnight, then they are nudged on the due day and once daily after,
 the reviewer is brought in at the grace boundary, the coordinator at seven
-days and the sponsor at fourteen, each step recorded and visible to the
-champion.
+days, and the sponsor at fourteen only where the workspace puts the sponsor
+in its ladders, each step recorded and visible to the champion.
 
 Given a burst of triggers on one subject, when the nudge engine runs, then
 only one nudge is produced per member per day, and the suppression record

@@ -18,7 +18,7 @@ already shipped in `scoring.ts`, `thresholds.ts`, `kpi.ts`, `workflow.ts` and
 | `kpi-formula.ts` | SS6.7 | P3-T13 | Formula tree, evaluator, cascade, validation |
 | `kpi-aggregate.ts` | SS6.7 | P3-T13 | Cross-frequency aggregation |
 | `workflow.ts` | SS2.3, SS4.5 | P3-T03 | Phase predicates, publish gates, phase work allowed |
-| `alignment.ts` | SS5.2 | P3-T09 | Alignment score, penalties, finding types |
+| `alignment.ts` | SS5.2 | P3-T09 | Alignment share and bands (penalties until P9-T16a), finding types |
 | `escalation.ts` | SS6.3 | P3-T06 | Escalation ladder data |
 | `guidance.ts` | SS9 | P3-T03 | Facilitator guidance per phase, horizons, timeline |
 | `terminology.ts` | SS2 | P3-T02 | Customisable term labels |
@@ -83,12 +83,12 @@ Condition tables use first-match-wins evaluation.
 
 | ID | Title | Conditions |
 |---|---|---|
-| AL-1 | Supports a bigger priority | 3 rows: fail no parent and no contribution, warn contribution < 3 words, pass |
+| AL-1 | Supports a bigger priority | 3 rows: warn with no parent, no contribution and no standalone reason; warn with a contribution under "Contribution minimum"; pass. The first row failed, and the second read "< 3 words", until P9-T16b-a |
 | AL-2 | One parent only | 1 row: fail if both parent goal and parent key result set |
-| AL-3 | No level skip | 1 row: flag when a team goal aligns straight to company |
-| AL-4 | Company anchor | 1 row: fail if no company-level objective anchors the tree |
+| AL-3 | No level skip | 1 row: flag a skip over the levels the cycle uses. Off by default since METHOD v2 (P9-T03a set the level, P9-T16b-a made the engine honour it) |
+| AL-4 | Company anchor | 1 row: warn if no company-level objective anchors the tree (fail until P9-T16b-a) |
 | AL-5 | Dependencies declared | 1 row: fail if any cross-team dependency is neither confirmed nor risk-owned |
-| AL-6 | Not siloed | 1 row: flag a department whose subtree has no horizontal dependency |
+| AL-6 | Not siloed | 1 row: flag a department whose subtree has no horizontal dependency. Off by default since METHOD v2 |
 
 #### Cycle checks (8)
 
@@ -260,8 +260,11 @@ Five types. Exported as a typed union and a data array.
 | `clarity` | The key result is ambiguous. Nobody agrees what done means | SS7.3 |
 | `priority_conflict` | Business as usual keeps displacing OKR work | SS7.3 |
 | `external` | Market, regulation or partner factors beyond your control | SS7.3 |
+| `approach_not_working` | The work is happening and the number is not moving | SS7.3, P9-T19a-a |
+| `other` | Anything else, described in a line | SS7.3, P9-T19a-a |
 
-Every blocker carries: opened time, owner, next action, 24-hour clock.
+Every blocker carries: opened time, owner, next action, due by the next
+check-in of the goal it blocks (P9-T19a-a; it was a 24-hour clock).
 
 ## 6. Root-cause taxonomy (SS8.4)
 
@@ -331,34 +334,44 @@ P4-T01 does not change these.
 
 ## 11. The coach watch list (SS10)
 
-Twenty situations from METHOD.md SS10. Each maps to a check in SS4 or a trigger
-in AI-NATIVE-PLAN.md SS6.4. The package exports them as a data array keyed by
-the rule they cite.
+Twenty situations from METHOD.md SS10. Each maps to a check in SS4 or SS5, or a
+trigger in AI-NATIVE-PLAN.md SS6.4. The package exports them as `COACH_LINES`
+in `packages/method/src/coach.ts`, each with the line the coach says, and the
+conformance suite compares both columns with SS10 word for word (P9-T21).
+
+**Rewritten at P9-T21 from the revised SS10.** Three rows changed what they
+cite: a near-certain aspirational set is KR-6, a committed key result below
+0.7 confidence is `quality.committed_floor`, and a fall into the low band is
+`confidence.critical`. Level skips (AL-3) and silos (AL-6) left the list,
+because both are off by default and join it only under a stricter profile.
+"Check-in overdue past grace" cites `checkin.stale`, the trigger that fires
+when the grace runs out, rather than `checkin.overdue`, which fires the day
+after the due date.
 
 | # | Situation | Fires on | Rule key |
 |---|---|---|---|
-| 1 | Objective starts with output verb | OBJ-1 | `OBJ-1` |
+| 1 | Objective starts with an output verb | OBJ-1 | `OBJ-1` |
 | 2 | Objective contains numbers | OBJ-2 | `OBJ-2` |
-| 3 | Key result has no baseline | KR-2 | `KR-2` |
+| 3 | Metric key result has no baseline | KR-2 | `KR-2` |
 | 4 | Key result measures activity volume | KR-5 | `KR-5` |
-| 5 | All key results are lagging | KR-4 | `KR-4` |
-| 6 | Average confidence above 0.9 at draft | KR-6 | `KR-6` |
-| 7 | More than five company objectives | OBJ-5 | `OBJ-5` |
-| 8 | Not-doing list empty at Phase 3 exit | CY-5 | `CY-5` |
-| 9 | Goal with no parent | AL-1 | `AL-1` |
-| 10 | Level skip in the cascade | AL-3 | `AL-3` |
-| 11 | Department with no horizontal dependencies | AL-6 | `AL-6` |
-| 12 | Two goals double-counting a metric | Semantic (Coach) | `quality.conflict` |
-| 13 | Dependency unconfirmed and unowned | AL-5 | `AL-5` |
-| 14 | Capacity check with nothing cut | CY-6 | `CY-6` |
-| 15 | Check-in overdue past grace | Cadence engine | `checkin.overdue` |
-| 16 | Blocker past 24h clock | Cadence engine | `blocker.overdue` |
-| 17 | Reported health disagrees with data | Scoring engine | `quality.divergence` |
-| 18 | Trend forecast misses target | Scoring engine | `quality.trending_off` |
-| 19 | KPI drops out of corridor | KPI engine | `kpi.unhealthy` |
-| 20 | Scores near 1.0 at close | Scoring engine | `quality.sandbagging_close` |
+| 5 | Tagged key results are all lagging | KR-4 | `KR-4` |
+| 6 | Aspirational set near certain at draft | KR-6 | `KR-6` |
+| 7 | Committed key result below 0.7 confidence | Scoring engine | `quality.committed_floor` |
+| 8 | More than five company objectives | OBJ-5 | `OBJ-5` |
+| 9 | Not-doing list empty at the end of an annual Phase 3 | CY-5 | `CY-5` |
+| 10 | Goal with no parent and no stated reason | AL-1 | `AL-1` |
+| 11 | Two goals may double-count a metric | Semantic (Coach) | `quality.conflict` |
+| 12 | Dependency unconfirmed | AL-5 | `AL-5` |
+| 13 | Capacity check with nothing cut | CY-6 | `CY-6` |
+| 14 | Check-in overdue past grace | Cadence engine | `checkin.stale` |
+| 15 | Blocker action past the next check-in | Cadence engine | `blocker.overdue` |
+| 16 | Confidence fell into the low band | Scoring engine | `confidence.critical` |
+| 17 | Reported health disagrees with the data | Scoring engine | `quality.divergence` |
+| 18 | Trend forecast misses the target | Scoring engine | `quality.trending_off` |
+| 19 | KPI turns unhealthy | KPI engine | `kpi.unhealthy` |
+| 20 | Pattern of 1.0s on aspirational key results at the close | Scoring engine | `quality.sandbagging_close` |
 
-Items 12, 15-20 are triggers from AI-NATIVE-PLAN.md SS6.4 rather than SS4
+Items 7, 11 and 14 to 20 are triggers from AI-NATIVE-PLAN.md SS6.4 rather than
 quality checks. They fire at runtime, not at drafting time. Their rule keys
 must resolve inside the package (CLAUDE.md hard rule: "A message citing a
 rule the package does not define fails the build").
@@ -431,7 +444,7 @@ key results, and the expected check verdict for every applicable check.
 
 | Check | Verdict | Reason |
 |---|---|---|
-| OBJ-1 | fail | Starts with output verb "Launch" |
+| OBJ-1 | warn | Starts with output verb "Launch". A fail until P9-T03a (2 October 2026), when METHOD.md §4.1 made every OBJ-1 row a warning |
 | OBJ-2 | pass | 9 words, no digits (Q3 is not a digit) |
 | OBJ-3 | pass | Cycle is set (Q3) |
 | OBJ-4 | pass | Champion and reviewer named |
@@ -443,7 +456,7 @@ key results, and the expected check verdict for every applicable check.
 
 | Check | Verdict | Reason |
 |---|---|---|
-| OBJ-1 | fail | Bare metric movement with no why (starts with movement verb, contains a number, no why marker) |
+| OBJ-1 | warn | Bare metric movement with no why (starts with movement verb, contains a number, no why marker). A fail until P9-T03a |
 | OBJ-2 | warn | Contains digits ("30") |
 | OBJ-3 | pass | Cycle set |
 | OBJ-4 | pass | Owned |
@@ -493,7 +506,7 @@ key results, and the expected check verdict for every applicable check.
 | KR-2 | warn (KR3) | KR3 has only 1 number |
 | KR-3 | pass | All have baseline and target |
 | KR-4 | warn | All leading, no lagging |
-| KR-5 | fail (KR1), warn (KR2), warn (KR3) | KR1: "interviews" is activity noun, no impact. KR2: "outreach emails" is activity noun. KR3: "Complete" is output verb with < 2 numbers |
+| KR-5 | pass | Every key result here is tagged leading, and since P9-T03a a leading key result is exempt from KR-5 (METHOD.md §4.2). Untagged, the same texts warn on all three: KR1 and KR2 are activity nouns with no impact, KR3 is an output verb with fewer than two numbers. Until P9-T03a this row read fail (KR1), warn (KR2), warn (KR3) |
 | KR-6 | depends on confidence | |
 | KR-7 | pass | All carry direction |
 
@@ -504,10 +517,10 @@ to company level, one department with no horizontal dependencies.
 
 | Check | Verdict | Reason |
 |---|---|---|
-| AL-1 | fail (for orphaned goal) | No parent and no stated contribution |
+| AL-1 | warn (for orphaned goal) | No parent, no stated contribution and no standalone reason. Read fail until P9-T16b-a |
 | AL-2 | pass | Single parent on all |
 | AL-3 | fail (for team goal) | Team goal aligned straight to company |
-| AL-4 | fail | No company-level objective anchors the tree |
+| AL-4 | warn | No company-level objective anchors the tree. Read fail until P9-T16b-a, when METHOD v2's "Warn" moved in |
 | AL-5 | pass | All dependencies confirmed |
 | AL-6 | fail (for isolated dept) | Department subtree has no horizontal dependency |
 

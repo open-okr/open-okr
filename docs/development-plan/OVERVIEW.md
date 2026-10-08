@@ -35,7 +35,7 @@ OpenOKR runs the entire OKR practice, from the annual frame to the quarterly clo
 | **A champion** | A composer that tells you why your key result is weak while you write it, a check-in the coach has already drafted from what actually happened, and a clear view of what is blocking you |
 | **A reviewer** | Every check-in from your people in one queue for a one-click acknowledgement, with stale and at-risk work impossible to miss |
 | **A coordinator** | A weekly session the product runs for you: confidence, blockers with owners and clocks, commitments, a digest, and a streak that makes the habit visible |
-| **A facilitator** | A guided cycle that knows which phase it is in and what is blocking it, and a sixty-minute quarterly review with a timer, a scoring reveal and exportable minutes |
+| **A facilitator** | A guided cycle that knows which phase it is in and what is blocking it, and a ninety-minute quarterly review with a timer, a scoring reveal and exportable minutes |
 | **An executive or sponsor** | The whole company on one map, escalations that reach you before things are unrecoverable, and a diagnostic at the close that tells you what to actually fix |
 | **An OKR lead or PMO** | Cycles across the organisation, KPI driver trees with recovery objectives, alignment health with named gaps, and everything exportable |
 | **An admin** | Members, access, single sign-on, backups with tested restores, a tamper-evident audit log, AI governance with hard cost caps, and a system built to pass a security review |
@@ -91,22 +91,22 @@ KPIs describe the health of your business. OKRs describe what you are changing a
 
 Build KPI driver trees: revenue is driven by new customers and order value, which are driven by conversion and basket size, and so on down to the leading indicators a team can move this week. Every KPI has a health corridor. Above ninety percent of target is healthy. Seventy to ninety is watch. Below seventy is unhealthy.
 
-When a KPI turns unhealthy, OpenOKR drafts a **recovery objective** from its leading drivers. Objective: bring this metric back to target. Key results: move each driver from where it is to where it needs to be. The KPI then reads "recovering", and its health rises as the recovery progresses, so you can see the fix working before the lagging number catches up. A recovery board shows every unhealthy KPI across the company in one list.
+When a KPI turns unhealthy, OpenOKR drafts a **recovery objective**: committed, named for what the metric protects, with the metric itself as the first key result, from where it is to where it is healthy, and then up to three leading drivers that are short of their own targets, each owned by the person who owns that driver. The KPI is then marked "recovering" beside its real health, never instead of it, and the recovery's own progress is shown next to the reading, so you can see the fix working without anyone mistaking it for the number having recovered. A recovery board shows every unhealthy KPI across the company in one list.
 
 ### 3.5 The weekly rhythm
 
 Fifteen to thirty minutes, four steps, run by the product.
 
 1. **Confidence round.** Every key result gets a score from 0.0 to 1.0. Where the team votes, everyone submits privately and the votes reveal together, so nobody anchors on the champion. The champion writes one or two lines: what changed this week. Facts, not feelings.
-2. **Diagnose what is low.** High and medium confidence moves on with no discussion. Every low score gets a blocker type, a named owner and one concrete action within twenty-four hours. Anything at or below 0.3 escalates to management the same day.
-3. **Commitments.** Close last week's out loud, delivered or not, no negotiation. Set this week's: two or three moves that will actually shift a key result.
-4. **Digest.** Generated for you, edited by the coordinator, posted to your channel.
+2. **Discuss what dropped.** Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner, and a blocker with its type only where something is actually blocked. A key result whose confidence falls into the low band is raised with the coordinator the same day.
+3. **Commitments and wins.** Close last week's, delivered or not, with a line on why where it helps. Set this week's: three or four moves that will actually shift a key result. Name the week's wins.
+4. **Digest.** Generated for you, with open blockers and their next actions, the commitments and the wins, edited by the coordinator, posted to your channel.
 
 It ends with a streak: the number of consecutive weeks your team held the session. A skipped week breaks it. It is a light touch that reliably keeps the heartbeat.
 
 ### 3.6 The quarterly review
 
-Sixty minutes, three acts, eleven timed stages, ending in exported minutes.
+Ninety minutes, four acts, eleven timed stages, about two weeks before the cycle ends, ending in exported minutes. The first act opens the room before the numbers.
 
 **Review** asks whether you achieved the results. A room pulse first, because steady rooms round their numbers up. Then score every key result against evidence, with the objective score hidden until the team reveals it together. Then the story behind each number, owner by owner. Then recognition.
 
@@ -138,7 +138,7 @@ Every message cites the rule behind it. You can open the rule and disagree with 
 
 ### The OKR Champion guards the rhythm
 
-It reminds the champion before the check-in is due, on the day, and daily after. It escalates: to the reviewer at the grace boundary, to the coordinator at a week, to the sponsor at a fortnight, always visibly to the person being escalated past. It runs the blocker clock: a warning at twenty hours, an escalation at twenty-four. It opens and closes the weekly session, assembles the digest, keeps the streak, watches the KPI corridors, and prepares the pack before your quarterly review so the session starts warm.
+It reminds the champion before the check-in is due, on the day, and daily after. It escalates: to the reviewer at the grace boundary where the goal has one, to the coordinator at a week, and to the sponsor at a fortnight only where the workspace puts the sponsor in its ladders, always visibly to the person being escalated past. It runs the blocker clock: a reminder the day before the check-in a blocker's next action is due by, and the coordinator once that check-in passes. It opens and closes the weekly session, assembles the digest, keeps the streak, watches the KPI corridors, and prepares the pack before your quarterly review so the session starts warm.
 
 ### They are safe, cheap and honest
 
@@ -226,7 +226,7 @@ Both are the same release. Self-host is never seat-limited and never feature-gat
 4. **Open a cycle.** The product walks you through the eight phases. It will tell you what is missing and refuse to let you draft on a thin input pack.
 5. **Draft your OKRs.** The coach checks every line as you write it, and will not let you publish a set that fails a gate.
 6. **Friday comes.** Everyone's review inbox fills. The Champion nudges the people who forgot. The session runs in twenty minutes. The digest goes out. The streak ticks up.
-7. **The quarter ends.** Sixty minutes, three acts, honest scores, a real diagnosis, and the next cycle already half-populated with what you learned.
+7. **The quarter ends.** Ninety minutes, four acts, honest scores, a real diagnosis, and the next cycle already half-populated with what you learned.
 
 That is the product.
 
@@ -241,7 +241,7 @@ That is the product.
 | **Reach** | Browser, email, Slack, Teams, WhatsApp, Telegram, and your own AI agent |
 | **OKRs** | Weighted, direction-aware key results with value history, confidence, trend forecasting, KPI-backed measurement, and full alignment with dependencies |
 | **KPIs** | Driver trees, health corridors, calculated formulas, recovery objectives and a recovery board |
-| **Rhythm** | Cadence with visible staleness, champion and reviewer accountability, blockers on a 24-hour clock, commitments, streaks and digests |
+| **Rhythm** | Cadence with visible staleness, champion and reviewer accountability, blockers due by the next check-in, commitments, streaks and digests |
 | **The work** | Initiatives, a key-result-linked board, and documents |
 | **Platform** | Spaces, the Work Map, the review inbox, a live feed, notifications that respect you, search, admin and a tamper-evident audit log |
 | **Ownership** | Open source, self-hosted in 30 minutes or in our cloud, air-gap capable, database-level isolation, full export |

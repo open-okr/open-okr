@@ -9,12 +9,11 @@
  * thin call onto an action that already exists. Nothing here decides anything:
  * the refusal a member sees is the one the Operation pipeline produced.
  *
- * **A value typed into the table is recorded as history, not as a column
- * write.** `goals.recordValue` writes a `key_result_values` row with source
- * `manual` and recomputes the goal, which is the same path a check-in takes.
- * Without that the table would be a second door onto progress, and the
- * check-in history would have holes exactly where somebody used the quicker
- * one.
+ * **Renames, values and removals moved to the OKR tree's cache at P9-T06c**
+ * (`lib/okr-tree/actions.ts`), where they change the row at once and carry
+ * the values they read, and deleting an objective joined them at P9-T07b-b.
+ * What stays here adds a row or a cycle, which re-renders the page because
+ * its count and score move with them.
  */
 
 import { callAction, OperationError } from "@openokr/core";
@@ -23,7 +22,7 @@ import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 
-export interface EditorResult {
+interface EditorResult {
   readonly error: string | null;
 }
 
@@ -61,57 +60,13 @@ function refresh(): void {
   revalidatePath("/", "layout");
 }
 
-export async function renameGoal(input: {
-  id: string;
-  title: string;
-}): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.update", {
-      id: input.id,
-      title: input.title,
-    });
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
-}
-
-export async function renameKeyResult(input: {
-  id: string;
-  title: string;
-}): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.updateKeyResult", {
-      id: input.id,
-      title: input.title,
-    });
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
-}
-
-export async function recordKeyResultValue(input: {
-  id: string;
-  value: number;
-}): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.recordValue", {
-      id: input.id,
-      value: input.value,
-    });
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
-}
-
 /**
- * A new objective in the current cycle, championed and reviewed by whoever
- * added it.
+ * A new objective in the current cycle, championed by whoever added it.
+ *
+ * **The reviewer is left to the practice** (P9-T04, with P8-G13d's default):
+ * `goals.create` names the creator where the workspace requires reviewers
+ * and nobody where they are optional or off, so a row added here owes no
+ * acknowledgement the workspace did not ask for.
  *
  * **`guided` is not set, so the phase gate does not refuse this.** METHOD.md
  * §2 blocks drafting inside the guided cycle until the earlier phases pass,
@@ -123,6 +78,12 @@ export async function addObjective(input: {
   cycleId: string;
   level: GoalLevel;
   title: string;
+  /** The objective it aligns under, from the diagram's "+ aligned" (P9-T10a). */
+  parentGoalId?: string;
+  /** Committed or aspirational; left out, the workspace's default (§2.8). */
+  kind?: "committed" | "aspirational";
+  /** Why it starts now, when added mid-cycle (METHOD.md §2.9). */
+  reason?: string;
 }): Promise<CreatedResult> {
   const memberId = await actingMemberId();
   try {
@@ -133,8 +94,10 @@ export async function addObjective(input: {
       ownerKind: "member",
       memberId,
       championId: memberId,
-      reviewerId: memberId,
       weight: 1,
+      ...(input.parentGoalId ? { parentGoalId: input.parentGoalId } : {}),
+      ...(input.kind ? { kind: input.kind } : {}),
+      ...(input.reason ? { reason: input.reason } : {}),
     });
     refresh();
     return { error: null, id: created.id };
@@ -156,6 +119,14 @@ export async function addObjective(input: {
 export async function addKeyResult(input: {
   goalId: string;
   title: string;
+  /**
+   * The objective's champion and the cycle's last day (design §4.3), so the
+   * first commit needs only a title and KR-3 has an owner and a date to read.
+   */
+  ownerId?: string;
+  dueOn?: string;
+  /** Why it starts now, when added mid-cycle (METHOD.md §2.9). */
+  reason?: string;
 }): Promise<CreatedResult> {
   try {
     const created = await callAction(await context(), "goals.addKeyResult", {
@@ -166,34 +137,15 @@ export async function addKeyResult(input: {
       baselineValue: 0,
       targetValue: 100,
       weight: 1,
+      ...(input.ownerId ? { ownerId: input.ownerId } : {}),
+      ...(input.dueOn ? { dueOn: input.dueOn } : {}),
+      ...(input.reason ? { reason: input.reason } : {}),
     });
     refresh();
     return { error: null, id: created.id };
   } catch (error) {
     return { ...refused(error), id: null };
   }
-}
-
-export async function removeKeyResult(input: {
-  id: string;
-}): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.removeKeyResult", input);
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
-}
-
-export async function removeGoal(input: { id: string }): Promise<EditorResult> {
-  try {
-    await callAction(await context(), "goals.delete", input);
-  } catch (error) {
-    return refused(error);
-  }
-  refresh();
-  return { error: null };
 }
 
 /**

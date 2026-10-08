@@ -491,7 +491,8 @@ export interface DecompositionContext {
   readonly unit: string | null;
   readonly direction: string;
   readonly baseline: number;
-  readonly target: number;
+  /** Null when nobody has set it yet (P9-T13-b-a). */
+  readonly target: number | null;
   readonly current: number;
   readonly existingInitiatives: readonly string[];
 }

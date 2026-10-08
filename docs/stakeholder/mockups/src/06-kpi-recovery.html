@@ -67,7 +67,7 @@
         <div><div class="h1">Retention driver tree</div><div class="sub">KPIs describe the health of the business. OKRs describe what you are changing about it.</div></div>
         <div class="row">
           <div class="chip ok"><i class="dot"></i>Healthy ≥ 90%</div><div class="chip warn"><i class="dot"></i>Watch 70–89%</div>
-          <div class="chip bad"><i class="dot"></i>Unhealthy &lt; 70%</div><div class="chip brand"><i class="dot"></i>Recovering</div>
+          <div class="chip bad"><i class="dot"></i>Unhealthy &lt; 70%</div><div class="chip brand"><i class="dot"></i>Recovering, beside its band</div>
         </div>
       </div>
 
@@ -100,7 +100,7 @@
               <div class="nm">Expansion revenue</div>
               <div class="vals"><b>RM 0.9m</b> of <b>RM 2.1m</b> · achievement <b>43%</b></div>
               <div class="corr"><i style="width:43%;background:var(--bad-dot)"></i><span class="m70"></span><span class="m90"></span></div>
-              <div class="ft"><span class="chip brand" style="height:18px"><i class="dot"></i>Recovering</span><span class="tier">LAGGING · OUTCOME</span></div>
+              <div class="ft"><span class="chip bad" style="height:18px"><i class="dot"></i>Unhealthy</span><span class="chip brand" style="height:18px"><i class="dot"></i>Recovering</span></div>
             </div>
 
             <div class="kn" style="left:560px;top:12px">
@@ -142,19 +142,21 @@
                 <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Retention tree</div>
                 <div class="h3" style="margin:3px 0 6px">Net revenue retention</div>
                 <div class="corr" style="margin-bottom:7px"><i style="width:71%;background:var(--bad-dot)"></i><span class="m70"></span><span class="m90"></span></div>
-                <div class="row"><span class="chip bad"><i class="dot"></i>Unhealthy 71%</span><div class="btn sm ai" style="margin-left:auto;height:22px">✨ Launch recovery</div></div>
+                <div class="row"><span class="chip bad"><i class="dot"></i>Unhealthy 71%</span><span class="tiny mut" style="margin-left:auto">Decide a response</span></div>
+                <div class="row" style="margin-top:6px;gap:5px;flex-wrap:wrap"><div class="btn sm" style="height:22px">Fix it now</div><div class="btn sm" style="height:22px">Add a key result</div><div class="btn sm ai" style="height:22px">Launch a recovery OKR</div></div>
               </div>
               <div class="bc">
                 <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Retention tree</div>
                 <div class="h3" style="margin:3px 0 6px">Expansion revenue</div>
                 <div class="corr" style="margin-bottom:7px"><i style="width:43%;background:var(--bad-dot)"></i><span class="m70"></span><span class="m90"></span></div>
-                <div class="row"><span class="chip brand"><i class="dot"></i>Recovering 49%</span><span class="tiny mut">2 KRs live</span></div>
+                <div class="row"><span class="chip bad"><i class="dot"></i>Unhealthy 43%</span><span class="chip brand"><i class="dot"></i>Recovering</span><span class="tiny mut">49% done</span></div>
               </div>
               <div class="bc">
                 <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Efficiency tree</div>
                 <div class="h3" style="margin:3px 0 6px">Cost to serve</div>
                 <div class="corr" style="margin-bottom:7px"><i style="width:64%;background:var(--bad-dot)"></i><span class="m70"></span><span class="m90"></span></div>
-                <div class="row"><span class="chip bad"><i class="dot"></i>Unhealthy 64%</span><div class="btn sm ai" style="margin-left:auto;height:22px">✨ Launch recovery</div></div>
+                <div class="row"><span class="chip bad"><i class="dot"></i>Unhealthy 64%</span><span class="tiny mut" style="margin-left:auto">Being fixed now</span></div>
+                <div class="tiny mut" style="margin-top:6px">Renegotiate the hosting contract · due 29 Aug</div>
               </div>
             </div>
           </div>
@@ -162,16 +164,16 @@
 
         <div class="col stagger" style="gap:12px;min-height:0">
           <div class="card">
-            <div class="card-h"><div class="h3">Expansion revenue</div><span class="chip brand" style="margin-left:auto"><i class="dot"></i>Recovering</span></div>
+            <div class="card-h"><div class="h3">Expansion revenue</div><span class="chip bad" style="margin-left:auto"><i class="dot"></i>Unhealthy</span><span class="chip brand"><i class="dot"></i>Recovering</span></div>
             <div class="card-b" style="padding:12px 14px">
               <div class="corr" style="height:10px"><i style="width:43%;background:var(--bad-dot)"></i><span class="m70"></span><span class="m90"></span></div>
               <div class="row" style="justify-content:space-between;margin-top:5px">
                 <span class="tiny mut4">0%</span><span class="tiny mut4">70%</span><span class="tiny mut4">90%</span><span class="tiny mut4">100%</span>
               </div>
               <div class="tiny mut" style="margin-top:9px;line-height:1.6">
-                Raw achievement is <b>43%</b>, below the 70% floor. It was <b>40%</b> when the recovery launched, and the
-                recovery is <b>49%</b> complete, so effective health reads <b style="color:var(--brand-600)">65%</b>:
-                <span class="num">40 + 0.49 × (90 − 40)</span>. The fix shows before the lagging number catches up.
+                Achievement is <b>43%</b>, below the 70% floor, so it reads unhealthy. It was <b>40%</b> when the recovery
+                launched, and the recovery objective is <b>49%</b> done. Its progress sits beside the reading, never in
+                its place: the KPI reads healthy only once the number itself is back.
               </div>
             </div>
           </div>
@@ -183,11 +185,18 @@
             </div>
             <div class="card-b" style="padding:12px 14px">
               <div class="rc" style="margin-bottom:11px">
-                <div style="font-size:12.5px;font-weight:650;line-height:1.35">Bring expansion revenue back to RM 2.1m</div>
+                <div style="font-size:12.5px;font-weight:650;line-height:1.35">Expansion revenue back where the business can rely on it</div>
                 <div class="row" style="margin-top:7px"><div class="av a4 sm">FA</div><span class="tiny mut">Fahmi Aziz</span>
                   <span class="chip warn" style="margin-left:auto"><i class="dot"></i>49%</span></div>
               </div>
-              <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:2px">Key results, one per leading child driver</div>
+              <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:2px">Committed · the KPI first, then its drivers</div>
+
+              <div class="krline">
+                <div><div class="t">Expansion revenue from RM 0.9m to RM 1.9m</div>
+                  <div class="n">Reads the KPI: moves when a month is recorded</div></div>
+                <div><div class="bar" style="margin-top:3px"><i style="width:43%"></i></div>
+                  <div class="tiny num mut" style="margin-top:4px">now RM 0.9m · 43%</div></div>
+              </div>
 
               <div class="krline">
                 <div><div class="t">Improve renewal touch coverage from 71% to 90%</div>

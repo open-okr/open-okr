@@ -1,7 +1,10 @@
+import { withWorkspace } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { routeCommand } from "../src/channels/router.ts";
+import { nudgeDraft } from "../src/nudges/message.ts";
 import { parseKeyRing } from "../src/secrets/key-ring.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
@@ -162,6 +165,31 @@ describe("what a nudge says", () => {
       { now: iso },
     );
   };
+
+  it("says the coach's line under the headline where METHOD.md §10 gives one (P9-T21)", async () => {
+    const wb = await workerDb();
+    const draftFor = (ruleKey: string) =>
+      withWorkspace(drizzle(wb.appPool), workspaceId, (tx) =>
+        nudgeDraft(tx as never, {
+          workspaceId,
+          ruleKey,
+          subjectType: "goal",
+          subjectId: goalId,
+          provider: "email",
+        }),
+      );
+
+    // §10: "Check-in overdue past grace | This goal is stale. It cannot
+    // quietly stay green". Said beside the rule, never instead of it.
+    const stale = await draftFor("checkin.stale");
+    expect(stale.text).toMatch(
+      /\n\nThis goal is stale\. It cannot quietly stay green\.\n\nRule: checkin\.stale$/,
+    );
+    // A rule §10 gives no line says nothing beyond its own name.
+    const due = await draftFor("checkin.due");
+    expect(due.text.split("\n\n")).toHaveLength(2);
+    expect(due.text).toMatch(/\n\nRule: checkin\.due$/);
+  });
 
   it("names the goal by email, and the button opens its check-in", async () => {
     await runWithLinks(`${dueOn}T09:00:00Z`);

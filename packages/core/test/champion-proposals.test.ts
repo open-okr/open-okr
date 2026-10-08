@@ -324,7 +324,8 @@ describe("the recovery proposal, with the provider off", () => {
       state: string;
       recovery_goal_id: string | null;
     }>("select state, recovery_goal_id from kpis where id = $1", [kpiId]);
-    expect(rows[0]?.state).toBe("recovering");
+    // The band stays; the recovery sits beside it (P9-T17b-a).
+    expect(rows[0]?.state).toBe("unhealthy");
     expect(rows[0]?.recovery_goal_id).not.toBeNull();
 
     // Applied by the member who decided, not by the agent. The audit row is

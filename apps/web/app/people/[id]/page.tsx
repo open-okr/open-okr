@@ -15,6 +15,7 @@ import {
   uploadAvatar,
 } from "../actions.ts";
 import { AvatarForm } from "./avatar-form.tsx";
+import { LeaveCard } from "./leave-card.tsx";
 import { LifecycleControls } from "./lifecycle-controls.tsx";
 import { ProfileForm } from "./profile-form.tsx";
 
@@ -104,12 +105,14 @@ export default async function MemberProfilePage({
     : false;
 
   // Load additional data in parallel.
-  const [goals, directory, possibleManagers] = await Promise.all([
+  const [goals, directory, possibleManagers, leave] = await Promise.all([
     callAction(context, "goals.list", { includeClosed: false }),
     callAction(context, "people.directory", {}),
     isAdmin && !isSelf
       ? callAction(context, "people.possibleManagers", { memberId: id })
       : Promise.resolve([]),
+    // Their leave and who stands in (METHOD.md §7.4, P9-T19b-b).
+    callAction(context, "people.leave", { memberId: id }),
   ]);
 
   const championed = goals.goals.filter((g) => g.champion.id === id);
@@ -333,6 +336,17 @@ export default async function MemberProfilePage({
           updateProfile={updateProfile}
         />
       ) : null}
+
+      <LeaveCard
+        memberId={id}
+        isSelf={isSelf}
+        canEdit={isSelf || isAdmin}
+        leave={leave}
+        // People, not agents: an agent cannot read a review it is handed.
+        delegates={directory
+          .filter((person) => person.id !== id && person.kind === "human")
+          .map((person) => ({ id: person.id, name: person.name }))}
+      />
 
       {/* Admin org-field edit */}
       {isAdmin && !isSelf ? (

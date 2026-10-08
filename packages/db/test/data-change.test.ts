@@ -16,6 +16,17 @@ import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_g
 import { bindAgentsToSpacelessItems } from "../src/data-changes/0009_bind_agents_to_spaceless_items.ts";
 import { scrubErasedMemberNames } from "../src/data-changes/0010_scrub_erased_member_names.ts";
 import { sealAccountTokens } from "../src/data-changes/0011_seal_account_tokens.ts";
+import { carryStrategicIssueMinimum } from "../src/data-changes/0014_carry_strategic_issue_minimum.ts";
+import { carryObjectiveLengthLimit } from "../src/data-changes/0015_carry_objective_length_limit.ts";
+import { carryCoachStrictness } from "../src/data-changes/0016_carry_coach_strictness.ts";
+import { keyResultKindFromDirection } from "../src/data-changes/0017_key_result_kind_from_direction.ts";
+import { keyResultScoreComputed } from "../src/data-changes/0018_key_result_score_computed.ts";
+import { dropAlignmentPenalties } from "../src/data-changes/0019_drop_alignment_penalties.ts";
+import { kpiTargetTypeFromDirection } from "../src/data-changes/0020_kpi_target_type_from_direction.ts";
+import { kpiRecoveringToBand } from "../src/data-changes/0021_kpi_recovering_to_band.ts";
+import { kpiNamedOwner } from "../src/data-changes/0022_kpi_named_owner.ts";
+import { blockerClockToCheckIn } from "../src/data-changes/0023_blocker_clock_to_check_in.ts";
+import { retireRhythmScoreThreshold } from "../src/data-changes/0024_retire_rhythm_score_threshold.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -710,7 +721,12 @@ describe("0011: sealing the identity-provider tokens stored in plain text", () =
     for (const value of Object.values(plain ?? {})) {
       expect(value).toMatch(SEALED);
     }
-    expect(JSON.stringify(plain)).not.toMatch(/access-1|refresh-1|eyJ/);
+    // The plain tokens in full, not a fragment of one: base64 ciphertext
+    // spells "eyJ" by chance about once in a few hundred runs, which is how
+    // this assertion failed on 6 October 2026 with every token sealed.
+    expect(JSON.stringify(plain)).not.toMatch(
+      /access-1|refresh-1|eyJ\.id\.token/,
+    );
     // A fresh data key per token, so equal tokens never look equal at rest.
     expect(new Set(Object.values(plain ?? {})).size).toBe(3);
 
@@ -801,5 +817,643 @@ describe("0011: sealing the identity-provider tokens stored in plain text", () =
     expect(`${(error as Error).message} ${cause.message}`).not.toContain(
       "not-a-key",
     );
+  });
+});
+
+describe("0013: carrying the strategic issue floor onto its new threshold", () => {
+  it("moves a raised floor, drops the canon one and anything unreadable, and keeps a value already set", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, overrides: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, $2::jsonb from w
+         returning workspace_id as id`,
+        [slug, JSON.stringify(overrides)],
+      );
+      return rows[0]?.id as string;
+    };
+    const raised = await seed("raised", {
+      "quality.strategicIssueBounds": { low: 5, high: 10 },
+      "cadence.graceDays": 4,
+    });
+    const canon = await seed("canon", {
+      "quality.strategicIssueBounds": { low: 3, high: 8 },
+    });
+    const garbled = await seed("garbled", {
+      "quality.strategicIssueBounds": { low: "five" },
+    });
+    const both = await seed("both", {
+      "quality.strategicIssueBounds": { low: 6, high: 10 },
+      "quality.strategicIssueMinimum": 4,
+    });
+    const untouched = await seed("untouched", { "cadence.graceDays": 2 });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [carryStrategicIssueMinimum],
+    });
+    expect(result?.rowsChanged).toBe(4);
+
+    const overridesOf = async (id: string) =>
+      (
+        await client.query<{ overrides: object }>(
+          "select overrides from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0]?.overrides;
+    expect(await overridesOf(raised)).toEqual({
+      "quality.strategicIssueMinimum": 5,
+      "cadence.graceDays": 4,
+    });
+    expect(await overridesOf(canon)).toEqual({});
+    expect(await overridesOf(garbled)).toEqual({});
+    expect(await overridesOf(both)).toEqual({
+      "quality.strategicIssueMinimum": 4,
+    });
+    expect(await overridesOf(untouched)).toEqual({ "cadence.graceDays": 2 });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [carryStrategicIssueMinimum],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0014: carrying the objective length limit onto its new threshold", () => {
+  it("moves a changed upper bound, drops the canon one, and keeps a value already set", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, overrides: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, $2::jsonb from w
+         returning workspace_id as id`,
+        [slug, JSON.stringify(overrides)],
+      );
+      return rows[0]?.id as string;
+    };
+    const longer = await seed("longer", {
+      "quality.objectiveLengthWords": { low: 3, high: 24 },
+    });
+    const canon = await seed("canon", {
+      "quality.objectiveLengthWords": { low: 2, high: 18 },
+    });
+    const both = await seed("both", {
+      "quality.objectiveLengthWords": { low: 4, high: 30 },
+      "quality.objectiveLengthLimit": 20,
+    });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [carryObjectiveLengthLimit],
+    });
+    expect(result?.rowsChanged).toBe(3);
+
+    const overridesOf = async (id: string) =>
+      (
+        await client.query<{ overrides: object }>(
+          "select overrides from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0]?.overrides;
+    expect(await overridesOf(longer)).toEqual({
+      "quality.objectiveLengthLimit": 24,
+    });
+    expect(await overridesOf(canon)).toEqual({});
+    expect(await overridesOf(both)).toEqual({
+      "quality.objectiveLengthLimit": 20,
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [carryObjectiveLengthLimit],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0015: carrying a strict Coach onto strict mode", () => {
+  it("turns strict mode on where the Coach was strict, clears the column, and leaves the rest", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, strictness: string, practice: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, coach_strictness, practice)
+         select w.id, $2, $3::jsonb from w
+         returning workspace_id as id`,
+        [slug, strictness, JSON.stringify(practice)],
+      );
+      return rows[0]?.id as string;
+    };
+    const strict = await seed("strict", "strict", { reviewer: "required" });
+    const advisory = await seed("advisory", "advisory", {});
+    const warn = await seed("warn", "warn", {});
+
+    const [result] = await runDataChanges(client, {
+      scripts: [carryCoachStrictness],
+    });
+    expect(result?.rowsChanged).toBe(1);
+
+    const rowOf = async (id: string) =>
+      (
+        await client.query<{ coach_strictness: string; practice: object }>(
+          "select coach_strictness, practice from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0];
+    expect(await rowOf(strict)).toEqual({
+      coach_strictness: "warn",
+      practice: { reviewer: "required", strictMode: "on" },
+    });
+    expect(await rowOf(advisory)).toEqual({
+      coach_strictness: "advisory",
+      practice: {},
+    });
+    expect(await rowOf(warn)).toEqual({
+      coach_strictness: "warn",
+      practice: {},
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [carryCoachStrictness],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0017: maintain key results from their direction", () => {
+  it("makes a key result written with a maintain direction a maintain key result, and leaves the rest", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const { rows } = await client.query<{ direction: string; id: string }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Owner', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe)
+         select gen_random_uuid(), m.workspace_id, 'Keep the service up',
+                'company', 'workspace', m.id, m.id,
+                '{"start": "2026-07-01", "end": "2026-09-30"}'::jsonb
+           from m
+         returning id, workspace_id
+       )
+       insert into key_results (id, workspace_id, goal_id, title, direction,
+                                indicator_type, baseline_value, target_value,
+                                current_value)
+       select gen_random_uuid(), g.workspace_id, g.id, d.title, d.direction,
+              'lagging', 0, 10, 0
+         from g,
+              (values ('Uptime', 'maintain'), ('Activation', 'increase'))
+                as d(title, direction)
+       returning direction, id`,
+    );
+    // Both arrive as metric, the column's default, before the script runs.
+    const kinds = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{ direction: string; kind: string }>(
+            "select direction, kind from key_results",
+          )
+        ).rows.map((row) => [row.direction, row.kind]),
+      );
+    expect(rows).toHaveLength(2);
+    expect(await kinds()).toEqual({ maintain: "metric", increase: "metric" });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [keyResultKindFromDirection],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    expect(await kinds()).toEqual({
+      maintain: "maintain",
+      increase: "metric",
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [keyResultKindFromDirection],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0018: the computed score of key results scored before adjusting existed", () => {
+  it("copies a scored key result's score into its computed score, and leaves the unscored", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Owner', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe)
+         select gen_random_uuid(), m.workspace_id, 'Win mid-market',
+                'company', 'workspace', m.id, m.id,
+                '{"start": "2026-01-01", "end": "2026-03-31"}'::jsonb
+           from m
+         returning id, workspace_id
+       )
+       insert into key_results (id, workspace_id, goal_id, title, direction,
+                                indicator_type, baseline_value, target_value,
+                                current_value, score)
+       select gen_random_uuid(), g.workspace_id, g.id, d.title, 'increase',
+              'lagging', 0, 10, 0, d.score
+         from g,
+              (values ('Scored', 0.7::numeric), ('Unscored', null::numeric))
+                as d(title, score)`,
+    );
+    const computed = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{ title: string; score_computed: string | null }>(
+            "select title, score_computed from key_results",
+          )
+        ).rows.map((row) => [row.title, row.score_computed]),
+      );
+    expect(await computed()).toEqual({ Scored: null, Unscored: null });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [keyResultScoreComputed],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    expect(await computed()).toEqual({ Scored: "0.70", Unscored: null });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [keyResultScoreComputed],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0019: the retired alignment penalties", () => {
+  it("removes the penalties and keeps every other override, the healthy threshold included", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const seed = async (slug: string, overrides: object) => {
+      const { rows } = await client.query<{ id: string }>(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values (gen_random_uuid(), $1, $1) returning id
+         )
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, $2::jsonb from w
+         returning workspace_id as id`,
+        [slug, JSON.stringify(overrides)],
+      );
+      return rows[0]?.id as string;
+    };
+    const tuned = await seed("tuned", {
+      "alignment.penalties": { noAnchor: 20, orphan: 5 },
+      "alignment.healthyThreshold": 70,
+      "cadence.graceDays": 2,
+    });
+    const untouched = await seed("untouched", { "cadence.graceDays": 3 });
+
+    const [result] = await runDataChanges(client, {
+      scripts: [dropAlignmentPenalties],
+    });
+    expect(result?.rowsChanged).toBe(1);
+
+    const overridesOf = async (id: string) =>
+      (
+        await client.query<{ overrides: object }>(
+          "select overrides from rhythm_settings where workspace_id = $1",
+          [id],
+        )
+      ).rows[0]?.overrides;
+    expect(await overridesOf(tuned)).toEqual({
+      "alignment.healthyThreshold": 70,
+      "cadence.graceDays": 2,
+    });
+    expect(await overridesOf(untouched)).toEqual({ "cadence.graceDays": 3 });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [dropAlignmentPenalties],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0020: the target type each KPI's direction implies", () => {
+  it("writes at least or at most, and leaves a type already set", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       )
+       insert into kpis (id, workspace_id, short_id, title, frequency,
+                         direction, target_type)
+       select gen_random_uuid(), w.id, d.short_id, d.title, 'monthly',
+              d.direction, d.target_type
+         from w,
+              (values ('K-1', 'Revenue', 'higher_better', null),
+                      ('K-2', 'Churn', 'lower_better', null),
+                      ('K-3', 'Uptime', 'higher_better', 'range'))
+                as d(short_id, title, direction, target_type)`,
+    );
+    const types = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{ title: string; target_type: string | null }>(
+            "select title, target_type from kpis",
+          )
+        ).rows.map((row) => [row.title, row.target_type]),
+      );
+
+    const [result] = await runDataChanges(client, {
+      scripts: [kpiTargetTypeFromDirection],
+    });
+    expect(result?.rowsChanged).toBe(2);
+    expect(await types()).toEqual({
+      Revenue: "at_least",
+      Churn: "at_most",
+      Uptime: "range",
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [kpiTargetTypeFromDirection],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0021: a recovering KPI reads its real band", () => {
+  it("rewrites recovering to the corridor band, and leaves the rest", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       )
+       insert into kpis (id, workspace_id, short_id, title, frequency, state,
+                         achievement_pct, green_low, red_low)
+       select gen_random_uuid(), w.id, d.short_id, d.title, 'monthly',
+              d.state, d.pct, d.green, d.red
+         from w,
+              (values ('K-1', 'Collapsed', 'recovering', 20::numeric, null::numeric, null::numeric),
+                      ('K-2', 'Back in watch', 'recovering', 75, null, null),
+                      ('K-3', 'Unmeasured', 'recovering', null, null, null),
+                      ('K-4', 'Thresholds', 'recovering', 50, 99.9, 99.5),
+                      ('K-5', 'Untouched', 'healthy', 95, null, null))
+                as d(short_id, title, state, pct, green, red)`,
+    );
+    const states = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{ title: string; state: string }>(
+            "select title, state from kpis",
+          )
+        ).rows.map((row) => [row.title, row.state]),
+      );
+
+    const [result] = await runDataChanges(client, {
+      scripts: [kpiRecoveringToBand],
+    });
+    expect(result?.rowsChanged).toBe(3);
+    expect(await states()).toEqual({
+      Collapsed: "unhealthy",
+      "Back in watch": "watch",
+      Unmeasured: "no_data",
+      Thresholds: "recovering",
+      Untouched: "healthy",
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [kpiRecoveringToBand],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0022: a member's KPI is owned by that member", () => {
+  it("names the member, and invents nobody for the rest", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       )
+       insert into kpis (id, workspace_id, short_id, title, frequency,
+                         owner_kind, member_id)
+       select gen_random_uuid(), m.workspace_id, d.short_id, d.title,
+              'monthly', d.owner_kind,
+              case when d.owner_kind = 'member' then m.id end
+         from m,
+              (values ('K-1', 'Mine', 'member'),
+                      ('K-2', 'Everybody''s', 'workspace'))
+                as d(short_id, title, owner_kind)`,
+    );
+    const owners = async () =>
+      Object.fromEntries(
+        (
+          await client.query<{
+            title: string;
+            owner_member_id: string | null;
+            member_id: string | null;
+          }>("select title, owner_member_id, member_id from kpis")
+        ).rows.map((row) => [
+          row.title,
+          row.owner_member_id === row.member_id && row.owner_member_id !== null,
+        ]),
+      );
+
+    const [result] = await runDataChanges(client, {
+      scripts: [kpiNamedOwner],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    expect(await owners()).toEqual({ Mine: true, "Everybody's": false });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [kpiNamedOwner],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0023: blockers on the check-in's clock", () => {
+  it("retires the hour clock and moves open blockers to their goal's next check-in, never earlier", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const { rows } = await client.query<{
+      workspace_id: string;
+      member_id: string;
+      later_goal: string;
+      same_day_goal: string;
+    }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), r as (
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, '{"cadence.blockerClockHours": 36,
+                        "cadence.blockerLadderHours":
+                          {"owner": 30, "coordinator": 36, "sponsor": 72},
+                        "cadence.stalenessGraceDays": 2}'::jsonb
+           from w
+         returning workspace_id
+       ), n as (
+         insert into nudge_rules (id, workspace_id, rule_key, escalation_ladder)
+         select gen_random_uuid(), w.id, 'blocker.escalated',
+                '{"owner": 30, "coordinator": 36, "sponsor": 72}'::jsonb
+           from w
+         returning workspace_id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Owner', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, timeframe, next_check_in_at)
+         select gen_random_uuid(), m.workspace_id, d.title, 'team',
+                'workspace', m.id,
+                '{"start": "2026-07-01", "end": "2026-09-30"}'::jsonb,
+                now() + d.ahead
+           from m,
+                (values ('Next week', interval '6 days'),
+                        ('Today', interval '2 hours'))
+                  as d(title, ahead)
+         returning id, title, workspace_id
+       )
+       select m.workspace_id, m.id as member_id,
+              (select id from g where title = 'Next week') as later_goal,
+              (select id from g where title = 'Today') as same_day_goal
+         from m`,
+    );
+    const seeded = rows[0] as {
+      workspace_id: string;
+      member_id: string;
+      later_goal: string;
+      same_day_goal: string;
+    };
+    // Three blockers on the old clock: an open one whose goal checks in next
+    // week, a resolved one on the same goal, and an open one whose goal is
+    // due before the old deadline anyway.
+    await client.query(
+      `insert into blockers (id, workspace_id, goal_id, type, owner_id,
+                             next_action, opened_at, due_at, resolved_at,
+                             source)
+       values (gen_random_uuid(), $1, $2, 'resource', $4, 'Moves',
+               now() - interval '1 hour', now() + interval '35 hours', null,
+               'session'),
+              (gen_random_uuid(), $1, $2, 'resource', $4, 'Resolved',
+               now() - interval '1 hour', now() + interval '35 hours', now(),
+               'session'),
+              (gen_random_uuid(), $1, $3, 'resource', $4, 'Stays',
+               now() - interval '1 hour', now() + interval '35 hours', null,
+               'session')`,
+      [
+        seeded.workspace_id,
+        seeded.later_goal,
+        seeded.same_day_goal,
+        seeded.member_id,
+      ],
+    );
+
+    const [result] = await runDataChanges(client, {
+      scripts: [blockerClockToCheckIn],
+    });
+    // One settings row, one ladder, one blocker.
+    expect(result?.rowsChanged).toBe(3);
+
+    const overrides = (
+      await client.query<{ overrides: object }>(
+        "select overrides from rhythm_settings where workspace_id = $1",
+        [seeded.workspace_id],
+      )
+    ).rows[0]?.overrides;
+    expect(overrides).toEqual({ "cadence.stalenessGraceDays": 2 });
+    const ladder = (
+      await client.query<{ escalation_ladder: object | null }>(
+        "select escalation_ladder from nudge_rules where workspace_id = $1",
+        [seeded.workspace_id],
+      )
+    ).rows[0]?.escalation_ladder;
+    expect(ladder).toBeNull();
+
+    const dues = Object.fromEntries(
+      (
+        await client.query<{ next_action: string; on_check_in: boolean }>(
+          `select b.next_action,
+                  b.due_at = g.next_check_in_at as on_check_in
+             from blockers b join goals g on g.id = b.goal_id`,
+        )
+      ).rows.map((row) => [row.next_action, row.on_check_in]),
+    );
+    expect(dues).toEqual({ Moves: true, Resolved: false, Stays: false });
+  });
+});
+
+describe("0024: the survey rhythm threshold retired", () => {
+  it("removes the five-point threshold and keeps every other override", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const { rows } = await client.query<{ workspace_id: string }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       )
+       insert into rhythm_settings (workspace_id, overrides)
+       select w.id, '{"sessions.diagnosticRhythmScore": 3,
+                      "sessions.diagnosticCycleScore": 0.65}'::jsonb
+         from w
+       returning workspace_id`,
+    );
+    const [result] = await runDataChanges(client, {
+      scripts: [retireRhythmScoreThreshold],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    const overrides = (
+      await client.query<{ overrides: object }>(
+        "select overrides from rhythm_settings where workspace_id = $1",
+        [rows[0]?.workspace_id],
+      )
+    ).rows[0]?.overrides;
+    expect(overrides).toEqual({ "sessions.diagnosticCycleScore": 0.65 });
   });
 });

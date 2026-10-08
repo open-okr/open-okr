@@ -59,9 +59,12 @@ export const LADDER_OWNERS: readonly LadderOwner[] = [
     governs: ["ack.owed", "ack.overdue"],
   },
   {
+    // One rung since P9-T19a-a: how many days before the check-in the owner
+    // is reminded. The coordinator's and the sponsor's are the check-ins
+    // themselves (§7.3), which a workspace moves by moving its cadence.
     ruleKey: "blocker.escalated",
-    threshold: "cadence.blockerLadderHours",
-    rungs: ["owner", "coordinator", "sponsor"],
+    threshold: "cadence.blockerLadderDays",
+    rungs: ["reminder"],
     governs: ["blocker.warning", "blocker.overdue", "blocker.escalated"],
   },
 ];

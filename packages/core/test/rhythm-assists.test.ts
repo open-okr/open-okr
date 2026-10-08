@@ -193,6 +193,76 @@ describe("the deterministic digest", () => {
     expect(digest.numbers).toEqual(expect.arrayContaining([62, 3, 4]));
   });
 
+  /**
+   * P9-T19a-d-c's acceptance criterion: "Given a weekly session that names
+   * two wins, when its digest is assembled, then the digest names both, and
+   * the open blockers with their next actions."
+   */
+  it("acceptance: names the session's wins and each open blocker's next action (P9-T19a-d-c)", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into blockers (id, workspace_id, type, owner_id, next_action, opened_at, due_at, session_id)
+       values (gen_random_uuid(), $1, 'dependency', $2, 'Get the pricing sign-off',
+               now() - interval '1 day', now() + interval '5 days', $3)`,
+      [workspaceId, ownerMemberId, sessionId],
+    );
+    await writeDigest({
+      averageConfidence: 0.6,
+      onTrackCount: 2,
+      atRiskCount: 0,
+      blockerCount: 1,
+      commitmentCount: 3,
+    });
+    // Named on a session still open; the digest reads the session's own list.
+    await wb.admin.query(
+      "update okr_sessions set state = 'running' where id = $1",
+      [sessionId],
+    );
+    await call("sessions.setWins", {
+      sessionId,
+      wins: ["Pricing page live", "Two renewals signed early"],
+    });
+
+    const digest = (await call("sessions.digest", { sessionId })) as {
+      lines: string[];
+    };
+    expect(digest.lines).toContain(
+      "Wins: Pricing page live and Two renewals signed early.",
+    );
+    expect(digest.lines.join("\n")).toContain(
+      "dependency: Get the pricing sign-off (Ada)",
+    );
+  });
+
+  it("names the space's stale goals, which is how the sponsor sees them (§11)", async () => {
+    const goal = (await call("goals.create", {
+      title: "Keep the platform standing",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: ownerMemberId,
+      weight: 1,
+    })) as { id: string };
+    const wb = await workerDb();
+    await wb.admin.query("update goals set health = 'outdated' where id = $1", [
+      goal.id,
+    ]);
+    await writeDigest({
+      averageConfidence: 0.6,
+      onTrackCount: 2,
+      atRiskCount: 0,
+      blockerCount: 0,
+      commitmentCount: 3,
+    });
+    const digest = (await call("sessions.digest", { sessionId })) as {
+      lines: string[];
+    };
+    expect(digest.lines).toContain(
+      "1 stale, past the check-in grace: Keep the platform standing (Ada).",
+    );
+  });
+
   it("computes the change on last week, which the stored row does not hold", async () => {
     await writeDigest(
       {
@@ -244,19 +314,23 @@ describe("the deterministic digest", () => {
     );
   });
 
-  it("puts a blocker's age on the 24-hour clock", async () => {
+  it("marks a blocker whose check-in has passed (§7.3, P9-T19a-a)", async () => {
     const wb = await workerDb();
+    // Due two days ago, so its check-in has gone by in any timezone; and one
+    // due in five days beside it, which has not.
     await wb.admin.query(
       `insert into blockers (id, workspace_id, type, owner_id, next_action, opened_at, due_at, session_id)
        values (gen_random_uuid(), $1, 'dependency', $2, 'Chase the billing team',
-               now() - interval '30 hours', now() - interval '6 hours', $3)`,
+               now() - interval '9 days', now() - interval '2 days', $3),
+              (gen_random_uuid(), $1, 'approach_not_working', $2, 'Try the other onboarding flow',
+               now() - interval '1 day', now() + interval '5 days', $3)`,
       [workspaceId, ownerMemberId, sessionId],
     );
     await writeDigest({
       averageConfidence: 0.5,
       onTrackCount: 1,
       atRiskCount: 0,
-      blockerCount: 1,
+      blockerCount: 2,
       commitmentCount: 2,
     });
 
@@ -264,10 +338,15 @@ describe("the deterministic digest", () => {
       lines: string[];
       numbers: number[];
     };
-    expect(digest.lines[3]).toContain("1 blocker open, 1 past the clock");
-    expect(digest.lines[3]).toContain("Chase the billing team");
-    expect(digest.lines[3]).toContain("past the 24-hour clock");
-    expect(digest.numbers).toContain(30);
+    expect(digest.lines[3]).toContain("2 blockers open, 1 past its check-in");
+    expect(digest.lines[3]).toContain(
+      "dependency: Chase the billing team (Ada, past its check-in)",
+    );
+    // Every underscore of a type, so it reads as words.
+    expect(digest.lines[3]).toContain(
+      "approach not working: Try the other onboarding flow (Ada)",
+    );
+    expect(digest.numbers).toEqual(expect.arrayContaining([2, 1]));
   });
 
   it("leaves out a resolved blocker", async () => {
@@ -320,7 +399,8 @@ describe("narrating the digest", () => {
     const digest = (await call("sessions.digest", { sessionId })) as {
       lines: string[];
     };
-    expect(digest.lines).toHaveLength(5);
+    // Six since P9-T19a-d-c: the wins have a line of their own.
+    expect(digest.lines).toHaveLength(6);
   });
 
   it("returns the prose and the lines together, so both are on screen", async () => {
@@ -335,7 +415,7 @@ describe("narrating the digest", () => {
       }),
     )) as { narrative: string; lines: string[] };
     expect(narrated.narrative).toContain("62%");
-    expect(narrated.lines).toHaveLength(5);
+    expect(narrated.lines).toHaveLength(6);
   });
 
   it("is dropped when the prose states a figure nobody measured", async () => {

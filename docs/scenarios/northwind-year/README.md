@@ -8,10 +8,10 @@ This is the reference for four kinds of work:
 |---|---|
 | **Knowing how the product is meant to be used** | Read it straight through. Each quarter is a chapter |
 | **Testing the code** | Every step has an ID (`NW-Q2-07`) and a Given / When / Then. End-to-end specs and the manual acceptance workbook cite the ID they prove |
-| **Running the demo** | §6 lists the dates worth showing and what must be true on each. Placing the seed at one of them is gap G-4 |
+| **Running the demo** | §6 lists the dates worth showing and what is true on each. The demo seed builds the year as of today, so the public demo moves through them with the calendar |
 | **Writing the user guide** | Each step names the screen and the practice rule it shows. A guide page explains the steps that cite it |
 
-Written on 2 October 2026, against METHOD.md as revised for Phase 9 ([p9-t00-method-v2.md](../../design/p9-t00-method-v2.md)) and the Phase 9 plan ([p9-t00-adaptable-practice.md](../../design/p9-t00-adaptable-practice.md), [p9-t00-okr-writing.md](../../design/p9-t00-okr-writing.md)). Where a step needs something not built yet, it says which task builds it.
+Written on 2 October 2026, against METHOD.md as revised for Phase 9 ([METHOD.md](../../development-plan/METHOD.md), which holds the whole revision since P9-T21) and the Phase 9 plan ([p9-t00-adaptable-practice.md](../../design/p9-t00-adaptable-practice.md), [p9-t00-okr-writing.md](../../design/p9-t00-okr-writing.md)). Where a step needs something not built yet, it says which task builds it.
 
 ## Chapters
 
@@ -42,7 +42,7 @@ Written on 2 October 2026, against METHOD.md as revised for Phase 9 ([p9-t00-met
 
 ## 2. The cast
 
-Elena, who registers the workspace, and the seven people the demo seed creates carry the story. Six more are added by this scenario, each for a part of it, and the seed should create them when it builds this year (P9-T22, gap G-4). That is fourteen in all, the cast the manual workbook's "Year" sheet uses.
+Elena, who registers the workspace, and the seven people the demo seed creates carry the story. Six more are added by this scenario, each for a part of it, and the seed creates them when it builds this year (P9-T22). That is fourteen in all, the cast the manual workbook's "Year" sheet uses.
 
 | Person | Role | Reports to | Time zone | Part in the story | In the seed |
 |---|---|---|---|---|---|
@@ -79,7 +79,7 @@ The two agent members, the **OKR Coach** and the **OKR Champion**, ship with the
 | Finance and Operations | Hugo | Hugo | 14 | All year |
 | Growth | Yuki | Yuki | 5 | From 9 August |
 
-**Levels.** Company, department and team. Individual OKRs are off, as METHOD.md recommends (§2.7: "Individual OKRs are not for everyone and should never be required"). In Q4 Northwind decides to drop the department level for 2028, following Castro's advice to use as few levels as possible. P9-T01 declares that setting; making the screens read it is gap G-3.
+**Levels.** Company, department and team. Individual OKRs are off, as METHOD.md recommends (§2.7: "Individual OKRs are not for everyone and should never be required"). In Q4 Northwind decides to drop the department level for 2028, following Castro's advice to use as few levels as possible. P9-T01 declares that setting, and P9-T07a and P9-T16 make the screens read it.
 
 ## 4. Northwind's practice settings
 
@@ -125,13 +125,13 @@ Quarters follow the calendar. Weekly check-ins are on Mondays. "W3" means week 3
 
 ## 6. Dates worth showing in the demo
 
-The demo seed is built relative to the day it runs (P8-T13b). Placing "today" at one of these points of the year, with everything before it already true, is gap G-4, which joins P9-T22.
+The demo is the year as of today (P9-T22c). `pnpm db:seed` places the scenario on the real calendar, its 2027 on the year that holds today and its autumn of 2026 on the year before, each date keeping its distance from its quarter's first Monday so a Monday check-in stays a Monday. Every step dated on or before today is written, and nothing after it, so whatever day a visitor arrives the organisation is exactly as far into its year as the calendar is. The rows below are what a visitor sees when today reaches each point; between them, the year is part of the way from one row to the next. `docs/design/p9-t22c-northwind-year.md` records what the seed writes and what it leaves to the running product, such as the agents' messages.
 
 | Demo date | What a visitor sees | Steps that must already be true |
 |---|---|---|
 | Q1 W2 (11 January) | Team drafting before peer review: coach warnings on Sales' task-shaped key results, Engineering over the cap, a diagonal alignment and a standalone objective with its reason | NW-P-01 to NW-Q1-11 |
 | Q1 W6 (8 February) | A running quarter: a key result added mid-cycle for a KPI that dropped, a confidence drop, a blocker with its next action | Up to NW-Q1-19 |
-| Q2 W7 (17 May) | The week after the competitor: a stopped objective, a started one, a kind changed openly, an eased target with its reason, a committed key result escalated, a draft check-in from an AI assistant | Up to NW-Q2-15 |
+| Q2 W7 (17 May) | The week after the competitor: a stopped objective, a started one, a kind changed openly, an eased target with its reason, a committed key result escalated, a draft check-in from an AI assistant | Up to NW-Q2-15, with NW-Q2-12 under way: Ben's last day is 21 May |
 | Q3 W7 (16 August) | The margin recovery beside its real KPI band, Support merged into Customer Success, Leo covering for Mei, the new Growth team, a holiday week with no check-in due, and a trend warning before the status changes | Up to NW-Q3-10, with NW-Q3-05 and NW-Q3-06 under way |
 | 24 December | The year closed: the annual review, four quarters on one scorecard, 2028's annual OKRs published and Q1 2028 drafted | The whole year |
 
@@ -168,5 +168,5 @@ Two cautions:
 | `NW-Q1-01` to `NW-Q4-nn` | Steps in each quarter, in date order |
 | **Screen** | The UIUX-PLAN screen number and route, for example S-13 `/goals` |
 | **Rule** | The METHOD.md section (revised text) the step exercises |
-| **Status** | **Today**: works in the product now. **P9-Tnn**: arrives with that Phase 9 task. **Gap**: no task builds it yet; [05-scenario-index.md](05-scenario-index.md) §3 lists every gap |
+| **Status** | **Today**: works in the product now. **P9-Tnn**: arrives with that Phase 9 task. [05-scenario-index.md](05-scenario-index.md) §3 records the four gaps the year found and the tasks that now build them |
 | Numbers | Every value is consistent across chapters: a key result that ends Q1 at 7 days starts Q2 there |

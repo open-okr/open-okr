@@ -7,7 +7,7 @@ import { NO_ERROR, type WriteState } from "./write-state.ts";
  * A form whose refusal is part of the screen.
  *
  * Every write on this page can be refused for a reason worth reading: a closed
- * cycle does not change, a second calibration is not allowed, a set cannot be
+ * cycle does not change, an agreed frame is not revised without a reason, a set cannot be
  * published through a red gate. Those sentences are written in `packages/core`
  * and this is what puts them in front of the person who tried.
  *

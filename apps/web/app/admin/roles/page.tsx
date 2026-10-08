@@ -68,13 +68,17 @@ export default async function RolesPage() {
             // A human only. A guest, an agent and a placeholder hold no role
             // by design, and offering to give one would be offering to undo
             // that.
+            // By name, so a row stays where it was after its role changes:
+            // the directory comes back in storage order, and a member whose
+            // role was just written moved to the end of it.
             members={members
               .filter((member) => member.kind === "human")
               .map((member) => ({
                 id: member.id,
                 name: member.name,
                 roleId: member.roleId,
-              }))}
+              }))
+              .sort((one, other) => one.name.localeCompare(other.name))}
             roles={roles.map((role) => ({ id: role.id, name: role.name }))}
           />
         </CardBody>

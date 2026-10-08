@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { applyEnforcement } from "../src/enforcement.ts";
+import { defaultPractice } from "../src/practice.ts";
 import {
-  applyStrictness,
   evaluateKeyResults,
   evaluateObjective,
   type KeyResultInput,
@@ -90,18 +91,18 @@ const OBJECTIVE = {
 
 /** One pass of exactly what the Draft Coach does per keystroke. */
 const evaluateOnce = (title: string) => {
-  const strictness = thresholds["quality.coachStrictness"];
-  const objective = applyStrictness(
+  const practice = defaultPractice();
+  const objective = applyEnforcement(
     evaluateObjective({ ...OBJECTIVE, title }, thresholds),
-    strictness,
+    practice,
   );
-  const keyResults = applyStrictness(
+  const keyResults = applyEnforcement(
     evaluateKeyResults({ keyResults: FIVE }, thresholds),
-    strictness,
+    practice,
   );
   return {
     verdicts: [...objective, ...keyResults],
-    score: strengthScore([...objective, ...keyResults]),
+    score: strengthScore([...objective, ...keyResults], thresholds),
   };
 };
 

@@ -97,13 +97,10 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
       nudge: 1,
       escalate: 3,
     });
-    expect(canon["cadence.blockerClockHours"]).toBe(24);
-    expect(canon["cadence.blockerLadderHours"]).toEqual({
-      owner: 20,
-      coordinator: 24,
-      sponsor: 48,
-    });
-    expect(canon["cadence.nudgeCeilingPerWeek"]).toBe(10);
+    // No clock of its own since P9-T19a-a: the next check-in is the clock.
+    expect(canon["cadence.blockerLadderDays"]).toEqual({ reminder: 1 });
+    // Five since P9-T19a-c-b, as Akmal decided on 2 October 2026.
+    expect(canon["cadence.nudgeCeilingPerWeek"]).toBe(5);
     expect(canon["cadence.publicationCountdownDays"]).toEqual([14, 7, 1]);
   });
 
@@ -111,13 +108,24 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
     expect(canon["scoring.confidenceHigh"]).toBe(0.7);
     expect(canon["scoring.confidenceLow"]).toBe(0.4);
     expect(canon["scoring.confidenceCritical"]).toBe(0.3);
+    // By kind since P9-T11a (METHOD v2 §3.2, §3.3, §3.4).
+    expect(canon["scoring.aspirationalDraftTarget"]).toBe(0.5);
     expect(canon["scoring.draftSandbagging"]).toBe(0.9);
-    expect(canon["scoring.draftComfortable"]).toBe(0.75);
-    expect(canon["scoring.draftAmbitious"]).toBe(0.25);
+    expect(canon["scoring.draftComfortable"]).toBe(0.7);
+    expect(canon["scoring.draftAmbitious"]).toBe(0.3);
+    expect(canon["scoring.committedConfidenceFloor"]).toBe(0.7);
+    expect(canon["scoring.committedExpectedScore"]).toBe(1);
+    expect(canon["scoring.aspirationalExpectedAverage"]).toBe(0.7);
+    expect(canon["scoring.closeTooSafeShare"]).toBe(0.75);
+    expect(canon["scoring.rootCauseThreshold"]).toEqual({
+      aspirational: 0.6,
+      committed: 1,
+    });
+    // METHOD v2's bands (P9-T14a): achieved only at the target.
     expect(canon["scoring.scoreBands"]).toEqual({
-      achieved: 0.9,
-      strong: 0.7,
-      partial: 0.4,
+      achieved: 1,
+      strong: 0.6,
+      partial: 0.3,
     });
     expect(canon["scoring.portfolioVerdicts"]).toEqual({
       tooSafe: 0.85,
@@ -135,10 +143,13 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
       low: 2,
       high: 5,
     });
-    expect(canon["quality.objectiveLengthWords"]).toEqual({ low: 4, high: 18 });
+    expect(canon["quality.objectiveLengthLimit"]).toBe(18);
+    expect(canon["quality.strengthScoreWarnWeight"]).toBe(0.5);
     expect(canon["quality.companyObjectiveCap"]).toBe(5);
     expect(canon["quality.objectivesPerUnitCap"]).toBe(3);
-    expect(canon["quality.strategicIssueBounds"]).toEqual({ low: 3, high: 10 });
+    expect(canon["quality.contributionMinimum"]).toBe(3);
+    expect(canon["quality.strategicIssueMinimum"]).toBe(3);
+    expect(canon["cadence.teamPublicationWindowWeeks"]).toBe(2);
     expect(canon["quality.priorityBounds"]).toEqual({ low: 3, high: 5 });
     expect(canon["quality.annualStrategyBounds"]).toEqual({ low: 2, high: 5 });
     expect(canon["quality.carryForwardIssueImpact"]).toBe(4);
@@ -146,15 +157,10 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
   });
 
   it("alignment", () => {
-    expect(canon["alignment.healthyThreshold"]).toBe(75);
-    expect(canon["alignment.penalties"]).toEqual({
-      noAnchor: 10,
-      orphan: 12,
-      noKeyResults: 4,
-      levelSkip: 3,
-      silo: 8,
-      floor: 5,
-    });
+    expect(canon["alignment.healthyThreshold"]).toBe(90);
+    expect(canon["alignment.watchThreshold"]).toBe(80);
+    // Retired at P9-T16a with the penalty score it fed.
+    expect(Object.keys(canon)).not.toContain("alignment.penalties");
   });
 
   it("KPIs and recovery", () => {
@@ -166,14 +172,17 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
 
   it("sessions", () => {
     expect(canon["sessions.weeklyMinutes"]).toEqual({ low: 15, high: 30 });
-    expect(canon["sessions.quarterlyMinutes"]).toBe(60);
+    // Ninety since P9-T20a, as METHOD v2 §8 has it.
+    expect(canon["sessions.quarterlyMinutes"]).toBe(90);
+    // Three or four since P9-T19a-d-c, as METHOD v2's step 3 has it.
     expect(canon["sessions.weeklyCommitmentBounds"]).toEqual({
-      low: 2,
-      high: 3,
+      low: 3,
+      high: 4,
     });
     expect(canon["sessions.roomPulseBands"]).toEqual({ high: 4, low: 3 });
-    expect(canon["sessions.diagnosticCycleScore"]).toBe(0.7);
-    expect(canon["sessions.diagnosticRhythmScore"]).toBe(3.5);
+    // Measured since P9-T20d: 0.6 and 75% of due check-ins on time.
+    expect(canon["sessions.diagnosticCycleScore"]).toBe(0.6);
+    expect(canon["sessions.diagnosticRhythm"]).toBe(0.75);
   });
 });
 
@@ -208,7 +217,7 @@ describe("validating an override map", () => {
     // A half-set ladder would leave the missing step reading the canon default
     // while the admin believed they had set the whole thing.
     const result = validateOverrides({
-      "cadence.blockerLadderHours": { owner: 12 },
+      "cadence.checkInLadderDays": { championRepeat: 2 },
     });
     expect(result.problems).toHaveLength(1);
   });

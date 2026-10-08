@@ -42,7 +42,10 @@ import { workspaceMembers, workspaces } from "./workspaces.ts";
 export const GOAL_OWNER_KINDS = ["workspace", "space", "member"] as const;
 export type GoalOwnerKind = (typeof GOAL_OWNER_KINDS)[number];
 
-/** The seven §4.1 values. The last two are outcomes, not live statuses. */
+/**
+ * The eight §3.5 values. The last three are outcomes, not live statuses;
+ * `abandoned` arrived at P9-T15b-a for an objective stopped mid-cycle.
+ */
 export const GOAL_HEALTH = [
   "pending",
   "on_track",
@@ -51,15 +54,55 @@ export const GOAL_HEALTH = [
   "outdated",
   "achieved",
   "missed",
+  "abandoned",
 ] as const;
 export type GoalHealth = (typeof GOAL_HEALTH)[number];
 
-export const GOAL_SUCCESS_STATUSES = ["achieved", "missed"] as const;
+/**
+ * METHOD.md §2.8 (P9-T11b-a). The same two words as the method's `OkrKind`,
+ * spelled here because this package does not depend on `packages/method`,
+ * and the column's check constraint names them too.
+ */
+export const GOAL_KINDS = ["committed", "aspirational"] as const;
+export type GoalKind = (typeof GOAL_KINDS)[number];
+
+/**
+ * METHOD.md §2.9 (P9-T13-b-b): an objective added mid-cycle that waits for
+ * its owner to publish it, then for its reviewer to approve it where the
+ * workspace asks for that. Null follows its cycle.
+ */
+export const GOAL_DRAFT_STATES = ["draft", "awaiting_approval"] as const;
+export type GoalDraftState = (typeof GOAL_DRAFT_STATES)[number];
+
+export const GOAL_SUCCESS_STATUSES = [
+  "achieved",
+  "missed",
+  "abandoned",
+] as const;
 export type GoalSuccessStatus = (typeof GOAL_SUCCESS_STATUSES)[number];
 
 /** METHOD.md §8.8, on every closed goal. */
-export const GOAL_CLOSE_DECISIONS = ["keep", "modify", "abandon"] as const;
+/** §8.8's five, in its order; achieved and defer since P9-T20e-a. */
+export const GOAL_CLOSE_DECISIONS = [
+  "achieved",
+  "keep",
+  "modify",
+  "defer",
+  "abandon",
+] as const;
 export type GoalCloseDecision = (typeof GOAL_CLOSE_DECISIONS)[number];
+
+/**
+ * METHOD.md §2.10 (P9-T12b). The same four words as the method's
+ * `KEY_RESULT_KINDS`, spelled here for the reason `GOAL_KINDS` is.
+ */
+export const KEY_RESULT_KINDS = [
+  "metric",
+  "maintain",
+  "milestone",
+  "baseline",
+] as const;
+export type KeyResultKind = (typeof KEY_RESULT_KINDS)[number];
 
 export const KEY_RESULT_DIRECTIONS = [
   "increase",
@@ -105,6 +148,8 @@ export const goals = pgTable("goals", {
   }),
   timeframe: jsonb("timeframe").$type<GoalTimeframe>(),
   level: text("level", { enum: GOAL_LEVELS }).notNull(),
+  /** Committed or aspirational (METHOD.md §2.8). Aspirational by default. */
+  kind: text("kind", { enum: GOAL_KINDS }).notNull().default("aspirational"),
   ownerKind: text("owner_kind", { enum: GOAL_OWNER_KINDS }).notNull(),
   spaceId: uuid("space_id").references(() => spaces.id, {
     onDelete: "set null",
@@ -115,9 +160,11 @@ export const goals = pgTable("goals", {
   championId: uuid("champion_id")
     .notNull()
     .references(() => workspaceMembers.id),
-  reviewerId: uuid("reviewer_id")
-    .notNull()
-    .references(() => workspaceMembers.id),
+  /**
+   * Optional since P9-T04 (METHOD.md §2.5): the practice decides whether a
+   * goal needs one, and a goal without one owes no acknowledgement.
+   */
+  reviewerId: uuid("reviewer_id").references(() => workspaceMembers.id),
   /**
    * The §2.1 annual strategy this objective serves (P6-G14b).
    *
@@ -137,6 +184,11 @@ export const goals = pgTable("goals", {
   nextCheckInAt: timestamp("next_check_in_at", { withTimezone: true }),
   lastCheckInId: uuid("last_check_in_id"),
   contributionStatement: text("contribution_statement"),
+  /**
+   * Why this goal stands alone, when it does (METHOD.md §5.2, P9-T16a). Counts
+   * as aligned in the alignment score; cleared when a parent is set.
+   */
+  standaloneReason: text("standalone_reason"),
   closedAt: timestamp("closed_at", { withTimezone: true }),
   closedById: uuid("closed_by_id").references(() => workspaceMembers.id),
   successStatus: text("success_status", { enum: GOAL_SUCCESS_STATUSES }),
@@ -147,6 +199,15 @@ export const goals = pgTable("goals", {
   qualityScore: smallint("quality_score"),
   qualityFlags: jsonb("quality_flags").$type<string[]>().notNull().default([]),
   aiGenerated: boolean("ai_generated").notNull().default(false),
+  /** When it was started mid-cycle (METHOD.md §2.9); null is the plan. */
+  addedMidCycleAt: timestamp("added_mid_cycle_at", { withTimezone: true }),
+  /** Waiting for its owner or its reviewer (§2.9); null follows its cycle. */
+  draftState: text("draft_state", { enum: GOAL_DRAFT_STATES }),
+  /**
+   * The objective a keep or a modify pre-filled this draft from (METHOD.md
+   * §8.9, P9-T20e-b). The foreign key is in migration 0137.
+   */
+  carriedFromGoalId: uuid("carried_from_goal_id"),
   position: integer("position").notNull().default(0),
   legacyType: text("legacy_type"),
   legacyId: text("legacy_id"),
@@ -169,10 +230,19 @@ export const keyResults = pgTable("key_results", {
     .references(() => goals.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   unit: text("unit"),
+  /** Metric, maintain, milestone or baseline (METHOD.md §2.10). */
+  kind: text("kind", { enum: KEY_RESULT_KINDS }).notNull().default("metric"),
+  /** When a milestone was done or a baseline recorded; null until then. */
+  doneAt: timestamp("done_at", { withTimezone: true }),
   direction: text("direction", { enum: KEY_RESULT_DIRECTIONS }).notNull(),
   indicatorType: text("indicator_type", { enum: INDICATOR_TYPES }).notNull(),
   baselineValue: numeric("baseline_value").notNull(),
-  targetValue: numeric("target_value").notNull(),
+  /**
+   * Null until somebody sets it, since P9-T13-b-a (METHOD.md §2.9): a metric
+   * or a maintain key result may be saved before its target is known, and
+   * fails KR-3 until it is. A milestone or a baseline stores nought to one.
+   */
+  targetValue: numeric("target_value"),
   currentValue: numeric("current_value").notNull(),
   dueOn: date("due_on"),
   ownerId: uuid("owner_id").references(() => workspaceMembers.id),
@@ -183,9 +253,17 @@ export const keyResults = pgTable("key_results", {
   confidence: numeric("confidence"),
   forecast: jsonb("forecast").$type<Record<string, unknown>>(),
   score: numeric("score"),
+  /**
+   * What §2.10 computed at the close, kept beside the review's `score`
+   * (METHOD.md §3.3, P9-T14a); `score_reason` is why they differ.
+   */
+  scoreComputed: numeric("score_computed"),
+  scoreReason: text("score_reason"),
   carryForward: boolean("carry_forward").notNull().default(false),
   qualityFlags: jsonb("quality_flags").$type<string[]>().notNull().default([]),
   position: integer("position").notNull().default(0),
+  /** When it was started mid-cycle (METHOD.md §2.9); null is the plan. */
+  addedMidCycleAt: timestamp("added_mid_cycle_at", { withTimezone: true }),
   legacyType: text("legacy_type"),
   legacyId: text("legacy_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -213,6 +291,42 @@ export const keyResultValues = pgTable("key_result_values", {
   checkInId: uuid("check_in_id"),
   source: text("source", { enum: VALUE_SOURCES }).notNull(),
   note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+/**
+ * Every change to a key result's target (P9-T06b, METHOD v2 §2.9). The
+ * original stays on record, and easing one carries its reason.
+ */
+export const keyResultTargetChanges = pgTable("key_result_target_changes", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  keyResultId: uuid("key_result_id")
+    .notNull()
+    .references(() => keyResults.id, { onDelete: "cascade" }),
+  fromValue: numeric("from_value").notNull(),
+  toValue: numeric("to_value").notNull(),
+  /** The baseline the change was judged against, which can move later. */
+  baselineValue: numeric("baseline_value").notNull(),
+  /** Whether this change moved the target toward its baseline when made. */
+  eased: boolean("eased").notNull(),
+  reason: text("reason"),
+  /** Whether the cycle's plan was already published (P9-T13 reads it). */
+  midCycle: boolean("mid_cycle").notNull().default(false),
+  actorMemberId: uuid("actor_member_id").references(() => workspaceMembers.id, {
+    onDelete: "set null",
+  }),
+  changedAt: timestamp("changed_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -32,9 +32,20 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { decideObjectiveAction } from "./actions";
 
-/** §8.8's three. The meanings come from the read; these are just the words. */
-const DECISIONS = ["keep", "modify", "abandon"] as const;
+/**
+ * §8.8's five, in its order (achieved and defer since P9-T20e-a). The
+ * meanings come from the read; these are the labels.
+ */
+const DECISIONS = ["achieved", "keep", "modify", "defer", "abandon"] as const;
 type DecisionKind = (typeof DECISIONS)[number];
+
+const DECISION_LABEL: Record<DecisionKind, string> = {
+  achieved: "goals.detail.decisionAchieved",
+  keep: "goals.detail.keep",
+  modify: "goals.detail.modify",
+  defer: "goals.detail.defer",
+  abandon: "goals.detail.abandon",
+};
 
 interface ResetObjective {
   readonly goalId: string;
@@ -43,6 +54,8 @@ interface ResetObjective {
   readonly decision: DecisionKind | null;
   readonly meaning: string | null;
   readonly why: string | null;
+  /** What the practice proposes, never chosen for the room (§8.8). */
+  readonly proposed: DecisionKind | null;
 }
 
 export interface Reset {
@@ -111,8 +124,18 @@ function ObjectiveRow({
         {objective.decision === null ? (
           <Chip tone="warn">{t("session.detail.reset.undecided")}</Chip>
         ) : (
-          <Chip tone="ok">{objective.decision}</Chip>
+          <Chip tone="ok">{t(DECISION_LABEL[objective.decision])}</Chip>
         )}
+        {objective.decision === null && objective.proposed !== null ? (
+          // Proposed beside the controls and never chosen: §8.8's "nothing
+          // carries over silently" is the room deciding, with the practice's
+          // suggestion in view (§12's carry-forward setting).
+          <Chip tone="info">
+            {t("session.detail.reset.proposed", {
+              decision: t(DECISION_LABEL[objective.proposed]),
+            })}
+          </Chip>
+        ) : null}
       </span>
 
       {objective.meaning === null ? null : (
@@ -136,7 +159,7 @@ function ObjectiveRow({
                 disabled={pending}
                 onClick={() => setChosen(decision)}
               >
-                {decision}
+                {t(DECISION_LABEL[decision])}
               </Button>
             ))}
           </fieldset>

@@ -1,6 +1,6 @@
 {
   "name": "@openokr/web",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -20,9 +20,10 @@
     "@openokr/method": "workspace:*",
     "@openokr/ui": "workspace:*",
     "@react-pdf/renderer": "^4.9.0",
+    "@xyflow/react": "catalog:",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "pg": "catalog:",
     "react": "19.3.0",
     "react-dom": "19.3.0"

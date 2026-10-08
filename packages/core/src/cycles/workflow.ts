@@ -46,7 +46,6 @@ import {
   type InitiativeSnapshot,
   type PhaseResult,
   phaseCompletion,
-  phaseWorkAllowed,
   publishGates,
   type ResolvedThresholds,
 } from "@openokr/method";
@@ -58,11 +57,14 @@ import {
   gte,
   inArray,
   isNull,
+  lt,
   lte,
+  ne,
   or,
 } from "drizzle-orm";
+import { practiceFromRow } from "../practice/settings.ts";
 import { loadCycleCadence } from "../sessions/booking.ts";
-import { workspaceTimeZone } from "./service.ts";
+import { readRhythmRow, workspaceTimeZone } from "./service.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -97,6 +99,7 @@ export async function loadWorkflowInput<
     | "endsOn"
     | "publicationDeadline"
     | "publishedAt"
+    | "companyPublishedAt"
     | "sponsorId"
     | "facilitatorId"
     | "packDistributedAt"
@@ -227,12 +230,36 @@ export async function loadWorkflowInput<
       .filter((on): on is string => typeof on === "string" && on !== "")
       .sort()[0] ?? null;
 
+  // METHOD.md §2.3, P9-T02: a cycle with no earlier cycle of its own mode
+  // is a first cycle whether or not anybody declared it, so a new workspace
+  // never meets "the prior cycle is not scored" for a prior cycle that does
+  // not exist. The declaration still counts for a workspace that made one.
+  const [earlier] = cycle.firstCycle
+    ? [undefined]
+    : await tx
+        .select({ id: cycles.id })
+        .from(cycles)
+        .where(
+          activeOnly(
+            cycles,
+            eq(cycles.workspaceId, workspaceId),
+            eq(cycles.mode, cycle.mode),
+            lt(cycles.startsOn, cycle.startsOn),
+          ),
+        )
+        .limit(1);
+
   return {
     mode: cycle.mode,
-    firstCycle: cycle.firstCycle,
+    firstCycle: cycle.firstCycle || earlier === undefined,
     startsOn: cycle.startsOn,
     publicationDeadline: cycle.publicationDeadline,
     publishedAt: cycle.publishedAt,
+    companyPublishedAt: cycle.companyPublishedAt,
+    // How hard each check and gate is here (METHOD.md §12). Read with the
+    // rest of the input, so phase 4, the gates and publication all judge by
+    // the workspace's practice rather than the recommended one (P9-T03b).
+    practice: practiceFromRow(await readRhythmRow(tx, workspaceId)).practice,
     sponsorId: cycle.sponsorId,
     facilitatorId: cycle.facilitatorId,
     packDistributedAt: cycle.packDistributedAt,
@@ -262,7 +289,12 @@ export async function loadWorkflowInput<
     cadence: await loadCycleCadence(
       tx,
       workspaceId,
-      { id: cycleId, startsOn: cycle.startsOn, endsOn: cycle.endsOn },
+      {
+        id: cycleId,
+        startsOn: cycle.startsOn,
+        endsOn: cycle.endsOn,
+        mode: cycle.mode,
+      },
       await workspaceTimeZone(tx, workspaceId),
     ),
   };
@@ -274,7 +306,8 @@ export async function loadWorkflowInput<
  *
  * **Scored** means `key_results.score` is set, which the quarterly review
  * writes back when it closes (P4-T10b-a). A cycle with no key results has
- * nothing scored, not everything.
+ * nothing scored, not everything. An objective stopped mid-cycle is left
+ * out, because its key results are not scored (P9-T22c-c-b).
  *
  * **The retrospective** is §8.1 stage five, the team retro, held in a
  * quarterly review of this cycle: one note in either column is a retro that
@@ -299,6 +332,9 @@ async function loadReviewAndLearn<
         eq(keyResults.workspaceId, workspaceId),
         eq(goals.cycleId, cycle.id),
         isNull(goals.deletedAt),
+        // A stopped objective's key results are not scored (§2.9, NW-Q2-19):
+        // it closed as abandoned before the review, so nothing waits on it.
+        or(isNull(goals.closeDecision), ne(goals.closeDecision, "abandon")),
       ),
     );
   const total = Number(tally?.total ?? 0);
@@ -361,6 +397,7 @@ async function loadInitiativeSnapshots<
       id: initiatives.id,
       title: initiatives.title,
       capacity: initiatives.capacity,
+      kind: goals.kind,
     })
     .from(initiatives)
     .innerJoin(
@@ -390,11 +427,22 @@ async function loadInitiativeSnapshots<
     )
     .where(activeOnly(initiatives, eq(initiatives.workspaceId, workspaceId)));
 
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    capacity: row.capacity,
-  }));
+  // One row per kind an initiative serves. It counts as committed when any
+  // objective it serves is (METHOD.md §5.5, P9-T11b-b): work a commitment
+  // depends on is part of the commitment, whatever else it also feeds.
+  const byId = new Map<string, InitiativeSnapshot>();
+  for (const row of rows) {
+    const seen = byId.get(row.id);
+    if (!seen || row.kind === "committed") {
+      byId.set(row.id, {
+        id: row.id,
+        title: row.title,
+        capacity: row.capacity,
+        kind: row.kind,
+      });
+    }
+  }
+  return [...byId.values()];
 }
 
 /**
@@ -424,6 +472,8 @@ async function loadGoalSnapshots<
       parentGoalId: goals.parentGoalId,
       parentKeyResultId: goals.parentKeyResultId,
       contributionStatement: goals.contributionStatement,
+      standaloneReason: goals.standaloneReason,
+      kind: goals.kind,
     })
     .from(goals)
     .where(
@@ -431,6 +481,9 @@ async function loadGoalSnapshots<
         goals,
         eq(goals.workspaceId, workspaceId),
         eq(goals.cycleId, cycleId),
+        // An objective started mid-cycle faces the checks set to block when
+        // it is written, never the set-level gates (METHOD.md §4.5, §2.9).
+        isNull(goals.addedMidCycleAt),
       ),
     );
 
@@ -444,6 +497,7 @@ async function loadGoalSnapshots<
       goalId: keyResults.goalId,
       title: keyResults.title,
       capacity: keyResults.capacity,
+      keyResultKind: keyResults.kind,
       // Publish gate 2 judges the §4.2 checks over the whole set, so the fields
       // those checks read travel with the snapshot.
       baselineValue: keyResults.baselineValue,
@@ -463,6 +517,8 @@ async function loadGoalSnapshots<
           keyResults.goalId,
           rows.map((row) => row.id),
         ),
+        // And a key result started mid-cycle under a planned objective.
+        isNull(keyResults.addedMidCycleAt),
       ),
     );
 
@@ -476,6 +532,7 @@ async function loadGoalSnapshots<
       keyResultId: keyResultDependencies.keyResultId,
       confirmed: keyResultDependencies.confirmed,
       riskOwnerId: keyResultDependencies.riskOwnerId,
+      escalatedToId: keyResultDependencies.escalatedToId,
     })
     .from(keyResultDependencies)
     .where(
@@ -497,29 +554,34 @@ async function loadGoalSnapshots<
     reviewerId: row.reviewerId,
     hasParent: Boolean(row.parentGoalId ?? row.parentKeyResultId),
     contributionStatement: row.contributionStatement,
+    standaloneReason: row.standaloneReason,
     keyResults: children
       .filter((child) => child.goalId === row.id)
       .map((child) => ({
         id: child.id,
         title: child.title,
         capacity: child.capacity,
+        // Gate 5 holds back only committed work at "exceeds" (§5.5).
+        kind: row.kind,
         dependencies: dependencies
           .filter((dependency) => dependency.keyResultId === child.id)
           .map((dependency) => ({
             confirmed: dependency.confirmed,
             riskOwnerId: dependency.riskOwnerId,
+            escalatedToId: dependency.escalatedToId,
           })),
         // `numeric` arrives as a string, and a string where §4.2 expects a
         // number makes every comparison read as a missing value.
         quality: {
           baseline: Number(child.baselineValue),
-          target: Number(child.targetValue),
+          target: child.targetValue === null ? null : Number(child.targetValue),
           dueOn: child.dueOn,
           ownerId: child.ownerId,
           indicatorType: child.indicatorType,
           direction: child.direction,
           confidence:
             child.confidence === null ? null : Number(child.confidence),
+          keyResultKind: child.keyResultKind,
         },
       })),
   }));
@@ -640,6 +702,7 @@ export async function loadCycleForWorkflow<
       endsOn: cycles.endsOn,
       publicationDeadline: cycles.publicationDeadline,
       publishedAt: cycles.publishedAt,
+      companyPublishedAt: cycles.companyPublishedAt,
       sponsorId: cycles.sponsorId,
       facilitatorId: cycles.facilitatorId,
       packDistributedAt: cycles.packDistributedAt,
@@ -675,34 +738,6 @@ export async function evaluateWorkflow<
     gates,
     publishable: canPublish(gates),
   };
-}
-
-/**
- * Why drafting in a cycle's phase 4 is refused, or null when it is not
- * (REQUIREMENTS §3.1: "drafting in Phase 4 is refused with the reason";
- * METHOD.md §2.6; completeness review H-09).
- *
- * Phase 4 waits for every earlier phase that applies, and the reason is each
- * condition still missing, in the words the rail shows. A closed or unknown
- * cycle is not this function's to refuse: the write that names it does.
- */
-export async function draftingRefusal<
-  TSchema extends Record<string, unknown> = Record<string, never>,
->(
-  tx: AnyTx<TSchema>,
-  workspaceId: string,
-  cycleId: string,
-  thresholds: ResolvedThresholds,
-): Promise<string | null> {
-  const cycle = await loadCycleForWorkflow(tx, workspaceId, cycleId);
-  if (!cycle) {
-    return null;
-  }
-  const { phases } = await evaluateWorkflow(tx, workspaceId, cycle, thresholds);
-  const work = phaseWorkAllowed(4, phases);
-  return work.allowed
-    ? null
-    : `Drafting waits until the earlier phases are complete. ${work.because.join(". ")}.`;
 }
 
 /**

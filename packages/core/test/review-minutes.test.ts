@@ -51,11 +51,12 @@ const minutes = async (userId = FACILITATOR) =>
     state: string;
     summary: {
       cycleScore: number | null;
+      committed: { met: number; reviewed: number };
       verdict: string | null;
       objectivesReviewed: number;
       keyResultsReviewed: number;
       belowThreshold: number;
-      threshold: number;
+      thresholds: { aspirational: number; committed: number };
       teamPulse: number | null;
       learningsCarried: number;
       actionsAgreed: number;
@@ -274,18 +275,63 @@ describe("§8.10's executive summary", () => {
 
     const record = await minutes();
     // §8.10's own list: cycle score, objectives and key results reviewed, key
-    // results below 0.7, team pulse, learnings carried, actions agreed.
+    // results below their root-cause threshold, team pulse, learnings carried,
+    // actions agreed. Each key result against its own kind's threshold since
+    // P9-T20c: 0.6 for an aspirational one, 1.0 for a committed one.
     expect(record.summary.cycleScore).toBeCloseTo(0.65, 10);
-    // 0.65 is below §11's 0.7 cycle floor and the rhythm is 5.0, so §8.6's
-    // second row applies: the team ran the rhythm and still missed.
-    expect(record.summary.verdict).toBe("strategy_or_quality");
+    // 0.65 is at or above §11's 0.6 cycle floor since P9-T20d, so §8.6's
+    // first row applies and no rhythm is consulted: results delivered.
+    expect(record.summary.verdict).toBe("results_delivered");
     expect(record.summary.objectivesReviewed).toBe(1);
     expect(record.summary.keyResultsReviewed).toBe(2);
-    expect(record.summary.threshold).toBe(0.7);
+    expect(record.summary.thresholds).toEqual({
+      aspirational: 0.6,
+      committed: 1,
+    });
     expect(record.summary.belowThreshold).toBe(1);
     expect(record.summary.teamPulse).toBeCloseTo(4, 10);
     expect(record.summary.learningsCarried).toBe(1);
     expect(record.summary.actionsAgreed).toBe(1);
+    // Nothing committed was graded, which the summary says rather than
+    // reading as none met.
+    expect(record.summary.committed).toEqual({ met: 0, reviewed: 0 });
+  });
+
+  it("reports committed key results met apart from the score (P9-T20e-b)", async () => {
+    const committed = (await call("goals.create", {
+      title: "Keep every enterprise customer live through the migration",
+      cycleId,
+      spaceId,
+      level: "team",
+      kind: "committed",
+      ownerKind: "space",
+      championId: facilitatorMemberId,
+    })) as { id: string };
+    const grades: [string, number][] = [
+      ["Hold uptime at 99.9% through the migration", 1],
+      ["Move all 40 enterprise accounts by 30 June", 0.8],
+    ];
+    for (const [title, score] of grades) {
+      const keyResult = (await call("goals.addKeyResult", {
+        goalId: committed.id,
+        title,
+        direction: "increase",
+        indicatorType: "lagging",
+        baselineValue: 0,
+        targetValue: 100,
+      })) as { id: string };
+      await call("sessions.scoreKeyResult", {
+        sessionId,
+        keyResultId: keyResult.id,
+        score,
+        reason: "As graded.",
+      });
+    }
+
+    // §8.10: "the cycle score, committed key results met". A commitment is
+    // met or it is not, so it is counted rather than averaged in.
+    const record = await minutes();
+    expect(record.summary.committed).toEqual({ met: 1, reviewed: 2 });
   });
 
   it("reads the cycle score the room was told, not one it recomputes", async () => {

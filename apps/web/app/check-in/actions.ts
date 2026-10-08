@@ -59,11 +59,19 @@ async function run(
 function composerValues(formData: FormData) {
   const values = new Map<
     string,
-    { keyResultId: string; value?: number; confidence?: number }
+    { keyResultId: string; value?: number; confidence?: number; done?: boolean }
   >();
 
   for (const [key, raw] of formData.entries()) {
     const [field, id] = key.split(":");
+    // A milestone's done (METHOD.md §2.10): asked on the form, and ticked or
+    // not, which a checkbox can only say by being there or absent.
+    if (field === "asked" && id && raw === "done") {
+      const entry = values.get(id) ?? { keyResultId: id };
+      entry.done = formData.has(`done:${id}`);
+      values.set(id, entry);
+      continue;
+    }
     if (!id || (field !== "value" && field !== "confidence")) {
       continue;
     }

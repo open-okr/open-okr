@@ -2,6 +2,7 @@ import { callAction } from "@openokr/core";
 import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
+import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ScheduleSessions } from "./schedule.tsx";
@@ -111,6 +112,7 @@ export default async function SessionsPage({
 
   return (
     <div className="stagger flex flex-col gap-4.5">
+      <SectionTabs items={CYCLE_TABS} active="/sessions" />
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">

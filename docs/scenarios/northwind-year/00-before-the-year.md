@@ -98,7 +98,7 @@ Elena keeps the recommended profile. She decides how Northwind uses reviewers:
 The reviewer setting stays at "Optional", which allows exactly that. Strict mode stays off, phase enforcement stays guided, and anybody can write at any time.
 *Test:* Given the recommended profile, when the practice settings screen opens, then it shows every setting at its default with no "differs from profile" marker. Given the reviewer at Optional, then a team objective can be created without one.
 
-**NW-P-10 · 2 to 11 Dec 2026 · Leadership · S-09 drafting, with the coach · METHOD v2 §2.8, §3.2, §4.1 · P9-T03, P9-T11**
+**NW-P-10 · 2 to 11 Dec 2026 · Leadership · S-09 drafting, with the coach · METHOD v2 §2.8, §3.2, §4.1 · P9-T03a, P9-T11**
 Four annual objectives are drafted, two committed and two aspirational. These are the company's promises for the year. The quarterly company OKRs will take slices of them.
 
 | # | Objective | Kind | Champion | Key results (baseline → year-end target) |
@@ -154,7 +154,7 @@ The pilot closes with a 90-minute review. The pilot scores 0.55. The room's two 
 Both feed Q1's input pack.
 *Test:* Given the pilot cycle reviewed, when Q1 2027's Phase 1 and Phase 2 open, then the pilot's scores and learnings appear in its input pack and its prior-cycle scoring list.
 
-**NW-P-14 · 18 Dec 2026 · Elena · S-10 publish, all-hands · METHOD v2 §4.5 · P9-T03**
+**NW-P-14 · 18 Dec 2026 · Elena · S-10 publish, all-hands · METHOD v2 §4.5 · P9-T03b**
 The annual set publishes. Gates 1 and 2 are green: every objective has a title, a champion and key results with targets, dates and owners. Gate 3 has nothing to warn about. Gate 5 asks about capacity: A3 is committed, and Engineering marks its SOC 2 milestone "tight", not "exceeds", after cutting the partner marketplace.
 
 Elena presents the annual OKRs at the all-hands on 18 December, as Google does at the start of its year. The whole company can read them.

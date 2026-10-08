@@ -38,9 +38,10 @@ import {
 import { asc, eq, type InferSelectModel, inArray, or, sql } from "drizzle-orm";
 import { daysPastDue } from "../cadence/service.ts";
 import { latestPublishedStatus } from "../check-ins/service.ts";
-import { workspaceTimeZone } from "../cycles/service.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { recomputeKpi } from "../kpis/service.ts";
 import type { OperationTx } from "../operations/operation.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -173,6 +174,8 @@ async function recomputeScoring<
     .select({
       id: keyResults.id,
       goalId: keyResults.goalId,
+      kind: keyResults.kind,
+      doneAt: keyResults.doneAt,
       direction: keyResults.direction,
       baselineValue: keyResults.baselineValue,
       targetValue: keyResults.targetValue,
@@ -274,6 +277,13 @@ async function recomputeScoring<
 
   for (const row of keyResultRows) {
     const baseline = asNumber(row.baselineValue);
+    // No target yet (P9-T13-b-a) is nothing to move toward, so the key
+    // result reads no progress and no forecast until one is set. Read as
+    // nought instead, a baseline of 4.1 "increasing" to 0 would be a span
+    // running backwards.
+    const untargeted =
+      row.targetValue === null &&
+      (row.kind === "metric" || row.kind === "maintain");
     const target = asNumber(row.targetValue);
     const current = asNumber(row.currentValue);
     const direction = row.direction;
@@ -283,14 +293,30 @@ async function recomputeScoring<
     // recorded is unmeasured, not failing.
     const progress = row.kpiId
       ? (kpiAchievementById.get(row.kpiId) ?? asNumber(row.progressPct))
-      : keyResultProgress({ direction, baseline, target, current }, thresholds);
+      : untargeted
+        ? 0
+        : keyResultProgress(
+            {
+              // §2.10 (P9-T12b): a milestone or a baseline reads its done.
+              kind: row.kind,
+              done: row.doneAt !== null,
+              direction,
+              baseline,
+              target,
+              current,
+            },
+            thresholds,
+          );
     keyResultProgressById.set(row.id, progress);
 
     const points = pointsByKeyResult.get(row.id) ?? [];
     const horizonDate = cycle?.endsOn ?? row.dueOn;
+    // §3.6 (P9-T15a): only a metric key result is forecast, and only once
+    // it has enough values. A milestone or a baseline is done or not, and a
+    // maintain is judged on its band, so a line through either says nothing.
     forecastById.set(
       row.id,
-      horizonDate
+      horizonDate && !untargeted && row.kind === "metric"
         ? trendForecast(
             points,
             new Date(`${horizonDate}T00:00:00Z`).getTime(),
@@ -299,6 +325,7 @@ async function recomputeScoring<
               baseline,
               target,
             },
+            thresholds["scoring.forecastMinimumValues"],
           )
         : null,
     );
@@ -330,7 +357,11 @@ async function recomputeScoring<
     })),
   ];
 
-  const cascade = cascadeProgress(cascadeInput, thresholds);
+  // §3.1's roll-up is the workspace's choice, off by default (P9-T12b).
+  const { practice } = practiceFromRow(await readRhythmRow(tx, workspaceId));
+  const cascade = cascadeProgress(cascadeInput, thresholds, {
+    rollUp: practice["progress.rollUp"] === "on",
+  });
   const graceDays = thresholds["cadence.stalenessGraceDays"];
   // Staleness is counted in the workspace's calendar, not in absolute hours: a
   // goal due at 23:59 local is one day overdue at any hour of the next day.
@@ -752,7 +783,7 @@ async function writeGoals<
 function healthFor(
   row: {
     closedAt: Date | string | null;
-    successStatus: "achieved" | "missed" | null;
+    successStatus: "achieved" | "missed" | "abandoned" | null;
     nextCheckInAt: Date | string | null;
   },
   graceDays: number,

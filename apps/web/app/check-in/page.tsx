@@ -1,8 +1,10 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import type { ResolvedThresholds } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
+import { healthWord } from "../../lib/health-words.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Composer, Votes } from "./composer.tsx";
@@ -138,7 +140,7 @@ export default async function CheckInPage({
                               : t("checkIn.dueOn", {
                                   date: String(goal.nextCheckInOn),
                                 }),
-                          health: goal.health.replace("_", " "),
+                          health: healthWord(t, goal.health),
                         },
                       )}
                     </span>
@@ -242,6 +244,11 @@ async function CheckInForGoal({
         <Composer
           checkInId={draft.id}
           goalTitle={goal.title}
+          kind={goal.kind}
+          thresholds={
+            (await callAction(context, "rhythm.read", {}))
+              .thresholds as ResolvedThresholds
+          }
           keyResults={goal.keyResults}
           nextGoalId={nextGoalId}
         />

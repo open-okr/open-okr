@@ -9,6 +9,7 @@ import {
   Circle,
   ClipboardCheck,
   Columns3,
+  Compass,
   Gauge,
   Hammer,
   Home,
@@ -109,6 +110,9 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "admin-directory": <Users className="size-full" />,
   "admin-audit": <ScrollText className="size-full" />,
   "admin-branding": <Palette className="size-full" />,
+  // The practice is the direction a workspace runs its OKRs in: which way,
+  // not how far, which is what the dial below it is for.
+  "admin-practice": <Compass className="size-full" />,
   // Thresholds are the readable half of "rhythm and thresholds", and a dial
   // is what a threshold looks like. Cycle already holds the arrows.
   "admin-rhythm": <Gauge className="size-full" />,

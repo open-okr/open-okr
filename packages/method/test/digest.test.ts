@@ -1,5 +1,5 @@
 /**
- * The weekly digest template (METHOD.md §7.2 step 4, P4-T15b-a).
+ * The weekly digest template (METHOD.md §7.2 step 4, P4-T15b-a, P9-T19a-d-c).
  *
  * §7.2's own sentence lists six parts: "headline average and the change on last
  * week, what is on track, what is at risk with owners, blockers on the 24-hour
@@ -33,24 +33,58 @@ const base: WeeklyDigestInput = {
     {
       title: "dependency: chase the billing team",
       ownerName: "Ada",
-      ageHours: 30,
+      pastCheckIn: true,
     },
   ],
   commitmentCount: 4,
+  wins: ["Pricing page live", "Two renewals signed early"],
+  staleGoals: [],
   coordinatorNote: "Billing is the whole story this week.",
-  blockerClockHours: 24,
 };
 
-describe("all six parts, in §7.2's order", () => {
-  it("renders them", () => {
+describe("every part, in §7.2's order", () => {
+  it("renders them, the wins after the commitments (P9-T19a-d-c)", () => {
     expect(weeklyDigestLines(base)).toEqual([
       "Product, week of 2026-08-24: confidence 62%, up 7 points on last week.",
       "3 objectives on track.",
       "1 at risk: Raise mid-market activation (Ada, caution).",
-      "1 blocker open, 1 past the clock: dependency: chase the billing team (Ada, 30h, past the 24-hour clock).",
+      "1 blocker open, 1 past its check-in: dependency: chase the billing team (Ada, past its check-in).",
       "4 commitments for next week.",
+      "Wins: Pricing page live and Two renewals signed early.",
       "For leadership: Billing is the whole story this week.",
     ]);
+  });
+});
+
+describe("the wins (§7.2 step 3, P9-T19a-d-c)", () => {
+  it("says none were named rather than leaving the line out", () => {
+    expect(weeklyDigestLines({ ...base, wins: [] })).toContain(
+      "No wins named this week.",
+    );
+  });
+});
+
+describe("stale goals (§11, P9-T19a-c-a)", () => {
+  it("names the space's stale goals after what is at risk, and only when there are some", () => {
+    const lines = weeklyDigestLines({
+      ...base,
+      staleGoals: [
+        { title: "Keep the platform standing", ownerName: "Leo" },
+        { title: "Answer once, in the product", ownerName: null },
+      ],
+    });
+    expect(lines[3]).toBe(
+      "2 stale, past the check-in grace: Keep the platform standing (Leo) and Answer once, in the product (no owner named).",
+    );
+    expect(weeklyDigestLines(base).some((line) => line.includes("stale"))).toBe(
+      false,
+    );
+    expect(
+      weeklyDigestNumbers({
+        ...base,
+        staleGoals: [{ title: "One", ownerName: null }],
+      }),
+    ).toContain(1);
   });
 });
 
@@ -114,28 +148,30 @@ describe("what is at risk", () => {
   });
 });
 
-describe("the 24-hour clock", () => {
-  it("marks the ones past it and counts them", () => {
+describe("the check-in's clock (§7.3, P9-T19a-a)", () => {
+  it("marks the ones past their check-in and counts them", () => {
     const line = weeklyDigestLines({
       ...base,
       blockers: [
-        { title: "One", ownerName: "Ada", ageHours: 30 },
-        { title: "Two", ownerName: "Ben", ageHours: 3 },
+        { title: "One", ownerName: "Ada", pastCheckIn: true },
+        { title: "Two", ownerName: "Ben", pastCheckIn: false },
       ],
     })[3];
-    expect(line).toContain("2 blockers open, 1 past the clock");
-    expect(line).toContain("One (Ada, 30h, past the 24-hour clock)");
-    expect(line).toContain("Two (Ben, 3h)");
+    expect(line).toContain("2 blockers open, 1 past its check-in");
+    expect(line).toContain("One (Ada, past its check-in)");
+    expect(line).toContain("Two (Ben)");
   });
 
-  it("does not mark one exactly at the clock as inside it", () => {
-    // §7.2's clock is a deadline. At 24 hours it has run out.
+  it("says their check-in for more than one", () => {
     expect(
       weeklyDigestLines({
         ...base,
-        blockers: [{ title: "One", ownerName: "Ada", ageHours: 24 }],
+        blockers: [
+          { title: "One", ownerName: "Ada", pastCheckIn: true },
+          { title: "Two", ownerName: "Ben", pastCheckIn: true },
+        ],
       })[3],
-    ).toContain("past the 24-hour clock");
+    ).toContain("2 blockers open, 2 past their check-in");
   });
 
   it("says none are open rather than leaving the line out", () => {
@@ -148,10 +184,10 @@ describe("the 24-hour clock", () => {
 describe("the coordinator's note", () => {
   it("is left out when there is not one, because it is the coordinator's own", () => {
     expect(weeklyDigestLines({ ...base, coordinatorNote: null })).toHaveLength(
-      5,
+      6,
     );
     expect(weeklyDigestLines({ ...base, coordinatorNote: "   " })).toHaveLength(
-      5,
+      6,
     );
   });
 });
@@ -180,23 +216,16 @@ describe("the numbers a narration is allowed to state", () => {
     expect(weeklyDigestNumbers(base)).toContain(7);
   });
 
-  it("includes each blocker's age", () => {
+  it("includes how many are past their check-in", () => {
     expect(
       weeklyDigestNumbers({
         ...base,
         blockers: [
-          { title: "One", ownerName: "Ada", ageHours: 30 },
-          { title: "Two", ownerName: "Ben", ageHours: 3 },
+          { title: "One", ownerName: "Ada", pastCheckIn: true },
+          { title: "Two", ownerName: "Ben", pastCheckIn: true },
+          { title: "Three", ownerName: "Cy", pastCheckIn: false },
         ],
       }),
-    ).toEqual(expect.arrayContaining([30, 3]));
-  });
-});
-
-describe("the blocker clock is the workspace's", () => {
-  it("reads cadence.blockerClockHours rather than a constant (H-17)", () => {
-    const lines = weeklyDigestLines({ ...base, blockerClockHours: 36 });
-    expect(lines.join("\n")).toContain("30h)");
-    expect(lines.join("\n")).not.toContain("past the");
+    ).toEqual(expect.arrayContaining([3, 2]));
   });
 });

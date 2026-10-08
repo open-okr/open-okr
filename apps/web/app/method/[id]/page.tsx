@@ -44,6 +44,7 @@ const GROUP_LABEL: Record<QualityCheck["group"], string> = {
 
 const TONE = {
   pass: "ok",
+  info: "neutral",
   warn: "warn",
   fail: "bad",
   todo: "neutral",

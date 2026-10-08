@@ -1,5 +1,5 @@
-import type { ResolvedThresholds } from "@openokr/method";
-import { scoreBand } from "@openokr/method";
+import type { ResolvedThresholds, ScoreColoursPractice } from "@openokr/method";
+import { scoreBand, scoreBandsIn } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
@@ -42,6 +42,8 @@ export interface Closure {
   readonly nextCycle: { readonly id: string; readonly name: string } | null;
   readonly priorScores: number;
   readonly carriedIssues: number;
+  readonly carriedDrafts: number;
+  readonly notCarried: readonly string[];
   readonly processPriority: string | null;
   readonly packNote: boolean;
 }
@@ -70,6 +72,7 @@ export async function ReviewAndLearn({
   waitingFor,
   canEdit,
   thresholds,
+  practice,
 }: {
   readonly keyResults: readonly ScoredKeyResult[];
   readonly cycleId: string;
@@ -93,6 +96,8 @@ export async function ReviewAndLearn({
    * exist, which is exactly the hardcoding the method rule forbids.
    */
   readonly thresholds: ResolvedThresholds;
+  /** Which colours the bands are read in (§12 "Score colours"). */
+  readonly practice: ScoreColoursPractice;
 }) {
   const { t } = await getTranslations();
 
@@ -105,8 +110,10 @@ export async function ReviewAndLearn({
 
   // The band the portfolio average falls in, decided by the method package
   // against this workspace's own thresholds.
-  const band = average === null ? null : scoreBand(average, thresholds);
-  const boundaries = thresholds["scoring.scoreBands"];
+  const band =
+    average === null ? null : scoreBand(average, thresholds, practice);
+  // In the workspace's score colours (§3.3, §12, P9-T14a).
+  const boundaries = scoreBandsIn(thresholds, practice);
   const table: readonly (readonly [string, string])[] = [
     [
       "fully_achieved",
@@ -192,6 +199,8 @@ export async function ReviewAndLearn({
             return (
               <div
                 key={name}
+                data-testid="score-band-row"
+                data-band={name}
                 className={
                   here
                     ? "flex items-center justify-between gap-2.5 rounded-md bg-brand-weak px-2.5 py-1.5 text-sm text-brand-text"
@@ -293,6 +302,24 @@ export async function ReviewAndLearn({
                   </dt>
                   <dd className="tabular-nums text-ink">
                     {closure.carriedIssues}
+                  </dd>
+                  <dt className="text-ink-3">
+                    {t("cycle.reviewAndLearn.close.carriedDrafts")}
+                  </dt>
+                  <dd className="text-ink">
+                    <span className="tabular-nums">
+                      {closure.carriedDrafts}
+                    </span>
+                    {closure.notCarried.length === 0 ? null : (
+                      // Said rather than dropped: a kept objective whose
+                      // champion has left needs somebody to own it before it
+                      // can be a draft (§2.5).
+                      <span className="block text-ink-3">
+                        {t("cycle.reviewAndLearn.close.notCarried", {
+                          titles: closure.notCarried.join(", "),
+                        })}
+                      </span>
+                    )}
                   </dd>
                   <dt className="text-ink-3">
                     {t("cycle.reviewAndLearn.close.processPriority")}

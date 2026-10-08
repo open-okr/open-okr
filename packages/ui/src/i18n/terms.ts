@@ -103,6 +103,10 @@ const TERM_CATALOGUE_KEYS: Readonly<
   },
   score: { singular: "term.score.singular", plural: "term.score.plural" },
   kpi: { singular: "term.kpi.singular", plural: "term.kpi.plural" },
+  atRisk: {
+    singular: "term.atRisk.singular",
+    plural: "term.atRisk.plural",
+  },
 };
 
 /**

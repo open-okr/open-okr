@@ -181,6 +181,14 @@ beforeEach(async () => {
   )) as { id: string };
   cycleId = current.id;
 
+  // The absolute signal, so "red progress" means a fixed number whatever day
+  // of the quarter the suite runs on. The pace-aware default (METHOD.md §3.7,
+  // P9-T15a) would read a young quarter's low progress as on pace, which is
+  // the point of it and not what these tests are about.
+  await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+    overrides: { "progress.signal": "absolute" },
+  });
+
   const second = await wb.admin.query<{ id: string }>(
     `insert into workspace_members (id, workspace_id, user_id, name, status)
      values (gen_random_uuid(), $1, $2, 'Divergence Second', 'active') returning id`,
@@ -445,5 +453,83 @@ describe("a dismissal survives", () => {
     expect(after.map((row) => row.id).sort()).toEqual(
       before.map((row) => row.id).sort(),
     );
+  });
+});
+
+describe("§3.5's divergence window (P9-T15b-b, NW-Q1-21)", () => {
+  /** The goal's one key result, written `weeksAgo` weeks ago. */
+  const writtenWeeksAgo = async (goalId: string, weeksAgo: number) => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      `update key_results set created_at = now() - make_interval(weeks => $2)
+        where goal_id = $1 returning id`,
+      [goalId, weeksAgo],
+    );
+    return rows[0]?.id as string;
+  };
+
+  it("acceptance: a metric key result not moved in four weeks while its goal reports on track is named", async () => {
+    // Progress and confidence both agree with on track, so only the window
+    // can find this one.
+    const goalId = await goalReporting({
+      title: "Win the mid-market deals we are in",
+      health: "on_track",
+      progressPct: 80,
+      confidence: 0.8,
+    });
+    const keyResultId = await writtenWeeksAgo(goalId, 5);
+    await runCoach();
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ reason: string }>(
+      `select reason from alignment_findings
+        where workspace_id = $1 and subject_key_result_id = $2
+          and kind = 'divergence' and deleted_at is null`,
+      [workspaceId, keyResultId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.reason).toMatch(/has not moved in 4 weeks/);
+  });
+
+  it("says nothing of one that moved inside the window", async () => {
+    const goalId = await goalReporting({
+      title: "Win the mid-market deals we are in",
+      health: "on_track",
+      progressPct: 80,
+      confidence: 0.8,
+    });
+    const keyResultId = await writtenWeeksAgo(goalId, 5);
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into key_result_values (id, workspace_id, key_result_id, value, source, created_at)
+       values (gen_random_uuid(), $1, $2, 140, 'manual', now() - interval '1 week')`,
+      [workspaceId, keyResultId],
+    );
+    await runCoach();
+    const { rows } = await wb.admin.query(
+      `select 1 from alignment_findings
+        where workspace_id = $1 and subject_key_result_id = $2
+          and kind = 'divergence' and deleted_at is null`,
+      [workspaceId, keyResultId],
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  it("says nothing while the goal does not claim to be on track", async () => {
+    const goalId = await goalReporting({
+      title: "Win the mid-market deals we are in",
+      health: "caution",
+      progressPct: 80,
+      confidence: 0.5,
+    });
+    const keyResultId = await writtenWeeksAgo(goalId, 5);
+    await runCoach();
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      `select 1 from alignment_findings
+        where workspace_id = $1 and subject_key_result_id = $2
+          and kind = 'divergence' and deleted_at is null`,
+      [workspaceId, keyResultId],
+    );
+    expect(rows).toHaveLength(0);
   });
 });

@@ -9,10 +9,13 @@
  */
 import {
   activeOnly,
+  annualFrameRevisions,
   annualFrames,
   annualStrategies,
   CYCLE_CADENCES,
   cycles,
+  FRAME_FIELDS,
+  type FrameField,
   GOAL_LEVELS,
   goals,
   performanceSnapshots,
@@ -24,6 +27,8 @@ import {
 import {
   CHECK_IN_FREQUENCIES,
   COACH_STRICTNESS,
+  scoreBand,
+  scoreBandsIn,
   THRESHOLD_KEYS,
   THRESHOLDS,
 } from "@openokr/method";
@@ -46,12 +51,14 @@ import {
   localDateIn,
   parseLocalDate,
 } from "../cycles/generation.ts";
+import { cycleMovesInTx } from "../cycles/moved.ts";
 import {
   COLUMN_BACKED_THRESHOLDS,
   mergeOverrides,
   resolveRhythm,
   validateRhythmPatch,
 } from "../cycles/rhythm.ts";
+import { cycleRulesInTx } from "../cycles/rules.ts";
 import {
   createCycleInTx,
   ensureCurrentCycleInTx,
@@ -63,6 +70,7 @@ import {
 } from "../cycles/service.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { cycleLevelsInTx } from "../practice/levels.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -192,6 +200,109 @@ const CYCLE_COLUMNS = {
   sponsorId: cycles.sponsorId,
   facilitatorId: cycles.facilitatorId,
 } as const;
+
+/**
+ * The rules one cycle is read under (METHOD.md §12, P9-T14b): the
+ * workspace's settings while it is open, the ones it closed with after, and
+ * today's canon for a cycle closed before snapshots existed. Every view of a
+ * closed cycle's verdicts reads this rather than the settings as they stand.
+ */
+export const readCycleRules = defineReadAction({
+  name: "cycles.rules",
+  summary:
+    "The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after.",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.object({
+    source: z.enum(["live", "snapshot", "canon"]),
+    thresholds: z.record(z.string(), z.unknown()),
+    practice: z.record(z.string(), z.unknown()),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const memberId = await actingMember(
+          tx as OperationTx,
+          context.workspaceId,
+          userId,
+        );
+        // A cycle is read through the workspace, as `cycles.list` explains.
+        await getAccessScoped(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "workspace",
+          resourceId: context.workspaceId,
+          requires: ACCESS_LEVELS.view,
+        });
+        const rules = await cycleRulesInTx(
+          tx as OperationTx,
+          context.workspaceId,
+          input.cycleId,
+        );
+        return {
+          source: rules.source,
+          thresholds: { ...rules.thresholds },
+          practice: { ...rules.practice },
+        };
+      },
+    );
+  },
+});
+
+/**
+ * The OKR levels one cycle offers (P9-T07a-c, METHOD v2 §2.7): the levels it
+ * began with, plus any level its objectives already use. What every level
+ * picker and the level filter read, so a cycle never offers a level the
+ * policy would refuse, and never hides one an objective in it already has.
+ */
+export const readCycleLevels = defineReadAction({
+  name: "cycles.levelsInUse",
+  summary:
+    "The OKR levels one cycle offers: the levels it began with, plus any its objectives already use.",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.object({ levels: z.array(z.enum(GOAL_LEVELS)) }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const memberId = await actingMember(
+          tx as OperationTx,
+          context.workspaceId,
+          userId,
+        );
+        // A cycle is read through the workspace, as `cycles.list` explains.
+        await getAccessScoped(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "workspace",
+          resourceId: context.workspaceId,
+          requires: ACCESS_LEVELS.view,
+        });
+        return {
+          levels: await cycleLevelsInTx(
+            tx as OperationTx,
+            context.workspaceId,
+            input.cycleId,
+          ),
+        };
+      },
+    );
+  },
+});
 
 export const listCycles = defineReadAction({
   name: "cycles.list",
@@ -923,11 +1034,29 @@ const frameOutput = z.object({
   ),
 });
 
+/**
+ * The frame as read, with every revision since it was agreed (METHOD.md §2.1,
+ * P9-T13-c-c), newest first. `before` is what the changed fields held.
+ */
+const frameReadOutput = frameOutput.extend({
+  revisions: z.array(
+    z.object({
+      id: z.uuid(),
+      fields: z.array(z.enum(FRAME_FIELDS)),
+      before: z.record(z.string(), z.unknown()),
+      reason: z.string(),
+      revisedAt: z.string(),
+      authorName: z.string().nullable(),
+    }),
+  ),
+});
+
 export const readAnnualFrame = defineReadAction({
   name: "frame.read",
-  summary: "The current annual frame and its strategic thrusts.",
+  summary:
+    "The current annual frame, its strategic thrusts, and every revision made since it was agreed.",
   input: z.object({}),
-  output: frameOutput.nullable(),
+  output: frameReadOutput.nullable(),
   access: ACCESS_LEVELS.view,
   async handler(context) {
     const db = drizzle(context.pool);
@@ -993,7 +1122,38 @@ export const readAnnualFrame = defineReadAction({
           )
           .orderBy(asc(annualStrategies.position));
 
-        return { ...frame, strategies };
+        const revisions = await tx
+          .select({
+            id: annualFrameRevisions.id,
+            fields: annualFrameRevisions.fields,
+            before: annualFrameRevisions.before,
+            reason: annualFrameRevisions.reason,
+            revisedAt: annualFrameRevisions.revisedAt,
+            authorName: workspaceMembers.name,
+          })
+          .from(annualFrameRevisions)
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, annualFrameRevisions.authorMemberId),
+          )
+          .where(
+            activeOnly(
+              annualFrameRevisions,
+              eq(annualFrameRevisions.workspaceId, context.workspaceId),
+              eq(annualFrameRevisions.frameId, frame.id),
+            ),
+          )
+          .orderBy(desc(annualFrameRevisions.revisedAt));
+
+        return {
+          ...frame,
+          strategies,
+          revisions: revisions.map((revision) => ({
+            ...revision,
+            fields: [...revision.fields],
+            revisedAt: new Date(revision.revisedAt).toISOString(),
+          })),
+        };
       },
     );
   },
@@ -1097,10 +1257,32 @@ export const readAnnualObjectives = defineReadAction({
   },
 });
 
+/**
+ * A value as a string that does not depend on key order, so a frame field
+ * read back from `jsonb`, which reorders keys, compares equal to the same
+ * document sent again.
+ */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonical).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map(
+        (key) =>
+          `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`,
+      )
+      .join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
 export const setAnnualFrame = defineWriteAction({
   name: "frame.set",
+  // openokr:policy-exempt: the annual frame is not an OKR write the practice governs; a revision of an agreed frame always needs its reason (METHOD.md §2.1), which this action asks for itself.
   summary:
-    "Creates or replaces the current annual frame. A replacement supersedes rather than edits.",
+    "Creates or replaces the current annual frame. A replacement supersedes rather than edits. Revising an agreed frame within its year needs a written reason, and the revision is kept.",
   input: z.object({
     yearLabel: z.string().trim().min(1).max(40),
     horizonLabel: z.string().trim().max(80).nullable().optional(),
@@ -1124,15 +1306,22 @@ export const setAnnualFrame = defineWriteAction({
       )
       .max(20)
       .default([]),
+    /**
+     * Why an agreed frame changes within its year (METHOD.md §2.1,
+     * P9-T13-c-c). Required then, and kept with the revision; ignored for a
+     * frame still being drafted, and for a new year.
+     */
+    reason: z.string().trim().min(1).max(500).optional(),
   }),
   output: frameOutput,
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId }) {
+    async execute({ tx, workspaceId, actor }) {
       const [current] = await tx
         .select({
           id: annualFrames.id,
           yearLabel: annualFrames.yearLabel,
+          agreed: annualFrames.agreed,
           mission: annualFrames.mission,
           missionVersion: annualFrames.missionVersion,
           vision: annualFrames.vision,
@@ -1152,10 +1341,18 @@ export const setAnnualFrame = defineWriteAction({
         )
         .limit(1);
 
-      // METHOD.md §2.1: the frame is "never rewritten mid-year". A new year
-      // supersedes; the same year's frame is edited in place, because recording
-      // a correction as a supersession would make history unreadable.
+      // METHOD.md §2.1: a new year supersedes; the same year's frame is edited
+      // in place, because recording a correction as a supersession would make
+      // history unreadable. Since P9-T13-c-c an agreed frame may be revised
+      // within its year with a written reason, and the revision is kept in
+      // `annual_frame_revisions` with what the changed fields held before.
       let frameId = current?.id;
+      let revised: readonly FrameField[] = [];
+      // A new frame writes its strategies; the same year's frame only when
+      // they changed (P9-T22c-c-b). Replacing an unchanged list gave every
+      // strategy a new id, and the annual objectives aligned to the old ones
+      // lost their strategy when somebody revised only the not-doing list.
+      let replaceStrategies = true;
       if (current && current.yearLabel !== input.yearLabel) {
         await tx
           .update(annualFrames)
@@ -1164,12 +1361,100 @@ export const setAnnualFrame = defineWriteAction({
         frameId = undefined;
       }
 
-      if (frameId) {
+      if (frameId && current) {
+        const priorStrategies = await tx
+          .select({ text: annualStrategies.text, note: annualStrategies.note })
+          .from(annualStrategies)
+          .where(
+            activeOnly(
+              annualStrategies,
+              eq(annualStrategies.workspaceId, workspaceId),
+              eq(annualStrategies.frameId, frameId),
+            ),
+          )
+          .orderBy(asc(annualStrategies.position));
+        const prose = {
+          mission: input.mission,
+          vision: input.vision,
+          strategy: input.strategy,
+          notDoing: input.notDoing,
+        } as const;
+        const changed: FrameField[] = (
+          ["mission", "vision", "strategy", "notDoing"] as const
+        ).filter(
+          (field) =>
+            prose[field] !== undefined &&
+            canonical(prose[field]) !== canonical(current[field]),
+        );
+        if (
+          canonical(
+            input.strategies.map((entry) => ({
+              text: entry.text,
+              note: entry.note ?? null,
+            })),
+          ) !== canonical(priorStrategies)
+        ) {
+          changed.push("strategies");
+        }
+        replaceStrategies = changed.includes("strategies");
+
+        // A draft keeps no history; an agreed frame keeps every revision.
+        if (current.agreed && changed.length > 0) {
+          if (!input.reason) {
+            throw new OperationError(
+              "forbidden",
+              "This year's frame is agreed, so a revision needs a written reason (METHOD.md §2.1): what changed, and why it changes now.",
+            );
+          }
+          const before = Object.fromEntries(
+            changed.map((field) => [
+              field,
+              field === "strategies" ? priorStrategies : current[field],
+            ]),
+          );
+          await tx.insert(annualFrameRevisions).values({
+            workspaceId,
+            frameId,
+            fields: changed,
+            before,
+            reason: input.reason,
+            authorMemberId: actor.memberId,
+          });
+          revised = changed;
+        }
+
+        // The prose is written in place too. Before P9-T13-c-c only the
+        // horizon and the agreement were, so an edit to the same year's
+        // mission or not-doing list was answered as saved and dropped.
         await tx
           .update(annualFrames)
           .set({
             horizonLabel: input.horizonLabel ?? null,
             agreed: input.agreed,
+            ...(input.mission === undefined
+              ? {}
+              : {
+                  mission: input.mission,
+                  missionVersion: RICH_TEXT_SCHEMA_VERSION,
+                }),
+            ...(input.vision === undefined
+              ? {}
+              : {
+                  vision: input.vision,
+                  visionVersion: RICH_TEXT_SCHEMA_VERSION,
+                }),
+            ...(input.strategy === undefined
+              ? {}
+              : {
+                  strategy: input.strategy,
+                  strategyVersion: RICH_TEXT_SCHEMA_VERSION,
+                }),
+            ...(input.notDoing === undefined
+              ? {}
+              : {
+                  notDoing: input.notDoing,
+                  notDoingVersion: RICH_TEXT_SCHEMA_VERSION,
+                }),
             updatedAt: new Date(),
           })
           .where(activeOnly(annualFrames, eq(annualFrames.id, frameId)));
@@ -1213,28 +1498,30 @@ export const setAnnualFrame = defineWriteAction({
         frameId = inserted.id;
       }
 
-      // The strategy list is replaced wholesale. Soft-deleting the old rows
-      // rather than updating them keeps "what the year's thrusts were in March"
-      // answerable after they change in June.
-      await tx
-        .update(annualStrategies)
-        .set({ deletedAt: new Date() })
-        .where(
-          activeOnly(
-            annualStrategies,
-            eq(annualStrategies.workspaceId, workspaceId),
-            eq(annualStrategies.frameId, frameId),
-          ),
-        );
+      // The strategy list is replaced wholesale when it changes.
+      // Soft-deleting the old rows rather than updating them keeps "what the
+      // year's thrusts were in March" answerable after they change in June.
+      if (replaceStrategies) {
+        await tx
+          .update(annualStrategies)
+          .set({ deletedAt: new Date() })
+          .where(
+            activeOnly(
+              annualStrategies,
+              eq(annualStrategies.workspaceId, workspaceId),
+              eq(annualStrategies.frameId, frameId),
+            ),
+          );
 
-      for (const [index, strategy] of input.strategies.entries()) {
-        await tx.insert(annualStrategies).values({
-          workspaceId,
-          frameId,
-          text: strategy.text,
-          note: strategy.note ?? null,
-          position: index,
-        });
+        for (const [index, strategy] of input.strategies.entries()) {
+          await tx.insert(annualStrategies).values({
+            workspaceId,
+            frameId,
+            text: strategy.text,
+            note: strategy.note ?? null,
+            position: index,
+          });
+        }
       }
 
       const strategies = await tx
@@ -1266,12 +1553,24 @@ export const setAnnualFrame = defineWriteAction({
           notDoing: input.notDoing ?? current?.notDoing ?? null,
           strategies,
         },
-        activity: {
-          kind: "frame.set",
-          subjectType: "workspace",
-          subjectId: workspaceId,
-          payload: { yearLabel: input.yearLabel },
-        },
+        activity:
+          revised.length > 0
+            ? {
+                kind: "frame.revised",
+                subjectType: "workspace",
+                subjectId: workspaceId,
+                payload: {
+                  yearLabel: input.yearLabel,
+                  fields: [...revised],
+                  reason: input.reason ?? "",
+                },
+              }
+            : {
+                kind: "frame.set",
+                subjectType: "workspace",
+                subjectId: workspaceId,
+                payload: { yearLabel: input.yearLabel },
+              },
         audit: {
           action: "frame.set",
           targetType: "annual_frame",
@@ -1347,7 +1646,7 @@ export const snapshotCycle = defineWriteAction({
 export const readScorecard = defineReadAction({
   name: "cycles.scorecard",
   summary:
-    "Every archived cycle's result with its band counts and verdict, oldest first. Drives the scorecard.",
+    "Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard.",
   input: z.object({}),
   output: z.object({
     rows: z.array(
@@ -1361,6 +1660,50 @@ export const readScorecard = defineReadAction({
         strong: z.number().int(),
         partial: z.number().int(),
         little: z.number().int(),
+        /**
+         * The bands this cycle was graded under (METHOD.md §12, P9-T14c),
+         * from its own snapshot, and the band its result falls in.
+         */
+        bands: z.object({
+          achieved: z.number(),
+          strong: z.number(),
+          partial: z.number(),
+        }),
+        resultBand: z
+          .enum(["fully_achieved", "strong", "partial", "little"])
+          .nullable(),
+        /** What moved in it, so the close can see behind the number. */
+        moved: z.object({
+          adjusted: z.array(
+            z.object({
+              keyResultId: z.uuid(),
+              title: z.string(),
+              score: z.number(),
+              computed: z.number(),
+              reason: z.string(),
+            }),
+          ),
+          eased: z.array(
+            z.object({
+              keyResultId: z.uuid(),
+              title: z.string(),
+              original: z.number(),
+              target: z.number().nullable(),
+              reason: z.string().nullable(),
+            }),
+          ),
+          addedMidCycle: z.number().int(),
+          kindChanges: z.array(
+            z.object({
+              goalId: z.uuid(),
+              title: z.string(),
+              from: z.string(),
+              to: z.string(),
+              reason: z.string().nullable(),
+              at: z.string(),
+            }),
+          ),
+        }),
       }),
     ),
     pointsEnabled: z.boolean(),
@@ -1397,9 +1740,16 @@ export const readScorecard = defineReadAction({
               performanceSnapshots,
               eq(performanceSnapshots.workspaceId, context.workspaceId),
               eq(performanceSnapshots.ownerKind, "workspace"),
+              // A deleted cycle has no place on the scorecard.
+              isNull(cycles.deletedAt),
             ),
           )
           .orderBy(asc(cycles.startsOn));
+        const memberId = await actingMember(
+          tx as OperationTx,
+          context.workspaceId,
+          userId,
+        );
 
         const [settings] = await tx
           .select({ enabled: scorecardSettings.enabled })
@@ -1412,12 +1762,35 @@ export const readScorecard = defineReadAction({
           )
           .limit(1);
 
-        return {
-          rows: rows.map((row) => ({
+        // Each cycle read under the rules it closed with (§12, P9-T14c), so
+        // a band moved since colours only the cycles graded after it.
+        const shaped = [];
+        for (const row of rows) {
+          const rules = await cycleRulesInTx(
+            tx as OperationTx,
+            context.workspaceId,
+            row.cycleId,
+          );
+          const resultValue =
+            row.resultValue === null ? null : Number(row.resultValue);
+          shaped.push({
             ...row,
-            resultValue:
-              row.resultValue === null ? null : Number(row.resultValue),
-          })),
+            resultValue,
+            bands: scoreBandsIn(rules.thresholds, rules.practice),
+            resultBand:
+              resultValue === null
+                ? null
+                : scoreBand(resultValue, rules.thresholds, rules.practice),
+            moved: await cycleMovesInTx(tx as OperationTx, {
+              workspaceId: context.workspaceId,
+              memberId,
+              cycleId: row.cycleId,
+            }),
+          });
+        }
+
+        return {
+          rows: shaped,
           // No row means off, which is the default and needs no row to say so.
           pointsEnabled: settings?.enabled ?? false,
         };
@@ -1433,12 +1806,18 @@ const feedForwardOutput = z.object({
   /** Rows of the mapping this build cannot fill, each naming its task. Empty since P4-T12-b. */
   waiting: z.array(z.string()),
   /**
-   * The process-health statement the next cycle now holds as a Phase 3
-   * priority, or null when the survey went unanswered (M-05).
+   * The process-health statement the next cycle now holds in Phase 3 as its
+   * improvement action, or null when the survey went unanswered (M-05).
    */
   processPriority: z.string().nullable(),
   /** Whether the learnings reached the next cycle's input pack. */
   packNote: z.boolean(),
+  /**
+   * Kept and modified objectives this run pre-filled as drafts, and the ones
+   * it could not because their champion has left, by title (§8.9, P9-T20e-b).
+   */
+  drafts: z.number().int(),
+  notCarried: z.array(z.string()),
 });
 
 /**
@@ -1450,7 +1829,7 @@ const feedForwardOutput = z.object({
 export const feedForwardCycle = defineWriteAction({
   name: "cycles.feedForward",
   summary:
-    "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work as issues, learnings into the input pack, the lowest process-health statement as a priority, and the annual frame. Closing a cycle already does this.",
+    "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
   input: z.object({ fromCycleId: z.uuid(), toCycleId: z.uuid() }),
   output: feedForwardOutput,
   access: ACCESS_LEVELS.edit,
@@ -1463,7 +1842,11 @@ export const feedForwardCycle = defineWriteAction({
         input.toCycleId,
       );
       return {
-        result: { ...result, waiting: [...result.waiting] },
+        result: {
+          ...result,
+          waiting: [...result.waiting],
+          notCarried: [...result.notCarried],
+        },
         activity: {
           kind: "cycle.fed_forward" as const,
           subjectType: "cycle" as const,
@@ -1481,6 +1864,7 @@ export const feedForwardCycle = defineWriteAction({
             from: input.fromCycleId,
             priorScores: result.priorScores,
             issues: result.issues,
+            drafts: result.drafts,
           },
         },
       };
@@ -1504,7 +1888,7 @@ export const feedForwardCycle = defineWriteAction({
 export const closeCycle = defineWriteAction({
   name: "cycles.close",
   summary:
-    "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, learnings and process priority.",
+    "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action.",
   input: z.object({ cycleId: z.uuid() }),
   output: z.object({
     cycleId: z.uuid(),
@@ -1532,6 +1916,7 @@ export const closeCycle = defineWriteAction({
             name: closed.fedInto.name,
             ...closed.fedInto.result,
             waiting: [...closed.fedInto.result.waiting],
+            notCarried: [...closed.fedInto.result.notCarried],
           }
         : null;
       return {
@@ -1566,6 +1951,7 @@ export const closeCycle = defineWriteAction({
                   cycleId: fedInto.cycleId,
                   priorScores: fedInto.priorScores,
                   issues: fedInto.issues,
+                  drafts: fedInto.drafts,
                   processPriority: fedInto.processPriority,
                   packNote: fedInto.packNote,
                 }

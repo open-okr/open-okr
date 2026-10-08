@@ -53,3 +53,34 @@
     outline-offset: 3px;
   }
 }
+
+/* The OKR diagram's canvas (P9-T09a), in the design system's own colours.
+ *
+ * React Flow paints its canvas, controls and minimap from these variables,
+ * and the tokens they point at change with `data-theme`, so the diagram
+ * follows light and dark the way every other screen does rather than
+ * carrying a second theme of its own. */
+@layer components {
+  .okr-diagram .react-flow {
+    --xy-background-color: var(--color-bg);
+    --xy-background-pattern-dots-color: var(--color-line-2);
+    --xy-edge-stroke: var(--color-ink-4);
+    --xy-edge-stroke-selected: var(--color-brand);
+    --xy-edge-stroke-width: 1.5;
+    --xy-minimap-background-color: var(--color-surface);
+    --xy-minimap-mask-background-color: color-mix(
+      in srgb,
+      var(--color-ink) 8%,
+      transparent
+    );
+    --xy-minimap-node-background-color: var(--color-raised);
+    --xy-minimap-node-stroke-color: var(--color-line);
+    --xy-controls-button-background-color: var(--color-surface);
+    --xy-controls-button-background-color-hover: var(--color-raised);
+    --xy-controls-button-color: var(--color-ink-2);
+    --xy-controls-button-color-hover: var(--color-ink);
+    --xy-controls-button-border-color: var(--color-line);
+    --xy-attribution-background-color: transparent;
+    --xy-node-boxshadow-selected: 0 0 0 2px var(--color-brand);
+  }
+}

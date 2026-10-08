@@ -39,12 +39,18 @@ export async function closeCommitmentsAction(
   form: FormData,
 ): Promise<CommitmentState> {
   const sessionId = String(form.get("sessionId") ?? "");
-  const items = form
-    .getAll("verdict")
-    .map((value) => String(value))
-    .map((value) => {
-      const [id, delivered] = value.split(":");
-      return { id: id ?? "", delivered: delivered === "yes" };
+  // One radio group per commitment, `verdict:<id>`, and its optional line on
+  // why beside it, `note:<id>` (§7.2 step 3, P9-T19a-d-c).
+  const items = [...form.keys()]
+    .filter((key) => key.startsWith("verdict:"))
+    .map((key) => {
+      const id = key.slice("verdict:".length);
+      const note = String(form.get(`note:${id}`) ?? "").trim();
+      return {
+        id,
+        delivered: String(form.get(key)) === "yes",
+        ...(note === "" ? {} : { note }),
+      };
     })
     .filter((item) => item.id !== "");
 
@@ -57,6 +63,31 @@ export async function closeCommitmentsAction(
 
   try {
     await callAction(await context(), "sessions.closeCommitments", { items });
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  revalidatePath(`/session/${sessionId}`);
+  return NO_ERROR;
+}
+
+/**
+ * The week's wins, written whole (§7.2 step 3, P9-T19a-d-c). Empty lines are
+ * dropped, so clearing a line removes that win.
+ */
+export async function setWinsAction(
+  _previous: CommitmentState,
+  form: FormData,
+): Promise<CommitmentState> {
+  const sessionId = String(form.get("sessionId") ?? "");
+  const wins = form
+    .getAll("win")
+    .map((value) => String(value).trim())
+    .filter((value) => value !== "");
+  try {
+    await callAction(await context(), "sessions.setWins", { sessionId, wins });
   } catch (error) {
     if (error instanceof OperationError) {
       return { error: error.message };

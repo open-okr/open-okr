@@ -184,6 +184,12 @@ describe("what the agents are bound to", () => {
       "cycles.current",
       { mode: "quarterly" },
     )) as { id: string };
+    // The member's objective is an individual one, which the practice has
+    // off by default, so this cycle is told to use it (P9-T07a-c).
+    await callAction({ pool: wb.appPool, ...context() }, "cycles.update", {
+      id: cycle.id,
+      levels: ["company", "department", "team", "individual"],
+    });
     for (const ownerKind of ["workspace", "member"] as const) {
       const goal = (await callAction(
         { pool: wb.appPool, ...context() },
@@ -382,10 +388,20 @@ describe("blocker escalation", () => {
       nextAction: "Ask finance for the second contractor",
     })) as { id: string };
 
-    // Past §11's sponsor rung, forty-eight hours by default, on the daily
-    // cadence the blocker ladder runs on.
+    // Past §11's sponsor rung, on the daily cadence the blocker ladder runs
+    // on. Since P9-T19a-a that rung exists only where the workspace puts the
+    // sponsor in its ladders, and is reached once the check-in after the one
+    // the action was due by has passed too.
+    await callAction(actor, "practice.update", {
+      overrides: { "escalation.sponsorInLadders": "on" },
+    });
+    const due = await wb.admin.query<{ due_at: Date }>(
+      "select due_at from blockers where id = $1",
+      [blocker.id],
+    );
+    const dueAt = due.rows[0]?.due_at as Date;
     await callAction(actor, "agents.runChampion", {
-      now: new Date(Date.now() + 50 * 3_600_000).toISOString(),
+      now: new Date(dueAt.getTime() + 9 * 86_400_000).toISOString(),
       cadence: "daily",
     });
 

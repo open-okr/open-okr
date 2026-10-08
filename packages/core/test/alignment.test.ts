@@ -72,6 +72,20 @@ async function makeGoal(input: {
   return goal.id;
 }
 
+/**
+ * AL-3 and AL-6 are off by default since METHOD v2 (P9-T16b-a), so a test of
+ * either turns it on first, before any goal is written: a practice change
+ * recomputes nothing, and the findings are stored by the writes that follow.
+ */
+async function turnOn(...checks: string[]): Promise<void> {
+  const wb = await workerDb();
+  await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+    overrides: Object.fromEntries(
+      checks.map((check) => [`checks.${check}`, "warn"]),
+    ),
+  });
+}
+
 const read = async (spaceId?: string) => {
   const wb = await workerDb();
   return callAction({ pool: wb.appPool, ...context() }, "alignment.read", {
@@ -151,8 +165,9 @@ afterAll(async () => {
 });
 
 describe("the score against real rows", () => {
-  /** The design document's acceptance criterion, and the plan's own example. */
-  it("reads 80 with one orphan and one siloed department", async () => {
+  /** The design document's acceptance criterion, read as a share (P9-T16a). */
+  it("reads 75 with one unaligned goal in four, and lists the silo beside it", async () => {
+    await turnOn("AL-6");
     const company = await makeGoal({
       title: "Become the default supplier for mid-market retail",
       level: "company",
@@ -198,10 +213,18 @@ describe("the score against real rows", () => {
     );
 
     const result = await read();
-    // 100 minus 12 for the orphan and 8 for the silo, which is the number the
-    // plan itself quotes and the design document's acceptance criterion.
-    expect(result.score).toBe(80);
-    expect(result.healthy).toBe(true);
+    // Three of the four goals below company level align. The silo is listed
+    // and not counted: §5.2 measures the share, not the shape.
+    expect(result.score).toBe(75);
+    expect(result.band).toBe("gap");
+    expect(result.healthy).toBe(false);
+    expect(result).toMatchObject({
+      measured: 4,
+      counted: 3,
+      anchored: true,
+      threshold: 90,
+      watchThreshold: 80,
+    });
     expect(result.findings.map((finding) => finding.ruleKey).sort()).toEqual([
       "AL-1",
       "AL-6",
@@ -224,8 +247,163 @@ describe("the score against real rows", () => {
   it("has no score at all when the cycle has no goals", async () => {
     const result = await read();
     expect(result.score).toBeNull();
+    expect(result.band).toBeNull();
     expect(result.healthy).toBeNull();
     expect(result.findings).toHaveLength(0);
+  });
+
+  it("counts a goal that says why it stands alone, set and cleared through the API", async () => {
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    const d1 = await makeGoal({
+      title: "Win two logos a quarter",
+      level: "department",
+      spaceId: spaceA,
+      parentGoalId: company,
+    });
+    const finance = await makeGoal({
+      title: "Close the books in five days",
+      level: "department",
+      spaceId: spaceB,
+    });
+    const wb = await workerDb();
+    const call = (name: string, input: object) =>
+      callAction({ pool: wb.appPool, ...context() }, name as never, input);
+    await call("goals.addDependency", { fromGoalId: d1, toGoalId: finance });
+
+    const before = await read();
+    expect(before.score).toBe(50);
+    expect(before.band).toBe("gap");
+    expect(
+      before.findings.find((finding) => finding.ruleKey === "AL-1")
+        ?.subjectGoalId,
+    ).toBe(finance);
+
+    // NW-Q1-11: Hugo marks it as standing alone, with the reason.
+    await call("goals.update", {
+      id: finance,
+      standaloneReason: "  Finance operating cadence the board relies on  ",
+    });
+    const stood = await read();
+    expect(stood.score).toBe(100);
+    expect(stood.band).toBe("healthy");
+    expect(stood.findings.filter((f) => f.ruleKey === "AL-1")).toHaveLength(0);
+    const readBack = (await call("goals.read", { id: finance })) as {
+      standaloneReason: string | null;
+      parentGoalId: string | null;
+    };
+    expect(readBack.standaloneReason).toBe(
+      "Finance operating cadence the board relies on",
+    );
+
+    // A parent replaces the reason: a goal that aligns has nothing to explain.
+    await call("goals.update", { id: finance, parentGoalId: company });
+    const hung = (await call("goals.read", { id: finance })) as {
+      standaloneReason: string | null;
+      parentGoalId: string | null;
+    };
+    expect(hung).toMatchObject({
+      parentGoalId: company,
+      standaloneReason: null,
+    });
+
+    // And a reason replaces the parent.
+    await call("goals.update", { id: finance, standaloneReason: "Statutory" });
+    const alone = (await call("goals.read", { id: finance })) as {
+      standaloneReason: string | null;
+      parentGoalId: string | null;
+    };
+    expect(alone).toMatchObject({
+      parentGoalId: null,
+      standaloneReason: "Statutory",
+    });
+
+    // Blank clears it, and the goal is listed again.
+    await call("goals.update", { id: finance, standaloneReason: "   " });
+    const cleared = await read();
+    expect(cleared.score).toBe(50);
+    expect(
+      cleared.findings.find((finding) => finding.ruleKey === "AL-1")
+        ?.subjectGoalId,
+    ).toBe(finance);
+  });
+
+  it("refuses a parent and a reason to stand alone in one call", async () => {
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    const team = await makeGoal({
+      title: "Cut first response time",
+      level: "team",
+      spaceId: spaceA,
+    });
+    const wb = await workerDb();
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+        id: team,
+        parentGoalId: company,
+        standaloneReason: "Both at once",
+      }),
+    ).rejects.toThrow(/either aligns to a parent or says why it stands alone/);
+  });
+
+  it("counts a parent in another cycle, and is anchored by an annual company objective", async () => {
+    const wb = await workerDb();
+    const call = (name: string, input: object) =>
+      callAction({ pool: wb.appPool, ...context() }, name as never, input);
+    const year = (await call("cycles.create", {
+      on: `${new Date().getUTCFullYear()}-06-30`,
+      mode: "annual",
+    })) as { id: string };
+    const annual = (await call("goals.create", {
+      title: "Mid-market buyers choose us",
+      cycleId: year.id,
+      level: "company",
+      ownerKind: "workspace",
+      championId: ownerMemberId,
+      reviewerId: ownerMemberId,
+      weight: 1,
+    })) as { id: string };
+
+    // The quarter holds no company objective of its own.
+    const d1 = await makeGoal({
+      title: "Win two logos a quarter",
+      level: "department",
+      spaceId: spaceA,
+      parentGoalId: annual.id,
+    });
+    const d2 = await makeGoal({
+      title: "Ship the onboarding rework",
+      level: "department",
+      spaceId: spaceB,
+      parentGoalId: annual.id,
+    });
+    await call("goals.addDependency", { fromGoalId: d1, toGoalId: d2 });
+
+    const result = await read();
+    expect(result.score).toBe(100);
+    expect(result.anchored).toBe(true);
+    expect(result.band).toBe("healthy");
+    expect(result.findings).toHaveLength(0);
+  });
+
+  it("counts a parent in another space at space scope", async () => {
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    await makeGoal({
+      title: "Rebuild the trial flow",
+      level: "team",
+      spaceId: spaceB,
+      parentGoalId: company,
+    });
+    const result = await read(spaceB);
+    expect(result.score).toBe(100);
+    expect(result.findings.filter((f) => f.ruleKey === "AL-1")).toHaveLength(0);
   });
 
   it("resolves a key result parent to the goal that owns it", async () => {
@@ -278,7 +456,168 @@ describe("the score against real rows", () => {
   });
 });
 
+describe("the checks at their levels (P9-T16b-a)", () => {
+  it("says nothing about a skip or a silo by default, and the share does not move", async () => {
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    // A skip: team straight under company. A silo: the only department.
+    await makeGoal({
+      title: "Rebuild the trial flow",
+      level: "team",
+      spaceId: spaceA,
+      parentGoalId: company,
+    });
+    await makeGoal({
+      title: "Win two logos a quarter",
+      level: "department",
+      spaceId: spaceB,
+      parentGoalId: company,
+    });
+    const result = await read();
+    expect(result.findings).toEqual([]);
+    expect(result.score).toBe(100);
+  });
+
+  it("hides a stored skip the moment AL-3 is turned off", async () => {
+    await turnOn("AL-3");
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    await makeGoal({
+      title: "Rebuild the trial flow",
+      level: "team",
+      spaceId: spaceA,
+      parentGoalId: company,
+    });
+    expect((await read()).findings.map((finding) => finding.ruleKey)).toEqual([
+      "AL-3",
+    ]);
+
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "practice.update", {
+      overrides: { "checks.AL-3": "off" },
+    });
+    // Nothing was recomputed: the stored row is still there, and not shown.
+    expect((await read()).findings).toEqual([]);
+  });
+
+  it("acceptance: with no department level, a team under the company skips nothing (G-3)", async () => {
+    await turnOn("AL-3");
+    const wb = await workerDb();
+    const call = (name: string, input: object) =>
+      callAction({ pool: wb.appPool, ...context() }, name as never, input);
+    await call("practice.update", {
+      overrides: { "levels.department": "off" },
+    });
+    // A cycle that begins after the change begins without the level (§2.7).
+    const next = (await call("cycles.create", {
+      on: `${new Date().getUTCFullYear() + 1}-02-15`,
+    })) as { id: string };
+    const goal = async (
+      title: string,
+      level: "company" | "team",
+      parentGoalId?: string,
+    ) =>
+      (
+        (await call("goals.create", {
+          title,
+          cycleId: next.id,
+          level,
+          ownerKind: level === "company" ? "workspace" : "space",
+          ...(level === "company" ? {} : { spaceId: spaceA }),
+          ...(parentGoalId ? { parentGoalId } : {}),
+          championId: ownerMemberId,
+          reviewerId: ownerMemberId,
+          weight: 1,
+        })) as { id: string }
+      ).id;
+    const company = await goal("Become the default supplier", "company");
+    await goal("Rebuild the trial flow", "team", company);
+
+    const later = (await call("alignment.read", {
+      cycleId: next.id,
+      includeDismissed: false,
+    })) as { findings: { ruleKey: string | null }[] };
+    expect(later.findings.filter((f) => f.ruleKey === "AL-3")).toEqual([]);
+
+    // The cycle that began with departments still counts the same skip.
+    const company2 = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    await makeGoal({
+      title: "Rebuild the trial flow",
+      level: "team",
+      spaceId: spaceA,
+      parentGoalId: company2,
+    });
+    expect(
+      (await read()).findings.filter((f) => f.ruleKey === "AL-3"),
+    ).toHaveLength(1);
+  });
+
+  it("lets a stated contribution pass AL-1, and still lists the goal as not counted", async () => {
+    await makeGoal({ title: "Become the default supplier", level: "company" });
+    const growth = await makeGoal({
+      title: "Grow the mid-market book",
+      level: "team",
+      spaceId: spaceA,
+    });
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+      id: growth,
+      contributionStatement: "The supplier priority, through mid-market retail",
+    });
+
+    const result = await read();
+    expect(result.findings.filter((f) => f.ruleKey === "AL-1")).toEqual([]);
+    expect(result.score).toBe(0);
+    expect(result.uncounted).toEqual([
+      { id: growth, title: "Grow the mid-market book" },
+    ]);
+  });
+
+  it("warns AL-1 on a contribution under the minimum, even with a parent", async () => {
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    const growth = await makeGoal({
+      title: "Grow the mid-market book",
+      level: "department",
+      spaceId: spaceA,
+      parentGoalId: company,
+    });
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+      id: growth,
+      contributionStatement: "Growth",
+    });
+
+    const result = await read();
+    expect(result.score).toBe(100);
+    expect(result.uncounted).toEqual([]);
+    expect(
+      result.findings
+        .filter((f) => f.ruleKey === "AL-1")
+        .map((f) => [f.subjectGoalId, f.reason]),
+    ).toEqual([
+      [
+        growth,
+        "Its stated contribution is under 3 words, which names a theme rather than a goal.",
+      ],
+    ]);
+  });
+});
+
 describe("the silo finding", () => {
+  beforeEach(async () => {
+    await turnOn("AL-6");
+  });
+
   it("is gone on the next recompute once the subtree gains a dependency", async () => {
     const company = await makeGoal({
       title: "Become the default supplier",
@@ -306,7 +645,7 @@ describe("the silo finding", () => {
 
     const before = await read();
     expect(before.findings.filter((f) => f.ruleKey === "AL-6")).toHaveLength(2);
-    const scoreBefore = before.score as number;
+    const scoreBefore = before.score;
 
     const wb = await workerDb();
     await callAction(
@@ -317,8 +656,8 @@ describe("the silo finding", () => {
 
     const after = await read();
     expect(after.findings.filter((f) => f.ruleKey === "AL-6")).toHaveLength(0);
-    // Two silos cleared at 8 each.
-    expect(after.score).toBe(scoreBefore + 16);
+    // A silo is listed, never counted, so clearing two moves nothing.
+    expect(after.score).toBe(scoreBefore);
   });
 
   it("is not cleared by a dependency inside its own subtree", async () => {
@@ -488,6 +827,126 @@ describe("findings survive a recompute", () => {
     expect(
       (await read()).findings.filter((f) => f.ruleKey === "AL-1"),
     ).toHaveLength(0);
+  });
+});
+
+describe("escalating a dependency to the sponsor (P9-T16b-b)", () => {
+  const call = async (name: string, input: object, userId = OWNER) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context(userId) },
+      name as never,
+      input as never,
+    ) as Promise<never>;
+  };
+  const otherMember = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OTHER],
+    );
+    return rows[0]?.id as string;
+  };
+  const dependencyOn = async () => {
+    const goalId = await makeGoal({
+      title: "Lift expansion revenue to 22%",
+      level: "department",
+      spaceId: spaceA,
+    });
+    const keyResultId = await keyResultOf(goalId);
+    return (
+      (await call("goals.addKeyResultDependency", {
+        keyResultId,
+        providerSpaceId: spaceB,
+        note: "In-app expansion prompts",
+      })) as { id: string }
+    ).id;
+  };
+  const gate4 = async () =>
+    (
+      (await call("workflow.read", { cycleId })) as {
+        gates: { passed: boolean }[];
+      }
+    ).gates[3]?.passed;
+  const dependencyRows = async (userId: string) =>
+    (
+      (await call("review.inbox", {}, userId)) as {
+        obligations: { kind: string; title: string; meta: string }[];
+      }
+    ).obligations.filter((row) => row.kind === "dependency");
+
+  it("is refused while the cycle names no sponsor", async () => {
+    const id = await dependencyOn();
+    await expect(call("goals.escalateDependency", { id })).rejects.toThrow(
+      /no active sponsor/,
+    );
+  });
+
+  it("acceptance: the sponsor's inbox lists it, and confirming it clears it (NW-Q2-07)", async () => {
+    const id = await dependencyOn();
+    const sponsor = await otherMember();
+    await call("cycles.update", { id: cycleId, sponsorId: sponsor });
+    expect(await gate4()).toBe(false);
+
+    const escalated = (await call("goals.escalateDependency", { id })) as {
+      escalatedToId: string;
+    };
+    expect(escalated.escalatedToId).toBe(sponsor);
+
+    // Escalated settles gate 4, as a confirmation or a risk owner does.
+    expect(await gate4()).toBe(true);
+    const read = (await call("alignment.read", {
+      cycleId,
+      includeDismissed: false,
+    })) as {
+      register: {
+        id: string;
+        escalatedToName: string | null;
+        blocksPublish: boolean;
+      }[];
+      sponsor: { id: string; name: string } | null;
+    };
+    expect(read.sponsor).toEqual({ id: sponsor, name: "Other" });
+    expect(read.register.find((entry) => entry.id === id)).toMatchObject({
+      escalatedToName: "Other",
+      blocksPublish: false,
+    });
+
+    const listed = await dependencyRows(OTHER);
+    expect(listed).toEqual([
+      expect.objectContaining({
+        title: expect.stringContaining("on Product"),
+        meta: expect.stringContaining("Escalated to you as sponsor"),
+      }),
+    ]);
+    // Nobody else is asked to decide it.
+    expect(await dependencyRows(OWNER)).toEqual([]);
+
+    await call("goals.confirmDependency", { id });
+    expect(await dependencyRows(OTHER)).toEqual([]);
+    expect(await gate4()).toBe(true);
+  });
+
+  it("leaves the inbox once somebody is named to carry the risk", async () => {
+    const id = await dependencyOn();
+    const sponsor = await otherMember();
+    await call("cycles.update", { id: cycleId, sponsorId: sponsor });
+    await call("goals.escalateDependency", { id });
+    expect(await dependencyRows(OTHER)).toHaveLength(1);
+    await call("goals.setDependencyRiskOwner", { id, memberId: sponsor });
+    expect(await dependencyRows(OTHER)).toEqual([]);
+  });
+
+  it("refuses a dependency the providing team already confirmed", async () => {
+    const id = await dependencyOn();
+    await call("cycles.update", {
+      id: cycleId,
+      sponsorId: await otherMember(),
+    });
+    await call("goals.confirmDependency", { id });
+    await expect(call("goals.escalateDependency", { id })).rejects.toThrow(
+      /nothing to escalate/,
+    );
   });
 });
 
@@ -705,6 +1164,7 @@ describe("horizontal links", () => {
   });
 
   it("bring the silo finding back when removed", async () => {
+    await turnOn("AL-6");
     const first = await makeGoal({
       title: "Win two logos a quarter",
       level: "department",

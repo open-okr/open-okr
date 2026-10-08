@@ -30,19 +30,21 @@ import {
   type WorkspaceTx,
 } from "@openokr/db";
 import {
-  applyStrictness,
+  applyEnforcement,
   type CoachStrictness,
   evaluateKeyResults,
   evaluateObjective,
   type KeyResultInput,
   type KeyResultVerdict,
   type QualityVerdict,
+  type ResolvedPractice,
   type ResolvedThresholds,
   strengthScore,
 } from "@openokr/method";
 import { and, eq, isNull, ne } from "drizzle-orm";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { practiceFromRow } from "../practice/settings.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 
 /**
@@ -100,6 +102,45 @@ async function spaceStrictnessInTx(
   return resolveSpaceSettingsFrom(row?.settings).coachStrictness;
 }
 
+/**
+ * What judging a mid-cycle addition needs, read once for a whole tree
+ * (METHOD.md §2.9, P9-T13-b-a): the thresholds, the practice, and each
+ * space's strictness, asked for only when a space holds an addition.
+ *
+ * The same three things `evaluateGoalInTx` reads, so an addition's draft and
+ * its stored flags are judged to one standard.
+ */
+export interface AdditionJudge {
+  readonly thresholds: ResolvedThresholds;
+  readonly practice: ResolvedPractice;
+  strictIn(spaceId: string | null): Promise<boolean>;
+}
+
+export async function additionJudgeInTx(
+  tx: WorkspaceTx,
+  workspaceId: string,
+): Promise<AdditionJudge> {
+  const row = await readRhythmRow(tx, workspaceId);
+  const thresholds = resolveRhythm(row).thresholds;
+  const { practice } = practiceFromRow(row);
+  const bySpace = new Map<string | null, boolean>();
+  return {
+    thresholds,
+    practice,
+    async strictIn(spaceId) {
+      const known = bySpace.get(spaceId);
+      if (known !== undefined) {
+        return known;
+      }
+      const override = await spaceStrictnessInTx(tx, workspaceId, spaceId);
+      const strict =
+        (override ?? thresholds["quality.coachStrictness"]) === "strict";
+      bySpace.set(spaceId, strict);
+      return strict;
+    },
+  };
+}
+
 export interface GoalQuality {
   /** The §4 strength score, 0 to 100, or null when nothing was evaluable. */
   readonly score: number | null;
@@ -109,9 +150,14 @@ export interface GoalQuality {
   readonly keyResultFlags: ReadonlyMap<string, readonly string[]>;
 }
 
-/** A verdict that is not a pass is a flag. `todo` counts: it has not passed. */
+/**
+ * A verdict that is not a pass is a flag. `todo` counts: it has not passed.
+ * `info` does not: a note asks nothing of anybody (P9-T03a).
+ */
 const flagsOf = (verdicts: readonly QualityVerdict[]): string[] =>
-  verdicts.filter((entry) => entry.status !== "pass").map((entry) => entry.id);
+  verdicts
+    .filter((entry) => entry.status !== "pass" && entry.status !== "info")
+    .map((entry) => entry.id);
 
 export interface GoalVerdicts {
   /** §4.1's five objective checks, after strictness. */
@@ -161,6 +207,7 @@ export async function evaluateGoalInTx(
       championId: goals.championId,
       reviewerId: goals.reviewerId,
       level: goals.level,
+      kind: goals.kind,
       ownerKind: goals.ownerKind,
       spaceId: goals.spaceId,
       memberId: goals.memberId,
@@ -204,6 +251,7 @@ export async function evaluateGoalInTx(
       indicatorType: keyResults.indicatorType,
       direction: keyResults.direction,
       confidence: keyResults.confidence,
+      keyResultKind: keyResults.kind,
     })
     .from(keyResults)
     .where(activeOnly(keyResults, eq(keyResults.goalId, input.goalId)));
@@ -211,12 +259,17 @@ export async function evaluateGoalInTx(
   const set: KeyResultInput[] = rows.map((row) => ({
     text: row.title,
     baseline: Number(row.baselineValue),
-    target: Number(row.targetValue),
+    // Null until somebody sets it, which is KR-3's to fail (P9-T13-b-a).
+    target: row.targetValue === null ? null : Number(row.targetValue),
     dueOn: row.dueOn,
     ownerId: row.ownerId,
     indicatorType: row.indicatorType,
     direction: row.direction,
     confidence: row.confidence === null ? null : Number(row.confidence),
+    // KR-6 judges only aspirational key results (METHOD.md §3.2, P9-T11b-b).
+    kind: goal.kind,
+    // KR-2, KR-3 and KR-7 judge by the key result's own kind (§2.10).
+    keyResultKind: row.keyResultKind,
   }));
 
   // A space's own strictness wins for its own goals, and nowhere else
@@ -232,8 +285,14 @@ export async function evaluateGoalInTx(
     override === null
       ? thresholds
       : { ...thresholds, "quality.coachStrictness": override };
-  const strictness = inForce["quality.coachStrictness"];
-  const objective = applyStrictness(
+  // Each check's level from the practice (METHOD.md §4, §12, P9-T03a).
+  // "Coach strictness" at strict, for the workspace or this space, still
+  // means every check at block, which is what strict mode is.
+  const practice = practiceFromRow(
+    await readRhythmRow(tx, input.workspaceId),
+  ).practice;
+  const options = { strict: inForce["quality.coachStrictness"] === "strict" };
+  const objective = applyEnforcement(
     evaluateObjective(
       {
         title: goal.title,
@@ -241,26 +300,29 @@ export async function evaluateGoalInTx(
         hasTimeframe: goal.timeframe !== null,
         championId: goal.championId,
         reviewerId: goal.reviewerId,
+        reviewerRequired: practice.reviewer === "required",
         objectivesInUnit: Math.max(unit.length, 1),
         level: goal.level,
       },
       inForce,
     ),
-    strictness,
+    practice,
+    options,
   );
-  const keyResultVerdicts = applyStrictness(
+  const keyResultVerdicts = applyEnforcement(
     evaluateKeyResults({ keyResults: set }, inForce),
-    strictness,
+    practice,
+    options,
   );
 
-  const score = strengthScore([...objective, ...keyResultVerdicts]);
+  const score = strengthScore([...objective, ...keyResultVerdicts], inForce);
   const flags = [...flagsOf(objective), ...flagsOf(keyResultVerdicts)];
 
   // Which key result tripped which check, so a surface can put the flag beside
   // the row rather than beside the objective.
   const perKeyResult = new Map<string, string[]>();
   for (const verdict of keyResultVerdicts) {
-    if (verdict.status === "pass") {
+    if (verdict.status === "pass" || verdict.status === "info") {
       continue;
     }
     for (const index of verdict.keyResults) {
@@ -372,7 +434,12 @@ export async function recomputeUnitQualityInTx(
           ne(goals.id, input.goalId),
         ),
       ),
-    );
+    )
+    // In one order for every writer. Two objectives added to the same unit at
+    // once each update every sibling, and in whatever order Postgres returned
+    // them they could each hold a row the other waits for, which is a
+    // deadlock and a refused write; in one order the second simply waits.
+    .orderBy(goals.id);
 
   for (const sibling of siblings) {
     await recomputeGoalQualityInTx(tx, {

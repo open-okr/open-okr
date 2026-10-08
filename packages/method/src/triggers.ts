@@ -86,29 +86,33 @@ const RHYTHM_ROWS = [
   {
     key: "blocker.warning",
     title: "Blocker nearing its deadline",
-    fires: "20h after opening",
+    fires: "1 day before the check-in the next action is due by",
     recipient: "Blocker owner",
     escalates: false,
   },
   {
     key: "blocker.overdue",
     title: "Blocker overdue",
-    fires: "24h after opening",
+    fires: "That check-in passes with the action open",
     recipient: "Coordinator",
     escalates: true,
   },
   {
     key: "blocker.escalated",
     title: "Blocker escalated",
-    fires: "48h after opening",
+    fires:
+      "The check-in after it passes too, where the sponsor is in the ladders",
     recipient: "Sponsor",
     escalates: true,
   },
   {
     key: "confidence.critical",
-    title: "Confidence critically low",
-    fires: "KR scored <= 0.3",
-    recipient: "Coordinator, same day",
+    // A fall into the low band since P9-T19a-c-a, not a level (METHOD v2
+    // §3.2). The key stays, so stored nudges and routing keep their meaning.
+    title: "Confidence fell into the low band",
+    fires:
+      "A KR's confidence falls below the low boundary; at <= 0.3, the sponsor too where critical escalation is on",
+    recipient: "Coordinator, same day; sponsor where critical escalation is on",
     escalates: true,
   },
   {
@@ -294,16 +298,25 @@ const QUALITY_ROWS = [
     deterministic: true,
   },
   {
+    // METHOD.md §3.2's committed rule (P9-T11b-c): high confidence is right
+    // for a commitment, and one nobody believes in is a risk to raise now.
+    key: "quality.committed_floor",
+    title: "A commitment nobody believes in",
+    fires: "Committed KR confidence < 0.7 at draft or check-in",
+    recipient: "Champion",
+    deterministic: true,
+  },
+  {
     key: "quality.sandbagging_draft",
     title: "Draft targets look too safe",
-    fires: "Avg draft confidence > 0.9",
+    fires: "Avg aspirational draft confidence > 0.9",
     recipient: "Champion + facilitator",
     deterministic: true,
   },
   {
     key: "quality.sandbagging_close",
     title: "Closing scores look too safe",
-    fires: "Scores cluster > 0.85 at close",
+    fires: "3/4 or more of aspirational KRs at 1.0 at close",
     recipient: "Sponsor",
     deterministic: true,
   },

@@ -27,6 +27,7 @@ import {
 import { ScheduleSessions } from "../../sessions/schedule.tsx";
 import { BlockerSummary } from "./blocker-summary.tsx";
 import { SpaceManagement } from "./manage.tsx";
+import { SpaceHolidaysCard } from "./space-holidays.tsx";
 import { SpaceMembership } from "./space-membership";
 import { SpaceSettingsCard } from "./space-settings.tsx";
 import { SpaceGoals, SpaceKpiTrees } from "./space-work.tsx";
@@ -124,6 +125,10 @@ export default async function SpacePage({
     throw error;
   }
 
+  // The space's holidays (METHOD.md §7.4, P9-T19b-a), which every reader
+  // of the space may see, because they say when nothing is due.
+  const holidays = await callAction(actor, "spaces.holidays", { id });
+
   // This space's own sessions (P5-T01c). The space is where a session is
   // scheduled and run, so this is the entry point that matters most: a
   // facilitator opening their team home should see the room they are about to
@@ -155,13 +160,14 @@ export default async function SpacePage({
   // uses, and `spaces.read` above has already answered not-found for a space
   // the reader may not see, so there is nothing extra to refuse here.
   const TREND_WEEKS = 12;
-  const [trend, streak, rhythm] = await Promise.all([
+  const [trend, streak, rhythm, practice] = await Promise.all([
     callAction(actor, "sessions.confidenceTrend", {
       spaceId: id,
       weeks: TREND_WEEKS,
     }),
     callAction(actor, "sessions.readStreak", { spaceId: id }),
     callAction(actor, "rhythm.read", {}).catch(refusedAsNull),
+    callAction(actor, "practice.read", {}).catch(refusedAsNull),
   ]);
 
   // Last week is the last session this space closed, and its digest is what
@@ -303,12 +309,25 @@ export default async function SpacePage({
         <SpaceSettingsCard
           spaceId={space.id}
           settings={space.settings}
-          workspaceStrictness={rhythm.coachStrictness}
+          // The workspace is strict through its practice's strict mode since
+          // P9-T05, and the old column only for a workspace an older
+          // release wrote to; either means what a space inherits is strict.
+          workspaceStrictness={
+            practice?.practice.strictMode === "on"
+              ? "strict"
+              : rhythm.coachStrictness
+          }
           workspaceFrequency={rhythm.defaultCheckInFrequency}
           canManage={canManage}
           connectedProviders={connectedProviders}
         />
       ) : null}
+
+      <SpaceHolidaysCard
+        spaceId={space.id}
+        holidays={holidays}
+        canManage={canManage}
+      />
 
       <SpaceManagement
         spaceId={space.id}
@@ -428,7 +447,9 @@ export default async function SpacePage({
               {board.blockers.map((blocker) => (
                 <li key={blocker.id} className="flex flex-col gap-1">
                   <span className="flex flex-wrap items-center gap-1.5">
-                    <Chip tone="neutral">{blocker.type.replace("_", " ")}</Chip>
+                    <Chip tone="neutral">
+                      {blocker.type.replace(/_/g, " ")}
+                    </Chip>
                     {blocker.pastTheClock ? (
                       <Chip tone="bad">{t("spaces.detail.pastTheClock")}</Chip>
                     ) : null}

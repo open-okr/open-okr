@@ -19,7 +19,13 @@
  * reads or writes one.
  */
 
-/** METHOD.md §4.3 AL-3's ordering. The index is what a level skip is measured in. */
+import { enforcementLevel } from "./enforcement.ts";
+import type { ResolvedPractice } from "./practice.ts";
+
+/**
+ * METHOD.md §4.3 AL-3's ordering. A level skip is measured over the levels a
+ * cycle uses, taken in this order (§2.7, G-3).
+ */
 export const ALIGNMENT_LEVEL_ORDER = [
   "company",
   "department",
@@ -31,14 +37,14 @@ export type AlignmentRuleKey = "AL-1" | "AL-3" | "AL-4" | "AL-6" | "KR-1";
 
 export type AlignmentSeverity = "high" | "medium" | "low";
 
-/** The penalties, as §11's `alignment.penalties` parameter carries them. */
-export interface AlignmentPenalties {
-  readonly noAnchor: number;
-  readonly orphan: number;
-  readonly noKeyResults: number;
-  readonly levelSkip: number;
-  readonly silo: number;
-  readonly floor: number;
+/** §5.2's three readings of the share. */
+export const ALIGNMENT_BANDS = ["healthy", "watch", "gap"] as const;
+export type AlignmentBand = (typeof ALIGNMENT_BANDS)[number];
+
+/** §11's two alignment thresholds, as percentages. */
+export interface AlignmentThresholds {
+  readonly healthy: number;
+  readonly watch: number;
 }
 
 /**
@@ -52,7 +58,26 @@ export interface AlignmentPenalties {
 export interface AlignmentGoal {
   readonly id: string;
   readonly level: string;
+  /** The parent inside the scope, which is what the subtree walks follow. */
   readonly parentGoalId: string | null;
+  /**
+   * The level of a parent outside the scope: another space, or an earlier or
+   * longer cycle such as an annual objective (§5.1). Null or absent when the
+   * parent is inside the scope or there is none.
+   *
+   * Carried separately because a parent the engine cannot see still aligns the
+   * goal. Before P9-T16a a space's goal hung under the company objective read
+   * as unaligned at space scope, which counted it against the share it most
+   * plainly belongs in.
+   */
+  readonly outsideParentLevel?: string | null;
+  /** Why this goal stands alone, when it does (§5.2). Counts as aligned. */
+  readonly standaloneReason?: string | null;
+  /**
+   * What it says it contributes to (§4.3, AL-1). Enough for AL-1 to pass and
+   * not enough for the share, which asks for a parent or a reason.
+   */
+  readonly contributionStatement?: string | null;
   readonly spaceId: string | null;
   readonly keyResultCount: number;
   /** Closed goals still count (decision D-11). Carried for the caller's clarity. */
@@ -79,33 +104,68 @@ export type AlignmentScope =
 
 export interface AlignmentFinding {
   readonly ruleKey: AlignmentRuleKey;
+  /**
+   * The §4.3 condition row that matched, where the check has more than one
+   * way to object (AL-1's missing alignment and its short contribution).
+   */
+  readonly condition?: string;
   readonly severity: AlignmentSeverity;
-  readonly penalty: number;
   /** Null only for the anchor finding, which no goal caused (decision D-16). */
   readonly subjectGoalId: string | null;
   readonly reason: string;
 }
 
 export interface AlignmentResult {
-  /** Null for an empty scope: nothing to align is not the same as aligned. */
+  /**
+   * The share of goals below company level that align or stand alone with a
+   * reason, as a whole percentage rounded down. Null when there is nothing
+   * below company level to measure: nothing to align is not the same as
+   * aligned.
+   */
   readonly score: number | null;
+  readonly band: AlignmentBand | null;
+  /** Goals below company level in scope: the share's denominator. */
+  readonly measured: number;
+  /** Of those, the ones aligned or standing alone with a reason. */
+  readonly counted: number;
+  /**
+   * The goals the share did not count, sorted. §5.2 lists every one, whether
+   * or not a check is raised against it: a goal that states a contribution
+   * passes AL-1 and is still not counted, and AL-1 may be off.
+   */
+  readonly uncounted: readonly string[];
   readonly findings: readonly AlignmentFinding[];
 }
 
-/**
- * Severity follows the penalty size, and is a separate axis from it on purpose:
- * severity drives how a finding is presented, the penalty drives the score.
- */
-function severityFor(penalty: number): AlignmentSeverity {
-  if (penalty >= 10) {
-    return "high";
-  }
-  return penalty >= 4 ? "medium" : "low";
+/** How the engine reads a cycle (§2.7, §4.3). */
+export interface AlignmentOptions {
+  /**
+   * The levels the cycle uses, which AL-3 measures a skip over (G-3). A level
+   * a workspace turned off is not counted as skipped. All four by default.
+   */
+  readonly levels?: readonly string[];
+  /** §11's "Contribution minimum", in words. 3 by default. */
+  readonly contributionMinimum?: number;
 }
 
-function levelIndex(level: string): number {
-  return (ALIGNMENT_LEVEL_ORDER as readonly string[]).indexOf(level);
-}
+/** §4.3's AL-1 rows, as `ALIGNMENT_CHECKS` words them. */
+export const AL1_UNALIGNED =
+  "No parent, no stated contribution and no standalone reason";
+export const AL1_SHORT_CONTRIBUTION =
+  "Stated contribution under the contribution minimum";
+
+/**
+ * How each finding is presented. Fixed per rule since P9-T16a, when the
+ * penalties it used to be read off left §5.2; the values are the ones the
+ * penalties produced, so no finding changed colour on the way.
+ */
+const SEVERITY: Readonly<Record<AlignmentRuleKey, AlignmentSeverity>> = {
+  "AL-4": "high",
+  "AL-1": "high",
+  "KR-1": "medium",
+  "AL-6": "medium",
+  "AL-3": "low",
+};
 
 /**
  * The department a goal belongs to, keyed for grouping.
@@ -119,49 +179,101 @@ function departmentKey(goal: AlignmentGoal): string {
   return goal.spaceId ?? `goal:${goal.id}`;
 }
 
+/**
+ * METHOD.md §5.2: the share of goals below company level that align to a
+ * parent or say why they stand alone.
+ *
+ * A share rather than penalties (P9-T16a). Fixed penalties cost the same
+ * points in a company of ten goals and one of five hundred, so eight unaligned
+ * goals took either to the floor. The findings are still raised, because the
+ * coach lists every unaligned goal and the nudges are keyed on them, but only
+ * the share decides the reading.
+ */
 export function alignmentScore(
   graph: AlignmentGraph,
   scope: AlignmentScope,
-  penalties: AlignmentPenalties,
+  thresholds: AlignmentThresholds,
+  options: AlignmentOptions = {},
 ): AlignmentResult {
   const goals = graph.goals;
   if (goals.length === 0) {
-    // §1: an empty scope has no score, not 100 and not 90. A workspace with no
-    // goals has nothing to align, and a penalty for an absent anchor would be
-    // scolding somebody for not having started.
-    return { score: null, findings: [] };
+    // An empty scope has no score, not 100 and not 0. A workspace with no
+    // goals has nothing to align, and an anchor finding would be scolding
+    // somebody for not having started.
+    return {
+      score: null,
+      band: null,
+      measured: 0,
+      counted: 0,
+      uncounted: [],
+      findings: [],
+    };
   }
+  const levels = options.levels ?? ALIGNMENT_LEVEL_ORDER;
+  const contributionMinimum = options.contributionMinimum ?? 3;
 
   const findings: AlignmentFinding[] = [];
   const byId = new Map(goals.map((goal) => [goal.id, goal]));
 
   // AL-4, once, workspace scope only. "A company objective anchors the tree" is
   // not a statement about one space, so at space scope it is skipped rather than
-  // failed.
-  if (
-    scope.kind === "workspace" &&
-    !goals.some((goal) => goal.level === "company")
-  ) {
+  // failed. A goal hung under an annual company objective is anchored by it,
+  // because §5.1 lets a quarter's goals align to a longer cycle's.
+  const anchored =
+    scope.kind !== "workspace" ||
+    goals.some(
+      (goal) =>
+        goal.level === "company" || goal.outsideParentLevel === "company",
+    );
+  if (!anchored) {
     findings.push({
       ruleKey: "AL-4",
-      severity: severityFor(penalties.noAnchor),
-      penalty: penalties.noAnchor,
+      severity: SEVERITY["AL-4"],
       subjectGoalId: null,
       reason: "No company-level objective anchors this cycle.",
     });
   }
 
+  let measured = 0;
+  let counted = 0;
+  const uncounted: string[] = [];
   for (const goal of goals) {
-    // AL-1, per goal. The contribution statement does not excuse it: §4.3's
-    // check coaches the drafter, §5.2's penalty measures the structure, and
-    // publish gate 3 is where a written contribution counts.
-    if (goal.level !== "company" && goal.parentGoalId === null) {
+    const parentLevel = goal.parentGoalId
+      ? (byId.get(goal.parentGoalId)?.level ?? null)
+      : (goal.outsideParentLevel ?? null);
+    const aligned = parentLevel !== null || hasReason(goal.standaloneReason);
+    const contribution = wordCount(goal.contributionStatement);
+
+    if (goal.level !== "company") {
+      measured += 1;
+      // The share. A reason to stand alone counts as aligned (§5.2); a
+      // contribution statement does not, because it says what the goal
+      // supports without pointing at it.
+      if (aligned) {
+        counted += 1;
+      } else {
+        uncounted.push(goal.id);
+      }
+    }
+
+    // AL-1, per goal, first match wins (§4.3). A stated contribution is
+    // enough for the check, which coaches the writer, though not for the
+    // share, which measures the structure.
+    if (goal.level !== "company" && !aligned && contribution === 0) {
       findings.push({
         ruleKey: "AL-1",
-        severity: severityFor(penalties.orphan),
-        penalty: penalties.orphan,
+        condition: AL1_UNALIGNED,
+        severity: SEVERITY["AL-1"],
         subjectGoalId: goal.id,
-        reason: `A ${goal.level} goal with no parent supports nothing above it.`,
+        reason: `This ${goal.level} goal has no parent, states no contribution and gives no reason to stand alone.`,
+      });
+    } else if (contribution > 0 && contribution < contributionMinimum) {
+      findings.push({
+        ruleKey: "AL-1",
+        condition: AL1_SHORT_CONTRIBUTION,
+        severity: SEVERITY["AL-1"],
+        subjectGoalId: goal.id,
+        reason: `Its stated contribution is under ${contributionMinimum} words, which names a theme rather than a goal.`,
       });
     }
 
@@ -169,26 +281,26 @@ export function alignmentScore(
     if (goal.keyResultCount === 0) {
       findings.push({
         ruleKey: "KR-1",
-        severity: severityFor(penalties.noKeyResults),
-        penalty: penalties.noKeyResults,
+        severity: SEVERITY["KR-1"],
         subjectGoalId: goal.id,
         reason: "This objective has no key results, so nothing measures it.",
       });
     }
 
-    // AL-3, per goal. Only a forward skip of more than one level counts. A
-    // same-level or inverted parent may be worth coaching, and that belongs to
-    // the quality canon rather than to the score.
-    const parent = goal.parentGoalId ? byId.get(goal.parentGoalId) : undefined;
-    if (parent) {
-      const gap = levelIndex(goal.level) - levelIndex(parent.level);
+    // AL-3, per goal. Only a forward skip of more than one level counts, over
+    // the levels this cycle uses: with no department level, a team goal under
+    // a company one skips nothing (G-3). A same-level or inverted parent may
+    // be worth coaching, and that belongs to the quality canon rather than to
+    // the score.
+    if (parentLevel !== null) {
+      const order = levelsBetween(levels, goal.level, parentLevel);
+      const gap = order.indexOf(goal.level) - order.indexOf(parentLevel);
       if (gap > 1) {
         findings.push({
           ruleKey: "AL-3",
-          severity: severityFor(penalties.levelSkip),
-          penalty: penalties.levelSkip,
+          severity: SEVERITY["AL-3"],
           subjectGoalId: goal.id,
-          reason: `A ${goal.level} goal aligned straight to a ${parent.level} goal skips a level.`,
+          reason: `A ${goal.level} goal aligned straight to a ${parentLevel} goal skips a level.`,
         });
       }
     }
@@ -197,18 +309,71 @@ export function alignmentScore(
   for (const siloed of siloedDepartments(graph, byId)) {
     findings.push({
       ruleKey: "AL-6",
-      severity: severityFor(penalties.silo),
-      penalty: penalties.silo,
+      severity: SEVERITY["AL-6"],
       subjectGoalId: siloed,
       reason:
         "This department and its whole subtree have no horizontal dependency with any other department.",
     });
   }
 
-  const total = findings.reduce((sum, finding) => sum + finding.penalty, 0);
-  const score = Math.max(penalties.floor, Math.min(100, 100 - total));
+  // Rounded down, so a share of 89.6 reads 89 and the figure never shows a
+  // band it has not reached.
+  const score = measured === 0 ? null : Math.floor((100 * counted) / measured);
+  return {
+    score,
+    band: score === null ? null : alignmentBand(score, thresholds, anchored),
+    measured,
+    counted,
+    uncounted: uncounted.sort((left, right) => left.localeCompare(right)),
+    findings: sortFindings(findings),
+  };
+}
 
-  return { score, findings: sortFindings(findings) };
+/**
+ * Drops the findings of a check this practice turned off (§4, §12, P9-T16b-a).
+ *
+ * A separate step, as `applyEnforcement` is for the other checks: the engine
+ * reports what it sees and the practice decides what is said. AL-3 and AL-6
+ * are off by default, so their findings, and the nudges keyed on them, stop
+ * by default too. The share is §5.2's and does not move: a workspace that
+ * turns AL-1 off still sees every goal the share did not count.
+ */
+export function enforceAlignment(
+  result: AlignmentResult,
+  practice: ResolvedPractice,
+): AlignmentResult {
+  return {
+    ...result,
+    findings: result.findings.filter(
+      (finding) => enforcementLevel(finding.ruleKey, practice) !== "off",
+    ),
+  };
+}
+
+function hasReason(reason: string | null | undefined): boolean {
+  return typeof reason === "string" && reason.trim().length > 0;
+}
+
+function wordCount(text: string | null | undefined): number {
+  return (text ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word !== "").length;
+}
+
+/**
+ * The cycle's levels in §4.3's order, plus the two levels being compared, so
+ * a goal at a level the cycle did not begin with is still measured from where
+ * it sits.
+ */
+function levelsBetween(
+  levels: readonly string[],
+  child: string,
+  parent: string,
+): readonly string[] {
+  return ALIGNMENT_LEVEL_ORDER.filter(
+    (level) => levels.includes(level) || level === child || level === parent,
+  );
 }
 
 /**
@@ -337,7 +502,22 @@ function sortFindings(findings: AlignmentFinding[]): AlignmentFinding[] {
   });
 }
 
-/** METHOD.md §5.2: at or above the threshold is healthy. */
-export function alignmentHealthy(score: number, threshold: number): boolean {
-  return score >= threshold;
+/**
+ * METHOD.md §5.2: healthy at or above the healthy threshold, watch at or above
+ * the watch threshold, a gap below it. With no company-level objective the
+ * reading is a gap whatever the share, because a tree with nothing at the top
+ * can be perfectly wired and still point nowhere.
+ */
+export function alignmentBand(
+  score: number,
+  thresholds: AlignmentThresholds,
+  anchored = true,
+): AlignmentBand {
+  if (!anchored) {
+    return "gap";
+  }
+  if (score >= thresholds.healthy) {
+    return "healthy";
+  }
+  return score >= thresholds.watch ? "watch" : "gap";
 }

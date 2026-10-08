@@ -54,6 +54,7 @@ export const QUALITY_WORD_LISTS = {
     "accelerate",
     "expand",
     "drive",
+    "bring",
   ],
   stateWords: [
     "become",
@@ -83,7 +84,10 @@ export const QUALITY_WORD_LISTS = {
     "famous for",
     "proud",
   ],
-  whyMarkers: ["to", "so that", "in order to", "because"],
+  // "to" left on 1 October 2026 (METHOD.md §4.1, P9-T03a): every "from X to
+  // Y" contains it, so "Increase revenue from $2M to $3M" passed OBJ-1 as
+  // movement with a why.
+  whyMarkers: ["so that", "in order to", "because"],
   /**
    * §4.2's list, which ends "(and plurals)". The plurals are written out
    * rather than derived, because the matcher is whole-word and an -s rule

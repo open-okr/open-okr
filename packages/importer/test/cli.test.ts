@@ -84,6 +84,7 @@ const report = (over: Partial<RunReport> = {}): RunReport => ({
   updated: 0,
   skipped: 1,
   unmappedHeaders: [],
+  assumed: [],
   rows: [
     { line: 2, outcome: "created", externalId: "obj-1" },
     { line: 3, outcome: "created", externalId: "obj-2" },

@@ -55,7 +55,8 @@ const call = async (name: string, input: unknown, userId = FACILITATOR) => {
 
 const causes = async (userId = FACILITATOR) =>
   (await call("sessions.rootCauses", { sessionId }, userId)) as {
-    threshold: number;
+    thresholds: { aspirational: number; committed: number };
+    required: boolean;
     keyResults: {
       keyResultId: string;
       title: string;
@@ -210,8 +211,11 @@ describe("the root-cause list", () => {
   });
 
   it("lists every key result below the threshold and nothing above it", async () => {
-    const threshold = resolveThresholds()["scoring.rootCauseThreshold"];
-    expect(threshold).toBe(0.7);
+    // An aspirational key result's threshold: this objective is aspirational,
+    // and root causes are asked by kind since P9-T20c.
+    const threshold =
+      resolveThresholds()["scoring.rootCauseThreshold"].aspirational;
+    expect(threshold).toBe(0.6);
 
     await call("sessions.scoreKeyResult", {
       sessionId,
@@ -227,7 +231,7 @@ describe("the root-cause list", () => {
     });
 
     const status = await causes();
-    expect(status.threshold).toBe(threshold);
+    expect(status.thresholds.aspirational).toBe(threshold);
     expect(status.keyResults.map((entry) => entry.keyResultId)).toEqual([
       missedKeyResultId,
     ]);
@@ -236,13 +240,14 @@ describe("the root-cause list", () => {
   });
 
   it("puts a key result exactly on the threshold above the line", async () => {
-    // §8.4 says "below 0.7". A key result that scored exactly the threshold met
+    // §8.4 says "below 0.6" for an aspirational key result. One that scored
+    // exactly the threshold met
     // it, and asking a room to explain a result it did not miss is the kind of
     // boundary error that makes people stop trusting the stage.
     await call("sessions.scoreKeyResult", {
       sessionId,
       keyResultId: missedKeyResultId,
-      score: 0.7,
+      score: 0.6,
       reason: "Exactly the line.",
     });
     expect((await causes()).keyResults).toHaveLength(0);
@@ -312,7 +317,8 @@ describe("the root-cause list", () => {
       score: 0.4,
       reason: "Landed 210 of 300.",
     });
-    for (const causeKey of [0, 9]) {
+    // Nine causes since P9-T20c; "Other" is the ninth and needs its line.
+    for (const causeKey of [0, 10]) {
       await expect(
         call("sessions.setRootCause", {
           sessionId,
@@ -339,6 +345,130 @@ describe("the root-cause list", () => {
         causeKey: 1,
       }),
     ).rejects.toThrow();
+  });
+});
+
+/**
+ * Root causes by kind, "Other" and a second cause, and scoring that closes on
+ * explanations (METHOD.md §8.3, §8.4, P9-T20c).
+ */
+describe("root causes by kind, and scoring that closes on explanations", () => {
+  const committedGoal = async () => {
+    const goal = (await call("goals.create", {
+      title: "Enterprise security teams approve us without a fight",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: facilitatorMemberId,
+      kind: "committed",
+      weight: 1,
+    })) as { id: string };
+    return (
+      (await call("goals.addKeyResult", {
+        goalId: goal.id,
+        title: "Answer a security questionnaire in 5 days, from 12",
+        direction: "reduce",
+        indicatorType: "lagging",
+        baselineValue: 12,
+        targetValue: 5,
+        unit: "days",
+        weight: 1,
+      })) as { id: string }
+    ).id;
+  };
+
+  it("does not ask an aspirational key result at 0.65 for one (acceptance)", async () => {
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: missedKeyResultId,
+      score: 0.65,
+      reason: "Landed 237 of 300.",
+    });
+    expect((await causes()).keyResults).toEqual([]);
+  });
+
+  it("asks a committed key result at 0.8, which aspirational's line would have passed", async () => {
+    const committed = await committedGoal();
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: committed,
+      score: 0.8,
+      reason: "Seven days, not five.",
+    });
+    const status = await causes();
+    expect(status.thresholds).toEqual({ aspirational: 0.6, committed: 1 });
+    expect(status.keyResults).toEqual([
+      expect.objectContaining({ keyResultId: committed, kind: "committed" }),
+    ]);
+  });
+
+  it("names Other only with its line, and a second cause that is not the first", async () => {
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: missedKeyResultId,
+      score: 0.4,
+      reason: "Landed 210 of 300.",
+    });
+    await expect(
+      call("sessions.setRootCause", {
+        sessionId,
+        keyResultId: missedKeyResultId,
+        causeKey: 9,
+      }),
+    ).rejects.toThrow(/described in a line/);
+    await expect(
+      call("sessions.setRootCause", {
+        sessionId,
+        keyResultId: missedKeyResultId,
+        causeKey: 3,
+        secondaryCauseKey: 3,
+      }),
+    ).rejects.toThrow(/different cause/);
+
+    await call("sessions.setRootCause", {
+      sessionId,
+      keyResultId: missedKeyResultId,
+      causeKey: 9,
+      secondaryCauseKey: 4,
+      detail: "The data warehouse migration froze every dashboard for a month",
+    });
+    const [row] = (await causes()).keyResults as unknown as {
+      causeLabel: string;
+      secondaryCauseLabel: string;
+    }[];
+    expect(row?.causeLabel).toBe("Other, described in a line");
+    expect(row?.secondaryCauseLabel).toBe("Capacity or resourcing");
+  });
+
+  it("says when the workspace leaves root causes optional", async () => {
+    expect((await causes()).required).toBe(true);
+    await call("practice.update", {
+      overrides: { "review.rootCauses": "optional" },
+    });
+    expect((await causes()).required).toBe(false);
+  });
+
+  it("does not close scoring while a committed miss has no explanation", async () => {
+    const committed = await committedGoal();
+    await call("sessions.advanceStage", { id: sessionId });
+    // Ungraded, and nothing recorded towards five days: a miss nobody has
+    // explained.
+    await expect(
+      call("sessions.advanceStage", { id: sessionId }),
+    ).rejects.toThrow(/Cannot close scoring: Answer a security questionnaire/);
+
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: committed,
+      score: 0.8,
+      reason: "Seven days, not five.",
+    });
+    await call("sessions.advanceStage", { id: sessionId });
+    const read = (await call("sessions.read", { id: sessionId })) as {
+      stageKey: string;
+    };
+    expect(read.stageKey).toBe("narratives");
   });
 });
 

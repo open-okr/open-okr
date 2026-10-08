@@ -68,10 +68,11 @@ describe("the weekly session panels", () => {
     expect(figures).toContain("confidenceBand(point.average, thresholds)");
   });
 
-  test("the blocker taxonomy is the canon's, so a sixth type needs no change here", () => {
-    expect(BLOCKER_TYPE_DEFINITIONS).toHaveLength(5);
+  test("the blocker taxonomy is the canon's, so a new type needs no change here", () => {
+    // Seven since P9-T19a-a, which added two and changed nothing in the panel.
+    expect(BLOCKER_TYPE_DEFINITIONS).toHaveLength(7);
     expect(blockers).toContain("BLOCKER_TYPE_DEFINITIONS.map");
-    // And none of the five is named in the component.
+    // And none of the seven is named in the component.
     for (const one of BLOCKER_TYPE_DEFINITIONS) {
       expect(code(blockers)).not.toContain(`"${one.type}"`);
     }

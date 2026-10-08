@@ -7,7 +7,20 @@
  */
 import { type KpiFrequency, normalisePeriod } from "./kpi.ts";
 
-export const KPI_AGGREGATES = ["sum", "avg", "max", "min", "count"] as const;
+/**
+ * §6.2's aggregates. `last` and `first` arrived at P9-T17a, for a balance or
+ * a headcount, where adding up the days of a month means nothing: the month's
+ * figure is the one it ended on.
+ */
+export const KPI_AGGREGATES = [
+  "sum",
+  "avg",
+  "max",
+  "min",
+  "count",
+  "last",
+  "first",
+] as const;
 export type KpiAggregate = (typeof KPI_AGGREGATES)[number];
 
 /** Coarse to fine, so two frequencies can be compared. */
@@ -67,11 +80,15 @@ export function aggregateForPeriod(
 
   // Finer source. A source record belongs to the target period exactly when
   // normalising its own start to the target frequency lands on the target.
-  const inside = records.filter(
-    (record) =>
-      normalisePeriod(targetFrequency, record.periodStart) ===
-      targetPeriodStart,
-  );
+  // In period order, so `last` and `first` mean the end and the start of the
+  // target period whatever order the records arrived in.
+  const inside = records
+    .filter(
+      (record) =>
+        normalisePeriod(targetFrequency, record.periodStart) ===
+        targetPeriodStart,
+    )
+    .sort((left, right) => left.periodStart.localeCompare(right.periodStart));
   return fold(
     aggregate,
     inside.map((record) => record.value),
@@ -102,6 +119,10 @@ function fold(
       return Math.max(...values);
     case "min":
       return Math.min(...values);
+    case "last":
+      return values[values.length - 1] ?? null;
+    case "first":
+      return values[0] ?? null;
   }
 }
 
