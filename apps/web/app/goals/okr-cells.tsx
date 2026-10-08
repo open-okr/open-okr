@@ -11,6 +11,7 @@ import {
 } from "@openokr/method";
 import { Chip, cn, useTranslations } from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
+import { focusOnMount } from "../../lib/focus-on-mount.ts";
 
 /**
  * The cells of the OKR list, each edited where it is read (P9-T07a-a,
@@ -440,7 +441,7 @@ export function KindControl({
           )}
         >
           <input
-            ref={(node) => node?.focus()}
+            ref={focusOnMount}
             value={reason}
             aria-label={t("okrKind.why", {
               kind: name(pending).toLowerCase(),
@@ -738,7 +739,7 @@ export function ReasonField({
       <label className="flex min-w-0 flex-1 items-center gap-2">
         <span className="text-ink-2">{label}</span>
         <input
-          ref={(node) => node?.focus()}
+          ref={focusOnMount}
           value={reason}
           aria-label={label}
           placeholder={t("okrList.reasonPlaceholder")}

@@ -720,6 +720,7 @@ export const bulkApplyProposedChanges = defineWriteAction({
                 userId: context.actor.userId,
                 memberId: actor.memberId ?? undefined,
               },
+              proposalId: proposal.id,
             },
             proposal.action as never,
             proposal.payload as never,

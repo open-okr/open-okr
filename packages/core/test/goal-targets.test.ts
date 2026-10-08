@@ -220,6 +220,25 @@ describe("goals.changeTarget", () => {
     ).resolves.toBeTruthy();
   });
 
+  it("judges a target eased in the same call that moves the baseline against the baseline it had", async () => {
+    // Baseline 0, target 100: moving the baseline to 160 and the target to 60
+    // in one call must still read as easing an increase, with a reason.
+    const goal = await objective("Grow the trial base", quarterId);
+    const kr = await keyResult(goal, "Trials from 0 to 100");
+    await expect(
+      call(OWNER, "goals.updateKeyResult", {
+        id: kr,
+        baselineValue: 160,
+        targetValue: 60,
+      }),
+    ).rejects.toThrow(/Easing a target/);
+    // A lowered increase target eases it whatever the baseline says.
+    await call(OWNER, "goals.updateKeyResult", { id: kr, baselineValue: 160 });
+    await expect(
+      call(OWNER, "goals.changeTarget", { id: kr, targetValue: 60 }),
+    ).rejects.toThrow(/Easing a target/);
+  });
+
   it("lets easing through without a reason where the workspace made it optional", async () => {
     await call(OWNER, "practice.update", {
       overrides: { "reasons.easingTarget": "optional" },

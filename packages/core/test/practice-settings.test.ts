@@ -208,6 +208,20 @@ describe("practice.update", () => {
     expect(reset.practice.reviewer).toBe("optional");
   });
 
+  it("returns a setting to a non-default profile's value, not the canon default", async () => {
+    // Governed requires reviewers, where the canon default is optional. A
+    // reset has to land back on Governed's required, and store nothing.
+    await call(OWNER, "practice.applyProfile", { profile: "governed" });
+    await call(OWNER, "practice.update", {
+      overrides: { reviewer: "optional" },
+    });
+    const reset = await call<PracticeState>(OWNER, "practice.update", {
+      overrides: { reviewer: null },
+    });
+    expect(reset.overrides).toEqual({});
+    expect(reset.practice.reviewer).toBe("required");
+  });
+
   it("does not store a value equal to the profile's own", async () => {
     // A settings card submits every field it renders. Storing the unchanged
     // ones would freeze them against a later change to the default.

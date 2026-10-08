@@ -7,6 +7,7 @@
  * Proved in two real years, so it holds whatever year the demo runs in.
  */
 import { describe, expect, it } from "vitest";
+import { YEAR_EVENTS } from "../src/demo/year/build.ts";
 import { firstMondayOf, quarterOf, toReal } from "../src/demo/year/calendar.ts";
 import { YEAR_STEPS, yearStepsAsOf } from "../src/demo/year/steps.ts";
 import { eventsDue, type YearEvent } from "../src/demo/year/timeline.ts";
@@ -128,5 +129,41 @@ describe("the timeline runs in date order", () => {
       "Kofi moves",
       "archive Support",
     ]);
+  });
+});
+
+describe("the story's order holds in every year the demo can run in", () => {
+  /**
+   * Two days the story keeps apart can land on one real day: a date before
+   * its quarter's first Monday is held on the quarter's first day, which in a
+   * year whose quarter starts on a Monday is that Monday too. In 2029 the
+   * pilot is declared on 1 October and its first check-ins fall due the same
+   * day, and they used to run first, against a pilot that did not exist yet.
+   */
+  it("declares the pilot before its first check-ins, even on the same real day", () => {
+    for (let year = 2027; year <= 2066; year += 1) {
+      const labels = eventsDue(YEAR_EVENTS, `${year}-12-31`).map(
+        (event) => event.label,
+      );
+      const pilot = labels.indexOf(
+        "The pilot quarter, a first cycle declared, and its two objectives",
+      );
+      const firstWeek = labels.indexOf("The pilot's check-ins, week 1");
+      expect(pilot, `${year}`).toBeGreaterThanOrEqual(0);
+      expect(pilot, `${year}`).toBeLessThan(firstWeek);
+    }
+  });
+
+  it("never runs an event before one the story dates earlier", () => {
+    for (let year = 2027; year <= 2066; year += 1) {
+      const due = eventsDue(YEAR_EVENTS, `${year}-12-31`);
+      for (let index = 1; index < due.length; index += 1) {
+        expect(
+          (due[index] as { on: string }).on >=
+            (due[index - 1] as { on: string }).on,
+          `${year}: ${due[index - 1]?.label} then ${due[index]?.label}`,
+        ).toBe(true);
+      }
+    }
   });
 });

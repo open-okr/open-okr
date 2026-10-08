@@ -36,6 +36,7 @@ import {
   createGoalInTx,
   createKeyResultInTx,
 } from "../goals/service.ts";
+import { recomputeKpi } from "../kpis/service.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { midCycleInTx } from "../practice/policy.ts";
 import { recomputeUnitQualityInTx } from "../quality/service.ts";
@@ -59,7 +60,11 @@ export async function closeDecisionsInTx(
   tx: OperationTx,
   workspaceId: string,
   cycleId: string,
-  reviewId: string | null,
+  /**
+   * Every closed review of the cycle. A company review and a team's own can
+   * both close in one cycle, and each decides its own objectives.
+   */
+  reviewIds: readonly string[],
 ): Promise<ClosedObjective[]> {
   const ownCloses = await tx
     .select({
@@ -92,7 +97,7 @@ export async function closeDecisionsInTx(
     }
   }
 
-  if (reviewId) {
+  if (reviewIds.length > 0) {
     const roomDecisions = await tx
       .select({
         goalId: reviewDecisions.goalId,
@@ -106,7 +111,7 @@ export async function closeDecisionsInTx(
         activeOnly(
           reviewDecisions,
           eq(reviewDecisions.workspaceId, workspaceId),
-          eq(reviewDecisions.sessionId, reviewId),
+          inArray(reviewDecisions.sessionId, [...reviewIds]),
           eq(goals.cycleId, cycleId),
           isNull(goals.deletedAt),
         ),
@@ -150,7 +155,8 @@ export interface CarriedKeyResult {
  *
  * | Kind | Carried as |
  * |---|---|
- * | Metric, maintain | The same kind, baseline the last value, the same target |
+ * | Metric | The same kind, baseline the last value, the same target |
+ * | Maintain | The same band: its baseline and target are the band's two edges, not a start and a finish |
  * | Milestone not done | A milestone again, not done |
  * | Milestone done | Left behind: it is done, and doing it again is not keeping it |
  * | Baseline not recorded | A baseline again, still to be measured |
@@ -180,6 +186,15 @@ export function carriedKeyResult(source: {
             targetValue: null,
           }
         : { kind: "baseline", baselineValue: 0, targetValue: 1 };
+    case "maintain":
+      // The band is what is kept. Moving an edge to the last reading would
+      // redraw it around wherever the number happened to finish, and a value
+      // that fell out of the band would read as inside it.
+      return {
+        kind: "maintain",
+        baselineValue: source.baselineValue,
+        targetValue: source.targetValue,
+      };
     default:
       return {
         kind: source.kind,
@@ -334,7 +349,7 @@ export async function carryKeptObjectivesInTx(
         ).map((row) => row.id),
   );
 
-  const running = await midCycleInTx(tx, workspaceId, toCycleId);
+  const running = await midCycleInTx(tx, workspaceId, toCycleId, now);
   const notCarried: string[] = [];
   const touched: { spaceId: string | null }[] = [];
   let drafts = 0;
@@ -508,7 +523,7 @@ export async function endRecoveriesInTx(
     return;
   }
   const recoveries = await tx
-    .select({ goalId: kpis.recoveryGoalId })
+    .select({ kpiId: kpis.id, goalId: kpis.recoveryGoalId })
     .from(kpis)
     .where(
       activeOnly(
@@ -551,5 +566,9 @@ export async function endRecoveriesInTx(
           isNull(goals.closedAt),
         ),
       );
+    // The KPI stops reading as recovering the moment its recovery closes,
+    // rather than at its next reading: its effective figure is its real one
+    // again (§6.4).
+    await recomputeKpi(tx, input.workspaceId, recovery.kpiId, input.now);
   }
 }

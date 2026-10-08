@@ -404,6 +404,28 @@ async function findClosedReview(
   return review;
 }
 
+/** Every closed review of a cycle, newest first: each decides its own objectives. */
+async function closedReviewIds(
+  tx: OperationTx,
+  workspaceId: string,
+  cycleId: string,
+): Promise<string[]> {
+  const rows = await tx
+    .select({ id: okrSessions.id })
+    .from(okrSessions)
+    .where(
+      activeOnly(
+        okrSessions,
+        eq(okrSessions.workspaceId, workspaceId),
+        eq(okrSessions.cycleId, cycleId),
+        eq(okrSessions.kind, "quarterly"),
+        eq(okrSessions.state, "closed"),
+      ),
+    )
+    .orderBy(desc(okrSessions.endedAt));
+  return rows.map((row) => row.id);
+}
+
 /**
  * §8.5's lowest-scoring statement for a review, or null when nobody answered.
  *
@@ -674,7 +696,7 @@ export async function feedForwardInTx(
     tx,
     workspaceId,
     fromCycleId,
-    review?.id ?? null,
+    await closedReviewIds(tx, workspaceId, fromCycleId),
   );
   const deferred = decided
     .filter((objective) => objective.decision === "defer")
@@ -974,14 +996,13 @@ export async function closeCycleInTx(
   // A recovery the room did not carry ends with the close (§6.5,
   // P9-T22c-e-b), whether or not there is a next cycle to feed. Before the
   // cycle is marked closed, which freezes its objectives.
-  const closedReview = await findClosedReview(tx, workspaceId, cycleId);
   await endRecoveriesInTx(tx, {
     workspaceId,
     decided: await closeDecisionsInTx(
       tx,
       workspaceId,
       cycleId,
-      closedReview?.id ?? null,
+      await closedReviewIds(tx, workspaceId, cycleId),
     ),
     now,
   });
@@ -1282,7 +1303,12 @@ export async function readClosureInTx(
   // The drafts this cycle's kept objectives became, including one deleted
   // since: it was handed on, and deleting it was the next cycle's decision.
   const kept = (
-    await closeDecisionsInTx(tx, workspaceId, cycleId, review?.id ?? null)
+    await closeDecisionsInTx(
+      tx,
+      workspaceId,
+      cycleId,
+      await closedReviewIds(tx, workspaceId, cycleId),
+    )
   ).filter((objective) => CARRIED_DECISIONS.includes(objective.decision));
   const drafts =
     kept.length === 0

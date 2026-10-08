@@ -24,6 +24,8 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
+import { workspaceTimeZone } from "../cycles/service.ts";
 import { OperationError } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -46,6 +48,12 @@ const leaveRow = z.object({
 });
 
 type LeaveSpan = z.infer<typeof leaveSpan>;
+
+/** How many spans may be running or still to come at once. */
+const LEAVE_AHEAD_LIMIT = 20;
+
+/** Every span a member has had, past ones included, bounded for the request. */
+const LEAVE_HISTORY_LIMIT = 200;
 
 /**
  * Replaces one member's leave, inside the calling operation. Every delegate
@@ -75,13 +83,27 @@ async function replaceLeaveInTx(
     throw new OperationError("not_found", "No such member.");
   }
 
-  const delegates = [...new Set(input.leave.map((span) => span.delegateId))];
-  if (delegates.includes(input.memberId)) {
+  if (input.leave.some((span) => span.delegateId === input.memberId)) {
     throw new OperationError(
       "forbidden",
       "Somebody else stands in while you are away. Choose a delegate who is not you.",
     );
   }
+  // Leave already over is history: it is kept as it was, whoever stood in
+  // then and whatever has happened to them since. Only leave still to come,
+  // or running now, needs somebody who can stand in, and only that counts
+  // toward the limit, so a long history never stops a member adding more.
+  const today = formatLocalDate(
+    localDateIn(new Date(), await workspaceTimeZone(tx, input.workspaceId)),
+  );
+  const ahead = input.leave.filter((span) => span.endsOn >= today);
+  if (ahead.length > LEAVE_AHEAD_LIMIT) {
+    throw new OperationError(
+      "forbidden",
+      `At most ${LEAVE_AHEAD_LIMIT} spans of leave can be ahead at once.`,
+    );
+  }
+  const delegates = [...new Set(ahead.map((span) => span.delegateId))];
   if (delegates.length > 0) {
     const found = await tx
       .select({ id: workspaceMembers.id })
@@ -94,10 +116,12 @@ async function replaceLeaveInTx(
           eq(workspaceMembers.status, "active"),
         ),
       );
-    if (found.length !== delegates.length) {
+    const active = new Set(found.map((row) => row.id));
+    const stale = ahead.find((span) => !active.has(span.delegateId));
+    if (stale) {
       throw new OperationError(
         "forbidden",
-        "A delegate has to be an active member of this workspace.",
+        `The delegate for the leave from ${stale.startsOn} to ${stale.endsOn} is not an active member of this workspace. Choose somebody who is.`,
       );
     }
   }
@@ -136,7 +160,7 @@ export const setOwnLeave = defineWriteAction({
   name: "people.setLeave",
   summary:
     "Sets the signed-in member's own leave, each span with the delegate who stands in (METHOD.md §7.4).",
-  input: z.object({ leave: z.array(leaveSpan).max(20) }),
+  input: z.object({ leave: z.array(leaveSpan).max(LEAVE_HISTORY_LIMIT) }),
   output: z.object({ memberId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -175,7 +199,7 @@ export const setMemberLeave = defineWriteAction({
     "Sets another member's leave, each span with the delegate who stands in (METHOD.md §7.4). For an administrator.",
   input: z.object({
     memberId: z.uuid(),
-    leave: z.array(leaveSpan).max(20),
+    leave: z.array(leaveSpan).max(LEAVE_HISTORY_LIMIT),
   }),
   output: z.object({ memberId: z.uuid() }),
   access: ACCESS_LEVELS.full,

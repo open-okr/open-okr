@@ -23,6 +23,12 @@ export const sessionConfidences = pgTable("session_confidences", {
     .notNull()
     .references(() => keyResults.id, { onDelete: "cascade" }),
   confirmedConfidence: numeric("confirmed_confidence").notNull(),
+  /**
+   * The key result's confidence just before this session first confirmed it
+   * (migration 0138), so a fall into the low band is seen in the session as
+   * it is in a check-in. Null on rows written before it existed.
+   */
+  previousConfidence: numeric("previous_confidence"),
   teamAverage: numeric("team_average"),
   whatChanged: text("what_changed").notNull(),
   confirmedById: uuid("confirmed_by_id")

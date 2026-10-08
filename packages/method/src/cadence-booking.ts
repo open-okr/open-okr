@@ -459,10 +459,24 @@ export function planCycleCadence(
   let reviewOn =
     atClose.find((session) => session.part !== "retrospective")?.on ?? null;
   if (!holds("review")) {
+    // Split, the review leaves two working days for its retrospective inside
+    // the span, where the span is long enough to.
+    const roomy = (span: Span): Span => {
+      if (!split) {
+        return span;
+      }
+      const fits = daysOf(span).filter(
+        (on) => isWorkingDay(on) && workingDaysAfter(on, 2) <= close.to,
+      );
+      const last = fits.at(-1);
+      return last === undefined || last < span.from
+        ? span
+        : { from: span.from, to: last };
+    };
     reviewOn =
-      pick(aim, weekday, from, true) ??
+      pick(roomy(aim), weekday, from, true) ??
       pick(
-        { from: close.from, to: earlier(close.to, window.endsOn) },
+        roomy({ from: close.from, to: earlier(close.to, window.endsOn) }),
         weekday,
         from,
         false,
@@ -478,11 +492,16 @@ export function planCycleCadence(
   }
   // Two working days after the review, the retrospective (§8, P9-T20b-a):
   // long enough for the scores to settle, short enough that the room still
-  // remembers them.
+  // remembers them. Never past the span the coverage accepts, or the close
+  // would read as unbooked and every later plan would book another one.
   if (split && reviewOn && !holds("retrospective")) {
+    const settled = workingDaysAfter(reviewOn, 2);
+    const room = daysOf({ from: reviewOn, to: close.to }).filter(
+      (on) => on > reviewOn && isWorkingDay(on),
+    );
     plan.push({
       kind: "quarterly",
-      on: workingDaysAfter(reviewOn, 2),
+      on: settled <= close.to ? settled : (room.at(-1) ?? reviewOn),
       part: "retrospective",
     });
   }

@@ -162,6 +162,11 @@ export interface GoalSnapshot {
   readonly contributionStatement: string | null;
   /** Why it stands alone, which gate 3 accepts as mapped (§4.5, P9-T16b-a). */
   readonly standaloneReason?: string | null;
+  /**
+   * The unit OBJ-5 counts within: a team, a department, a person, or the
+   * company. Left out, every objective at the same level is one unit.
+   */
+  readonly unit?: string;
   readonly keyResults: readonly KeyResultSnapshot[];
 }
 
@@ -642,8 +647,10 @@ function goalVerdicts(
           championId: goal.championId,
           reviewerId: goal.reviewerId,
           reviewerRequired: practice.reviewer === "required",
-          objectivesInUnit: goals.filter((other) => other.level === goal.level)
-            .length,
+          // §4.1: per unit, never a workspace total at the level.
+          objectivesInUnit: goals.filter(
+            (other) => other.level === goal.level && other.unit === goal.unit,
+          ).length,
           level,
         },
         thresholds,

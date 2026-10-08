@@ -165,6 +165,14 @@ describe("the refusals that are not about wording", () => {
     );
     expect(verdict("OBJ-5", failed)).toBe("warn");
   });
+
+  it("holds the company level to its own cap of five, not the unit cap of three", () => {
+    const four = evaluateObjective(
+      { ...base, hasCycle: true, objectivesInUnit: 4, level: "company" },
+      thresholds,
+    );
+    expect(verdict("OBJ-5", four)).toBe("pass");
+  });
 });
 
 describe("the strength score", () => {
@@ -492,6 +500,28 @@ describe("the checks METHOD.md words but corpus entry 4 does not exercise", () =
       thresholds,
     );
     expect(krVerdict("KR-7", result)?.status).toBe("fail");
+  });
+
+  it("asks whether a metric with a direction and equal numbers is a maintain or a milestone (§3.1)", () => {
+    const result = evaluateKeyResults(
+      {
+        keyResults: [one({ direction: "increase", baseline: 50, target: 50 })],
+      },
+      thresholds,
+    );
+    const kr7 = krVerdict("KR-7", result);
+    expect(kr7?.status).toBe("warn");
+    expect(kr7?.prompt).toMatch(/maintain key result/);
+  });
+
+  it("does not say the numbers are equal when the baseline is missing", () => {
+    const result = evaluateKeyResults(
+      { keyResults: [one({ direction: null, baseline: null, target: 60 })] },
+      thresholds,
+    );
+    const kr7 = krVerdict("KR-7", result);
+    expect(kr7?.status).toBe("fail");
+    expect(kr7?.prompt).not.toMatch(/are the same/);
   });
 
   it("passes KR-7 on a metric whose direction its numbers give", () => {

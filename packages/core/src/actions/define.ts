@@ -145,6 +145,12 @@ export interface ActionCallContext {
    */
   readonly bulk?: boolean;
   /**
+   * The proposal this call applies, when a person applies one (P4-T05c).
+   * Set by the actions that apply proposals and by nothing else, so a write
+   * can say in its audit row whether a person made it or accepted it.
+   */
+  readonly proposalId?: string;
+  /**
    * Where to record that this call happened, when the host has a meter to
    * give (P7-T06a).
    *

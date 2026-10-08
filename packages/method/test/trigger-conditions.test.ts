@@ -109,10 +109,13 @@ describe("streak.at_risk", () => {
 
 describe("cycle.phase_blocked", () => {
   it("reads each phase's window from the §2.4 timeline", () => {
-    // Quarterly: phases 1 and 2 in week 3, 3 and 4 in week 2, 5 in week 1.
-    expect(phasesClosingToday("quarterly", 14)).toEqual([1, 2]);
-    expect(phasesClosingToday("quarterly", 7)).toEqual([3, 4]);
-    expect(phasesClosingToday("quarterly", 0)).toEqual([5]);
+    // Quarterly, as §2.4 prints it: phase 1 four weeks before, so due three
+    // weeks out; phase 2 two weeks before, due one week out; phases 3 to 5
+    // by the start. The teams' step runs after the start and closes nothing.
+    expect(phasesClosingToday("quarterly", 21)).toEqual([1]);
+    expect(phasesClosingToday("quarterly", 14)).toEqual([]);
+    expect(phasesClosingToday("quarterly", 7)).toEqual([2]);
+    expect(phasesClosingToday("quarterly", 0)).toEqual([3, 4, 5]);
     expect(phasesClosingToday("quarterly", 10)).toEqual([]);
     // Annual: phase 1 runs 6 to 5 weeks before, so it is due four weeks out.
     expect(phasesClosingToday("annual", 28)).toEqual([1]);

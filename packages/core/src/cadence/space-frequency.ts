@@ -16,6 +16,7 @@
 import { activeOnly, goals, spaces, type WorkspaceTx } from "@openokr/db";
 import type { CheckInFrequency, ResolvedThresholds } from "@openokr/method";
 import { and, eq, isNull, or } from "drizzle-orm";
+import { followGoalDueInTx } from "./blockers.ts";
 import { stampFirstDue } from "./service.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -167,6 +168,13 @@ export async function followSpaceFrequencyInTx<
       input.thresholds,
       input.now,
     );
+    // A blocker is due by the goal's next check-in, so it moves with it when
+    // a slower rhythm puts that later (§7.3).
+    await followGoalDueInTx(tx as WorkspaceTx, {
+      workspaceId: input.workspaceId,
+      goalId: goal.id,
+      now: input.now,
+    });
   }
   return moved.length;
 }

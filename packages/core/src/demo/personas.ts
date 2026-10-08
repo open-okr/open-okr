@@ -46,6 +46,9 @@ import { withProvisioningAuthority } from "../auth/provisioning-authority.ts";
 import { OperationError } from "../operations/errors.ts";
 import { runOperation } from "../operations/operation.ts";
 import { INVENTED_CAST } from "./cast.ts";
+import { LAST_QUARTER } from "./last-quarter.ts";
+import { ANNUAL_OBJECTIVES } from "./year/annual.ts";
+import { toReal } from "./year/calendar.ts";
 import { YEAR_PEOPLE } from "./year/people.ts";
 
 type Auth = ReturnType<typeof createAuth>;
@@ -64,6 +67,11 @@ export interface DemoPersona {
   readonly name: string;
   readonly email: string;
   readonly title: string;
+  /**
+   * The scenario day they join the story, for the people the year adds. A
+   * persona is not offered before it: there is no account to sign in to.
+   */
+  readonly arrives?: string;
 }
 
 /**
@@ -80,6 +88,7 @@ const YEAR_CAST: readonly DemoPersona[] = YEAR_PEOPLE.filter(
   name: person.name,
   email: `${person.key}@northwind.example`,
   title: person.title,
+  arrives: person.arrives,
 }));
 
 /**
@@ -99,6 +108,21 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
   })),
   ...YEAR_CAST,
 ];
+
+/**
+ * The personas a visitor can sign in as on a local date: everybody the year
+ * has brought in by then. Placed on the real calendar the way the seed places
+ * the year, so the list and the accounts `demo:prepare` gives agree: Yuki,
+ * who joins in April, is not offered in March.
+ */
+export function demoPersonasOn(today: string): readonly DemoPersona[] {
+  const realYear = Number(today.slice(0, 4));
+  return DEMO_PERSONAS.filter(
+    (persona) =>
+      persona.arrives === undefined ||
+      toReal(persona.arrives, realYear) <= today,
+  );
+}
 
 export interface PrepareDemoPersonasInput {
   readonly pool: Pool;
@@ -223,19 +247,29 @@ export async function prepareDemoPersonas(
 }
 
 /**
+ * The company objectives only the demo builders write: the one-quarter
+ * demo's closed quarter and the Northwind year's annual objectives, which
+ * each build writes before anything else of its own and never renames.
+ */
+const DEMO_COMPANY_TITLES: ReadonlySet<string> = new Set([
+  ...LAST_QUARTER.map((objective) => objective.title),
+  ...ANNUAL_OBJECTIVES.map((objective) => objective.title),
+]);
+
+/**
  * The guard.
  *
- * The same test the builder uses for its own idempotence, read the other way
- * round: company objectives are what the demo builder always writes and what
- * nothing else creates on a fresh workspace, so their absence means this
- * workspace is not a demo and must not be given invented accounts.
+ * Not "holds a company objective", which nearly every real workspace does,
+ * but "holds one of the demo's own": a workspace somebody runs for real would
+ * otherwise have any member whose name matched the cast given an invented
+ * account with a published password, and its agents put in sandbox.
  */
 async function refuseUnlessSeeded(context: Context): Promise<void> {
   const existing = await callAction(context, "goals.list", {
     includeClosed: true,
     level: "company",
   });
-  if (existing.goals.length === 0) {
+  if (!existing.goals.some((goal) => DEMO_COMPANY_TITLES.has(goal.title))) {
     throw new OperationError(
       "not_found",
       "This workspace holds no demo content. Run `pnpm db:seed` first. Personas are only ever given to a workspace the demo builder built.",

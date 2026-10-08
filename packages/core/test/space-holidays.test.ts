@@ -176,6 +176,32 @@ describe("no check-in is due in a holiday", () => {
     expect(await nextDueOf(goalId)).toBe(addDays(dueOn, 7));
   });
 
+  it("moves the goal's open blockers with it, since they are due by that check-in (§7.3)", async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      `insert into blockers
+         (id, workspace_id, goal_id, type, owner_id, next_action, opened_at, due_at)
+       select gen_random_uuid(), workspace_id, id, 'dependency', $2,
+              'Ask Platform for the release date', now(), next_check_in_at
+         from goals where id = $1
+       returning id`,
+      [goalId, ownerMemberId],
+    );
+    const blockerId = rows[0]?.id as string;
+    await call("spaces.setHolidays", {
+      id: spaceId,
+      holidays: [weekOf(dueOn)],
+    });
+    const { rows: after } = await wb.admin.query<{ same: boolean }>(
+      `select b.due_at = g.next_check_in_at as same
+         from blockers b join goals g on g.id = b.goal_id
+        where b.id = $1`,
+      [blockerId],
+    );
+    expect(after[0]?.same).toBe(true);
+    expect(await nextDueOf(goalId)).toBe(addDays(dueOn, 7));
+  });
+
   it("leaves a goal due outside every holiday where it was", async () => {
     const result = await call<{ moved: number }>("spaces.setHolidays", {
       id: spaceId,

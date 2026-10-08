@@ -47,6 +47,10 @@ export interface DraftGoal {
   readonly id: string;
   readonly title: string;
   readonly level: string;
+  /** Who owns it, which is the unit OBJ-5 counts within (METHOD.md §4.1). */
+  readonly ownerKind?: string;
+  readonly spaceId?: string | null;
+  readonly memberId?: string | null;
   /** Committed or aspirational (METHOD.md §2.8). */
   readonly kind: "committed" | "aspirational";
   readonly progressPct: number;
@@ -72,6 +76,28 @@ export interface DraftGoal {
     readonly confidence: number | null;
     readonly kind: "metric" | "maintain" | "milestone" | "baseline";
   }[];
+}
+
+/** The unit OBJ-5 counts within: the owning space, the owning person, or the company. */
+function unitOf(goal: DraftGoal): string {
+  if (goal.ownerKind === "space" && goal.spaceId) {
+    return `space:${goal.spaceId}`;
+  }
+  if (goal.ownerKind === "member" && goal.memberId) {
+    return `member:${goal.memberId}`;
+  }
+  return "company";
+}
+
+/** How many objectives share this one's level and unit, itself included. */
+export function objectivesInUnit(
+  goals: readonly DraftGoal[],
+  goal: DraftGoal,
+): number {
+  const unit = unitOf(goal);
+  return goals.filter(
+    (other) => other.level === goal.level && unitOf(other) === unit,
+  ).length;
 }
 
 const HEALTH_TONE: Readonly<
@@ -231,12 +257,9 @@ export async function Drafting({
                 hasTimeframe: false,
                 championId: goal.champion.id,
                 reviewerId: goal.reviewer?.id ?? null,
-                // Every objective on this screen belongs to the cycle being
-                // drafted, and they share a level per row, so the count the
-                // per-unit cap reads is the number on screen at this level.
-                objectivesInUnit: goals.filter(
-                  (other) => other.level === goal.level,
-                ).length,
+                // OBJ-5 counts within the objective's own unit at its level,
+                // the way the stored verdict does, never across every space.
+                objectivesInUnit: objectivesInUnit(goals, goal),
                 level: goal.level as
                   | "company"
                   | "department"

@@ -260,6 +260,12 @@ export const updatePractice = defineWriteAction({
         delete next[key];
       }
       for (const [key, value] of Object.entries(valid)) {
+        // A reset was validated by its default only to prove the key is a
+        // setting. It removes the override, so the profile's value applies,
+        // and writing the default here would store it as a new override.
+        if (resets.includes(key)) {
+          continue;
+        }
         // A change that equals the profile's own value is not a change, and
         // storing it would freeze it: it would keep winning after the profile
         // or the default itself moved. So it is dropped, which is also how a

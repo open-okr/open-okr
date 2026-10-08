@@ -331,6 +331,7 @@ export async function runDueNudgesInTx(
           workspaceId,
           cycleId,
           thresholds,
+          now: at,
           ...scoped,
         })
       ).found;

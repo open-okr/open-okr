@@ -1397,6 +1397,12 @@ export const setAnnualFrame = defineWriteAction({
           changed.push("strategies");
         }
         replaceStrategies = changed.includes("strategies");
+        // Withdrawing the agreement is itself a revision of an agreed frame:
+        // otherwise a frame could be taken back to draft, rewritten with no
+        // history and agreed again, and nobody would know why it changed.
+        if (current.agreed && input.agreed === false) {
+          changed.push("agreed");
+        }
 
         // A draft keeps no history; an agreed frame keeps every revision.
         if (current.agreed && changed.length > 0) {
@@ -1409,7 +1415,11 @@ export const setAnnualFrame = defineWriteAction({
           const before = Object.fromEntries(
             changed.map((field) => [
               field,
-              field === "strategies" ? priorStrategies : current[field],
+              field === "strategies"
+                ? priorStrategies
+                : field === "agreed"
+                  ? true
+                  : current[field],
             ]),
           );
           await tx.insert(annualFrameRevisions).values({

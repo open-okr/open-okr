@@ -53,9 +53,10 @@ try {
   const result = await pool.query<{
     workspace_id: string;
     user_id: string;
+    member_id: string;
     name: string;
   }>(
-    `select w.id as workspace_id, w.name, wm.user_id
+    `select w.id as workspace_id, w.name, wm.user_id, wm.id as member_id
        from workspaces w
        join workspace_members wm on wm.workspace_id = w.id
       where w.deleted_at is null
@@ -79,6 +80,7 @@ try {
       pool,
       workspaceId: row.workspace_id,
       adminUserId: row.user_id,
+      adminMemberId: row.member_id,
     });
     write("");
     write(

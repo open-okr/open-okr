@@ -172,13 +172,54 @@ describe("people.setLeave, people.setMemberLeave and people.leave", () => {
       call("people.setLeave", {
         leave: [
           {
-            startsOn: "2026-08-23",
-            endsOn: "2026-08-27",
+            startsOn: addDays(today(), 5),
+            endsOn: addDays(today(), 9),
             delegateId: suspendedId,
           },
         ],
       }),
-    ).rejects.toThrow(/active member/);
+    ).rejects.toThrow(/not an active member/);
+  });
+
+  it("keeps leave already over as it was, whoever stood in, and lets more be added", async () => {
+    // A past span naming somebody since suspended is history, not a choice
+    // being made now, so it does not block the leave being added after it.
+    await call("people.setLeave", {
+      leave: [
+        {
+          startsOn: addDays(today(), -40),
+          endsOn: addDays(today(), -30),
+          delegateId: suspendedId,
+        },
+        {
+          startsOn: addDays(today(), 5),
+          endsOn: addDays(today(), 9),
+          delegateId: priyaId,
+        },
+      ],
+    });
+    expect(
+      await call<unknown[]>("people.leave", { memberId: saraId }),
+    ).toHaveLength(2);
+    // Twenty spans of history never stop the twenty-first being added.
+    const history = Array.from({ length: 25 }, (_, n) => ({
+      startsOn: addDays(today(), -400 + n * 10),
+      endsOn: addDays(today(), -398 + n * 10),
+      delegateId: priyaId,
+    }));
+    await call("people.setLeave", {
+      leave: [
+        ...history,
+        {
+          startsOn: addDays(today(), 5),
+          endsOn: addDays(today(), 9),
+          delegateId: priyaId,
+        },
+      ],
+    });
+    expect(
+      await call<unknown[]>("people.leave", { memberId: saraId }),
+    ).toHaveLength(26);
   });
 
   it("refuses leave that ends before it starts, and replaces the list whole", async () => {
@@ -240,6 +281,60 @@ describe("the delegate answers for the reviewer (acceptance)", () => {
     expect(asked.length).toBeGreaterThan(0);
     expect(asked.map((row) => row.recipient_member_id)).toContain(priyaId);
     expect(asked.map((row) => row.recipient_member_id)).not.toContain(meiId);
+  });
+});
+
+describe("the delegate closes what was owed before the leave began", () => {
+  it("lets the stand-in acknowledge a check-in published while the reviewer was still here", async () => {
+    const wb = await workerDb();
+    const PRIYA = "leave-priya";
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      [PRIYA, "Priya", "leave-priya@example.com"],
+    );
+    // A teammate who can edit the goal, as a stand-in in the same space
+    // would be; the rule under test is who may close the loop, not access.
+    await wb.admin.query(
+      `update workspace_members
+          set user_id = $1,
+              role_id = (select role_id from workspace_members where id = $3)
+        where id = $2`,
+      [PRIYA, priyaId, saraId],
+    );
+    const goalId = await createGoal(meiId);
+    const draft = await call<{ id: string }>("goals.startCheckIn", { goalId });
+    await call("goals.publishCheckIn", {
+      id: draft.id,
+      status: "on_track",
+      confidence: 0.6,
+      narrative: richText("Activation is moving."),
+    });
+    // Mei goes on leave after it was published, so Mei is its reviewer of
+    // record and Priya stands in.
+    await call("people.setMemberLeave", {
+      memberId: meiId,
+      leave: [
+        {
+          startsOn: addDays(today(), -1),
+          endsOn: addDays(today(), 10),
+          delegateId: priyaId,
+        },
+      ],
+    });
+    await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", userId: PRIYA },
+      },
+      "goals.acknowledgeCheckIn",
+      { id: draft.id },
+    );
+    const { rows } = await wb.admin.query<{ by: string }>(
+      "select acknowledged_by_id as by from check_ins where id = $1",
+      [draft.id],
+    );
+    expect(rows[0]?.by).toBe(priyaId);
   });
 });
 

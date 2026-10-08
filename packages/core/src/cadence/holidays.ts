@@ -24,6 +24,7 @@ import {
   parseLocalDate,
 } from "../cycles/generation.ts";
 import { workspaceTimeZone } from "../cycles/service.ts";
+import { followGoalDueInTx } from "./blockers.ts";
 import { cadence, dueInstant } from "./engine.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -129,6 +130,12 @@ export async function clearOpenGoalsOfHolidaysInTx<
         updatedAt: input.now,
       })
       .where(activeOnly(goals, eq(goals.id, goal.id)));
+    // A blocker is due by that check-in, so it moves with it (§7.3).
+    await followGoalDueInTx(tx as WorkspaceTx, {
+      workspaceId: input.workspaceId,
+      goalId: goal.id,
+      now: input.now,
+    });
     moved += 1;
   }
   return moved;

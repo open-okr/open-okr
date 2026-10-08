@@ -371,6 +371,27 @@ describe("aggregation", () => {
 });
 
 describe("rendering", () => {
+  it("says the numbers a payload carries as numbers", () => {
+    expect(renderActivity("session.winsNamed", { count: 3 })).toBe(
+      "Named 3 wins for the week",
+    );
+    expect(renderActivity("session.winsNamed", { count: 1 })).toBe(
+      "Named one win for the week",
+    );
+    expect(renderActivity("member.leaveSet", { name: "Mei", count: 0 })).toBe(
+      "Mei has no leave marked",
+    );
+    expect(renderActivity("member.leaveSet", { name: "Mei", count: 2 })).toBe(
+      "Mei marked their leave",
+    );
+    expect(
+      renderActivity("channel.templatesSynced", { recorded: 4, withdrawn: 1 }),
+    ).toBe("Synced 4 WhatsApp templates, withdrawing 1");
+    expect(renderActivity("session.commitmentsSet", { count: 3 })).toBe(
+      "Set 3 commitments for this week",
+    );
+  });
+
   it("renders a registered kind's payload into a readable sentence", () => {
     expect(renderActivity("member.suspended", { name: "Jane Doe" })).toBe(
       "Jane Doe was suspended",

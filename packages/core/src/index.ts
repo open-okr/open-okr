@@ -715,6 +715,7 @@ export {
   DEMO_PERSONA_PASSWORD,
   DEMO_PERSONAS,
   type DemoPersona,
+  demoPersonasOn,
   type PrepareDemoPersonasInput,
   type PrepareDemoPersonasResult,
   type PreparedPersona,

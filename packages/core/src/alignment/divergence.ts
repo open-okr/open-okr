@@ -76,8 +76,14 @@ export async function sweepDivergenceInTx(
     readonly thresholds: ResolvedThresholds;
     /** The Coach this reads as (completeness review H-04). */
     readonly scope?: AgentScope;
+    /**
+     * The run's own time, so a run replayed at a date judges pace and stalls
+     * at that date rather than at the machine's. Left out, now.
+     */
+    readonly now?: Date;
   },
 ): Promise<DivergenceSweepResult> {
+  const at = input.now ?? new Date();
   const open = await tx
     .select({
       id: goals.id,
@@ -99,7 +105,7 @@ export async function sweepDivergenceInTx(
 
   // §3.7 (P9-T15a): the signal the data gives is read against the progress
   // expected for the date, so a young cycle does not read as diverging.
-  const pace = await paceInTx(tx, input.workspaceId, input.cycleId);
+  const pace = await paceInTx(tx, input.workspaceId, input.cycleId, at);
   for (const goal of open) {
     const measures = await tx
       .select({
@@ -158,7 +164,7 @@ export async function sweepDivergenceInTx(
         (measure) => measure.kind === "metric" && !held.has(measure.id),
       );
       const moved = await lastMovedAtInTx(tx, input.workspaceId, metrics);
-      const now = Date.now();
+      const now = at.getTime();
       for (const measure of metrics) {
         const stalled = stalledWhileOnTrack(
           {

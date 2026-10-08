@@ -527,6 +527,30 @@ describe("checking in", () => {
     );
   });
 
+  test("records a first baseline of zero, though the key result already reads zero (§2.10)", async () => {
+    await render({
+      address: "?okr=g&tab=check-in",
+      keyResults: [
+        keyResult({ kind: "baseline", doneAt: null, currentValue: 0 }),
+      ],
+    });
+    await fill(
+      inDrawer(`Value for ${KR} in this check-in`) as HTMLInputElement,
+      "0",
+    );
+    await fill(
+      form()?.querySelector("textarea") as HTMLTextAreaElement,
+      "Measured the backlog for the first time: none waiting.",
+    );
+    await submit();
+    expect(runOkrMutation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "checkIn",
+        values: [{ keyResultId: "k", value: 0 }],
+      }),
+    );
+  });
+
   test("a commitment set below the floor is told so before it is published (P9-T11b-c)", async () => {
     await render({ address: "?okr=g&tab=check-in", kind: "committed" });
     const floor = () =>

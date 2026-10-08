@@ -245,3 +245,61 @@ describe("the reviews", () => {
     ]);
   });
 });
+
+describe("moving an objective into a running cycle", () => {
+  async function ownTimeframe() {
+    return (
+      await call<{ id: string }>("goals.create", {
+        title: "Make the first week the reason teams renew",
+        timeframe: {
+          startsOn: "2026-01-01",
+          endsOn: "2026-06-30",
+          label: "This half",
+        },
+        level: "team",
+        ownerKind: "workspace",
+        championId: ownerMemberId,
+      })
+    ).id;
+  }
+
+  it("marks it started mid-cycle, as creating it there would", async () => {
+    await cycleStarted(35, true);
+    const goalId = await ownTimeframe();
+    expect(await markOf(goalId)).toBeNull();
+    await call("goals.moveToCycle", { id: goalId, cycleId });
+    expect(await markOf(goalId)).not.toBeNull();
+  });
+
+  it("asks the reason the workspace requires, and keeps it", async () => {
+    await cycleStarted(35, true);
+    await call("practice.update", {
+      overrides: { "reasons.midCycleAddition": "required" },
+    });
+    const goalId = await ownTimeframe();
+    await expect(
+      call("goals.moveToCycle", { id: goalId, cycleId }),
+    ).rejects.toThrow(/asks why anything is added mid-cycle/);
+    await call("goals.moveToCycle", {
+      id: goalId,
+      cycleId,
+      reason: "Pulled into the quarter after the renewal review",
+    });
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ payload: Record<string, unknown> }>(
+      "select payload from activities where subject_id = $1 and kind = 'goal.moved_to_cycle'",
+      [goalId],
+    );
+    expect(rows[0]?.payload).toMatchObject({
+      addedMidCycle: true,
+      reason: "Pulled into the quarter after the renewal review",
+    });
+  });
+
+  it("refuses a level the cycle does not use, on a move or an edit", async () => {
+    const goalId = await objective();
+    await expect(
+      call("goals.update", { id: goalId, level: "individual" }),
+    ).rejects.toThrow(/has no place in it/);
+  });
+});

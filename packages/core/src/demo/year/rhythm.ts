@@ -11,7 +11,6 @@ import { keyResultProgress, resolveThresholds } from "@openokr/method";
 import { eq } from "drizzle-orm";
 import { callAction } from "../../actions/registry.ts";
 import { runOperation } from "../../operations/operation.ts";
-import { isoDay } from "./calendar.ts";
 import { narrative } from "./okr.ts";
 import {
   YEAR_SPACES,
@@ -159,6 +158,16 @@ export const weeklyCheckIns = (
         week > (objective.until ?? week) ||
         (week - from) % (objective.every ?? 1) !== 0 ||
         objective.skip?.includes(week)
+      ) {
+        continue;
+      }
+      // A check-in published later in the week than the round it belongs to
+      // has not happened yet on the days in between: written now, it would
+      // stand in the workspace dated after today (§1 of the seed's design).
+      if (
+        (run.publishedOn?.(objective, monday) ?? monday) !== monday &&
+        context.real(run.publishedOn?.(objective, monday) ?? monday) >
+          context.today
       ) {
         continue;
       }
@@ -410,9 +419,54 @@ export async function bookRhythm(
   const cycle = (await callAction(context.action, "cycles.list", {})).find(
     (one) => one.id === cycleId,
   );
-  if (!cycle || cycle.endsOn < isoDay(new Date())) {
+  if (!cycle || cycle.endsOn < context.today) {
     return;
   }
+  // The quarter under way today is booked last, once the rest of the year to
+  // date has run: a booking made at the plan would keep weekly sessions for a
+  // space that later moved to every two weeks, sessions in holiday weeks
+  // marked after it, and sessions for a space archived since.
+  if (cycle.startsOn <= context.today) {
+    context.deferredBookings.push({ cycleKey, spaces });
+    return;
+  }
+  await bookSpaces(context, cycleId, spaces);
+}
+
+/** The bookings `bookRhythm` held back, for the spaces still standing. */
+export async function bookDeferredRhythms(context: YearContext): Promise<void> {
+  if (context.deferredBookings.length === 0) {
+    return;
+  }
+  const standing = new Set(
+    (await callAction(context.action, "spaces.list", {})).map(
+      (space) => space.id,
+    ),
+  );
+  const cycles = await callAction(context.action, "cycles.list", {});
+  for (const booking of context.deferredBookings) {
+    const cycleId = need(context.ids.cycles, booking.cycleKey, "Cycle");
+    // A quarter the story has already closed by today owes nothing more: its
+    // rituals are the ones the story held.
+    if (cycles.find((one) => one.id === cycleId)?.status === "closed") {
+      continue;
+    }
+    await bookSpaces(
+      context,
+      cycleId,
+      booking.spaces.filter((key) => {
+        const id = context.ids.spaces.get(key);
+        return id !== undefined && standing.has(id);
+      }),
+    );
+  }
+}
+
+async function bookSpaces(
+  context: YearContext,
+  cycleId: string,
+  spaces: readonly YearSpaceKey[],
+): Promise<void> {
   for (const key of spaces) {
     const space = YEAR_SPACES.find((one) => one.key === key);
     if (!space) {

@@ -302,6 +302,7 @@ export const applyProposal = defineWriteAction({
             userId: context.actor.userId,
             memberId,
           },
+          proposalId: input.id,
         },
         proposal.action as never,
         withoutPreview(proposal.payload as Record<string, unknown>) as never,

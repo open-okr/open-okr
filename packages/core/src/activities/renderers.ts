@@ -14,6 +14,10 @@ export type ActivityRenderer = (payload: Record<string, unknown>) => string;
 const asString = (value: unknown, fallback = ""): string =>
   typeof value === "string" ? value : fallback;
 
+/** A count the payload carries as a number, or the fallback. */
+const asCount = (value: unknown, fallback = 0): number =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
 /** §8.8's five decisions as a feed line says them (P9-T20e-a). */
 const CLOSE_DECISION_PHRASE: Readonly<Record<string, string>> = {
   achieved: "nothing left to carry",
@@ -32,7 +36,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "workspace.state_changed": (p) =>
     `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "support.granted": (p) =>
-    `Support access granted for ${asString(p.hours)} hours`,
+    `Support access granted for ${asCount(p.hours)} hours`,
   "support.ended": (p) => `Support access ended (${asString(p.reason)})`,
   "workspace.lifecycle_changed": (p) =>
     `Workspace lifecycle set to "${asString(p.state)}"`,
@@ -44,7 +48,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `${asString(p.name, "A member")} updated their profile`,
   "member.tour_finished": () => "Finished the first-visit tour",
   "channel.templatesSynced": (p) =>
-    `Synced ${asString(p.recorded, "0")} WhatsApp templates, withdrawing ${asString(p.withdrawn, "0")}`,
+    `Synced ${asCount(p.recorded)} WhatsApp templates, withdrawing ${asCount(p.withdrawn)}`,
   "channel.templateMapped": (p) =>
     `The "${asString(p.ruleKey, "unnamed")}" reminder was pointed at a WhatsApp template`,
   "channel.templateUnmapped": (p) =>
@@ -59,7 +63,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "device.denied": (p) => `${asString(p.clientName, "A terminal")} was refused`,
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
   "member.leaveSet": (p) =>
-    asString(p.count) === "0"
+    asCount(p.count) === 0
       ? `${asString(p.name, "A member")} has no leave marked`
       : `${asString(p.name, "A member")} marked their leave`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
@@ -490,14 +494,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   // Confidence round (P4-T07b)
   "session.voteCast": () => "Cast a confidence vote",
   "session.votesRevealed": (p) =>
-    `Revealed ${asString(p.count, "0")} votes on a key result`,
+    `Revealed ${asCount(p.count)} votes on a key result`,
   "session.confidenceConfirmed": (p) =>
-    `Confirmed confidence at ${asString(p.confidence)}`,
+    `Confirmed confidence at ${asCount(p.confidence)}`,
   // Blockers (P4-T07c)
   "session.winsNamed": (p) =>
-    asString(p.count) === "1"
+    asCount(p.count) === 1
       ? "Named one win for the week"
-      : `Named ${asString(p.count, "0")} wins for the week`,
+      : `Named ${asCount(p.count)} wins for the week`,
   "session.nextActionSet": () => "Named the next action for a low score",
   "session.blockerCreated": (p) => `Opened a ${asString(p.type)} blocker`,
   "session.blockerResolved": (p) => `Resolved a ${asString(p.type)} blocker`,
@@ -505,9 +509,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A ${asString(p.type, "blocker")} blocker was handed to ${asString(p.ownerName, "somebody else")}`,
   // Commitments, digest, streaks (P4-T08)
   "session.commitmentsSet": (p) =>
-    `Set ${asString(p.count, "0")} commitments for this week`,
+    `Set ${asCount(p.count)} commitments for this week`,
   "session.commitmentsClosed": (p) =>
-    `Closed ${asString(p.count, "0")} commitments from last week`,
+    `Closed ${asCount(p.count)} commitments from last week`,
   "session.coordinatorNoteSet": () => "Added a coordinator note to the digest",
   "session.digestPosted": (p) => {
     const named = (Array.isArray(p.channels) ? p.channels : []).map(

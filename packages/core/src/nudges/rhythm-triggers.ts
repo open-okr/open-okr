@@ -169,6 +169,7 @@ export async function dueCriticalConfidenceNudges(
       keyResultId: sessionConfidences.keyResultId,
       sessionId: sessionConfidences.sessionId,
       confidence: sessionConfidences.confirmedConfidence,
+      previous: sessionConfidences.previousConfidence,
       createdAt: sessionConfidences.createdAt,
     })
     .from(sessionConfidences)
@@ -207,6 +208,14 @@ export async function dueCriticalConfidenceNudges(
       )
       .orderBy(desc(sessionConfidences.createdAt));
     for (const row of confirmed) {
+      // What it held just before the session confirmed it, recorded on the
+      // row since migration 0138. A row written before that falls back to
+      // the last session's confirmation, which misses a check-in or a draft
+      // in between, and is the best an older row can say.
+      if (row.previous !== null) {
+        consider(row.goalId, Number(row.previous), Number(row.confidence));
+        continue;
+      }
       const before = earlier.find(
         (one) =>
           one.keyResultId === row.keyResultId &&

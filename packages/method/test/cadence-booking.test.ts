@@ -343,4 +343,36 @@ describe("the annual review", () => {
       { kind: "quarterly", on: "2027-12-10", part: "retrospective" },
     ]);
   });
+
+  it("keeps the retrospective inside the span the close accepts, whatever the anchor", () => {
+    // 2026's span ends on 10 December, a Thursday: a review on the Wednesday
+    // or the Thursday would put its retrospective two working days later,
+    // outside it, and the close would never read as booked.
+    const year2026 = { startsOn: "2026-01-01", endsOn: "2026-12-31" } as const;
+    for (const weekday of [1, 2, 3, 4, 5] as const) {
+      const split = planCycleCadence(year2026, {
+        weekday,
+        from: year2026.startsOn,
+        existing: [],
+        cycleMode: "annual",
+        reviewFormat: "split",
+      });
+      expect(
+        cadenceCoverage(year2026, split, {
+          cycleMode: "annual",
+          reviewFormat: "split",
+        }),
+      ).toEqual({ booked: true, missing: [] });
+      // And a second plan books nothing more.
+      expect(
+        planCycleCadence(year2026, {
+          weekday,
+          from: year2026.startsOn,
+          existing: split,
+          cycleMode: "annual",
+          reviewFormat: "split",
+        }),
+      ).toEqual([]);
+    }
+  });
 });

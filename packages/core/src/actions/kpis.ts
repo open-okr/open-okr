@@ -28,6 +28,7 @@ import {
   newId,
   proposedChanges,
   spaces,
+  tasks,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
@@ -270,7 +271,9 @@ async function namedOwner(
       "No such member. A KPI's owner is a person who is still here.",
     );
   }
-  if (member.kind !== "human") {
+  // A person who has not signed in yet, as an import leaves them, is still
+  // a person: only an agent cannot be accountable for a number.
+  if (member.kind === "agent") {
     throw new OperationError(
       "forbidden",
       "A KPI is owned by a person, not an agent.",
@@ -1377,6 +1380,25 @@ export const recordKpiResponse = defineWriteAction({
           resourceId: input.taskId,
           requires: ACCESS_LEVELS.view,
         });
+        // A task already done is a fix that happened, not one under way, so
+        // it answers nothing about the KPI as it stands.
+        const [task] = await tx
+          .select({ status: tasks.status })
+          .from(tasks)
+          .where(
+            activeOnly(
+              tasks,
+              eq(tasks.workspaceId, workspaceId),
+              eq(tasks.id, input.taskId),
+            ),
+          )
+          .limit(1);
+        if (task?.status === "done") {
+          throw new OperationError(
+            "forbidden",
+            "That task is already done, so it cannot be how the KPI is being fixed now. Name a task still open, or open a new one.",
+          );
+        }
         subjectId = input.taskId;
       } else {
         if (!input.keyResultId) {
@@ -1386,8 +1408,9 @@ export const recordKpiResponse = defineWriteAction({
           );
         }
         const [keyResult] = await tx
-          .select({ goalId: keyResults.goalId })
+          .select({ goalId: keyResults.goalId, closedAt: goals.closedAt })
           .from(keyResults)
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
           .where(
             activeOnly(
               keyResults,
@@ -1398,6 +1421,14 @@ export const recordKpiResponse = defineWriteAction({
           .limit(1);
         if (!keyResult) {
           throw new OperationError("not_found", "No such key result.");
+        }
+        // A closed objective moves nothing any more, so its key result
+        // cannot be what answers the KPI from here on.
+        if (keyResult.closedAt !== null) {
+          throw new OperationError(
+            "forbidden",
+            "That key result's objective is closed, so it cannot answer the KPI. Choose a key result on an open objective.",
+          );
         }
         await getAccessScoped(tx, {
           workspaceId,

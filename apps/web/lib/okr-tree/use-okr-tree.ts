@@ -155,6 +155,12 @@ export interface FailedChange {
   readonly error: string;
 }
 
+/** This tab, so it can tell its own announcements from another tab's. */
+const TAB =
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : String(Math.random());
+
 export function useOkrMutation(input: {
   readonly cycleId: string;
   readonly scope: OkrScope;
@@ -172,9 +178,26 @@ export function useOkrMutation(input: {
       return;
     }
     const channel = new BroadcastChannel(OKR_CHANNEL);
-    channel.postMessage({ cycleId: input.cycleId });
+    // Signed with this tab, whose own listener ignores it: the write has
+    // already put its result in this tab's cache, and re-reading the tree
+    // here would only risk overwriting an edit still on its way.
+    channel.postMessage({ cycleId: input.cycleId, from: TAB });
     channel.close();
   }, [input.cycleId]);
+
+  /**
+   * Puts back what was on screen before a change the server did not take,
+   * then re-reads it. The snapshot was taken when the change started, so
+   * another edit that succeeded in the meantime is missing from it; the
+   * re-read brings those results back rather than leaving them rolled back
+   * with this one.
+   */
+  const rollBack = (previous: OkrTree | undefined) => {
+    if (previous) {
+      queryClient.setQueryData(key, previous);
+    }
+    void queryClient.invalidateQueries({ queryKey: key });
+  };
 
   const mutation = useMutation<
     OkrOutcome,
@@ -194,16 +217,12 @@ export function useOkrMutation(input: {
       return { previous };
     },
     onError: (_error, _change, saved) => {
-      if (saved?.previous) {
-        queryClient.setQueryData(key, saved.previous);
-      }
+      rollBack(saved?.previous);
       setProblem(t("okrTree.couldNotSave"));
     },
     onSuccess: (outcome, change, saved) => {
       if (!outcome.ok) {
-        if (saved?.previous) {
-          queryClient.setQueryData(key, saved.previous);
-        }
+        rollBack(saved?.previous);
         if (outcome.conflict) {
           setConflict({ mutation: change, conflict: outcome.conflict });
           return;
@@ -359,8 +378,11 @@ export function useOkrLive(cycleId: string): void {
     let channel: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {
       channel = new BroadcastChannel(OKR_CHANNEL);
-      channel.onmessage = (event: MessageEvent<{ cycleId?: string }>) => {
-        if (event.data?.cycleId === cycleId) {
+      channel.onmessage = (
+        event: MessageEvent<{ cycleId?: string; from?: string }>,
+      ) => {
+        // Another tab's write; this tab's own already merged its result.
+        if (event.data?.cycleId === cycleId && event.data.from !== TAB) {
           invalidate();
         }
       };

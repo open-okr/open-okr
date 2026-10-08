@@ -212,6 +212,19 @@ describe("published by its owner", () => {
     expect((await waiting(await reviewedObjective())).draftState).toBeNull();
   });
 
+  it("refuses to publish a draft that was stopped before it went live", async () => {
+    await cycleStarted(35);
+    await startsAs("ownerDraft");
+    const goalId = await reviewedObjective();
+    await call("goals.stop", {
+      id: goalId,
+      reason: "The team folded into Sales",
+    });
+    await expect(call("goals.publishDraft", { id: goalId })).rejects.toThrow(
+      /is closed, so its draft cannot go live/,
+    );
+  });
+
   it("refuses to publish what is not a draft", async () => {
     await cycleStarted(35);
     const goalId = await reviewedObjective();
@@ -251,6 +264,28 @@ describe("approved by its reviewer", () => {
     expect((await activityKinds(goalId)).map((row) => row.kind)).toEqual(
       expect.arrayContaining(["goal.draft_published", "goal.draft_approved"]),
     );
+  });
+
+  it("defaults a required reviewer to the writer's manager, not the writer", async () => {
+    await call("practice.update", { overrides: { reviewer: "required" } });
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set manager_id = $1 where id = $2",
+      [teammateMemberId, ownerMemberId],
+    );
+    const goalId = (
+      await call<{ id: string }>("goals.create", {
+        title: "Make self-serve a second engine of growth",
+        cycleId,
+        spaceId,
+        level: "team",
+        ownerKind: "space",
+      })
+    ).id;
+    const read = await call<{ reviewer: { id: string } | null }>("goals.read", {
+      id: goalId,
+    });
+    expect(read.reviewer?.id).toBe(teammateMemberId);
   });
 
   it("asks for a reviewer before its owner can publish it", async () => {

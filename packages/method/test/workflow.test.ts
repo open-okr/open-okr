@@ -994,6 +994,49 @@ describe("phase 4 and gate 2 over the drafted set", () => {
     expect(canPublish(gates)).toBe(false);
   });
 
+  it("counts OBJ-5 per unit and lets the company hold five (§2.7)", () => {
+    const blocking = resolvePractice("recommended", {
+      "checks.OBJ-5": "block",
+    });
+    const title = goal().title;
+    // Four company objectives: within the company's own cap of five.
+    const company = [1, 2, 3, 4].map((n) => ({
+      ...judged(title),
+      id: `c${n}`,
+      unit: "company",
+    }));
+    const companyGate = publishGates(
+      base({ goals: company, practice: blocking }),
+      thresholds,
+    ).find((entry) => entry.gateKey === 2);
+    expect(companyGate?.detail.missing ?? []).not.toContainEqual(
+      expect.stringMatching(/^OBJ-5/),
+    );
+    // Four teams with one objective each: nobody is over three.
+    const teams = [1, 2, 3, 4].map((n) => ({
+      ...judged(title),
+      id: `t${n}`,
+      level: "team",
+      unit: `space:${n}`,
+    }));
+    const teamGate = publishGates(
+      base({ goals: teams, practice: blocking }),
+      thresholds,
+    ).find((entry) => entry.gateKey === 2);
+    expect(teamGate?.detail.missing ?? []).not.toContainEqual(
+      expect.stringMatching(/^OBJ-5/),
+    );
+    // One team with four is over.
+    const crowded = teams.map((entry) => ({ ...entry, unit: "space:1" }));
+    const crowdedGate = publishGates(
+      base({ goals: crowded, practice: blocking }),
+      thresholds,
+    ).find((entry) => entry.gateKey === 2);
+    expect(crowdedGate?.detail.missing ?? []).toContainEqual(
+      expect.stringMatching(/^OBJ-5/),
+    );
+  });
+
   it("judges gate 2 on phase 5's rail, not only at publication", () => {
     const five = phase(base({ goals: [judged(goal().title)] }), 5);
     expect(five?.blocked).toEqual([]);

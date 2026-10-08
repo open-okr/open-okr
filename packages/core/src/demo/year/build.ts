@@ -22,6 +22,7 @@ import { Q3_EARLY_EVENTS } from "./q3-run.ts";
 import { Q4_CLOSE_EVENTS } from "./q4-close.ts";
 import { Q4_PLAN_EVENTS } from "./q4-plan.ts";
 import { Q4_EARLY_EVENTS } from "./q4-run.ts";
+import { bookDeferredRhythms } from "./rhythm.ts";
 import {
   runYear,
   type YearEvent,
@@ -30,7 +31,7 @@ import {
 } from "./timeline.ts";
 
 /** The year's events, frame first, each part's after it. */
-const YEAR_EVENTS: readonly YearEvent[] = [
+export const YEAR_EVENTS: readonly YearEvent[] = [
   ...FRAME_EVENTS,
   ...PILOT_EVENTS,
   ...Q1_PLAN_EVENTS,
@@ -84,5 +85,6 @@ export async function buildNorthwindYear(
     context,
     seed.frameOnly ? FRAME_EVENTS : YEAR_EVENTS,
   );
+  await bookDeferredRhythms(context);
   return { alreadySeeded: false, today, events };
 }

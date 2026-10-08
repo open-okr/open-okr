@@ -648,11 +648,104 @@ for (const line of COACH_LINES) {
   }
 }
 
-// §8.1. Eleven stages, in order, with the act each belongs to. The minutes
-// are not compared here: §11 lists "Quarterly stage minutes" as a parameter
-// in the same breath as saying the stage order cannot change, so they are a
-// threshold and the registry check above already owns them.
+// --- 2c. Threshold defaults ------------------------------------------------
+//
+// The labels above prove a parameter exists on both sides; they cannot see a
+// default changed on one side only. So every number in a parameter's default
+// has to appear in its §11 row. A few rows say a number in words, and each is
+// named here with the word it is said as, so a changed number still fails.
+
+const registryRows = new Map<string, string>();
+for (const line of section(
+  method,
+  "## 11. The threshold registry",
+  "\n---\n",
+).split(NEWLINE)) {
+  const cells = line.trim().split("|").slice(1, -1).map((cell) => cell.trim());
+  if (cells.length === 2 && cells[0] && cells[1] && cells[0] !== "Parameter") {
+    registryRows.set(cells[0], cells[1]);
+  }
+}
+const SAID_IN_WORDS: Readonly<Record<string, Readonly<Record<number, string>>>> =
+  {
+    "cadence.anchorDay": {
+      1: "Monday",
+      2: "Tuesday",
+      3: "Wednesday",
+      4: "Thursday",
+      5: "Friday",
+      6: "Saturday",
+      7: "Sunday",
+    },
+    "cadence.nudgeDeduplicationHours": { 24: "per day" },
+    "scoring.closeTooSafeShare": { 0.75: "Three quarters" },
+  };
+// Compared against §8.1's own table below, where the row points.
+const COMPARED_WITH_THEIR_TABLE: ReadonlySet<string> = new Set([
+  "sessions.quarterlyStageMinutes",
+]);
+const numbersIn = (value: unknown): number[] =>
+  typeof value === "number"
+    ? [value]
+    : Array.isArray(value)
+      ? value.flatMap(numbersIn)
+      : value !== null && typeof value === "object"
+        ? Object.values(value).flatMap(numbersIn)
+        : [];
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+let defaultsCompared = 0;
+for (const [key, param] of Object.entries(THRESHOLDS)) {
+  const row = registryRows.get(param.label);
+  if (row === undefined || COMPARED_WITH_THEIR_TABLE.has(key)) {
+    continue;
+  }
+  for (const value of numbersIn(param.default)) {
+    defaultsCompared += 1;
+    const said = SAID_IN_WORDS[key]?.[value];
+    const forms = [
+      String(value),
+      value.toFixed(1),
+      value.toFixed(2),
+      `${Math.round(value * 100)}%`,
+    ];
+    const found =
+      (said !== undefined && row.includes(said)) ||
+      forms.some((form) =>
+        new RegExp(`(^|[^\\d.])${escaped(form)}($|[^\\d])`).test(row),
+      );
+    if (!found) {
+      fail(
+        "thresholds",
+        `\`${key}\` defaults to ${value}, and METHOD.md §11's "${param.label}" row does not say so: "${row}"`,
+      );
+    }
+  }
+}
+if (defaultsCompared < 60) {
+  fail(
+    "thresholds",
+    `only ${defaultsCompared} default values compared against §11; the parse is wrong, not the document`,
+  );
+}
+
+// §8.1. Eleven stages, in order, with the act each belongs to, and the
+// minutes each stage defaults to against the registry's own default.
 const stageRows = section(method, "### 8.1 The stages", "### 8.2");
+{
+  const documentedMinutes = tableColumn(stageRows, 3).map(Number);
+  const registryMinutes = numbersIn(
+    THRESHOLDS["sessions.quarterlyStageMinutes"].default,
+  );
+  if (
+    documentedMinutes.length !== 11 ||
+    documentedMinutes.join(",") !== registryMinutes.join(",")
+  ) {
+    fail(
+      "thresholds",
+      `§8.1's stage minutes are ${documentedMinutes.join(", ")} and the registry's default is ${registryMinutes.join(", ")}`,
+    );
+  }
+}
 compare(
   "the review stages",
   tableColumn(stageRows, 1),

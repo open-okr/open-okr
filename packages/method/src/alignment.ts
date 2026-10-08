@@ -135,6 +135,12 @@ export interface AlignmentResult {
    */
   readonly uncounted: readonly string[];
   readonly findings: readonly AlignmentFinding[];
+  /**
+   * Whether a company-level objective anchors the tree (§5.2). Reported in
+   * its own right rather than read from the findings, because AL-4 may be off
+   * and its finding dropped while the band still reads a gap without one.
+   */
+  readonly anchored: boolean;
 }
 
 /** How the engine reads a cycle (§2.7, §4.3). */
@@ -207,6 +213,8 @@ export function alignmentScore(
       counted: 0,
       uncounted: [],
       findings: [],
+      // Nothing to anchor, and nothing to scold.
+      anchored: true,
     };
   }
   const levels = options.levels ?? ALIGNMENT_LEVEL_ORDER;
@@ -326,6 +334,7 @@ export function alignmentScore(
     counted,
     uncounted: uncounted.sort((left, right) => left.localeCompare(right)),
     findings: sortFindings(findings),
+    anchored,
   };
 }
 

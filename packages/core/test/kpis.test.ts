@@ -388,6 +388,24 @@ describe("the named owner and an optional tier (§6.2, P9-T17b-b)", () => {
       }),
     ).rejects.toThrow(/owned by a person, not an agent/);
   });
+
+  it("accepts a person who has not signed in yet, as an import leaves them", async () => {
+    const imported = (await call("people.importMember", {
+      name: "Kofi Imported",
+      email: "kofi.imported@example.com",
+      legacy: { type: "csv", id: "kofi-imported" },
+    })) as { memberId: string };
+    const kpi = (await call("kpis.create", {
+      title: "Tickets closed",
+      frequency: "monthly",
+      ownerMemberId: imported.memberId,
+    })) as { id: string };
+    const detail = (await call("kpis.detail", {
+      kpiId: kpi.id,
+      periods: 12,
+    })) as Detail;
+    expect(detail.kpi.namedOwnerId).toBe(imported.memberId);
+  });
 });
 
 describe("period normalisation on the write path", () => {
@@ -955,6 +973,34 @@ describe("recovery OKRs", () => {
     // And the state still says where the metric really is: the projection
     // never stands in for the reading (§6.4, NW-Q3-05).
     expect(after.rows[0]?.state).toBe("unhealthy");
+  });
+
+  it("reads the recovery's own key result from the reading to the boundary, not the KPI's achievement (§6.5)", async () => {
+    const wb = await workerDb();
+    const root = await unhealthyTree();
+    const launched = await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.launchRecovery",
+      { kpiId: root.id, cycleId: await currentCycleId() },
+    );
+    const own = launched.keyResultIds[0] as string;
+    const progressOf = async () =>
+      Number(
+        (
+          await wb.admin.query<{ progress_pct: string }>(
+            "select progress_pct from key_results where id = $1",
+            [own],
+          )
+        ).rows[0]?.progress_pct,
+      );
+    // From 60 to 90: nothing recovered on the day it starts, where the KPI's
+    // achievement against its target of 100 reads 60.
+    expect(await progressOf()).toBe(0);
+    // Halfway back, then all the way to the boundary.
+    await record(root.id, 75);
+    expect(await progressOf()).toBe(50);
+    await record(root.id, 90);
+    expect(await progressOf()).toBe(100);
   });
 
   it("proposes closing the recovery exactly once, on the real number", async () => {

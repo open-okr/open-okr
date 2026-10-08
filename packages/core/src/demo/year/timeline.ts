@@ -20,6 +20,11 @@ export interface YearSeed {
   readonly workspaceId: string;
   /** Every write is made as the person who registered the workspace: Elena. */
   readonly adminUserId: string;
+  /**
+   * That person's member row, where the caller knows it. Left out, the first
+   * person in the directory, never an agent.
+   */
+  readonly adminMemberId?: string;
 }
 
 /** What the events have written so far, by the scenario's own names. */
@@ -59,6 +64,15 @@ export interface YearContext {
   };
   /** A scenario date on the real calendar. */
   real(scenarioDate: string): string;
+  /**
+   * Bookings for the quarter that holds today, made once every event due by
+   * today has run, so they see the frequencies, holidays and archived spaces
+   * the story has reached by then rather than the ones at the plan.
+   */
+  readonly deferredBookings: {
+    readonly cycleKey: string;
+    readonly spaces: readonly YearSpaceKey[];
+  }[];
 }
 
 export interface YearEvent {
@@ -84,6 +98,7 @@ export function yearContext(seed: YearSeed, today: string): YearContext {
     realYear,
     today,
     on: today,
+    deferredBookings: [],
     ids: {
       people: new Map(),
       spaces: new Map(),
@@ -106,9 +121,16 @@ export function yearContext(seed: YearSeed, today: string): YearContext {
 }
 
 /**
- * The events due by today, in the order they run: by real date, then by
- * their order, then as listed. Exported so a test can read the plan without
- * writing it.
+ * The events due by today, in the order they run: by real date, then by the
+ * scenario's own date, then by their order, then as listed. Exported so a
+ * test can read the plan without writing it.
+ *
+ * The scenario's date breaks a tie before `order` does, because two days the
+ * story keeps apart can land on one real day: a date before its quarter's
+ * first Monday is held on the quarter's first day, and in a year whose
+ * quarter starts on a Monday that is the first Monday too. The story's own
+ * sequence then still holds: the pilot is declared before its first week's
+ * check-ins run against it.
  */
 export function eventsDue(
   events: readonly YearEvent[],
@@ -125,6 +147,7 @@ export function eventsDue(
     .sort(
       (a, b) =>
         a.on.localeCompare(b.on) ||
+        a.event.on.localeCompare(b.event.on) ||
         (a.event.order ?? 0) - (b.event.order ?? 0) ||
         a.index - b.index,
     )

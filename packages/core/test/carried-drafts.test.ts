@@ -306,7 +306,7 @@ describe("the other decisions", () => {
 describe("how each kind of key result starts (§2.10)", () => {
   const base = { baselineValue: 0, targetValue: 1, currentValue: 0 };
 
-  it("starts a metric or a maintain from its last value, with the same target", () => {
+  it("starts a metric from its last value, with the same target, and keeps a maintain's band", () => {
     expect(
       carriedKeyResult({
         kind: "metric",
@@ -324,7 +324,18 @@ describe("how each kind of key result starts (§2.10)", () => {
         targetValue: 99,
         currentValue: 99.4,
       }),
-    ).toEqual({ kind: "maintain", baselineValue: 99.4, targetValue: 99 });
+    ).toEqual({ kind: "maintain", baselineValue: 98, targetValue: 99 });
+    // A reading that fell out of the band stays out of it: the band is what
+    // was kept, not wherever the number finished.
+    expect(
+      carriedKeyResult({
+        kind: "maintain",
+        doneAt: null,
+        baselineValue: 99.5,
+        targetValue: 99.99,
+        currentValue: 98,
+      }),
+    ).toEqual({ kind: "maintain", baselineValue: 99.5, targetValue: 99.99 });
   });
 
   it("leaves a done milestone behind and starts an open one again", () => {

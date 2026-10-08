@@ -247,9 +247,15 @@ async function recomputeScoring<
     ),
   ];
   const kpiAchievementById = new Map<string, number>();
+  // Each linked KPI's recovery objective, where it has one (§6.5).
+  const recoveryGoalByKpi = new Map<string, string>();
   if (linkedKpiIds.length > 0) {
     const linked = await tx
-      .select({ id: kpis.id, achievementPct: kpis.achievementPct })
+      .select({
+        id: kpis.id,
+        achievementPct: kpis.achievementPct,
+        recoveryGoalId: kpis.recoveryGoalId,
+      })
       .from(kpis)
       .where(
         activeOnly(
@@ -259,6 +265,9 @@ async function recomputeScoring<
         ),
       );
     for (const row of linked) {
+      if (row.recoveryGoalId !== null) {
+        recoveryGoalByKpi.set(row.id, row.recoveryGoalId);
+      }
       if (row.achievementPct !== null) {
         // The ceiling is §11's `scoring.progressCeilingPct`, not a constant.
         // This line read `Math.min(100, ...)` until P8-G03, which threw away
@@ -288,25 +297,33 @@ async function recomputeScoring<
     const current = asNumber(row.currentValue);
     const direction = row.direction;
 
+    // A recovery's own key result runs from the reading the KPI had to its
+    // healthy boundary (§6.5), so it reads that span, which the KPI's readings
+    // move, rather than the KPI's achievement against its whole target: a KPI
+    // at 9 of 15 with a boundary of 13.5 is not 60% recovered on day one, and
+    // a range KPI has no achievement at all.
+    const recovering =
+      row.kpiId !== null && recoveryGoalByKpi.get(row.kpiId) === row.goalId;
     // A KPI with no achievement at all has measured nothing, so the key result
     // keeps the progress it had rather than dropping to zero: a KPI nobody has
     // recorded is unmeasured, not failing.
-    const progress = row.kpiId
-      ? (kpiAchievementById.get(row.kpiId) ?? asNumber(row.progressPct))
-      : untargeted
-        ? 0
-        : keyResultProgress(
-            {
-              // §2.10 (P9-T12b): a milestone or a baseline reads its done.
-              kind: row.kind,
-              done: row.doneAt !== null,
-              direction,
-              baseline,
-              target,
-              current,
-            },
-            thresholds,
-          );
+    const progress =
+      row.kpiId && !recovering
+        ? (kpiAchievementById.get(row.kpiId) ?? asNumber(row.progressPct))
+        : untargeted
+          ? 0
+          : keyResultProgress(
+              {
+                // §2.10 (P9-T12b): a milestone or a baseline reads its done.
+                kind: row.kind,
+                done: row.doneAt !== null,
+                direction,
+                baseline,
+                target,
+                current,
+              },
+              thresholds,
+            );
     keyResultProgressById.set(row.id, progress);
 
     const points = pointsByKeyResult.get(row.id) ?? [];

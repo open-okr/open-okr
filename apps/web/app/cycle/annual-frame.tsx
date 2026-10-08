@@ -68,6 +68,7 @@ interface FrameRevision {
     | "strategy"
     | "notDoing"
     | "strategies"
+    | "agreed"
   )[];
   readonly reason: string;
   readonly revisedAt: string;
@@ -270,6 +271,7 @@ const FIELD_LABEL_KEYS = {
   strategy: "cycle.annualFrame.midTermStrategy",
   notDoing: "cycle.annualFrame.notDoingThisYear",
   strategies: "cycle.annualFrame.strategies",
+  agreed: "cycle.annualFrame.agreement",
 } as const;
 
 /**

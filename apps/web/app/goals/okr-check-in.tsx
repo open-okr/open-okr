@@ -141,7 +141,11 @@ export function CheckInTab({
         keyResult.kpiId === null &&
         values[keyResult.id]?.trim() !== "" &&
         Number.isFinite(value) &&
-        value !== keyResult.currentValue
+        // A baseline nobody has recorded starts empty, so anything typed is
+        // the number it found, even one equal to the zero it holds until
+        // then: the first measurement of 0 is still a measurement (§2.10).
+        (value !== keyResult.currentValue ||
+          (keyResult.kind === "baseline" && keyResult.doneAt === null))
       ) {
         entry.value = value;
       }

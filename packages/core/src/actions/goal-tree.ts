@@ -1268,19 +1268,27 @@ export const patchKeyResult = defineWriteAction({
       await recomputeGoalQualityInTx(tx, { workspaceId, goalId: row.goalId });
 
       const keys = Object.keys(input.set);
+      // A baseline is a measured fact rather than a target, so moving it asks
+      // nothing, but the trail keeps what it was.
+      const before = asNumber(row.baselineValue);
+      const baselineMoved =
+        input.set.baselineValue !== undefined &&
+        input.set.baselineValue !== before
+          ? { baselineFrom: before, baselineTo: input.set.baselineValue }
+          : {};
       return {
         result: { goal: await treeNode(tx, workspaceId, row.goalId) },
         activity: {
           kind: "key_result.updated",
           subjectType: "goal",
           subjectId: row.goalId,
-          payload: { keys },
+          payload: { keys, ...baselineMoved },
         },
         audit: {
           action: "goals.patchKeyResult",
           targetType: "key_result",
           targetId: input.id,
-          payload: { keys },
+          payload: { keys, ...baselineMoved },
         },
       };
     },

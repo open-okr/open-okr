@@ -21,7 +21,11 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { isEasing } from "@openokr/method";
+import {
+  isEasing,
+  type KeyResultDirection,
+  type KeyResultKind,
+} from "@openokr/method";
 import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -34,6 +38,7 @@ import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { requirePolicy } from "../practice/policy.ts";
 import { recomputeGoalQualityInTx } from "../quality/service.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
+import { recomputeAlignmentFor } from "./alignment.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { treeGoal, treeNode } from "./goal-tree.ts";
 
@@ -97,6 +102,17 @@ export async function changeTargetInTx<
     readonly actorMemberId: string | null;
     /** An import records history and is never refused (design §2.5). */
     readonly bulk?: boolean;
+    /**
+     * The key result as it stood before the caller's own write, when the same
+     * call also changes its baseline, direction or kind. Easing is judged
+     * against that, so a baseline moved in the same breath cannot make an
+     * easier target read as a harder one.
+     */
+    readonly before?: {
+      readonly baseline: number;
+      readonly direction: KeyResultDirection;
+      readonly kind: KeyResultKind;
+    };
   },
 ): Promise<TargetChange> {
   const [row] = await tx
@@ -104,6 +120,8 @@ export async function changeTargetInTx<
       goalId: keyResults.goalId,
       targetValue: keyResults.targetValue,
       baselineValue: keyResults.baselineValue,
+      direction: keyResults.direction,
+      kind: keyResults.kind,
       published: cycles.publishedAt,
     })
     .from(keyResults)
@@ -122,7 +140,9 @@ export async function changeTargetInTx<
     throw new OperationError("not_found", "No such key result.");
   }
   const from = asNumber(row.targetValue);
-  const baseline = asNumber(row.baselineValue) ?? 0;
+  const baseline = input.before?.baseline ?? asNumber(row.baselineValue) ?? 0;
+  const direction = input.before?.direction ?? row.direction;
+  const keyResultKind = input.before?.kind ?? row.kind;
   if (from === input.to) {
     return { goalId: row.goalId, from, to: from, eased: false, changed: false };
   }
@@ -161,11 +181,19 @@ export async function changeTargetInTx<
       from,
       to: input.to,
       baseline,
+      direction,
+      keyResultKind,
       hasReason: reason !== null,
     },
   );
 
-  const eased = isEasing({ from, to: input.to, baseline });
+  const eased = isEasing({
+    from,
+    to: input.to,
+    baseline,
+    direction,
+    keyResultKind,
+  });
   // openokr:allow-mutation: inside the operation that called this; the
   // change, its history row, the activity and the audit commit together.
   await tx
@@ -417,6 +445,8 @@ export const restoreKeyResult = defineWriteAction({
           goalId: keyResults.goalId,
           title: keyResults.title,
           goalDeletedAt: goals.deletedAt,
+          cycleId: goals.cycleId,
+          spaceId: goals.spaceId,
         })
         .from(keyResults)
         .innerJoin(goals, eq(goals.id, keyResults.goalId))
@@ -462,6 +492,11 @@ export const restoreKeyResult = defineWriteAction({
       const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
       await recomputeForGoal(tx, workspaceId, row.goalId, rhythm.thresholds);
       await recomputeGoalQualityInTx(tx, { workspaceId, goalId: row.goalId });
+      // KR-1 is an alignment finding at none, so a restore that brings an
+      // objective back from none clears it, as adding one does.
+      await recomputeAlignmentFor(tx, workspaceId, [
+        { cycleId: row.cycleId, spaceId: row.spaceId },
+      ]);
 
       return {
         result: { goal: await treeNode(tx, workspaceId, row.goalId) },
