@@ -216,6 +216,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
       "Implicit TLS from the first byte. False means STARTTLS, which is what port 587 expects.",
   },
   {
+    key: "mail.requireTls",
+    kind: "boolean",
+    fallback: true,
+    environment: "OPENOKR_MAIL_REQUIRE_TLS",
+    summary:
+      "Refuse to send over a connection that is not encrypted. On by default, because a password sent in the clear is worse than mail that does not go. Turn it off only for a relay on the same machine or a trusted network that offers no TLS, such as Mailpit in a test instance.",
+  },
+  {
     key: "mail.user",
     kind: "string",
     fallback: "",

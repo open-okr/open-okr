@@ -25,6 +25,7 @@ export function mailerFrom(settings: ResolvedMailSettings): Mailer {
     host: settings.host,
     port: settings.port,
     secure: settings.secure,
+    requireTls: settings.requireTls,
     from: settings.from,
     ...(settings.user ? { user: settings.user } : {}),
     ...(settings.password ? { password: settings.password } : {}),
