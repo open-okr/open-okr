@@ -3278,6 +3278,7 @@
   "sessions.schedule.oneHint": "Untuk sesi perancangan, atau ritual yang dipindahkan dari hari biasanya.",
   "sessions.schedule.scheduleButton": "Jadualkan",
   "sessions.schedule.scheduled": "Dijadualkan.",
+  "sessions.schedule.companySpace": "{name} (seluruh ruang kerja: semakannya menilai setiap {termObjectiveLower})",
   "sessions.schedule.space": "{termSpace}",
   "sessions.schedule.time": "Masa",
   "sessions.schedule.title": "Jadualkan sesi",

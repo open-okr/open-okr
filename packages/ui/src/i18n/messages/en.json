@@ -3278,6 +3278,7 @@
   "sessions.schedule.oneHint": "For a planning session, or a ritual moved off its usual day.",
   "sessions.schedule.scheduleButton": "Schedule",
   "sessions.schedule.scheduled": "Scheduled.",
+  "sessions.schedule.companySpace": "{name} (the whole workspace: its review grades every {termObjectiveLower})",
   "sessions.schedule.space": "{termSpace}",
   "sessions.schedule.time": "Time",
   "sessions.schedule.title": "Schedule sessions",

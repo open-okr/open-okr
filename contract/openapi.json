@@ -18115,6 +18115,9 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "isCompany": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -18122,7 +18125,8 @@
                           "name",
                           "mission",
                           "memberCount",
-                          "ownRole"
+                          "ownRole",
+                          "isCompany"
                         ],
                         "additionalProperties": false
                       }
