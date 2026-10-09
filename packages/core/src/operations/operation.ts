@@ -37,12 +37,13 @@ import {
   activities,
   auditEvents,
   enqueueOutbox,
+  notifications,
   type OutboxMessage,
   withContext,
   workspaceMembers,
   workspaces,
 } from "@openokr/db";
-import { eq } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
@@ -625,6 +626,26 @@ export async function runOperation<TResult, TLoaded = undefined>(
           at: new Date(),
         })
         .returning({ id: activities.id });
+
+      // **A notification this write made in its own words points at the
+      // event too** (UAT M10-04). A comment notifies its subject's
+      // followers inside the action, before this row exists, so the inbox
+      // had no activity to render and said "Something new here". Every row
+      // this transaction wrote with no activity and no nudge behind it is
+      // about this write, so it is linked here, once, for every action.
+      // openokr:allow-mutation: the Operation's own transaction.
+      await tx
+        .update(notifications)
+        .set({ activityId: (insertedActivity as { id: string }).id })
+        .where(
+          activeOnly(
+            notifications,
+            eq(notifications.workspaceId, spec.workspaceId),
+            isNull(notifications.activityId),
+            isNull(notifications.nudgeId),
+            sql`${notifications.createdAt} = now()`,
+          ),
+        );
 
       /**
        * The feed's own live insert (P6-G11c).

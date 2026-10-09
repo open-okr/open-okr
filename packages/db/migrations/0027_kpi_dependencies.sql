@@ -1,5 +1,5 @@
 -- The KPI formula dependency graph (TECHNICAL-PLAN.md §6.4, design
--- `kpi-engine.md` §7, P3-T13).
+-- `p3-t00-kpi-engine.md` §7, P3-T13).
 --
 -- One row per formula edge: this calculated KPI references that one. The table
 -- exists rather than being derived from the formula on every read because the

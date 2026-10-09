@@ -66,8 +66,10 @@ import {
 import { followKpisInTx } from "../kpis/linked.ts";
 import { draftRecoveryForKpi, launchRecoveryInTx } from "../kpis/recovery.ts";
 import {
+  corridorOf,
   isRecovering,
   KPI_RULE_COLUMNS,
+  type KpiCorridor,
   type KpiRule,
   kpiResponsesInTx,
   loadKpiRecords,
@@ -77,6 +79,7 @@ import {
   targetTypeOf,
   thresholdsOf,
   upsertKpiRecord,
+  workspaceKpiCorridor,
 } from "../kpis/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -231,12 +234,12 @@ const ruleOutput = {
   basis: z.enum(["thresholds", "ratio"]),
 };
 
-function ruleOf(rule: KpiRule) {
+function ruleOf(rule: KpiRule, workspace: KpiCorridor) {
   const thresholds = thresholdsOf(rule);
   return {
     targetType: targetTypeOf(rule),
     ...thresholds,
-    basis: readingOf(rule, null, null).basis,
+    basis: readingOf(rule, null, null, workspace).basis,
   };
 }
 
@@ -407,14 +410,19 @@ export const createKpi = defineWriteAction({
 
       await assertLegacyKeyFree(tx, workspaceId, kpis, input.legacy, "KPI");
 
-      // The workspace's own corridor where the caller names none (completeness
-      // review H-17). The columns' defaults were the canon's 90 and 70, so a
-      // workspace that moved its thresholds on /admin/rhythm still got those.
-      const thresholds = resolveRhythm(
-        await readRhythmRow(tx, workspaceId),
-      ).thresholds;
-      const healthyPct = input.healthyPct ?? thresholds["kpi.healthyThreshold"];
-      const watchPct = input.watchPct ?? thresholds["kpi.watchThreshold"];
+      // A line the caller names none for follows the workspace's own,
+      // stored as null (completeness review H-17, UAT BUG-011): copying the
+      // number in froze it, and moving the workspace's thresholds on
+      // /admin/rhythm then recoloured nothing that already existed.
+      const { healthyPct, watchPct } = corridorOf(
+        {
+          healthyPct:
+            input.healthyPct === undefined ? null : String(input.healthyPct),
+          watchPct:
+            input.watchPct === undefined ? null : String(input.watchPct),
+        },
+        await workspaceKpiCorridor(tx, workspaceId),
+      );
       if (watchPct > healthyPct) {
         // The corridor reads from below in both bands, so a watch band above the
         // healthy band would put every KPI in `watch` and none in `healthy`. The
@@ -456,8 +464,9 @@ export const createKpi = defineWriteAction({
           input.targetDefault === undefined
             ? null
             : String(input.targetDefault),
-        healthyPct: String(healthyPct),
-        watchPct: String(watchPct),
+        healthyPct:
+          input.healthyPct === undefined ? null : String(input.healthyPct),
+        watchPct: input.watchPct === undefined ? null : String(input.watchPct),
         ...legacyColumns(input.legacy),
       });
 
@@ -749,8 +758,10 @@ export const readKpiGrid = defineReadAction({
           .where(activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)))
           .orderBy(asc(kpis.position), asc(kpis.title));
 
+        const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         const out = [];
         for (const kpi of kpiRows) {
+          const corridor = corridorOf(kpi, workspace);
           const records = await loadKpiRecords(
             tx,
             context.workspaceId,
@@ -759,14 +770,14 @@ export const readKpiGrid = defineReadAction({
           );
           out.push({
             ...kpi,
-            ...ruleOf(kpi),
-            state: shownState(kpi),
+            ...ruleOf(kpi, workspace),
+            state: shownState(kpi, workspace),
             recovering: isRecovering(kpi),
             achievementPct:
               kpi.achievementPct === null ? null : Number(kpi.achievementPct),
             targetDefault:
               kpi.targetDefault === null ? null : Number(kpi.targetDefault),
-            healthyPct: Number(kpi.healthyPct),
+            healthyPct: corridor.healthyPct,
             ownerId: kpi.memberId ?? kpi.spaceId,
             ownerName:
               kpi.ownerKind === "member"
@@ -782,7 +793,7 @@ export const readKpiGrid = defineReadAction({
                 : typeof kpi.formula === "string"
                   ? kpi.formula
                   : JSON.stringify(kpi.formula),
-            watchPct: Number(kpi.watchPct),
+            watchPct: corridor.watchPct,
             records: records.map((record) => {
               const actual =
                 record.actualValue === null ? null : Number(record.actualValue);
@@ -802,6 +813,7 @@ export const readKpiGrid = defineReadAction({
                     (kpi.targetDefault === null
                       ? null
                       : Number(kpi.targetDefault)),
+                  workspace,
                 ).band,
               };
             }),
@@ -1002,8 +1014,9 @@ export const updateKpi = defineWriteAction({
     parentKpiId: z.uuid().nullable().optional(),
     treeId: z.uuid().nullable().optional(),
     categoryId: z.uuid().nullable().optional(),
-    healthyPct: z.number().min(0).max(200).optional(),
-    watchPct: z.number().min(0).max(200).optional(),
+    /** Null returns the line to the workspace's own (UAT BUG-011). */
+    healthyPct: z.number().min(0).max(200).nullable().optional(),
+    watchPct: z.number().min(0).max(200).nullable().optional(),
   }),
   output: z.object({
     id: z.uuid(),
@@ -1072,8 +1085,15 @@ export const updateKpi = defineWriteAction({
         }
       }
 
-      const healthyPct = input.healthyPct ?? Number(existing.healthyPct);
-      const watchPct = input.watchPct ?? Number(existing.watchPct);
+      const pick = (given: number | null | undefined, stored: string | null) =>
+        given === undefined ? stored : given === null ? null : String(given);
+      const { healthyPct, watchPct } = corridorOf(
+        {
+          healthyPct: pick(input.healthyPct, existing.healthyPct),
+          watchPct: pick(input.watchPct, existing.watchPct),
+        },
+        await workspaceKpiCorridor(tx, workspaceId),
+      );
       if (watchPct > healthyPct) {
         throw new OperationError(
           "forbidden",
@@ -1125,10 +1145,11 @@ export const updateKpi = defineWriteAction({
         set.categoryId = input.categoryId;
       }
       if (input.healthyPct !== undefined) {
-        set.healthyPct = String(input.healthyPct);
+        set.healthyPct =
+          input.healthyPct === null ? null : String(input.healthyPct);
       }
       if (input.watchPct !== undefined) {
-        set.watchPct = String(input.watchPct);
+        set.watchPct = input.watchPct === null ? null : String(input.watchPct);
       }
 
       // openokr:allow-mutation: the calling Operation's own transaction.
@@ -1656,6 +1677,7 @@ export const readRecoveryBoard = defineReadAction({
           }
         }
 
+        const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         return {
           cards: rows.map((row) => ({
             kpiId: row.id,
@@ -1663,15 +1685,14 @@ export const readRecoveryBoard = defineReadAction({
             title: row.title,
             treeId: row.treeId,
             treeName: row.treeName,
-            state: shownState(row),
+            state: shownState(row, workspace),
             recovering: isRecovering(row),
             response: responses.get(row.id) ?? null,
             achievementPct:
               row.achievementPct === null ? null : Number(row.achievementPct),
             effectivePct:
               row.effectivePct === null ? null : Number(row.effectivePct),
-            healthyPct: Number(row.healthyPct),
-            watchPct: Number(row.watchPct),
+            ...corridorOf(row, workspace),
             unit: row.unit,
             spaceId: row.spaceId,
             ownerMemberId: row.ownerMemberId,
@@ -1790,6 +1811,7 @@ const numberOrNull = (value: string | null): number | null =>
 
 function toTreeNode(
   formulaLinks: ReadonlySet<string>,
+  workspace: KpiCorridor,
   row: {
     readonly id: string;
     readonly parentKpiId: string | null;
@@ -1801,8 +1823,8 @@ function toTreeNode(
     readonly state: string;
     readonly achievementPct: string | null;
     readonly effectivePct: string | null;
-    readonly healthyPct: string;
-    readonly watchPct: string;
+    readonly healthyPct: string | null;
+    readonly watchPct: string | null;
     readonly targetDefault: string | null;
     readonly recoveryGoalId: string | null;
     readonly recoveryGoalLive: string | null;
@@ -1818,12 +1840,11 @@ function toTreeNode(
     indicatorType: row.indicatorType,
     tier: row.tier,
     direction: row.direction,
-    state: shownState(row),
+    state: shownState(row, workspace),
     recovering: isRecovering(row),
     achievementPct: numberOrNull(row.achievementPct),
     effectivePct: numberOrNull(row.effectivePct),
-    healthyPct: Number(row.healthyPct),
-    watchPct: Number(row.watchPct),
+    ...corridorOf(row, workspace),
     targetDefault: numberOrNull(row.targetDefault),
     recoveryGoalId: row.recoveryGoalId,
     recoveryProgressPct: numberOrNull(row.recoveryProgress),
@@ -1893,10 +1914,11 @@ export const readKpiTree = defineReadAction({
           context.workspaceId,
           rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
         );
+        const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         return {
           trees,
           treeId,
-          nodes: rows.map((row) => toTreeNode(links, row)),
+          nodes: rows.map((row) => toTreeNode(links, workspace, row)),
         };
       },
     );
@@ -1995,6 +2017,7 @@ export const readSpaceKpiTrees = defineReadAction({
           context.workspaceId,
           rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
         );
+        const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         // A tree that was deleted leaves its KPIs pointing at nothing live, so
         // they are grouped with the unfiled ones rather than under a name
         // nobody can open.
@@ -2009,7 +2032,7 @@ export const readSpaceKpiTrees = defineReadAction({
             name: key === null ? null : row.treeName,
             nodes: [],
           };
-          group.nodes.push(toTreeNode(links, row));
+          group.nodes.push(toTreeNode(links, workspace, row));
           groups.set(key, group);
         }
         const unfiled = groups.get(null);
@@ -2053,6 +2076,8 @@ export const readKpiDetail = defineReadAction({
       effectivePct: z.number().nullable(),
       healthyPct: z.number(),
       watchPct: z.number(),
+      /** Neither line is set on the KPI, so both move with the workspace. */
+      corridorFollowsWorkspace: z.boolean(),
       ...ruleOutput,
       targetDefault: z.number().nullable(),
       isCalculated: z.boolean(),
@@ -2221,6 +2246,7 @@ export const readKpiDetail = defineReadAction({
             ),
           );
 
+        const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         return {
           kpi: {
             id: kpi.id,
@@ -2235,15 +2261,16 @@ export const readKpiDetail = defineReadAction({
             direction: kpi.direction,
             indicatorType: kpi.indicatorType,
             tier: kpi.tier,
-            state: shownState(kpi),
+            state: shownState(kpi, workspace),
             recovering: isRecovering(kpi),
             achievementPct:
               kpi.achievementPct === null ? null : Number(kpi.achievementPct),
             effectivePct:
               kpi.effectivePct === null ? null : Number(kpi.effectivePct),
-            healthyPct: Number(kpi.healthyPct),
-            watchPct: Number(kpi.watchPct),
-            ...ruleOf(kpi),
+            ...corridorOf(kpi, workspace),
+            corridorFollowsWorkspace:
+              kpi.healthyPct === null && kpi.watchPct === null,
+            ...ruleOf(kpi, workspace),
             targetDefault:
               kpi.targetDefault === null ? null : Number(kpi.targetDefault),
             isCalculated: kpi.isCalculated,

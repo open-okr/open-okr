@@ -10,6 +10,7 @@
  */
 import { join } from "node:path";
 import { lintMigrationDirs } from "../migration-lint.ts";
+import { checkShippedMigrations } from "../shipped-migrations.ts";
 
 const migrations = join(import.meta.dirname, "../../migrations");
 const dirs = [migrations, ...process.argv.slice(2)];
@@ -38,6 +39,19 @@ if (emptyDirs.length > 0) {
   process.exit(1);
 }
 
+const shipped = await checkShippedMigrations(migrations);
+if (shipped.problems.length > 0) {
+  for (const problem of shipped.problems) {
+    process.stderr.write(`${problem}\n`);
+  }
+  process.exit(1);
+}
+
 process.stdout.write(
   `Migration lint passed. ${filesChecked} file(s) checked.\n`,
+);
+process.stdout.write(
+  shipped.tag === null
+    ? "Shipped migrations not compared: no release tag in this checkout. Fetch the tags (git fetch --tags) to run that check.\n"
+    : `Shipped migrations unchanged since ${shipped.tag}: ${shipped.compared} compared.\n`,
 );

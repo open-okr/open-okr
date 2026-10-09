@@ -59,6 +59,7 @@ import {
   type KpiRule,
   kpiResponsesInTx,
   readingOf,
+  workspaceKpiCorridor,
 } from "../kpis/service.ts";
 import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
@@ -503,6 +504,7 @@ async function periodStatesFor(
       ),
     )
     .orderBy(asc(kpiRecords.periodStart));
+  const workspace = await workspaceKpiCorridor(tx, workspaceId);
 
   return rows.map((row) => {
     // Each period judged by the KPI's own rule (§6.4, P9-T17a): its
@@ -519,6 +521,7 @@ async function periodStatesFor(
       kpi,
       row.actualValue === null ? null : Number(row.actualValue),
       target === null ? null : Number(target),
+      workspace,
     );
     // The band alone: this asks what each period looked like on its own
     // terms, which is what a state has been since a recovery stopped being

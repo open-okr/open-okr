@@ -69,11 +69,15 @@ import {
   workspaceTimeZone,
 } from "../cycles/service.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
+import { recomputeKpisFollowingWorkspace } from "../kpis/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { cycleLevelsInTx } from "../practice/levels.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+
+/** The two §11 keys a KPI that follows the workspace is read by. */
+const KPI_CORRIDOR_KEYS = ["kpi.healthyThreshold", "kpi.watchThreshold"];
 
 const cycleOutput = z.object({
   id: z.uuid(),
@@ -994,6 +998,16 @@ export const updateRhythmSettings = defineWriteAction({
         .returning();
       if (!updated) {
         throw new Error("The rhythm settings row could not be updated.");
+      }
+
+      // Every KPI that follows the workspace's corridor is read by the new
+      // one from now on, so its stored state is recomputed here, in the same
+      // transaction (UAT BUG-011).
+      if (
+        patch.overrides !== undefined &&
+        KPI_CORRIDOR_KEYS.some((key) => key in (patch.overrides ?? {}))
+      ) {
+        await recomputeKpisFollowingWorkspace(tx, workspaceId);
       }
 
       const resolved = resolveRhythm(updated);

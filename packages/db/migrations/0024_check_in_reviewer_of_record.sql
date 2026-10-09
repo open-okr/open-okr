@@ -2,7 +2,7 @@
 --
 -- The review inbox has to answer "who owes this acknowledgement" without asking
 -- the goal, because the goal only knows who reviews it *now*. Two rules in the
--- approved design document (`okr-core-domain.md` §4.4) meet on this
+-- approved design document (`p3-t00-okr-core-domain.md` §4.4) meet on this
 -- column, and neither can be honoured by reading `goals.reviewer_id`:
 --
 --   Step 4 of a reassignment: "Reassign every pending obligation of that role on

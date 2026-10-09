@@ -1,6 +1,9 @@
+import { withWorkspace } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
+import { accessFilterMember } from "../src/access/reads.ts";
 import { callAction } from "../src/actions/registry.ts";
 import {
   endSupportSession,
@@ -172,6 +175,52 @@ describe("the session is a binding, not a bypass", () => {
     ).rejects.toThrow();
   });
 
+  it("reads goals and spaces as a member would, and changes nothing, at view (UAT BUG-021)", async () => {
+    const wb = await workerDb();
+    const as = (userId: string) => ({
+      pool: wb.appPool,
+      workspaceId,
+      actor: { kind: "human" as const, userId },
+    });
+    const cycle = (await callAction(as(OWNER), "cycles.current", {
+      mode: "quarterly",
+    })) as { id: string };
+    const space = (await callAction(as(OWNER), "spaces.create", {
+      name: "Support",
+    })) as { id: string };
+    const goal = (await callAction(as(OWNER), "goals.create", {
+      title: "Every customer question answered the same day",
+      cycleId: cycle.id,
+      level: "team",
+      ownerKind: "space",
+      spaceId: space.id,
+      weight: 1,
+    })) as { id: string };
+
+    await grantOperator();
+    const { id } = await request();
+    await grant(id, { level: ACCESS_LEVELS.view });
+
+    const spaces = (await callAction(as(OPERATOR), "spaces.list", {})) as {
+      id: string;
+    }[];
+    expect(spaces.map((row) => row.id)).toContain(space.id);
+    await expect(
+      callAction(as(OPERATOR), "goals.read", { id: goal.id }),
+    ).resolves.toMatchObject({ id: goal.id });
+    const listed = (await callAction(as(OPERATOR), "goals.list", {
+      spaceId: space.id,
+      includeClosed: false,
+    })) as { goals: { id: string }[] };
+    expect(listed.goals.map((row) => row.id)).toContain(goal.id);
+    await expect(
+      callAction(as(OPERATOR), "goals.update", {
+        id: goal.id,
+        title: "Changed by support",
+      }),
+    ).rejects.toThrow();
+  });
+
   it("refuses a grant at full, however it is asked for", async () => {
     // `full` includes changing who has access, so an operator holding it
     // could extend their own session, and a session that can extend itself
@@ -210,6 +259,35 @@ describe("expiry is refused at use, not at the next sweep", () => {
     // No sweep has run. The member row is still active and the session row is
     // still open; the refusal comes from `resolveActor` reading the expiry.
     await expect(readAsOperator()).rejects.toThrow();
+  });
+
+  it("stops reading as a member the moment it expires (UAT BUG-021)", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const { id } = await request();
+    await grant(id);
+    const filterMember = async () => {
+      const { rows } = await wb.admin.query<{ id: string }>(
+        "select id from workspace_members where workspace_id = $1 and user_id = $2",
+        [workspaceId, OPERATOR],
+      );
+      return withWorkspace(drizzle(wb.appPool), workspaceId, (tx) =>
+        accessFilterMember(tx, {
+          workspaceId,
+          memberId: rows[0]?.id as string,
+        }),
+      );
+    };
+    await expect(filterMember()).resolves.toMatchObject({
+      human: true,
+      supportLevel: ACCESS_LEVELS.view,
+    });
+
+    await expire();
+
+    const after = await filterMember();
+    expect(after.human).toBe(false);
+    expect(after.supportLevel).toBeUndefined();
   });
 
   it("is then tidied by the sweep, which suspends the member", async () => {
@@ -291,6 +369,31 @@ describe("the customer can see who was in their workspace", () => {
     await expect(
       liveSupportSession(wb.appPool, workspaceId),
     ).resolves.toBeUndefined();
+  });
+
+  it("lets the same operator in again once the first session has ended (UAT BUG-029)", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const first = await request();
+    await grant(first.id);
+    await endSupportSession(wb.appPool, {
+      workspaceId,
+      sessionId: first.id,
+      reason: "finished",
+      endedByUserId: OWNER,
+    });
+    await expect(readAsOperator()).rejects.toThrow();
+
+    const second = await request();
+    await grant(second.id, { level: ACCESS_LEVELS.view });
+    await expect(readAsOperator()).resolves.toBeTruthy();
+
+    // One guest row for both sessions, so the operator stays one author.
+    const { rows } = await wb.admin.query(
+      "select status from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OPERATOR],
+    );
+    expect(rows).toEqual([{ status: "active" }]);
   });
 
   it("records the grant and the end in the workspace's own audit trail", async () => {

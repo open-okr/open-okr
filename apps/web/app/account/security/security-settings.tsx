@@ -7,7 +7,7 @@ import {
   CardHeader,
   useTranslations,
 } from "@openokr/ui";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { FormError } from "../../(auth)/auth-card";
 
@@ -17,6 +17,10 @@ import { FormError } from "../../(auth)/auth-card";
  *
  * Backup codes are shown once, on enrolment, because they are only useful
  * before the authenticator is lost.
+ *
+ * **The passkeys an account holds are listed, each with a way to remove it**
+ * (UAT BUG-024). Adding one used to leave nothing on the page to show it
+ * had worked, and a lost device's passkey could not be taken away.
  *
  * **A card each, and the message knows which one it belongs to.** This
  * rendered as one bare `<section>` of unstyled `<h2>`s and browser-default
@@ -33,6 +37,13 @@ const INPUT_CLASS =
 const LABEL_CLASS =
   "flex w-full max-w-xs flex-col gap-1 text-xs font-semibold text-ink-2";
 
+/** One row of Better Auth's passkey list, the fields this screen shows. */
+type Passkey = {
+  readonly id: string;
+  readonly name?: string | null;
+  readonly createdAt: string | Date;
+};
+
 type Note = {
   readonly scope: "passkey" | "totp";
   readonly tone: "ok" | "bad";
@@ -44,13 +55,49 @@ export function SecuritySettings({
 }: {
   twoFactorEnabled: boolean;
 }) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
 
   const [note, setNote] = useState<Note | null>(null);
+  const [passkeys, setPasskeys] = useState<readonly Passkey[] | null>(null);
   const [totpUri, setTotpUri] = useState("");
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+
+  const loadPasskeys = useCallback(async () => {
+    const { data } = await authClient.passkey.listUserPasskeys();
+    setPasskeys((data ?? []) as Passkey[]);
+  }, []);
+
+  useEffect(() => {
+    void loadPasskeys();
+  }, [loadPasskeys]);
+
+  const removePasskey = async (passkey: Passkey) => {
+    if (
+      !window.confirm(t("account.security.securitySettings.removePasskeyAsk"))
+    ) {
+      return;
+    }
+    setNote(null);
+    const { error: failure } = await authClient.passkey.deletePasskey({
+      id: passkey.id,
+    });
+    if (failure) {
+      setNote({
+        scope: "passkey",
+        tone: "bad",
+        text: t("account.security.securitySettings.passkeyNotRemoved"),
+      });
+      return;
+    }
+    await loadPasskeys();
+  };
+
+  const added = (when: string | Date) =>
+    new Date(when).toLocaleDateString(locale === "pseudo" ? "en" : locale, {
+      dateStyle: "medium",
+    });
 
   const addPasskey = async () => {
     setNote(null);
@@ -68,6 +115,7 @@ export function SecuritySettings({
       tone: "ok",
       text: "Passkey added. You can now sign in with it.",
     });
+    await loadPasskeys();
   };
 
   const startTwoFactor = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -153,6 +201,43 @@ export function SecuritySettings({
           <p className="max-w-prose text-sm text-ink-3">
             {t("account.security.securitySettings.aPasskeySignsYou")}
           </p>
+          {passkeys === null ? null : passkeys.length === 0 ? (
+            <p className="text-sm text-ink-3">
+              {t("account.security.securitySettings.noPasskeysYet")}
+            </p>
+          ) : (
+            <ul
+              className="flex w-full max-w-md flex-col divide-y divide-line rounded-control border border-line"
+              aria-label={t("account.security.securitySettings.passkeys")}
+            >
+              {passkeys.map((passkey) => (
+                <li
+                  key={passkey.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2"
+                >
+                  <span className="flex flex-col">
+                    <span className="text-sm font-medium text-ink">
+                      {passkey.name ||
+                        t("account.security.securitySettings.unnamedPasskey")}
+                    </span>
+                    <span className="text-xs text-ink-3">
+                      {t("account.security.securitySettings.passkeyAdded", {
+                        date: added(passkey.createdAt),
+                      })}
+                    </span>
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => removePasskey(passkey)}
+                  >
+                    {t("account.security.securitySettings.removePasskey")}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
           <Button type="button" size="sm" onClick={addPasskey}>
             {t("account.security.securitySettings.addAPasskey")}
           </Button>

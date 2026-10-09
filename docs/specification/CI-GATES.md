@@ -18,7 +18,7 @@ locally than to discover on a pull request.
 pnpm typecheck        # strict types across every package
 pnpm lint             # Biome. Read the whole tail, not the last line
 pnpm dead-code        # knip
-pnpm db:lint          # migration rules, then soft-delete usage
+pnpm db:lint          # migration rules, shipped migrations unchanged, then soft-delete usage
 pnpm check:boundaries # the architecture gate
 pnpm check:licences   # dependency licences
 pnpm check:air-gap    # the air-gap checklist, against the guide
@@ -107,6 +107,7 @@ linter reads every query in the workspace.
 | A business table with no `deleted_at` and no `-- openokr:hard-delete: <reason>` marker | Soft delete is the repository default. Hard delete is allowed, with a stated reason |
 | A query using `from(table)` with no soft-delete scope | Deleted rows come back. Use `activeOnly(table, ...)`, or `includeDeleted(table, ...)` when reviving a row is the point |
 | A character in a migration that a non-UTF8 database cannot store | You do not control the encoding of somebody else's install. `§` and `—` are safe; box drawing (`─`, `│`, `└`) is not |
+| A migration the newest release tag (`v*`) holds that is now different or gone, comments and blank lines included | Every instance that ran it refuses to upgrade with "was edited after it ran", and a fresh-database CI run cannot see that. Compared through the runner's own checksum. Needs the tags in the checkout; without them the linter says it did not compare |
 
 A marker needs the colon and a reason after it. `-- openokr:hard-delete` with no
 colon reads as prose, and the check still fails.

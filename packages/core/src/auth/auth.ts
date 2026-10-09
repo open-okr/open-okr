@@ -32,6 +32,7 @@ import { previewInvite } from "../invitations/preview.ts";
 import { domainIsTrusted } from "../invitations/trusted-domain.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import type { KeyRing } from "../secrets/key-ring.ts";
+import { readSetupState } from "../setup/state.ts";
 import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
 import {
@@ -357,6 +358,11 @@ export function createAuth(options: AuthOptions) {
         // back outside the Operation pipeline, so there is no outbox row to
         // attach the mail to. The link is sent in response to a request, not
         // as a consequence of a domain write.
+        // The account that claims the instance is created verified, and a
+        // link asking it to confirm again would only confuse (BUG-028).
+        if (user.emailVerified) {
+          return;
+        }
         await options.sendVerificationEmail?.({ to: user.email, url });
       },
     },
@@ -556,12 +562,23 @@ export function createAuth(options: AuthOptions) {
               cookieHeaderFrom(hookContext),
               user.email,
             );
-            if (allowed) {
-              return;
+            if (!allowed) {
+              throw new APIError("FORBIDDEN", {
+                message: REGISTRATION_CLOSED_MESSAGE,
+              });
             }
-            throw new APIError("FORBIDDEN", {
-              message: REGISTRATION_CLOSED_MESSAGE,
-            });
+            // **The account that claims the instance arrives verified** (UAT
+            // BUG-028). The setup wizard signs up and finishes setup in one
+            // go, which needs a session. With mail configured before the
+            // first run, verification is required, so the sign-up gave no
+            // session, setup could not finish, and every later sign-in was
+            // refused as unverified. Whoever runs the wizard is the operator
+            // who deployed it, so there is nobody to prove the address to.
+            const setup = await readSetupState(options.pool);
+            if (!setup.configured && !setup.hasUser) {
+              return { data: { ...user, emailVerified: true } };
+            }
+            return;
           },
           /**
            * Provisioning. Better Auth queues after-create hooks and drains

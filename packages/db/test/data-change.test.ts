@@ -27,6 +27,8 @@ import { kpiRecoveringToBand } from "../src/data-changes/0021_kpi_recovering_to_
 import { kpiNamedOwner } from "../src/data-changes/0022_kpi_named_owner.ts";
 import { blockerClockToCheckIn } from "../src/data-changes/0023_blocker_clock_to_check_in.ts";
 import { retireRhythmScoreThreshold } from "../src/data-changes/0024_retire_rhythm_score_threshold.ts";
+import { verifyFirstAccount } from "../src/data-changes/0025_verify_first_account.ts";
+import { kpiCorridorFollowsWorkspace } from "../src/data-changes/0026_kpi_corridor_follows_workspace.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1221,10 +1223,13 @@ describe("0021: a recovering KPI reads its real band", () => {
          insert into workspaces (id, name, slug)
          values (gen_random_uuid(), 'Acme', 'acme') returning id
        )
+       -- The corridor written out: rows of 0021's era always carried one,
+       -- and the column has had no default since migration 0139.
        insert into kpis (id, workspace_id, short_id, title, frequency, state,
-                         achievement_pct, green_low, red_low)
+                         achievement_pct, green_low, red_low,
+                         healthy_pct, watch_pct)
        select gen_random_uuid(), w.id, d.short_id, d.title, 'monthly',
-              d.state, d.pct, d.green, d.red
+              d.state, d.pct, d.green, d.red, 90, 70
          from w,
               (values ('K-1', 'Collapsed', 'recovering', 20::numeric, null::numeric, null::numeric),
                       ('K-2', 'Back in watch', 'recovering', 75, null, null),
@@ -1455,5 +1460,86 @@ describe("0024: the survey rhythm threshold retired", () => {
       )
     ).rows[0]?.overrides;
     expect(overrides).toEqual({ "sessions.diagnosticCycleScore": 0.65 });
+  });
+});
+
+describe("0025: the account that claimed the instance verified", () => {
+  it("verifies the earliest account and leaves later ones to their link", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `insert into users (id, name, email, created_at) values
+         ('first', 'Operator', 'ops@example.com', now() - interval '2 days'),
+         ('later', 'Member', 'member@example.com', now())`,
+    );
+    const [result] = await runDataChanges(client, {
+      scripts: [verifyFirstAccount],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    const { rows } = await client.query<{ id: string; v: boolean }>(
+      "select id, email_verified as v from users order by id",
+    );
+    expect(rows).toEqual([
+      { id: "first", v: true },
+      { id: "later", v: false },
+    ]);
+  });
+});
+
+describe("0026: a KPI's corridor follows the workspace", () => {
+  it("clears the copies, keeps the KPI's own lines, and rereads the band", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), r as (
+         insert into rhythm_settings (workspace_id, overrides)
+         select w.id, '{"kpi.healthyThreshold": 85}'::jsonb from w
+       )
+       insert into kpis (id, workspace_id, short_id, title, frequency,
+                         healthy_pct, watch_pct, achievement_pct, state)
+       select gen_random_uuid(), w.id, d.short_id, d.title, 'monthly',
+              d.healthy, d.watch, d.pct, d.state
+         from w,
+              (values ('K-1', 'Copied', 85, 70, 87::numeric, 'healthy'),
+                      ('K-2', 'Own healthy', 95, 70, 87, 'watch'),
+                      ('K-3', 'Own both', 95, 60, 87, 'watch'),
+                      ('K-4', 'Canon copy', 90, 70, 87, 'watch'))
+                as d(short_id, title, healthy, watch, pct, state)`,
+    );
+    const [result] = await runDataChanges(client, {
+      scripts: [kpiCorridorFollowsWorkspace],
+    });
+    expect(result?.rowsChanged).toBe(3);
+    const { rows } = await client.query<{
+      short_id: string;
+      healthy_pct: string | null;
+      watch_pct: string | null;
+      state: string;
+    }>(
+      "select short_id, healthy_pct, watch_pct, state from kpis order by short_id",
+    );
+    expect(rows).toEqual([
+      { short_id: "K-1", healthy_pct: null, watch_pct: null, state: "healthy" },
+      {
+        short_id: "K-2",
+        healthy_pct: "95.00",
+        watch_pct: null,
+        state: "watch",
+      },
+      {
+        short_id: "K-3",
+        healthy_pct: "95.00",
+        watch_pct: "60.00",
+        state: "watch",
+      },
+      // Copied the canon's 90 before the workspace moved to 85: it follows
+      // 85 now, so 87% is healthy.
+      { short_id: "K-4", healthy_pct: null, watch_pct: null, state: "healthy" },
+    ]);
   });
 });

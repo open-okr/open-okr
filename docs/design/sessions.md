@@ -347,6 +347,12 @@ purpose.
 | Reveal | Deterministic, instant under reduced motion |
 | Running cycle score | Updates as objectives are revealed |
 
+**Which objectives a review grades.** A review in a space grades that space's
+objectives. A review in the workspace's first space, the company space, grades
+every objective of the cycle, the workspace's own included, so company
+objectives are never left with nowhere to be scored. The schedule form says
+which space that is (UAT M18-03), because nothing else on screen did.
+
 The reveal is one write. All connected clients see the same number at the
 same time (same atomicity contract as the check-in vote reveal from P3-T07).
 

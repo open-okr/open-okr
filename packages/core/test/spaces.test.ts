@@ -208,6 +208,18 @@ describe("workspace provisioning creates the default space", () => {
     expect(detail.coordinatorMemberId).toBe(ownerMemberId);
   });
 
+  it("is the company space, and a later one is not (UAT M18-03)", async () => {
+    const wb = await workerDb();
+    const ctx = { pool: wb.appPool, ...context(OWNER) };
+    await callAction(ctx, "spaces.create", { name: "Aardvarks" });
+    const listed = await callAction(ctx, "spaces.list", {});
+    // Ordered by name, so the later space comes first and still is not it.
+    expect(listed.map((row) => [row.name, row.isCompany])).toEqual([
+      ["Aardvarks", false],
+      ["Spaces Owner's workspace", true],
+    ]);
+  });
+
   it("gives its manager full access to it", async () => {
     expect(await levelOnSpace(ownerMemberId, defaultSpaceId)).toBe(
       ACCESS_LEVELS.full,

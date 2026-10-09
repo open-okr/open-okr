@@ -1,6 +1,6 @@
 -- Site messages, and who has dismissed one (P8-T03c).
 --
--- Design: docs/design/operator-console.md §4, which this migration
+-- Design: docs/design/p8-t01b-operator-console.md §4, which this migration
 -- corrects on two points, both recorded below.
 --
 -- A site message is what the vendor says to everybody, or to a named set of

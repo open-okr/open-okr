@@ -211,6 +211,35 @@ export async function defaultRoleId<
   return (row as { id: string } | undefined)?.id ?? null;
 }
 
+/**
+ * A built-in role by its key, or null when an administrator deleted it.
+ *
+ * For the support session (UAT BUG-021), which takes the built-in role whose
+ * reach matches the level the customer granted.
+ */
+export async function builtinRoleId<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  key: BuiltinRoleKey,
+): Promise<string | null> {
+  const [row] = await tx
+    .select({ id: workspaceRoles.id })
+    .from(workspaceRoles)
+    .where(
+      activeOnly(
+        workspaceRoles,
+        and(
+          eq(workspaceRoles.workspaceId, workspaceId),
+          eq(workspaceRoles.builtinKey, key),
+        ),
+      ),
+    )
+    .limit(1);
+  return (row as { id: string } | undefined)?.id ?? null;
+}
+
 export interface MoveAdministratorRoleInput {
   readonly workspaceId: string;
   readonly memberId: string;
