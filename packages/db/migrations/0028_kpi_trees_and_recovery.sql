@@ -1,5 +1,5 @@
 -- Named KPI driver trees, and the one column the recovery loop was missing
--- (TECHNICAL-PLAN.md §4.6, METHOD.md §6.3 and §6.5, design `kpi-engine.md`
+-- (TECHNICAL-PLAN.md §4.6, METHOD.md §6.3 and §6.5, design `p3-t00-kpi-engine.md`
 -- §8 and §9, P3-T14).
 --
 -- 0026 left `kpis.tree_id` as a bare uuid with a comment saying P3-T14 decides

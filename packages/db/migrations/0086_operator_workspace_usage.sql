@@ -1,6 +1,6 @@
 -- Per-tenant usage, as a snapshot above the tenant floor (P8-T03b).
 --
--- Design: docs/design/operator-console.md §5, which this migration
+-- Design: docs/design/p8-t01b-operator-console.md §5, which this migration
 -- corrects. That section says the counts come from "named read-only views".
 -- They cannot. `force row level security` applies to the table owner too,
 -- which is the whole point of it, and migrations run as the owner rather than

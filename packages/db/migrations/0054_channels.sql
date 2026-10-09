@@ -1,7 +1,7 @@
 -- Channels: connections, identities and the message log (AI-NATIVE-PLAN.md §5,
 -- TECHNICAL-PLAN §4.11, P5-T01b-a).
 --
--- Three tables, and the design document `docs/design/channels.md`
+-- Three tables, and the design document `docs/design/p5-t00-channel-design.md`
 -- §2 is where each column is argued. What matters here:
 --
 -- * Email needs no connection row. It is the instance's own mail settings, so
