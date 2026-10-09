@@ -117,7 +117,11 @@ OPENOKR_MAIL_FROM=openokr@example.com
 
 For a host with no mail server, run Mailpit and point the instance at it:
 `OPENOKR_MAIL_HOST` is the host's address as the container sees it,
-`OPENOKR_MAIL_PORT=1025`, and the mail is readable on port 8025.
+`OPENOKR_MAIL_PORT=1025`, and the mail is readable on port 8025. Mailpit
+offers no TLS by default and the instance refuses to send without it, so add
+`OPENOKR_MAIL_REQUIRE_TLS=false` as well. Never set that against a mail server
+across a network you do not control: the mail password would travel in the
+clear.
 
 ## 3. Start the stack with the staging overlay
 

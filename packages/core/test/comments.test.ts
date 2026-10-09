@@ -341,13 +341,18 @@ describe("who a comment tells", () => {
       "comments.create",
       { subjectType: "goal", subjectId: goalId, body: richText("Draft") },
     )) as { id: string };
-    expect(await notified(secondMemberId)).toEqual([]);
+    // The second member reviews this goal, so the comment itself reaches
+    // them (UAT BUG-007); the mention below is the news being tested.
+    expect(await notified(secondMemberId)).toEqual([
+      { reason: "joined", subject_type: "goal" },
+    ]);
 
     await callAction({ pool: wb.appPool, ...context() }, "comments.update", {
       commentId: created.id,
       body: mentioning(secondMemberId, "this one is yours"),
     });
     expect(await notified(secondMemberId)).toEqual([
+      { reason: "joined", subject_type: "goal" },
       { reason: "mentioned", subject_type: "goal" },
     ]);
 
@@ -356,7 +361,51 @@ describe("who a comment tells", () => {
       commentId: created.id,
       body: mentioning(secondMemberId, "this one is yours, by Friday"),
     });
-    expect(await notified(secondMemberId)).toHaveLength(1);
+    expect(await notified(secondMemberId)).toHaveLength(2);
+  });
+
+  it("tells the goal's champion about a comment, without a Watch (UAT BUG-007)", async () => {
+    const wb = await workerDb();
+    const goalId = await createGoal();
+    await callAction(
+      { pool: wb.appPool, ...context(SECOND) },
+      "comments.create",
+      { subjectType: "goal", subjectId: goalId, body: richText("Blocked?") },
+    );
+    expect((await notified(ownerMemberId)).map((row) => row.reason)).toEqual([
+      "joined",
+    ]);
+    const read = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "subscriptions.read",
+      { subjectType: "goal", subjectId: goalId },
+    )) as { watching: boolean };
+    expect(read.watching).toBe(true);
+  });
+
+  it("stops telling the champion once they turn the watch off, and starts again when they turn it on", async () => {
+    const wb = await workerDb();
+    const goalId = await createGoal();
+    const toggle = (subscribe: boolean) =>
+      callAction({ pool: wb.appPool, ...context() }, "subscriptions.toggle", {
+        subjectType: "goal",
+        subjectId: goalId,
+        subscribe,
+      });
+    const comment = (text: string) =>
+      callAction({ pool: wb.appPool, ...context(SECOND) }, "comments.create", {
+        subjectType: "goal",
+        subjectId: goalId,
+        body: richText(text),
+      });
+
+    await toggle(false);
+    await comment("First");
+    expect(await notified(ownerMemberId)).toEqual([]);
+
+    await toggle(true);
+    await comment("Second");
+    expect(await notified(ownerMemberId)).toHaveLength(1);
   });
 });
 

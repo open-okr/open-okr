@@ -21,6 +21,8 @@ export type MailerConfig =
       readonly host: string;
       readonly port: number;
       readonly secure: boolean;
+      /** Defaults to true in the driver: unencrypted is opted into, never fallen into. */
+      readonly requireTls?: boolean;
       readonly from: string;
       readonly user?: string;
       readonly password?: string;
@@ -44,6 +46,9 @@ export function createMailer(config: MailerConfig): Mailer {
     host: config.host,
     port: config.port,
     secure: config.secure,
+    ...(config.requireTls === undefined
+      ? {}
+      : { requireTls: config.requireTls }),
     from: config.from,
     ...(config.user ? { user: config.user } : {}),
     ...(config.password !== undefined ? { password: config.password } : {}),

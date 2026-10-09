@@ -62,6 +62,10 @@ pnpm cloud:operator --email ops@example.com --granted-by founder@example.com
 pnpm cloud:operator --email ops@example.com --revoke --by founder@example.com
 ```
 
+The plans an operator can choose from come from `OPENOKR_CLOUD_PLANS`, a JSON
+list such as `[{"key":"team","name":"Team","seats":20,"aiMonthlyUsd":50}]`
+(`seats` null is unlimited). Without it the only plan is Free.
+
 Nobody grants the role to themselves. Once one operator exists, only an
 operator can grant another. Every grant and revocation is written to the
 instance audit chain. An operator sets a workspace's plan, or a seat count of

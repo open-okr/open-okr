@@ -127,6 +127,8 @@ export async function Drafting({
   checkTitles,
   memberId,
   assistsAvailable,
+  spaces,
+  defaultSpaceId,
   levels,
 }: {
   readonly cycleId: string;
@@ -178,6 +180,14 @@ export async function Drafting({
    * only these, because the policy refuses any other.
    */
   readonly levels: readonly string[];
+  /**
+   * Where a new objective can be filed (UAT BUG-014). Without a space the
+   * objective belongs to the workspace, and a space's sessions, page and
+   * alignment picture never see it.
+   */
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
+  /** The space the drafter came from, through "Open drafting" on its page. */
+  readonly defaultSpaceId: string | null;
 }) {
   const { t } = await getTranslations();
   const canDraft = canEdit && draftingAllowed;
@@ -731,6 +741,30 @@ export async function Drafting({
                     </select>
                   </>
                 )}
+                {spaces.length > 0 ? (
+                  <>
+                    <label className="sr-only" htmlFor="goal-space">
+                      {t("cycle.drafting.space")}
+                    </label>
+                    <select
+                      id="goal-space"
+                      name="spaceId"
+                      defaultValue={
+                        spaces.some((space) => space.id === defaultSpaceId)
+                          ? (defaultSpaceId ?? "")
+                          : ""
+                      }
+                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    >
+                      <option value="">{t("cycle.drafting.noSpace")}</option>
+                      {spaces.map((space) => (
+                        <option key={space.id} value={space.id}>
+                          {t("cycle.drafting.inSpace", { name: space.name })}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : null}
                 <Button type="submit" variant="primary">
                   {t("cycle.drafting.addObjective")}
                 </Button>

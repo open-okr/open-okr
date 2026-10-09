@@ -11,6 +11,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../lib/auth";
+import { formNumber } from "../lib/form-number";
 import { getTranslations } from "../lib/translations";
 import { requireWorkspace } from "../lib/workspace";
 import { NO_ERROR, type WriteState } from "./cycle/write-state.ts";
@@ -22,13 +23,15 @@ export async function recordFromMap(
   const goalId = String(formData.get("goalId") ?? "");
   const keyResultId = String(formData.get("keyResultId") ?? "");
   // An empty box is asked about, not read: `Number("")` is 0, so a cleared
-  // box used to write a real value of 0 into the key result's history.
+  // box used to write a real value of 0 into the key result's history. The
+  // sentence says what to do; `formNumber` would refuse it too, as text that
+  // is not a number.
   const typed = String(formData.get("value") ?? "").trim();
   if (typed === "") {
     const { t } = await getTranslations();
     return { error: t("quickCheckIn.typeAValueFirst") };
   }
-  const value = Number(typed);
+  const value = formNumber(formData, "value");
   if (!Number.isFinite(value)) {
     const { t } = await getTranslations();
     return { error: t("cycle.actions.valueHasToBeANumber") };

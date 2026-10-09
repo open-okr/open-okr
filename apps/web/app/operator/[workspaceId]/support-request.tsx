@@ -1,5 +1,6 @@
 import { requestSupportSession } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -22,6 +23,7 @@ async function ask(formData: FormData): Promise<void> {
   const operator = await requireOperator();
   const workspaceId = String(formData.get("workspaceId") ?? "");
 
+  let refused: string | null = null;
   try {
     await requestSupportSession(getPool(), {
       workspaceId,
@@ -29,13 +31,20 @@ async function ask(formData: FormData): Promise<void> {
       reason: String(formData.get("reason") ?? ""),
     });
   } catch (error) {
-    // A blank reason and a request that already exists both arrive as
-    // errors, and neither should show a stack trace. The page re-renders
-    // showing whatever is actually true.
-    if (error instanceof Error) {
-      return;
+    // A blank reason, a request that already exists and an operator who is
+    // already a member all arrive as errors, and none should show a stack
+    // trace. They used to vanish, so the page looked as if the request had
+    // gone and nothing had (UAT BUG-020). The sentence is carried back to the
+    // form instead.
+    if (!(error instanceof Error)) {
+      throw error;
     }
-    throw error;
+    refused = error.message;
+  }
+  if (refused !== null) {
+    redirect(
+      `/operator/${workspaceId}?refused=${encodeURIComponent(refused.slice(0, 300))}`,
+    );
   }
   revalidatePath(`/operator/${workspaceId}`);
 }
@@ -43,9 +52,12 @@ async function ask(formData: FormData): Promise<void> {
 export async function SupportRequest({
   pending,
   workspaceId,
+  refused = null,
 }: {
   readonly pending: boolean;
   readonly workspaceId: string;
+  /** Why the last request was refused, carried back by \`ask\`. */
+  readonly refused?: string | null;
 }) {
   const { t } = await getTranslations();
 
@@ -63,6 +75,11 @@ export async function SupportRequest({
       className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4"
     >
       <input name="workspaceId" type="hidden" value={workspaceId} />
+      {refused ? (
+        <p role="alert" className="text-bad text-sm">
+          {refused}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-1.5">
         {/* Distinct from the lifecycle form's own reason field, which sits
          * on this same page. Two controls sharing an id make every `for`

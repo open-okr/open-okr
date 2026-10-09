@@ -169,6 +169,44 @@ async function loadSpaceMembers(
     .orderBy(spaceMembers.createdAt);
 }
 
+/**
+ * **A name already taken is a sentence, not a crash** (UAT BUG-002). The
+ * unique index on \`(workspace_id, lower(name))\` refuses a second live space
+ * with the same name, and without this the refusal reached the screen as a raw
+ * database error: the page fell to "We could not load the spaces" instead of
+ * saying which name to change. The same check \`roles.create\` makes.
+ */
+async function requireFreeSpaceName(
+  tx: OperationTx,
+  workspaceId: string,
+  name: string,
+  exceptId?: string,
+): Promise<void> {
+  const [taken] = await tx
+    .select({ id: spaces.id })
+    // openokr:allow-raw-read: a uniqueness check inside the calling write's
+    // own transaction, which already authorised the caller. It answers only
+    // whether a live space holds the name, as the unique index does.
+    .from(spaces)
+    .where(
+      activeOnly(
+        spaces,
+        and(
+          eq(spaces.workspaceId, workspaceId),
+          sql`lower(${spaces.name}) = lower(${name.trim()})`,
+          exceptId ? sql`${spaces.id} <> ${exceptId}` : sql`true`,
+        ),
+      ),
+    )
+    .limit(1);
+  if (taken) {
+    throw new OperationError(
+      "forbidden",
+      `A space called "${name.trim()}" already exists. Give this one another name.`,
+    );
+  }
+}
+
 export const listSpaces = defineReadAction({
   name: "spaces.list",
   summary: "Every space this member can see, with their own role in each.",
@@ -741,6 +779,7 @@ export const createSpace = defineWriteAction({
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       await assertLegacyKeyFree(tx, workspaceId, spaces, input.legacy, "space");
+      await requireFreeSpaceName(tx, workspaceId, input.name);
 
       const created = await createSpaceInTx(tx, {
         workspaceId,
@@ -808,6 +847,9 @@ export const updateSpace = defineWriteAction({
       });
 
       const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.name !== undefined) {
+        await requireFreeSpaceName(tx, workspaceId, input.name, input.id);
+      }
       if (input.name !== undefined) {
         patch.name = input.name;
       }

@@ -2252,6 +2252,41 @@
       "pages": false
     },
     {
+      "name": "ai recordCredentialCheck",
+      "action": "ai.recordCredentialCheck",
+      "method": "POST",
+      "path": "/ai/recordCredentialCheck",
+      "scope": "write",
+      "summary": "Records the result of a live connection test on the workspace's key for a provider.",
+      "flags": [
+        {
+          "name": "provider",
+          "field": "provider",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "anthropic",
+            "openai",
+            "google",
+            "openrouter",
+            "ollama",
+            "openai-compatible"
+          ]
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "verified",
+            "invalid"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "ai removeWorkspaceCredential",
       "action": "ai.removeWorkspaceCredential",
       "method": "POST",

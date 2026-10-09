@@ -142,10 +142,13 @@ function Fact({
 
 export default async function OperatorWorkspacePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspaceId: string }>;
+  searchParams?: Promise<{ refused?: string }>;
 }) {
   const { workspaceId } = await params;
+  const refused = (await searchParams)?.refused ?? null;
   const operator = await requireOperator();
   const pool = getPool();
 
@@ -326,7 +329,11 @@ export default async function OperatorWorkspacePage({
         {/* Asking is all this does. There is no path in this product that
          * lets an operator into a workspace on their own, and the form says
          * so rather than leaving somebody to find out. */}
-        <SupportRequest pending={pending} workspaceId={workspaceId} />
+        <SupportRequest
+          pending={pending}
+          workspaceId={workspaceId}
+          refused={refused}
+        />
       </section>
 
       {/* Completeness review H-21: nothing wrote a plan or seats after a

@@ -12,6 +12,7 @@ import { markRead, mute, snooze } from "./actions.ts";
 import { InboxLive } from "./inbox-live.tsx";
 import { SNOOZE_CHOICES } from "./snooze-choices.ts";
 import {
+  REASON_FALLBACK_KEYS,
   REASON_LABEL_KEYS,
   subjectLink,
   subjectNameKey,
@@ -96,9 +97,13 @@ export default async function InboxPage({
     return (
       <Card>
         <CardBody>
-          <p className="text-sm text-ink-2">{t("inbox.youDoNotHave")}</p>
+          {/* A guest lands here as well as a member whose access was
+              narrowed, so the sentence says limited rather than lost: "ask an
+              administrator to restore it" told a guest something had been
+              taken away (UAT BUG-018). */}
+          <p className="text-sm text-ink-2">{t("inbox.limitedAccess")}</p>
           <p className="mt-1 text-xs text-ink-3">
-            {t("inbox.askAWorkspaceAdministrator")}
+            {t("inbox.limitedAccessHelp")}
           </p>
         </CardBody>
       </Card>
@@ -284,7 +289,7 @@ async function NotificationRow({
     row.rendered ??
     (rule ? rule.fires : null) ??
     (ruleName === null
-      ? t("inbox.somethingHappenedHere")
+      ? t(REASON_FALLBACK_KEYS[row.reason] ?? "inbox.somethingHappenedHere")
       : t("inbox.reminder", { rule: ruleName }));
 
   return (

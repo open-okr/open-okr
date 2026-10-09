@@ -118,14 +118,14 @@ export function DraftFromAmbition({
       });
       setDrafted(result);
       if (!result) {
-        setNotice("Nothing was drafted from that. Try saying what changes.");
+        setNotice(t("cycle.assists.nothingDrafted"));
       }
     } catch {
-      setNotice("The assist could not run. The form below still works.");
+      setNotice(t("cycle.assists.couldNotRunFormWorks"));
     } finally {
       setBusy(false);
     }
-  }, [ambition, busy, cycleId, level]);
+  }, [ambition, busy, cycleId, level, t]);
 
   const apply = useCallback(async () => {
     if (!drafted || busy) {
@@ -305,7 +305,7 @@ export function SuggestMeasure({ goalId }: { readonly goalId: string }) {
 
   const run = useCallback(async () => {
     if (title.trim() === "" || busy) {
-      setNotice("Type what is measured first.");
+      setNotice(t("cycle.assists.typeWhatIsMeasured"));
       return;
     }
     setBusy(true);
@@ -317,14 +317,14 @@ export function SuggestMeasure({ goalId }: { readonly goalId: string }) {
       });
       setSuggested(result);
       if (!result) {
-        setNotice("Nothing suggested for that one.");
+        setNotice(t("cycle.assists.nothingSuggested"));
       }
     } catch {
-      setNotice("The assist could not run.");
+      setNotice(t("cycle.assists.couldNotRun"));
     } finally {
       setBusy(false);
     }
-  }, [busy, goalId, title]);
+  }, [busy, goalId, t, title]);
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -393,14 +393,14 @@ export function SuggestParent({ goalId }: { readonly goalId: string }) {
       const result = await suggestParentAction(goalId);
       setSuggested(result);
       if (!result) {
-        setNotice("Nothing above this one looks like its parent.");
+        setNotice(t("cycle.assists.noParentFound"));
       }
     } catch {
-      setNotice("The assist could not run.");
+      setNotice(t("cycle.assists.couldNotRun"));
     } finally {
       setBusy(false);
     }
-  }, [goalId]);
+  }, [goalId, t]);
 
   const align = useCallback(async () => {
     if (!suggested) {

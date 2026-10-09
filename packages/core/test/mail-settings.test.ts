@@ -55,6 +55,26 @@ describe("resolveMailSettings", () => {
     });
   });
 
+  it("requires TLS unless somebody turns it off on purpose (UAT BUG-025)", async () => {
+    const wb = await workerDb();
+    const smtp = {
+      OPENOKR_MAIL_TRANSPORT: "smtp",
+      OPENOKR_MAIL_HOST: "localhost",
+      OPENOKR_MAIL_PORT: "1025",
+    };
+    expect((await resolveMailSettings(wb.appPool, ring, smtp)).requireTls).toBe(
+      true,
+    );
+    expect(
+      (
+        await resolveMailSettings(wb.appPool, ring, {
+          ...smtp,
+          OPENOKR_MAIL_REQUIRE_TLS: "false",
+        })
+      ).requireTls,
+    ).toBe(false);
+  });
+
   it("prefers a stored value over the environment", async () => {
     // The environment is bootstrap, not an override: a host changed in the
     // product must survive a restart with the old variable still set.

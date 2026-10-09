@@ -83,6 +83,20 @@ export default async function GoalPage({
 
   // The feed for this surface (S-31, P6-G11b). Both halves of the cursor or
   // neither: a half cursor is a link somebody edited by hand.
+  let goal: Awaited<ReturnType<typeof callAction<"goals.read">>>;
+  try {
+    goal = await callAction(context, "goals.read", { id });
+  } catch (error) {
+    // A goal somebody may not see is indistinguishable from one that does not
+    // exist (§8.1 layer 2). Read before anything else that names the goal:
+    // the feed and the watch control refuse an unknown id too, and reached
+    // first they sent the page to its error boundary instead (UAT BUG-017).
+    if (error instanceof OperationError && error.code === "not_found") {
+      notFound();
+    }
+    throw error;
+  }
+
   const feedParams = await searchParams;
   const feedCursor =
     feedParams.at && feedParams.id
@@ -107,18 +121,6 @@ export default async function GoalPage({
     subjectType: "goal",
     subjectId: id,
   });
-
-  let goal: Awaited<ReturnType<typeof callAction<"goals.read">>>;
-  try {
-    goal = await callAction(context, "goals.read", { id });
-  } catch (error) {
-    // A goal somebody may not see is indistinguishable from one that does not
-    // exist (§8.1 layer 2).
-    if (error instanceof OperationError && error.code === "not_found") {
-      notFound();
-    }
-    throw error;
-  }
 
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,

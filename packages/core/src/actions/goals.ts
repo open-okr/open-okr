@@ -1172,6 +1172,19 @@ export const createGoal = defineWriteAction({
       );
 
       await assertLegacyKeyFree(tx, workspaceId, goals, input.legacy, "goal");
+      // Filing a new objective under a space asks edit on that space, the same
+      // question \`goals.moveToSpace\` asks before moving one there (UAT BUG-014).
+      // It also refuses a space id from another workspace, which the foreign
+      // key alone would accept because it is checked past row-level security.
+      if (input.ownerKind === "space" && input.spaceId) {
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "space",
+          resourceId: input.spaceId,
+          requires: ACCESS_LEVELS.edit,
+        });
+      }
       const { practice } = practiceFromRow(
         await readRhythmRow(tx, workspaceId),
       );

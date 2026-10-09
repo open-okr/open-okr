@@ -534,13 +534,39 @@ export const confirmKeyResultDependency = defineWriteAction({
       // The providing side, not the depending side. §5.4 makes confirmation the
       // providing team's statement that it will deliver; anybody else saying so
       // is the depending team confirming its own wish.
-      await getAccessScoped(tx, {
-        workspaceId,
-        memberId,
-        resourceType: "space",
-        resourceId: row.providerSpaceId,
-        requires: ACCESS_LEVELS.edit as never,
-      });
+      //
+      // **Refused by name** (UAT BUG-009). The access getter answers not-found
+      // for a space the reader cannot edit, which is right for a read and read
+      // here as "No such space" about a space named on the same line. Every
+      // member can see the space exists, so the refusal says whose it is.
+      try {
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "space",
+          resourceId: row.providerSpaceId,
+          requires: ACCESS_LEVELS.edit as never,
+        });
+      } catch (error) {
+        if (!(error instanceof OperationError) || error.code !== "not_found") {
+          throw error;
+        }
+        const [provider] = await tx
+          .select({ name: spaces.name })
+          .from(spaces)
+          .where(
+            activeOnly(
+              spaces,
+              eq(spaces.workspaceId, workspaceId),
+              eq(spaces.id, row.providerSpaceId),
+            ),
+          )
+          .limit(1);
+        throw new OperationError(
+          "forbidden",
+          `Only the people of ${provider?.name ?? "the providing space"} can confirm what they will deliver. Ask them to confirm it, or name a risk owner.`,
+        );
+      }
 
       const goal = await requireKeyResultGoal(
         tx,
