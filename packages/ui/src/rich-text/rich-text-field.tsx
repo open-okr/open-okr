@@ -11,6 +11,15 @@ export interface RichTextFieldProps {
   readonly content?: unknown;
   readonly description?: ReactNode;
   readonly placeholder?: string;
+  /** The most characters it takes, counted as the server counts them. */
+  readonly maxCharacters?: number;
+  /**
+   * For a form whose action writes every field on each save, as the cycle's
+   * forms do: the stored document is sent as it is, so the action can tell a
+   * field kept as it was from an empty one. An empty field still sends
+   * nothing.
+   */
+  readonly sendUnchanged?: boolean;
 }
 
 /**
@@ -19,9 +28,10 @@ export interface RichTextFieldProps {
  * hidden input named after the field, so a server action reads it like any
  * other field.
  *
- * **Sent only once it is edited.** Each save of a rich text field writes a
- * new version of it, so a form that sent an untouched field would version
- * something nobody changed. An action reads an absent field as "leave it".
+ * **Sent only once it is edited**, unless `sendUnchanged` says otherwise. Each
+ * save of a rich text field writes a new version of it, so a form that sent
+ * an untouched field would version something nobody changed. An action reads
+ * an absent field as "leave it".
  */
 export function RichTextField({
   label,
@@ -29,8 +39,14 @@ export function RichTextField({
   content,
   description,
   placeholder,
+  maxCharacters,
+  sendUnchanged = false,
 }: RichTextFieldProps) {
-  const [edited, setEdited] = useState<string | null>(null);
+  const [edited, setEdited] = useState<string | null>(() =>
+    sendUnchanged && content !== null && content !== undefined
+      ? JSON.stringify(content)
+      : null,
+  );
   const descriptionId = `${useId()}-description`;
 
   return (
@@ -48,6 +64,7 @@ export function RichTextField({
           variant="compact"
           content={content ?? null}
           placeholder={placeholder}
+          maxCharacters={maxCharacters}
           onUpdate={(json) => setEdited(JSON.stringify(json))}
         />
       </div>

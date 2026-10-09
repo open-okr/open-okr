@@ -48,3 +48,19 @@ export function readRichTextField(
     document: parseRichText(parsed, RICH_TEXT_SCHEMA_VERSION),
   };
 }
+
+/**
+ * A rich text field from a form that writes every field on each save, the
+ * cycle's forms among them (`RichTextField`'s `sendUnchanged`): the document,
+ * null for an empty field, or "malformed" for something no editor makes.
+ */
+export function documentOrNull(
+  form: FormData,
+  name: string,
+): RichTextDocument | null | "malformed" {
+  const read = readRichTextField(form, name);
+  if (read.state === "malformed") {
+    return "malformed";
+  }
+  return read.state === "document" ? read.document : null;
+}

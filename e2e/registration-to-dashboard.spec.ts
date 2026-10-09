@@ -461,10 +461,22 @@ test("the planning phases complete from the browser, and the gaps clear", async 
 
   // Phase 2: baseline health and three ranked issues.
   await page.goto("/cycle?phase=2");
-  const baseline = page.locator("form", { has: page.getByLabel("Stable") });
-  await baseline.getByLabel("Stable").fill("Churn holds at 2% a month");
+  // The compact editor (guided-inputs §4.7): the column is typed in bold, and
+  // opens on what was written once the page is read again.
+  const stable = page.getByRole("textbox", { name: "Stable", exact: true });
+  const baseline = page.locator("form", { has: stable });
+  await baseline
+    .getByRole("group", { name: "Stable", exact: true })
+    .getByRole("button", { name: "Bold", exact: true })
+    .click();
+  await stable.pressSequentially("Churn holds at 2% a month");
+  await expect(stable.locator("strong")).toHaveText("Churn holds at 2% a month");
   await baseline.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Recorded", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(stable.locator("strong")).toHaveText(
+    "Churn holds at 2% a month",
+  );
   for (const issue of [
     "Trials stall before the first project",
     "Support answers take a day",

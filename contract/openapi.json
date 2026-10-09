@@ -24557,6 +24557,28 @@
                             "null"
                           ]
                         },
+                        "baselineHealthDocuments": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "stable": {},
+                                "declining": {},
+                                "businessAsUsual": {}
+                              },
+                              "required": [
+                                "stable",
+                                "declining",
+                                "businessAsUsual"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "capacityCutsDocument": {},
                         "calibration": {
                           "anyOf": [
                             {
@@ -24709,6 +24731,8 @@
                         "revalidation",
                         "focus",
                         "capacityCuts",
+                        "baselineHealthDocuments",
+                        "capacityCutsDocument",
                         "calibration",
                         "closure"
                       ],

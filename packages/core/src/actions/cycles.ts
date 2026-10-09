@@ -73,8 +73,8 @@ import {
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { cycleLevelsInTx } from "../practice/levels.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const cycleOutput = z.object({
@@ -1039,13 +1039,7 @@ export const updateRhythmSettings = defineWriteAction({
  * the same shape a task description takes, because METHOD.md §2.1 expects a
  * mission somebody wrote in sentences rather than a single line.
  */
-const frameProse = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const frameProse = richTextSchema();
 
 const frameOutput = z.object({
   id: z.uuid(),

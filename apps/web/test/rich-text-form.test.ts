@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readRichTextField } from "../lib/rich-text-form.ts";
+import { documentOrNull, readRichTextField } from "../lib/rich-text-form.ts";
 
 /**
  * Reading a rich text field a form posted (docs/design/guided-inputs.md §4.7).
@@ -72,5 +72,23 @@ describe("a rich text field from a form", () => {
     expect(readRichTextField(form({ narrative: value }), "narrative")).toEqual({
       state: "malformed",
     });
+  });
+});
+
+describe("a field from a form that writes every field on each save", () => {
+  it("is the document, null when empty or not sent, and says when it is broken", () => {
+    const empty = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph" }],
+    });
+    expect(
+      documentOrNull(form({ stable: JSON.stringify(PARAGRAPH) }), "stable"),
+    ).toEqual(PARAGRAPH);
+    expect(documentOrNull(form({ stable: empty }), "stable")).toBeNull();
+    // Nothing stored and nothing typed sends nothing, which is empty too.
+    expect(documentOrNull(form({}), "stable")).toBeNull();
+    expect(documentOrNull(form({ stable: "Churn" }), "stable")).toBe(
+      "malformed",
+    );
   });
 });

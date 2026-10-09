@@ -58,7 +58,15 @@ import { recomputeForCycle } from "../scoring/recompute.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /** Editor JSON, validated before it reaches storage. Never Markdown. */
-const richText = richTextSchema();
+/**
+ * The most a baseline health column or the cuts may hold: the cap their
+ * textareas held only in the browser, held here since guided-inputs §4.7 and
+ * counted as a reader sees the text. No importer writes either, so nothing a
+ * source holds is refused by it.
+ */
+export const CYCLE_NOTE_MAX_CHARACTERS = 4000;
+
+const cycleNote = richTextSchema({ maxCharacters: CYCLE_NOTE_MAX_CHARACTERS });
 
 const phaseResult = z.object({
   phase: z.number().int(),
@@ -314,6 +322,20 @@ export const readWorkflow = defineReadAction({
       ),
     }),
     capacityCuts: z.string().nullable(),
+    /**
+     * The same three columns and the cuts as stored, formatting and all, for
+     * the editors to open on (guided-inputs §4.7). Beside the plain text
+     * rather than instead of it, so a client reading the plain text today
+     * keeps working.
+     */
+    baselineHealthDocuments: z
+      .object({
+        stable: z.unknown(),
+        declining: z.unknown(),
+        businessAsUsual: z.unknown(),
+      })
+      .nullable(),
+    capacityCutsDocument: z.unknown(),
     /**
      * The one mid-cycle calibration METHOD.md §7.6 allows, or null while it is
      * unused (completeness review M-06).
@@ -598,6 +620,14 @@ export const readWorkflow = defineReadAction({
                 : [],
           },
           capacityCuts: plainOf(capacity?.cuts),
+          baselineHealthDocuments: baseline
+            ? {
+                stable: baseline.stable ?? null,
+                declining: baseline.declining ?? null,
+                businessAsUsual: baseline.businessAsUsual ?? null,
+              }
+            : null,
+          capacityCutsDocument: capacity?.cuts ?? null,
           calibration: calibration
             ? {
                 reason: calibration.reason,
@@ -983,9 +1013,9 @@ export const setBaselineHealth = defineWriteAction({
     "Records phase 2's KPI reading in the three §8.5 columns: stable, declining, business as usual.",
   input: z.object({
     cycleId: z.uuid(),
-    stable: richText.optional(),
-    declining: richText.optional(),
-    businessAsUsual: richText.optional(),
+    stable: cycleNote.optional(),
+    declining: cycleNote.optional(),
+    businessAsUsual: cycleNote.optional(),
   }),
   output: z.object({ cycleId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -1060,7 +1090,7 @@ export const setCapacityNotes = defineWriteAction({
   name: "workflow.setCapacityNotes",
   summary:
     "Records what was cut, which publish gate 5 reads (§5.5: if nothing was cut, capacity was not checked).",
-  input: z.object({ cycleId: z.uuid(), cuts: richText }),
+  input: z.object({ cycleId: z.uuid(), cuts: cycleNote }),
   output: z.object({ cycleId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({

@@ -1,4 +1,14 @@
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { CYCLE_NOTE_MAX_CHARACTERS } from "@openokr/core";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  RichTextField,
+  RichTextView,
+} from "@openokr/ui";
+import { richTextHtml } from "../../lib/rich-text-html.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import {
@@ -123,10 +133,11 @@ export async function BaselineHealth({
   canEdit,
 }: {
   readonly cycleId: string;
+  /** The three columns as stored, editor JSON or null. */
   readonly saved: {
-    readonly stable: string | null;
-    readonly declining: string | null;
-    readonly businessAsUsual: string | null;
+    readonly stable: unknown;
+    readonly declining: unknown;
+    readonly businessAsUsual: unknown;
   } | null;
   readonly canEdit: boolean;
 }) {
@@ -159,16 +170,16 @@ export async function BaselineHealth({
             <input type="hidden" name="cycleId" value={cycleId} />
             <div className="grid gap-2 md:grid-cols-3">
               {columns.map((column) => (
-                <label key={column.name} className={LABEL}>
-                  {column.label}
-                  <textarea
-                    name={column.name}
-                    rows={4}
-                    maxLength={4000}
-                    defaultValue={saved?.[column.name] ?? ""}
-                    className={FIELD}
-                  />
-                </label>
+                // The compact editor (guided-inputs §4.7), each column sent
+                // as it stands, so a column nobody touched is kept.
+                <RichTextField
+                  key={column.name}
+                  label={column.label}
+                  name={column.name}
+                  content={saved?.[column.name] ?? null}
+                  maxCharacters={CYCLE_NOTE_MAX_CHARACTERS}
+                  sendUnchanged
+                />
               ))}
             </div>
             <Button type="submit" className="self-start">
@@ -177,14 +188,23 @@ export async function BaselineHealth({
           </ActionForm>
         ) : (
           <dl className="grid gap-2 text-sm md:grid-cols-3">
-            {columns.map((column) => (
-              <div key={column.name} className="flex flex-col gap-0.5">
-                <dt className="text-xs font-bold text-ink-3">{column.label}</dt>
-                <dd className="whitespace-pre-line text-ink-2">
-                  {saved?.[column.name] ?? t("cycle.baseline.notRecorded")}
-                </dd>
-              </div>
-            ))}
+            {columns.map((column) => {
+              const html = richTextHtml(saved?.[column.name]);
+              return (
+                <div key={column.name} className="flex flex-col gap-0.5">
+                  <dt className="text-xs font-bold text-ink-3">
+                    {column.label}
+                  </dt>
+                  <dd className="text-ink-2">
+                    {html === null ? (
+                      t("cycle.baseline.notRecorded")
+                    ) : (
+                      <RichTextView html={html} />
+                    )}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
         )}
       </CardBody>
@@ -347,10 +367,12 @@ export async function CapacityCuts({
   canEdit,
 }: {
   readonly cycleId: string;
-  readonly saved: string | null;
+  /** What was cut, as stored: editor JSON or null. */
+  readonly saved: unknown;
   readonly canEdit: boolean;
 }) {
   const { t } = await getTranslations();
+  const savedHtml = richTextHtml(saved);
   return (
     <Card>
       <CardHeader className="justify-between">
@@ -360,33 +382,32 @@ export async function CapacityCuts({
           </h2>
           <p className="text-xs text-ink-3">{t("cycle.cuts.hint")}</p>
         </div>
-        <Chip tone={saved ? "ok" : "warn"}>
-          {saved ? t("cycle.cuts.recorded") : t("cycle.cuts.missing")}
+        <Chip tone={savedHtml === null ? "warn" : "ok"}>
+          {savedHtml === null
+            ? t("cycle.cuts.missing")
+            : t("cycle.cuts.recorded")}
         </Chip>
       </CardHeader>
       <CardBody>
         {canEdit ? (
           <ActionForm action={saveCapacityCuts} className="flex flex-col gap-2">
             <input type="hidden" name="cycleId" value={cycleId} />
-            <label className={LABEL}>
-              {t("cycle.cuts.label")}
-              <textarea
-                name="cuts"
-                rows={3}
-                maxLength={4000}
-                defaultValue={saved ?? ""}
-                placeholder={t("cycle.cuts.placeholder")}
-                className={FIELD}
-              />
-            </label>
+            <RichTextField
+              label={t("cycle.cuts.label")}
+              name="cuts"
+              content={saved ?? null}
+              placeholder={t("cycle.cuts.placeholder")}
+              maxCharacters={CYCLE_NOTE_MAX_CHARACTERS}
+              sendUnchanged
+            />
             <Button type="submit" className="self-start">
               {t("common.save")}
             </Button>
           </ActionForm>
+        ) : savedHtml === null ? (
+          <p className="text-sm text-ink-2">{t("cycle.cuts.missing")}</p>
         ) : (
-          <p className="whitespace-pre-line text-sm text-ink-2">
-            {saved ?? t("cycle.cuts.missing")}
-          </p>
+          <RichTextView html={savedHtml} className="text-sm text-ink-2" />
         )}
       </CardBody>
     </Card>

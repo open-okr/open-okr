@@ -47,6 +47,12 @@ type Read = {
   } | null;
   focus: { chosen: string[]; candidates: { id: string; title: string }[] };
   capacityCuts: string | null;
+  baselineHealthDocuments: {
+    stable: unknown;
+    declining: unknown;
+    businessAsUsual: unknown;
+  } | null;
+  capacityCutsDocument: unknown;
   phases: { phase: number; missing: string[] }[];
 };
 
@@ -218,6 +224,51 @@ describe("baseline health and the cuts, read back as the forms show them", () =>
     expect(after.phases[2]?.missing).not.toContain(
       "Baseline health is not recorded",
     );
+  });
+
+  it("returns the documents too, formatting and all, for the editors to open on", async () => {
+    const bold = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Churn holds", marks: [{ type: "bold" }] },
+          ],
+        },
+      ],
+    };
+    await call("workflow.setBaselineHealth", {
+      cycleId: quarterId,
+      stable: bold,
+    });
+    await call("workflow.setCapacityNotes", { cycleId: quarterId, cuts: bold });
+    const after = await read();
+    expect(after.baselineHealthDocuments).toEqual({
+      stable: bold,
+      declining: null,
+      businessAsUsual: null,
+    });
+    expect(after.capacityCutsDocument).toEqual(bold);
+    // The plain fields stay, for every client that reads them today.
+    expect(after.baselineHealth?.stable).toBe("Churn holds");
+    expect(after.capacityCuts).toBe("Churn holds");
+  });
+
+  it("refuses a column or the cuts over 4000 characters, counted as a reader sees them", async () => {
+    const long = richTextFromPlainText("x".repeat(4001));
+    await expect(
+      call("workflow.setBaselineHealth", { cycleId: quarterId, stable: long }),
+    ).rejects.toThrow("Keep it to 4000 characters. This has 4001.");
+    await expect(
+      call("workflow.setCapacityNotes", { cycleId: quarterId, cuts: long }),
+    ).rejects.toThrow("Keep it to 4000 characters. This has 4001.");
+    // Exactly the limit is kept.
+    await call("workflow.setCapacityNotes", {
+      cycleId: quarterId,
+      cuts: richTextFromPlainText("x".repeat(4000)),
+    });
+    expect((await read()).capacityCuts).toHaveLength(4000);
   });
 });
 

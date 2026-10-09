@@ -1855,6 +1855,7 @@
   "fields.counter": "{used} of {max} characters",
   "fields.counterOver": "{used} of {max} characters. Take out {over} to save it.",
   "fields.email.invalid": "Check the address. It needs a name, an @ and a domain, like priya@northwind.example.",
+  "fields.richTextUnreadable": "That text could not be read. Reload the page and write it again.",
   "fields.secret.showWhatYouTyped": "Show what you typed",
   "fields.timezone.noMatch": "No zone matches that. Try a city, or an offset like +8.",
   "fields.timezone.notRecognised": "{zone} (not a recognised zone)",

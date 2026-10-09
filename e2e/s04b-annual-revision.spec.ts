@@ -72,8 +72,13 @@ test("acceptance: a not-doing item removed from the agreed frame keeps its reaso
     "Phase 0 · Annual strategy",
     { timeout: 15_000 },
   );
-  const notDoing = page.locator('textarea[name="notDoing"]');
-  await expect(notDoing).toHaveValue(`${PRICING}\n${REGIONS}`);
+  // The compact editor (guided-inputs §4.7), opened on the stored document:
+  // one paragraph per thing not being done.
+  const notDoing = page.getByRole("textbox", {
+    name: "Not doing this year",
+    exact: true,
+  });
+  await expect(notDoing.locator("p")).toHaveText([PRICING, REGIONS]);
 
   // The pricing rebuild comes off the list. Without a reason it is refused.
   await notDoing.fill(REGIONS);
@@ -83,8 +88,9 @@ test("acceptance: a not-doing item removed from the agreed frame keeps its reaso
     page.getByRole("alert").filter({ hasText: "needs a written reason" }),
   ).toBeVisible({ timeout: 15_000 });
 
-  // React resets a form with an action once it answers, so the edit is typed
-  // again, now with its reason.
+  // React resets a form with an action once it answers. The editor keeps its
+  // text through that, and the edit is typed again anyway, now with its
+  // reason, so the spec does not depend on which.
   await notDoing.fill(REGIONS);
   await page.locator('input[name="reason"]').fill(REASON);
   await page.getByRole("button", { name: "Replace the frame" }).click();
@@ -92,5 +98,5 @@ test("acceptance: a not-doing item removed from the agreed frame keeps its reaso
   const history = page.getByTestId("frame-revisions");
   await expect(history).toContainText(REASON, { timeout: 15_000 });
   await expect(history).toContainText("Not doing this year");
-  await expect(notDoing).toHaveValue(REGIONS);
+  await expect(notDoing).toHaveText(REGIONS);
 });

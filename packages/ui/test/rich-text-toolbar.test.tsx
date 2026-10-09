@@ -146,6 +146,55 @@ describe("a rich text field in a form", () => {
   });
 });
 
+describe("a rich text field in a form that writes every field", () => {
+  test("sends the stored document unchanged, so a kept field is not an empty one", async () => {
+    const { container } = inEnglish(
+      <form>
+        <RichTextField
+          label="Stable"
+          name="stable"
+          content={PARAGRAPH}
+          sendUnchanged
+        />
+        <RichTextField
+          label="Declining"
+          name="declining"
+          content={null}
+          sendUnchanged
+        />
+      </form>,
+    );
+    await editorReady(container);
+    const stable = container.querySelector<HTMLInputElement>(
+      'input[name="stable"]',
+    );
+    expect(JSON.parse(stable?.value ?? "null")).toEqual(PARAGRAPH);
+    // Nothing stored is nothing sent, which the action reads as empty.
+    expect(container.querySelector('input[name="declining"]')).toBeNull();
+  });
+
+  test("counts toward its limit", async () => {
+    const { container } = inEnglish(
+      <RichTextField
+        label="Stable"
+        name="stable"
+        content={{
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "x".repeat(90) }],
+            },
+          ],
+        }}
+        maxCharacters={100}
+      />,
+    );
+    await editorReady(container);
+    expect(screen.getByText("90 of 100 characters")).not.toBeNull();
+  });
+});
+
 describe("a blank document", () => {
   test("is one with nothing but empty paragraphs and spaces in it", () => {
     expect(isBlankDocument(null)).toBe(true);
