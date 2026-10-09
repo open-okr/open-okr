@@ -93,6 +93,20 @@ export interface RichTextEditorHandle {
   getJSON(): unknown;
 }
 
+/**
+ * The editor's document as plain JSON.
+ *
+ * ProseMirror builds every node's and mark's attributes with
+ * `Object.create(null)`, and React's server action encoder cannot send an
+ * object with no prototype: it sends a placeholder the server reads as
+ * nothing, so a heading arrived as `attrs: "$T"` and the document was refused
+ * as invalid. A link's address and a mention's id went the same way. Every
+ * document this component hands out goes through here first.
+ */
+function plainJSON(json: unknown): unknown {
+  return JSON.parse(JSON.stringify(json));
+}
+
 const NO_SEARCH_RESULTS: readonly MentionSearchResult[] = [];
 
 async function noSearch(): Promise<readonly MentionSearchResult[]> {
@@ -193,7 +207,7 @@ export const RichTextEditor = forwardRef<
       },
     },
     onUpdate: ({ editor: current }) => {
-      const json = current.getJSON();
+      const json = plainJSON(current.getJSON());
       setLength(richTextLength(json));
       if (validate) {
         validate(json);
@@ -232,7 +246,7 @@ export const RichTextEditor = forwardRef<
     ref,
     () => ({
       hasUploadsInProgress,
-      getJSON: () => editor?.getJSON(),
+      getJSON: () => (editor ? plainJSON(editor.getJSON()) : undefined),
     }),
     [editor, hasUploadsInProgress],
   );
@@ -247,19 +261,11 @@ export const RichTextEditor = forwardRef<
     maxCharacters !== undefined && length >= Math.ceil(maxCharacters * 0.8) ? (
       <LengthCounter length={length} max={maxCharacters} />
     ) : null;
-  if (variant !== "compact") {
-    return counter ? (
-      <div className="flex flex-col gap-1.5">
-        {surface}
-        {counter}
-      </div>
-    ) : (
-      surface
-    );
-  }
   return (
     <div className="flex flex-col gap-1.5">
-      {editor && editable ? <EditorToolbar editor={editor} /> : null}
+      {editor && editable ? (
+        <EditorToolbar editor={editor} blocks={variant === "full"} />
+      ) : null}
       {surface}
       {counter}
     </div>

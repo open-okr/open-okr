@@ -124,7 +124,13 @@ const editor = () => page.locator(".ProseMirror").first();
 
 test("saving keeps the words without telling anybody", async () => {
   await editor().click();
-  await page.keyboard.type("First draft.");
+  // The full editor's toolbar (guided-inputs §4.7): the draft starts with a
+  // heading. Only the document's editor has one; a comment's does not.
+  await page.getByRole("button", { name: "Heading 2", exact: true }).click();
+  await expect(editor().locator("h2")).toHaveCount(1);
+  // Typed into the editor itself: the toolbar hands focus back a frame later,
+  // and keys pressed before then went to the button.
+  await editor().pressSequentially("First draft.");
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page.getByText("Saved. Not published yet.")).toBeVisible({
@@ -148,6 +154,7 @@ test("saving keeps the words without telling anybody", async () => {
     // And the words are really in the row, which is what the wrong selector
     // hid the first time this was written.
     expect(JSON.stringify(rows[0]?.body)).toContain("First draft.");
+    expect(JSON.stringify(rows[0]?.body)).toContain('"type":"heading"');
   }).toPass({ timeout: 15_000 });
 });
 

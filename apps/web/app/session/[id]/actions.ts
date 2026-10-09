@@ -8,6 +8,7 @@ import {
   RICH_TEXT_SCHEMA_VERSION,
   richTextFromPlainText,
 } from "@openokr/core";
+import { isBlankDocument } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { getInstanceName } from "../../../lib/instance-name";
@@ -785,12 +786,25 @@ export async function clusterRetroAction(sessionId: string) {
   );
 }
 
-/** The review written up as prose from its own record, or null (M-09). */
+/**
+ * The review written up as prose from its own record, or null (M-09).
+ *
+ * With the draft as a document too, since the field it opens in is the full
+ * editor and `richTextFromPlainText` runs on the server only.
+ */
 export async function draftMinutesAction(sessionId: string) {
   const { assistContext } = await import("../../../lib/assists");
-  return callAction(await assistContext(), "sessions.draftMinutes", {
-    sessionId,
-  });
+  const drafted = await callAction(
+    await assistContext(),
+    "sessions.draftMinutes",
+    { sessionId },
+  );
+  return drafted === null
+    ? null
+    : {
+        narrative: drafted.narrative,
+        document: richTextFromPlainText(drafted.narrative),
+      };
 }
 
 /**
@@ -806,10 +820,11 @@ export async function draftMinutesAction(sessionId: string) {
 export async function saveMinutesWriteUpAction(
   sessionId: string,
   title: string,
-  text: string,
+  body: unknown,
 ): Promise<{ readonly documentId: string } | { readonly error: string }> {
   const { t } = await getTranslations();
-  if (text.trim() === "") {
+  // The full editor's document (guided-inputs §4.7), headings and all.
+  if (isBlankDocument(body)) {
     return { error: t("session.detail.minutes.writeUp.nothingToSave") };
   }
   const { session, workspace } = await requireWorkspace();
@@ -827,7 +842,8 @@ export async function saveMinutesWriteUpAction(
         title:
           title.trim().slice(0, 300) ||
           t("session.detail.minutes.writeUp.title"),
-        body: richTextFromPlainText(text),
+        // A body that is not a document is refused here rather than stored.
+        body: parseRichText(body, RICH_TEXT_SCHEMA_VERSION),
       },
     );
     revalidatePath(`/session/${sessionId}/minutes`);

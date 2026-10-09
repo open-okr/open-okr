@@ -93,11 +93,126 @@ describe("the compact editor's toolbar", () => {
     expect(await screen.findByText(en("editor.link.invalid"))).not.toBeNull();
   });
 
-  test("has no toolbar in the full editor yet", async () => {
+  test("has no block formats: a heading or a table is a document's job", async () => {
+    const { container } = inEnglish(
+      <RichTextEditor label="Comment" variant="compact" content={PARAGRAPH} />,
+    );
+    await editorReady(container);
+    expect(
+      screen.queryByRole("button", { name: en("editor.toolbar.heading1") }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: en("editor.toolbar.table") }),
+    ).toBeNull();
+  });
+});
+
+describe("the full editor's toolbar", () => {
+  test("adds headings, a quote and a table to the simple formats", async () => {
     const { container } = inEnglish(
       <RichTextEditor label="Document" content={PARAGRAPH} />,
     );
     await editorReady(container);
+    const toolbar = screen.getByRole("toolbar", {
+      name: en("editor.toolbar.label"),
+    });
+    const names = [...toolbar.querySelectorAll("button")].map((button) =>
+      button.getAttribute("aria-label"),
+    );
+    expect(names).toEqual([
+      en("editor.toolbar.bold"),
+      en("editor.toolbar.italic"),
+      en("editor.toolbar.strike"),
+      en("editor.toolbar.code"),
+      en("editor.toolbar.bulletList"),
+      en("editor.toolbar.orderedList"),
+      en("editor.toolbar.heading1"),
+      en("editor.toolbar.heading2"),
+      en("editor.toolbar.blockquote"),
+      en("editor.toolbar.table"),
+      en("editor.toolbar.link"),
+    ]);
+    const reachable = [...toolbar.querySelectorAll("button")].filter(
+      (button) => button.getAttribute("tabindex") !== "-1",
+    );
+    expect(reachable).toHaveLength(1);
+  });
+
+  test("turns a paragraph into a heading, and says it is one", async () => {
+    const user = userEvent.setup();
+    const { container } = inEnglish(
+      <RichTextEditor label="Document" content={PARAGRAPH} />,
+    );
+    await editorReady(container);
+    const heading = screen.getByRole("button", {
+      name: en("editor.toolbar.heading2"),
+    });
+    expect(heading.getAttribute("aria-pressed")).toBe("false");
+    await user.click(heading);
+    await waitFor(() => expect(container.querySelector("h2")).toBeTruthy());
+    expect(heading.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("inserts a table, and offers nothing a cell cannot hold inside it", async () => {
+    const user = userEvent.setup();
+    const { container } = inEnglish(
+      <RichTextEditor label="Document" content={PARAGRAPH} />,
+    );
+    await editorReady(container);
+    const table = screen.getByRole("button", {
+      name: en("editor.toolbar.table"),
+    });
+    // An action, not a state: it says nothing about being pressed.
+    expect(table.hasAttribute("aria-pressed")).toBe(false);
+    await user.click(table);
+    await waitFor(() => expect(container.querySelector("table")).toBeTruthy());
+    // The caret is in the first cell now, and a cell holds paragraphs, lists
+    // and code: neither a table nor a heading could be saved there.
+    await waitFor(() =>
+      expect(
+        table.getAttribute("aria-disabled") ?? table.getAttribute("disabled"),
+      ).not.toBeNull(),
+    );
+    const heading = screen.getByRole("button", {
+      name: en("editor.toolbar.heading1"),
+    });
+    expect(
+      heading.getAttribute("aria-disabled") ?? heading.getAttribute("disabled"),
+    ).not.toBeNull();
+  });
+
+  test("hands out plain JSON, which a server action can carry", async () => {
+    // ProseMirror builds every node's attributes with no prototype, and
+    // React's server action encoder sends such an object as a placeholder the
+    // server cannot read: a heading arrived with `attrs: "$T"` and was refused.
+    const user = userEvent.setup();
+    const seen: unknown[] = [];
+    const { container } = inEnglish(
+      <RichTextEditor
+        label="Document"
+        content={PARAGRAPH}
+        onUpdate={(json) => seen.push(json)}
+      />,
+    );
+    await editorReady(container);
+    await user.click(
+      screen.getByRole("button", { name: en("editor.toolbar.heading2") }),
+    );
+    await waitFor(() => expect(seen.length).toBeGreaterThan(0));
+    const heading = (
+      seen.at(-1) as { content: { type: string; attrs: object }[] }
+    ).content[0];
+    expect(heading?.type).toBe("heading");
+    expect(Object.getPrototypeOf(heading?.attrs)).toBe(Object.prototype);
+  });
+
+  test("is not there while the document is read rather than edited", async () => {
+    const { container } = inEnglish(
+      <RichTextEditor label="Document" content={PARAGRAPH} editable={false} />,
+    );
+    await waitFor(() =>
+      expect(container.querySelector('[contenteditable="false"]')).toBeTruthy(),
+    );
     expect(screen.queryByRole("toolbar")).toBeNull();
   });
 });

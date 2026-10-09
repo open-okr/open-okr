@@ -5,11 +5,15 @@ import { type Editor, useEditorState } from "@tiptap/react";
 import {
   Bold,
   Code,
+  Heading1,
+  Heading2,
   Italic,
   Link,
   List,
   ListOrdered,
+  Quote,
   Strikethrough,
+  Table,
 } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { TextInput } from "../fields/text-input.tsx";
@@ -25,6 +29,21 @@ interface Format {
   readonly active: (editor: Editor) => boolean;
   readonly toggle: (editor: Editor) => void;
   readonly shortcut: string;
+  /** Whether the result could be stored where the caret is. */
+  readonly allowed?: (editor: Editor) => boolean;
+}
+
+/**
+ * What holds the block the caret is in: the document, a list item, a quote
+ * or a table cell. The stored format (core's `NESTING_RULES`, which this
+ * package cannot import) lets a heading sit in the document or a quote, a
+ * quote in the document or a list item, and a table in the document alone,
+ * and the editor's own schema is looser than that. So a block button is
+ * offered only where its result could be saved.
+ */
+function holder(editor: Editor): string {
+  const { $from } = editor.state.selection;
+  return $from.depth > 0 ? $from.node($from.depth - 1).type.name : "doc";
 }
 
 const FORMATS: readonly Format[] = [
@@ -72,6 +91,44 @@ const FORMATS: readonly Format[] = [
   },
 ];
 
+/**
+ * The full editor's block formats (guided-inputs §4.7), the ones its slash
+ * menu offers: a document has headings and quotes, a comment does not.
+ */
+const BLOCKS: readonly Format[] = [
+  {
+    key: "heading1",
+    icon: <Heading1 className="size-4" aria-hidden="true" />,
+    active: (editor) => editor.isActive("heading", { level: 1 }),
+    toggle: (editor) =>
+      editor.chain().focus().toggleHeading({ level: 1 }).run(),
+    shortcut: "Control+Alt+1 Meta+Alt+1",
+    allowed: (editor) => ["doc", "blockquote"].includes(holder(editor)),
+  },
+  {
+    key: "heading2",
+    icon: <Heading2 className="size-4" aria-hidden="true" />,
+    active: (editor) => editor.isActive("heading", { level: 2 }),
+    toggle: (editor) =>
+      editor.chain().focus().toggleHeading({ level: 2 }).run(),
+    shortcut: "Control+Alt+2 Meta+Alt+2",
+    allowed: (editor) => ["doc", "blockquote"].includes(holder(editor)),
+  },
+  {
+    key: "blockquote",
+    icon: <Quote className="size-4" aria-hidden="true" />,
+    active: (editor) => editor.isActive("blockquote"),
+    toggle: (editor) => editor.chain().focus().toggleBlockquote().run(),
+    shortcut: "Control+Shift+B Meta+Shift+B",
+    allowed: (editor) =>
+      editor.isActive("blockquote") ||
+      ["doc", "listItem"].includes(holder(editor)),
+  },
+];
+
+/** The same table the slash menu inserts. */
+const NEW_TABLE = { rows: 2, cols: 2, withHeaderRow: true } as const;
+
 const BUTTON_CLASS =
   "flex size-7 items-center justify-center rounded-control text-ink-3 outline-none hover:bg-raised hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-line aria-pressed:bg-brand-weak aria-pressed:text-brand-text";
 
@@ -85,7 +142,14 @@ const BUTTON_CLASS =
  * rather than in a dialog, and refuses one that is not a web or mail link,
  * which the stored format would refuse too.
  */
-export function EditorToolbar({ editor }: { readonly editor: Editor }) {
+export function EditorToolbar({
+  editor,
+  blocks = false,
+}: {
+  readonly editor: Editor;
+  /** The full editor's headings, quote and table, beside the simple formats. */
+  readonly blocks?: boolean;
+}) {
   const { t } = useTranslations();
   // One literal call per key, so the catalogue's own check can see each is
   // used.
@@ -96,11 +160,19 @@ export function EditorToolbar({ editor }: { readonly editor: Editor }) {
     code: t("editor.toolbar.code"),
     bulletList: t("editor.toolbar.bulletList"),
     orderedList: t("editor.toolbar.orderedList"),
+    heading1: t("editor.toolbar.heading1"),
+    heading2: t("editor.toolbar.heading2"),
+    blockquote: t("editor.toolbar.blockquote"),
   };
+  const formats = blocks ? [...FORMATS, ...BLOCKS] : FORMATS;
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
-      active: FORMATS.map((format) => format.active(current)),
+      active: [...FORMATS, ...BLOCKS].map((format) => format.active(current)),
+      allowed: [...FORMATS, ...BLOCKS].map(
+        (format) => format.allowed?.(current) ?? true,
+      ),
+      canInsertTable: holder(current) === "doc",
       link: current.isActive("link"),
       href: String(current.getAttributes("link").href ?? ""),
     }),
@@ -133,7 +205,7 @@ export function EditorToolbar({ editor }: { readonly editor: Editor }) {
         aria-label={t("editor.toolbar.label")}
         className="flex flex-wrap items-center gap-0.5 border-line border-b pb-1"
       >
-        {FORMATS.map((format, index) => (
+        {formats.map((format, index) => (
           <Toolbar.Button
             key={format.key}
             type="button"
@@ -141,12 +213,25 @@ export function EditorToolbar({ editor }: { readonly editor: Editor }) {
             aria-pressed={state.active[index] ?? false}
             aria-keyshortcuts={format.shortcut}
             title={labels[format.key]}
+            disabled={!(state.allowed[index] ?? true)}
             onClick={() => format.toggle(editor)}
-            className={BUTTON_CLASS}
+            className={cn(BUTTON_CLASS, "disabled:opacity-40")}
           >
             {format.icon}
           </Toolbar.Button>
         ))}
+        {blocks ? (
+          <Toolbar.Button
+            type="button"
+            aria-label={t("editor.toolbar.table")}
+            title={t("editor.toolbar.table")}
+            disabled={!state.canInsertTable}
+            onClick={() => editor.chain().focus().insertTable(NEW_TABLE).run()}
+            className={cn(BUTTON_CLASS, "disabled:opacity-40")}
+          >
+            <Table className="size-4" aria-hidden="true" />
+          </Toolbar.Button>
+        ) : null}
         <Toolbar.Separator className="mx-1 h-4 w-px bg-line" />
         <Toolbar.Button
           type="button"

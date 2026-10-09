@@ -331,6 +331,50 @@ describe("creating what a person kept from a decomposition", () => {
   });
 });
 
+describe("keeping a minutes write-up", () => {
+  // The full editor's document (guided-inputs §4.7), so a heading stays one.
+  const body = {
+    type: "doc",
+    content: [
+      {
+        type: "heading",
+        attrs: { level: 2 },
+        content: [{ type: "text", text: "Decisions" }],
+      },
+      { type: "paragraph", content: [{ type: "text", text: "Ship it." }] },
+    ],
+  };
+
+  it("keeps the document, headings and all, as a draft on the session", async () => {
+    callAction.mockResolvedValue({ id: "document-1" });
+    const saved = await sessionActions.saveMinutesWriteUpAction(
+      "session-1",
+      "Q3 review, written up",
+      body,
+    );
+    expect(saved).toEqual({ documentId: "document-1" });
+    expect(callAction.mock.calls[0]?.[1]).toBe("documents.create");
+    expect(callAction.mock.calls[0]?.[2]).toEqual({
+      subjectType: "session",
+      subjectId: "session-1",
+      title: "Q3 review, written up",
+      body,
+    });
+  });
+
+  it("refuses an empty one before anything is sent", async () => {
+    const saved = await sessionActions.saveMinutesWriteUpAction(
+      "session-1",
+      "Q3 review, written up",
+      { type: "doc", content: [{ type: "paragraph" }] },
+    );
+    expect(saved).toEqual({
+      error: "session.detail.minutes.writeUp.nothingToSave",
+    });
+    expect(callAction).not.toHaveBeenCalled();
+  });
+});
+
 describe("every screen draws its affordance only when offered", () => {
   const source = (path: string) =>
     readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");

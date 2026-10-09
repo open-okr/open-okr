@@ -160,7 +160,7 @@ The existing `RichTextEditor` gains a `variant` prop:
 
 | | `compact` (new) | `full` (today's editor, plus the toolbar) |
 |---|---|---|
-| Toolbar | Bold, italic, underline, strike, inline code, bulleted list, numbered list, link | The same, plus heading, quote and table |
+| Toolbar | Bold, italic, underline, strike, inline code, bulleted list, numbered list, link | The same, plus Heading 1, Heading 2, quote and table, the slash menu's own blocks. A block the stored format cannot hold where the caret is (a heading in a list item, anything but text and lists in a table cell) is offered disabled |
 | Slash menu | Off | On |
 | `@` mentions | Where the caller passes `searchMembers` (comments) | Same |
 | Attachments | Where the caller passes `uploadFile` | Same |
@@ -335,7 +335,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 4d | The rest of change 4 | The length limit in `richTextSchema`, with its first capped field. The stored text is shown as written on the goal page and the review stage. Done 9 October 2026 | Goal retrospective, initiative description, review narrative |
 | 4b | `feat/underline` | Underline step 2, one release after 4a: the button, Mod-U, pasted `<u>`, and the HTML import's `<u>` | Every editor |
 | 5a | The cycle's rich fields | `RichTextField` with `sendUnchanged` for forms that write every field, the 4000-character cap on `workflow.setBaselineHealth` and `workflow.setCapacityNotes`, `workflow.read`'s documents beside its plain text, and `asText` and `asDocument` removed. Done 9 October 2026 | Annual frame ×4, baseline health ×3, capacity cuts |
-| 5b | The full editor's toolbar | The compact buttons plus Heading 1, Heading 2, Quote and Table | The minutes write-up, and every document editor |
+| 5b | The full editor's toolbar | The compact buttons plus Heading 1, Heading 2, Quote and Table, each offered only where the stored format can hold what it makes. Done 9 October 2026 | The minutes write-up, and every document editor |
 | 6 | `feat/number-fields` | `NumberInput`, `MetricInput`, `ConfidenceInput`, `UnitInput`, weight bounds | OKR list, drawer and diagram, goal page, check-in, KPI add, judged-by, suggestion, grid, recovery, trees |
 | 7 | `feat/date-time-fields` | `DateInput`, `DateRangeInput`, `DateTimeInput`, `TimeRangeInput`, and the server date checks | Cycle dates, key result due dates, tasks, initiatives, leave, holidays, sessions, site messages, audit, quiet hours |
 | 8 | `feat/entity-picker` | `EntityPicker` | About 60 selects and the 3 pasted ids |

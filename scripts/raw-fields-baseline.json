@@ -88,7 +88,6 @@
   "apps/web/app/session/[id]/coordinator-note.tsx": 1,
   "apps/web/app/session/[id]/forward.tsx": 4,
   "apps/web/app/session/[id]/management-retro.tsx": 1,
-  "apps/web/app/session/[id]/minutes/minutes-write-up.tsx": 1,
   "apps/web/app/session/[id]/monthly-review.tsx": 5,
   "apps/web/app/session/[id]/next-actions.tsx": 2,
   "apps/web/app/session/[id]/process-health.tsx": 2,
