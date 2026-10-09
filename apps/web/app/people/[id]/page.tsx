@@ -216,7 +216,7 @@ export default async function MemberProfilePage({
                 {t("people.detail.bio")}
               </h3>
               <div
-                className="prose prose-sm max-w-none text-ink"
+                className="rich-text text-ink"
                 // The HTML is produced by renderRichTextToHtml, which is a
                 // sanitising allow-list at every surface (CLAUDE.md).
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by renderRichTextToHtml

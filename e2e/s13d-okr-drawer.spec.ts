@@ -237,8 +237,11 @@ test("acceptance: checking in from the row moves its health, and the history sho
   await expect(form).toBeVisible({ timeout: 15_000 });
   await form.getByLabel("Status", { exact: true }).selectOption("caution");
   await form.getByLabel(`Confidence in ${KEY_RESULT}, out of 10`).fill("6");
+  // The compact editor, a content-editable box named by its own label.
   await form
-    .getByLabel("What moved, what is in the way, what happens next")
+    .getByRole("textbox", {
+      name: "What moved, what is in the way, what happens next",
+    })
     .fill(NARRATIVE);
   await form.getByRole("button", { name: "Publish the check-in" }).click();
 

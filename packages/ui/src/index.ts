@@ -29,6 +29,7 @@ export * from "./keyboard/use-keyboard-shortcut.ts";
 export * from "./lib/cn.ts";
 export * from "./lib/format-measure.ts";
 export * from "./query/query-provider.tsx";
+export * from "./rich-text/blank.ts";
 export * from "./rich-text/draft.ts";
 export * from "./rich-text/editor.tsx";
 export * from "./rich-text/rich-text-field.tsx";

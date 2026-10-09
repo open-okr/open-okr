@@ -42,6 +42,37 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => undefined, push: () => undefined }),
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
+// The narrative is written in the compact editor, which is ProseMirror, and
+// jsdom cannot type into it. A plain box stands in that hands the drawer the
+// document the editor would, so the claims here stay about the drawer; typing
+// and formatting in the real editor is `e2e/s15-check-in-publish.spec.ts`.
+vi.mock("@openokr/ui", async (original) => ({
+  ...(await original<typeof import("@openokr/ui")>()),
+  RichTextEditor: ({
+    label,
+    onUpdate,
+  }: {
+    label: string;
+    onUpdate?: (json: unknown) => void;
+  }) => (
+    <textarea
+      aria-label={label}
+      onChange={(event) =>
+        onUpdate?.({
+          type: "doc",
+          content: [
+            event.target.value === ""
+              ? { type: "paragraph" }
+              : {
+                  type: "paragraph",
+                  content: [{ type: "text", text: event.target.value }],
+                },
+          ],
+        })
+      }
+    />
+  ),
+}));
 
 class Quiet {
   onmessage = null;
@@ -613,7 +644,20 @@ describe("checking in", () => {
       id: "g",
       status: "caution",
       confidence: 0.5,
-      narrative: "The guide is back and activation moved again.",
+      narrative: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "The guide is back and activation moved again.",
+              },
+            ],
+          },
+        ],
+      },
       values: [{ keyResultId: "k", value: 40, confidence: 0.7 }],
     });
     expect(new URLSearchParams(window.location.search).get("tab")).toBe(

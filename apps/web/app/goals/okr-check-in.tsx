@@ -1,11 +1,18 @@
 "use client";
 
+import type { RichTextDocument } from "@openokr/core";
 import {
   belowCommittedFloor,
   COMMITTED_FLOOR_TEXT,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { Button, Chip, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  Chip,
+  isBlankDocument,
+  RichTextEditor,
+  useTranslations,
+} from "@openokr/ui";
 import { useState } from "react";
 import type { OkrDetail } from "../../lib/okr-tree/actions.ts";
 import type { OkrGoal } from "../../lib/okr-tree/cache.ts";
@@ -103,7 +110,8 @@ export function CheckInTab({
       ]),
     ),
   );
-  const [narrative, setNarrative] = useState("");
+  // The compact editor's document (guided-inputs §4.7), null until typed in.
+  const [narrative, setNarrative] = useState<RichTextDocument | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -117,7 +125,7 @@ export function CheckInTab({
       setProblem(t("okrDrawer.confidenceOutOfTen"));
       return;
     }
-    if (narrative.trim() === "") {
+    if (narrative === null || isBlankDocument(narrative)) {
       setProblem(t("checkIn.actions.needsANarrative"));
       return;
     }
@@ -312,18 +320,19 @@ export function CheckInTab({
         ))}
       </ul>
 
-      <label className="flex flex-col gap-1 text-xs">
-        <span className="font-semibold text-ink-2">
+      <fieldset className="m-0 flex flex-col gap-1 border-0 p-0 text-xs">
+        <legend className="mb-1 font-semibold text-ink-2">
           {t("checkIn.composer.whatMovedWhatIs")}
-        </span>
-        <textarea
-          rows={4}
-          value={narrative}
-          onChange={(event) => setNarrative(event.target.value)}
-          placeholder={t("checkIn.composer.statusLivesInThe")}
-          className="rounded-control border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
-        />
-      </label>
+        </legend>
+        <div className="rounded-control border border-line bg-surface px-2.5 py-1.5 text-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
+          <RichTextEditor
+            label={t("checkIn.composer.whatMovedWhatIs")}
+            variant="compact"
+            placeholder={t("checkIn.composer.statusLivesInThe")}
+            onUpdate={(json) => setNarrative(json as RichTextDocument)}
+          />
+        </div>
+      </fieldset>
 
       {problem ? (
         <p role="alert" className="text-xs text-bad">

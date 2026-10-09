@@ -6,6 +6,7 @@ import {
   CardHeader,
   Chip,
   formatMeasure,
+  RichTextField,
 } from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -239,22 +240,17 @@ export async function Composer({
             </ul>
           )}
 
-          <div className="flex flex-col gap-1.5">
-            <label
-              className="text-xs font-semibold text-ink-2"
-              htmlFor="narrative"
-            >
-              {t("checkIn.composer.whatMovedWhatIs")}
-            </label>
-            <textarea
-              id="narrative"
-              name="narrative"
-              rows={5}
-              required
-              placeholder={t("checkIn.composer.statusLivesInThe")}
-              className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
-            />
-          </div>
+          {/* The compact editor (guided-inputs §4.7). Required, which the
+              action says before the round trip, since an editor cannot carry
+              the browser's own `required`. Keyed to the draft because an
+              editor keeps its own text through a form reset, which a
+              textarea did not: a new draft starts empty. */}
+          <RichTextField
+            key={checkInId}
+            label={t("checkIn.composer.whatMovedWhatIs")}
+            name="narrative"
+            placeholder={t("checkIn.composer.statusLivesInThe")}
+          />
 
           <div className="flex items-center gap-2.5">
             <Button type="submit" variant="primary">

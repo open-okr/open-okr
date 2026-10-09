@@ -8,14 +8,10 @@
  * editor replaces the textarea when the goal surfaces land at P3-T10; what it
  * cannot replace is the refusal, which stays on the server.
  */
-import {
-  callAction,
-  isBlankText,
-  OperationError,
-  richTextFromPlainText,
-} from "@openokr/core";
+import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { readRichTextField } from "../../lib/rich-text-form";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
@@ -100,13 +96,20 @@ export async function publishCheckIn(
   formData: FormData,
 ): Promise<WriteState> {
   const id = String(formData.get("checkInId") ?? "");
-  const narrative = String(formData.get("narrative") ?? "");
+  // The composer's narrative is the compact editor's document since
+  // guided-inputs §4.7, so what was written bold stays bold.
+  const narrative = readRichTextField(formData, "narrative");
 
-  if (isBlankText(narrative)) {
+  if (narrative.state !== "document") {
     // The same refusal the action makes, said before the round trip so it lands
     // beside the empty field.
     const { t } = await getTranslations();
-    return { error: t("checkIn.actions.needsANarrative") };
+    return {
+      error:
+        narrative.state === "malformed"
+          ? t("checkIn.actions.narrativeUnreadable")
+          : t("checkIn.actions.needsANarrative"),
+    };
   }
 
   return run((context) =>
@@ -117,7 +120,7 @@ export async function publishCheckIn(
         | "caution"
         | "off_track",
       confidence: Number(formData.get("confidence") ?? 0.5),
-      narrative: richTextFromPlainText(narrative),
+      narrative: narrative.document,
       values: composerValues(formData),
     }),
   );
@@ -128,7 +131,13 @@ export async function editCheckIn(
   formData: FormData,
 ): Promise<WriteState> {
   const id = String(formData.get("checkInId") ?? "");
-  const narrative = String(formData.get("narrative") ?? "");
+  // Left untouched, the narrative is not sent and stays as it was; emptied,
+  // it stays too, since a check-in needs one.
+  const narrative = readRichTextField(formData, "narrative");
+  if (narrative.state === "malformed") {
+    const { t } = await getTranslations();
+    return { error: t("checkIn.actions.narrativeUnreadable") };
+  }
 
   return run((context) =>
     callAction(context, "goals.editCheckIn", {
@@ -138,9 +147,9 @@ export async function editCheckIn(
         | "caution"
         | "off_track",
       confidence: Number(formData.get("confidence") ?? 0.5),
-      ...(isBlankText(narrative)
-        ? {}
-        : { narrative: richTextFromPlainText(narrative) }),
+      ...(narrative.state === "document"
+        ? { narrative: narrative.document }
+        : {}),
       values: composerValues(formData),
     }),
   );

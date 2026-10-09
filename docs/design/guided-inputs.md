@@ -179,7 +179,7 @@ The existing `RichTextEditor` gains a `variant` prop:
 | `packages/core/src/rich-text/render.ts` | `underline` renders as `<u>`, so the screen, email and exports show it |
 | `excerpt.ts`, chat messages, search, embeddings | Nothing. They read plain text, and an underline has no text of its own |
 | `packages/ui/src/rich-text/editor.tsx` | StarterKit's `underline` extension is switched on (it ships in the installed version and is disabled today) |
-| `packages/ui/src/styles/prosemirror.css` | Links keep their brand colour, and underlined text keeps the text colour, so underlined text never looks like a link |
+| `packages/ui/src/styles/rich-text.css` | Links keep their brand colour, and underlined text keeps the text colour, so underlined text never looks like a link. The file arrived with 4c, for the editor and the rendered HTML alike, because the `prose` classes both carried came from a typography plugin the product does not install and lists showed no markers |
 
 **It ships in two steps, as PLAN.md §5.1 asks of anything a newer release writes and an older one reads.** An editor built without the underline mark cannot load a document that carries one: ProseMirror refuses a mark its schema does not know. During a rolling upgrade, or in a browser tab left open across one, an older editor would meet underlined text written by a newer one. So:
 
@@ -330,7 +330,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 2 | `feat/code-input` | `CodeInput`, and the terminal code's alphabet and shape in `packages/formats`. Done 9 October 2026 | Sign-in second step, turning on the authenticator, backup code, terminal login |
 | 3 | `feat/timezone-select` | `TimezoneSelect`, the stricter `timezoneSchema`. Done 9 October 2026 | Welcome wizard, Admin > General, profile |
 | 4a | `feat/compact-editor` | The `compact` variant, the toolbar, `RichTextField`. Underline step 1: every reader knows the mark, nothing writes it. Done 9 October 2026 | Comments, new and edit, with `@` mentions; the profile bio |
-| 4c | Check-in narratives | `RichTextField` on the three narrative fields | Check-in composer, the OKR drawer's check-in tab, the timeline's edit |
+| 4c | Check-in narratives | `RichTextField` on the composer and the timeline's edit, and the compact editor itself in the drawer, which keeps its own state rather than posting a form. The history card shows the narrative as written. Done 9 October 2026 | Check-in composer, the OKR drawer's check-in tab, the timeline's edit |
 | 4d | The rest of change 4 | The length limit in `richTextSchema`, with its first capped field | Goal retrospective, initiative description, review narrative |
 | 4b | `feat/underline` | Underline step 2, one release after 4a: the button, Mod-U, pasted `<u>`, and the HTML import's `<u>` | Every editor |
 | 5 | `feat/editor-cycle-fields` | The cycle's rich fields, with `asText` and `asDocument` removed | Annual frame ×4, baseline health ×3, capacity cuts, the minutes write-up |

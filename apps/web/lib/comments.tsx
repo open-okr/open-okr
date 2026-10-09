@@ -12,7 +12,12 @@
  * about is its parent's business: `SubjectComments` binds the writes.
  */
 import type { RichTextDocument } from "@openokr/core";
-import { Button, RichTextEditor, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  isBlankDocument,
+  RichTextEditor,
+  useTranslations,
+} from "@openokr/ui";
 import { useCallback, useState, useTransition } from "react";
 
 /** One emoji's reactions on one subject, as `reactions.list` groups them. */
@@ -156,9 +161,7 @@ export function CommentThread({
               />
             </div>
           ) : (
-            <div className="prose prose-sm max-w-none text-ink">
-              <CommentBody html={comment.html} />
-            </div>
+            <CommentBody html={comment.html} />
           )}
 
           <div className="flex flex-wrap items-center gap-2">
@@ -283,7 +286,7 @@ function CommentBody({ html }: { html: string | null }) {
   }
   return (
     <div
-      className="prose prose-sm max-w-none text-ink"
+      className="rich-text text-ink"
       // The HTML is produced by renderRichTextToHtml, which escapes every
       // text value and emits tags only from its own allow-list.
       // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by renderRichTextToHtml
@@ -301,19 +304,6 @@ interface CommentEditorProps {
   readonly searchMembers?: (
     query: string,
   ) => Promise<readonly { readonly id: string; readonly label: string }[]>;
-}
-
-/** Whether a document holds anything but empty paragraphs. */
-interface ContentNode {
-  readonly type?: string;
-  readonly content?: readonly unknown[];
-}
-
-function hasContent(node: ContentNode): boolean {
-  if (node.type !== "doc" && node.type !== "paragraph" && !node.content) {
-    return true;
-  }
-  return (node.content ?? []).some((child) => hasContent(child as ContentNode));
 }
 
 /**
@@ -356,7 +346,7 @@ function CommentEditor({
         <Button
           size="sm"
           onClick={() => body && onSave(body)}
-          disabled={saving || !body || !hasContent(body)}
+          disabled={saving || !body || isBlankDocument(body)}
         >
           {saving
             ? t("comments.thread.posting")

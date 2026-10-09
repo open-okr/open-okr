@@ -36,6 +36,9 @@ const OBJECTIVE = "Every team reports on its own goals each week";
 const KEY_RESULT = "Raise weekly check-in completion from 40 to 80";
 const NARRATIVE =
   "Two teams started posting on Mondays. The platform team is still waiting on access to the board.";
+const NEXT_STEP = "Ask the platform lead for board access";
+const CORRECTION = " by Tuesday";
+const NARRATIVE_LABEL = "What moved, what is in the way, what happens next";
 
 // The superuser, for the reason `reviews.spec.ts` gives: every business table
 // carries forced row-level security, and the one update below has to reach a
@@ -65,6 +68,11 @@ test.afterAll(async () => {
 });
 
 const history = () => page.getByRole("article").filter({ hasText: NARRATIVE });
+// The narrative as the card shows it, apart from the copy loaded into the
+// card's own edit field: its first paragraph, and the list under it.
+const shownParagraph = () =>
+  history().locator(":scope > .rich-text > p").first();
+const shownList = () => history().locator(":scope > .rich-text > ul > li");
 
 test("a goal of this reader's own, with one key result, is due", async () => {
   await goTo(page, "/cycle?phase=4");
@@ -118,9 +126,21 @@ test("the walker offers it, and publishing puts the card in the history", async 
 
   await page.getByLabel(`New value for ${KEY_RESULT}`).fill("60");
   await page.getByLabel("Status", { exact: true }).selectOption("caution");
-  await page
-    .getByLabel("What moved, what is in the way, what happens next")
-    .fill(NARRATIVE);
+  // The compact editor (guided-inputs §4.7): the narrative is bolded from the
+  // toolbar, and the next step goes in a bulleted list under it.
+  const field = page.getByRole("group", { name: NARRATIVE_LABEL });
+  const narrative = field.getByRole("textbox", { name: NARRATIVE_LABEL });
+  await narrative.fill(NARRATIVE);
+  await narrative.press("ControlOrMeta+a");
+  await field.getByRole("button", { name: "Bold", exact: true }).click();
+  // The right arrow puts the caret at the end of what is selected on every
+  // platform. End does not move it at all on macOS.
+  await narrative.press("ArrowRight");
+  await narrative.press("Enter");
+  await field
+    .getByRole("button", { name: "Bulleted list", exact: true })
+    .click();
+  await narrative.pressSequentially(NEXT_STEP);
   await page
     .getByRole("main")
     .getByRole("button", { name: "Publish", exact: true })
@@ -134,6 +154,31 @@ test("the walker offers it, and publishing puts the card in the history", async 
   // "At risk", §3.5's default label for the stored `caution` (P9-T15b-a).
   await expect(card).toContainText("At risk");
   await expect(card).toContainText("awaiting the reviewer");
+  // As it was written, not flattened to a line of text.
+  await expect(shownParagraph().locator("strong")).toHaveText(NARRATIVE);
+  await expect(shownList()).toHaveText(NEXT_STEP);
+  // A list that looks like one: Preflight takes the markers off every list.
+  await expect(shownList()).toHaveCSS("list-style-type", "disc");
+});
+
+test("correcting the narrative from the timeline keeps its formatting", async () => {
+  const card = history();
+  const edit = card.getByRole("textbox", { name: "Narrative", exact: true });
+  // A click at the far end of the list item's line puts the caret after its
+  // last word. Select-all and the right arrow would put it after the list.
+  const line = edit.locator("li p");
+  const box = await line.boundingBox();
+  expect(box, "the list item is not on screen").not.toBeNull();
+  await line.click({
+    position: { x: (box?.width ?? 0) - 2, y: (box?.height ?? 0) / 2 },
+  });
+  await edit.pressSequentially(CORRECTION);
+  await card.getByRole("button", { name: "Save", exact: true }).click();
+
+  await expect(shownList()).toHaveText(`${NEXT_STEP}${CORRECTION}`, {
+    timeout: 15_000,
+  });
+  await expect(shownParagraph().locator("strong")).toHaveText(NARRATIVE);
 });
 
 test("the reviewer acknowledges it, and the card says so", async () => {

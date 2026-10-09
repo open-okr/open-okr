@@ -213,7 +213,7 @@ export const RichTextEditor = forwardRef<
   const surface = (
     <EditorContent
       editor={editor}
-      className="prose prose-sm max-w-none text-ink focus:outline-none"
+      className="rich-text text-ink focus:outline-none"
     />
   );
   if (variant !== "compact") {

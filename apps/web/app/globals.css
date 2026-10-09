@@ -4,6 +4,8 @@
  * Content-Security-Policy refuses. In `base`, for the reason the block below
  * gives: a utility on an editor must still be able to win. */
 @import "../../../packages/ui/src/styles/prosemirror.css" layer(base);
+/* Lists, spacing, code and links in rich text, written and read. */
+@import "../../../packages/ui/src/styles/rich-text.css" layer(components);
 
 /* packages/ui/src lives outside apps/web's own tree, so Tailwind v4's
  * automatic content detection (which scans relative to this file) never

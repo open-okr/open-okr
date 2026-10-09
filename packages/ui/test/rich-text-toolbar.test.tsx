@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { describe, expect, test } from "vitest";
 import { CATALOGUES, translate } from "../src/i18n/catalogue.ts";
 import { TranslationsProvider } from "../src/i18n/use-translations.tsx";
+import { isBlankDocument } from "../src/rich-text/blank.ts";
 import { RichTextEditor } from "../src/rich-text/editor.tsx";
 import { RichTextField } from "../src/rich-text/rich-text-field.tsx";
 
@@ -142,5 +143,26 @@ describe("a rich text field in a form", () => {
     // An untouched field is not sent, so saving the form does not write a new
     // version of something nobody changed.
     expect(container.querySelector('input[name="bio"]')).toBeNull();
+  });
+});
+
+describe("a blank document", () => {
+  test("is one with nothing but empty paragraphs in it", () => {
+    expect(isBlankDocument(null)).toBe(true);
+    expect(
+      isBlankDocument({ type: "doc", content: [{ type: "paragraph" }] }),
+    ).toBe(true);
+    expect(isBlankDocument(PARAGRAPH)).toBe(false);
+    expect(
+      isBlankDocument({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "mention", attrs: { id: "m", label: "Priya" } }],
+          },
+        ],
+      }),
+    ).toBe(false);
   });
 });

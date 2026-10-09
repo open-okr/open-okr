@@ -1,11 +1,18 @@
-import { excerptRichText } from "@openokr/core";
+import {
+  isValidRichText,
+  parseRichText,
+  RICH_TEXT_SCHEMA_VERSION,
+  renderRichTextToHtml,
+} from "@openokr/core";
 import {
   Button,
   Card,
   CardBody,
   CardHeader,
   Chip,
+  isBlankDocument,
   type MessageValues,
+  RichTextField,
 } from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -145,10 +152,10 @@ export async function Timeline({
                 )}
               </header>
 
-              <p className="text-sm text-ink-2">
-                {excerptRichText(entry.narrative as never, 2000) ||
-                  t("checkIn.timeline.noNarrativeRecorded")}
-              </p>
+              <Narrative
+                document={entry.narrative}
+                empty={t("checkIn.timeline.noNarrativeRecorded")}
+              />
 
               {entry.entries.length > 0 ? (
                 <ul className="flex flex-col gap-0.5">
@@ -240,18 +247,19 @@ export async function Timeline({
                     defaultValue={entry.confidence ?? 0.5}
                     className="w-28"
                   />
-                  <label
-                    className="sr-only"
-                    htmlFor={`edit-narrative-${entry.id}`}
-                  >
-                    {t("checkIn.timeline.replaceTheNarrative")}
-                  </label>
-                  <input
-                    id={`edit-narrative-${entry.id}`}
-                    name="narrative"
-                    placeholder={t("checkIn.timeline.leaveBlankToKeep")}
-                    className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink placeholder:text-ink-4"
-                  />
+                  {/* The stored narrative itself, in the compact editor
+                      (guided-inputs §4.7). The one-line box this replaced
+                      could only overwrite a narrative of several paragraphs
+                      with one line of plain text. Untouched, it is not sent
+                      and the narrative stays as it was. */}
+                  <div className="w-full">
+                    <RichTextField
+                      label={t("checkIn.timeline.narrative")}
+                      name="narrative"
+                      content={entry.narrative}
+                      description={t("checkIn.timeline.keptIfUntouched")}
+                    />
+                  </div>
                   <Button
                     type="submit"
                     variant="ghost"
@@ -273,5 +281,37 @@ export async function Timeline({
             never useful anyway, so the placeholder is gone rather than reworded. */}
       </CardBody>
     </Card>
+  );
+}
+
+/**
+ * The narrative as it was written, formatting and all (guided-inputs §4.7),
+ * since the card is where a check-in is read in full. The HTML comes from
+ * `renderRichTextToHtml`, which escapes every text value and emits tags only
+ * from its own allow-list, so a narrative that arrived through an importer or
+ * a channel is shown as safely as one typed here.
+ */
+function Narrative({
+  document,
+  empty,
+}: {
+  readonly document: unknown;
+  readonly empty: string;
+}) {
+  if (
+    isBlankDocument(document) ||
+    !isValidRichText(document, RICH_TEXT_SCHEMA_VERSION)
+  ) {
+    return <p className="text-sm text-ink-3 italic">{empty}</p>;
+  }
+  const html = renderRichTextToHtml(
+    parseRichText(document, RICH_TEXT_SCHEMA_VERSION),
+  );
+  return (
+    <div
+      className="rich-text text-sm text-ink-2"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by renderRichTextToHtml
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
