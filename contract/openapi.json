@@ -8758,6 +8758,12 @@
                               "null"
                             ]
                           },
+                          "actorName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "ruleKey": {
                             "type": [
                               "string",
@@ -8778,6 +8784,7 @@
                           "subjectType",
                           "subjectId",
                           "rendered",
+                          "actorName",
                           "ruleKey",
                           "watching"
                         ],
