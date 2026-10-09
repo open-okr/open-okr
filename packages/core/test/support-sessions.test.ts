@@ -371,6 +371,31 @@ describe("the customer can see who was in their workspace", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("lets the same operator in again once the first session has ended (UAT BUG-029)", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const first = await request();
+    await grant(first.id);
+    await endSupportSession(wb.appPool, {
+      workspaceId,
+      sessionId: first.id,
+      reason: "finished",
+      endedByUserId: OWNER,
+    });
+    await expect(readAsOperator()).rejects.toThrow();
+
+    const second = await request();
+    await grant(second.id, { level: ACCESS_LEVELS.view });
+    await expect(readAsOperator()).resolves.toBeTruthy();
+
+    // One guest row for both sessions, so the operator stays one author.
+    const { rows } = await wb.admin.query(
+      "select status from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OPERATOR],
+    );
+    expect(rows).toEqual([{ status: "active" }]);
+  });
+
   it("records the grant and the end in the workspace's own audit trail", async () => {
     const wb = await workerDb();
     await grantOperator();

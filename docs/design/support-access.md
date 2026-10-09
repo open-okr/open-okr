@@ -135,6 +135,13 @@ level, the list filter and the visible-ids set.
 | comment | `viewer` | The same | Comments |
 | edit | `member` | The same | What a member edits |
 
+**A later session reuses the guest an ended one left** (UAT BUG-029).
+Ending a session suspends its guest, and that row used to make every later
+request and grant answer "already a member", so an operator could be let in
+once per workspace for good. A request now ignores a suspended guest, and the
+grant wakes it with the new level's role and binding: one member, so every
+session's actions keep one author.
+
 **Given** an owner who granted view, **when** the operator lists the goals
 of a space, **then** they see what a member sees, and an edit to any of
 them is refused.
