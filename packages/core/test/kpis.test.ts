@@ -574,19 +574,67 @@ describe("achievement and the corridor", () => {
   });
 });
 
-describe("the corridor a new KPI takes (completeness review H-17)", () => {
+describe("the corridor a KPI is read by (completeness review H-17, UAT BUG-011)", () => {
+  const detail = async (kpiId: string) => {
+    const wb = await workerDb();
+    return (
+      await callAction({ pool: wb.appPool, ...context() }, "kpis.detail", {
+        kpiId,
+        periods: 24,
+      })
+    ).kpi;
+  };
+
   it("is the workspace's kpi.healthyThreshold and kpi.watchThreshold", async () => {
     const wb = await workerDb();
     await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
       overrides: { "kpi.healthyThreshold": 85, "kpi.watchThreshold": 60 },
     });
     const kpi = await makeKpi({ title: "Net revenue retention" });
-    const { rows } = await wb.admin.query<{
-      healthy_pct: string;
-      watch_pct: string;
-    }>("select healthy_pct, watch_pct from kpis where id = $1", [kpi.id]);
-    expect(Number(rows[0]?.healthy_pct)).toBe(85);
-    expect(Number(rows[0]?.watch_pct)).toBe(60);
+    const read = await detail(kpi.id);
+    expect(read.healthyPct).toBe(85);
+    expect(read.watchPct).toBe(60);
+    expect(read.corridorFollowsWorkspace).toBe(true);
+  });
+
+  it("recolours a KPI that follows it when the workspace moves its thresholds", async () => {
+    const wb = await workerDb();
+    const kpi = await makeKpi({ title: "Net revenue retention" });
+    await callAction({ pool: wb.appPool, ...context() }, "kpis.record", {
+      kpiId: kpi.id,
+      on: "2026-08-11",
+      actualValue: 87,
+      targetValue: 100,
+    });
+    expect((await detail(kpi.id)).state).toBe("watch");
+
+    await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
+      overrides: { "kpi.healthyThreshold": 85 },
+    });
+    const read = await detail(kpi.id);
+    expect(read.healthyPct).toBe(85);
+    expect(read.state).toBe("healthy");
+  });
+
+  it("leaves a KPI with its own corridor where it was, until it is cleared", async () => {
+    const wb = await workerDb();
+    const kpi = await makeKpi({ title: "Net revenue retention" });
+    await callAction({ pool: wb.appPool, ...context() }, "kpis.update", {
+      kpiId: kpi.id,
+      healthyPct: 95,
+    });
+    await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
+      overrides: { "kpi.healthyThreshold": 85 },
+    });
+    expect((await detail(kpi.id)).healthyPct).toBe(95);
+
+    await callAction({ pool: wb.appPool, ...context() }, "kpis.update", {
+      kpiId: kpi.id,
+      healthyPct: null,
+    });
+    const read = await detail(kpi.id);
+    expect(read.healthyPct).toBe(85);
+    expect(read.corridorFollowsWorkspace).toBe(true);
   });
 });
 

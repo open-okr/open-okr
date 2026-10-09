@@ -7,6 +7,7 @@ import {
   kpis,
   newId,
   tasks,
+  type WorkspaceTx,
 } from "@openokr/db";
 import {
   type KpiReading as KpiBandReading,
@@ -24,8 +25,10 @@ import {
   shouldProposeRecoveryClose,
   targetTypeOfDirection,
 } from "@openokr/method";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { visibleResourceIds } from "../access/reads.ts";
+import { resolveRhythm } from "../cycles/rhythm.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import type { OperationTx } from "../operations/operation.ts";
 
 /**
@@ -50,8 +53,46 @@ export interface KpiRule {
   readonly greenHigh: string | null;
   readonly redLow: string | null;
   readonly redHigh: string | null;
-  readonly healthyPct: string;
-  readonly watchPct: string;
+  /** Null follows the workspace (UAT BUG-011). Resolve with `corridorOf`. */
+  readonly healthyPct: string | null;
+  readonly watchPct: string | null;
+}
+
+/** A KPI's healthy and watch thresholds, in percent of target (§6.4). */
+export interface KpiCorridor {
+  readonly healthyPct: number;
+  readonly watchPct: number;
+}
+
+/**
+ * The workspace's corridor as it is now: §11 `kpi.healthyThreshold` and
+ * `kpi.watchThreshold`, with its overrides applied. Read once per action and
+ * handed to every reader below.
+ */
+export async function workspaceKpiCorridor<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: WorkspaceTx<TSchema>, workspaceId: string): Promise<KpiCorridor> {
+  const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
+  return {
+    healthyPct: thresholds["kpi.healthyThreshold"],
+    watchPct: thresholds["kpi.watchThreshold"],
+  };
+}
+
+/**
+ * The corridor one KPI is read by: its own where it deviates, the
+ * workspace's where it follows (UAT BUG-011). Each column falls back on its
+ * own, so a KPI that set only its healthy line keeps following the watch line.
+ */
+export function corridorOf(
+  row: { readonly healthyPct: string | null; readonly watchPct: string | null },
+  workspace: KpiCorridor,
+): KpiCorridor {
+  return {
+    healthyPct:
+      row.healthyPct === null ? workspace.healthyPct : Number(row.healthyPct),
+    watchPct: row.watchPct === null ? workspace.watchPct : Number(row.watchPct),
+  };
 }
 
 /** The selection that loads a `KpiRule`, so every reader asks for the same columns. */
@@ -91,16 +132,14 @@ export function readingOf(
   rule: KpiRule,
   actual: number | null,
   target: number | null,
+  workspace: KpiCorridor,
 ): KpiBandReading {
   return kpiReading({
     targetType: targetTypeOf(rule),
     thresholds: thresholdsOf(rule),
     actual,
     target,
-    corridor: {
-      healthyPct: Number(rule.healthyPct),
-      watchPct: Number(rule.watchPct),
-    },
+    corridor: corridorOf(rule, workspace),
   });
 }
 
@@ -110,18 +149,21 @@ export function readingOf(
  * its achievement gives, which is the rule it was judged by; data change 0021
  * rewrites those rows, and this covers any it left.
  */
-export function shownState(row: {
-  readonly state: string;
-  readonly achievementPct: string | null;
-  readonly healthyPct: string;
-  readonly watchPct: string;
-}): KpiState {
+export function shownState(
+  row: {
+    readonly state: string;
+    readonly achievementPct: string | null;
+    readonly healthyPct: string | null;
+    readonly watchPct: string | null;
+  },
+  workspace: KpiCorridor,
+): KpiState {
   if (row.state !== "recovering") {
     return row.state as KpiState;
   }
   return kpiState(
     row.achievementPct === null ? null : Number(row.achievementPct),
-    { healthyPct: Number(row.healthyPct), watchPct: Number(row.watchPct) },
+    corridorOf(row, workspace),
   );
 }
 
@@ -552,12 +594,13 @@ export async function recomputeKpi(
 
   // By its own thresholds where it has them, by the ratio where it has not
   // (§6.4, P9-T17a). The ratio is still kept for display and the projection.
-  const reading = readingOf(kpi, actual, target);
+  const workspace = await workspaceKpiCorridor(tx, workspaceId);
+  const reading = readingOf(kpi, actual, target, workspace);
   const achievement = {
     pct: reading.achievementPct,
     diagnostic: reading.diagnostic,
   };
-  const healthyPct = Number(kpi.healthyPct);
+  const { healthyPct } = corridorOf(kpi, workspace);
   const recovery = await loadRecovery(tx, workspaceId, kpi.recoveryGoalId);
   // The band, whatever the recovery is doing (§6.4, P9-T17b-a): a recovery is
   // shown beside it by the readers, never written in its place.
@@ -612,6 +655,32 @@ export async function recomputeKpi(
     diagnostic: achievement.diagnostic ?? effective?.diagnostic ?? null,
     closureProposed,
   };
+}
+
+/**
+ * Recomputes every KPI that follows the workspace's corridor, after the
+ * corridor moved (UAT BUG-011). In the writing transaction like every other
+ * recompute, so the grid never shows a state the thresholds no longer give.
+ * A KPI with both lines of its own is untouched: nothing it reads changed.
+ */
+export async function recomputeKpisFollowingWorkspace(
+  tx: OperationTx,
+  workspaceId: string,
+): Promise<number> {
+  const following = await tx
+    .select({ id: kpis.id })
+    .from(kpis)
+    .where(
+      activeOnly(
+        kpis,
+        eq(kpis.workspaceId, workspaceId),
+        or(isNull(kpis.healthyPct), isNull(kpis.watchPct)),
+      ),
+    );
+  for (const { id } of following) {
+    await recomputeKpi(tx, workspaceId, id);
+  }
+  return following.length;
 }
 
 /** Every period a grid column needs, newest first, for one KPI. */

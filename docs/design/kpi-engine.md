@@ -127,6 +127,24 @@ no data, then the band. Both thresholds are §11 parameters, defaults 90 and 70.
 | 3 | Achievement at or above the watch threshold | `watch` |
 | 4 | Otherwise | `unhealthy` |
 
+**Whose thresholds (UAT BUG-011).** A KPI reads the workspace's
+`kpi.healthyThreshold` and `kpi.watchThreshold` as they are now, unless it
+holds a line of its own. `healthy_pct` and `watch_pct` are null for a KPI that
+follows, and each falls back on its own through `corridorOf`.
+
+| Event | What happens |
+|---|---|
+| `kpis.create` without a corridor | Both lines stored null |
+| `kpis.update` with a number | That line becomes the KPI's own |
+| `kpis.update` with null | That line follows the workspace again |
+| `rhythm.update` moves either key | Every KPI with a null line is recomputed in the same transaction |
+| Data change 0026 | Clears each stored line equal to the workspace's current one or the canon's 90 and 70, and rereads the band of a ratio KPI against the corridor it now follows |
+
+**Given** a KPI at 87% that follows a workspace at 90 and 70, **when** an
+administrator moves the healthy threshold to 85, **then** the KPI reads
+`healthy` straight away. **Given** a KPI with its own healthy line at 95,
+**when** the workspace moves to 85, **then** it still reads by 95.
+
 **Recovering is beside the state, not one of them (P9-T17b-a).** Until then an
 open recovery goal outranked the band, so a collapsing KPI read "recovering"
 for as long as its recovery ran, whatever the metric did. Now the state is
