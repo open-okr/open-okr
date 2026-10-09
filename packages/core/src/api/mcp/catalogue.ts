@@ -100,7 +100,13 @@ function jsonSchema(schema: ZodType): JsonObject {
     target: "draft-2020-12",
   }) as JsonObject;
   const { $schema, ...rest } = converted;
-  return rest;
+  // **The protocol requires an object at the top** (`type: "object"`), and a
+  // client built on the official SDK validates every tool of a list against
+  // that. An input that is a union of objects converts to a bare `anyOf`, and
+  // one such tool made the whole list unreadable to those clients (found by
+  // the MCP test against the UAT instance, 9 October 2026). The union stays
+  // as it is, under an object type it already satisfies.
+  return rest.type === "object" ? rest : { type: "object", ...rest };
 }
 
 /**

@@ -78,6 +78,14 @@ describe("every tool is an action, and every action is a tool", () => {
 });
 
 describe("the safety classification, which is what this test exists for", () => {
+  it("gives every tool an object input, as the protocol and its official clients require", () => {
+    // One tool whose input was a bare union made the whole list unreadable to
+    // a client on the official SDK (UAT, 9 October 2026).
+    for (const tool of MCP_TOOLS) {
+      expect(tool.inputSchema.type, tool.name).toBe("object");
+    }
+  });
+
   it("gives every tool a scope, and only one this server issues", () => {
     for (const tool of MCP_TOOLS) {
       expect(["read", "write", "destructive"], tool.name).toContain(tool.scope);

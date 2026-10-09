@@ -24,6 +24,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import {
   CallToolRequestSchema,
   ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
@@ -76,6 +77,14 @@ export class McpAgentServer implements AgentServerPort {
         isError: outcome.isError,
       };
     });
+
+    // Every resource here is a template, addressed by its URI, so the plain
+    // list is empty. Answered rather than left unhandled: the server declares
+    // the resources capability, and a client that lists on connect read the
+    // missing method as a fault (MCP test against the UAT, 9 October 2026).
+    server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: [],
+    }));
 
     server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
       resourceTemplates: this.#config.resources.map((resource) => ({

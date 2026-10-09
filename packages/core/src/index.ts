@@ -284,6 +284,7 @@ export {
 export {
   closeSession,
   closeSessionFor,
+  initializeVersion,
   negotiateVersion,
   newSessionId,
   originAllowed,
