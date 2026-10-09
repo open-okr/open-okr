@@ -147,12 +147,20 @@ describe("a rich text field in a form", () => {
 });
 
 describe("a blank document", () => {
-  test("is one with nothing but empty paragraphs in it", () => {
+  test("is one with nothing but empty paragraphs and spaces in it", () => {
     expect(isBlankDocument(null)).toBe(true);
     expect(
       isBlankDocument({ type: "doc", content: [{ type: "paragraph" }] }),
     ).toBe(true);
     expect(isBlankDocument(PARAGRAPH)).toBe(false);
+    expect(
+      isBlankDocument({
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "   " }] },
+        ],
+      }),
+    ).toBe(true);
     expect(
       isBlankDocument({
         type: "doc",
@@ -164,5 +172,91 @@ describe("a blank document", () => {
         ],
       }),
     ).toBe(false);
+  });
+});
+
+describe("a length limit", () => {
+  const words = (count: number) => ({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "x".repeat(count) }],
+      },
+    ],
+  });
+
+  test("says nothing while the text is well inside it", async () => {
+    const { container } = inEnglish(
+      <RichTextEditor
+        label="What it changes"
+        variant="compact"
+        content={words(10)}
+        maxCharacters={100}
+      />,
+    );
+    await editorReady(container);
+    expect(screen.queryByText(/of 100 characters/)).toBeNull();
+  });
+
+  test("counts once the text is near it, the way the server counts", async () => {
+    const { container } = inEnglish(
+      <RichTextEditor
+        label="What it changes"
+        variant="compact"
+        content={words(85)}
+        maxCharacters={100}
+      />,
+    );
+    await editorReady(container);
+    expect(screen.getByText("85 of 100 characters")).not.toBeNull();
+  });
+
+  test("says how much to take out once it is over", async () => {
+    const { container } = inEnglish(
+      <RichTextEditor
+        label="What it changes"
+        variant="compact"
+        content={words(104)}
+        maxCharacters={100}
+      />,
+    );
+    await editorReady(container);
+    expect(
+      screen.getByText(
+        translate(CATALOGUES.en, "fields.counterOver", {
+          used: 104,
+          max: 100,
+          over: 4,
+        }),
+      ),
+    ).not.toBeNull();
+  });
+});
+
+describe("an editor that is not editable", () => {
+  test("follows the prop after it was made", async () => {
+    const { container, rerender } = inEnglish(
+      <RichTextEditor
+        label="What it changes"
+        variant="compact"
+        content={PARAGRAPH}
+      />,
+    );
+    await editorReady(container);
+    rerender(
+      <TranslationsProvider locale="en">
+        <RichTextEditor
+          label="What it changes"
+          variant="compact"
+          content={PARAGRAPH}
+          editable={false}
+        />
+      </TranslationsProvider>,
+    );
+    await waitFor(() =>
+      expect(container.querySelector('[contenteditable="false"]')).toBeTruthy(),
+    );
+    expect(screen.queryByRole("toolbar")).toBeNull();
   });
 });

@@ -138,8 +138,8 @@ import {
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
 import { computedScoresInTx } from "../scoring/computed.ts";
 import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
 import { sessionChannel } from "../sessions/live.ts";
@@ -5562,13 +5562,7 @@ export const scoreKeyResult = defineWriteAction({
 // ---------------------------------------------------------------------------
 
 /** Editor JSON for the current rich text schema, or null. */
-const narrativeBody = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const narrativeBody = richTextSchema();
 
 /**
  * The review's own objectives: this space, this cycle, still open.

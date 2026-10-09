@@ -1,12 +1,20 @@
-import { ACCESS_LEVELS, callAction, renderRichTextToHtml } from "@openokr/core";
+import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
-import { Avatar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Avatar,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  RichTextView,
+} from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppearanceControl } from "../../../lib/appearance.tsx";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { getPool } from "../../../lib/pool";
+import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
@@ -128,7 +136,7 @@ export default async function MemberProfilePage({
     ? (directory.find((m) => m.id === member.managerId) ?? null)
     : null;
 
-  const bioHtml = member.bio ? renderRichTextToHtml(member.bio as never) : null;
+  const bioHtml = richTextHtml(member.bio);
   // The thumbnail, through the same access check as the file itself. A reader
   // the picture is not shared with gets a 404 and the initials instead.
   const avatarUrl = member.avatarBlobId
@@ -215,13 +223,7 @@ export default async function MemberProfilePage({
               <h3 className="mb-1 text-xs font-semibold text-ink-3">
                 {t("people.detail.bio")}
               </h3>
-              <div
-                className="rich-text text-ink"
-                // The HTML is produced by renderRichTextToHtml, which is a
-                // sanitising allow-list at every surface (CLAUDE.md).
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by renderRichTextToHtml
-                dangerouslySetInnerHTML={{ __html: bioHtml }}
-              />
+              <RichTextView html={bioHtml} className="text-ink" />
             </div>
           ) : null}
 

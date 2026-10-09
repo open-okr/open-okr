@@ -45,6 +45,18 @@ describe("a rich text field from a form", () => {
     });
   });
 
+  it("is blank when it holds only spaces", () => {
+    const spaces = JSON.stringify({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "   " }] },
+      ],
+    });
+    expect(readRichTextField(form({ narrative: spaces }), "narrative")).toEqual(
+      { state: "blank" },
+    );
+  });
+
   it("is the document, formatting and all, when something was written", () => {
     const read = readRichTextField(
       form({ narrative: JSON.stringify(PARAGRAPH) }),

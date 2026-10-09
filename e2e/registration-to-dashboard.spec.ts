@@ -715,10 +715,11 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
   await page.getByRole("link", { name: "Open" }).first().click();
   await expect(page).toHaveURL(/\/goals\//);
 
-  // The server refuses an empty retrospective. The textarea's own `required`
-  // would stop the request, so the field is filled with whitespace, which passes
-  // the browser and fails the rule.
-  await page.getByRole("textbox", { name: "The retrospective" }).fill("   ");
+  // The server refuses an empty retrospective, and a run of spaces is empty.
+  const retrospective = page.getByRole("textbox", {
+    name: "The retrospective",
+  });
+  await retrospective.fill("   ");
   await page.getByRole("button", { name: "Close this goal" }).click();
   // Filtered rather than the bare role: Next's own route announcer is also an
   // alert, so the page has two and only one of them is ours.
@@ -726,14 +727,24 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
     page.getByRole("alert").filter({ hasText: "retrospective" }),
   ).toBeVisible();
 
+  // The compact editor (guided-inputs §4.7): the account is bolded from its
+  // toolbar, and the closed goal shows it as written.
+  await retrospective.fill(
+    "Activation moved. Onboarding did the work, not the campaign.",
+  );
+  await retrospective.press("ControlOrMeta+a");
+  // Within the field: the discussion below has a toolbar of its own.
   await page
-    .getByRole("textbox", { name: "The retrospective" })
-    .fill("Activation moved. Onboarding did the work, not the campaign.");
+    .getByRole("group", { name: "The retrospective" })
+    .getByRole("button", { name: "Bold", exact: true })
+    .click();
   await page.getByRole("button", { name: "Close this goal" }).click();
 
   await expect(page.getByText("closed · achieved")).toBeVisible();
   await expect(
-    page.getByText("Activation moved. Onboarding did the work"),
+    page.locator(".rich-text strong", {
+      hasText: "Activation moved. Onboarding did the work",
+    }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Reopen this goal" }).click();

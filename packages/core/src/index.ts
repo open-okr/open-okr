@@ -1010,6 +1010,7 @@ export {
   extractAttachments,
   extractMentionIds,
 } from "./rich-text/extract.ts";
+export { richTextSchema } from "./rich-text/field-schema.ts";
 export {
   asBlocks,
   type FromHtmlOptions,

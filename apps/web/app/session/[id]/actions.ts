@@ -4,6 +4,8 @@ import { loadEnv } from "@openokr/config";
 import {
   callAction,
   OperationError,
+  parseRichText,
+  RICH_TEXT_SCHEMA_VERSION,
   richTextFromPlainText,
 } from "@openokr/core";
 import { revalidatePath } from "next/cache";
@@ -584,14 +586,14 @@ export async function passMicAction(sessionId: string, goalId: string | null) {
  * What the number does not show, for one objective (METHOD.md §8.1 stage 3,
  * P4-T10c).
  *
- * Collected as plain text and stored as editor JSON through the one shared rich
- * text module, the same path the check-in composer uses. An empty line clears the
- * note, which is a real act and does not undo that the objective was spoken for.
+ * The compact editor's document (docs/design/guided-inputs.md §4.7), which
+ * `sessions.setNarrative` holds to the rich text schema. Null clears the note,
+ * which is a real act and does not undo that the objective was spoken for.
  */
 export async function setNarrativeAction(
   sessionId: string,
   goalId: string,
-  text: string,
+  body: unknown,
 ) {
   const { session, workspace } = await requireWorkspace();
   await callAction(
@@ -604,7 +606,10 @@ export async function setNarrativeAction(
     {
       sessionId,
       goalId,
-      body: text.trim().length === 0 ? null : richTextFromPlainText(text),
+      // A body that is not a document is refused here, in words, rather
+      // than stored or quietly cleared.
+      body:
+        body === null ? null : parseRichText(body, RICH_TEXT_SCHEMA_VERSION),
     },
   );
   revalidatePath(`/session/${sessionId}`);

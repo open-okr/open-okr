@@ -40,18 +40,11 @@ import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { leavesOnInTx } from "../people/leave.ts";
-import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
-const richText = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const richText = richTextSchema();
 
 const composerValue = z.object({
   keyResultId: z.uuid(),

@@ -1,19 +1,14 @@
 import {
-  isValidRichText,
-  parseRichText,
-  RICH_TEXT_SCHEMA_VERSION,
-  renderRichTextToHtml,
-} from "@openokr/core";
-import {
   Button,
   Card,
   CardBody,
   CardHeader,
   Chip,
-  isBlankDocument,
   type MessageValues,
   RichTextField,
+  RichTextView,
 } from "@openokr/ui";
+import { richTextHtml } from "../../lib/rich-text-html.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledgeCheckIn, deleteCheckIn, editCheckIn } from "./actions.ts";
@@ -286,10 +281,9 @@ export async function Timeline({
 
 /**
  * The narrative as it was written, formatting and all (guided-inputs §4.7),
- * since the card is where a check-in is read in full. The HTML comes from
- * `renderRichTextToHtml`, which escapes every text value and emits tags only
- * from its own allow-list, so a narrative that arrived through an importer or
- * a channel is shown as safely as one typed here.
+ * since the card is where a check-in is read in full. Rendered on the server
+ * through core's one renderer, so a narrative that arrived through an
+ * importer or a channel is shown as safely as one typed here.
  */
 function Narrative({
   document,
@@ -298,20 +292,9 @@ function Narrative({
   readonly document: unknown;
   readonly empty: string;
 }) {
-  if (
-    isBlankDocument(document) ||
-    !isValidRichText(document, RICH_TEXT_SCHEMA_VERSION)
-  ) {
+  const html = richTextHtml(document);
+  if (html === null) {
     return <p className="text-sm text-ink-3 italic">{empty}</p>;
   }
-  const html = renderRichTextToHtml(
-    parseRichText(document, RICH_TEXT_SCHEMA_VERSION),
-  );
-  return (
-    <div
-      className="rich-text text-sm text-ink-2"
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by renderRichTextToHtml
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
+  return <RichTextView html={html} className="text-sm text-ink-2" />;
 }

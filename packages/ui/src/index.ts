@@ -34,6 +34,7 @@ export * from "./rich-text/draft.ts";
 export * from "./rich-text/editor.tsx";
 export * from "./rich-text/rich-text-field.tsx";
 export * from "./rich-text/use-draft-autosave.ts";
+export * from "./rich-text/view.tsx";
 export * from "./shell/app-shell.tsx";
 export * from "./shell/cycle-strip.tsx";
 export * from "./shell/mobile-tab-bar.tsx";

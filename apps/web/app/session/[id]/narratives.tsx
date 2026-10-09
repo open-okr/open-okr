@@ -14,10 +14,10 @@
  * never tracks a holder of its own, because a second copy of that answer is a
  * second answer.
  *
- * **The narrative is a textarea, not an editor.** It is collected as plain text
- * and becomes editor JSON through the one shared rich text module in the server
- * action, the same path the check-in composer uses (P3-T07). A stage with nine
- * minutes of talking in it does not need a toolbar.
+ * **The narrative is the compact editor** (docs/design/guided-inputs.md §4.7),
+ * as the check-in narrative is, and is shown as it was written. It was a
+ * textarea whose text became one paragraph per blank line on save, so a list
+ * somebody typed while the owner spoke came back as a run of lines.
  */
 import {
   Button,
@@ -25,6 +25,9 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  isBlankDocument,
+  RichTextEditor,
+  RichTextView,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -37,8 +40,10 @@ interface NarrativeObjective {
   readonly championName: string | null;
   readonly hasMic: boolean;
   readonly spokenAt: string | null;
-  /** A plain-text excerpt of the stored body, or null when nothing was typed. */
-  readonly excerpt: string | null;
+  /** The stored body, for the editor to open on. */
+  readonly body: unknown;
+  /** The body rendered on the server, or null when nothing was written. */
+  readonly html: string | null;
   readonly authorName: string | null;
 }
 
@@ -68,7 +73,7 @@ function ObjectiveRow({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
-  const [text, setText] = useState(objective.excerpt ?? "");
+  const [written, setWritten] = useState<unknown>(objective.body);
 
   const run = useCallback(
     (work: () => Promise<unknown>) => {
@@ -110,11 +115,11 @@ function ObjectiveRow({
         )}
       </span>
 
-      {objective.excerpt === null ? null : (
-        <span className="text-xs text-ink-3">
-          {objective.excerpt}
-          {objective.authorName ? ` — ${objective.authorName}` : ""}
-        </span>
+      {objective.html === null ? null : (
+        <div className="flex flex-col gap-0.5 text-xs text-ink-3">
+          <RichTextView html={objective.html} />
+          {objective.authorName ? <span>— {objective.authorName}</span> : null}
+        </div>
       )}
 
       <span className="flex flex-wrap items-center gap-2">
@@ -151,7 +156,7 @@ function ObjectiveRow({
           >
             {open
               ? t("common.cancel")
-              : objective.excerpt === null
+              : objective.html === null
                 ? t("session.detail.narratives.addWhatTheNumber")
                 : t("session.detail.narratives.changeTheNote")}
           </Button>
@@ -160,23 +165,21 @@ function ObjectiveRow({
 
       {open && canWrite ? (
         <>
-          <label
-            className="flex flex-col gap-1"
-            htmlFor={`narrative-${objective.goalId}`}
-          >
-            <span className="text-xs font-medium text-ink-3">
+          <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
+            <legend className="mb-1 text-xs font-medium text-ink-3">
               {t("session.detail.narratives.whatTheNumberDoes")}
-            </span>
-            <textarea
-              id={`narrative-${objective.goalId}`}
-              rows={3}
-              className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-              value={text}
-              disabled={pending}
-              placeholder={t("session.detail.narratives.thePartTheScore")}
-              onChange={(event) => setText(event.target.value)}
-            />
-          </label>
+            </legend>
+            <div className="rounded-md border border-line bg-surface p-2 text-sm text-ink focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
+              <RichTextEditor
+                label={t("session.detail.narratives.whatTheNumberDoes")}
+                variant="compact"
+                content={objective.body}
+                editable={!pending}
+                placeholder={t("session.detail.narratives.thePartTheScore")}
+                onUpdate={setWritten}
+              />
+            </div>
+          </fieldset>
           <span className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
@@ -187,7 +190,7 @@ function ObjectiveRow({
                   await setNarrativeAction(
                     sessionId,
                     objective.goalId,
-                    text.trim(),
+                    isBlankDocument(written) ? null : written,
                   );
                   setOpen(false);
                 })

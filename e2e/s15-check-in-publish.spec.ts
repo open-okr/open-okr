@@ -126,21 +126,23 @@ test("the walker offers it, and publishing puts the card in the history", async 
 
   await page.getByLabel(`New value for ${KEY_RESULT}`).fill("60");
   await page.getByLabel("Status", { exact: true }).selectOption("caution");
-  // The compact editor (guided-inputs §4.7): the narrative is bolded from the
-  // toolbar, and the next step goes in a bulleted list under it.
+  // The compact editor (guided-inputs §4.7): the narrative is typed in bold
+  // from the toolbar, and the next step goes in a bulleted list under it.
+  // Each step waits for the editor to show the last one, because a toolbar
+  // press acts on wherever the editor's own selection is at that moment.
   const field = page.getByRole("group", { name: NARRATIVE_LABEL });
   const narrative = field.getByRole("textbox", { name: NARRATIVE_LABEL });
-  await narrative.fill(NARRATIVE);
-  await narrative.press("ControlOrMeta+a");
   await field.getByRole("button", { name: "Bold", exact: true }).click();
-  // The right arrow puts the caret at the end of what is selected on every
-  // platform. End does not move it at all on macOS.
-  await narrative.press("ArrowRight");
+  await narrative.pressSequentially(NARRATIVE);
+  await expect(narrative.locator("p > strong")).toHaveText(NARRATIVE);
   await narrative.press("Enter");
+  await expect(narrative.locator("p")).toHaveCount(2);
   await field
     .getByRole("button", { name: "Bulleted list", exact: true })
     .click();
+  await expect(narrative.locator("ul > li")).toHaveCount(1);
   await narrative.pressSequentially(NEXT_STEP);
+  await expect(narrative.locator("ul > li")).toHaveText(NEXT_STEP);
   await page
     .getByRole("main")
     .getByRole("button", { name: "Publish", exact: true })

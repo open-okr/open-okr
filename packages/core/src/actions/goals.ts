@@ -94,9 +94,9 @@ import {
   recomputeGoalQualityInTx,
   recomputeUnitQualityInTx,
 } from "../quality/service.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
 import { recomputeAlignmentFor } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
@@ -122,13 +122,7 @@ const localDate = z
   .string()
   .regex(LOCAL_DATE_PATTERN, "Give the date as YYYY-MM-DD.");
 
-const richText = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const richText = richTextSchema();
 
 const timeframe = z.object({
   startsOn: z.string(),

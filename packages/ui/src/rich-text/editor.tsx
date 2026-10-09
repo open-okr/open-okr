@@ -6,6 +6,7 @@
  * (§3) — nothing pulled in from `@tiptap/starter-kit` that is not on that
  * list.
  */
+import { richTextLength } from "@openokr/formats";
 import {
   Table,
   TableCell,
@@ -20,7 +21,10 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useState,
 } from "react";
+import { useTranslations } from "../i18n/use-translations.tsx";
+import { cn } from "../lib/cn.ts";
 import { Attachment } from "./attachment-node.ts";
 import {
   createEntityLinkExtension,
@@ -51,6 +55,16 @@ export interface RichTextEditorProps {
   readonly content?: unknown;
   readonly placeholder?: string;
   readonly editable?: boolean;
+  /**
+   * The most characters the field takes, counted the way the server counts
+   * (`richTextLength` in `@openokr/formats`). Near it the field says how much
+   * is used, and past it how much to take out: an editor cannot refuse a
+   * keystroke the way `maxLength` does, so it says so instead.
+   */
+  readonly maxCharacters?: number;
+  /** Puts the caret at the end once the editor is made: for a field that has
+   * just been given text the person is now to edit. */
+  readonly autoFocus?: boolean;
   readonly onUpdate?: (json: unknown) => void;
   /** `packages/ui` cannot import `packages/core`'s `parseRichText`
    * (TECHNICAL-PLAN §1's own package table) — a host wires the real
@@ -95,6 +109,8 @@ export const RichTextEditor = forwardRef<
     content,
     placeholder,
     editable = true,
+    maxCharacters,
+    autoFocus = false,
     onUpdate,
     validate,
     searchMembers,
@@ -103,6 +119,7 @@ export const RichTextEditor = forwardRef<
   },
   ref,
 ) {
+  const [length, setLength] = useState(() => richTextLength(content));
   const extensions = useMemo(
     () => [
       StarterKit.configure({
@@ -137,6 +154,7 @@ export const RichTextEditor = forwardRef<
     extensions,
     content: content as never,
     editable,
+    autofocus: autoFocus ? "end" : false,
     // TipTap would append its base rules as an inline <style>, which the
     // Content-Security-Policy refuses in production. The same rules ship in
     // `styles/prosemirror.css` instead (completeness review L-22).
@@ -176,6 +194,7 @@ export const RichTextEditor = forwardRef<
     },
     onUpdate: ({ editor: current }) => {
       const json = current.getJSON();
+      setLength(richTextLength(json));
       if (validate) {
         validate(json);
       }
@@ -184,6 +203,14 @@ export const RichTextEditor = forwardRef<
   });
 
   useEffect(() => () => editor?.destroy(), [editor]);
+
+  // `useEditor` reads `editable` once, when it makes the editor. A row that
+  // is set aside after that has to stop taking text too.
+  useEffect(() => {
+    if (editor && editor.isEditable !== editable) {
+      editor.setEditable(editable);
+    }
+  }, [editor, editable]);
 
   const hasUploadsInProgress = useCallback(() => {
     if (!editor) {
@@ -216,16 +243,57 @@ export const RichTextEditor = forwardRef<
       className="rich-text text-ink focus:outline-none"
     />
   );
+  const counter =
+    maxCharacters !== undefined && length >= Math.ceil(maxCharacters * 0.8) ? (
+      <LengthCounter length={length} max={maxCharacters} />
+    ) : null;
   if (variant !== "compact") {
-    return surface;
+    return counter ? (
+      <div className="flex flex-col gap-1.5">
+        {surface}
+        {counter}
+      </div>
+    ) : (
+      surface
+    );
   }
   return (
     <div className="flex flex-col gap-1.5">
       {editor && editable ? <EditorToolbar editor={editor} /> : null}
       {surface}
+      {counter}
     </div>
   );
 });
+
+/**
+ * How much of a length limit is used, once it is close, and how much to take
+ * out once it is passed. Its own component so that only a field with a limit
+ * needs the translations, as `TextInput`'s counter does.
+ */
+function LengthCounter({
+  length,
+  max,
+}: {
+  readonly length: number;
+  readonly max: number;
+}) {
+  const { t } = useTranslations();
+  const over = length - max;
+  return (
+    <p
+      className={cn(
+        "text-xs",
+        over > 0 ? "font-medium text-bad" : "text-ink-3",
+      )}
+      aria-live="polite"
+    >
+      {over > 0
+        ? t("fields.counterOver", { used: length, max, over })
+        : t("fields.counter", { used: length, max })}
+    </p>
+  );
+}
 
 /**
  * §7's upload flow, steps 2-4: an `attachment` node appears immediately

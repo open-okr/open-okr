@@ -49,22 +49,16 @@ import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { policyDecisionInTx, requirePolicy } from "../practice/policy.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { plainTextLines } from "../rich-text/excerpt.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
 import {
   RICH_TEXT_SCHEMA_VERSION,
   type RichTextDocument,
 } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForCycle } from "../scoring/recompute.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /** Editor JSON, validated before it reaches storage. Never Markdown. */
-const richText = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const richText = richTextSchema();
 
 const phaseResult = z.object({
   phase: z.number().int(),

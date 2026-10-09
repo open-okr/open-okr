@@ -16,6 +16,7 @@ import {
   Button,
   isBlankDocument,
   RichTextEditor,
+  RichTextView,
   useTranslations,
 } from "@openokr/ui";
 import { useCallback, useState, useTransition } from "react";
@@ -284,15 +285,7 @@ function CommentBody({ html }: { html: string | null }) {
       <p className="text-ink-3 italic">{t("comments.thread.emptyComment")}</p>
     );
   }
-  return (
-    <div
-      className="rich-text text-ink"
-      // The HTML is produced by renderRichTextToHtml, which escapes every
-      // text value and emits tags only from its own allow-list.
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by renderRichTextToHtml
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
+  return <RichTextView html={html} className="text-ink" />;
 }
 
 interface CommentEditorProps {

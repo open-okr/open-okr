@@ -47,8 +47,8 @@ import { notifyRecipients } from "../notifications/create.ts";
 import { resolveRecipients } from "../notifications/recipients.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
 import { boardChannel } from "../tasks/live.ts";
 import {
   BOARD_SCOPE_KINDS,
@@ -68,13 +68,7 @@ import {
 } from "../tasks/service.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
-const richText = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const richText = richTextSchema();
 
 const assignee = z.object({ id: z.uuid(), name: z.string() });
 

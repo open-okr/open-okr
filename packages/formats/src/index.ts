@@ -22,6 +22,12 @@ export {
 export { DOMAIN_PATTERN, isDomain } from "./domain.ts";
 export { EMAIL_PATTERN, isEmailAddress } from "./email.ts";
 export {
+  type MentionName,
+  richTextAsLine,
+  richTextLength,
+  textOfRichTextNode,
+} from "./rich-text.ts";
+export {
   isKnownTimezone,
   isListedTimezone,
   listTimezones,
