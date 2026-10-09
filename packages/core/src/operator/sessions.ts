@@ -225,6 +225,9 @@ export async function grantSupportSession(
           },
           kind: "guest",
           level: level as (typeof GRANTABLE_LEVELS)[number],
+          // What a member sees, never more than the customer granted
+          // (BUG-021): `viewer` reads every domain, `member` also edits.
+          guestRole: level >= ACCESS_LEVELS.edit ? "member" : "viewer",
         });
 
         // **The funnel is idempotent, and that is a hazard here rather than a
