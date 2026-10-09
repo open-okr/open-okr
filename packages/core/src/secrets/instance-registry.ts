@@ -100,6 +100,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
       "Recorded on every tenant this deployment provisions. Recorded and never routed on: a residency claim is a contract, not a column.",
   },
   {
+    key: "cloud.plans",
+    kind: "string",
+    fallback: "[]",
+    environment: "OPENOKR_CLOUD_PLANS",
+    summary:
+      'The plans an operator can put a workspace on, as a JSON list: [{"key":"team","name":"Team","seats":20,"aiMonthlyUsd":50}]. Seats null is unlimited. Without it the only plan is Free.',
+  },
+  {
     key: "cloud.closureRetentionDays",
     kind: "number",
     fallback: 0,
@@ -214,6 +222,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_MAIL_SECURE",
     summary:
       "Implicit TLS from the first byte. False means STARTTLS, which is what port 587 expects.",
+  },
+  {
+    key: "mail.requireTls",
+    kind: "boolean",
+    fallback: true,
+    environment: "OPENOKR_MAIL_REQUIRE_TLS",
+    summary:
+      "Refuse to send over a connection that is not encrypted. On by default, because a password sent in the clear is worse than mail that does not go. Turn it off only for a relay on the same machine or a trusted network that offers no TLS, such as Mailpit in a test instance.",
   },
   {
     key: "mail.user",

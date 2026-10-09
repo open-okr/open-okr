@@ -15,6 +15,7 @@ import {
   saveProvider,
   saveTier,
   saveWorkspaceKey,
+  testWorkspaceKeyAction,
 } from "./actions.ts";
 import { AIForm } from "./ai-form.tsx";
 import {
@@ -284,6 +285,15 @@ export default async function AdminAIPage() {
                       : t("admin.ai.store")}
                   </Button>
                 </AIForm>
+
+                {config?.hasWorkspaceCredential ? (
+                  <AIForm action={testWorkspaceKeyAction}>
+                    <input type="hidden" name="provider" value={kind} />
+                    <Button type="submit" variant="ghost" size="sm">
+                      {t("admin.ai.testTheConnection")}
+                    </Button>
+                  </AIForm>
+                ) : null}
 
                 {config?.hasWorkspaceCredential ? (
                   <AIForm action={removeWorkspaceKey}>

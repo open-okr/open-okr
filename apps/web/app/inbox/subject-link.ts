@@ -46,6 +46,19 @@ export function subjectNameKey(subjectType: string | null): string | null {
 }
 
 /** The catalogue key for what each reason means, as the chip shows it. */
+/**
+ * What a row says when no activity stands behind it (UAT BUG-013). A
+ * check-in waiting for review and a comment both notify without an activity
+ * row, so they read "Something happened here." The reason is enough to say
+ * what it is, and the row links to the subject for the rest.
+ */
+export const REASON_FALLBACK_KEYS: Readonly<Record<string, string>> = {
+  review: "inbox.fallback.review",
+  mentioned: "inbox.fallback.mentioned",
+  joined: "inbox.fallback.joined",
+  role: "inbox.fallback.role",
+};
+
 export const REASON_LABEL_KEYS: Readonly<Record<string, string>> = {
   invited: "inbox.reason.invited",
   joined: "inbox.reason.joined",

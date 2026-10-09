@@ -35,6 +35,11 @@ describe("gate remedies", () => {
     expect(FIX[4]?.href).toBe("#dependency-register");
   });
 
+  test("gate 6 sends a facilitator to the deadline on the Cycles card (UAT BUG-010)", () => {
+    // It pointed at /admin/rhythm, which has no deadline field.
+    expect(FIX[6]?.href).toBe("#cycle-admin");
+  });
+
   test("no remedy is the page its own panel renders on", () => {
     // The general form. The gates panel renders on phase 5, so a remedy that
     // navigates there has told nobody anything; an anchor into a block on that

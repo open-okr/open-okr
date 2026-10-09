@@ -472,6 +472,69 @@ export const setWorkspaceCredential = defineWriteAction({
   }),
 });
 
+/**
+ * The result of a live connection test on the workspace's key (UAT BUG-026).
+ *
+ * AI-NATIVE-PLAN §2 asks the AI screen for "a masked hint and a live
+ * connection test", and the status column had been "unverified" for every key
+ * ever stored, working or not. The test itself is a provider call, which lives
+ * with the host that holds the adapters; this records what it found. Only a
+ * provider that answered, or one that refused the key, changes the status: a
+ * provider that could not be reached says nothing about the key.
+ */
+export const recordWorkspaceCredentialCheck = defineWriteAction({
+  name: "ai.recordCredentialCheck",
+  summary:
+    "Records the result of a live connection test on the workspace's key for a provider.",
+  input: z.object({
+    provider: providerSchema,
+    status: z.enum(["verified", "invalid"]),
+  }),
+  output: z.object({ provider: providerSchema, status: z.string() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [updated] = await tx
+        .update(aiCredentials)
+        .set({
+          status: input.status,
+          lastVerifiedAt: input.status === "verified" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(
+          activeOnly(
+            aiCredentials,
+            eq(aiCredentials.workspaceId, workspaceId),
+            eq(aiCredentials.provider, input.provider),
+            isNull(aiCredentials.ownerMemberId),
+          ),
+        )
+        .returning({ id: aiCredentials.id });
+      if (!updated) {
+        throw new OperationError(
+          "not_found",
+          `${input.provider} has no workspace key to test.`,
+        );
+      }
+      return {
+        result: { provider: input.provider, status: input.status },
+        activity: {
+          kind: "ai.workspace_credential_checked",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { provider: input.provider, status: input.status },
+        },
+        audit: {
+          action: "ai.recordCredentialCheck",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { provider: input.provider, status: input.status },
+        },
+      };
+    },
+  }),
+});
+
 export const removeWorkspaceCredential = defineWriteAction({
   name: "ai.removeWorkspaceCredential",
   summary: "Removes the workspace's own key for a provider.",

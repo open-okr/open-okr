@@ -17,6 +17,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { formNumber } from "../../../lib/form-number";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
@@ -59,7 +60,7 @@ export async function editGoal(
   const contributionStatement = String(
     formData.get("contributionStatement") ?? "",
   ).trim();
-  const weight = Number(formData.get("weight"));
+  const weight = formNumber(formData, "weight");
 
   if (title === "") {
     const { t } = await getTranslations();

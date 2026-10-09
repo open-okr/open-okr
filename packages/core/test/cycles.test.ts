@@ -474,6 +474,33 @@ describe("creating a cycle by hand", () => {
 });
 
 describe("archiving a cycle", () => {
+  it("refuses an open cycle that still holds goals (UAT BUG-023)", async () => {
+    const wb = await workerDb();
+    const created = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.create",
+      { on: "2027-05-14", firstCycle: false },
+    );
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.create", {
+      title: "Customers renew because the product keeps its promises",
+      cycleId: created.id,
+      level: "company",
+      ownerKind: "workspace",
+      weight: 1,
+    });
+    await expect(
+      callAction({ pool: wb.appPool, ...context(OWNER) }, "cycles.archive", {
+        id: created.id,
+      }),
+    ).rejects.toThrow(/has not been closed/);
+    const all = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.list",
+      {},
+    );
+    expect(all.map((cycle) => cycle.id)).toContain(created.id);
+  });
+
   it("drops it from the list", async () => {
     const wb = await workerDb();
     const created = await callAction(

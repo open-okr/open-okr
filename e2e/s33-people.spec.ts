@@ -331,22 +331,28 @@ test("watching a goal from its own page sticks", async () => {
   expect(goalUrl, "no goal link on /goals").not.toBe("");
   await goTo(page, goalUrl);
 
+  // Either state can be the starting one: a goal's champion and reviewer
+  // count as watching it from the start (UAT BUG-007), and the signed-in
+  // member champions the goals the earlier specs made. What is proved is that
+  // a press flips it and the flip is written.
   const watch = page.getByTestId("watch-control");
   await expect(watch).toBeVisible();
-  await expect(watch).toHaveText("Watch this");
+  const before = ((await watch.textContent()) ?? "").trim();
+  expect(["Watch this", "Watching"]).toContain(before);
+  const after = before === "Watching" ? "Watch this" : "Watching";
 
   await watch.click();
-  await expect(watch).toHaveText("Watching", { timeout: 15_000 });
+  await expect(watch).toHaveText(after, { timeout: 15_000 });
 
   // Reloaded, because the point is that it was written and not just toggled
   // in the browser's own memory.
   await goTo(page, goalUrl);
-  await expect(page.getByTestId("watch-control")).toHaveText("Watching");
+  await expect(page.getByTestId("watch-control")).toHaveText(after);
 
-  // And off again, so the instance is left as it was found for every spec
+  // And back again, so the instance is left as it was found for every spec
   // after this one.
   await page.getByTestId("watch-control").click();
-  await expect(page.getByTestId("watch-control")).toHaveText("Watch this", {
+  await expect(page.getByTestId("watch-control")).toHaveText(before, {
     timeout: 15_000,
   });
 });

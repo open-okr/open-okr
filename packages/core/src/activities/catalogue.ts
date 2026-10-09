@@ -205,6 +205,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "ai.provider_config_updated": z.object({ provider: z.string() }),
   "ai.workspace_credential_set": z.object({ provider: z.string() }),
   "ai.workspace_credential_removed": z.object({ provider: z.string() }),
+  "ai.workspace_credential_checked": z.object({
+    provider: z.string(),
+    status: z.string(),
+  }),
   "ai.personal_credential_set": z.object({ provider: z.string() }),
   "ai.personal_credential_removed": z.object({ provider: z.string() }),
   "ai.credentials_rotated": z.object({

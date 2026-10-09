@@ -30,6 +30,8 @@ export interface ResolvedMailSettings {
   readonly host: string;
   readonly port: number;
   readonly secure: boolean;
+  /** False only where somebody chose a relay that offers no TLS (UAT BUG-025). */
+  readonly requireTls: boolean;
   readonly user: string;
   /** Opened from the sealed columns. Never log this object. */
   readonly password: string;
@@ -84,6 +86,7 @@ export async function resolveMailSettings(
     host: resolve<string>("mail.host").value,
     port: resolve<number>("mail.port").value,
     secure: resolve<boolean>("mail.secure").value,
+    requireTls: resolve<boolean>("mail.requireTls").value,
     user: resolve<string>("mail.user").value,
     password,
     from: resolve<string>("mail.from").value,

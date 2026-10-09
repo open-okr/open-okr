@@ -165,6 +165,52 @@ describe("the precedence resolver: user, then workspace, then deployment, then o
     });
   });
 
+  it("records a connection test on the workspace key (UAT BUG-026)", async () => {
+    const wb = await workerDb();
+    const call = (action: string, input: unknown) =>
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        action as never,
+        input as never,
+      );
+    await call("ai.updateProviderConfig", {
+      provider: "anthropic",
+      enabled: true,
+    });
+    await call("ai.setWorkspaceCredential", {
+      provider: "anthropic",
+      apiKey: "sk-ant-workspace-key",
+    });
+    const status = async () =>
+      (
+        await wb.admin.query<{ status: string; verified: boolean }>(
+          `select status, last_verified_at is not null as verified
+             from ai_credentials where workspace_id = $1`,
+          [workspaceId],
+        )
+      ).rows[0];
+    expect(await status()).toEqual({ status: "unverified", verified: false });
+
+    await call("ai.recordCredentialCheck", {
+      provider: "anthropic",
+      status: "verified",
+    });
+    expect(await status()).toEqual({ status: "verified", verified: true });
+
+    await call("ai.recordCredentialCheck", {
+      provider: "anthropic",
+      status: "invalid",
+    });
+    expect(await status()).toEqual({ status: "invalid", verified: false });
+
+    // Storing a new key starts it over.
+    await call("ai.setWorkspaceCredential", {
+      provider: "anthropic",
+      apiKey: "sk-ant-another-key",
+    });
+    expect((await status())?.status).toBe("unverified");
+  });
+
   it("prefers a member's own key over the workspace's, for that member only — the acceptance criterion itself", async () => {
     const wb = await workerDb();
     const member = await addMember("Member With Own Key");

@@ -74,7 +74,12 @@ import { RunningCadence } from "./running-cadence.tsx";
 export default async function CyclePage({
   searchParams,
 }: {
-  searchParams: Promise<{ phase?: string; cycle?: string; mode?: string }>;
+  searchParams: Promise<{
+    phase?: string;
+    cycle?: string;
+    mode?: string;
+    space?: string;
+  }>;
 }) {
   const { t } = await getTranslations();
 
@@ -614,6 +619,10 @@ export default async function CyclePage({
               practice={draft.practice}
               checkTitles={draft.checkTitles}
               memberId={workspace.memberId}
+              spaces={(await callAction(context, "spaces.list", {})).map(
+                (space) => ({ id: space.id, name: space.name }),
+              )}
+              defaultSpaceId={query.space ?? null}
               assistsAvailable={await assistsAvailableAction()}
               levels={
                 (

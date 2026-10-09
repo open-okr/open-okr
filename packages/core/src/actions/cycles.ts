@@ -758,6 +758,45 @@ export const archiveCycle = defineWriteAction({
   safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
+      // **An open cycle that holds goals is closed first** (UAT BUG-023). The
+      // scorecard records a cycle when its review closes it, and archiving
+      // hides the cycle from every list, so archiving an open one left its
+      // goals reachable by URL only and its result never recorded. One click
+      // did it, twice in a row emptied the work map, and nothing undid it. A
+      // cycle with no goals, made by mistake, still goes straight away.
+      const [cycle] = await tx
+        .select({ name: cycles.name, status: cycles.status })
+        .from(cycles)
+        .where(
+          activeOnly(
+            cycles,
+            eq(cycles.id, input.id),
+            eq(cycles.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!cycle) {
+        throw new OperationError("not_found", "No such cycle.");
+      }
+      if (cycle.status !== "closed") {
+        const [held] = await tx
+          .select({ id: goals.id })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, workspaceId),
+              eq(goals.cycleId, input.id),
+            ),
+          )
+          .limit(1);
+        if (held) {
+          throw new OperationError(
+            "forbidden",
+            `${cycle.name} still has goals and has not been closed. Close it on the scorecard first, so its result is recorded before it is archived.`,
+          );
+        }
+      }
       const [archived] = await tx
         .update(cycles)
         .set({ deletedAt: new Date() })

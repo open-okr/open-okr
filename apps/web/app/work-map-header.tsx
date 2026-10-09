@@ -104,7 +104,10 @@ export async function WorkMapContextStrip({
         </Link>
       )}
 
-      {context.daysToDeadline === null ? null : (
+      {/* Once the set is published the deadline has been met or overtaken,
+          and a red "passed" beside "Published. The set is live." read as a
+          fault nobody could act on (UAT BUG-016). */}
+      {context.daysToDeadline === null || context.published ? null : (
         <span
           className={
             context.daysToDeadline < 0

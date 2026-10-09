@@ -55,7 +55,13 @@ export default async function SpacesPage() {
         <CardBody className="flex flex-col gap-3">
           {spaces.length === 0 ? (
             <p className="text-sm text-ink-3">
-              {t("spaces.noSpacesYetProvisioning")}
+              {/* Below view on the workspace is a guest, or somebody whose
+                  access was narrowed: they see only spaces they were invited
+                  to, and "it was archived" was not true for them (UAT
+                  BUG-018). */}
+              {level < ACCESS_LEVELS.view
+                ? t("spaces.noneInvitedYet")
+                : t("spaces.noSpacesYetProvisioning")}
             </p>
           ) : (
             <ul className="flex flex-col gap-2">

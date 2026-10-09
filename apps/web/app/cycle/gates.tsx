@@ -63,8 +63,10 @@ export const FIX: Record<
   // this page, and gate-remedies.test.ts refuses a remedy that navigates to the
   // address the panel is already at.
   5: { href: "#capacity-check", label: "cycle.gates.fix.checkTheCapacity" },
+  // The deadline is set on the Cycles card in this page's own rail. It sent
+  // the reader to /admin/rhythm, which has no deadline field (UAT BUG-010).
   6: {
-    href: "/admin/rhythm",
+    href: "#cycle-admin",
     label: "cycle.gates.fix.setThePublicationDate",
   },
 };

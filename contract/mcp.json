@@ -3234,6 +3234,47 @@
       }
     },
     {
+      "name": "ai.recordCredentialCheck",
+      "description": "Records the result of a live connection test on the workspace's key for a provider.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "anthropic",
+              "openai",
+              "google",
+              "openrouter",
+              "ollama",
+              "openai-compatible"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "invalid"
+            ]
+          }
+        },
+        "required": [
+          "provider",
+          "status"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "provider": "anthropic",
+        "status": "verified"
+      }
+    },
+    {
       "name": "ai.removeWorkspaceCredential",
       "description": "Removes the workspace's own key for a provider.",
       "inputSchema": {
