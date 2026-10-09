@@ -310,6 +310,8 @@ export {
   tooSafePattern,
   trendForecast,
   type ValuePoint,
+  WEIGHT_MAX,
+  WEIGHT_MIN,
   type WeightedItem,
   weightedProgress,
 } from "./scoring.ts";

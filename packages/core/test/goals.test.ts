@@ -261,16 +261,23 @@ describe("creating a goal", () => {
     ).rejects.toThrow(/No such key result/);
   });
 
-  it("clamps a weight above the domain rather than refusing it", async () => {
+  it("refuses a weight outside 0 to 100, and keeps both ends", async () => {
+    // guided-inputs §4.8: the field and the server agree on the bounds, so a
+    // call sending 4000 is told so rather than quietly stored as 100.
     const wb = await workerDb();
-    const created = await createGoal({ weight: 4000 });
-    const read = await callAction(
-      { pool: wb.appPool, ...context() },
-      "goals.read",
-      { id: created.id },
-    );
-    expect(read.weight).toBe(100);
-
+    await expect(createGoal({ weight: 4000 })).rejects.toThrow(/100/);
+    const created = await createGoal({ weight: 100 });
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "goals.addKeyResult", {
+        goalId: created.id,
+        title: "Raise activation",
+        direction: "increase",
+        indicatorType: "leading",
+        baselineValue: 0,
+        targetValue: 1,
+        weight: -12,
+      }),
+    ).rejects.toThrow(/0/);
     const keyResult = await callAction(
       { pool: wb.appPool, ...context() },
       "goals.addKeyResult",
@@ -281,15 +288,22 @@ describe("creating a goal", () => {
         indicatorType: "leading",
         baselineValue: 0,
         targetValue: 1,
-        weight: -12,
+        weight: 0,
       },
     );
-    const after = await callAction(
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "goals.updateKeyResult", {
+        id: keyResult.id,
+        weight: 101,
+      } as never),
+    ).rejects.toThrow(/100/);
+    const read = await callAction(
       { pool: wb.appPool, ...context() },
       "goals.read",
       { id: created.id },
     );
-    expect(after.keyResults.find((kr) => kr.id === keyResult.id)?.weight).toBe(
+    expect(read.weight).toBe(100);
+    expect(read.keyResults.find((kr) => kr.id === keyResult.id)?.weight).toBe(
       0,
     );
   });

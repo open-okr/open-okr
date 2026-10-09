@@ -9,7 +9,14 @@ import {
   type OkrKind,
   type QualityStatus,
 } from "@openokr/method";
-import { Chip, cn, useTranslations } from "@openokr/ui";
+import {
+  Chip,
+  cn,
+  formatMeasure,
+  NumberInput,
+  UnitInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
 
@@ -126,12 +133,23 @@ export function InlineText({
   );
 }
 
-/** A number: a value, a target or a baseline. */
+/**
+ * A number: a value, a target, a baseline or a weight.
+ *
+ * `NumberInput` (guided-inputs §4.8) with the cell's own behaviour on top:
+ * grouped as the reader reads numbers, stepped by the arrow keys, the unit
+ * beside it, and held to `min` and `max` where the contract has them, as a
+ * weight's 0 to 100. Emptied, it puts the stored value back rather than
+ * sending 0.
+ */
 export function InlineNumber({
   value,
   label,
   readOnly,
   wide,
+  unit,
+  min,
+  max,
   onSave,
 }: {
   /** Null for a number nobody has recorded yet, such as a baseline's. */
@@ -139,43 +157,113 @@ export function InlineNumber({
   readonly label: string;
   readonly readOnly: boolean;
   readonly wide?: boolean;
+  /** The measure's unit, drawn beside the number. */
+  readonly unit?: string | null;
+  readonly min?: number;
+  readonly max?: number;
   readonly onSave: (next: number) => void;
 }) {
-  const shown = value === null ? "" : String(value);
-  const { draft, setDraft, field } = useDraft(shown);
+  const { draft, setDraft, field } = useDraft<number | null>(value);
 
   if (readOnly) {
     return (
       <span className="px-1 text-xs font-semibold tabular-nums text-ink">
-        {value ?? "–"}
+        {value === null ? "–" : formatMeasure(value, unit)}
       </span>
     );
   }
 
   const commit = () => {
-    const next = Number(draft);
-    if (draft.trim() === "" || Number.isNaN(next) || next === value) {
-      setDraft(shown);
+    // Held to its bounds here as well as by the field, whose own clamp on
+    // leaving may come after this handler has already sent the number.
+    const next =
+      draft === null
+        ? null
+        : Math.min(max ?? draft, Math.max(min ?? draft, draft));
+    if (next === null || next === value) {
+      setDraft(value);
+      return;
+    }
+    setDraft(next);
+    onSave(next);
+  };
+
+  return (
+    <NumberInput
+      label={label}
+      hideLabel
+      value={draft}
+      onValueChange={setDraft}
+      unit={unit}
+      min={min}
+      max={max}
+      inputRef={field}
+      onBlur={commit}
+      onKeyDown={keys(() => setDraft(value))}
+      inputClassName={cn(
+        FIELD,
+        "h-auto text-right text-xs font-semibold",
+        wide ? "w-20" : "w-14",
+      )}
+    />
+  );
+}
+
+/**
+ * A measure's unit (guided-inputs §4.8): `UnitInput`, offering the units the
+ * cycle already uses and the common ones, with the cell's own behaviour on
+ * top. Empty is a real answer for a unit, so it is sent.
+ */
+export function InlineUnit({
+  value,
+  label,
+  readOnly,
+  known,
+  placeholder,
+  onSave,
+}: {
+  readonly value: string;
+  readonly label: string;
+  readonly readOnly: boolean;
+  /** The units already in use where this cell is drawn. */
+  readonly known: readonly string[];
+  readonly placeholder?: string;
+  readonly onSave: (next: string) => void;
+}) {
+  const { draft, setDraft, field } = useDraft(value);
+
+  if (readOnly) {
+    return <span className="truncate px-1.5 text-xs text-ink">{value}</span>;
+  }
+  const revert = keys(() => setDraft(value));
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next === value) {
+      setDraft(value);
       return;
     }
     onSave(next);
   };
 
   return (
-    <input
-      ref={field}
-      type="number"
-      step="any"
+    <UnitInput
+      label={label}
+      hideLabel
       value={draft}
-      aria-label={label}
-      onChange={(event) => setDraft(event.target.value)}
+      onValueChange={setDraft}
+      known={known}
+      placeholder={placeholder}
+      inputRef={field}
       onBlur={commit}
-      onKeyDown={keys(() => setDraft(shown))}
-      className={cn(
-        "text-right text-xs font-semibold tabular-nums",
-        wide ? "w-20" : "w-14",
-        FIELD,
-      )}
+      onKeyDown={(event) => {
+        // With the suggestions open, Enter and Escape are the list's: Enter
+        // takes the highlighted unit and Escape closes it.
+        if (event.currentTarget.getAttribute("aria-expanded") !== "true") {
+          revert(event);
+        }
+      }}
+      inputClassName={cn(FIELD, "h-auto w-full truncate text-xs")}
     />
   );
 }

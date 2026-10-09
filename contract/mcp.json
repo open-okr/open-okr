@@ -8915,7 +8915,9 @@
           },
           "weight": {
             "default": 1,
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "contributionStatement": {
             "type": "string",
@@ -8997,7 +8999,9 @@
             ]
           },
           "weight": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "contributionStatement": {
             "anyOf": [
@@ -9432,7 +9436,9 @@
           },
           "weight": {
             "default": 1,
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "kpiId": {
             "type": "string",
@@ -9585,7 +9591,9 @@
             ]
           },
           "weight": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "capacity": {
             "anyOf": [
@@ -9798,7 +9806,9 @@
                 ]
               },
               "weight": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
               },
               "championId": {
                 "type": "string",
@@ -9897,7 +9907,9 @@
                 ]
               },
               "weight": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
               },
               "kind": {
                 "type": "string",

@@ -545,8 +545,8 @@ test("drafting a goal with key results persists at zero percent and pending", as
     ["Cut median first response from 6h to 2h", "6", "2"],
   ] as const) {
     await page.getByRole("textbox", { name: "The key result" }).fill(title);
-    await page.getByRole("spinbutton", { name: "Baseline" }).fill(baseline);
-    await page.getByRole("spinbutton", { name: "Target" }).fill(target);
+    await page.getByRole("textbox", { name: "Baseline" }).fill(baseline);
+    await page.getByRole("textbox", { name: "Target" }).fill(target);
     await page.getByRole("button", { name: "Add key result" }).click();
     // Exact, because the row's own title is also inside the label of the field
     // that records a new value for it.

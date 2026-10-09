@@ -284,3 +284,21 @@ test("the goal page adds a key result, and a changed confidence there is a check
   await goTo(page, `/goals?okr=${id}&tab=history`);
   await expect(drawer()).toContainText(LINE, { timeout: 15_000 });
 });
+
+test("the goal page holds a weight to 0 to 100, as the server does", async () => {
+  // guided-inputs §4.8: a weight past 100 is brought back to it in the field,
+  // and the server refuses one outside the range rather than clamping it.
+  const id = await goalId(OBJECTIVE);
+  await goTo(page, `/goals/${id}`);
+  const weight = main().getByRole("textbox", { name: "Weight", exact: true });
+  await weight.fill("150");
+  await weight.press("Tab");
+  await expect(weight).toHaveValue("100");
+  await weight.press("Enter");
+  await expect(async () => {
+    await page.reload();
+    await expect(
+      main().getByRole("textbox", { name: "Weight", exact: true }),
+    ).toHaveValue("100", { timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+});

@@ -60,6 +60,7 @@ import {
   reassignRoleInTx,
   requireActiveMember,
 } from "../goals/service.ts";
+import { weightSchema } from "../goals/weight.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import {
   midCycleInTx,
@@ -957,7 +958,7 @@ async function requireUnchanged(
 const goalFields = z.object({
   title: z.string().trim().min(1).max(500),
   contributionStatement: z.string().trim().max(1000).nullable(),
-  weight: z.number(),
+  weight: weightSchema,
   championId: z.uuid(),
 });
 
@@ -967,7 +968,7 @@ const keyResultFields = z.object({
   baselineValue: z.number(),
   dueOn: localDate.nullable(),
   ownerId: z.uuid().nullable(),
-  weight: z.number(),
+  weight: weightSchema,
   /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). */
   kind: z.enum(KEY_RESULT_KINDS),
   /** A milestone done or a baseline recorded; false undoes it. */

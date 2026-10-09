@@ -55,8 +55,8 @@ test("an objective with a key result measured by hand", async () => {
     name: `Add a key result to ${OBJECTIVE}`,
   });
   await form.getByRole("textbox", { name: "The key result" }).fill(KEY_RESULT);
-  await form.getByRole("spinbutton", { name: "Baseline" }).fill("0");
-  await form.getByRole("spinbutton", { name: "Target" }).fill("10");
+  await form.getByRole("textbox", { name: "Baseline" }).fill("0");
+  await form.getByRole("textbox", { name: "Target" }).fill("10");
   await form.getByRole("button", { name: "Add key result" }).click();
   await expect(page.getByText(KEY_RESULT, { exact: true })).toBeVisible({
     timeout: 15_000,

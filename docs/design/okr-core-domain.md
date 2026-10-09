@@ -308,7 +308,7 @@ behaviour attached.
 | `level` | `company` / `department` / `team` / `individual`. Drives the level-skip and anchor rules |
 | `owner_kind` | `workspace` / `space` / `member`, with exactly one of `space_id` / `member_id` set to match |
 | `cycle_id` or `timeframe` | Exactly one. A goal with neither fails OBJ-3 |
-| `weight` | Numeric, default 1, clamped to 0 to 100 on write. 0 means tracked but not counted |
+| `weight` | Numeric, default 1, 0 to 100 (`WEIGHT_MIN` and `WEIGHT_MAX` in `packages/method`). An action refuses a weight outside the range ([guided-inputs.md](guided-inputs.md) §4.8); the service and both importers clamp it, for a row that reaches the table another way. 0 means tracked but not counted |
 | `parent_goal_id` / `parent_key_result_id` | At most one of the two. Cycles rejected |
 | `contribution_statement` | Required to pass gate 3 when there is no parent |
 | `progress_pct`, `health` | Derived columns, written only by the recompute job |

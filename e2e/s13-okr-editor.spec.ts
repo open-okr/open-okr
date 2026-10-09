@@ -170,7 +170,7 @@ test("a title changed in one tab shows in another without a reload", async () =>
 });
 
 test("a value typed into the table is recorded and moves the progress", async () => {
-  const value = page.getByRole("spinbutton", {
+  const value = page.getByRole("textbox", {
     name: `Current value for ${KEY_RESULT}`,
   });
   await expect(value).toHaveValue("0");
@@ -200,7 +200,7 @@ test("a key result's title, value and due date change with the keyboard alone, a
   await page.keyboard.type(retitled);
   await page.keyboard.press("Enter");
 
-  const value = page.getByRole("spinbutton", {
+  const value = page.getByRole("textbox", {
     name: `Current value for ${retitled}`,
   });
   await expect(value).toBeVisible({ timeout: 15_000 });
@@ -221,7 +221,7 @@ test("a key result's title, value and due date change with the keyboard alone, a
       page.locator(`input[aria-label="Key result title"][value="${retitled}"]`),
     ).toBeVisible({ timeout: 5_000 });
     await expect(
-      page.getByRole("spinbutton", { name: `Current value for ${retitled}` }),
+      page.getByRole("textbox", { name: `Current value for ${retitled}` }),
     ).toHaveValue("55");
     await expect(page.getByLabel(`Due date for ${retitled}`)).toHaveValue(
       "2030-03-31",
@@ -250,7 +250,7 @@ test("a key result's title, value and due date change with the keyboard alone, a
  */
 test("easing a target asks why, and saves with the reason", async () => {
   await goTo(page, "/goals");
-  const target = page.getByRole("spinbutton", {
+  const target = page.getByRole("textbox", {
     name: `Target for ${KEY_RESULT}`,
   });
   await expect(target).toHaveValue("100", { timeout: 15_000 });
@@ -269,7 +269,7 @@ test("easing a target asks why, and saves with the reason", async () => {
   await expect(async () => {
     await page.reload();
     await expect(
-      page.getByRole("spinbutton", { name: `Target for ${KEY_RESULT}` }),
+      page.getByRole("textbox", { name: `Target for ${KEY_RESULT}` }),
     ).toHaveValue("80", { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
 });

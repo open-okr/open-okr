@@ -84,6 +84,7 @@ import {
   unlinkKpiInTx,
   wouldCloseAlignmentLoop,
 } from "../goals/service.ts";
+import { weightSchema } from "../goals/weight.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { readLinkableKpi } from "../kpis/linked.ts";
@@ -1111,7 +1112,7 @@ export const createGoal = defineWriteAction({
        * refusal mid-workshop is worse than a strange-looking row.
        */
       strategyId: z.uuid().optional(),
-      weight: z.number().default(1),
+      weight: weightSchema.default(1),
       contributionStatement: z.string().trim().max(1000).optional(),
       /**
        * True when a model wrote the words (P4-T15a).
@@ -1371,7 +1372,7 @@ export const updateGoal = defineWriteAction({
     title: z.string().trim().min(1).max(500).optional(),
     description: richText.optional(),
     level: z.enum(GOAL_LEVELS).optional(),
-    weight: z.number().optional(),
+    weight: weightSchema.optional(),
     contributionStatement: z.string().trim().max(1000).nullable().optional(),
     /** Null clears the alignment. A goal with no parent is an island, not an error. */
     parentGoalId: z.uuid().nullable().optional(),
@@ -2238,7 +2239,7 @@ export const createKeyResult = defineWriteAction({
       currentValue: z.number().optional(),
       dueOn: localDate.optional(),
       ownerId: z.uuid().optional(),
-      weight: z.number().default(1),
+      weight: weightSchema.default(1),
       kpiId: z.uuid().optional(),
       capacity: z.enum(CAPACITY_VERDICTS).optional(),
       /** The source-system identity, when an import is creating this (P6-T01a). */
@@ -2418,7 +2419,7 @@ export const updateKeyResult = defineWriteAction({
     targetReason: targetReason.optional(),
     dueOn: localDate.nullable().optional(),
     ownerId: z.uuid().nullable().optional(),
-    weight: z.number().optional(),
+    weight: weightSchema.optional(),
     capacity: z.enum(CAPACITY_VERDICTS).nullable().optional(),
     carryForward: z.boolean().optional(),
   }),

@@ -2,7 +2,12 @@
 
 import { Dialog } from "@base-ui-components/react/dialog";
 import { Tabs } from "@base-ui-components/react/tabs";
-import { keyResultKindsInUse, okrKindsInUse } from "@openokr/method";
+import {
+  keyResultKindsInUse,
+  okrKindsInUse,
+  WEIGHT_MAX,
+  WEIGHT_MIN,
+} from "@openokr/method";
 import {
   Bar,
   Chip,
@@ -25,6 +30,7 @@ import {
   type OkrHandle,
   useOkrDetail,
 } from "../../lib/okr-tree/use-okr-tree.ts";
+import { unitsInUse } from "../../lib/units-in-use.ts";
 import { setStandaloneReason, unlinkGoals } from "./alignment-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
@@ -34,6 +40,7 @@ import {
   InlineDate,
   InlineNumber,
   InlineText,
+  InlineUnit,
   KeyResultKindPicker,
   KindControl,
   MemberPicker,
@@ -437,6 +444,8 @@ function DrawerBody({
                 value={goal.weight}
                 label={t("okrDrawer.weightOf", { title: goal.title })}
                 readOnly={!canEdit}
+                min={WEIGHT_MIN}
+                max={WEIGHT_MAX}
                 onSave={(weight) =>
                   okr.mutate({
                     kind: "patchGoal",
@@ -467,6 +476,7 @@ function DrawerBody({
                 progressMax={progressMax}
                 members={members}
                 coach={coach}
+                units={unitsInUse(tree.goals)}
               />
             ))
           )}
@@ -603,6 +613,7 @@ function DrawerKeyResult({
   progressMax,
   members,
   coach,
+  units,
 }: {
   readonly keyResult: OkrGoal["keyResults"][number];
   readonly highlighted: boolean;
@@ -611,6 +622,8 @@ function DrawerKeyResult({
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
+  /** The units the cycle already uses, for the unit cell to offer. */
+  readonly units: readonly string[];
 }) {
   const { t } = useTranslations();
   const cells = useKeyResultCells(keyResult, okr, coach);
@@ -720,11 +733,11 @@ function DrawerKeyResult({
                 wide
                 onSave={cells.saveTarget}
               />
-              <InlineText
+              <InlineUnit
                 value={keyResult.unit ?? ""}
                 label={t("okrList.unitOf", { title })}
+                known={units}
                 readOnly={!canEdit}
-                allowEmpty
                 placeholder={t("okrList.unit")}
                 onSave={(unit) =>
                   cells.patch(
@@ -784,6 +797,8 @@ function DrawerKeyResult({
           <InlineNumber
             value={keyResult.weight}
             label={t("okrDrawer.weightOf", { title })}
+            min={WEIGHT_MIN}
+            max={WEIGHT_MAX}
             readOnly={!canEdit}
             onSave={(weight) =>
               cells.patch({ weight }, { weight: keyResult.weight })

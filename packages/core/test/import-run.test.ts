@@ -360,6 +360,40 @@ describe("a second entity, against the rows the first one wrote", () => {
     expect(await count("key_results")).toBe(1);
   });
 
+  it("keeps a weight above 100 as 100, as it always has, though the action now refuses one", async () => {
+    // guided-inputs §4.8 bounds weight at the action. An import records what
+    // the source held, so the template clamps first, as the FlowyTeam
+    // connector does, rather than skipping the row.
+    await runImport({
+      pool,
+      workspaceId,
+      userId: OWNER,
+      entity: "goals",
+      file: await fileWith("goals.csv", GOALS_CSV),
+      dryRun: false,
+    });
+    const result = await runImport({
+      pool,
+      workspaceId,
+      userId: OWNER,
+      entity: "key-results",
+      file: await fileWith(
+        "krs.csv",
+        [
+          "Key result ID,Objective,Key result,Direction,Baseline,Target,Weight",
+          "kr-1,obj-1,Weekly active teams,increase,10,40,150",
+        ].join("\n"),
+      ),
+      dryRun: false,
+    });
+    expect(result.report.created).toBe(1);
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ weight: string }>(
+      "select weight from key_results",
+    );
+    expect(Number(rows[0]?.weight)).toBe(100);
+  });
+
   /**
    * Found by the mixed spreadsheet-plus-company test at P6-T04d.
    *

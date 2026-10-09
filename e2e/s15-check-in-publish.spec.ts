@@ -98,8 +98,8 @@ test("a goal of this reader's own, with one key result, is due", async () => {
   goalId = await form.locator('input[name="goalId"]').inputValue();
   if ((await page.getByText(KEY_RESULT, { exact: true }).count()) === 0) {
     await form.getByRole("textbox", { name: "The key result" }).fill(KEY_RESULT);
-    await form.getByRole("spinbutton", { name: "Baseline" }).fill("40");
-    await form.getByRole("spinbutton", { name: "Target" }).fill("80");
+    await form.getByRole("textbox", { name: "Baseline" }).fill("40");
+    await form.getByRole("textbox", { name: "Target" }).fill("80");
     await form.getByRole("button", { name: "Add key result" }).click();
     await expect(page.getByText(KEY_RESULT, { exact: true })).toBeVisible({
       timeout: 15_000,
@@ -141,6 +141,9 @@ test("the walker offers it, and publishing puts the card in the history", async 
     .getByRole("button", { name: "Bulleted list", exact: true })
     .click();
   await expect(narrative.locator("ul > li")).toHaveCount(1);
+  // Into the new item by hand: the toolbar hands focus back a frame later,
+  // and the caret it restores is not always the one the list was made at.
+  await narrative.locator("ul > li").click();
   await narrative.pressSequentially(NEXT_STEP);
   await expect(narrative.locator("ul > li")).toHaveText(NEXT_STEP);
   await page

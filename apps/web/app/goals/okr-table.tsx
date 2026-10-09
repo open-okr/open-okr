@@ -27,6 +27,7 @@ import {
   useOkrMutation,
   useOkrTree,
 } from "../../lib/okr-tree/use-okr-tree.ts";
+import { unitsInUse } from "../../lib/units-in-use.ts";
 import { addKeyResult, addObjective } from "./editor-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
@@ -36,6 +37,7 @@ import {
   InlineDate,
   InlineNumber,
   InlineText,
+  InlineUnit,
   KeyResultKindPicker,
   KindControl,
   MemberPicker,
@@ -308,6 +310,7 @@ function LiveOkrTable({
   // for the server rather than for the row, which moves before it answers.
   const saving = useIsMutating() > 0 || pending;
   const goals = filterGoals(tree.goals, filters);
+  const units = unitsInUse(tree.goals);
   const problem = okr.problem;
 
   useEffect(() => {
@@ -504,6 +507,7 @@ function LiveOkrTable({
                         t("okrList.moveKeyResult", { title: keyResult.title }),
                       )}
                       keyResult={keyResult}
+                      units={units}
                       onOpen={() =>
                         drawer.open(goal.id, { keyResultId: keyResult.id })
                       }
@@ -811,6 +815,7 @@ function KeyResultRow({
   members,
   coach,
   mover,
+  units,
 }: {
   readonly keyResult: OkrGoal["keyResults"][number];
   readonly onOpen: () => void;
@@ -821,6 +826,8 @@ function KeyResultRow({
   readonly members: readonly Person[];
   readonly coach: Coach;
   readonly mover: Mover | null;
+  /** The units the cycle already uses, for the unit cell to offer. */
+  readonly units: readonly string[];
 }) {
   const { t } = useTranslations();
   const cells = useKeyResultCells(keyResult, okr, coach);
@@ -923,11 +930,11 @@ function KeyResultRow({
                 readOnly={!canEdit}
                 onSave={cells.saveTarget}
               />
-              <InlineText
+              <InlineUnit
                 value={keyResult.unit ?? ""}
                 label={t("okrList.unitOf", { title: keyResult.title })}
                 readOnly={!canEdit}
-                allowEmpty
+                known={units}
                 placeholder={t("okrList.unit")}
                 onSave={(unit) =>
                   patch(

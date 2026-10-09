@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, MetricInput, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { addKeyResult } from "../editor-actions.ts";
@@ -33,6 +33,9 @@ export function KeyResultUpdate({
     readonly title: string;
     readonly currentValue: number;
     readonly confidence: number | null;
+    readonly unit: string | null;
+    readonly baselineValue: number;
+    readonly targetValue: number | null;
   };
   readonly lastStatus: Status | null;
 }) {
@@ -42,15 +45,15 @@ export function KeyResultUpdate({
     keyResult.confidence === null
       ? ""
       : String(Math.round(keyResult.confidence * 10));
-  const [value, setValue] = useState(String(keyResult.currentValue));
+  // A number or nothing: emptied, the field records nothing rather than 0.
+  const [value, setValue] = useState<number | null>(keyResult.currentValue);
   const [confidence, setConfidence] = useState(stored);
   const [status, setStatus] = useState<Status | "">(lastStatus ?? "");
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const confidenceMoved = confidence.trim() !== "" && confidence !== stored;
-  const valueMoved =
-    value.trim() !== "" && Number(value) !== keyResult.currentValue;
+  const valueMoved = value !== null && value !== keyResult.currentValue;
 
   const save = async () => {
     if (!valueMoved && !confidenceMoved) {
@@ -60,7 +63,7 @@ export function KeyResultUpdate({
     const result = await updateKeyResult({
       goalId,
       keyResultId: keyResult.id,
-      ...(valueMoved ? { value: Number(value) } : {}),
+      ...(valueMoved && value !== null ? { value } : {}),
       ...(confidenceMoved
         ? {
             confidence: Number(confidence) / 10,
@@ -88,13 +91,15 @@ export function KeyResultUpdate({
       }}
     >
       <span className="flex items-center gap-1">
-        <input
-          type="number"
-          step="any"
-          aria-label={t("common.newValueFor4", { title: keyResult.title })}
+        <MetricInput
+          label={t("common.newValueFor4", { title: keyResult.title })}
+          hideLabel
           value={value}
-          onChange={(event) => setValue(event.target.value)}
-          className="w-32 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
+          onValueChange={setValue}
+          unit={keyResult.unit}
+          baseline={keyResult.baselineValue}
+          target={keyResult.targetValue}
+          inputClassName="h-auto w-32 px-1.5 py-0.5 text-xs"
         />
         <input
           type="number"

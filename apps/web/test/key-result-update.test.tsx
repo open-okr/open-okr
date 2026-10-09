@@ -45,8 +45,20 @@ async function render(node: React.ReactNode) {
   });
 }
 
-const field = <T extends HTMLElement = HTMLInputElement>(label: string) =>
-  container.querySelector<T>(`[aria-label="${label}"]`);
+// By its `aria-label`, or by a `<label>` naming it: the value is a
+// `NumberInput` (guided-inputs §4.8), which Base UI's `Field` labels.
+const field = <T extends HTMLElement = HTMLInputElement>(label: string) => {
+  const named = container.querySelector<T>(`[aria-label="${label}"]`);
+  if (named) {
+    return named;
+  }
+  const element = [...container.querySelectorAll("label")].find(
+    (candidate) => candidate.textContent === label,
+  );
+  return element?.htmlFor
+    ? (document.getElementById(element.htmlFor) as T | null)
+    : null;
+};
 
 async function type(input: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(
@@ -71,7 +83,15 @@ async function save() {
 const update = (lastStatus: "on_track" | "caution" | "off_track" | null) => (
   <KeyResultUpdate
     goalId="g"
-    keyResult={{ id: "k", title: KR, currentValue: 33, confidence: 0.6 }}
+    keyResult={{
+      id: "k",
+      title: KR,
+      currentValue: 33,
+      confidence: 0.6,
+      unit: null,
+      baselineValue: 30,
+      targetValue: 45,
+    }}
     lastStatus={lastStatus}
   />
 );

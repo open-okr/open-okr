@@ -6,7 +6,11 @@ import {
   REVIEW_ASSIST_KEYS,
   THREAD_SUMMARY_MINIMUM,
 } from "@openokr/core";
-import type { ResolvedThresholds } from "@openokr/method";
+import {
+  type ResolvedThresholds,
+  WEIGHT_MAX,
+  WEIGHT_MIN,
+} from "@openokr/method";
 import {
   Bar,
   Button,
@@ -16,6 +20,7 @@ import {
   CardHeader,
   Chip,
   formatMeasure,
+  NumberInput,
   RichTextView,
 } from "@openokr/ui";
 
@@ -475,6 +480,9 @@ export default async function GoalPage({
                             title: keyResult.title,
                             currentValue: keyResult.currentValue,
                             confidence: keyResult.confidence,
+                            unit: keyResult.unit,
+                            baselineValue: keyResult.baselineValue,
+                            targetValue: keyResult.targetValue,
                           }}
                           lastStatus={lastStatus}
                         />
@@ -528,23 +536,19 @@ export default async function GoalPage({
                   placeholder={t("common.thePriorityThisMoves")}
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
                 />
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs text-ink-3" htmlFor="edit-weight">
-                    {t("goals.detail.weight")}
-                  </label>
-                  <input
+                <div className="flex items-end gap-1.5">
+                  {/* guided-inputs §4.8: held to the method's 0 to 100,
+                      which the action now refuses outside of too. */}
+                  <NumberInput
                     id="edit-weight"
+                    label={t("goals.detail.weight")}
                     name="weight"
-                    type="number"
-                    step="any"
-                    min={0}
-                    max={100}
                     defaultValue={goal.weight}
-                    className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink"
+                    min={WEIGHT_MIN}
+                    max={WEIGHT_MAX}
+                    description={t("goals.detail.0MeansTrackedBut")}
+                    inputClassName="w-24"
                   />
-                  <span className="text-xs text-ink-4">
-                    {t("goals.detail.0MeansTrackedBut")}
-                  </span>
                   <Button type="submit" className="ml-auto">
                     {t("common.save")}
                   </Button>
