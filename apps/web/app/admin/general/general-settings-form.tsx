@@ -1,6 +1,12 @@
 "use client";
 
-import { Button, Card, CardBody, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  TimezoneSelect,
+  useTranslations,
+} from "@openokr/ui";
 import { type FormEvent, startTransition, useActionState } from "react";
 import { submitGeneral } from "./actions.ts";
 import { NOTHING_SAVED } from "./general-state.ts";
@@ -33,8 +39,11 @@ const LABEL_CLASS =
 
 export function GeneralSettingsForm({
   settings,
+  zones,
 }: {
   settings: Record<string, unknown>;
+  /** The server's own list, so the card offers only what it will accept. */
+  zones: readonly string[];
 }) {
   const { t } = useTranslations();
   const [state, formAction, pending] = useActionState(
@@ -72,15 +81,16 @@ export function GeneralSettingsForm({
           aria-busy={pending}
           className="flex flex-col gap-3"
         >
-          <label htmlFor="timezone" className={LABEL_CLASS}>
-            {t("common.timezone")}
-            <input
-              id="timezone"
+          <div className="w-full max-w-sm">
+            <TimezoneSelect
+              label={t("common.timezone")}
               name="timezone"
-              defaultValue={String(settings.timezone ?? "")}
-              className={INPUT_CLASS}
+              zones={zones}
+              defaultValue={
+                typeof settings.timezone === "string" ? settings.timezone : null
+              }
             />
-          </label>
+          </div>
           <label htmlFor="language" className={LABEL_CLASS}>
             {t("admin.general.generalSettingsForm.language")}
             {/* A picker of the catalogues that exist, not a text box that

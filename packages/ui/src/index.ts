@@ -16,6 +16,7 @@ export * from "./fields/code-input.tsx";
 export * from "./fields/email-input.tsx";
 export * from "./fields/secret-input.tsx";
 export * from "./fields/text-input.tsx";
+export * from "./fields/timezone-select.tsx";
 export * from "./forms/unsaved-changes.tsx";
 export * from "./forms/use-form-dirty.ts";
 export * from "./forms/use-submit-shortcut.ts";

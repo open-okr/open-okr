@@ -12,8 +12,10 @@ import {
   isEmailAddress,
   isHexColour,
   isKnownTimezone,
+  isListedTimezone,
   isLocalDate,
   LOCAL_DATE_PATTERN,
+  listTimezones,
 } from "../src/index.ts";
 
 /**
@@ -140,5 +142,32 @@ describe("a terminal login code", () => {
   it("is written as two groups of four with a hyphen", () => {
     expect(DEVICE_USER_CODE_GROUPS).toEqual([4, 4]);
     expect(formatDeviceUserCode("ABCDEFGH")).toBe("ABCD-EFGH");
+  });
+});
+
+describe("the timezone list", () => {
+  it("is the runtime's own list with UTC added, which the runtime leaves out", () => {
+    const zones = listTimezones();
+    expect(zones[0]).toBe("UTC");
+    expect(zones).toContain("Asia/Kuala_Lumpur");
+    expect(zones).toContain("America/New_York");
+    expect(new Set(zones).size).toBe(zones.length);
+  });
+
+  it.each(["UTC", "Asia/Kuala_Lumpur", "Europe/London"])("lists %s", (zone) => {
+    expect(isListedTimezone(zone)).toBe(true);
+  });
+
+  it.each([
+    // The runtime accepts each of these, which is why "known" was not enough:
+    // an abbreviation, a different case, an offset and an old alias.
+    "EST",
+    "asia/kuala_lumpur",
+    "+08:00",
+    "US/Eastern",
+    " Asia/Kuala_Lumpur",
+    "",
+  ])("does not list %j", (zone) => {
+    expect(isListedTimezone(zone)).toBe(false);
   });
 });

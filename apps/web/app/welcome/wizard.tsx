@@ -9,6 +9,7 @@ import {
   CardHeader,
   EmailInput,
   TextInput,
+  TimezoneSelect,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -91,11 +92,14 @@ const FREQUENCIES = [
 export function Wizard({
   workspaceName,
   timezone,
+  zones,
   frequency: currentFrequency,
 }: {
   readonly workspaceName: string;
   /** The workspace's timezone: the registering browser's, or a later answer. */
   readonly timezone: string;
+  /** The server's own list, so the wizard offers only what it will accept. */
+  readonly zones: readonly string[];
   /**
    * The rhythm the workspace runs now. Weekly on a first run, which is the
    * method's own default; whatever was chosen since on a reopened one. It may
@@ -176,13 +180,12 @@ export function Wizard({
               maxLength={200}
               onChange={(event) => setName(event.target.value)}
             />
-            {/* A list of zones replaces this box in its own change (docs/
-                design/guided-inputs.md §4.6). */}
-            <TextInput
+            <TimezoneSelect
               label={t("welcome.basics.timezone")}
               description={t("welcome.basics.timezoneHelp")}
+              zones={zones}
               value={zone}
-              onChange={(event) => setZone(event.target.value)}
+              onValueChange={(chosen) => setZone(chosen ?? "")}
             />
           </div>
         ) : null}

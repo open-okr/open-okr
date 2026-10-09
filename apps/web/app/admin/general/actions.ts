@@ -18,10 +18,10 @@
 
 import {
   callAction,
-  isKnownTimezone,
   OperationError,
   trustedEmailDomainsSchema,
 } from "@openokr/core";
+import { isListedTimezone } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
@@ -68,7 +68,7 @@ export async function submitGeneral(
     .map((domain) => domain.trim())
     .filter((domain) => domain.length > 0);
 
-  if (timezone !== "" && !isKnownTimezone(timezone)) {
+  if (timezone !== "" && !isListedTimezone(timezone)) {
     return {
       error: t("admin.general.generalSettingsForm.unknownTimezone", {
         timezone,

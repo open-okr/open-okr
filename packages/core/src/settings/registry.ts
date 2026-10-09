@@ -2,6 +2,7 @@ import {
   DOMAIN_PATTERN,
   HEX_COLOUR_PATTERN,
   isKnownTimezone,
+  isListedTimezone,
 } from "@openokr/formats";
 import type { CheckInFrequency, CoachStrictness } from "@openokr/method";
 import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
@@ -126,11 +127,6 @@ export const DEFAULT_DAILY_SUMMARY_TIME = "08:00";
  */
 const DEFAULT_SPACE_TEAM_VOTING = true;
 
-// The format rules live in `packages/formats`, where the browser checks a
-// field with the same function this refuses it with. Still exported from here,
-// because callers have always asked core for it.
-export { isKnownTimezone };
-
 const resolveTimezone = (context: ProvisioningContext): string => {
   const candidate = context.timezone?.trim();
   return candidate && isKnownTimezone(candidate) ? candidate : "UTC";
@@ -140,7 +136,9 @@ export const timezoneSchema = z
   .string()
   .trim()
   .min(1)
-  .refine(isKnownTimezone, { message: "not a timezone the runtime knows" });
+  // On the list the card offers, exactly as written. The runtime alone also
+  // takes `EST`, `+08:00` and a name in the wrong case, and each was stored.
+  .refine(isListedTimezone, { message: "not a timezone on the list" });
 
 export const languageSchema = z.string().trim().min(2).max(35);
 

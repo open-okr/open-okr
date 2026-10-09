@@ -23,7 +23,7 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { EMAIL_PATTERN } from "@openokr/formats";
+import { EMAIL_PATTERN, isListedTimezone } from "@openokr/formats";
 import { and, eq, isNull, type SQL, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -56,15 +56,12 @@ import {
 } from "../people/profile.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
-import {
-  isKnownTimezone,
-  resolveMemberSettings,
-} from "../settings/registry.ts";
+import { resolveMemberSettings } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /** `null` clears the bio; anything else must be a valid rich text
  * document (docs/design/rich-text-editor.md). Validated at the input
- * boundary, same as `isKnownTimezone` below, rather than inside
+ * boundary, same as the timezone below, rather than inside
  * `execute()` — a bad document is refused before the transaction opens. */
 const bioInputSchema = z
   .unknown()
@@ -102,9 +99,13 @@ export const updateOwnProfile = defineWriteAction({
   summary:
     "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
   input: z.object({
+    // On the list the profile offers, trimmed first (docs/design/
+    // guided-inputs.md §4.6). A name the runtime merely resolves, such as
+    // `EST`, was stored as typed.
     timezone: z
       .string()
-      .refine(isKnownTimezone, { message: "Unknown timezone." })
+      .trim()
+      .refine(isListedTimezone, { message: "Unknown timezone." })
       .optional(),
     avatarBlobId: z.uuid().nullable().optional(),
     bio: bioInputSchema,

@@ -40,21 +40,29 @@ async function type(label: string, value: string): Promise<void> {
   }).toPass({ timeout: 20_000 });
 }
 
-test("a timezone the server does not know is refused on the card", async () => {
+/**
+ * **A timezone is chosen, not typed** (guided-inputs §4.6). The refusal this
+ * spec first pinned, a zone the server does not know reaching the error page,
+ * cannot be reached from the card any more: the field offers only the
+ * server's own list. The refusal itself is still proved without a browser in
+ * `apps/web/test/general-settings.test.ts`.
+ */
+test("a zone off the list matches nothing, and one on it is found by its offset", async () => {
   await goTo(page, "/admin/general");
   const before = await page.getByLabel("Timezone").inputValue();
 
-  await type("Timezone", "Mars/Olympus_Mons");
-  await generalForm().getByRole("button", { name: "Save", exact: true }).click();
+  await type("Timezone", "Mars/Olympus");
+  await expect(page.getByText("No zone matches that")).toBeVisible({
+    timeout: 10_000,
+  });
 
-  await expect(generalForm().getByRole("alert")).toContainText(
-    "Mars/Olympus_Mons is not a timezone this server knows",
-    { timeout: 10_000 },
-  );
-  // Still the card, not the error page, and what was typed is still there to
-  // correct.
-  await expect(page.getByLabel("Timezone")).toHaveValue("Mars/Olympus_Mons");
+  await type("Timezone", "gmt+8");
+  await expect(
+    page.getByRole("option", { name: /Kuala Lumpur, GMT\+8/ }),
+  ).toBeVisible({ timeout: 10_000 });
+  await page.keyboard.press("Escape");
 
+  // Nothing was chosen, so the saved zone is what the card opens on.
   await goTo(page, "/admin/general");
   await expect(page.getByLabel("Timezone")).toHaveValue(before, {
     timeout: 10_000,

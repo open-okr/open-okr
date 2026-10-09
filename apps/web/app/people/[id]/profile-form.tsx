@@ -6,6 +6,7 @@ import {
   CardBody,
   CardHeader,
   RichTextEditor,
+  TimezoneSelect,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState, useState } from "react";
@@ -28,6 +29,7 @@ import type { ProfileResult } from "../actions.ts";
 export function ProfileForm({
   memberId,
   timezone,
+  zones,
   primaryChannel,
   quietHours,
   bio,
@@ -35,6 +37,8 @@ export function ProfileForm({
 }: {
   readonly memberId: string;
   readonly timezone: string | null;
+  /** The server's own list, so the form offers only what it will accept. */
+  readonly zones: readonly string[];
   readonly primaryChannel: string | null;
   /** The saved window, shown so a save that does not touch it keeps it. */
   readonly quietHours: { readonly start: string; readonly end: string } | null;
@@ -62,15 +66,12 @@ export function ProfileForm({
         <form action={action} className="flex flex-col gap-2">
           <input type="hidden" name="memberId" value={memberId} />
 
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.timezone")}
-            <input
-              name="timezone"
-              defaultValue={timezone ?? ""}
-              placeholder={t("people.detail.profileForm.eGAsiaKuala")}
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-          </label>
+          <TimezoneSelect
+            label={t("common.timezone")}
+            name="timezone"
+            zones={zones}
+            defaultValue={timezone}
+          />
 
           <label className="flex flex-col gap-1 text-xs text-ink-3">
             {t("common.primaryChannel")}

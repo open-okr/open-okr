@@ -1104,7 +1104,6 @@ export {
   DEFAULT_QUIET_HOURS,
   findWorkspaceSetting,
   INSTANCE_DEFAULT_LANGUAGE,
-  isKnownTimezone,
   languageSchema,
   type ProvisioningContext,
   primaryChannelSchema,

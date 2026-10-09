@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction, renderRichTextToHtml } from "@openokr/core";
+import { listTimezones } from "@openokr/formats";
 import { Avatar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -337,6 +338,7 @@ export default async function MemberProfilePage({
         <ProfileForm
           memberId={id}
           timezone={member.timezone}
+          zones={listTimezones()}
           primaryChannel={member.primaryChannel}
           quietHours={ownDelivery?.quietHours ?? null}
           bio={member.bio}

@@ -147,9 +147,10 @@ How it behaves:
 - **Each option shows the city, the current offset and the IANA name**, for example `Kuala Lumpur, GMT+8, Asia/Kuala_Lumpur`. Offsets are worked out for today, so daylight saving shows correctly.
 - **The search matches** the city, the IANA name, the offset (`+8`, `GMT+8`) and the zone's generic name in the reader's language (`Malaysia Time`, `Pacific Time`), using `Intl.DateTimeFormat` with `timeZoneName: "longGeneric"`.
 - Options are grouped by region, which is the part of the name before the `/`.
-- The device's own zone is offered first, as "This device: Asia/Kuala_Lumpur".
+- The device's own zone is offered in one press, as a "Use this device's zone: Asia/Kuala_Lumpur" button beside the field. A first option in the list would have been the same zone twice, which confuses the list's highlighting. A browser that spells the zone differently from the server's list (`Asia/Kolkata` against `Asia/Calcutta`) is matched to the listed spelling.
 - **A stored value that is not on the list**, such as an old `EST`, still shows, marked "not a recognised zone", until somebody picks another. Nothing already stored is rewritten.
-- **Server:** `timezoneSchema` accepts only a trimmed name on the list. `isKnownTimezone` stays, for reading old values.
+- **Server:** `timezoneSchema` and `people.updateOwnProfile` accept only a trimmed name on the list (`isListedTimezone` in `packages/formats`). The list is the runtime's own, which leaves out `UTC`, so `UTC` is added first. `isKnownTimezone` stays, for reading old values; the importer still stores what the source held, and the field shows it as not recognised.
+- **The field labels its own input.** Inside Base UI `Field`, the label pointed at the combobox's hidden form input as well, so three elements answered to one label.
 
 It is used on three screens: the welcome wizard, Admin > General and the profile form.
 
@@ -327,7 +328,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 1b | The base kit | `TextInput` on Base UI `Field`, `EmailInput`, `SecretInput`. Done 9 October 2026 | Sign-in, sign-up, forgot and reset password, setup, the welcome wizard. The auth `Field` helper is rebuilt on `TextInput`, so the backup code page and the single sign-on form take the same skin |
 | 1c | The ratchet gate | The gate below, with its first baseline: 336 raw fields in 111 screen files. Done 9 October 2026 | None |
 | 2 | `feat/code-input` | `CodeInput`, and the terminal code's alphabet and shape in `packages/formats`. Done 9 October 2026 | Sign-in second step, turning on the authenticator, backup code, terminal login |
-| 3 | `feat/timezone-select` | `TimezoneSelect`, the stricter `timezoneSchema` | Welcome wizard, Admin > General, profile |
+| 3 | `feat/timezone-select` | `TimezoneSelect`, the stricter `timezoneSchema`. Done 9 October 2026 | Welcome wizard, Admin > General, profile |
 | 4 | `feat/compact-editor` | The `compact` variant, the toolbar, `RichTextField`, the length limit in `richTextSchema`. Underline step 1: every reader knows the mark, nothing writes it | Comments, check-in narrative ×3, retrospective, initiative description, review narrative |
 | 4b | `feat/underline` | Underline step 2, one release after change 4: the button and Mod-U | Every editor |
 | 5 | `feat/editor-cycle-fields` | The cycle's rich fields, with `asText` and `asDocument` removed | Annual frame ×4, baseline health ×3, capacity cuts, the minutes write-up |
