@@ -137,7 +137,11 @@ export default function SignInPage() {
       setError(
         failure.status === 429
           ? t("auth.signIn.tooManyAttempts")
-          : t("auth.signIn.thoseDetailsDidNotMatch"),
+          : // Better Auth answers this only after the password matched, so
+            // saying it confirms nothing to somebody guessing (BUG-028).
+            failure.code === "EMAIL_NOT_VERIFIED"
+            ? t("auth.signIn.confirmYourEmailFirst")
+            : t("auth.signIn.thoseDetailsDidNotMatch"),
       );
       return;
     }

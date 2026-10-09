@@ -27,6 +27,7 @@ import { kpiRecoveringToBand } from "../src/data-changes/0021_kpi_recovering_to_
 import { kpiNamedOwner } from "../src/data-changes/0022_kpi_named_owner.ts";
 import { blockerClockToCheckIn } from "../src/data-changes/0023_blocker_clock_to_check_in.ts";
 import { retireRhythmScoreThreshold } from "../src/data-changes/0024_retire_rhythm_score_threshold.ts";
+import { verifyFirstAccount } from "../src/data-changes/0025_verify_first_account.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1455,5 +1456,29 @@ describe("0024: the survey rhythm threshold retired", () => {
       )
     ).rows[0]?.overrides;
     expect(overrides).toEqual({ "sessions.diagnosticCycleScore": 0.65 });
+  });
+});
+
+describe("0025: the account that claimed the instance verified", () => {
+  it("verifies the earliest account and leaves later ones to their link", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `insert into users (id, name, email, created_at) values
+         ('first', 'Operator', 'ops@example.com', now() - interval '2 days'),
+         ('later', 'Member', 'member@example.com', now())`,
+    );
+    const [result] = await runDataChanges(client, {
+      scripts: [verifyFirstAccount],
+    });
+    expect(result?.rowsChanged).toBe(1);
+    const { rows } = await client.query<{ id: string; v: boolean }>(
+      "select id, email_verified as v from users order by id",
+    );
+    expect(rows).toEqual([
+      { id: "first", v: true },
+      { id: "later", v: false },
+    ]);
   });
 });

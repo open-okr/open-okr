@@ -1001,6 +1001,7 @@
   "auth.signIn.thatPasskeyDidNotWork": "That passkey did not work. Try your password instead.",
   "auth.signIn.thePasswordIsForAllOfThem": "The password is {password} for all of them.",
   "auth.signIn.thisIsADemonstrationInstance": "This is a demonstration instance. Sign in as anybody here; the workspace is rebuilt on a schedule and nothing in it is real.",
+  "auth.signIn.confirmYourEmailFirst": "Confirm your email address first. Open the link we sent you, then sign in.",
   "auth.signIn.thoseDetailsDidNotMatch": "Those details did not match. Check them and try again.",
   "auth.signIn.tooManyAttempts": "Too many attempts. Wait a minute and try again.",
   "auth.signIn.verify": "Verify",

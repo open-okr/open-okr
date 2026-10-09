@@ -1001,6 +1001,7 @@
   "auth.signIn.thatPasskeyDidNotWork": "Kunci laluan itu tidak berfungsi. Cuba kata laluan anda.",
   "auth.signIn.thePasswordIsForAllOfThem": "Kata laluan untuk semua mereka ialah {password}.",
   "auth.signIn.thisIsADemonstrationInstance": "Ini ialah instans demonstrasi. Log masuk sebagai sesiapa di sini; ruang kerja ini dibina semula mengikut jadual dan tiada apa-apa di dalamnya yang sebenar.",
+  "auth.signIn.confirmYourEmailFirst": "Sahkan alamat e-mel anda dahulu. Buka pautan yang kami hantar, kemudian log masuk.",
   "auth.signIn.thoseDetailsDidNotMatch": "Butiran itu tidak sepadan. Semak dan cuba lagi.",
   "auth.signIn.tooManyAttempts": "Terlalu banyak cubaan. Tunggu seminit dan cuba lagi.",
   "auth.signIn.verify": "Sahkan",
