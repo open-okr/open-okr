@@ -89,6 +89,7 @@ The kit lives in `packages/ui/src/fields/` and is exported from `@openokr/ui`. E
 | `isLocalDate(text)`, `isClockTime(text)` | Every date and time field |
 | `isHexColour(text)`, `isStatusLikeColour(hex)` | Branding, which refuses red, amber and green |
 | `normaliseTimezone(name, zones)` | `TimezoneSelect` and `timezoneSchema` |
+| `DEVICE_CODE_ALPHABET`, `DEVICE_USER_CODE_GROUPS`, `formatDeviceUserCode` | `CodeInput` for a terminal login code, and the code the server issues |
 
 **The alternative.** Keep the rules in a pure subpath of core, `@openokr/core/formats`, and pass each rule into the kit as a prop, the way the editor already takes `validate`. That adds no package, but every call site has to remember to wire in the check. Q2 chose the new package, so TECHNICAL-PLAN §1's package table and PLAN.md's package list gain `packages/formats` in change 1.
 
@@ -325,7 +326,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 1a | `packages/formats` | The package, with the rules core already enforced moved into it unchanged: email, domain, local date, hex colour, timezone. Done 8 October 2026 | None. Nothing a person sees changes |
 | 1b | The base kit | `TextInput` on Base UI `Field`, `EmailInput`, `SecretInput`. Done 9 October 2026 | Sign-in, sign-up, forgot and reset password, setup, the welcome wizard. The auth `Field` helper is rebuilt on `TextInput`, so the backup code page and the single sign-on form take the same skin |
 | 1c | The ratchet gate | The gate below, with its first baseline: 336 raw fields in 111 screen files. Done 9 October 2026 | None |
-| 2 | `feat/code-input` | `CodeInput` | Sign-in second step, turning on the authenticator, backup code, terminal login |
+| 2 | `feat/code-input` | `CodeInput`, and the terminal code's alphabet and shape in `packages/formats`. Done 9 October 2026 | Sign-in second step, turning on the authenticator, backup code, terminal login |
 | 3 | `feat/timezone-select` | `TimezoneSelect`, the stricter `timezoneSchema` | Welcome wizard, Admin > General, profile |
 | 4 | `feat/compact-editor` | The `compact` variant, the toolbar, `RichTextField`, the length limit in `richTextSchema`. Underline step 1: every reader knows the mark, nothing writes it | Comments, check-in narrative ×3, retrospective, initiative description, review narrative |
 | 4b | `feat/underline` | Underline step 2, one release after change 4: the button and Mod-U | Every editor |

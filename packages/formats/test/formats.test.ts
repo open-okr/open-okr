@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
+  DEVICE_CODE_ALPHABET,
+  DEVICE_USER_CODE_GROUPS,
   DOMAIN_PATTERN,
   EMAIL_PATTERN,
+  formatDeviceUserCode,
   HEX_COLOUR_HTML_PATTERN,
   HEX_COLOUR_PATTERN,
   isDomain,
@@ -124,4 +127,18 @@ describe("a timezone", () => {
       expect(isKnownTimezone(timezone)).toBe(false);
     },
   );
+});
+
+describe("a terminal login code", () => {
+  it("leaves out the characters a person could mistype off a screen", () => {
+    expect(DEVICE_CODE_ALPHABET).toHaveLength(31);
+    for (const confusable of ["0", "O", "1", "I", "L"]) {
+      expect(DEVICE_CODE_ALPHABET).not.toContain(confusable);
+    }
+  });
+
+  it("is written as two groups of four with a hyphen", () => {
+    expect(DEVICE_USER_CODE_GROUPS).toEqual([4, 4]);
+    expect(formatDeviceUserCode("ABCDEFGH")).toBe("ABCD-EFGH");
+  });
 });

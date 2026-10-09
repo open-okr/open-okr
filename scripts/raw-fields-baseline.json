@@ -3,7 +3,7 @@
   "apps/web/app/account/api-tokens/page.tsx": 2,
   "apps/web/app/account/channels/cadence-form.tsx": 3,
   "apps/web/app/account/channels/page.tsx": 2,
-  "apps/web/app/account/security/security-settings.tsx": 2,
+  "apps/web/app/account/security/security-settings.tsx": 1,
   "apps/web/app/admin/agents/agent-policy.tsx": 3,
   "apps/web/app/admin/ai/governance.tsx": 8,
   "apps/web/app/admin/ai/page.tsx": 12,

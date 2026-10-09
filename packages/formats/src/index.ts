@@ -14,6 +14,11 @@ export {
   isHexColour,
 } from "./colour.ts";
 export { isLocalDate, LOCAL_DATE_PATTERN } from "./date.ts";
+export {
+  DEVICE_CODE_ALPHABET,
+  DEVICE_USER_CODE_GROUPS,
+  formatDeviceUserCode,
+} from "./device-code.ts";
 export { DOMAIN_PATTERN, isDomain } from "./domain.ts";
 export { EMAIL_PATTERN, isEmailAddress } from "./email.ts";
 export { isKnownTimezone } from "./timezone.ts";

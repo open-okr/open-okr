@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  CodeInput,
   useTranslations,
 } from "@openokr/ui";
 import { useState } from "react";
@@ -51,6 +52,10 @@ export function SecuritySettings({
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  // A refused code is said on the code field itself, which then empties and
+  // takes focus back, rather than in the note under the card.
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const addPasskey = async () => {
     setNote(null);
@@ -103,16 +108,18 @@ export function SecuritySettings({
     setPassword("");
   };
 
-  const confirmTwoFactor = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  // Called by the code field once its sixth digit is in, and by Turn on.
+  const confirmTwoFactor = async (entered: string) => {
     setNote(null);
-    const { error: failure } = await authClient.twoFactor.verifyTotp({ code });
+    setCodeError(null);
+    setConfirming(true);
+    const { error: failure } = await authClient.twoFactor.verifyTotp({
+      code: entered,
+    });
+    setConfirming(false);
     if (failure) {
-      setNote({
-        scope: "totp",
-        tone: "bad",
-        text: "That code was not right. Codes change every 30 seconds.",
-      });
+      setCode("");
+      setCodeError(t("account.security.securitySettings.thatCodeWasNotRight"));
       return;
     }
     setNote({
@@ -201,22 +208,30 @@ export function SecuritySettings({
               ) : null}
 
               <form
-                onSubmit={confirmTwoFactor}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  confirmTwoFactor(code);
+                }}
                 className="flex flex-col items-start gap-3"
               >
-                <label htmlFor="totp-code" className={LABEL_CLASS}>
-                  {t("account.security.securitySettings.codeFromYourApp")}
-                  <input
-                    id="totp-code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    required
-                    value={code}
-                    onChange={(event) => setCode(event.target.value)}
-                    className={INPUT_CLASS}
-                  />
-                </label>
-                <Button type="submit" variant="primary" size="sm">
+                <CodeInput
+                  id="totp-code"
+                  label={t("account.security.securitySettings.codeFromYourApp")}
+                  groups={[6]}
+                  characters="digits"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={setCode}
+                  onComplete={confirmTwoFactor}
+                  busy={confirming}
+                  error={codeError}
+                />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={confirming || code.length < 6}
+                >
                   {t("account.security.securitySettings.turnOn")}
                 </Button>
               </form>

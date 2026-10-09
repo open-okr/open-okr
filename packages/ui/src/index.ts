@@ -12,6 +12,7 @@ export * from "./components/chip.tsx";
 export * from "./components/kbd.tsx";
 export * from "./components/verdict-dot.tsx";
 export * from "./feedback/toast.tsx";
+export * from "./fields/code-input.tsx";
 export * from "./fields/email-input.tsx";
 export * from "./fields/secret-input.tsx";
 export * from "./fields/text-input.tsx";
