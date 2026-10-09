@@ -54,7 +54,8 @@ const MIGRATION_LOCK_KEY = 761_803_2;
 const normalise = (content: string): string =>
   content.replaceAll("\r\n", "\n").replace(/\n+$/, "");
 
-const checksum = (content: string): string =>
+/** The checksum the runner records, so the shipped-migration gate agrees. */
+export const checksum = (content: string): string =>
   createHash("sha256").update(normalise(content)).digest("hex");
 
 /**
