@@ -108,6 +108,5 @@
   "apps/web/app/spaces/page.tsx": 3,
   "apps/web/app/tasks/[id]/controls.tsx": 1,
   "apps/web/app/tasks/[id]/page.tsx": 1,
-  "apps/web/app/workspace-select.tsx": 1,
-  "apps/web/lib/comments.tsx": 1
+  "apps/web/app/workspace-select.tsx": 1
 }

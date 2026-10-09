@@ -5,19 +5,19 @@ import {
   Card,
   CardBody,
   CardHeader,
-  RichTextEditor,
+  RichTextField,
   TimezoneSelect,
   useTranslations,
 } from "@openokr/ui";
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import type { ProfileResult } from "../actions.ts";
 
 /**
  * The self-edit form on the profile page (P6-G09, screen S-33).
  *
  * Timezone, primary channel, quiet hours and the bio. **The bio is rich text**
- * (TECHNICAL-PLAN §4.1 names `bio` as rich), so it is written in the shared
- * editor the documents use and validated again at the action's boundary. It
+ * (TECHNICAL-PLAN §4.1 names `bio` as rich), so it is written in the compact
+ * rich text field and validated again at the action's boundary. It
  * was deferred at P6-G09 and nothing else could edit it, which completeness
  * review M-22 recorded. No mentions and no attachments: a bio is a few lines
  * about somebody, and a picture of them is the avatar card's.
@@ -52,8 +52,6 @@ export function ProfileForm({
   const { t } = useTranslations();
 
   const [state, action, pending] = useActionState(updateProfile, null);
-  // The edited document, serialised, once somebody has typed in the editor.
-  const [editedBio, setEditedBio] = useState<string | null>(null);
 
   return (
     <Card>
@@ -101,25 +99,13 @@ export function ProfileForm({
             </select>
           </label>
 
-          <fieldset className="flex flex-col gap-1">
-            <legend className="text-xs text-ink-3">
-              {t("people.detail.bio")}
-            </legend>
-            <div className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm">
-              <RichTextEditor
-                label={t("people.detail.bio")}
-                content={bio ?? null}
-                placeholder={t("people.detail.profileForm.aFewLinesAbout")}
-                onUpdate={(json) => setEditedBio(JSON.stringify(json))}
-              />
-            </div>
-            {editedBio === null ? null : (
-              <input type="hidden" name="bio" value={editedBio} />
-            )}
-            <span className="text-xs text-ink-4">
-              {t("people.detail.profileForm.emptyTheBioTo")}
-            </span>
-          </fieldset>
+          <RichTextField
+            label={t("people.detail.bio")}
+            name="bio"
+            content={bio ?? null}
+            placeholder={t("people.detail.profileForm.aFewLinesAbout")}
+            description={t("people.detail.profileForm.emptyTheBioTo")}
+          />
 
           <fieldset className="flex flex-col gap-1">
             <legend className="text-xs text-ink-3">

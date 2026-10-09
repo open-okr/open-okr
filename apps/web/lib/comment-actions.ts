@@ -129,3 +129,37 @@ export async function toggleReaction(
     }
   }, "comments.actions.failedToChangeTheReaction");
 }
+
+/**
+ * Who `@` offers in a comment, by name (docs/design/guided-inputs.md §4.7).
+ *
+ * People and guests who are active: a mention tells the person named, and
+ * an agent, a placeholder or somebody suspended would be told nothing. Eight
+ * at most, because a list longer than a glance is a search that has not
+ * narrowed yet. The directory read is the one the people page uses, so it
+ * shows nobody the reader could not already see.
+ */
+export async function searchMentionable(
+  query: string,
+): Promise<readonly { readonly id: string; readonly label: string }[]> {
+  const { session, workspace } = await requireWorkspace();
+  const people = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "people.directory",
+    {},
+  );
+  const needle = query.trim().toLowerCase();
+  return people
+    .filter(
+      (person) =>
+        person.status === "active" &&
+        (person.kind === "human" || person.kind === "guest") &&
+        person.name.toLowerCase().includes(needle),
+    )
+    .slice(0, 8)
+    .map((person) => ({ id: person.id, label: person.name }));
+}

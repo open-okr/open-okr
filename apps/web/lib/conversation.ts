@@ -1,4 +1,11 @@
-import { type ActionCallContext, callAction } from "@openokr/core";
+import {
+  type ActionCallContext,
+  callAction,
+  isValidRichText,
+  parseRichText,
+  RICH_TEXT_SCHEMA_VERSION,
+  renderRichTextToHtml,
+} from "@openokr/core";
 import type { CommentSubjectType } from "./comment-actions.ts";
 import type { CommentData, ReactionGroupData } from "./comments.tsx";
 
@@ -22,6 +29,19 @@ const groupsOf = (
     own: group.own,
     ownReactionId: group.ownReactionId,
   }));
+
+/**
+ * A comment's body as the screen shows it: rendered here, through the one
+ * sanitising renderer every surface uses, so the browser draws formatting it
+ * never has to interpret. Null for a body that is not a document the schema
+ * accepts, which a comment written before bodies were checked can be.
+ */
+function htmlOf(body: unknown): string | null {
+  if (!isValidRichText(body, RICH_TEXT_SCHEMA_VERSION)) {
+    return null;
+  }
+  return renderRichTextToHtml(parseRichText(body, RICH_TEXT_SCHEMA_VERSION));
+}
 
 /**
  * A subject's discussion, read on the server (completeness review M-01).
@@ -55,7 +75,11 @@ export async function readConversation(
       subjectType: "comment",
       subjectId: comment.id,
     });
-    withReactions.push({ ...comment, reactions: groupsOf(groups) });
+    withReactions.push({
+      ...comment,
+      html: htmlOf(comment.body),
+      reactions: groupsOf(groups),
+    });
   }
   return { comments: withReactions, reactions: groupsOf(onSubject) };
 }

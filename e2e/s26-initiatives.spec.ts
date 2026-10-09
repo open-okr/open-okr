@@ -124,7 +124,8 @@ test("linking it to a key result is done from the initiative itself", async () =
   const picker = page.getByLabel("Key result to link");
   await expect(picker).toBeVisible({ timeout: 10_000 });
   await picker.selectOption({ index: 0 });
-  await page.getByRole("button", { name: "Link" }).click();
+  // Exact: the comment editor's toolbar on this page has "Insert link".
+  await page.getByRole("button", { name: "Link", exact: true }).click();
 
   await expect(page.getByTestId("linked-key-results")).toBeVisible({
     timeout: 15_000,
@@ -272,13 +273,19 @@ test("the initiative carries documents and a discussion", async () => {
   const thread = page.getByTestId("comment-thread");
   await expect(thread).toBeVisible();
 
+  // The composer is the compact editor since guided-inputs §4.7, found by
+  // its name. The posted comment is looked for among the posted ones: the
+  // editor holds the same text until the post lands, so the thread as a whole
+  // would contain it before anything was saved.
   await thread
-    .getByPlaceholder("Write a comment...")
+    .getByRole("textbox", { name: "Your comment" })
     .fill("The flow needs a second designer.");
   await thread.getByRole("button", { name: "Post" }).click();
-  await expect(thread).toContainText("The flow needs a second designer.", {
-    timeout: 15_000,
-  });
+  await expect(
+    thread
+      .locator('[id^="comment-"]')
+      .filter({ hasText: "The flow needs a second designer." }),
+  ).toBeVisible({ timeout: 15_000 });
 
   await expect(async () => {
     const { rows } = await pool.query<{ subject_type: string }>(

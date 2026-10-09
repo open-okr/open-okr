@@ -217,13 +217,15 @@ describe("parseRichText: rejects what is not on the allow-list", () => {
   });
 
   test("an unknown mark type", () => {
+    // Text colour, which the allow-list still leaves out. Underline was the
+    // example here until it joined the list (guided-inputs §4.7).
     const doc = {
       type: "doc",
       content: [
         {
           type: "paragraph",
           content: [
-            { type: "text", text: "x", marks: [{ type: "underline" }] },
+            { type: "text", text: "x", marks: [{ type: "textStyle" }] },
           ],
         },
       ],
@@ -475,5 +477,41 @@ describe("extractMentionIds / extractAttachments: decode-safe", () => {
     expect(extractAttachments(doc)).toEqual([
       { blobId: undefined, status: "uploading" },
     ]);
+  });
+});
+
+/**
+ * Underline, step 1 (docs/design/guided-inputs.md §4.7): every reader knows
+ * the mark before anything can write it, so a document carrying one, written
+ * by a later release, still validates and still renders during a rolling
+ * upgrade. Nothing in this release adds the mark: not the editor's keyboard,
+ * not a paste, and not the HTML import.
+ */
+describe("underline, which readers know before anything writes it", () => {
+  const underlined = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Mind " },
+          { type: "text", text: "this", marks: [{ type: "underline" }] },
+        ],
+      },
+    ],
+  };
+
+  test("validates as a document", () => {
+    expect(isValidRichText(underlined, RICH_TEXT_SCHEMA_VERSION)).toBe(true);
+  });
+
+  test("renders as <u>, on the screen, in email and in exports alike", () => {
+    const doc = parseRichText(underlined, RICH_TEXT_SCHEMA_VERSION);
+    expect(renderRichTextToHtml(doc)).toContain("<u>this</u>");
+  });
+
+  test("reads as its text in an excerpt", () => {
+    const doc = parseRichText(underlined, RICH_TEXT_SCHEMA_VERSION);
+    expect(excerptRichText(doc, 100)).toBe("Mind this");
   });
 });

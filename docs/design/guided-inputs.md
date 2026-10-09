@@ -183,7 +183,7 @@ The existing `RichTextEditor` gains a `variant` prop:
 
 **It ships in two steps, as PLAN.md §5.1 asks of anything a newer release writes and an older one reads.** An editor built without the underline mark cannot load a document that carries one: ProseMirror refuses a mark its schema does not know. During a rolling upgrade, or in a browser tab left open across one, an older editor would meet underlined text written by a newer one. So:
 
-1. Change 4 teaches every reader the mark: the allow-list, the renderer and the editor's extension. The button and Mod-U stay off, so nothing writes underline yet.
+1. Change 4a teaches every reader the mark: the allow-list, the renderer and the editor's schema. The editor's mark is defined in `packages/ui/src/rich-text/underline.ts` with no keyboard shortcut and no rule for pasted `<u>`, and the HTML import (`from-html.ts`) does not map `<u>` yet, so nothing writes underline. A local mark rather than TipTap's underline extension, which `packages/ui` does not depend on.
 2. Change 4b, a release later, turns on the button and the shortcut.
 
 **Moves now, with no migration:** these already store editor JSON in `jsonb` with a version column.
@@ -329,8 +329,10 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 1c | The ratchet gate | The gate below, with its first baseline: 336 raw fields in 111 screen files. Done 9 October 2026 | None |
 | 2 | `feat/code-input` | `CodeInput`, and the terminal code's alphabet and shape in `packages/formats`. Done 9 October 2026 | Sign-in second step, turning on the authenticator, backup code, terminal login |
 | 3 | `feat/timezone-select` | `TimezoneSelect`, the stricter `timezoneSchema`. Done 9 October 2026 | Welcome wizard, Admin > General, profile |
-| 4 | `feat/compact-editor` | The `compact` variant, the toolbar, `RichTextField`, the length limit in `richTextSchema`. Underline step 1: every reader knows the mark, nothing writes it | Comments, check-in narrative ×3, retrospective, initiative description, review narrative |
-| 4b | `feat/underline` | Underline step 2, one release after change 4: the button and Mod-U | Every editor |
+| 4a | `feat/compact-editor` | The `compact` variant, the toolbar, `RichTextField`. Underline step 1: every reader knows the mark, nothing writes it. Done 9 October 2026 | Comments, new and edit, with `@` mentions; the profile bio |
+| 4c | Check-in narratives | `RichTextField` on the three narrative fields | Check-in composer, the OKR drawer's check-in tab, the timeline's edit |
+| 4d | The rest of change 4 | The length limit in `richTextSchema`, with its first capped field | Goal retrospective, initiative description, review narrative |
+| 4b | `feat/underline` | Underline step 2, one release after 4a: the button, Mod-U, pasted `<u>`, and the HTML import's `<u>` | Every editor |
 | 5 | `feat/editor-cycle-fields` | The cycle's rich fields, with `asText` and `asDocument` removed | Annual frame ×4, baseline health ×3, capacity cuts, the minutes write-up |
 | 6 | `feat/number-fields` | `NumberInput`, `MetricInput`, `ConfidenceInput`, `UnitInput`, weight bounds | OKR list, drawer and diagram, goal page, check-in, KPI add, judged-by, suggestion, grid, recovery, trees |
 | 7 | `feat/date-time-fields` | `DateInput`, `DateRangeInput`, `DateTimeInput`, `TimeRangeInput`, and the server date checks | Cycle dates, key result due dates, tasks, initiatives, leave, holidays, sessions, site messages, audit, quiet hours |
@@ -342,7 +344,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 13 | `chore/drop-plain-prose-columns` | Second release, one release after 11 and 12: drop the six old `text` columns, and stop accepting string stage notes | None. Nothing a person sees changes |
 | Later | `PhoneInput` | §4.12 | The first screen that needs a phone number |
 
-**Each part of the kit arrives with the change that first uses it.** Change 1 was planned with `TextArea`, `UrlInput` and the server field errors of §4.2, but none of the screens it moved has a textarea, a URL or a server action that reports a field: they talk to Better Auth or keep their own state. So `UrlInput` arrives with change 9, `TextArea` with change 10, and the field errors with the first change whose form is a server action, rather than shipping unused.
+**Each part of the kit arrives with the change that first uses it.** The length limit of §4.7 waits for 4d, whose initiative description is the first rich field with a cap, and the full editor's toolbar for change 5, which moves the first full-editor field. Change 1 was planned with `TextArea`, `UrlInput` and the server field errors of §4.2, but none of the screens it moved has a textarea, a URL or a server action that reports a field: they talk to Better Auth or keep their own state. So `UrlInput` arrives with change 9, `TextArea` with change 10, and the field errors with the first change whose form is a server action, rather than shipping unused.
 
 **The ratchet gate.** A pass in `pnpm check:boundaries` counts the raw text-like `<input>`, `<textarea>` and `<select>` elements in each screen file of `apps/web`, reading the syntax tree so a comment does not count, and compares the counts with `scripts/raw-fields-baseline.json`. A file's count may go down, never up, and a lower count has to be written into the baseline (`pnpm check:boundaries --update-field-baseline`), so the gain cannot be spent again. Change 10 brings every count to zero and deletes the baseline file, and from then on any raw text field in `apps/web` fails the gate.
 

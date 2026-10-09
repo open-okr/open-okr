@@ -12,10 +12,7 @@
  * about is its parent's business: `SubjectComments` binds the writes.
  */
 import type { RichTextDocument } from "@openokr/core";
-import { Button, useTranslations } from "@openokr/ui";
-// Rich text editor and mention extensions will be wired in once the
-// comment thread component uses the full TipTap editor. For now the
-// composer uses a plain textarea that wraps input into editor JSON.
+import { Button, RichTextEditor, useTranslations } from "@openokr/ui";
 import { useCallback, useState, useTransition } from "react";
 
 /** One emoji's reactions on one subject, as `reactions.list` groups them. */
@@ -37,6 +34,8 @@ export interface CommentData {
   readonly authorMemberId: string;
   readonly authorName: string;
   readonly body: unknown;
+  /** The body rendered on the server, or null when it is not a document. */
+  readonly html: string | null;
   readonly editedAt: string | null;
   readonly createdAt: string;
   readonly reactions: readonly ReactionGroupData[];
@@ -47,7 +46,8 @@ interface CommentThreadProps {
   readonly subjectId: string;
   readonly comments: readonly CommentData[];
   readonly currentMemberId: string;
-  readonly onPost: (body: RichTextDocument) => Promise<void>;
+  /** Resolves true once the comment is posted, which empties the composer. */
+  readonly onPost: (body: RichTextDocument) => Promise<boolean>;
   readonly onEdit: (commentId: string, body: RichTextDocument) => Promise<void>;
   readonly onDelete: (commentId: string) => Promise<void>;
   readonly onReact: (
@@ -56,6 +56,10 @@ interface CommentThreadProps {
     emoji: string,
     ownReactionId: string | null,
   ) => Promise<void>;
+  /** Who `@` offers, by name. */
+  readonly searchMembers?: (
+    query: string,
+  ) => Promise<readonly { readonly id: string; readonly label: string }[]>;
 }
 
 export function CommentThread({
@@ -69,11 +73,15 @@ export function CommentThread({
   onEdit,
   onDelete,
   onReact,
+  searchMembers,
 }: CommentThreadProps) {
   const { t } = useTranslations();
 
   const [isPending, startTransition] = useTransition();
   const [editingId, setEditingId] = useState<string | null>(null);
+  // A new composer once a comment is posted: the editor shows its text as the
+  // page's own, so a posted comment left in it would read as said twice.
+  const [composer, setComposer] = useState(0);
 
   const handleEdit = useCallback(
     (commentId: string, body: RichTextDocument) => {
@@ -142,13 +150,14 @@ export function CommentThread({
               <CommentEditor
                 initialBody={comment.body}
                 onSave={(body) => handleEdit(comment.id, body)}
+                searchMembers={searchMembers}
                 onCancel={() => setEditingId(null)}
                 saving={isPending}
               />
             </div>
           ) : (
             <div className="prose prose-sm max-w-none text-ink">
-              <CommentBody body={comment.body} />
+              <CommentBody html={comment.html} />
             </div>
           )}
 
@@ -185,13 +194,17 @@ export function CommentThread({
       {/* Composer */}
       <div className="rounded-lg border border-line bg-surface p-3 space-y-2">
         <CommentEditor
-          onSave={(_body) => {
+          key={composer}
+          onSave={(body) => {
             startTransition(async () => {
-              await onPost(_body);
+              if (await onPost(body)) {
+                setComposer((count) => count + 1);
+              }
             });
           }}
           saving={isPending}
           placeholder={t("comments.thread.writeAComment")}
+          searchMembers={searchMembers}
         />
       </div>
     </div>
@@ -254,51 +267,28 @@ function postedAt(createdAt: string): string {
   });
 }
 
-function CommentBody({ body }: { body: unknown }) {
+/**
+ * A comment as the server rendered it, through the one sanitising renderer
+ * every surface uses (`renderRichTextToHtml`), so bold, lists, links and
+ * mentions read here as they were written. Null when the stored body is not
+ * a document the schema accepts, which a comment written before bodies were
+ * checked can be.
+ */
+function CommentBody({ html }: { html: string | null }) {
   const { t } = useTranslations();
-
-  if (!body || typeof body !== "object") {
-    return (
-      <p className="text-ink-3 italic">{t("comments.thread.emptyComment")}</p>
-    );
-  }
-  // Render rich text content as paragraphs for now.
-  // The full rich-text renderer from packages/core will be used once
-  // the sanitising allow-list render is wired to a React component.
-  const doc = body as { content?: unknown[] };
-  if (!doc.content || !Array.isArray(doc.content)) {
+  if (html === null || html === "") {
     return (
       <p className="text-ink-3 italic">{t("comments.thread.emptyComment")}</p>
     );
   }
   return (
-    <>
-      {doc.content.map((node, i) => {
-        const n = node as { type?: string; content?: unknown[] };
-        if (n.type === "paragraph" && Array.isArray(n.content)) {
-          const text = n.content
-            .map((c) => {
-              const child = c as {
-                text?: string;
-                type?: string;
-                attrs?: { label?: string };
-              };
-              if (child.type === "mention") {
-                return `@${child.attrs?.label ?? t("comments.thread.someone")}`;
-              }
-              return child.text ?? "";
-            })
-            .join("");
-          return (
-            // biome-ignore lint/suspicious/noArrayIndexKey: paragraph nodes have no stable id
-            <p key={i} className="text-sm">
-              {text}
-            </p>
-          );
-        }
-        return null;
-      })}
-    </>
+    <div
+      className="prose prose-sm max-w-none text-ink"
+      // The HTML is produced by renderRichTextToHtml, which escapes every
+      // text value and emits tags only from its own allow-list.
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by renderRichTextToHtml
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 
@@ -308,14 +298,37 @@ interface CommentEditorProps {
   readonly onCancel?: () => void;
   readonly saving?: boolean;
   readonly placeholder?: string;
+  readonly searchMembers?: (
+    query: string,
+  ) => Promise<readonly { readonly id: string; readonly label: string }[]>;
 }
 
+/** Whether a document holds anything but empty paragraphs. */
+interface ContentNode {
+  readonly type?: string;
+  readonly content?: readonly unknown[];
+}
+
+function hasContent(node: ContentNode): boolean {
+  if (node.type !== "doc" && node.type !== "paragraph" && !node.content) {
+    return true;
+  }
+  return (node.content ?? []).some((child) => hasContent(child as ContentNode));
+}
+
+/**
+ * The compact editor (docs/design/guided-inputs.md §4.7): bold, italic,
+ * strike, code, lists and links from its toolbar, and `@` to mention
+ * somebody. An edit opens on the stored document itself, so what was
+ * formatted stays formatted; the plain textarea this replaced flattened it.
+ */
 function CommentEditor({
   initialBody,
   onSave,
   onCancel,
   saving,
   placeholder,
+  searchMembers,
 }: CommentEditorProps) {
   const { t } = useTranslations();
 
@@ -325,30 +338,25 @@ function CommentEditor({
 
   return (
     <div className="space-y-2">
-      <textarea
-        className="w-full min-h-[80px] rounded border border-line bg-surface p-2 text-sm text-ink placeholder:text-ink-4 resize-y focus:outline-none focus:ring-1 focus:ring-brand"
-        placeholder={placeholder ?? t("comments.thread.writeSomething")}
-        defaultValue={initialBody ? extractPlainText(initialBody) : ""}
-        onChange={(e) => {
-          // Wrap plain text in a minimal rich-text document
-          setBody({
-            type: "doc",
-            content: [
-              {
-                type: "paragraph",
-                content: e.target.value
-                  ? [{ type: "text", text: e.target.value }]
-                  : [],
-              },
-            ],
-          });
-        }}
-      />
+      <div className="rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
+        <RichTextEditor
+          label={
+            initialBody
+              ? t("comments.thread.editComment")
+              : t("comments.thread.yourComment")
+          }
+          variant="compact"
+          content={initialBody ?? null}
+          placeholder={placeholder ?? t("comments.thread.writeSomething")}
+          onUpdate={(json) => setBody(json as RichTextDocument)}
+          searchMembers={searchMembers}
+        />
+      </div>
       <div className="flex gap-2">
         <Button
           size="sm"
           onClick={() => body && onSave(body)}
-          disabled={saving || !body}
+          disabled={saving || !body || !hasContent(body)}
         >
           {saving
             ? t("comments.thread.posting")
@@ -364,22 +372,4 @@ function CommentEditor({
       </div>
     </div>
   );
-}
-
-function extractPlainText(body: unknown): string {
-  if (!body || typeof body !== "object") return "";
-  const doc = body as { content?: unknown[] };
-  if (!doc.content) return "";
-  return doc.content
-    .map((node) => {
-      const n = node as { content?: unknown[] };
-      if (!n.content) return "";
-      return n.content
-        .map((c) => {
-          const child = c as { text?: string };
-          return child.text ?? "";
-        })
-        .join("");
-    })
-    .join("\n");
 }

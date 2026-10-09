@@ -28,6 +28,8 @@ import {
   type MentionSearchResult,
 } from "./mention-extensions.ts";
 import { SlashMenu } from "./slash-menu.ts";
+import { EditorToolbar, LINK_HREF } from "./toolbar.tsx";
+import { ReadOnlyUnderline } from "./underline.ts";
 
 export interface UploadedFile {
   readonly blobId: string;
@@ -39,6 +41,13 @@ export interface RichTextEditorProps {
    * serious accessibility finding. The placeholder is not a name: it
    * disappears the moment somebody types. */
   readonly label: string;
+  /**
+   * `compact` for the prose people write for each other (a comment, a
+   * narrative, a bio): a toolbar of simple formats and no slash menu.
+   * `full`, the default, is the document editor as it was
+   * (docs/design/guided-inputs.md §4.7).
+   */
+  readonly variant?: "compact" | "full";
   readonly content?: unknown;
   readonly placeholder?: string;
   readonly editable?: boolean;
@@ -82,6 +91,7 @@ export const RichTextEditor = forwardRef<
 >(function RichTextEditor(
   {
     label,
+    variant = "full",
     content,
     placeholder,
     editable = true,
@@ -105,7 +115,7 @@ export const RichTextEditor = forwardRef<
         link: {
           protocols: ["http", "https", "mailto"],
           openOnClick: false,
-          validate: (href: string) => /^(https?:|mailto:)/.test(href),
+          validate: (href: string) => LINK_HREF.test(href),
         },
       }),
       Table.configure({ resizable: false }),
@@ -115,9 +125,12 @@ export const RichTextEditor = forwardRef<
       Attachment,
       createMemberMentionExtension(searchMembers ?? noSearch),
       createEntityLinkExtension(searchEntities ?? noSearch),
-      SlashMenu,
+      ReadOnlyUnderline,
+      // A heading or a table in a comment is a document's job, so the menu
+      // that makes them is the full editor's only.
+      ...(variant === "full" ? [SlashMenu] : []),
     ],
-    [searchMembers, searchEntities],
+    [searchMembers, searchEntities, variant],
   );
 
   const editor = useEditor({
@@ -197,11 +210,20 @@ export const RichTextEditor = forwardRef<
     [editor, hasUploadsInProgress],
   );
 
-  return (
+  const surface = (
     <EditorContent
       editor={editor}
       className="prose prose-sm max-w-none text-ink focus:outline-none"
     />
+  );
+  if (variant !== "compact") {
+    return surface;
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      {editor && editable ? <EditorToolbar editor={editor} /> : null}
+      {surface}
+    </div>
   );
 });
 
