@@ -5,6 +5,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateInput,
   type MessageValues,
   NumberInput,
 } from "@openokr/ui";
@@ -376,18 +377,12 @@ export default async function RecoveryBoardPage() {
                               </option>
                             ))}
                           </select>
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`fix-due-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.due")}
-                          </label>
-                          <input
+                          <DateInput
                             id={`fix-due-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.due")}
                             name="dueOn"
-                            type="date"
                             required
-                            className={FIELD}
+                            inputClassName="h-auto py-1 text-xs"
                           />
                           <label
                             className="text-xs text-ink-3"

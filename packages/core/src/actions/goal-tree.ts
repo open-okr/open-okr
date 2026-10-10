@@ -37,7 +37,6 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { LOCAL_DATE_PATTERN } from "@openokr/formats";
 import {
   ADDITION_FIELDS,
   type AdditionDraft,
@@ -76,10 +75,7 @@ import { recomputeForGoal } from "../scoring/recompute.ts";
 import { recomputeAlignmentFor } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
-
-const localDate = z
-  .string()
-  .regex(LOCAL_DATE_PATTERN, "Give the date as YYYY-MM-DD.");
+import { localDate } from "./local-date.ts";
 
 const person = z.object({ id: z.uuid(), name: z.string() });
 

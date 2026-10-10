@@ -12,6 +12,7 @@ import {
 import {
   Chip,
   cn,
+  DateInput,
   formatMeasure,
   NumberInput,
   UnitInput,
@@ -268,16 +269,24 @@ export function InlineUnit({
   );
 }
 
-/** A due date, or none. */
+/**
+ * A due date, or none (guided-inputs §4.9): `DateInput`, with the date in
+ * words beside it, and a warning, not a refusal, when it falls outside the
+ * cycle. METHOD.md has no rule against that, and adding one would be a
+ * practice change.
+ */
 export function InlineDate({
   value,
   label,
   readOnly,
+  cycle,
   onSave,
 }: {
   readonly value: string | null;
   readonly label: string;
   readonly readOnly: boolean;
+  /** The cycle the key result sits in, for the warning. */
+  readonly cycle?: { readonly startsOn: string; readonly endsOn: string };
   readonly onSave: (next: string | null) => void;
 }) {
   const { t } = useTranslations();
@@ -298,17 +307,27 @@ export function InlineDate({
     }
     onSave(next);
   };
+  // `YYYY-MM-DD` compares as text in calendar order.
+  const warning =
+    cycle && draft !== ""
+      ? draft > cycle.endsOn
+        ? t("okrList.dueAfterCycle", { date: cycle.endsOn })
+        : draft < cycle.startsOn
+          ? t("okrList.dueBeforeCycle", { date: cycle.startsOn })
+          : undefined
+      : undefined;
 
   return (
-    <input
-      ref={field}
-      type="date"
+    <DateInput
+      label={label}
+      hideLabel
       value={draft}
-      aria-label={label}
-      onChange={(event) => setDraft(event.target.value)}
+      onValueChange={(next) => setDraft(next ?? "")}
+      warning={warning}
+      inputRef={field}
       onBlur={commit}
       onKeyDown={keys(() => setDraft(value ?? ""))}
-      className={cn("w-32 text-xs tabular-nums", FIELD)}
+      inputClassName={cn("h-auto w-32 text-xs", FIELD)}
     />
   );
 }

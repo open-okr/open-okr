@@ -37,7 +37,6 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { LOCAL_DATE_PATTERN } from "@openokr/formats";
 import {
   additionStartsAs,
   defaultOkrKind,
@@ -103,6 +102,7 @@ import { recomputeAlignmentFor } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { changeTargetInTx, targetReason } from "./goal-targets.ts";
+import { localDate } from "./local-date.ts";
 
 /**
  * Goals per page when the caller names no limit.
@@ -117,11 +117,6 @@ import { changeTargetInTx, targetReason } from "./goal-targets.ts";
  * end of the list: the cursor still advances, and the caller asks again.
  */
 const GOAL_PAGE = 200;
-
-/** A key result's due date: a local calendar date, never a free string. */
-const localDate = z
-  .string()
-  .regex(LOCAL_DATE_PATTERN, "Give the date as YYYY-MM-DD.");
 
 const richText = richTextSchema();
 

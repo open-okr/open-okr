@@ -2553,6 +2553,8 @@
   "okrList.company": "Company",
   "okrList.discard": "Discard",
   "okrList.due": "Due",
+  "okrList.dueAfterCycle": "Due after the cycle ends on {date}.",
+  "okrList.dueBeforeCycle": "Due before the cycle starts on {date}.",
   "okrList.dueOf": "Due date for {title}",
   "okrList.emptyCycle": "No objectives in this cycle yet. Add the first one below.",
   "okrList.emptyCycleRead": "No objectives in this cycle yet.",

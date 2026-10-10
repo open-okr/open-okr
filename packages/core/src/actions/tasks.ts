@@ -67,6 +67,7 @@ import {
   unassignTaskInTx,
 } from "../tasks/service.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { localDate } from "./local-date.ts";
 
 const richText = richTextSchema();
 
@@ -818,7 +819,7 @@ export const createTask = defineWriteAction({
     initiativeId: z.uuid().optional(),
     keyResultId: z.uuid().optional(),
     status: z.enum(TASK_STATUSES).optional(),
-    dueOn: z.string().optional(),
+    dueOn: localDate.optional(),
     assigneeIds: z.array(z.uuid()).max(20).optional(),
     /** The source-system identity, when an import is creating this (P6-T01a). */
     legacy: legacyKey.optional(),
@@ -949,7 +950,7 @@ export const updateTask = defineWriteAction({
       title: z.string().trim().min(1).max(500).optional(),
       description: richText.optional(),
       status: z.enum(TASK_STATUSES).optional(),
-      dueOn: z.string().nullable().optional(),
+      dueOn: localDate.nullable().optional(),
       initiativeId: z.uuid().nullable().optional(),
       keyResultId: z.uuid().nullable().optional(),
     })

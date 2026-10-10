@@ -5,6 +5,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateInput,
   RichTextField,
   RichTextView,
 } from "@openokr/ui";
@@ -98,15 +99,13 @@ export async function CycleSetup({
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {SESSIONS.map((session) => (
-              <label key={session.key} className={LABEL}>
-                {t(session.label)}
-                <input
-                  type="date"
-                  name={`session-${session.key}`}
-                  defaultValue={dateOf(session.key)}
-                  className={FIELD}
-                />
-              </label>
+              <DateInput
+                key={session.key}
+                label={t(session.label)}
+                name={`session-${session.key}`}
+                defaultValue={dateOf(session.key) || null}
+                inputClassName="h-auto py-1.5 text-xs"
+              />
             ))}
           </div>
           <label className="flex items-center gap-2 text-sm text-ink-2">

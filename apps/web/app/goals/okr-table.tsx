@@ -509,6 +509,7 @@ function LiveOkrTable({
                       )}
                       keyResult={keyResult}
                       units={units}
+                      cycle={tree.cycle}
                       onOpen={() =>
                         drawer.open(goal.id, { keyResultId: keyResult.id })
                       }
@@ -817,6 +818,7 @@ function KeyResultRow({
   coach,
   mover,
   units,
+  cycle,
 }: {
   readonly keyResult: OkrGoal["keyResults"][number];
   readonly onOpen: () => void;
@@ -829,6 +831,8 @@ function KeyResultRow({
   readonly mover: Mover | null;
   /** The units the cycle already uses, for the unit cell to offer. */
   readonly units: readonly string[];
+  /** The cycle's dates, which a due date outside of is warned about. */
+  readonly cycle: { readonly startsOn: string; readonly endsOn: string };
 }) {
   const { t } = useTranslations();
   const cells = useKeyResultCells(keyResult, okr, coach);
@@ -883,6 +887,7 @@ function KeyResultRow({
                 value={keyResult.dueOn}
                 label={t("okrList.dueOf", { title: keyResult.title })}
                 readOnly={!canEdit}
+                cycle={cycle}
                 onSave={(dueOn) => patch({ dueOn }, { dueOn: keyResult.dueOn })}
               />
             </span>

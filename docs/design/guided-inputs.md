@@ -252,7 +252,7 @@ Everything that reads these fields as text (the digest, its narration, the minut
 
 ### 4.9 Dates and times
 
-- **`DateInput`** is the native `type="date"` control with min and max, and a relative label beside it ("in 12 days", "Q3 2027"), as UIUX-PLAN §2 "Dates" asks.
+- **`DateInput`** is the native `type="date"` control with min and max, and a relative label beside it ("in 12 days", "today"), as UIUX-PLAN §2 "Dates" asks, linked as its description. Beyond two months the label is the month and year ("Sep 2027") rather than "Q3 2027": a workspace whose year starts in April numbers its quarters differently from the calendar.
 - **A key result's due date outside its cycle gets a warning, not a refusal.** METHOD.md has no such rule, and adding one would be a practice change.
 - **`DateRangeInput`**: the end date's minimum follows the start date. It is used for leave, holidays, initiatives and the audit filter. The server also starts refusing an initiative that ends before it starts, which it accepts today.
 - **`DateTimeInput`** is `datetime-local` with the timezone shown beside it. It sends the local value together with the zone, and the server turns the pair into an instant. For workspace screens the zone is the workspace's. For the operator's site messages it is the operator's own browser zone.
@@ -340,7 +340,9 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 6a | OKR numbers | `NumberInput`, `MetricInput`, `UnitInput`, weight bounds. Done 10 October 2026 | OKR list, drawer and diagram cells, the goal page's weight and value, drafting |
 | 6b | Confidence | `ConfidenceInput` and the `confidence.display` setting, which nothing read before, on every confidence typed or printed. Done 10 October 2026 | Drawer check-in, goal page, composer, votes, timeline, session dial; the composer's and the Work Map's values |
 | 6c | KPI numbers | Threshold order as typed, by the method's own `thresholdsProblem`; the grid's cells keep the spreadsheet's arrow keys. Done 10 October 2026 | KPI add and tree driver (with a unit), judged by, suggestion, grid, recovery |
-| 7 | `feat/date-time-fields` | `DateInput`, `DateRangeInput`, `DateTimeInput`, `TimeRangeInput`, and the server date checks | Cycle dates, key result due dates, tasks, initiatives, leave, holidays, sessions, site messages, audit, quiet hours |
+| 7a | Dates | `DateInput` with the date in words, the warning outside a cycle, and `YYYY-MM-DD` on task and initiative dates (one `localDate` schema). Done 10 October 2026 | Key result due dates, cycle and phase 1 dates, a new cycle, tasks, the board, recovery, the session's actions |
+| 7b | Date ranges | `DateRangeInput`, an initiative refused for ending before it starts (not on an import), the audit filter at midnight in the workspace's zone | Initiatives, leave, holidays, audit |
+| 7c | Times | `DateTimeInput` and its zone, `TimeRangeInput`, one `HH:MM` rule, a local time and zone turned into an instant on the server | Site messages, scheduling a session, quiet hours, the daily summary |
 | 8 | `feat/entity-picker` | `EntityPicker` | About 60 selects and the 3 pasted ids |
 | 9 | `feat/list-identifier-fields` | `TokenInput`, `IdentifierInput`, `ColourInput`, `UrlInput`, the channel fields per provider, one domain rule | Admin > General, invitations, SSO, AI, channels, audit, branding, rhythm |
 | 10 | `feat/text-limits` | `TextArea`, then `TextInput` and `TextArea` on every remaining title and reason, every label fixed. The ratchet reaches zero | Everything that is left |

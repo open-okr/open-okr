@@ -56,6 +56,7 @@ import { OperationError } from "../operations/operation.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { localDate } from "./local-date.ts";
 
 const richText = richTextSchema();
 
@@ -497,8 +498,8 @@ export const createInitiative = defineWriteAction({
     title: z.string().trim().min(1).max(500),
     description: richText.optional(),
     ownerId: z.uuid(),
-    startsOn: z.string().optional(),
-    endsOn: z.string().optional(),
+    startsOn: localDate.optional(),
+    endsOn: localDate.optional(),
     status: z.enum(INITIATIVE_STATUSES).optional(),
     confidence: z.number().min(0).max(1).optional(),
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
@@ -601,8 +602,8 @@ export const updateInitiative = defineWriteAction({
       title: z.string().trim().min(1).max(500).optional(),
       description: richText.optional(),
       ownerId: z.uuid().optional(),
-      startsOn: z.string().nullable().optional(),
-      endsOn: z.string().nullable().optional(),
+      startsOn: localDate.nullable().optional(),
+      endsOn: localDate.nullable().optional(),
       status: z.enum(INITIATIVE_STATUSES).optional(),
       confidence: z.number().min(0).max(1).nullable().optional(),
       capacity: z.enum(CAPACITY_VERDICTS).nullable().optional(),

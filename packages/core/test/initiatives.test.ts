@@ -661,3 +661,14 @@ describe("initiative progress (P6-G28)", () => {
     expect(listed.map((task) => task.title)).toEqual(["Belongs to mine"]);
   });
 });
+
+describe("an initiative's dates (guided-inputs §4.9)", () => {
+  it("are calendar dates, as a key result's is, and nothing else", async () => {
+    await expect(createInitiative({ startsOn: "next month" })).rejects.toThrow(
+      "Give the date as YYYY-MM-DD.",
+    );
+    await expect(createInitiative({ endsOn: "2030/06/30" })).rejects.toThrow(
+      "Give the date as YYYY-MM-DD.",
+    );
+  });
+});

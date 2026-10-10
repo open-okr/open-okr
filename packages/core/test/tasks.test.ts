@@ -792,3 +792,15 @@ describe("the board, which is a view over one set of rows", () => {
     await expect(call("tasks.board", {})).rejects.toThrow();
   });
 });
+
+describe("a task's due date (guided-inputs §4.9)", () => {
+  it("is a calendar date, as a key result's is, and nothing else", async () => {
+    await expect(
+      createTask("Draft the guide", { dueOn: "next week" }),
+    ).rejects.toThrow("Give the date as YYYY-MM-DD.");
+    const task = await createTask("Draft the guide", { dueOn: "2030-03-31" });
+    await expect(
+      call("tasks.update", { id: task.id, dueOn: "31/03/2030" }),
+    ).rejects.toThrow("Give the date as YYYY-MM-DD.");
+  });
+});

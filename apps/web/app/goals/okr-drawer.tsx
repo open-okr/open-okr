@@ -479,6 +479,7 @@ function DrawerBody({
                 members={members}
                 coach={coach}
                 units={unitsInUse(tree.goals)}
+                cycle={tree.cycle}
               />
             ))
           )}
@@ -623,6 +624,7 @@ function DrawerKeyResult({
   members,
   coach,
   units,
+  cycle,
 }: {
   readonly keyResult: OkrGoal["keyResults"][number];
   readonly highlighted: boolean;
@@ -633,6 +635,8 @@ function DrawerKeyResult({
   readonly coach: Coach;
   /** The units the cycle already uses, for the unit cell to offer. */
   readonly units: readonly string[];
+  /** The cycle's dates, which a due date outside of is warned about. */
+  readonly cycle: { readonly startsOn: string; readonly endsOn: string };
 }) {
   const { t } = useTranslations();
   const cells = useKeyResultCells(keyResult, okr, coach);
@@ -798,6 +802,7 @@ function DrawerKeyResult({
             value={keyResult.dueOn}
             label={t("okrList.dueOf", { title })}
             readOnly={!canEdit}
+            cycle={cycle}
             onSave={(dueOn) =>
               cells.patch({ dueOn }, { dueOn: keyResult.dueOn })
             }

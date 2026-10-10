@@ -2553,6 +2553,8 @@
   "okrList.company": "Syarikat",
   "okrList.discard": "Buang",
   "okrList.due": "Tarikh akhir",
+  "okrList.dueAfterCycle": "Tarikh akhir selepas kitaran tamat pada {date}.",
+  "okrList.dueBeforeCycle": "Tarikh akhir sebelum kitaran bermula pada {date}.",
   "okrList.dueOf": "Tarikh akhir bagi {title}",
   "okrList.emptyCycle": "Belum ada objektif dalam kitaran ini. Tambah yang pertama di bawah.",
   "okrList.emptyCycleRead": "Belum ada objektif dalam kitaran ini.",

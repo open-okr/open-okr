@@ -11,6 +11,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateInput,
   formatMeasure,
   MetricInput,
   NumberInput,
@@ -432,20 +433,15 @@ export async function Drafting({
                             </option>
                           ))}
                         </select>
-                        <label
-                          className="sr-only"
-                          htmlFor={`due-${keyResult.id}`}
-                        >
-                          {t("cycle.drafting.dueDateOf", {
+                        <DateInput
+                          id={`due-${keyResult.id}`}
+                          label={t("cycle.drafting.dueDateOf", {
                             title: keyResult.title,
                           })}
-                        </label>
-                        <input
-                          id={`due-${keyResult.id}`}
-                          type="date"
+                          hideLabel
                           name="dueOn"
-                          defaultValue={keyResult.dueOn ?? ""}
-                          className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
+                          defaultValue={keyResult.dueOn}
+                          inputClassName="h-auto px-1.5 py-1 text-xs"
                         />
                         <Button
                           type="submit"
@@ -580,15 +576,13 @@ export async function Drafting({
                       </option>
                     ))}
                   </select>
-                  <label className="sr-only" htmlFor={`kr-due-${goal.id}`}>
-                    {t("cycle.drafting.dueOn")}
-                  </label>
-                  <input
+                  <DateInput
                     id={`kr-due-${goal.id}`}
-                    type="date"
+                    label={t("cycle.drafting.dueOn")}
+                    hideLabel
                     name="dueOn"
                     defaultValue={endsOn}
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    inputClassName="h-auto px-1.5 py-1.5 text-xs"
                   />
                   <UnitInput
                     id={`kr-unit-${goal.id}`}
