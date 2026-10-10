@@ -248,7 +248,7 @@ Everything that reads these fields as text (the digest, its narration, the minut
 - **Weight** gets the contract bounds 0 to 100, `WEIGHT_MIN` and `WEIGHT_MAX` in `packages/method/src/scoring.ts`, which the average already clamped to. The field and the server now agree. An API call sending 150 is refused rather than silently clamped, which is why this needs a changeset. Both importers clamp before they call, so an import records what the source held as it always did.
 - **`UnitInput`** is a Base UI `Autocomplete` over the units the workspace already uses, plus a short list from the catalogue (`%`, `people`, `US$`, `days`, `hours`, `points`). Free text is still allowed. "Already uses" is read from what the screen already holds, the cycle's key results, so offering them costs no request.
 - **A field in a table cell is named by `aria-label`**, as every cell is, rather than through a label nobody sees: `hideLabel` on `NumberInput` and `UnitInput` does that, with the unit in the name.
-- **KPI thresholds** check the order of green and red as the person types, which is the same check the server makes on save.
+- **KPI thresholds** check the order of green and red as the person types, which is the same check the server makes on save: `thresholdsProblem` in `packages/method`, run once the set is complete enough to judge. The suggestion's healthy and watch percentages say when healthy sits below watch.
 
 ### 4.9 Dates and times
 
@@ -339,7 +339,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 5b | The full editor's toolbar | The compact buttons plus Heading 1, Heading 2, Quote and Table, each offered only where the stored format can hold what it makes. Done 9 October 2026 | The minutes write-up, and every document editor |
 | 6a | OKR numbers | `NumberInput`, `MetricInput`, `UnitInput`, weight bounds. Done 10 October 2026 | OKR list, drawer and diagram cells, the goal page's weight and value, drafting |
 | 6b | Confidence | `ConfidenceInput` and the `confidence.display` setting, which nothing read before, on every confidence typed or printed. Done 10 October 2026 | Drawer check-in, goal page, composer, votes, timeline, session dial; the composer's and the Work Map's values |
-| 6c | KPI numbers | Threshold order as typed | KPI add and tree driver (with a unit), judged by, suggestion, grid, recovery |
+| 6c | KPI numbers | Threshold order as typed, by the method's own `thresholdsProblem`; the grid's cells keep the spreadsheet's arrow keys. Done 10 October 2026 | KPI add and tree driver (with a unit), judged by, suggestion, grid, recovery |
 | 7 | `feat/date-time-fields` | `DateInput`, `DateRangeInput`, `DateTimeInput`, `TimeRangeInput`, and the server date checks | Cycle dates, key result due dates, tasks, initiatives, leave, holidays, sessions, site messages, audit, quiet hours |
 | 8 | `feat/entity-picker` | `EntityPicker` | About 60 selects and the 3 pasted ids |
 | 9 | `feat/list-identifier-fields` | `TokenInput`, `IdentifierInput`, `ColourInput`, `UrlInput`, the channel fields per provider, one domain rule | Admin > General, invitations, SSO, AI, channels, audit, branding, rhythm |

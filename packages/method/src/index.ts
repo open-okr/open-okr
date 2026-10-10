@@ -125,6 +125,7 @@ export {
   normalisePeriod,
   type RecoveryLink,
   targetTypeOfDirection,
+  thresholdsComplete,
   thresholdsProblem,
 } from "./kpi.ts";
 export {

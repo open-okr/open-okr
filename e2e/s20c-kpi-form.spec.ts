@@ -87,7 +87,8 @@ test("adds a range with its band and red boundary, owned by the person adding it
     "A range needs its band",
   );
   await form.getByLabel("Green from").fill("99.9");
-  await form.getByLabel("to", { exact: true }).fill("100");
+  // "Green to", in full, where it was only "to" (guided-inputs §4.8).
+  await form.getByLabel("Green to").fill("100");
   await form.getByLabel("Red below").fill("99.5");
   await expect(form.getByTestId("kpi-fallback-note")).toHaveCount(0);
   await form.getByRole("button", { name: "Add", exact: true }).click();

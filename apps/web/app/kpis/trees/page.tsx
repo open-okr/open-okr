@@ -1,5 +1,11 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  NumberInput,
+  UnitInput,
+} from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
@@ -198,15 +204,21 @@ export default async function KpiTreesPage({
                   <option value="higher_better">{t("common.higher")}</option>
                   <option value="lower_better">{t("common.lower")}</option>
                 </select>
-                <label className="text-xs text-ink-3" htmlFor="driver-target">
-                  {t("common.standingTarget")}
-                </label>
-                <input
+              </div>
+              {/* guided-inputs §4.8: the target as a number, and the unit
+                  it is measured in, which the form did not ask for. */}
+              <div className="flex flex-wrap items-end gap-2.5">
+                <NumberInput
                   id="driver-target"
+                  label={t("common.standingTarget")}
                   name="targetDefault"
-                  type="number"
-                  step="any"
-                  className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+                  inputClassName="h-auto w-24 py-1 text-xs"
+                />
+                <UnitInput
+                  id="driver-unit"
+                  label={t("kpis.unit")}
+                  name="unit"
+                  inputClassName="h-auto w-28 py-1 text-xs"
                 />
               </div>
               <div className="flex items-center gap-2">

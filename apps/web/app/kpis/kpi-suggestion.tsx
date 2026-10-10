@@ -10,7 +10,7 @@
  * presses Add. A formula §6's parser refused is not offered at all; the reason
  * is shown instead, and the metric can still be added by hand-entry.
  */
-import { Button, Chip, useTranslations } from "@openokr/ui";
+import { Button, Chip, NumberInput, useTranslations } from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
 import {
@@ -60,6 +60,16 @@ const numberOrNull = (text: string): number | null => {
   }
   const value = Number(text);
   return Number.isFinite(value) ? value : null;
+};
+
+/** Both thresholds set, and healthy below watch, which reads backwards. */
+const healthyBelowWatch = (editing: {
+  readonly healthy: string;
+  readonly watch: string;
+}): boolean => {
+  const healthy = numberOrNull(editing.healthy);
+  const watch = numberOrNull(editing.watch);
+  return healthy !== null && watch !== null && healthy < watch;
 };
 
 const FIELD =
@@ -196,44 +206,47 @@ export function KpiSuggestion() {
                 <option value="lower_better">{t("common.lower")}</option>
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("common.standingTarget")}
-              <input
-                type="number"
-                step="any"
-                value={editing.target}
-                disabled={pending}
-                onChange={(event) => set({ target: event.target.value })}
-                className={`w-24 ${FIELD}`}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("kpis.suggestion.healthyAt")}
-              <input
-                type="number"
-                step="any"
-                min={0}
-                max={200}
-                value={editing.healthy}
-                disabled={pending}
-                onChange={(event) => set({ healthy: event.target.value })}
-                className={`w-20 ${FIELD}`}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("kpis.suggestion.watchAt")}
-              <input
-                type="number"
-                step="any"
-                min={0}
-                max={200}
-                value={editing.watch}
-                disabled={pending}
-                onChange={(event) => set({ watch: event.target.value })}
-                className={`w-20 ${FIELD}`}
-              />
-            </label>
+            {/* guided-inputs §4.8: numbers, and the two thresholds held to
+                the 0 to 200 the share of a target runs to. */}
+            <NumberInput
+              label={t("common.standingTarget")}
+              value={numberOrNull(editing.target)}
+              onValueChange={(next) =>
+                set({ target: next === null ? "" : String(next) })
+              }
+              disabled={pending}
+              inputClassName="h-auto w-24 py-1 text-xs"
+            />
+            <NumberInput
+              label={t("kpis.suggestion.healthyAt")}
+              value={numberOrNull(editing.healthy)}
+              onValueChange={(next) =>
+                set({ healthy: next === null ? "" : String(next) })
+              }
+              min={0}
+              max={200}
+              disabled={pending}
+              inputClassName="h-auto w-20 py-1 text-xs"
+            />
+            <NumberInput
+              label={t("kpis.suggestion.watchAt")}
+              value={numberOrNull(editing.watch)}
+              onValueChange={(next) =>
+                set({ watch: next === null ? "" : String(next) })
+              }
+              min={0}
+              max={200}
+              disabled={pending}
+              inputClassName="h-auto w-20 py-1 text-xs"
+            />
           </div>
+          {/* The order is said, where it was only implied: below watch is
+              where the alarm is, so healthy sits at or above it. */}
+          {healthyBelowWatch(editing) ? (
+            <p role="status" className="text-xs font-medium text-bad">
+              {t("kpis.suggestion.healthyAboveWatch")}
+            </p>
+          ) : null}
           {editing.formula !== null ? (
             <label className="flex items-center gap-2 text-xs text-ink-3">
               <input

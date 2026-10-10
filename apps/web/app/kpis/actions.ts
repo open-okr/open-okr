@@ -128,6 +128,7 @@ export async function addKpi(
   const title = String(formData.get("title") ?? "").trim();
   const frequency = String(formData.get("frequency") ?? "monthly");
   const target = numberField(formData, "targetDefault");
+  const unit = String(formData.get("unit") ?? "").trim();
   if (title === "") {
     const { t } = await getTranslations();
     return { error: t("kpis.actions.kpiNeedsATitle") };
@@ -149,6 +150,7 @@ export async function addKpi(
       ...kpiRuleFrom(formData),
       ...ownerAndTier(formData),
       ...(target === null ? {} : { targetDefault: target }),
+      ...(unit === "" ? {} : { unit }),
     }),
   );
 }

@@ -6,6 +6,7 @@ import {
   CardHeader,
   Chip,
   type MessageValues,
+  NumberInput,
 } from "@openokr/ui";
 import Link from "next/link";
 import { workspaceReaderLevel } from "../../../lib/access";
@@ -486,40 +487,28 @@ export default async function RecoveryBoardPage() {
                               className={`${FIELD} min-w-0 flex-1`}
                             />
                           </div>
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-baseline-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.from")}
-                            </label>
-                            <input
+                          {/* guided-inputs §4.8: numbers, grouped as the
+                              reader reads them, and nothing sent empty. */}
+                          <div className="flex flex-wrap items-end gap-2.5">
+                            <NumberInput
                               id={`kr-baseline-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.from")}
                               name="baseline"
-                              type="number"
-                              step="any"
                               defaultValue={
                                 recoveryDrafts.get(card.kpiId)?.keyResults[0]
-                                  ?.baseline
+                                  ?.baseline ?? null
                               }
-                              className={`${FIELD} w-24`}
+                              inputClassName="h-auto w-24 py-1 text-xs"
                             />
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-target-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.to")}
-                            </label>
-                            <input
+                            <NumberInput
                               id={`kr-target-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.to")}
                               name="target"
-                              type="number"
-                              step="any"
                               defaultValue={
                                 recoveryDrafts.get(card.kpiId)?.keyResults[0]
-                                  ?.target
+                                  ?.target ?? null
                               }
-                              className={`${FIELD} w-24`}
+                              inputClassName="h-auto w-24 py-1 text-xs"
                             />
                           </div>
                           <div className="flex flex-wrap items-center gap-2.5">
