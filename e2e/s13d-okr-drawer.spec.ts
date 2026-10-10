@@ -236,7 +236,7 @@ test("acceptance: checking in from the row moves its health, and the history sho
   const form = drawer().getByTestId("drawer-check-in");
   await expect(form).toBeVisible({ timeout: 15_000 });
   await form.getByLabel("Status", { exact: true }).selectOption("caution");
-  await form.getByLabel(`Confidence in ${KEY_RESULT}, out of 10`).fill("6");
+  await form.getByRole("textbox", { name: `Confidence in ${KEY_RESULT}` }).fill("6");
   // The compact editor, a content-editable box named by its own label.
   await form
     .getByRole("textbox", {
@@ -268,7 +268,7 @@ test("the goal page adds a key result, and a changed confidence there is a check
     timeout: 15_000,
   });
 
-  const confidence = main().getByLabel(`Confidence for ${KEY_RESULT}`);
+  const confidence = main().getByRole("textbox", { name: `Confidence for ${KEY_RESULT}` });
   await confidence.fill("4");
   // The status starts at what the last check-in said.
   await expect(

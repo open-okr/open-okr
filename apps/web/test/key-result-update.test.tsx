@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { canonThresholds } from "@openokr/method";
 import { TranslationsProvider } from "@openokr/ui";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -93,6 +94,8 @@ const update = (lastStatus: "on_track" | "caution" | "off_track" | null) => (
       targetValue: 45,
     }}
     lastStatus={lastStatus}
+    display="xIn10"
+    thresholds={canonThresholds()}
   />
 );
 
@@ -139,7 +142,7 @@ describe("a key result's value and confidence", () => {
 
   test("a changed confidence asks for its line, starts at the last status, and is sent as one", async () => {
     await render(update("caution"));
-    await type(field(`Confidence for ${KR}`) as HTMLInputElement, "4");
+    await type(field(`Confidence for ${KR} (in 10)`) as HTMLInputElement, "4");
     const status = field<HTMLSelectElement>(`Status for the check-in on ${KR}`);
     expect(status?.value).toBe("caution");
     await type(
@@ -162,7 +165,7 @@ describe("a key result's value and confidence", () => {
         "Choose a status. A changed confidence is published as a check-in, and a check-in carries one.",
     });
     await render(update(null));
-    await type(field(`Confidence for ${KR}`) as HTMLInputElement, "8");
+    await type(field(`Confidence for ${KR} (in 10)`) as HTMLInputElement, "8");
     expect(
       field<HTMLSelectElement>(`Status for the check-in on ${KR}`)?.value,
     ).toBe("");

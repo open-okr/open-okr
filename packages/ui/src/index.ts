@@ -13,6 +13,8 @@ export * from "./components/kbd.tsx";
 export * from "./components/verdict-dot.tsx";
 export * from "./feedback/toast.tsx";
 export * from "./fields/code-input.tsx";
+export * from "./fields/confidence-format.ts";
+export * from "./fields/confidence-input.tsx";
 export * from "./fields/email-input.tsx";
 export * from "./fields/number-input.tsx";
 export * from "./fields/secret-input.tsx";

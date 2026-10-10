@@ -5,7 +5,10 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  type ConfidenceDisplay,
+  ConfidenceInput,
   formatMeasure,
+  MetricInput,
   RichTextField,
 } from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
@@ -51,6 +54,7 @@ export async function Composer({
   goalTitle,
   kind,
   thresholds,
+  display,
   keyResults,
   nextGoalId,
 }: {
@@ -59,6 +63,8 @@ export async function Composer({
   /** The objective's kind, for §3.2's committed floor (P9-T11b-c). */
   readonly kind: OkrKind;
   readonly thresholds: ResolvedThresholds;
+  /** The workspace's "Confidence shown as" (METHOD.md §12). */
+  readonly display: ConfidenceDisplay;
   readonly keyResults: readonly ComposerKeyResult[];
   /** The goal the walker moves to after this one, when there is one. */
   readonly nextGoalId: string | null;
@@ -96,29 +102,18 @@ export async function Composer({
               <option value="off_track">{t("common.offTrack")}</option>
             </select>
 
-            <label
-              className="text-xs font-semibold text-ink-2"
-              htmlFor="confidence"
-            >
-              {t("common.confidence")}
-            </label>
-            {/* A dial, as S-15 asks. 0.0 to 1.0 in tenths: METHOD.md §3.2 bands
-                are read at 0.3, 0.4 and 0.7, so tenths are fine enough to land on
-                every boundary and coarse enough to stop anybody pretending to
-                two decimal places of certainty. */}
-            <input
+            {/* guided-inputs §4.8: shown the way the workspace's practice
+                says, "7 in 10" by default, with its §3.2 band beside it, and
+                posted as the stored 0.0 to 1.0. The slider this replaces
+                never showed its value. */}
+            <ConfidenceInput
               id="confidence"
+              label={t("common.confidence")}
               name="confidence"
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              defaultValue="0.5"
-              className="w-40"
+              defaultValue={0.5}
+              display={display}
+              thresholds={thresholds}
             />
-            <span className="text-xs text-ink-4">
-              {t("checkIn.composer.0To")}
-            </span>
           </div>
 
           {keyResults.length === 0 ? (
@@ -190,49 +185,42 @@ export async function Composer({
                       ) : keyResult.kpiId ? (
                         <Chip tone="info">{t("common.fromAKpi")}</Chip>
                       ) : (
-                        <>
-                          <label
-                            className="sr-only"
-                            htmlFor={`value-${keyResult.id}`}
-                          >
-                            {t("common.newValueFor", {
-                              title: keyResult.title,
-                            })}
-                          </label>
-                          <input
-                            id={`value-${keyResult.id}`}
-                            name={`value:${keyResult.id}`}
-                            type="number"
-                            step="any"
-                            // A baseline nobody has recorded starts empty,
-                            // so the first value typed is the one it found.
-                            defaultValue={
-                              keyResult.kind === "baseline" &&
-                              keyResult.doneAt === null
-                                ? ""
-                                : keyResult.currentValue
-                            }
-                            // Nine digits fit. A measure in rupiah or
-                            // impressions reaches them and `w-24` hid half.
-                            className="w-32 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
-                          />
-                        </>
+                        <MetricInput
+                          id={`value-${keyResult.id}`}
+                          label={t("common.newValueFor", {
+                            title: keyResult.title,
+                          })}
+                          hideLabel
+                          name={`value:${keyResult.id}`}
+                          unit={keyResult.unit}
+                          baseline={keyResult.baselineValue}
+                          target={keyResult.targetValue}
+                          // A baseline nobody has recorded starts empty,
+                          // so the first value typed is the one it found.
+                          defaultValue={
+                            keyResult.kind === "baseline" &&
+                            keyResult.doneAt === null
+                              ? null
+                              : keyResult.currentValue
+                          }
+                          // Nine digits fit. A measure in rupiah or
+                          // impressions reaches them and `w-24` hid half.
+                          inputClassName="h-auto w-32 px-2 py-1 text-xs"
+                        />
                       )}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <label
-                      className="text-xs text-ink-3"
-                      htmlFor={`confidence-${keyResult.id}`}
-                    >
-                      {t("common.confidence")}
-                    </label>
                     <ConfidenceRange
                       id={`confidence-${keyResult.id}`}
+                      label={t("checkIn.composer.confidenceIn", {
+                        title: keyResult.title,
+                      })}
                       name={`confidence:${keyResult.id}`}
                       defaultValue={keyResult.confidence ?? 0.5}
                       kind={kind}
                       thresholds={thresholds}
+                      display={display}
                     />
                   </div>
                 </li>
@@ -274,9 +262,11 @@ export async function Composer({
 export async function Votes({
   votes,
   canReveal,
+  display,
 }: {
   readonly votes: readonly VoteState[];
   readonly canReveal: boolean;
+  readonly display: ConfidenceDisplay;
 }) {
   const { t } = await getTranslations();
 
@@ -295,7 +285,12 @@ export async function Votes({
           {t("checkIn.composer.privateUntilTheReveal")}
         </p>
         {votes.map((vote) => (
-          <VotePanel key={vote.keyResultId} vote={vote} canReveal={canReveal} />
+          <VotePanel
+            key={vote.keyResultId}
+            vote={vote}
+            canReveal={canReveal}
+            display={display}
+          />
         ))}
       </CardBody>
     </Card>

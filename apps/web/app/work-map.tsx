@@ -11,10 +11,13 @@ import {
   Card,
   CardBody,
   Chip,
+  type ConfidenceDisplay,
+  formatConfidence,
   type MessageValues,
 } from "@openokr/ui";
 import type { ReactNode } from "react";
 import { progressCeiling } from "../lib/ceilings.ts";
+import { confidenceDisplay } from "../lib/confidence-display.ts";
 import { workspaceTerminology } from "../lib/terminology.ts";
 import { getTranslations } from "../lib/translations";
 import { HealthChip } from "./goals/health-chip.tsx";
@@ -93,9 +96,12 @@ function ConfidenceChip({
   confidence,
   thresholds,
   t,
+  display,
 }: {
   readonly confidence: number | null;
   readonly thresholds: ResolvedThresholds;
+  /** The workspace's "Confidence shown as" (guided-inputs §4.8). */
+  readonly display: ConfidenceDisplay;
   /** The caller's `t`, so a row does not resolve the locale once per row. */
   readonly t: (key: string, values?: MessageValues) => string;
 }) {
@@ -105,7 +111,7 @@ function ConfidenceChip({
   const verdict = confidenceBand(confidence, thresholds);
   const tone =
     verdict.band === "high" ? "ok" : verdict.band === "medium" ? "warn" : "bad";
-  const value = { confidence: confidence.toFixed(1) };
+  const value = { confidence: formatConfidence(confidence, display, t) };
   const label =
     verdict.band === "high"
       ? t("workMap.confidenceHigh", value)
@@ -190,6 +196,7 @@ export async function GoalTable({
   const rowKind = rowKindLabels(await workspaceTerminology(), t);
 
   const thresholds = canonThresholds();
+  const display = await confidenceDisplay();
 
   return (
     <Card>
@@ -283,6 +290,7 @@ export async function GoalTable({
                       confidence={node.confidence}
                       thresholds={thresholds}
                       t={t}
+                      display={display}
                     />
                   </td>
                   <td className="hidden px-2 py-2 sm:table-cell">

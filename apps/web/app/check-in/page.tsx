@@ -1,5 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import type { ResolvedThresholds } from "@openokr/method";
+import type { ResolvedPractice, ResolvedThresholds } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
@@ -236,6 +236,17 @@ async function CheckInForGoal({
   // goal was told "This goal is not due" about a date that had passed.
   const dueHere = stillDue || (goal.daysPastDue ?? -1) >= 0;
 
+  // The workspace's "Confidence shown as" (METHOD.md §12) and its §3.2
+  // bands, read once for the composer, the votes and the timeline.
+  const [rhythm, practiceRead] = await Promise.all([
+    callAction(context, "rhythm.read", {}),
+    callAction(context, "practice.read", {}),
+  ]);
+  const thresholds = rhythm.thresholds as ResolvedThresholds;
+  const display = (practiceRead.practice as ResolvedPractice)[
+    "confidence.display"
+  ];
+
   const votes: VoteState[] = [];
   for (const keyResult of goal.keyResults) {
     const state = await callAction(context, "goals.readVotes", {
@@ -251,10 +262,8 @@ async function CheckInForGoal({
           checkInId={draft.id}
           goalTitle={goal.title}
           kind={goal.kind}
-          thresholds={
-            (await callAction(context, "rhythm.read", {}))
-              .thresholds as ResolvedThresholds
-          }
+          thresholds={thresholds}
+          display={display}
           keyResults={goal.keyResults}
           nextGoalId={nextGoalId}
         />
@@ -285,9 +294,13 @@ async function CheckInForGoal({
         </Card>
       )}
 
-      <Votes votes={votes} canReveal={canEdit} />
+      <Votes votes={votes} canReveal={canEdit} display={display} />
 
-      <Timeline checkIns={timeline.checkIns} canEdit={canEdit} />
+      <Timeline
+        checkIns={timeline.checkIns}
+        canEdit={canEdit}
+        display={display}
+      />
     </>
   );
 }

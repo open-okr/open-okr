@@ -542,7 +542,7 @@ describe("checking in", () => {
       address: "?okr=g&tab=check-in",
       keyResults: [keyResult({ kind: "milestone" })],
     });
-    expect(inDrawer(`Value for ${KR} in this check-in`)).toBeNull();
+    expect(inDrawer(`Value for ${KR} in this check-in (%)`)).toBeNull();
     const done = inDrawer(`${KR} is done`) as HTMLInputElement;
     await act(async () => done.click());
     await fill(
@@ -566,7 +566,7 @@ describe("checking in", () => {
       ],
     });
     await fill(
-      inDrawer(`Value for ${KR} in this check-in`) as HTMLInputElement,
+      inDrawer(`Value for ${KR} in this check-in (%)`) as HTMLInputElement,
       "0",
     );
     await fill(
@@ -587,14 +587,14 @@ describe("checking in", () => {
     const floor = () =>
       drawer()?.querySelector('[data-testid="committed-floor"]') ?? null;
     await fill(
-      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      inDrawer(`Confidence in ${KR} (in 10)`) as HTMLInputElement,
       "4",
     );
     expect(floor()?.textContent).toBe(
       "A commitment nobody believes in is a risk. Escalate now, or make it aspirational",
     );
     await fill(
-      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      inDrawer(`Confidence in ${KR} (in 10)`) as HTMLInputElement,
       "7",
     );
     expect(floor()).toBeNull();
@@ -603,7 +603,7 @@ describe("checking in", () => {
   test("an aspirational key result at the same confidence is told nothing", async () => {
     await render({ address: "?okr=g&tab=check-in" });
     await fill(
-      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      inDrawer(`Confidence in ${KR} (in 10)`) as HTMLInputElement,
       "4",
     );
     expect(
@@ -627,11 +627,11 @@ describe("checking in", () => {
     // The last check-in said caution, so that is where the status starts.
     expect(form()?.querySelector("select")?.value).toBe("caution");
     await fill(
-      inDrawer(`Value for ${KR} in this check-in`) as HTMLInputElement,
+      inDrawer(`Value for ${KR} in this check-in (%)`) as HTMLInputElement,
       "40",
     );
     await fill(
-      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      inDrawer(`Confidence in ${KR} (in 10)`) as HTMLInputElement,
       "7",
     );
     await fill(

@@ -9,7 +9,10 @@ import {
 import {
   Button,
   Chip,
+  type ConfidenceDisplay,
+  ConfidenceInput,
   isBlankDocument,
+  MetricInput,
   RichTextEditor,
   useTranslations,
 } from "@openokr/ui";
@@ -45,51 +48,39 @@ const STATUSES: readonly { readonly value: Status; readonly label: string }[] =
   ];
 
 /** "7" for 0.7; empty where nothing is set. */
-const outOfTen = (confidence: number | null | undefined): string =>
-  confidence === null || confidence === undefined
-    ? ""
-    : String(Math.round(confidence * 10));
-
-/** A whole number from nought to ten, or null for anything else. */
-function tenths(text: string): number | null {
-  if (text.trim() === "") {
-    return null;
-  }
-  const value = Number(text);
-  return Number.isInteger(value) && value >= 0 && value <= 10
-    ? value / 10
-    : null;
-}
-
 export function CheckInTab({
   goal,
   detail,
   okr,
   thresholds,
+  display,
   onPublished,
 }: {
   readonly goal: OkrGoal;
   readonly detail: OkrDetail;
   readonly okr: OkrHandle;
-  /** This workspace's numbers, for §3.2's committed floor. */
+  /** This workspace's numbers, for §3.2's committed floor and bands. */
   readonly thresholds: ResolvedThresholds;
+  /** The workspace's "Confidence shown as" (METHOD.md §12). */
+  readonly display: ConfidenceDisplay;
   readonly onPublished: () => void;
 }) {
   const { t } = useTranslations();
   const last = detail.checkIns[0] ?? null;
   const [status, setStatus] = useState<Status | "">(last?.status ?? "");
-  const [confidence, setConfidence] = useState(
-    outOfTen(last?.confidence ?? 0.5),
+  // Stored 0.0 to 1.0, shown on the workspace's scale (guided-inputs §4.8).
+  const [confidence, setConfidence] = useState<number | null>(
+    last?.confidence ?? 0.5,
   );
-  const [values, setValues] = useState<Record<string, string>>(() =>
+  const [values, setValues] = useState<Record<string, number | null>>(() =>
     Object.fromEntries(
       goal.keyResults.map((keyResult) => [
         keyResult.id,
         // A baseline nobody has recorded starts empty, so the first value
         // typed is the one it found (§2.10).
         keyResult.kind === "baseline" && keyResult.doneAt === null
-          ? ""
-          : String(keyResult.currentValue),
+          ? null
+          : keyResult.currentValue,
       ]),
     ),
   );
@@ -102,13 +93,14 @@ export function CheckInTab({
       ]),
     ),
   );
-  const [confidences, setConfidences] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      goal.keyResults.map((keyResult) => [
-        keyResult.id,
-        outOfTen(keyResult.confidence),
-      ]),
-    ),
+  const [confidences, setConfidences] = useState<Record<string, number | null>>(
+    () =>
+      Object.fromEntries(
+        goal.keyResults.map((keyResult) => [
+          keyResult.id,
+          keyResult.confidence,
+        ]),
+      ),
   );
   // The compact editor's document (guided-inputs §4.7), null until typed in.
   const [narrative, setNarrative] = useState<RichTextDocument | null>(null);
@@ -120,9 +112,9 @@ export function CheckInTab({
       setProblem(t("okrDrawer.chooseStatus"));
       return;
     }
-    const overall = tenths(confidence);
+    const overall = confidence;
     if (overall === null) {
-      setProblem(t("okrDrawer.confidenceOutOfTen"));
+      setProblem(t("checkIn.actions.confidenceNeeded"));
       return;
     }
     if (narrative === null || isBlankDocument(narrative)) {
@@ -132,8 +124,8 @@ export function CheckInTab({
     // Only what moved: leaving a value alone and setting it to what it
     // already was are different statements, and the history says which.
     const changed = goal.keyResults.flatMap((keyResult) => {
-      const value = Number(values[keyResult.id]);
-      const next = tenths(confidences[keyResult.id] ?? "");
+      const value = values[keyResult.id] ?? null;
+      const next = confidences[keyResult.id] ?? null;
       const entry: {
         keyResultId: string;
         value?: number;
@@ -147,8 +139,7 @@ export function CheckInTab({
         }
       } else if (
         keyResult.kpiId === null &&
-        values[keyResult.id]?.trim() !== "" &&
-        Number.isFinite(value) &&
+        value !== null &&
         // A baseline nobody has recorded starts empty, so anything typed is
         // the number it found, even one equal to the zero it holds until
         // then: the first measurement of 0 is still a measurement (§2.10).
@@ -216,22 +207,20 @@ export function CheckInTab({
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-1.5">
-          <span className="font-semibold text-ink-2">
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="font-semibold text-ink-2">
             {t("okrDrawer.objectiveConfidence")}
           </span>
-          <input
-            type="number"
-            min={0}
-            max={10}
-            step={1}
-            aria-label={t("okrDrawer.objectiveConfidence")}
+          <ConfidenceInput
+            label={t("okrDrawer.objectiveConfidence")}
+            hideLabel
             value={confidence}
-            onChange={(event) => setConfidence(event.target.value)}
-            className="w-14 rounded-control border border-line bg-surface px-2 py-1 text-right tabular-nums text-ink"
+            onValueChange={setConfidence}
+            display={display}
+            thresholds={thresholds}
+            inputClassName="h-auto py-1 text-xs"
           />
-          <span className="text-ink-4">{t("okrDrawer.outOfTen")}</span>
-        </label>
+        </span>
       </div>
 
       <ul className="flex flex-col gap-2">
@@ -259,53 +248,55 @@ export function CheckInTab({
               ) : keyResult.kpiId ? (
                 <Chip tone="info">{t("common.fromAKpi")}</Chip>
               ) : (
-                <label className="flex items-center gap-1.5">
-                  <span className="text-ink-3">{t("okrDrawer.value")}</span>
-                  <input
-                    type="number"
-                    step="any"
-                    aria-label={t("okrDrawer.checkInValueOf", {
+                <span className="flex items-start gap-1.5">
+                  <span aria-hidden="true" className="pt-1 text-ink-3">
+                    {t("okrDrawer.value")}
+                  </span>
+                  <MetricInput
+                    label={t("okrDrawer.checkInValueOf", {
                       title: keyResult.title,
                     })}
-                    value={values[keyResult.id] ?? ""}
-                    onChange={(event) =>
+                    hideLabel
+                    value={values[keyResult.id] ?? null}
+                    onValueChange={(next) =>
                       setValues((current) => ({
                         ...current,
-                        [keyResult.id]: event.target.value,
+                        [keyResult.id]: next,
                       }))
                     }
-                    className="w-24 rounded-control border border-line bg-surface px-2 py-1 text-right tabular-nums text-ink"
+                    unit={keyResult.unit}
+                    baseline={keyResult.baselineValue}
+                    target={keyResult.targetValue}
+                    inputClassName="h-auto w-24 py-1 text-right text-xs"
                   />
-                </label>
+                </span>
               )}
-              <label className="flex items-center gap-1.5">
-                <span className="text-ink-3">
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden="true" className="text-ink-3">
                   {t("okrDrawer.confidenceLabel")}
                 </span>
-                <input
-                  type="number"
-                  min={0}
-                  max={10}
-                  step={1}
-                  aria-label={t("okrDrawer.checkInConfidenceOf", {
+                <ConfidenceInput
+                  label={t("okrDrawer.checkInConfidenceOf", {
                     title: keyResult.title,
                   })}
-                  value={confidences[keyResult.id] ?? ""}
-                  onChange={(event) =>
+                  hideLabel
+                  value={confidences[keyResult.id] ?? null}
+                  onValueChange={(next) =>
                     setConfidences((current) => ({
                       ...current,
-                      [keyResult.id]: event.target.value,
+                      [keyResult.id]: next,
                     }))
                   }
-                  className="w-14 rounded-control border border-line bg-surface px-2 py-1 text-right tabular-nums text-ink"
+                  display={display}
+                  thresholds={thresholds}
+                  inputClassName="h-auto py-1 text-xs"
                 />
-                <span className="text-ink-4">{t("okrDrawer.outOfTen")}</span>
-              </label>
+              </span>
             </span>
             {/* §3.2's committed rule, said before it is published: the
              * Coach will say it to the champion once it is (P9-T11b-c). */}
             {belowCommittedFloor(
-              tenths(confidences[keyResult.id] ?? "") ?? 1,
+              confidences[keyResult.id] ?? 1,
               goal.kind,
               thresholds,
             ) ? (

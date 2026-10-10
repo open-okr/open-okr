@@ -83,6 +83,15 @@ describe("a number field", () => {
     });
   });
 
+  test("when required, is refused empty on the field the reader can see", () => {
+    // The Work Map's quick value relies on this: the browser refuses it there,
+    // on the input the reader can see, before anything is sent.
+    inEnglish(<NumberInput label="Value" name="value" required />);
+    const field = screen.getByLabelText("Value") as HTMLInputElement;
+    expect(field.required).toBe(true);
+    expect(field.validity.valueMissing).toBe(true);
+  });
+
   test("names itself a number field in the reader's language", () => {
     render(
       <TranslationsProvider locale="ms">

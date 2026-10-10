@@ -6,6 +6,7 @@ import {
   Bar,
   Button,
   Chip,
+  formatConfidence,
   useIsMutating,
   useQueryClient,
   useTranslations,
@@ -978,9 +979,11 @@ function KeyResultRow({
         <span className="hidden text-xs tabular-nums text-ink-3 md:block">
           {keyResult.confidence === null
             ? t("okrList.noConfidence")
-            : t("okrList.confidence", {
-                value: String(Math.round(keyResult.confidence * 10)),
-              })}
+            : formatConfidence(
+                keyResult.confidence,
+                coach.practice["confidence.display"],
+                t,
+              )}
         </span>
 
         <RowActions

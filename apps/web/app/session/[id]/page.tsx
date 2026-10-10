@@ -39,6 +39,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
+import { confidenceDisplay } from "../../../lib/confidence-display.ts";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
@@ -815,6 +816,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           names={Object.fromEntries(
             participants.map((one) => [one.memberId, one.name]),
           )}
+          display={await confidenceDisplay()}
         />
       )}
 
@@ -833,6 +835,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           scores={diagnoseStage.scores}
           owners={diagnoseStage.owners}
           canWrite={isFacilitator}
+          display={await confidenceDisplay()}
         />
       )}
 

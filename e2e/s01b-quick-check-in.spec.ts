@@ -30,7 +30,7 @@ test.afterAll(async () => {
   await context?.close();
 });
 
-const panelValue = () => page.getByLabel("Record a value");
+const panelValue = () => page.getByRole("textbox", { name: "Record a value" });
 const panelForm = () => page.locator("form").filter({ has: panelValue() });
 
 async function openThePanel(): Promise<void> {

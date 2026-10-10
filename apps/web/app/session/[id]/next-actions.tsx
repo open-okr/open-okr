@@ -6,6 +6,8 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  type ConfidenceDisplay,
+  formatConfidence,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
@@ -102,11 +104,14 @@ export function NextActionPanel({
   scores,
   owners,
   canWrite,
+  display,
 }: {
   readonly sessionId: string;
   readonly scores: readonly LowScore[];
   readonly owners: readonly Option[];
   readonly canWrite: boolean;
+  /** The workspace's "Confidence shown as" (guided-inputs §4.8). */
+  readonly display: ConfidenceDisplay;
 }) {
   const { t } = useTranslations();
   const waiting = scores.filter(
@@ -147,12 +152,16 @@ export function NextActionPanel({
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-sm text-ink">{score.title}</span>
                 <Chip tone={score.low ? "bad" : "warn"}>
-                  {score.confidence.toFixed(1)}
+                  {formatConfidence(score.confidence, display, t)}
                 </Chip>
                 {score.dropped && score.previousConfidence !== null ? (
                   <span className="text-xs text-ink-3">
                     {t("session.detail.nextActions.fellFrom", {
-                      from: score.previousConfidence.toFixed(1),
+                      from: formatConfidence(
+                        score.previousConfidence,
+                        display,
+                        t,
+                      ),
                     })}
                   </span>
                 ) : null}

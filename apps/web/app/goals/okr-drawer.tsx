@@ -11,6 +11,8 @@ import {
 import {
   Bar,
   Chip,
+  type ConfidenceDisplay,
+  formatConfidence,
   formatMeasure,
   useQueryClient,
   useToast,
@@ -495,6 +497,7 @@ function DrawerBody({
                 detail={loaded}
                 okr={okr}
                 thresholds={coach.thresholds}
+                display={coach.practice["confidence.display"]}
                 onPublished={() => {
                   toast.show({ tone: "ok", message: t("okrDrawer.checkedIn") });
                   onTab("history");
@@ -510,7 +513,13 @@ function DrawerBody({
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
       >
         <Loaded detail={detail}>
-          {(loaded) => <History goal={goal} detail={loaded} />}
+          {(loaded) => (
+            <History
+              goal={goal}
+              detail={loaded}
+              display={coach.practice["confidence.display"]}
+            />
+          )}
         </Loaded>
       </Tabs.Panel>
 
@@ -660,9 +669,11 @@ function DrawerKeyResult({
         <span className="text-xs tabular-nums text-ink-3">
           {keyResult.confidence === null
             ? t("okrList.noConfidence")
-            : t("okrList.confidence", {
-                value: String(Math.round(keyResult.confidence * 10)),
-              })}
+            : formatConfidence(
+                keyResult.confidence,
+                coach.practice["confidence.display"],
+                t,
+              )}
         </span>
       </div>
       <dl className="grid grid-cols-[7rem_1fr] items-center gap-x-3 gap-y-1 text-xs">
@@ -864,9 +875,12 @@ const STATUS = {
 function History({
   goal,
   detail,
+  display,
 }: {
   readonly goal: OkrGoal;
   readonly detail: OkrDetail;
+  /** The workspace's "Confidence shown as" (guided-inputs §4.8). */
+  readonly display: ConfidenceDisplay;
 }) {
   const { t } = useTranslations();
   return (
@@ -902,9 +916,7 @@ function History({
                   ) : null}
                   {checkIn.confidence === null ? null : (
                     <span>
-                      {t("okrList.confidence", {
-                        value: String(Math.round(checkIn.confidence * 10)),
-                      })}
+                      {formatConfidence(checkIn.confidence, display, t)}
                     </span>
                   )}
                 </span>

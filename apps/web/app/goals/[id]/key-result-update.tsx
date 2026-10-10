@@ -1,6 +1,13 @@
 "use client";
 
-import { Button, MetricInput, useTranslations } from "@openokr/ui";
+import type { ResolvedThresholds } from "@openokr/method";
+import {
+  Button,
+  type ConfidenceDisplay,
+  ConfidenceInput,
+  MetricInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { addKeyResult } from "../editor-actions.ts";
@@ -26,6 +33,8 @@ export function KeyResultUpdate({
   goalId,
   keyResult,
   lastStatus,
+  display,
+  thresholds,
 }: {
   readonly goalId: string;
   readonly keyResult: {
@@ -38,21 +47,23 @@ export function KeyResultUpdate({
     readonly targetValue: number | null;
   };
   readonly lastStatus: Status | null;
+  /** The workspace's "Confidence shown as" (METHOD.md §12). */
+  readonly display: ConfidenceDisplay;
+  /** Its §3.2 bands, named beside the confidence. */
+  readonly thresholds: ResolvedThresholds;
 }) {
   const { t } = useTranslations();
   const router = useRouter();
-  const stored =
-    keyResult.confidence === null
-      ? ""
-      : String(Math.round(keyResult.confidence * 10));
+  const stored = keyResult.confidence;
   // A number or nothing: emptied, the field records nothing rather than 0.
   const [value, setValue] = useState<number | null>(keyResult.currentValue);
-  const [confidence, setConfidence] = useState(stored);
+  // Stored 0.0 to 1.0, shown on the workspace's scale (guided-inputs §4.8).
+  const [confidence, setConfidence] = useState<number | null>(stored);
   const [status, setStatus] = useState<Status | "">(lastStatus ?? "");
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const confidenceMoved = confidence.trim() !== "" && confidence !== stored;
+  const confidenceMoved = confidence !== null && confidence !== stored;
   const valueMoved = value !== null && value !== keyResult.currentValue;
 
   const save = async () => {
@@ -66,7 +77,7 @@ export function KeyResultUpdate({
       ...(valueMoved && value !== null ? { value } : {}),
       ...(confidenceMoved
         ? {
-            confidence: Number(confidence) / 10,
+            confidence,
             status: status === "" ? null : status,
             note,
           }
@@ -101,19 +112,17 @@ export function KeyResultUpdate({
           target={keyResult.targetValue}
           inputClassName="h-auto w-32 px-1.5 py-0.5 text-xs"
         />
-        <input
-          type="number"
-          min={0}
-          max={10}
-          step={1}
-          aria-label={t("goals.detail.confidenceFor", {
+        <ConfidenceInput
+          label={t("goals.detail.confidenceFor", {
             title: keyResult.title,
           })}
+          hideLabel
           value={confidence}
-          onChange={(event) => setConfidence(event.target.value)}
-          className="w-12 rounded-md border border-line bg-surface px-1.5 py-0.5 text-right text-xs text-ink"
+          onValueChange={setConfidence}
+          display={display}
+          thresholds={thresholds}
+          inputClassName="h-auto px-1.5 py-0.5 text-xs"
         />
-        <span className="text-xs text-ink-4">{t("okrDrawer.outOfTen")}</span>
         <Button type="submit" size="sm" disabled={saving}>
           {t("common.save")}
         </Button>

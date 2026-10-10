@@ -124,7 +124,11 @@ test("the walker offers it, and publishing puts the card in the history", async 
     .click();
   await expect(page).toHaveURL(`/check-in?goal=${goalId}`);
 
-  await page.getByLabel(`New value for ${KEY_RESULT}`).fill("60");
+  // By role, which skips the hidden copy streaming leaves for a moment: a
+  // number field is named by `aria-label`, and that copy carries it too.
+  await page
+    .getByRole("textbox", { name: `New value for ${KEY_RESULT}` })
+    .fill("60");
   await page.getByLabel("Status", { exact: true }).selectOption("caution");
   // The compact editor (guided-inputs §4.7): the narrative is typed in bold
   // from the toolbar, and the next step goes in a bulleted list under it.
@@ -197,19 +201,31 @@ test("the reviewer acknowledges it, and the card says so", async () => {
 });
 
 test("a private vote shows only its author's number until the reveal", async () => {
+  // The innermost block holding both the key result's title and its vote
+  // field: the field has wrappers of its own now, which hold no title.
   const panel = page
     .getByRole("main")
     .locator("div")
-    .filter({ has: page.getByLabel(`Your confidence in ${KEY_RESULT}`) })
+    .filter({ hasText: KEY_RESULT })
+    .filter({
+      has: page.getByRole("textbox", {
+        name: `Your confidence in ${KEY_RESULT}`,
+      }),
+    })
     .last();
 
   await expect(panel).toContainText("You have not voted yet.");
-  await panel.getByLabel(`Your confidence in ${KEY_RESULT}`).fill("0.7");
+  // On the workspace's scale, "x in 10" by default (guided-inputs §4.8).
+  await panel
+    .getByRole("textbox", { name: `Your confidence in ${KEY_RESULT}` })
+    .fill("7");
   await panel.getByRole("button", { name: "Vote", exact: true }).click();
 
   // Before the reveal the server sends the count and the reader's own vote and
   // nothing else, so what is on the page is all a client could know.
-  await expect(panel).toContainText("Your vote: 0.7", { timeout: 15_000 });
+  await expect(panel).toContainText("Your vote: 7 in 10", {
+    timeout: 15_000,
+  });
   await expect(panel).toContainText("1 vote in");
   await expect(panel.getByRole("button", { name: "Change" })).toBeVisible();
 });
@@ -225,10 +241,66 @@ test("revealing shows every vote together, and closes the ballot", async () => {
 
   const revealed = page
     .getByRole("main")
-    .getByText(/^revealed · average 0\.7/);
+    .getByText(/^revealed · average 7 in 10/);
   await expect(revealed).toBeVisible({ timeout: 15_000 });
   // One write over the whole set, so there is nothing left to vote on.
   await expect(
-    page.getByLabel(`Your confidence in ${KEY_RESULT}`),
+    page.getByRole("textbox", { name: `Your confidence in ${KEY_RESULT}` }),
   ).toHaveCount(0);
+});
+
+/**
+ * guided-inputs §4.8's acceptance: in a workspace whose "Confidence shown as"
+ * is Percent, the composer reads confidence from 0 to 100%, and 70% is
+ * stored as 0.7. The setting is put back whatever happens, because every
+ * spec after this one reads the default "x in 10".
+ */
+test("in a percent workspace the composer reads 0 to 100%, and stores 70% as 0.7", async () => {
+  const setDisplay = (display: string | null) =>
+    pool.query(
+      `update rhythm_settings
+          set practice = case when $2::text is null
+                then practice - 'confidence.display'
+                else practice || jsonb_build_object('confidence.display', $2::text)
+              end
+        where workspace_id = (select workspace_id from goals where id = $1)`,
+      [goalId, display],
+    );
+  try {
+    await setDisplay("percent");
+    await pool.query(
+      `update goals set next_check_in_at = now() - interval '1 hour'
+        where id = $1 and deleted_at is null`,
+      [goalId],
+    );
+    await goTo(page, `/check-in?goal=${goalId}`);
+
+    const confidence = page
+      .getByRole("main")
+      .getByRole("textbox", { name: "Confidence (%)", exact: true });
+    await expect(confidence).toHaveValue("50", { timeout: 15_000 });
+    await confidence.fill("70");
+    await confidence.press("Tab");
+    await page.getByLabel("Status", { exact: true }).selectOption("on_track");
+    await page
+      .getByRole("textbox", { name: NARRATIVE_LABEL })
+      .fill("Read on the percent scale.");
+    await page
+      .getByRole("main")
+      .getByRole("button", { name: "Publish", exact: true })
+      .click();
+
+    await expect(async () => {
+      const { rows } = await pool.query<{ confidence: string }>(
+        `select confidence from check_ins
+          where subject_id = $1 and state = 'published'
+            and deleted_at is null
+          order by published_at desc limit 1`,
+        [goalId],
+      );
+      expect(Number(rows[0]?.confidence)).toBe(0.7);
+    }).toPass({ timeout: 15_000 });
+  } finally {
+    await setDisplay(null);
+  }
 });

@@ -7,6 +7,7 @@ import {
   THREAD_SUMMARY_MINIMUM,
 } from "@openokr/core";
 import {
+  type ResolvedPractice,
   type ResolvedThresholds,
   WEIGHT_MAX,
   WEIGHT_MIN,
@@ -177,6 +178,11 @@ export default async function GoalPage({
   const pageThresholds = (await callAction(context, "rhythm.read", {}))
     .thresholds as unknown as ResolvedThresholds;
   const strengthBands = pageThresholds["quality.strengthScoreBands"];
+  // How the workspace shows a confidence (METHOD.md §12, guided-inputs §4.8).
+  const confidenceDisplay = (
+    (await callAction(context, "practice.read", {}))
+      .practice as unknown as ResolvedPractice
+  )["confidence.display"];
   const { available: drafting } = await callAction(
     context,
     "ai.readAvailability",
@@ -485,6 +491,8 @@ export default async function GoalPage({
                             targetValue: keyResult.targetValue,
                           }}
                           lastStatus={lastStatus}
+                          display={confidenceDisplay}
+                          thresholds={pageThresholds}
                         />
                       ) : keyResult.kpiId ? (
                         <Chip tone="info">{t("common.fromAKpi")}</Chip>

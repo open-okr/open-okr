@@ -11,6 +11,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { formNumber } from "../../lib/form-number";
 import { readRichTextField } from "../../lib/rich-text-form";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -112,6 +113,15 @@ export async function publishCheckIn(
     };
   }
 
+  // An emptied confidence posts nothing (guided-inputs §4.8), and
+  // `Number("")` is 0, so reading it as a number recorded a confidence of 0
+  // nobody gave. A check-in carries one, so an empty one is said in words.
+  const confidence = formNumber(formData, "confidence");
+  if (!Number.isFinite(confidence)) {
+    const { t } = await getTranslations();
+    return { error: t("checkIn.actions.confidenceNeeded") };
+  }
+
   return run((context) =>
     callAction(context, "goals.publishCheckIn", {
       id,
@@ -119,7 +129,7 @@ export async function publishCheckIn(
         | "on_track"
         | "caution"
         | "off_track",
-      confidence: Number(formData.get("confidence") ?? 0.5),
+      confidence,
       narrative: narrative.document,
       values: composerValues(formData),
     }),
@@ -139,6 +149,10 @@ export async function editCheckIn(
     return { error: t("checkIn.actions.narrativeUnreadable") };
   }
 
+  // Emptied, the confidence is not sent and stays as it was, as the
+  // narrative does; `Number("")` would have recorded 0.
+  const confidence = formNumber(formData, "confidence");
+
   return run((context) =>
     callAction(context, "goals.editCheckIn", {
       id,
@@ -146,7 +160,7 @@ export async function editCheckIn(
         | "on_track"
         | "caution"
         | "off_track",
-      confidence: Number(formData.get("confidence") ?? 0.5),
+      ...(Number.isFinite(confidence) ? { confidence } : {}),
       ...(narrative.state === "document"
         ? { narrative: narrative.document }
         : {}),
@@ -178,10 +192,11 @@ export async function castVote(
   formData: FormData,
 ): Promise<WriteState> {
   const keyResultId = String(formData.get("keyResultId") ?? "");
-  const confidence = Number(formData.get("confidence"));
+  // `formNumber`, because `Number("")` is 0 and an empty field voted 0.
+  const confidence = formNumber(formData, "confidence");
   if (!Number.isFinite(confidence)) {
     const { t } = await getTranslations();
-    return { error: t("checkIn.actions.voteBetweenZeroAndOne") };
+    return { error: t("checkIn.actions.confidenceNeeded") };
   }
   return run((context) =>
     callAction(context, "goals.vote", { keyResultId, confidence }),
