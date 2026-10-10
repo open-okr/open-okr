@@ -15,14 +15,15 @@
  */
 
 import { callAction, OperationError, statusHueOf } from "@openokr/core";
+import { HEX_COLOUR_PATTERN } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { BrandingState } from "./branding-state.ts";
 
-/** What the settings schema accepts. The input's `pattern` is the same. */
-const HEX = /^#[0-9a-fA-F]{6}$/;
+/** What the settings schema accepts. The input's `pattern` is the same rule. */
+const HEX = HEX_COLOUR_PATTERN;
 
 /** Why each status family is refused, one whole sentence per family. */
 const REFUSED = {

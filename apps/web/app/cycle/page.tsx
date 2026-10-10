@@ -523,7 +523,7 @@ export default async function CyclePage({
           {viewing === 2 ? (
             <BaselineHealth
               cycleId={workflow.cycleId}
-              saved={workflow.baselineHealth}
+              saved={workflow.baselineHealthDocuments}
               canEdit={canEdit}
             />
           ) : null}
@@ -588,7 +588,7 @@ export default async function CyclePage({
           {viewing === 5 ? (
             <CapacityCuts
               cycleId={workflow.cycleId}
-              saved={workflow.capacityCuts}
+              saved={workflow.capacityCutsDocument}
               canEdit={canEdit}
             />
           ) : null}

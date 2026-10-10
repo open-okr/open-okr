@@ -212,6 +212,16 @@ describe("every assist's server action", () => {
 });
 
 describe("creating what a person kept from a decomposition", () => {
+  // Each description is the compact editor's document (guided-inputs §4.7).
+  const words = (text: string) => ({
+    type: "doc",
+    content: [
+      text === ""
+        ? { type: "paragraph" }
+        : { type: "paragraph", content: [{ type: "text", text }] },
+    ],
+  });
+
   it("creates each initiative as them, behind the key result, then its tasks", async () => {
     callAction.mockImplementation(async (_context, action: string) =>
       action === "initiatives.create" ? { id: "initiative-1" } : { id: "task" },
@@ -223,10 +233,10 @@ describe("creating what a person kept from a decomposition", () => {
       initiatives: [
         {
           title: " Hand trials to finance ",
-          description: "A named owner.",
+          description: words("A named owner."),
           tasks: ["Draft the handover note", "  "],
         },
-        { title: "   ", description: "", tasks: ["Never created"] },
+        { title: "   ", description: words(""), tasks: ["Never created"] },
       ],
     });
 
@@ -245,6 +255,7 @@ describe("creating what a person kept from a decomposition", () => {
     expect(calls[0]?.[2]).toMatchObject({
       spaceId: "space-1",
       title: "Hand trials to finance",
+      description: words("A named owner."),
       ownerId: "member-1",
       keyResultIds: ["kr-1"],
     });
@@ -281,8 +292,8 @@ describe("creating what a person kept from a decomposition", () => {
       keyResultId: "kr-1",
       spaceId: "space-1",
       initiatives: [
-        { title: "Refused", description: "", tasks: ["One"] },
-        { title: "Kept", description: "", tasks: ["Two"] },
+        { title: "Refused", description: words(""), tasks: ["One"] },
+        { title: "Kept", description: words(""), tasks: ["Two"] },
       ],
     });
     expect(created.initiatives).toBe(1);
@@ -290,6 +301,77 @@ describe("creating what a person kept from a decomposition", () => {
     expect(created.refused).toEqual([
       'goals.detail.decompose.refused {"title":"Refused","reason":"No such space."}',
     ]);
+    // An empty description is no description, not an empty document.
+    expect(callAction.mock.calls[2]?.[2]).not.toHaveProperty("description");
+  });
+
+  it("refuses a description over the panel's cap by name, and creates the rest", async () => {
+    callAction.mockImplementation(async (_context, action: string) =>
+      action === "initiatives.create" ? { id: "initiative-1" } : { id: "task" },
+    );
+    const created = await goal.createDecomposedWorkAction({
+      goalId: "goal-1",
+      keyResultId: "kr-1",
+      spaceId: "space-1",
+      initiatives: [
+        { title: "Too long", description: words("x".repeat(1001)), tasks: [] },
+        { title: "Exactly", description: words("x".repeat(1000)), tasks: [] },
+      ],
+    });
+    expect(created.initiatives).toBe(1);
+    expect(created.refused).toEqual([
+      'goals.detail.decompose.refused {"title":"Too long","reason":"Keep it to 1000 characters. This has 1001."}',
+    ]);
+    // Nothing was sent for the refused one: the cap is held before the write.
+    expect(
+      callAction.mock.calls.map(
+        ([, , input]) => (input as { title: string }).title,
+      ),
+    ).toEqual(["Exactly"]);
+  });
+});
+
+describe("keeping a minutes write-up", () => {
+  // The full editor's document (guided-inputs §4.7), so a heading stays one.
+  const body = {
+    type: "doc",
+    content: [
+      {
+        type: "heading",
+        attrs: { level: 2 },
+        content: [{ type: "text", text: "Decisions" }],
+      },
+      { type: "paragraph", content: [{ type: "text", text: "Ship it." }] },
+    ],
+  };
+
+  it("keeps the document, headings and all, as a draft on the session", async () => {
+    callAction.mockResolvedValue({ id: "document-1" });
+    const saved = await sessionActions.saveMinutesWriteUpAction(
+      "session-1",
+      "Q3 review, written up",
+      body,
+    );
+    expect(saved).toEqual({ documentId: "document-1" });
+    expect(callAction.mock.calls[0]?.[1]).toBe("documents.create");
+    expect(callAction.mock.calls[0]?.[2]).toEqual({
+      subjectType: "session",
+      subjectId: "session-1",
+      title: "Q3 review, written up",
+      body,
+    });
+  });
+
+  it("refuses an empty one before anything is sent", async () => {
+    const saved = await sessionActions.saveMinutesWriteUpAction(
+      "session-1",
+      "Q3 review, written up",
+      { type: "doc", content: [{ type: "paragraph" }] },
+    );
+    expect(saved).toEqual({
+      error: "session.detail.minutes.writeUp.nothingToSave",
+    });
+    expect(callAction).not.toHaveBeenCalled();
   });
 });
 

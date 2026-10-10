@@ -15,8 +15,13 @@
  * UIUX-PLAN §3's "never auto-committed", made literal. The space defaults to
  * the objective's own and can be changed, because an initiative lives in a
  * space and which one is the person's call.
+ *
+ * Each description is the compact editor (docs/design/guided-inputs.md §4.7),
+ * holding the draft as a document, with the 1000-character cap its textarea
+ * had counted as the server counts it.
  */
-import { Button, Chip, useTranslations } from "@openokr/ui";
+import { richTextLength } from "@openokr/formats";
+import { Button, Chip, RichTextEditor, useTranslations } from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -24,6 +29,7 @@ import {
   createDecomposedWorkAction,
   decomposeKeyResultAction,
 } from "./assist-actions.ts";
+import { DESCRIPTION_MAX_CHARACTERS } from "./decompose-limits.ts";
 
 interface DraftTask {
   readonly title: string;
@@ -32,7 +38,8 @@ interface DraftTask {
 
 interface DraftRow {
   readonly title: string;
-  readonly description: string;
+  /** The editor's document. */
+  readonly description: unknown;
   readonly keep: boolean;
   readonly tasks: readonly DraftTask[];
 }
@@ -152,6 +159,11 @@ export function DecomposeKeyResult({
   }
 
   const kept = rows.filter((row) => row.keep && row.title.trim() !== "");
+  // The server refuses a description over the cap, so the button waits for
+  // the counter that already says so.
+  const overLimit = kept.some(
+    (row) => richTextLength(row.description) > DESCRIPTION_MAX_CHARACTERS,
+  );
 
   return (
     <section
@@ -195,17 +207,16 @@ export function DecomposeKeyResult({
               onChange={(event) => change(index, { title: event.target.value })}
               className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             />
-            <textarea
-              aria-label={t("goals.detail.decompose.whatItChanges")}
-              value={row.description}
-              rows={2}
-              maxLength={1000}
-              disabled={pending || !row.keep}
-              onChange={(event) =>
-                change(index, { description: event.target.value })
-              }
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink-2"
-            />
+            <div className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink-2">
+              <RichTextEditor
+                label={t("goals.detail.decompose.whatItChanges")}
+                variant="compact"
+                content={row.description}
+                editable={!pending && row.keep}
+                maxCharacters={DESCRIPTION_MAX_CHARACTERS}
+                onUpdate={(json) => change(index, { description: json })}
+              />
+            </div>
             {row.tasks.length > 0 ? (
               <fieldset className="flex flex-col gap-1 pl-3">
                 <legend className="text-xs font-medium text-ink-3">
@@ -265,7 +276,7 @@ export function DecomposeKeyResult({
           type="button"
           variant="primary"
           size="sm"
-          disabled={pending || kept.length === 0 || spaceId === ""}
+          disabled={pending || kept.length === 0 || spaceId === "" || overLimit}
           onClick={() => {
             setNotice(null);
             start(async () => {

@@ -87,7 +87,7 @@ export function targetTypeOfDirection(direction: KpiDirection): KpiTargetType {
  * its band; its red boundaries are optional. A one-sided type needs its green
  * and its red value.
  */
-function thresholdsComplete(
+export function thresholdsComplete(
   type: KpiTargetType,
   thresholds: KpiThresholds,
 ): boolean {

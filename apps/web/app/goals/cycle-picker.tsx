@@ -1,7 +1,7 @@
 "use client";
 
 import type { CycleCadence } from "@openokr/db";
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, DateInput, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { addCycle } from "./editor-actions.ts";
@@ -206,17 +206,14 @@ export function CyclePicker({
                   </option>
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-3">
-                {t("goals.editor.cycleOn")}
-                <input
-                  type="date"
-                  value={form.on}
-                  onChange={(event) =>
-                    setForm((value) => ({ ...value, on: event.target.value }))
-                  }
-                  className="rounded-control border border-line-2 bg-surface px-2 py-1.5 text-xs font-normal text-ink outline-none focus:border-brand"
-                />
-              </label>
+              <DateInput
+                label={t("goals.editor.cycleOn")}
+                value={form.on}
+                onValueChange={(next) =>
+                  setForm((value) => ({ ...value, on: next ?? "" }))
+                }
+                inputClassName="h-auto py-1.5 text-xs"
+              />
               <p className="text-[11px] text-ink-4">
                 {t("goals.editor.cycleHelp")}
               </p>

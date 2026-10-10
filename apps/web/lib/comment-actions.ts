@@ -16,7 +16,11 @@
  * Nothing here decides who may write: `comments.*` and `reactions.*` ask
  * whether the caller reads the subject, and the refusal they return is shown.
  */
-import { callAction, OperationError } from "@openokr/core";
+import {
+  callAction,
+  OperationError,
+  type RichTextDocument,
+} from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { NO_ERROR, type WriteState } from "../app/cycle/write-state.ts";
 import { getPool } from "./auth";
@@ -61,7 +65,9 @@ async function run(
 export async function postComment(input: {
   readonly subjectType: CommentSubjectType;
   readonly subjectId: string;
-  readonly body: unknown;
+  // Typed rather than `unknown`, as the document action is: the composer
+  // hands back editor JSON, and the action validates it again at the boundary.
+  readonly body: RichTextDocument;
 }): Promise<WriteState> {
   return run(
     (context) =>
@@ -76,7 +82,7 @@ export async function postComment(input: {
 
 export async function editComment(
   commentId: string,
-  body: unknown,
+  body: RichTextDocument,
 ): Promise<WriteState> {
   return run(
     (context) => callAction(context, "comments.update", { commentId, body }),
@@ -122,4 +128,38 @@ export async function toggleReaction(
       });
     }
   }, "comments.actions.failedToChangeTheReaction");
+}
+
+/**
+ * Who `@` offers in a comment, by name (docs/design/guided-inputs.md §4.7).
+ *
+ * People and guests who are active: a mention tells the person named, and
+ * an agent, a placeholder or somebody suspended would be told nothing. Eight
+ * at most, because a list longer than a glance is a search that has not
+ * narrowed yet. The directory read is the one the people page uses, so it
+ * shows nobody the reader could not already see.
+ */
+export async function searchMentionable(
+  query: string,
+): Promise<readonly { readonly id: string; readonly label: string }[]> {
+  const { session, workspace } = await requireWorkspace();
+  const people = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "people.directory",
+    {},
+  );
+  const needle = query.trim().toLowerCase();
+  return people
+    .filter(
+      (person) =>
+        person.status === "active" &&
+        (person.kind === "human" || person.kind === "guest") &&
+        person.name.toLowerCase().includes(needle),
+    )
+    .slice(0, 8)
+    .map((person) => ({ id: person.id, label: person.name }));
 }

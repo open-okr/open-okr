@@ -4,6 +4,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateRangeInput,
   type MessageValues,
 } from "@openokr/ui";
 import Link from "next/link";
@@ -232,23 +233,12 @@ export default async function InitiativesPage({
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                  {t("initiatives.starts")}
-                  <input
-                    type="date"
-                    name="startsOn"
-                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                  {t("initiatives.ends")}
-                  <input
-                    type="date"
-                    name="endsOn"
-                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
+                <DateRangeInput
+                  startLabel={t("initiatives.starts")}
+                  endLabel={t("initiatives.ends")}
+                  startName="startsOn"
+                  endName="endsOn"
+                />
               </div>
 
               <button

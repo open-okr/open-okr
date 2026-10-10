@@ -1,5 +1,13 @@
 import { ACCESS_LEVELS, callAction, RHYTHM_ASSIST_KEYS } from "@openokr/core";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  NumberInput,
+  UnitInput,
+} from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { assistOffered } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
@@ -283,15 +291,24 @@ export default async function KpisPage({
                     <option value="quarterly">{t("common.quarterly")}</option>
                     <option value="yearly">{t("common.yearly")}</option>
                   </select>
-                  <label className="text-xs text-ink-3" htmlFor="targetDefault">
-                    {t("common.standingTarget")}
-                  </label>
-                  <input
+                </div>
+                {/* guided-inputs §4.8: the target as a number, and the unit
+                    it is measured in, which the form did not ask for. */}
+                <div className="flex flex-wrap items-end gap-2.5">
+                  <NumberInput
                     id="targetDefault"
+                    label={t("common.standingTarget")}
                     name="targetDefault"
-                    type="number"
-                    step="any"
-                    className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+                    inputClassName="h-auto w-24 py-1 text-xs"
+                  />
+                  <UnitInput
+                    id="kpi-unit"
+                    label={t("kpis.unit")}
+                    name="unit"
+                    known={grid.kpis.flatMap((kpi) =>
+                      kpi.unit ? [kpi.unit] : [],
+                    )}
+                    inputClassName="h-auto w-28 py-1 text-xs"
                   />
                 </div>
                 <JudgedBy idPrefix="add" />

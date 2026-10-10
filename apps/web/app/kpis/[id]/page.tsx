@@ -255,6 +255,7 @@ export default async function KpiDetailPage({
               <input type="hidden" name="kpiId" value={kpi.id} />
               <JudgedBy
                 idPrefix="edit"
+                unit={kpi.unit}
                 initial={{
                   targetType: kpi.targetType,
                   greenLow: kpi.greenLow,

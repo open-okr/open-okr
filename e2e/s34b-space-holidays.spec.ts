@@ -137,12 +137,15 @@ test("acceptance: marking the week it is due in moves the check-in past it", asy
   await expect(card).toBeVisible({ timeout: 15_000 });
   await expect(card).toContainText("No holidays marked.");
 
-  // Nothing ends before it starts.
+  // Nothing ends before it starts, and the end says so under itself.
   await card.getByLabel("From").fill(addDays(dueOn, 3));
   await card.getByLabel("To").fill(dueOn);
   await expect(
     card.getByRole("button", { name: "Mark the holiday" }),
   ).toBeDisabled();
+  await expect(card.getByRole("alert")).toHaveText(
+    `Ends before it starts. Pick a date on or after ${addDays(dueOn, 3)}.`,
+  );
 
   // The whole week the check-in is due in, Monday to Sunday.
   const day = new Date(`${dueOn}T00:00:00Z`).getUTCDay();

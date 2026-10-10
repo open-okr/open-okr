@@ -22,6 +22,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -235,17 +236,11 @@ export function ProcessHealthPanel({
                     ))}
                   </select>
                 </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs text-ink-3">
-                    {t("session.detail.processHealth.byWhen")}
-                  </span>
-                  <input
-                    type="date"
-                    value={actionDue}
-                    onChange={(event) => setActionDue(event.target.value)}
-                    className="rounded-md border border-line bg-surface p-1.5 text-sm text-ink"
-                  />
-                </label>
+                <DateInput
+                  label={t("session.detail.processHealth.byWhen")}
+                  value={actionDue}
+                  onValueChange={(next) => setActionDue(next ?? "")}
+                />
                 <Button
                   type="button"
                   size="sm"

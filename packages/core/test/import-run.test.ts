@@ -360,6 +360,40 @@ describe("a second entity, against the rows the first one wrote", () => {
     expect(await count("key_results")).toBe(1);
   });
 
+  it("keeps a weight above 100 as 100, as it always has, though the action now refuses one", async () => {
+    // guided-inputs §4.8 bounds weight at the action. An import records what
+    // the source held, so the template clamps first, as the FlowyTeam
+    // connector does, rather than skipping the row.
+    await runImport({
+      pool,
+      workspaceId,
+      userId: OWNER,
+      entity: "goals",
+      file: await fileWith("goals.csv", GOALS_CSV),
+      dryRun: false,
+    });
+    const result = await runImport({
+      pool,
+      workspaceId,
+      userId: OWNER,
+      entity: "key-results",
+      file: await fileWith(
+        "krs.csv",
+        [
+          "Key result ID,Objective,Key result,Direction,Baseline,Target,Weight",
+          "kr-1,obj-1,Weekly active teams,increase,10,40,150",
+        ].join("\n"),
+      ),
+      dryRun: false,
+    });
+    expect(result.report.created).toBe(1);
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ weight: string }>(
+      "select weight from key_results",
+    );
+    expect(Number(rows[0]?.weight)).toBe(100);
+  });
+
   /**
    * Found by the mixed spreadsheet-plus-company test at P6-T04d.
    *
@@ -413,5 +447,51 @@ describe("a second entity, against the rows the first one wrote", () => {
       )
     ).rows;
     expect(goal?.champion).toBe(member?.id);
+  });
+
+  it("keeps the start of an initiative that ends before it, and says so in both runs", async () => {
+    await callAction(
+      { pool, workspaceId, actor: { kind: "human", userId: OWNER } },
+      "spaces.create",
+      { name: "Platform" },
+    );
+    const file = await fileWith(
+      "initiatives.csv",
+      [
+        "ID,Initiative,Space,Owner,Start,End",
+        `in-1,Ends before it starts,Platform,${OWNER_EMAIL},2026-03-01,2026-02-01`,
+        `in-2,In the right order,Platform,${OWNER_EMAIL},2026-03-01,2026-04-01`,
+      ].join("\n"),
+    );
+    const note =
+      "endsOn, 2026-02-01, is before startsOn, 2026-03-01. Imported with the start and no end date.";
+
+    for (const dryRun of [true, false]) {
+      const { report } = await runImport({
+        pool,
+        workspaceId,
+        userId: OWNER,
+        entity: "initiatives",
+        file,
+        dryRun,
+      });
+      expect(report.skipped).toBe(0);
+      expect(report.rows.map((row) => row.notes ?? [])).toEqual([[note], []]);
+    }
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      legacy_id: string;
+      starts_on: string | null;
+      ends_on: string | null;
+    }>(
+      `select legacy_id, to_char(starts_on, 'YYYY-MM-DD') as starts_on,
+              to_char(ends_on, 'YYYY-MM-DD') as ends_on
+         from initiatives order by legacy_id`,
+    );
+    expect(rows).toEqual([
+      { legacy_id: "in-1", starts_on: "2026-03-01", ends_on: null },
+      { legacy_id: "in-2", starts_on: "2026-03-01", ends_on: "2026-04-01" },
+    ]);
   });
 });

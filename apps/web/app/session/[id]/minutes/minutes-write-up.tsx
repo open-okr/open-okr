@@ -6,12 +6,19 @@
  *
  * `sessions.draftMinutes` was built at P4-T15c "on the minutes screen" and the
  * minutes screen never called it. The generated minutes below are the record
- * and are untouched. The draft arrives in an editable field, and only "Save as
- * a draft document" keeps it, as a document on the session that is private to
- * the person who saved it until they publish it. Nothing is written by the
- * model on its own.
+ * and are untouched. The draft arrives in the full editor (guided-inputs
+ * §4.7), since what it becomes is a document, and only "Save as a draft
+ * document" keeps it, as a document on the session that is private to the
+ * person who saved it until they publish it. Nothing is written by the model
+ * on its own.
  */
-import { Button, Chip, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  Chip,
+  isBlankDocument,
+  RichTextEditor,
+  useTranslations,
+} from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -27,7 +34,10 @@ export function MinutesWriteUp({
 }) {
   const { t } = useTranslations();
   const [pending, start] = useTransition();
-  const [text, setText] = useState<string | null>(null);
+  // The draft as it arrived, which the editor opens on, and what is in the
+  // editor now. Null before anything was drafted.
+  const [draft, setDraft] = useState<unknown>(null);
+  const [written, setWritten] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
@@ -44,7 +54,7 @@ export function MinutesWriteUp({
             {t("session.detail.minutes.writeUp.openIt")}
           </Link>
         </p>
-      ) : text === null ? (
+      ) : draft === null ? (
         <Button
           type="button"
           variant="ai"
@@ -57,7 +67,8 @@ export function MinutesWriteUp({
               try {
                 const drafted = await draftMinutesAction(sessionId);
                 if (drafted) {
-                  setText(drafted.narrative);
+                  setDraft(drafted.document);
+                  setWritten(drafted.document);
                 } else {
                   setNotice(t("assists.reading.nothingThisTime"));
                 }
@@ -80,37 +91,34 @@ export function MinutesWriteUp({
               {t("session.detail.minutes.writeUp.editBeforeSaving")}
             </span>
           </span>
-          <label className="sr-only" htmlFor="minutes-write-up-text">
-            {t("session.detail.minutes.writeUp.heading")}
-          </label>
-          <textarea
-            id="minutes-write-up-text"
-            value={text}
-            rows={10}
-            disabled={pending}
-            onChange={(event) => setText(event.target.value)}
-            className="rounded-md border border-line bg-surface p-2 text-sm text-ink"
-          />
+          <div className="rounded-md border border-line bg-surface p-2 text-sm text-ink focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
+            <RichTextEditor
+              label={t("session.detail.minutes.writeUp.heading")}
+              content={draft}
+              editable={!pending}
+              onUpdate={setWritten}
+            />
+          </div>
           <span className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="primary"
               size="sm"
-              disabled={pending || text.trim() === ""}
+              disabled={pending || isBlankDocument(written)}
               onClick={() => {
                 setNotice(null);
                 start(async () => {
                   const result = await saveMinutesWriteUpAction(
                     sessionId,
                     t("session.detail.minutes.writeUp.titleOf", { title }),
-                    text,
+                    written,
                   );
                   if ("error" in result) {
                     setNotice(result.error);
                     return;
                   }
                   setSaved(result.documentId);
-                  setText(null);
+                  setDraft(null);
                 });
               }}
             >
@@ -121,7 +129,7 @@ export function MinutesWriteUp({
               variant="ghost"
               size="sm"
               disabled={pending}
-              onClick={() => setText(null)}
+              onClick={() => setDraft(null)}
             >
               {t("common.dismiss")}
             </Button>

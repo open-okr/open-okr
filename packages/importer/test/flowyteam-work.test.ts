@@ -131,6 +131,30 @@ describe.skipIf(!runnable)("importing one company's work", () => {
     ).toContain('"archived"');
   });
 
+  it("keeps the start of a project whose deadline is before it, and says so", async () => {
+    const preview = await run(false);
+    const said = (report: typeof preview.report) =>
+      domain(report, "initiatives")
+        ?.flags.filter((row) => row.source === "projects:3")
+        .map((row) => row.reason)
+        .join(" | ");
+    expect(said(preview.report)).toContain(
+      "The source's deadline, 2026-02-15, is before its start, 2026-04-01.",
+    );
+
+    const { report } = await run(true);
+    expect(said(report)).toContain("Imported with the start and no end date.");
+    const [initiative] = await rows<{
+      starts_on: string | null;
+      ends_on: string | null;
+    }>(
+      `select to_char(starts_on, 'YYYY-MM-DD') as starts_on,
+              to_char(ends_on, 'YYYY-MM-DD') as ends_on
+         from initiatives where legacy_id = 'projects:3'`,
+    );
+    expect(initiative).toEqual({ starts_on: "2026-04-01", ends_on: null });
+  });
+
   it("acceptance: the status comes from the board column, then from the task", async () => {
     await run(true);
     const tasks = await rows<{ legacy_id: string; status: string }>(

@@ -530,10 +530,19 @@ function RowTable({ report }: { readonly report: ReportView }) {
                     })}
                   </span>
                 ) : (
-                  <span className="text-ink-2">
+                  <span className="flex flex-col gap-0.5 text-ink-2">
                     {row.outcome === "created"
                       ? t("admin.imports.wizard.created")
                       : t("admin.imports.wizard.updated")}
+                    {(row.notes ?? []).map((note) => (
+                      <span
+                        key={note}
+                        className="text-warn"
+                        data-testid="import-row-note"
+                      >
+                        {note}
+                      </span>
+                    ))}
                   </span>
                 )}
               </td>

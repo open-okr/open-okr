@@ -82,19 +82,18 @@ describe("the picture", () => {
 });
 
 describe("the bio", () => {
-  test("is written in the shared rich text editor", () => {
-    expect(form).toContain("<RichTextEditor");
+  test("is written in the compact rich text field", () => {
+    expect(form).toContain("<RichTextField");
+    expect(form).toContain('name="bio"');
     expect(form).toContain("content={bio ?? null}");
     expect(formText).toContain("Empty it and save to remove your bio.");
   });
 
   test("is sent only once it has been edited, so a timezone change versions nothing", () => {
-    expect(form).toContain(
-      "onUpdate={(json) => setEditedBio(JSON.stringify(json))}",
-    );
-    expect(form).toMatch(
-      /editedBio === null \? null : \(\s*<input type="hidden" name="bio"/,
-    );
+    // The field submits nothing until it is edited, which
+    // `packages/ui/test/rich-text-toolbar.test.tsx` proves of the field
+    // itself; the form adds no bio input of its own beside it.
+    expect(form).not.toMatch(/<input type="hidden" name="bio"/);
   });
 });
 

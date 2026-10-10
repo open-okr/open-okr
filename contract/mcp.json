@@ -314,11 +314,11 @@
                 "properties": {
                   "start": {
                     "type": "string",
-                    "pattern": "^\\d{1,2}:\\d{2}$"
+                    "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                   },
                   "end": {
                     "type": "string",
-                    "pattern": "^\\d{1,2}:\\d{2}$"
+                    "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                   }
                 },
                 "required": [
@@ -2463,7 +2463,7 @@
           },
           "dailySummaryTime": {
             "type": "string",
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
           },
           "routing": {
             "type": "object",
@@ -7871,7 +7871,8 @@
             ]
           },
           "dueOn": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "assigneeIds": {
             "maxItems": 20,
@@ -7947,9 +7948,14 @@
             ]
           },
           "dueOn": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "initiativeId": {
@@ -8401,10 +8407,12 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "startsOn": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "endsOn": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "status": {
             "type": "string",
@@ -8500,15 +8508,25 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "startsOn": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "endsOn": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "status": {
@@ -8915,7 +8933,9 @@
           },
           "weight": {
             "default": 1,
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "contributionStatement": {
             "type": "string",
@@ -8997,7 +9017,9 @@
             ]
           },
           "weight": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "contributionStatement": {
             "anyOf": [
@@ -9432,7 +9454,9 @@
           },
           "weight": {
             "default": 1,
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "kpiId": {
             "type": "string",
@@ -9585,7 +9609,9 @@
             ]
           },
           "weight": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "capacity": {
             "anyOf": [
@@ -9798,7 +9824,9 @@
                 ]
               },
               "weight": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
               },
               "championId": {
                 "type": "string",
@@ -9897,7 +9925,9 @@
                 ]
               },
               "weight": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
               },
               "kind": {
                 "type": "string",
@@ -12925,7 +12955,7 @@
           },
           "time": {
             "type": "string",
-            "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$"
+            "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
           },
           "facilitatorId": {
             "type": "string",

@@ -8,14 +8,11 @@
  * editor replaces the textarea when the goal surfaces land at P3-T10; what it
  * cannot replace is the refusal, which stays on the server.
  */
-import {
-  callAction,
-  isBlankText,
-  OperationError,
-  richTextFromPlainText,
-} from "@openokr/core";
+import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { formNumber } from "../../lib/form-number";
+import { readRichTextField } from "../../lib/rich-text-form";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
@@ -100,13 +97,29 @@ export async function publishCheckIn(
   formData: FormData,
 ): Promise<WriteState> {
   const id = String(formData.get("checkInId") ?? "");
-  const narrative = String(formData.get("narrative") ?? "");
+  // The composer's narrative is the compact editor's document since
+  // guided-inputs §4.7, so what was written bold stays bold.
+  const narrative = readRichTextField(formData, "narrative");
 
-  if (isBlankText(narrative)) {
+  if (narrative.state !== "document") {
     // The same refusal the action makes, said before the round trip so it lands
     // beside the empty field.
     const { t } = await getTranslations();
-    return { error: t("checkIn.actions.needsANarrative") };
+    return {
+      error:
+        narrative.state === "malformed"
+          ? t("checkIn.actions.narrativeUnreadable")
+          : t("checkIn.actions.needsANarrative"),
+    };
+  }
+
+  // An emptied confidence posts nothing (guided-inputs §4.8), and
+  // `Number("")` is 0, so reading it as a number recorded a confidence of 0
+  // nobody gave. A check-in carries one, so an empty one is said in words.
+  const confidence = formNumber(formData, "confidence");
+  if (!Number.isFinite(confidence)) {
+    const { t } = await getTranslations();
+    return { error: t("checkIn.actions.confidenceNeeded") };
   }
 
   return run((context) =>
@@ -116,8 +129,8 @@ export async function publishCheckIn(
         | "on_track"
         | "caution"
         | "off_track",
-      confidence: Number(formData.get("confidence") ?? 0.5),
-      narrative: richTextFromPlainText(narrative),
+      confidence,
+      narrative: narrative.document,
       values: composerValues(formData),
     }),
   );
@@ -128,7 +141,17 @@ export async function editCheckIn(
   formData: FormData,
 ): Promise<WriteState> {
   const id = String(formData.get("checkInId") ?? "");
-  const narrative = String(formData.get("narrative") ?? "");
+  // Left untouched, the narrative is not sent and stays as it was; emptied,
+  // it stays too, since a check-in needs one.
+  const narrative = readRichTextField(formData, "narrative");
+  if (narrative.state === "malformed") {
+    const { t } = await getTranslations();
+    return { error: t("checkIn.actions.narrativeUnreadable") };
+  }
+
+  // Emptied, the confidence is not sent and stays as it was, as the
+  // narrative does; `Number("")` would have recorded 0.
+  const confidence = formNumber(formData, "confidence");
 
   return run((context) =>
     callAction(context, "goals.editCheckIn", {
@@ -137,10 +160,10 @@ export async function editCheckIn(
         | "on_track"
         | "caution"
         | "off_track",
-      confidence: Number(formData.get("confidence") ?? 0.5),
-      ...(isBlankText(narrative)
-        ? {}
-        : { narrative: richTextFromPlainText(narrative) }),
+      ...(Number.isFinite(confidence) ? { confidence } : {}),
+      ...(narrative.state === "document"
+        ? { narrative: narrative.document }
+        : {}),
       values: composerValues(formData),
     }),
   );
@@ -169,10 +192,11 @@ export async function castVote(
   formData: FormData,
 ): Promise<WriteState> {
   const keyResultId = String(formData.get("keyResultId") ?? "");
-  const confidence = Number(formData.get("confidence"));
+  // `formNumber`, because `Number("")` is 0 and an empty field voted 0.
+  const confidence = formNumber(formData, "confidence");
   if (!Number.isFinite(confidence)) {
     const { t } = await getTranslations();
-    return { error: t("checkIn.actions.voteBetweenZeroAndOne") };
+    return { error: t("checkIn.actions.confidenceNeeded") };
   }
   return run((context) =>
     callAction(context, "goals.vote", { keyResultId, confidence }),

@@ -6,6 +6,7 @@
  * (§3) — nothing pulled in from `@tiptap/starter-kit` that is not on that
  * list.
  */
+import { richTextLength } from "@openokr/formats";
 import {
   Table,
   TableCell,
@@ -20,7 +21,10 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useState,
 } from "react";
+import { useTranslations } from "../i18n/use-translations.tsx";
+import { cn } from "../lib/cn.ts";
 import { Attachment } from "./attachment-node.ts";
 import {
   createEntityLinkExtension,
@@ -28,6 +32,8 @@ import {
   type MentionSearchResult,
 } from "./mention-extensions.ts";
 import { SlashMenu } from "./slash-menu.ts";
+import { EditorToolbar, LINK_HREF } from "./toolbar.tsx";
+import { ReadOnlyUnderline } from "./underline.ts";
 
 export interface UploadedFile {
   readonly blobId: string;
@@ -39,9 +45,26 @@ export interface RichTextEditorProps {
    * serious accessibility finding. The placeholder is not a name: it
    * disappears the moment somebody types. */
   readonly label: string;
+  /**
+   * `compact` for the prose people write for each other (a comment, a
+   * narrative, a bio): a toolbar of simple formats and no slash menu.
+   * `full`, the default, is the document editor as it was
+   * (docs/design/guided-inputs.md §4.7).
+   */
+  readonly variant?: "compact" | "full";
   readonly content?: unknown;
   readonly placeholder?: string;
   readonly editable?: boolean;
+  /**
+   * The most characters the field takes, counted the way the server counts
+   * (`richTextLength` in `@openokr/formats`). Near it the field says how much
+   * is used, and past it how much to take out: an editor cannot refuse a
+   * keystroke the way `maxLength` does, so it says so instead.
+   */
+  readonly maxCharacters?: number;
+  /** Puts the caret at the end once the editor is made: for a field that has
+   * just been given text the person is now to edit. */
+  readonly autoFocus?: boolean;
   readonly onUpdate?: (json: unknown) => void;
   /** `packages/ui` cannot import `packages/core`'s `parseRichText`
    * (TECHNICAL-PLAN §1's own package table) — a host wires the real
@@ -70,6 +93,20 @@ export interface RichTextEditorHandle {
   getJSON(): unknown;
 }
 
+/**
+ * The editor's document as plain JSON.
+ *
+ * ProseMirror builds every node's and mark's attributes with
+ * `Object.create(null)`, and React's server action encoder cannot send an
+ * object with no prototype: it sends a placeholder the server reads as
+ * nothing, so a heading arrived as `attrs: "$T"` and the document was refused
+ * as invalid. A link's address and a mention's id went the same way. Every
+ * document this component hands out goes through here first.
+ */
+function plainJSON(json: unknown): unknown {
+  return JSON.parse(JSON.stringify(json));
+}
+
 const NO_SEARCH_RESULTS: readonly MentionSearchResult[] = [];
 
 async function noSearch(): Promise<readonly MentionSearchResult[]> {
@@ -82,9 +119,12 @@ export const RichTextEditor = forwardRef<
 >(function RichTextEditor(
   {
     label,
+    variant = "full",
     content,
     placeholder,
     editable = true,
+    maxCharacters,
+    autoFocus = false,
     onUpdate,
     validate,
     searchMembers,
@@ -93,6 +133,7 @@ export const RichTextEditor = forwardRef<
   },
   ref,
 ) {
+  const [length, setLength] = useState(() => richTextLength(content));
   const extensions = useMemo(
     () => [
       StarterKit.configure({
@@ -105,7 +146,7 @@ export const RichTextEditor = forwardRef<
         link: {
           protocols: ["http", "https", "mailto"],
           openOnClick: false,
-          validate: (href: string) => /^(https?:|mailto:)/.test(href),
+          validate: (href: string) => LINK_HREF.test(href),
         },
       }),
       Table.configure({ resizable: false }),
@@ -115,15 +156,19 @@ export const RichTextEditor = forwardRef<
       Attachment,
       createMemberMentionExtension(searchMembers ?? noSearch),
       createEntityLinkExtension(searchEntities ?? noSearch),
-      SlashMenu,
+      ReadOnlyUnderline,
+      // A heading or a table in a comment is a document's job, so the menu
+      // that makes them is the full editor's only.
+      ...(variant === "full" ? [SlashMenu] : []),
     ],
-    [searchMembers, searchEntities],
+    [searchMembers, searchEntities, variant],
   );
 
   const editor = useEditor({
     extensions,
     content: content as never,
     editable,
+    autofocus: autoFocus ? "end" : false,
     // TipTap would append its base rules as an inline <style>, which the
     // Content-Security-Policy refuses in production. The same rules ship in
     // `styles/prosemirror.css` instead (completeness review L-22).
@@ -162,7 +207,8 @@ export const RichTextEditor = forwardRef<
       },
     },
     onUpdate: ({ editor: current }) => {
-      const json = current.getJSON();
+      const json = plainJSON(current.getJSON());
+      setLength(richTextLength(json));
       if (validate) {
         validate(json);
       }
@@ -171,6 +217,14 @@ export const RichTextEditor = forwardRef<
   });
 
   useEffect(() => () => editor?.destroy(), [editor]);
+
+  // `useEditor` reads `editable` once, when it makes the editor. A row that
+  // is set aside after that has to stop taking text too.
+  useEffect(() => {
+    if (editor && editor.isEditable !== editable) {
+      editor.setEditable(editable);
+    }
+  }, [editor, editable]);
 
   const hasUploadsInProgress = useCallback(() => {
     if (!editor) {
@@ -192,18 +246,60 @@ export const RichTextEditor = forwardRef<
     ref,
     () => ({
       hasUploadsInProgress,
-      getJSON: () => editor?.getJSON(),
+      getJSON: () => (editor ? plainJSON(editor.getJSON()) : undefined),
     }),
     [editor, hasUploadsInProgress],
   );
 
-  return (
+  const surface = (
     <EditorContent
       editor={editor}
-      className="prose prose-sm max-w-none text-ink focus:outline-none"
+      className="rich-text text-ink focus:outline-none"
     />
   );
+  const counter =
+    maxCharacters !== undefined && length >= Math.ceil(maxCharacters * 0.8) ? (
+      <LengthCounter length={length} max={maxCharacters} />
+    ) : null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      {editor && editable ? (
+        <EditorToolbar editor={editor} blocks={variant === "full"} />
+      ) : null}
+      {surface}
+      {counter}
+    </div>
+  );
 });
+
+/**
+ * How much of a length limit is used, once it is close, and how much to take
+ * out once it is passed. Its own component so that only a field with a limit
+ * needs the translations, as `TextInput`'s counter does.
+ */
+function LengthCounter({
+  length,
+  max,
+}: {
+  readonly length: number;
+  readonly max: number;
+}) {
+  const { t } = useTranslations();
+  const over = length - max;
+  return (
+    <p
+      className={cn(
+        "text-xs",
+        over > 0 ? "font-medium text-bad" : "text-ink-3",
+      )}
+      aria-live="polite"
+    >
+      {over > 0
+        ? t("fields.counterOver", { used: length, max, over })
+        : t("fields.counter", { used: length, max })}
+    </p>
+  );
+}
 
 /**
  * §7's upload flow, steps 2-4: an `attachment` node appears immediately

@@ -1,15 +1,23 @@
-import { callAction, OperationError } from "@openokr/core";
-import { Button, Card, CardBody } from "@openokr/ui";
-import { revalidatePath } from "next/cache";
-import { getPool } from "../../../lib/auth";
-import { getTranslations } from "../../../lib/translations";
-import { requireWorkspace } from "../../../lib/workspace";
+"use client";
+
+import {
+  Button,
+  Card,
+  CardBody,
+  TimezoneSelect,
+  useTranslations,
+} from "@openokr/ui";
+import { type FormEvent, startTransition, useActionState } from "react";
+import { submitGeneral } from "./actions.ts";
+import { NOTHING_SAVED } from "./general-state.ts";
 
 /**
  * The general admin card (screen S-36, P2-T08): timezone, language and
- * trusted email domains, one save for the whole card. A refusal fails quietly
- * rather than rendering a stack trace, the same tradeoff
- * `rename-workspace.tsx` already makes.
+ * trusted email domains, one save for the whole card.
+ *
+ * **A refusal is said on the card.** It used to fail quietly, and a mistyped
+ * timezone or domain sent the administrator to the error page instead. The
+ * save now hands back why, in words, beside the button that was pressed.
  *
  * **It really was a card, and it took until now to look like one.** P2-T08
  * left this as three `<p><label><br><input>` groups and two browser-default
@@ -18,9 +26,9 @@ import { requireWorkspace } from "../../../lib/workspace";
  * card directly below it has been drawn properly since P6-G25, which is what
  * made the difference obvious.
  *
- * **One form, two actions.** Reset is a second submit button carrying its own
- * `formAction` rather than a second `<form>`, because a form cannot nest
- * inside another and the two controls belong on one row.
+ * **One form, two buttons.** Save and Reset carry their own `intent` to one
+ * action, because a form cannot nest inside another and the two controls
+ * belong on one row.
  */
 
 const INPUT_CLASS =
@@ -29,64 +37,28 @@ const INPUT_CLASS =
 const LABEL_CLASS =
   "flex w-full max-w-sm flex-col gap-1 text-xs font-semibold text-ink-2";
 
-async function save(formData: FormData): Promise<void> {
-  "use server";
-  const { session, workspace } = await requireWorkspace();
-
-  const timezone = String(formData.get("timezone") ?? "").trim();
-  const language = String(formData.get("language") ?? "").trim();
-  const trustedEmailDomains = String(formData.get("trustedEmailDomains") ?? "")
-    .split(",")
-    .map((domain) => domain.trim())
-    .filter((domain) => domain.length > 0);
-
-  try {
-    await callAction(
-      {
-        pool: getPool(),
-        workspaceId: workspace.workspaceId,
-        actor: { kind: "human", userId: session.user.id },
-      },
-      "settings.updateWorkspaceGeneral",
-      {
-        timezone: timezone === "" ? undefined : timezone,
-        language: language === "" ? undefined : language,
-        trustedEmailDomains,
-        // A checkbox that is off sends nothing at all, so the absence is the
-        // value rather than a missing one (P8-T09).
-        requireSecondFactor: formData.get("requireSecondFactor") === "on",
-      },
-    );
-  } catch (error) {
-    if (!(error instanceof OperationError)) {
-      throw error;
-    }
-    return;
-  }
-  revalidatePath("/admin/general");
-}
-
-async function reset(): Promise<void> {
-  "use server";
-  const { session, workspace } = await requireWorkspace();
-  await callAction(
-    {
-      pool: getPool(),
-      workspaceId: workspace.workspaceId,
-      actor: { kind: "human", userId: session.user.id },
-    },
-    "settings.resetWorkspaceSettings",
-    { card: "general" },
-  );
-  revalidatePath("/admin/general");
-}
-
-export async function GeneralSettingsForm({
+export function GeneralSettingsForm({
   settings,
+  zones,
 }: {
   settings: Record<string, unknown>;
+  /** The server's own list, so the card offers only what it will accept. */
+  zones: readonly string[];
 }) {
-  const { t } = await getTranslations();
+  const { t } = useTranslations();
+  const [state, formAction, pending] = useActionState(
+    submitGeneral,
+    NOTHING_SAVED,
+  );
+
+  // Carries the pressed button's `intent`, which a FormData built from the
+  // form alone would leave out.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const data = new FormData(event.currentTarget, submitter);
+    startTransition(() => formAction(data));
+  };
 
   const trustedEmailDomains = Array.isArray(settings.trustedEmailDomains)
     ? (settings.trustedEmailDomains as string[]).join(", ")
@@ -95,16 +67,30 @@ export async function GeneralSettingsForm({
   return (
     <Card>
       <CardBody>
-        <form action={save} className="flex flex-col gap-3">
-          <label htmlFor="timezone" className={LABEL_CLASS}>
-            {t("common.timezone")}
-            <input
-              id="timezone"
+        <form
+          // Keyed on what is stored, so a save or a reset shows the new
+          // values, while a refused save keeps what was typed to be corrected.
+          key={JSON.stringify([
+            settings.timezone,
+            settings.language,
+            settings.trustedEmailDomains,
+            settings.requireSecondFactor,
+          ])}
+          action={formAction}
+          onSubmit={submit}
+          aria-busy={pending}
+          className="flex flex-col gap-3"
+        >
+          <div className="w-full max-w-sm">
+            <TimezoneSelect
+              label={t("common.timezone")}
               name="timezone"
-              defaultValue={String(settings.timezone ?? "")}
-              className={INPUT_CLASS}
+              zones={zones}
+              defaultValue={
+                typeof settings.timezone === "string" ? settings.timezone : null
+              }
             />
-          </label>
+          </div>
           <label htmlFor="language" className={LABEL_CLASS}>
             {t("admin.general.generalSettingsForm.language")}
             {/* A picker of the catalogues that exist, not a text box that
@@ -166,11 +152,35 @@ export async function GeneralSettingsForm({
               {t("admin.general.generalSettingsForm.requireSecondFactorHint")}
             </p>
           </div>
+          {state.error === null ? null : (
+            <p role="alert" className="max-w-sm text-xs font-medium text-bad">
+              {state.error}
+            </p>
+          )}
+          {state.saved === null ? null : (
+            <p role="status" className="max-w-sm text-xs text-ink-2">
+              {state.saved}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-3">
-            <Button type="submit" variant="primary" size="sm">
+            <Button
+              type="submit"
+              name="intent"
+              value="save"
+              variant="primary"
+              size="sm"
+              disabled={pending}
+            >
               {t("common.save")}
             </Button>
-            <Button type="submit" formAction={reset} variant="ghost" size="sm">
+            <Button
+              type="submit"
+              name="intent"
+              value="reset"
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+            >
               {t("common.resetToDefaults")}
             </Button>
           </div>

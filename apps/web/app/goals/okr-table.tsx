@@ -6,6 +6,7 @@ import {
   Bar,
   Button,
   Chip,
+  formatConfidence,
   useIsMutating,
   useQueryClient,
   useTranslations,
@@ -27,6 +28,7 @@ import {
   useOkrMutation,
   useOkrTree,
 } from "../../lib/okr-tree/use-okr-tree.ts";
+import { unitsInUse } from "../../lib/units-in-use.ts";
 import { addKeyResult, addObjective } from "./editor-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
@@ -36,6 +38,7 @@ import {
   InlineDate,
   InlineNumber,
   InlineText,
+  InlineUnit,
   KeyResultKindPicker,
   KindControl,
   MemberPicker,
@@ -308,6 +311,7 @@ function LiveOkrTable({
   // for the server rather than for the row, which moves before it answers.
   const saving = useIsMutating() > 0 || pending;
   const goals = filterGoals(tree.goals, filters);
+  const units = unitsInUse(tree.goals);
   const problem = okr.problem;
 
   useEffect(() => {
@@ -504,6 +508,8 @@ function LiveOkrTable({
                         t("okrList.moveKeyResult", { title: keyResult.title }),
                       )}
                       keyResult={keyResult}
+                      units={units}
+                      cycle={tree.cycle}
                       onOpen={() =>
                         drawer.open(goal.id, { keyResultId: keyResult.id })
                       }
@@ -811,6 +817,8 @@ function KeyResultRow({
   members,
   coach,
   mover,
+  units,
+  cycle,
 }: {
   readonly keyResult: OkrGoal["keyResults"][number];
   readonly onOpen: () => void;
@@ -821,6 +829,10 @@ function KeyResultRow({
   readonly members: readonly Person[];
   readonly coach: Coach;
   readonly mover: Mover | null;
+  /** The units the cycle already uses, for the unit cell to offer. */
+  readonly units: readonly string[];
+  /** The cycle's dates, which a due date outside of is warned about. */
+  readonly cycle: { readonly startsOn: string; readonly endsOn: string };
 }) {
   const { t } = useTranslations();
   const cells = useKeyResultCells(keyResult, okr, coach);
@@ -875,6 +887,7 @@ function KeyResultRow({
                 value={keyResult.dueOn}
                 label={t("okrList.dueOf", { title: keyResult.title })}
                 readOnly={!canEdit}
+                cycle={cycle}
                 onSave={(dueOn) => patch({ dueOn }, { dueOn: keyResult.dueOn })}
               />
             </span>
@@ -923,11 +936,11 @@ function KeyResultRow({
                 readOnly={!canEdit}
                 onSave={cells.saveTarget}
               />
-              <InlineText
+              <InlineUnit
                 value={keyResult.unit ?? ""}
                 label={t("okrList.unitOf", { title: keyResult.title })}
                 readOnly={!canEdit}
-                allowEmpty
+                known={units}
                 placeholder={t("okrList.unit")}
                 onSave={(unit) =>
                   patch(
@@ -971,9 +984,11 @@ function KeyResultRow({
         <span className="hidden text-xs tabular-nums text-ink-3 md:block">
           {keyResult.confidence === null
             ? t("okrList.noConfidence")
-            : t("okrList.confidence", {
-                value: String(Math.round(keyResult.confidence * 10)),
-              })}
+            : formatConfidence(
+                keyResult.confidence,
+                coach.practice["confidence.display"],
+                t,
+              )}
         </span>
 
         <RowActions

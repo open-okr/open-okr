@@ -24,6 +24,7 @@
  * actions call in the same transaction (P3-T05). A goal created here reads 0% and
  * `pending`, and stays that way until something moves.
  */
+
 import {
   activeOnly,
   type CapacityVerdict,
@@ -46,6 +47,7 @@ import {
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
+import { WEIGHT_MAX, WEIGHT_MIN } from "@openokr/method";
 import { desc, eq, isNull } from "drizzle-orm";
 import {
   bindGroup,
@@ -81,7 +83,7 @@ export const asNumber = (value: string | number | null): number | null => {
 
 /** §4.1: weight is clamped on write, never rejected. 0 means "does not count". */
 export const clampWeight = (weight: number): number =>
-  Math.min(100, Math.max(0, weight));
+  Math.min(WEIGHT_MAX, Math.max(WEIGHT_MIN, weight));
 
 export interface CreateGoalInput {
   readonly workspaceId: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, TimeInput, useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
 import type { LinkResult } from "./link-state.ts";
 
@@ -28,6 +28,7 @@ export function CadenceForm({
   settings,
   reasons,
   channels,
+  timezone,
 }: {
   readonly action: (
     previous: LinkResult | null,
@@ -43,6 +44,8 @@ export function CadenceForm({
   /** Each reason and the words for it, in registry order. */
   readonly reasons: readonly { readonly id: string; readonly label: string }[];
   readonly channels: readonly { readonly id: string; readonly label: string }[];
+  /** The member's own zone, which the summary's hour is read in. */
+  readonly timezone: string;
 }) {
   const { t } = useTranslations();
 
@@ -99,20 +102,14 @@ export function CadenceForm({
           <span>{t("account.channels.cadenceForm.sendMeASummary")}</span>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          <span>{t("account.channels.cadenceForm.at")}</span>
-          <span className="flex items-center gap-2">
-            <input
-              type="time"
-              name="dailySummaryTime"
-              defaultValue={settings.dailySummaryTime}
-              className="w-28 rounded-md border border-line bg-surface px-2 py-1 text-sm"
-            />
-            <span className="text-xs text-ink-3">
-              {t("account.channels.cadenceForm.inYourOwnTimezone")}
-            </span>
-          </span>
-        </label>
+        <TimeInput
+          label={t("account.channels.cadenceForm.at")}
+          name="dailySummaryTime"
+          defaultValue={settings.dailySummaryTime}
+          description={t("account.channels.cadenceForm.inYourOwnTimezone", {
+            timezone,
+          })}
+        />
       </div>
 
       <fieldset className="flex flex-col gap-2 rounded-lg border border-line p-3">

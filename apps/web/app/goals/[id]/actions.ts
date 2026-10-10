@@ -3,10 +3,9 @@
 /**
  * A goal's own writes (P3-T04).
  *
- * The close form collects the retrospective as plain text and it becomes editor
- * JSON through the one shared constructor. Storage is always editor JSON, never
- * Markdown, and a textarea is still a reasonable way to collect prose before the
- * TipTap editor is wired into this screen at P3-T10.
+ * The close form's retrospective is the compact editor's document
+ * (docs/design/guided-inputs.md §4.7), so what was written bold stays bold.
+ * Storage is always editor JSON, never Markdown.
  */
 import {
   callAction,
@@ -18,6 +17,7 @@ import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
 import { formNumber } from "../../../lib/form-number";
+import { readRichTextField } from "../../../lib/rich-text-form.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
@@ -83,13 +83,18 @@ export async function closeGoal(
   formData: FormData,
 ): Promise<WriteState> {
   const id = String(formData.get("id") ?? "");
-  const body = String(formData.get("retrospective") ?? "");
+  const retrospective = readRichTextField(formData, "retrospective");
 
-  if (isBlankText(body)) {
+  if (retrospective.state !== "document") {
     // The same refusal the action makes, said before the round trip so the
     // person reads it beside the field they left empty.
     const { t } = await getTranslations();
-    return { error: t("goals.detail.actions.closingNeedsARetrospective") };
+    return {
+      error:
+        retrospective.state === "malformed"
+          ? t("goals.detail.actions.retrospectiveUnreadable")
+          : t("goals.detail.actions.closingNeedsARetrospective"),
+    };
   }
 
   return run(id, (context) =>
@@ -106,7 +111,7 @@ export async function closeGoal(
         | "abandon",
       closeReason:
         String(formData.get("closeReason") ?? "").trim() || undefined,
-      retrospectiveBody: richTextFromPlainText(body),
+      retrospectiveBody: retrospective.document,
     }),
   );
 }

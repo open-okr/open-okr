@@ -116,6 +116,9 @@ export function render(report: RunReport, runId: string): string {
     if (row.outcome === "skipped") {
       lines.push(`  line ${row.line}: skipped. ${row.reason}`);
     }
+    for (const note of row.notes ?? []) {
+      lines.push(`  line ${row.line}: ${row.outcome}. ${note}`);
+    }
   }
   lines.push(`Run ${runId}.`);
   return lines.join("\n");

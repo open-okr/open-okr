@@ -42,6 +42,37 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => undefined, push: () => undefined }),
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
+// The narrative is written in the compact editor, which is ProseMirror, and
+// jsdom cannot type into it. A plain box stands in that hands the drawer the
+// document the editor would, so the claims here stay about the drawer; typing
+// and formatting in the real editor is `e2e/s15-check-in-publish.spec.ts`.
+vi.mock("@openokr/ui", async (original) => ({
+  ...(await original<typeof import("@openokr/ui")>()),
+  RichTextEditor: ({
+    label,
+    onUpdate,
+  }: {
+    label: string;
+    onUpdate?: (json: unknown) => void;
+  }) => (
+    <textarea
+      aria-label={label}
+      onChange={(event) =>
+        onUpdate?.({
+          type: "doc",
+          content: [
+            event.target.value === ""
+              ? { type: "paragraph" }
+              : {
+                  type: "paragraph",
+                  content: [{ type: "text", text: event.target.value }],
+                },
+          ],
+        })
+      }
+    />
+  ),
+}));
 
 class Quiet {
   onmessage = null;
@@ -511,7 +542,7 @@ describe("checking in", () => {
       address: "?okr=g&tab=check-in",
       keyResults: [keyResult({ kind: "milestone" })],
     });
-    expect(inDrawer(`Value for ${KR} in this check-in`)).toBeNull();
+    expect(inDrawer(`Value for ${KR} in this check-in (%)`)).toBeNull();
     const done = inDrawer(`${KR} is done`) as HTMLInputElement;
     await act(async () => done.click());
     await fill(
@@ -535,7 +566,7 @@ describe("checking in", () => {
       ],
     });
     await fill(
-      inDrawer(`Value for ${KR} in this check-in`) as HTMLInputElement,
+      inDrawer(`Value for ${KR} in this check-in (%)`) as HTMLInputElement,
       "0",
     );
     await fill(
@@ -556,14 +587,14 @@ describe("checking in", () => {
     const floor = () =>
       drawer()?.querySelector('[data-testid="committed-floor"]') ?? null;
     await fill(
-      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      inDrawer(`Confidence in ${KR} (in 10)`) as HTMLInputElement,
       "4",
     );
     expect(floor()?.textContent).toBe(
       "A commitment nobody believes in is a risk. Escalate now, or make it aspirational",
     );
     await fill(
-      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      inDrawer(`Confidence in ${KR} (in 10)`) as HTMLInputElement,
       "7",
     );
     expect(floor()).toBeNull();
@@ -572,7 +603,7 @@ describe("checking in", () => {
   test("an aspirational key result at the same confidence is told nothing", async () => {
     await render({ address: "?okr=g&tab=check-in" });
     await fill(
-      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      inDrawer(`Confidence in ${KR} (in 10)`) as HTMLInputElement,
       "4",
     );
     expect(
@@ -596,11 +627,11 @@ describe("checking in", () => {
     // The last check-in said caution, so that is where the status starts.
     expect(form()?.querySelector("select")?.value).toBe("caution");
     await fill(
-      inDrawer(`Value for ${KR} in this check-in`) as HTMLInputElement,
+      inDrawer(`Value for ${KR} in this check-in (%)`) as HTMLInputElement,
       "40",
     );
     await fill(
-      inDrawer(`Confidence in ${KR}, out of 10`) as HTMLInputElement,
+      inDrawer(`Confidence in ${KR} (in 10)`) as HTMLInputElement,
       "7",
     );
     await fill(
@@ -613,7 +644,20 @@ describe("checking in", () => {
       id: "g",
       status: "caution",
       confidence: 0.5,
-      narrative: "The guide is back and activation moved again.",
+      narrative: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "The guide is back and activation moved again.",
+              },
+            ],
+          },
+        ],
+      },
       values: [{ keyResultId: "k", value: 40, confidence: 0.7 }],
     });
     expect(new URLSearchParams(window.location.search).get("tab")).toBe(

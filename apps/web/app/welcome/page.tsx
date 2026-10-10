@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { listTimezones } from "@openokr/formats";
 import { redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
@@ -58,6 +59,7 @@ export default async function WelcomePage() {
       <Wizard
         workspaceName={workspace.name}
         timezone={String(read.settings.timezone ?? "UTC")}
+        zones={listTimezones()}
         frequency={rhythm.defaultCheckInFrequency}
       />
     </main>

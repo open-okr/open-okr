@@ -1,12 +1,18 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  CodeInput,
+  EmailInput,
+  SecretInput,
+  useTranslations,
+} from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { useInstanceName } from "../../../lib/instance-name-context";
-import { AuthCard, Field, FormError } from "../auth-card";
+import { AuthCard, FormError } from "../auth-card";
 
 interface SSOProvider {
   id: string;
@@ -149,14 +155,18 @@ export default function SignInPage() {
     router.push("/");
   };
 
-  const verify = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  // Called by the code field once its sixth digit is in, and by Verify.
+  // A wrong code empties the cells, so the next attempt starts at the first.
+  const verify = async (entered: string) => {
     setError("");
     setPending(true);
-    const { error: failure } = await authClient.twoFactor.verifyTotp({ code });
+    const { error: failure } = await authClient.twoFactor.verifyTotp({
+      code: entered,
+    });
     setPending(false);
 
     if (failure) {
+      setCode("");
       setError(t("auth.signIn.thatCodeWasNotRight"));
       return;
     }
@@ -179,21 +189,33 @@ export default function SignInPage() {
         title={t("auth.signIn.enterYourCode")}
         description={t("auth.signIn.openYourAuthenticatorApp")}
       >
-        <form onSubmit={verify} className="flex flex-col gap-3">
-          <Field
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            verify(code);
+          }}
+          className="flex flex-col gap-3"
+        >
+          <CodeInput
             label={t("auth.signIn.sixDigitCode")}
-            name="code"
-            inputMode="numeric"
+            groups={[6]}
+            characters="digits"
             autoComplete="one-time-code"
-            required
+            autoFocus
             value={code}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={setCode}
+            onComplete={verify}
+            busy={pending}
+            error={error || null}
           />
-          <Button type="submit" variant="primary" disabled={pending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={pending || code.length < 6}
+          >
             {pending ? t("auth.signIn.checking") : t("auth.signIn.verify")}
           </Button>
         </form>
-        <FormError>{error}</FormError>
         <p className="text-sm text-ink-3">
           {t("auth.signIn.lostYourPhoneUse")}{" "}
           <Link
@@ -230,10 +252,9 @@ export default function SignInPage() {
       }
     >
       <form onSubmit={signIn} className="flex flex-col gap-3">
-        <Field
+        <EmailInput
           label={t("people.detail.profileForm.email")}
           name="email"
-          type="email"
           autoComplete="username webauthn"
           required
           onBlur={(event) => {
@@ -243,10 +264,9 @@ export default function SignInPage() {
             }
           }}
         />
-        <Field
+        <SecretInput
           label={t("auth.signIn.password")}
           name="password"
-          type="password"
           autoComplete="current-password"
           required
         />

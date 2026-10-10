@@ -1,5 +1,11 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  DateTimeInput,
+  TimeInput,
+} from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
@@ -156,21 +162,15 @@ export async function ScheduleSessions({
                     ))}
                   </select>
                 </label>
-                <label className={LABEL}>
-                  {t("sessions.schedule.time")}
-                  <input
-                    type="time"
-                    name="time"
-                    required
-                    defaultValue="09:00"
-                    className={FIELD}
-                  />
-                </label>
+                <TimeInput
+                  label={t("sessions.schedule.time")}
+                  name="time"
+                  required
+                  defaultValue="09:00"
+                  description={t("sessions.schedule.inTimezone", { timezone })}
+                />
               </div>
               {facilitatorField}
-              <p className="text-xs text-ink-4">
-                {t("sessions.schedule.inTimezone", { timezone })}
-              </p>
               <button
                 type="submit"
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
@@ -225,19 +225,15 @@ export async function ScheduleSessions({
                 className={FIELD}
               />
             </label>
-            <label className={LABEL}>
-              {t("sessions.schedule.when")}
-              <input
-                type="datetime-local"
-                name="scheduledFor"
-                required
-                className={FIELD}
-              />
-            </label>
+            {/* The local time alone: the action reads a time with no offset
+                in the workspace's zone, which is the one named here. */}
+            <DateTimeInput
+              label={t("sessions.schedule.when")}
+              name="scheduledFor"
+              required
+              timeZone={timezone}
+            />
             {facilitatorField}
-            <p className="text-xs text-ink-4">
-              {t("sessions.schedule.inTimezone", { timezone })}
-            </p>
             <button
               type="submit"
               className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"

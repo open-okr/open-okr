@@ -95,8 +95,8 @@ test("drafting names the KPI, and the key result starts where it stands", async 
   await form
     .getByLabel("Measured by")
     .selectOption({ label: `Read from ${KPI}` });
-  await form.getByRole("spinbutton", { name: "Baseline" }).fill("40");
-  await form.getByRole("spinbutton", { name: "Target" }).fill("200");
+  await form.getByRole("textbox", { name: "Baseline" }).fill("40");
+  await form.getByRole("textbox", { name: "Target" }).fill("200");
   await form.getByRole("button", { name: "Add key result" }).click();
 
   await expect(page.getByText(READ_FROM_KPI, { exact: true })).toBeVisible({
@@ -114,8 +114,8 @@ test("a second key result, measured by hand", async () => {
   });
   await form.getByRole("textbox", { name: "The key result" }).fill(BY_HAND);
   await form.getByLabel("Direction").selectOption("reduce");
-  await form.getByRole("spinbutton", { name: "Baseline" }).fill("9");
-  await form.getByRole("spinbutton", { name: "Target" }).fill("3");
+  await form.getByRole("textbox", { name: "Baseline" }).fill("9");
+  await form.getByRole("textbox", { name: "Target" }).fill("3");
   await form.getByRole("button", { name: "Add key result" }).click();
   await expect(page.getByText(BY_HAND, { exact: true })).toBeVisible({
     timeout: 15_000,

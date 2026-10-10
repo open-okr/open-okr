@@ -1,12 +1,17 @@
-import { excerptRichText } from "@openokr/core";
 import {
   Button,
   Card,
   CardBody,
   CardHeader,
   Chip,
+  type ConfidenceDisplay,
+  ConfidenceInput,
+  formatConfidence,
   type MessageValues,
+  RichTextField,
+  RichTextView,
 } from "@openokr/ui";
+import { richTextHtml } from "../../lib/rich-text-html.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledgeCheckIn, deleteCheckIn, editCheckIn } from "./actions.ts";
@@ -70,12 +75,17 @@ function difference(value: number, previous: number | null): string {
 function byline(
   t: (key: string, values?: MessageValues) => string,
   entry: TimelineCheckIn,
+  display: ConfidenceDisplay,
 ): string {
   const name = entry.author.name;
   const date = entry.publishedAt
     ? new Date(entry.publishedAt).toLocaleDateString()
     : null;
-  const confidence = entry.confidence;
+  // On the workspace's own scale (guided-inputs §4.8), "7 in 10" by default.
+  const confidence =
+    entry.confidence === null
+      ? null
+      : formatConfidence(entry.confidence, display, t);
   if (date !== null && confidence !== null) {
     return t("checkIn.timeline.bylineDateConfidence", {
       name,
@@ -95,9 +105,12 @@ function byline(
 export async function Timeline({
   checkIns,
   canEdit,
+  display,
 }: {
   readonly checkIns: readonly TimelineCheckIn[];
   readonly canEdit: boolean;
+  /** The workspace's "Confidence shown as" (METHOD.md §12). */
+  readonly display: ConfidenceDisplay;
 }) {
   const { t } = await getTranslations();
 
@@ -134,7 +147,9 @@ export async function Timeline({
                           ? t("common.offTrack")
                           : ""}
                   </Chip>
-                  <span className="text-xs text-ink-3">{byline(t, entry)}</span>
+                  <span className="text-xs text-ink-3">
+                    {byline(t, entry, display)}
+                  </span>
                 </span>
                 {entry.acknowledgedAt ? (
                   <Chip tone="ok">{t("checkIn.timeline.acknowledged")}</Chip>
@@ -145,10 +160,10 @@ export async function Timeline({
                 )}
               </header>
 
-              <p className="text-sm text-ink-2">
-                {excerptRichText(entry.narrative as never, 2000) ||
-                  t("checkIn.timeline.noNarrativeRecorded")}
-              </p>
+              <Narrative
+                document={entry.narrative}
+                empty={t("checkIn.timeline.noNarrativeRecorded")}
+              />
 
               {entry.entries.length > 0 ? (
                 <ul className="flex flex-col gap-0.5">
@@ -224,34 +239,29 @@ export async function Timeline({
                     <option value="caution">{t("common.caution")}</option>
                     <option value="off_track">{t("common.offTrack")}</option>
                   </select>
-                  <label
-                    className="sr-only"
-                    htmlFor={`edit-confidence-${entry.id}`}
-                  >
-                    {t("common.confidence")}
-                  </label>
-                  <input
+                  {/* The slider this replaces never showed its value.
+                      Emptied, the confidence is kept as it was. */}
+                  <ConfidenceInput
                     id={`edit-confidence-${entry.id}`}
+                    label={t("common.confidence")}
+                    hideLabel
                     name="confidence"
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
                     defaultValue={entry.confidence ?? 0.5}
-                    className="w-28"
+                    display={display}
                   />
-                  <label
-                    className="sr-only"
-                    htmlFor={`edit-narrative-${entry.id}`}
-                  >
-                    {t("checkIn.timeline.replaceTheNarrative")}
-                  </label>
-                  <input
-                    id={`edit-narrative-${entry.id}`}
-                    name="narrative"
-                    placeholder={t("checkIn.timeline.leaveBlankToKeep")}
-                    className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink placeholder:text-ink-4"
-                  />
+                  {/* The stored narrative itself, in the compact editor
+                      (guided-inputs §4.7). The one-line box this replaced
+                      could only overwrite a narrative of several paragraphs
+                      with one line of plain text. Untouched, it is not sent
+                      and the narrative stays as it was. */}
+                  <div className="w-full">
+                    <RichTextField
+                      label={t("checkIn.timeline.narrative")}
+                      name="narrative"
+                      content={entry.narrative}
+                      description={t("checkIn.timeline.keptIfUntouched")}
+                    />
+                  </div>
                   <Button
                     type="submit"
                     variant="ghost"
@@ -274,4 +284,24 @@ export async function Timeline({
       </CardBody>
     </Card>
   );
+}
+
+/**
+ * The narrative as it was written, formatting and all (guided-inputs §4.7),
+ * since the card is where a check-in is read in full. Rendered on the server
+ * through core's one renderer, so a narrative that arrived through an
+ * importer or a channel is shown as safely as one typed here.
+ */
+function Narrative({
+  document,
+  empty,
+}: {
+  readonly document: unknown;
+  readonly empty: string;
+}) {
+  const html = richTextHtml(document);
+  if (html === null) {
+    return <p className="text-sm text-ink-3 italic">{empty}</p>;
+  }
+  return <RichTextView html={html} className="text-sm text-ink-2" />;
 }

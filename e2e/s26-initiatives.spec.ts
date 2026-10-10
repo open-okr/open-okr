@@ -97,6 +97,40 @@ test("adding one puts it in the list with its owner and its space", async () => 
   await expect(row).toContainText("not yet behind a key result");
 });
 
+/**
+ * guided-inputs §4.9: the two dates are one range. The end says when it is
+ * before the start, and a save leaves the form empty for the next row rather
+ * than holding the last one's dates.
+ */
+test("its dates are one range, and the form is empty again after a save", async () => {
+  const dated = "Move the help centre";
+  await goTo(page, "/initiatives");
+  await page.getByLabel("What work is this").fill(dated);
+  const starts = page.getByLabel("Starts", { exact: true });
+  const ends = page.getByLabel("Ends", { exact: true });
+  await starts.fill("2026-11-09");
+  await ends.fill("2026-11-02");
+  await expect(
+    page.getByText("Ends before it starts. Pick a date on or after 2026-11-09."),
+  ).toBeVisible();
+
+  await ends.fill("2026-12-18");
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(
+    page.getByTestId("initiative").filter({ hasText: dated }),
+  ).toBeVisible({ timeout: 15_000 });
+  const { rows } = await pool.query<{ starts: string; ends: string }>(
+    `select to_char(starts_on, 'YYYY-MM-DD') as starts,
+            to_char(ends_on, 'YYYY-MM-DD') as ends
+       from initiatives
+      where workspace_id = $1 and title = $2 and deleted_at is null`,
+    [workspaceId, dated],
+  );
+  expect(rows).toEqual([{ starts: "2026-11-09", ends: "2026-12-18" }]);
+  await expect(starts).toHaveValue("");
+  await expect(ends).toHaveValue("");
+});
+
 test("the capacity select saves from the row itself", async () => {
   const row = page.getByTestId("initiative").filter({ hasText: TITLE });
   await row.getByLabel(`Capacity of ${TITLE}`).selectOption("exceeds");
@@ -124,7 +158,8 @@ test("linking it to a key result is done from the initiative itself", async () =
   const picker = page.getByLabel("Key result to link");
   await expect(picker).toBeVisible({ timeout: 10_000 });
   await picker.selectOption({ index: 0 });
-  await page.getByRole("button", { name: "Link" }).click();
+  // Exact: the comment editor's toolbar on this page has "Insert link".
+  await page.getByRole("button", { name: "Link", exact: true }).click();
 
   await expect(page.getByTestId("linked-key-results")).toBeVisible({
     timeout: 15_000,
@@ -272,13 +307,19 @@ test("the initiative carries documents and a discussion", async () => {
   const thread = page.getByTestId("comment-thread");
   await expect(thread).toBeVisible();
 
+  // The composer is the compact editor since guided-inputs §4.7, found by
+  // its name. The posted comment is looked for among the posted ones: the
+  // editor holds the same text until the post lands, so the thread as a whole
+  // would contain it before anything was saved.
   await thread
-    .getByPlaceholder("Write a comment...")
+    .getByRole("textbox", { name: "Your comment" })
     .fill("The flow needs a second designer.");
   await thread.getByRole("button", { name: "Post" }).click();
-  await expect(thread).toContainText("The flow needs a second designer.", {
-    timeout: 15_000,
-  });
+  await expect(
+    thread
+      .locator('[id^="comment-"]')
+      .filter({ hasText: "The flow needs a second designer." }),
+  ).toBeVisible({ timeout: 15_000 });
 
   await expect(async () => {
     const { rows } = await pool.query<{ subject_type: string }>(

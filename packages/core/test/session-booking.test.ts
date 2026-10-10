@@ -155,6 +155,28 @@ describe("booking the whole cycle", () => {
     expect(of("quarterly")[0]?.title).toBe("Quarterly review");
   });
 
+  it("takes 9:30 as people write it, and refuses a time no clock shows", async () => {
+    await call("sessions.bookCycle", {
+      spaceId,
+      cycleId,
+      weekday: 1,
+      time: "9:30",
+      facilitatorId: ownerMemberId,
+    });
+    expect(new Set((await booked()).map((row) => row.at))).toEqual(
+      new Set(["09:30"]),
+    );
+    await expect(
+      call("sessions.bookCycle", {
+        spaceId,
+        cycleId,
+        weekday: 1,
+        time: "24:00",
+        facilitatorId: ownerMemberId,
+      }),
+    ).rejects.toThrow("Give the time as HH:MM, from 00:00 to 23:59.");
+  });
+
   it("books nothing the second time", async () => {
     const input = {
       spaceId,

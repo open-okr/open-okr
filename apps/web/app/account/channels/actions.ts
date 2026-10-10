@@ -4,6 +4,7 @@ import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getInstanceName } from "../../../lib/instance-name";
 import { getPool } from "../../../lib/pool";
+import { quietHoursFromForm } from "../../../lib/quiet-hours";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { LinkResult } from "./link-state.ts";
@@ -98,7 +99,8 @@ export async function unlink(
  *
  * A blank window clears it rather than storing two equal times, which
  * `insideQuietHours` treats as no window anyway: somebody who typed the same
- * time twice meant to switch it off.
+ * time twice meant to switch it off. One time without the other is refused,
+ * because reading it as "off" deleted a window somebody had half edited.
  */
 export async function saveDelivery(
   _previous: LinkResult | null,
@@ -106,8 +108,14 @@ export async function saveDelivery(
 ): Promise<LinkResult> {
   const { t } = await getTranslations();
   const primaryChannel = String(form.get("primaryChannel") ?? "");
-  const start = String(form.get("quietStart") ?? "").trim();
-  const end = String(form.get("quietEnd") ?? "").trim();
+  const quietHours = quietHoursFromForm(form);
+  if (!quietHours.ok) {
+    return {
+      ok: false,
+      code: null,
+      message: t("common.quietHoursNeedBothTimes"),
+    };
+  }
 
   try {
     // Only what the form actually submitted. A disabled radio sends nothing,
@@ -126,7 +134,9 @@ export async function saveDelivery(
               | "telegram",
           }
         : {}),
-      quietHours: start && end ? { start, end } : null,
+      ...(quietHours.value !== undefined
+        ? { quietHours: quietHours.value }
+        : {}),
     });
   } catch (error) {
     return {

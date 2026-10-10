@@ -21,6 +21,7 @@ import {
   KEY_RESULT_DIRECTIONS,
   KEY_RESULT_KINDS,
 } from "@openokr/db";
+import { clampWeight } from "../../goals/service.ts";
 import { asDay, asEnum, asNumber, asText } from "./coerce.ts";
 import type { EntityTemplate, PlanContext, RowPlan } from "./types.ts";
 
@@ -159,10 +160,13 @@ export const keyResultsTemplate: EntityTemplate = {
       values.currentValue === undefined || values.currentValue === ""
         ? undefined
         : asNumber("currentValue", values.currentValue);
+    // The action refuses a weight outside 0 to 100 (guided-inputs §4.8). An
+    // import records the source, so it clamps as the write always did rather
+    // than skipping the row, the way the FlowyTeam connector does.
     const weight =
       values.weight === undefined || values.weight === ""
         ? undefined
-        : asNumber("weight", values.weight);
+        : clampWeight(asNumber("weight", values.weight));
     const dueOn = values.dueOn ? asDay("dueOn", values.dueOn) : undefined;
     const ownerId = values.owner
       ? await references.member(values.owner)

@@ -51,6 +51,7 @@ const MARK_TAG_BY_TYPE: Readonly<Record<string, string>> = {
   italic: "em",
   code: "code",
   strike: "s",
+  underline: "u",
 };
 
 function wrapMarks(inner: string, marks: readonly Mark[] | undefined): string {

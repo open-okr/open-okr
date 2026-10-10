@@ -8,13 +8,17 @@
  * row. The rules themselves live in `packages/config/src/boundaries.ts`,
  * where they are unit tested.
  */
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   type BoundarySourceFile,
   checkBoundaries,
 } from "../packages/config/src/boundaries.ts";
+import {
+  compareRawFields,
+  countRawFields,
+} from "../packages/config/src/raw-fields.ts";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -110,24 +114,76 @@ if (guardedTables.size === 0) {
 
 const violations = checkBoundaries(sources, { guardedTables });
 
-if (violations.length > 0) {
+/**
+ * The raw-field ratchet (docs/design/guided-inputs.md §6). Every screen file
+ * in `apps/web` may draw as many raw `<input>`, `<textarea>` and `<select>`
+ * elements as the baseline says, and the baseline only goes down.
+ */
+const FIELD_BASELINE = join(repoRoot, "scripts/raw-fields-baseline.json");
+const fieldCounts = new Map<string, number>();
+for (const source of sources) {
+  if (source.path.startsWith("apps/web/") && source.path.endsWith(".tsx")) {
+    const count = countRawFields(source.text);
+    if (count > 0) {
+      fieldCounts.set(source.path, count);
+    }
+  }
+}
+const baselineText = await readFile(FIELD_BASELINE, "utf8").catch(() => null);
+const fieldBaseline = JSON.parse(baselineText ?? "{}") as Record<string, number>;
+const fieldFindings = compareRawFields(fieldCounts, fieldBaseline);
+
+if (process.argv.includes("--update-field-baseline")) {
+  // The first baseline is whatever the tree holds. Every later one may only
+  // be lower, file by file.
+  const raised = (baselineText === null ? [] : fieldFindings).filter(
+    (finding) => (fieldCounts.get(finding.path) ?? 0) > (fieldBaseline[finding.path] ?? 0),
+  );
+  if (raised.length > 0) {
+    process.stderr.write(
+      [
+        "The field baseline only goes down. These files draw more raw fields than it allows:",
+        ...raised.map((finding) => `  ${finding.path} ${finding.message}`),
+        "",
+      ].join("\n"),
+    );
+    process.exit(1);
+  }
+  const entries = [...fieldCounts.entries()].sort(([a], [b]) => a.localeCompare(b));
+  await writeFile(
+    FIELD_BASELINE,
+    `${JSON.stringify(Object.fromEntries(entries), null, 2)}\n`,
+  );
+  process.stdout.write(
+    `Field baseline written: ${entries.length} file(s), ${entries.reduce((sum, [, n]) => sum + n, 0)} raw field(s).\n`,
+  );
+  process.exit(0);
+}
+
+if (violations.length > 0 || fieldFindings.length > 0) {
   const lines = violations.map(
     (violation) =>
       `  ${violation.path}:${violation.line} [${violation.rule}] ${violation.message}`,
   );
+  const fieldLines = fieldFindings.map(
+    (finding) => `  ${finding.path} [raw-field] ${finding.message}`,
+  );
   process.stderr.write(
     [
-      `Boundary check failed. ${violations.length} violation(s):`,
+      `Boundary check failed. ${violations.length + fieldFindings.length} violation(s):`,
       ...lines,
+      ...fieldLines,
       "",
       "These boundaries are what keep the ports meaningful and side effects",
-      "atomic with their writes. See CLAUDE.md, hard rules.",
+      "atomic with their writes, and every field on the field kit. See",
+      "CLAUDE.md, hard rules, and docs/design/guided-inputs.md.",
       "",
     ].join("\n"),
   );
   process.exit(1);
 }
 
+const rawFields = [...fieldCounts.values()].reduce((sum, n) => sum + n, 0);
 process.stdout.write(
-  `Boundary check passed. ${sources.length} file(s) checked.\n`,
+  `Boundary check passed. ${sources.length} file(s) checked, and ${rawFields} raw field(s) in ${fieldCounts.size} screen file(s) are within the field-kit baseline.\n`,
 );

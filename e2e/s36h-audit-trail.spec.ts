@@ -148,3 +148,43 @@ test("a filter the trail has nothing for says so on the screen", async () => {
     { timeout: 15_000 },
   );
 });
+
+/**
+ * guided-inputs §4.9: the two dates are days in the workspace's zone, the
+ * one the rows are stamped in, rather than days in UTC.
+ */
+test("a day is the workspace's day, from its midnight to its next", async () => {
+  await goTo(page, "/admin/audit");
+  const said = page.getByText(/^Days run midnight to midnight in (.+), the zone/);
+  await expect(said).toBeVisible({ timeout: 15_000 });
+  const zone = /in (.+), the zone/.exec((await said.textContent()) ?? "")?.[1];
+  expect(zone).toBeTruthy();
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone as string,
+  }).format(new Date());
+
+  await page.getByLabel("From", { exact: true }).fill(today);
+  await page.getByLabel("To", { exact: true }).fill(today);
+  await page.getByLabel("Action").fill("audit.export");
+  await page.getByRole("button", { name: "Show matching rows" }).click();
+  // The exports this spec took were today, wherever the workspace is.
+  await expect(page.getByTestId("audit-row").first()).toContainText(
+    "audit.export",
+    { timeout: 15_000 },
+  );
+
+  // An end before the start is said under the end, before anything is sent.
+  const [year, month, day] = today.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  const yesterday = new Date(Date.UTC(year, month - 1, day - 1))
+    .toISOString()
+    .slice(0, 10);
+  await page.getByLabel("To", { exact: true }).fill(yesterday);
+  // By its text: Next.js's route announcer is an alert too.
+  await expect(
+    page.getByText(`Ends before it starts. Pick a date on or after ${today}.`),
+  ).toBeVisible();
+});

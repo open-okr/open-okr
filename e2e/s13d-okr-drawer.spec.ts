@@ -236,9 +236,12 @@ test("acceptance: checking in from the row moves its health, and the history sho
   const form = drawer().getByTestId("drawer-check-in");
   await expect(form).toBeVisible({ timeout: 15_000 });
   await form.getByLabel("Status", { exact: true }).selectOption("caution");
-  await form.getByLabel(`Confidence in ${KEY_RESULT}, out of 10`).fill("6");
+  await form.getByRole("textbox", { name: `Confidence in ${KEY_RESULT}` }).fill("6");
+  // The compact editor, a content-editable box named by its own label.
   await form
-    .getByLabel("What moved, what is in the way, what happens next")
+    .getByRole("textbox", {
+      name: "What moved, what is in the way, what happens next",
+    })
     .fill(NARRATIVE);
   await form.getByRole("button", { name: "Publish the check-in" }).click();
 
@@ -265,7 +268,7 @@ test("the goal page adds a key result, and a changed confidence there is a check
     timeout: 15_000,
   });
 
-  const confidence = main().getByLabel(`Confidence for ${KEY_RESULT}`);
+  const confidence = main().getByRole("textbox", { name: `Confidence for ${KEY_RESULT}` });
   await confidence.fill("4");
   // The status starts at what the last check-in said.
   await expect(
@@ -280,4 +283,22 @@ test("the goal page adds a key result, and a changed confidence there is a check
   // Published as a check-in, so the history has its line.
   await goTo(page, `/goals?okr=${id}&tab=history`);
   await expect(drawer()).toContainText(LINE, { timeout: 15_000 });
+});
+
+test("the goal page holds a weight to 0 to 100, as the server does", async () => {
+  // guided-inputs §4.8: a weight past 100 is brought back to it in the field,
+  // and the server refuses one outside the range rather than clamping it.
+  const id = await goalId(OBJECTIVE);
+  await goTo(page, `/goals/${id}`);
+  const weight = main().getByRole("textbox", { name: "Weight", exact: true });
+  await weight.fill("150");
+  await weight.press("Tab");
+  await expect(weight).toHaveValue("100");
+  await weight.press("Enter");
+  await expect(async () => {
+    await page.reload();
+    await expect(
+      main().getByRole("textbox", { name: "Weight", exact: true }),
+    ).toHaveValue("100", { timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
 });

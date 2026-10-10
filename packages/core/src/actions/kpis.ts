@@ -12,6 +12,7 @@
  * a KPI whose value nobody computes would read `no_data` forever with no way to
  * fix it.
  */
+
 import {
   activeOnly,
   goals,
@@ -32,6 +33,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { LOCAL_DATE_PATTERN } from "@openokr/formats";
 import {
   directionOfTargetType,
   KPI_TARGET_TYPES,
@@ -503,7 +505,7 @@ export const recordKpiValue = defineWriteAction({
   input: z.object({
     kpiId: z.uuid(),
     /** Any date inside the period. Normalised on the server, never by a client. */
-    on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    on: z.string().regex(LOCAL_DATE_PATTERN),
     actualValue: z.number().nullable().optional(),
     targetValue: z.number().nullable().optional(),
     remark: z.string().trim().max(500).nullable().optional(),
@@ -900,7 +902,7 @@ export const setKpiFormulaAction = defineWriteAction({
     /** The stored tree. Validated by the engine, never parsed from a string. */
     formula: z.unknown(),
     /** Any date inside the period to evaluate straight away. */
-    on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    on: z.string().regex(LOCAL_DATE_PATTERN),
   }),
   output: z.object({
     id: z.uuid(),

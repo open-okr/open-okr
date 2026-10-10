@@ -1,4 +1,6 @@
 import { createSiteMessage } from "@openokr/core";
+import { isKnownTimezone, localDateTimeInstant } from "@openokr/formats";
+import { DateTimeInput } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
@@ -17,6 +19,23 @@ import { getTranslations } from "../../../lib/translations";
  * page rendered ten minutes ago is not evidence that the person is still an
  * operator.
  */
+/**
+ * A time the form posted, as an instant. The control carries no zone, so the
+ * form posts the operator's own browser zone beside it (guided-inputs §4.9):
+ * read in the server's zone instead, a message set for 09:00 in Kuala Lumpur
+ * went up at 17:00 there. With no zone, which only a page that never ran its
+ * script sends, it is read as UTC rather than as wherever the server is.
+ */
+function instantFrom(formData: FormData, field: string): string {
+  const local = String(formData.get(field) ?? "");
+  const zone = String(formData.get(`${field}Zone`) ?? "");
+  const instant = localDateTimeInstant(
+    local,
+    zone !== "" && isKnownTimezone(zone) ? zone : "UTC",
+  );
+  return instant ? instant.toISOString() : local;
+}
+
 async function publish(formData: FormData): Promise<void> {
   "use server";
   const operator = await requireOperator();
@@ -30,8 +49,8 @@ async function publish(formData: FormData): Promise<void> {
     await createSiteMessage(getPool(), operator.userId, {
       body: String(formData.get("body") ?? ""),
       level: String(formData.get("level") ?? "info") as "info" | "warn" | "bad",
-      startsAt: String(formData.get("startsAt") ?? ""),
-      endsAt: String(formData.get("endsAt") ?? ""),
+      startsAt: instantFrom(formData, "startsAt"),
+      endsAt: instantFrom(formData, "endsAt"),
       targetWorkspaceIds: targets,
       dismissible: formData.get("dismissible") !== null,
     });
@@ -102,28 +121,20 @@ export async function SiteMessageForm({
             </option>
           </select>
         </div>
+        <DateTimeInput
+          label={t("operator.siteMessage.showsFrom")}
+          id="startsAt"
+          name="startsAt"
+          zoneName="startsAtZone"
+          required
+        />
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="startsAt">
-            {t("operator.siteMessage.showsFrom")}
-          </label>
-          <input
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
-            id="startsAt"
-            name="startsAt"
-            required
-            type="datetime-local"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="endsAt">
-            {t("operator.siteMessage.stopsAt")}
-          </label>
-          <input
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+          <DateTimeInput
+            label={t("operator.siteMessage.stopsAt")}
             id="endsAt"
             name="endsAt"
+            zoneName="endsAtZone"
             required
-            type="datetime-local"
           />
           {/* Said once, here, rather than left for somebody to meet as a
            * refusal after typing everything else. */}

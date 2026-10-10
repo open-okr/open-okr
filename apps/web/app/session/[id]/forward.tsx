@@ -36,6 +36,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -392,19 +393,13 @@ export function ForwardPanel({
                     ))}
                   </select>
                 </label>
-                <label className="flex flex-col gap-1" htmlFor="action-due">
-                  <span className="text-xs font-medium text-ink-3">
-                    {t("session.detail.forward.by")}
-                  </span>
-                  <input
-                    id="action-due"
-                    type="date"
-                    className="rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                    value={dueOn}
-                    disabled={pending}
-                    onChange={(event) => setDueOn(event.target.value)}
-                  />
-                </label>
+                <DateInput
+                  id="action-due"
+                  label={t("session.detail.forward.by")}
+                  value={dueOn}
+                  disabled={pending}
+                  onValueChange={(next) => setDueOn(next ?? "")}
+                />
                 <Button
                   type="button"
                   size="sm"

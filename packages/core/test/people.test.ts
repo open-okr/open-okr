@@ -1078,3 +1078,35 @@ describe("what erasure leaves behind (completeness review M-18)", () => {
     expect(mine.tables.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * A member's own timezone is one on the list the screen offers
+ * (docs/design/guided-inputs.md §4.6). The runtime accepts an abbreviation,
+ * an offset and a name in the wrong case, and each was stored as typed.
+ */
+describe("a member's own timezone", () => {
+  it.each(["UTC", "Asia/Kuala_Lumpur"])(
+    "accepts %s, which is listed",
+    (zone) => {
+      expect(updateOwnProfile.input.safeParse({ timezone: zone }).success).toBe(
+        true,
+      );
+    },
+  );
+
+  it("takes the spaces off a listed name", () => {
+    const result = updateOwnProfile.input.safeParse({
+      timezone: " Asia/Kuala_Lumpur ",
+    });
+    expect(result.success && result.data.timezone).toBe("Asia/Kuala_Lumpur");
+  });
+
+  it.each(["EST", "asia/kuala_lumpur", "+08:00", "US/Eastern"])(
+    "refuses %s, which the runtime resolves but the list does not hold",
+    (zone) => {
+      expect(updateOwnProfile.input.safeParse({ timezone: zone }).success).toBe(
+        false,
+      );
+    },
+  );
+});

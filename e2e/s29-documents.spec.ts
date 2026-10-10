@@ -124,7 +124,13 @@ const editor = () => page.locator(".ProseMirror").first();
 
 test("saving keeps the words without telling anybody", async () => {
   await editor().click();
-  await page.keyboard.type("First draft.");
+  // The full editor's toolbar (guided-inputs §4.7): the draft starts with a
+  // heading. Only the document's editor has one; a comment's does not.
+  await page.getByRole("button", { name: "Heading 2", exact: true }).click();
+  await expect(editor().locator("h2")).toHaveCount(1);
+  // Typed into the editor itself: the toolbar hands focus back a frame later,
+  // and keys pressed before then went to the button.
+  await editor().pressSequentially("First draft.");
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page.getByText("Saved. Not published yet.")).toBeVisible({
@@ -148,6 +154,7 @@ test("saving keeps the words without telling anybody", async () => {
     // And the words are really in the row, which is what the wrong selector
     // hid the first time this was written.
     expect(JSON.stringify(rows[0]?.body)).toContain("First draft.");
+    expect(JSON.stringify(rows[0]?.body)).toContain('"type":"heading"');
   }).toPass({ timeout: 15_000 });
 });
 
@@ -200,9 +207,17 @@ test("a published document carries a discussion and takes reactions", async () =
   await expect(thread).toBeVisible({ timeout: 15_000 });
   await expect(thread).toContainText("No comments yet");
 
-  await thread.getByPlaceholder("Write a comment...").fill("Ready for review.");
+  // The composer is the compact editor since guided-inputs §4.7, found by
+  // its name. The posted comment is looked for among the posted ones: the
+  // editor holds the same text until the post lands, so the thread as a whole
+  // would contain it before anything was saved.
+  await thread
+    .getByRole("textbox", { name: "Your comment" })
+    .fill("Ready for review.");
   await thread.getByRole("button", { name: "Post" }).click();
-  await expect(thread).toContainText("Ready for review.", { timeout: 15_000 });
+  await expect(
+    thread.locator('[id^="comment-"]').filter({ hasText: "Ready for review." }),
+  ).toBeVisible({ timeout: 15_000 });
 
   // A reaction on the document itself, above its thread.
   const reactions = page.getByTestId("subject-reactions");
@@ -219,6 +234,25 @@ test("a published document carries a discussion and takes reactions", async () =
     );
     expect(rows.map((row) => row.subject_type)).toEqual(["document"]);
   }).toPass({ timeout: 15_000 });
+});
+
+test("a comment keeps the formatting it was written with", async () => {
+  // The compact editor's toolbar (guided-inputs §4.7). The composer this
+  // replaced was a plain textarea that wrapped what was typed in one
+  // paragraph, so nothing written could be bold.
+  const thread = page.getByTestId("comment-thread");
+  const composer = thread.getByRole("textbox", { name: "Your comment" });
+  await composer.fill("Signed off by legal");
+  await composer.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await thread.getByRole("button", { name: "Bold" }).click();
+  await thread.getByRole("button", { name: "Post" }).click();
+
+  await expect(
+    thread
+      .locator('[id^="comment-"] strong')
+      .filter({ hasText: "Signed off by legal" }),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 test("the goal carries files beside its documents", async () => {

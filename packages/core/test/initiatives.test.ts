@@ -661,3 +661,59 @@ describe("initiative progress (P6-G28)", () => {
     expect(listed.map((task) => task.title)).toEqual(["Belongs to mine"]);
   });
 });
+
+describe("an initiative's dates (guided-inputs §4.9)", () => {
+  it("are calendar dates, as a key result's is, and nothing else", async () => {
+    await expect(createInitiative({ startsOn: "next month" })).rejects.toThrow(
+      "Give the date as YYYY-MM-DD.",
+    );
+    await expect(createInitiative({ endsOn: "2030/06/30" })).rejects.toThrow(
+      "Give the date as YYYY-MM-DD.",
+    );
+  });
+});
+
+describe("an initiative that ends before it starts (guided-inputs §4.9)", () => {
+  it("is refused, as leave and a holiday are, on creation and on a change", async () => {
+    await expect(
+      createInitiative({ startsOn: "2030-06-01", endsOn: "2030-05-31" }),
+    ).rejects.toThrow("An initiative ends on or after the day it starts.");
+    const initiative = await createInitiative({
+      startsOn: "2030-06-01",
+      endsOn: "2030-06-30",
+    });
+    // Measured against the start it already has.
+    await expect(
+      call("initiatives.update", { id: initiative.id, endsOn: "2030-05-01" }),
+    ).rejects.toThrow("An initiative ends on or after the day it starts.");
+    await call("initiatives.update", {
+      id: initiative.id,
+      endsOn: "2030-06-01",
+    });
+  });
+
+  it("is refused for an import too, so the importers leave the end out instead", async () => {
+    // The table has refused it since migration 0064
+    // (initiatives_window_check); an import keeps the start and reports the
+    // end it left out, which the import tests check.
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        {
+          pool: wb.appPool,
+          workspaceId,
+          actor: { kind: "human" as const, userId: OWNER },
+          bulk: true,
+        },
+        "initiatives.create",
+        {
+          spaceId,
+          title: "Imported with its deadline before its start",
+          ownerId: ownerMemberId,
+          startsOn: "2024-03-01",
+          endsOn: "2024-02-01",
+        },
+      ),
+    ).rejects.toThrow("An initiative ends on or after the day it starts.");
+  });
+});

@@ -1,12 +1,11 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, EmailInput, SecretInput, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { useInstanceName } from "../../../lib/instance-name-context";
 import { Field, FormError } from "../../(auth)/auth-card.tsx";
-import { PasswordField } from "../../(auth)/password-field.tsx";
 import { finishSetup } from "./actions";
 
 /**
@@ -94,26 +93,21 @@ export function SetupAccountForm() {
         required
       />
 
-      <Field
+      <EmailInput
         label={t("people.detail.profileForm.email")}
         name="email"
-        type="email"
-        autoComplete="email"
         required
       />
 
-      <div className="flex flex-col gap-1">
-        <PasswordField
-          label={t("setup.account.setupAccountForm.password")}
-          name="password"
-          autoComplete="new-password"
-          minLength={12}
-          required
-        />
-        <p className="text-xs text-ink-3">
-          {t("setup.account.setupAccountForm.atLeast12Characters")}
-        </p>
-      </div>
+      <SecretInput
+        label={t("setup.account.setupAccountForm.password")}
+        name="password"
+        autoComplete="new-password"
+        minLength={12}
+        maxLength={128}
+        required
+        description={t("setup.account.setupAccountForm.atLeast12Characters")}
+      />
 
       {/*
         The wizard is specified to offer demo data. There is none to offer

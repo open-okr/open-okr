@@ -18,10 +18,10 @@
 import {
   callAction,
   excerptRichText,
-  isBlankText,
   OperationError,
-  richTextFromPlainText,
+  type RichTextDocument,
 } from "@openokr/core";
+import { isBlankDocument } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../auth";
 import { getTranslations } from "../translations";
@@ -243,7 +243,8 @@ export type OkrMutation =
       readonly status: "on_track" | "caution" | "off_track";
       /** §3.2's own scale, nought to one. */
       readonly confidence: number;
-      readonly narrative: string;
+      /** The compact editor's document (guided-inputs §4.7). */
+      readonly narrative: RichTextDocument;
       readonly values: readonly {
         readonly keyResultId: string;
         readonly value?: number;
@@ -377,7 +378,7 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
         goalId: mutation.id,
         status: mutation.status,
         confidence: mutation.confidence,
-        narrative: richTextFromPlainText(mutation.narrative),
+        narrative: mutation.narrative,
         values: [...mutation.values],
       });
       return null;
@@ -387,7 +388,7 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
 export async function runOkrMutation(
   mutation: OkrMutation,
 ): Promise<OkrOutcome> {
-  if (mutation.kind === "checkIn" && isBlankText(mutation.narrative)) {
+  if (mutation.kind === "checkIn" && isBlankDocument(mutation.narrative)) {
     // The action stores an empty narrative as readily as a full one, so the
     // rule a check-in needs is said here, before the round trip, in the
     // composer's own words.

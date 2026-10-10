@@ -1,8 +1,8 @@
 "use client";
 
 import { type KpiFrequency, normalisePeriod } from "@openokr/method";
-import { useTranslations } from "@openokr/ui";
-import { useState, useTransition } from "react";
+import { NumberInput, useTranslations } from "@openokr/ui";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { recordCell } from "./actions.ts";
 
 /**
@@ -135,15 +135,14 @@ export function KpiGrid({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const commit = (kpiId: string, periodStart: string, raw: string): void => {
-    const text = raw.trim();
+  const commit = (
+    kpiId: string,
+    periodStart: string,
+    value: number | null,
+  ): void => {
     setError(null);
     startTransition(async () => {
-      const state = await recordCell(
-        kpiId,
-        periodStart,
-        text === "" ? null : Number(text),
-      );
+      const state = await recordCell(kpiId, periodStart, value);
       if (state.error) {
         setError(state.error);
       }
@@ -155,7 +154,7 @@ export function KpiGrid({
     event: React.KeyboardEvent<HTMLInputElement>,
     kpiId: string,
     periodStart: string,
-    original: string,
+    cell: { readonly commit: () => void; readonly revert: () => void },
   ): void => {
     const move = (rowDelta: number, columnDelta: number): void => {
       const rowIndex = kpis.findIndex((kpi) => kpi.id === kpiId);
@@ -171,12 +170,12 @@ export function KpiGrid({
     switch (event.key) {
       case "Enter":
         event.preventDefault();
-        commit(kpiId, periodStart, event.currentTarget.value);
+        cell.commit();
         move(1, 0);
         break;
       case "Escape":
         event.preventDefault();
-        event.currentTarget.value = original;
+        cell.revert();
         break;
       case "ArrowDown":
         event.preventDefault();
@@ -311,27 +310,19 @@ export function KpiGrid({
                               ·
                             </span>
                           ) : canEdit && !kpi.isCalculated ? (
-                            <input
+                            <GridCell
                               id={`cell-${kpi.id}-${column}`}
-                              defaultValue={original}
-                              inputMode="decimal"
-                              aria-label={t("kpis.grid.periodBeginning", {
+                              label={t("kpis.grid.periodBeginning", {
                                 title: kpi.title,
                                 period: column,
                               })}
-                              onKeyDown={(event) =>
-                                onKeyDown(event, kpi.id, column, original)
+                              original={actual}
+                              onCommit={(value) =>
+                                commit(kpi.id, column, value)
                               }
-                              onBlur={(event) => {
-                                if (event.currentTarget.value !== original) {
-                                  commit(
-                                    kpi.id,
-                                    column,
-                                    event.currentTarget.value,
-                                  );
-                                }
-                              }}
-                              className="w-16 bg-transparent px-1.5 py-1 text-right text-ink focus:outline focus:outline-2 focus:outline-brand-strong"
+                              onKeyDown={(event, cell) =>
+                                onKeyDown(event, kpi.id, column, cell)
+                              }
                             />
                           ) : (
                             <span className="block px-1.5 py-1 text-right text-ink-2">
@@ -354,5 +345,59 @@ export function KpiGrid({
           : t("kpis.grid.enterCommitsCalculatedReadOnly")}
       </p>
     </div>
+  );
+}
+
+/**
+ * One cell of the grid (guided-inputs §4.8): a `NumberInput`, so a value is
+ * grouped as the reader reads it and posted as the number, with the
+ * spreadsheet's own keys on top. The unit is the row's, so the cell does not
+ * repeat it. The arrows move between cells rather than
+ * step the value: the grid's handler runs first and takes them. A value is
+ * sent once, though Enter commits it and the blur that follows the move
+ * would too.
+ */
+function GridCell({
+  id,
+  label,
+  original,
+  onCommit,
+  onKeyDown,
+}: {
+  readonly id: string;
+  readonly label: string;
+  /** The recorded value, or null for none. */
+  readonly original: number | null;
+  readonly onCommit: (value: number | null) => void;
+  readonly onKeyDown: (
+    event: React.KeyboardEvent<HTMLInputElement>,
+    cell: { readonly commit: () => void; readonly revert: () => void },
+  ) => void;
+}) {
+  const [draft, setDraft] = useState<number | null>(original);
+  const sent = useRef<number | null>(original);
+  useEffect(() => {
+    setDraft(original);
+    sent.current = original;
+  }, [original]);
+  const commit = () => {
+    if (draft !== sent.current) {
+      sent.current = draft;
+      onCommit(draft);
+    }
+  };
+  return (
+    <NumberInput
+      id={id}
+      label={label}
+      hideLabel
+      value={draft}
+      onValueChange={setDraft}
+      onBlur={commit}
+      onKeyDown={(event) =>
+        onKeyDown(event, { commit, revert: () => setDraft(sent.current) })
+      }
+      inputClassName="h-auto w-16 border-0 bg-transparent px-1.5 py-1 text-right text-ink focus:outline focus:outline-2 focus:outline-brand-strong focus:ring-0"
+    />
   );
 }

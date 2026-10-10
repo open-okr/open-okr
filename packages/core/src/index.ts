@@ -1,8 +1,9 @@
 import { PACKAGE_NAME as DB } from "@openokr/db";
+import { PACKAGE_NAME as FORMATS } from "@openokr/formats";
 import { PACKAGE_NAME as METHOD } from "@openokr/method";
 
 export const PACKAGE_NAME = "@openokr/core";
-export const DEPENDS_ON = [DB, METHOD] as const;
+export const DEPENDS_ON = [DB, FORMATS, METHOD] as const;
 
 export {
   type BindGroupInput,
@@ -36,6 +37,7 @@ export {
 } from "./access/reads.ts";
 export { AUDIT_EXPORT_CEILING } from "./actions/audit.ts";
 export { CHANNEL_MESSAGE_TOPIC } from "./actions/channels.ts";
+export { CYCLE_NOTE_MAX_CHARACTERS } from "./actions/cycle-workflow.ts";
 export {
   type ActionCallContext,
   type ActionDefinition,
@@ -1009,6 +1011,7 @@ export {
   extractAttachments,
   extractMentionIds,
 } from "./rich-text/extract.ts";
+export { richTextSchema } from "./rich-text/field-schema.ts";
 export {
   asBlocks,
   type FromHtmlOptions,
@@ -1103,7 +1106,6 @@ export {
   DEFAULT_QUIET_HOURS,
   findWorkspaceSetting,
   INSTANCE_DEFAULT_LANGUAGE,
-  isKnownTimezone,
   languageSchema,
   type ProvisioningContext,
   primaryChannelSchema,

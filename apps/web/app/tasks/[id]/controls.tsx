@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { DateInput, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import type { WriteState } from "../../cycle/write-state.ts";
 
@@ -138,13 +138,13 @@ export function DueDateField({
 
   return (
     <span className="flex flex-col items-end gap-1">
-      <input
-        type="date"
-        aria-label={t("tasks.detail.controls.dueDate")}
+      <DateInput
+        label={t("tasks.detail.controls.dueDate")}
+        hideLabel
         value={value}
         disabled={disabled || pending}
-        onChange={(event) => {
-          const next = event.target.value;
+        onValueChange={(chosen) => {
+          const next = chosen ?? "";
           const previous = value;
           setValue(next);
           run(
@@ -152,7 +152,7 @@ export function DueDateField({
             () => setValue(previous),
           );
         }}
-        className="rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink"
+        inputClassName="h-auto py-1"
       />
       {error ? (
         <span role="alert" className="text-xs text-bad">

@@ -1,6 +1,13 @@
 import { callAction } from "@openokr/core";
 import { NOTIFICATION_REASONS } from "@openokr/db";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  TimeRangeInput,
+} from "@openokr/ui";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -143,38 +150,20 @@ export default async function AccountChannelsPage() {
               })}
             </fieldset>
 
-            <fieldset className="flex flex-col gap-1.5">
-              <legend className="mb-1 text-xs font-semibold text-ink-2">
-                {t("account.channels.quietHoursIn", {
-                  timezone: settings.timezone,
-                })}
-              </legend>
-              <p className="text-xs text-ink-3">
-                {t("account.channels.aReminderDueInside")}
-              </p>
-              <div className="flex items-center gap-2">
-                {/* Named for anybody who cannot see the "Quiet hours" heading
-                    above them. Two bare time inputs are announced as "time"
-                    and "time", which is P7-T05's `label` finding on this
-                    screen: the visible layout carries the meaning and the
-                    accessibility tree does not. */}
-                <input
-                  type="time"
-                  name="quietStart"
-                  aria-label={t("account.channels.quietStart")}
-                  defaultValue={settings.quietHours?.start ?? ""}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                />
-                <span className="text-xs text-ink-3">{t("common.to")}</span>
-                <input
-                  type="time"
-                  name="quietEnd"
-                  aria-label={t("account.channels.quietEnd")}
-                  defaultValue={settings.quietHours?.end ?? ""}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                />
-              </div>
-            </fieldset>
+            {/* Each time is named for anybody who cannot see the heading
+                above them: two bare time inputs were announced as "time"
+                and "time" (P7-T05's `label` finding on this screen). */}
+            <TimeRangeInput
+              label={t("account.channels.quietHoursIn", {
+                timezone: settings.timezone,
+              })}
+              description={t("account.channels.aReminderDueInside")}
+              startLabel={t("account.channels.quietStart")}
+              endLabel={t("account.channels.quietEnd")}
+              startName="quietStart"
+              endName="quietEnd"
+              defaultValue={settings.quietHours}
+            />
 
             <Button type="submit" variant="primary" size="sm" className="w-fit">
               {t("common.save")}
@@ -247,6 +236,7 @@ export default async function AccountChannelsPage() {
           <CadenceForm
             action={saveCadence}
             settings={cadence}
+            timezone={settings.timezone}
             reasons={NOTIFICATION_REASONS.map((reason) => {
               const labelKey = REASON_LABELS[reason];
               return { id: reason, label: labelKey ? t(labelKey) : reason };

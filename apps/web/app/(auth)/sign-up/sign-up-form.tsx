@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, EmailInput, SecretInput, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -54,26 +54,20 @@ export function SignUpForm() {
           autoComplete="name"
           required
         />
-        <Field
+        <EmailInput
           label={t("people.detail.profileForm.email")}
           name="email"
-          type="email"
-          autoComplete="email"
           required
         />
-        <div className="flex flex-col gap-1">
-          <Field
-            label={t("auth.signUp.signUpForm.password")}
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            minLength={12}
-            required
-          />
-          <p className="text-xs text-ink-3">
-            {t("auth.signUp.signUpForm.atLeast12Characters")}
-          </p>
-        </div>
+        <SecretInput
+          label={t("auth.signUp.signUpForm.password")}
+          name="password"
+          autoComplete="new-password"
+          minLength={12}
+          maxLength={128}
+          required
+          description={t("auth.signUp.signUpForm.atLeast12Characters")}
+        />
         <Button type="submit" variant="primary" disabled={pending}>
           {pending
             ? t("auth.signUp.signUpForm.creating")

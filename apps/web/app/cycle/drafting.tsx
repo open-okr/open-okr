@@ -11,11 +11,16 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateInput,
   formatMeasure,
+  MetricInput,
+  NumberInput,
+  UnitInput,
 } from "@openokr/ui";
 import { healthWord } from "../../lib/health-words.ts";
 import type { KpiOption } from "../../lib/kpi-options.ts";
 import { getTranslations } from "../../lib/translations";
+import { unitsInUse } from "../../lib/units-in-use.ts";
 import { ActionForm } from "./action-form.tsx";
 import {
   DraftFromAmbition,
@@ -190,6 +195,9 @@ export async function Drafting({
   readonly defaultSpaceId: string | null;
 }) {
   const { t } = await getTranslations();
+  // The units the cycle's key results already use, most used first, for the
+  // unit field to offer (guided-inputs §4.8).
+  const units = unitsInUse(goals);
   const canDraft = canEdit && draftingAllowed;
 
   return (
@@ -364,20 +372,21 @@ export async function Drafting({
                         className="flex items-center gap-1.5"
                       >
                         <input type="hidden" name="id" value={keyResult.id} />
-                        <label
-                          className="sr-only"
-                          htmlFor={`value-${keyResult.id}`}
-                        >
-                          {t("common.newValueFor3", { title: keyResult.title })}
-                        </label>
-                        <input
+                        {/* guided-inputs §4.8: the unit beside it, and
+                            nothing sent from an empty field, which the
+                            action refuses in words. */}
+                        <MetricInput
                           id={`value-${keyResult.id}`}
+                          label={t("common.newValueFor3", {
+                            title: keyResult.title,
+                          })}
+                          hideLabel
                           name="value"
-                          type="number"
-                          step="any"
-                          required
+                          unit={keyResult.unit}
+                          baseline={keyResult.baselineValue}
+                          target={keyResult.targetValue}
                           placeholder={t("cycle.drafting.whereIsItNow")}
-                          className="w-36 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink placeholder:text-ink-4"
+                          inputClassName="h-auto w-36 px-2 py-1 text-xs"
                         />
                         <Button
                           type="submit"
@@ -424,20 +433,15 @@ export async function Drafting({
                             </option>
                           ))}
                         </select>
-                        <label
-                          className="sr-only"
-                          htmlFor={`due-${keyResult.id}`}
-                        >
-                          {t("cycle.drafting.dueDateOf", {
+                        <DateInput
+                          id={`due-${keyResult.id}`}
+                          label={t("cycle.drafting.dueDateOf", {
                             title: keyResult.title,
                           })}
-                        </label>
-                        <input
-                          id={`due-${keyResult.id}`}
-                          type="date"
+                          hideLabel
                           name="dueOn"
-                          defaultValue={keyResult.dueOn ?? ""}
-                          className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
+                          defaultValue={keyResult.dueOn}
+                          inputClassName="h-auto px-1.5 py-1 text-xs"
                         />
                         <Button
                           type="submit"
@@ -536,32 +540,26 @@ export async function Drafting({
                       </option>
                     ))}
                   </select>
-                  <label className="sr-only" htmlFor={`kr-base-${goal.id}`}>
-                    {t("cycle.drafting.baseline")}
-                  </label>
-                  <input
+                  {/* `w-32`, because a measure in rupiah or impressions
+                      runs to nine digits. No `max`: the ceiling on a measure
+                      is the unit's, not the product's. */}
+                  <NumberInput
                     id={`kr-base-${goal.id}`}
+                    label={t("cycle.drafting.baseline")}
+                    hideLabel
                     name="baselineValue"
-                    type="number"
-                    step="any"
                     required
                     placeholder={t("cycle.drafting.baseline")}
-                    // `w-24` held five digits, and a measure in rupiah or
-                    // impressions runs to nine. No `max`: the ceiling on a
-                    // measure is the unit's, not the product's.
-                    className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
+                    inputClassName="w-32 text-xs"
                   />
-                  <label className="sr-only" htmlFor={`kr-target-${goal.id}`}>
-                    {t("common.target")}
-                  </label>
-                  <input
+                  <NumberInput
                     id={`kr-target-${goal.id}`}
+                    label={t("common.target")}
+                    hideLabel
                     name="targetValue"
-                    type="number"
-                    step="any"
                     required
                     placeholder={t("common.target")}
-                    className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
+                    inputClassName="w-32 text-xs"
                   />
                   <label className="sr-only" htmlFor={`kr-owner-${goal.id}`}>
                     {t("cycle.drafting.owner")}
@@ -578,25 +576,22 @@ export async function Drafting({
                       </option>
                     ))}
                   </select>
-                  <label className="sr-only" htmlFor={`kr-due-${goal.id}`}>
-                    {t("cycle.drafting.dueOn")}
-                  </label>
-                  <input
+                  <DateInput
                     id={`kr-due-${goal.id}`}
-                    type="date"
+                    label={t("cycle.drafting.dueOn")}
+                    hideLabel
                     name="dueOn"
                     defaultValue={endsOn}
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    inputClassName="h-auto px-1.5 py-1.5 text-xs"
                   />
-                  <label className="sr-only" htmlFor={`kr-unit-${goal.id}`}>
-                    {t("cycle.drafting.unit")}
-                  </label>
-                  <input
+                  <UnitInput
                     id={`kr-unit-${goal.id}`}
+                    label={t("cycle.drafting.unit")}
+                    hideLabel
                     name="unit"
-                    maxLength={60}
+                    known={units}
                     placeholder={t("cycle.drafting.unit")}
-                    className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
+                    inputClassName="w-24 text-xs"
                   />
                   <Button type="submit">
                     {t("cycle.drafting.addKeyResult")}

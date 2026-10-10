@@ -126,9 +126,11 @@ test("the profile page loads for the signed-in member", async () => {
 });
 
 test("the profile has a timezone field", async () => {
-  // Already on the profile page from the previous test.
-  const timezone = page.locator("input[name='timezone']");
-  await expect(timezone).toBeVisible();
+  // Already on the profile page from the previous test. A list to choose from
+  // since the field kit (guided-inputs §4.6): the name the form submits is the
+  // list's hidden field, and the box a person sees is labelled.
+  await expect(page.getByLabel("Timezone")).toBeVisible();
+  await expect(page.locator("input[name='timezone']")).toHaveCount(1);
 });
 
 /**

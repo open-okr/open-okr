@@ -678,9 +678,10 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     .first()
     .getByRole("button", { name: "Add what the number does not show" })
     .click();
+  // The compact editor (guided-inputs §4.7), named by its own label.
   await micRows
     .first()
-    .getByLabel("What the number does not show")
+    .getByRole("textbox", { name: "What the number does not show" })
     .fill("Activation held. The funnel above it never did.");
   await micRows.first().getByRole("button", { name: "Save the note" }).click();
   await expect(

@@ -9,6 +9,7 @@ import {
 } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
+import { quietHoursFromForm } from "../../lib/quiet-hours";
 import { getStorage } from "../../lib/storage";
 import { getTranslations } from "../../lib/translations";
 import { getImageProcessor } from "../../lib/upload-ports";
@@ -54,12 +55,12 @@ export async function updateProfile(
     const primaryChannel = form.get("primaryChannel");
     if (primaryChannel) input.primaryChannel = String(primaryChannel);
 
-    const quietStart = form.get("quietStart");
-    const quietEnd = form.get("quietEnd");
-    if (quietStart && quietEnd) {
-      input.quietHours = { start: String(quietStart), end: String(quietEnd) };
-    } else if (quietStart === "" && quietEnd === "") {
-      input.quietHours = null;
+    const quietHours = quietHoursFromForm(form);
+    if (!quietHours.ok) {
+      return { ok: false, message: t("common.quietHoursNeedBothTimes") };
+    }
+    if (quietHours.value !== undefined) {
+      input.quietHours = quietHours.value;
     }
 
     const bioRaw = form.get("bio");

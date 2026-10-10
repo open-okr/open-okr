@@ -182,7 +182,7 @@ test.describe("NW-Q1-04 and NW-Q2-10: objectives drafted by kind, and a change o
     }
     await goTo(page, `/goals?okr=${goalId}&tab=check-in`);
     const confidence = drawer().getByLabel(
-      `Confidence in ${FLOOR_KEY_RESULT}, out of 10`,
+      `Confidence in ${FLOOR_KEY_RESULT}`,
     );
     await expect(confidence).toBeVisible({ timeout: 15_000 });
     await confidence.fill("4");

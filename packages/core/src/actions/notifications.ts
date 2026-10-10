@@ -37,6 +37,7 @@ import {
 import { readerMaySeeSubject } from "../notifications/visibility.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { wallClock } from "./wall-clock.ts";
 
 /**
  * One inbox row (screen S-03, P6-G07a).
@@ -564,10 +565,7 @@ export const updateOwnNotificationSettings = defineWriteAction({
     // registry's own schema is where that bound is written (P6-G08).
     batchWindowMinutes: z.number().int().min(1).max(1440).optional(),
     dailySummary: z.boolean().optional(),
-    dailySummaryTime: z
-      .string()
-      .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
-      .optional(),
+    dailySummaryTime: wallClock.optional(),
     /**
      * The whole map, not one entry (P6-G08).
      *

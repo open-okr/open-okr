@@ -47,6 +47,10 @@ export const markSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("italic") }),
   z.object({ type: z.literal("code") }),
   z.object({ type: z.literal("strike") }),
+  // Read in every release from the one that added it, and written only from
+  // the next (docs/design/guided-inputs.md §4.7): an editor that met a mark
+  // its schema lacked would refuse the whole document.
+  z.object({ type: z.literal("underline") }),
   linkMarkSchema,
 ]);
 

@@ -2,10 +2,17 @@
 
 import { Dialog } from "@base-ui-components/react/dialog";
 import { Tabs } from "@base-ui-components/react/tabs";
-import { keyResultKindsInUse, okrKindsInUse } from "@openokr/method";
+import {
+  keyResultKindsInUse,
+  okrKindsInUse,
+  WEIGHT_MAX,
+  WEIGHT_MIN,
+} from "@openokr/method";
 import {
   Bar,
   Chip,
+  type ConfidenceDisplay,
+  formatConfidence,
   formatMeasure,
   useQueryClient,
   useToast,
@@ -25,6 +32,7 @@ import {
   type OkrHandle,
   useOkrDetail,
 } from "../../lib/okr-tree/use-okr-tree.ts";
+import { unitsInUse } from "../../lib/units-in-use.ts";
 import { setStandaloneReason, unlinkGoals } from "./alignment-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
@@ -34,6 +42,7 @@ import {
   InlineDate,
   InlineNumber,
   InlineText,
+  InlineUnit,
   KeyResultKindPicker,
   KindControl,
   MemberPicker,
@@ -437,6 +446,8 @@ function DrawerBody({
                 value={goal.weight}
                 label={t("okrDrawer.weightOf", { title: goal.title })}
                 readOnly={!canEdit}
+                min={WEIGHT_MIN}
+                max={WEIGHT_MAX}
                 onSave={(weight) =>
                   okr.mutate({
                     kind: "patchGoal",
@@ -467,6 +478,8 @@ function DrawerBody({
                 progressMax={progressMax}
                 members={members}
                 coach={coach}
+                units={unitsInUse(tree.goals)}
+                cycle={tree.cycle}
               />
             ))
           )}
@@ -485,6 +498,7 @@ function DrawerBody({
                 detail={loaded}
                 okr={okr}
                 thresholds={coach.thresholds}
+                display={coach.practice["confidence.display"]}
                 onPublished={() => {
                   toast.show({ tone: "ok", message: t("okrDrawer.checkedIn") });
                   onTab("history");
@@ -500,7 +514,13 @@ function DrawerBody({
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
       >
         <Loaded detail={detail}>
-          {(loaded) => <History goal={goal} detail={loaded} />}
+          {(loaded) => (
+            <History
+              goal={goal}
+              detail={loaded}
+              display={coach.practice["confidence.display"]}
+            />
+          )}
         </Loaded>
       </Tabs.Panel>
 
@@ -603,6 +623,8 @@ function DrawerKeyResult({
   progressMax,
   members,
   coach,
+  units,
+  cycle,
 }: {
   readonly keyResult: OkrGoal["keyResults"][number];
   readonly highlighted: boolean;
@@ -611,6 +633,10 @@ function DrawerKeyResult({
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
+  /** The units the cycle already uses, for the unit cell to offer. */
+  readonly units: readonly string[];
+  /** The cycle's dates, which a due date outside of is warned about. */
+  readonly cycle: { readonly startsOn: string; readonly endsOn: string };
 }) {
   const { t } = useTranslations();
   const cells = useKeyResultCells(keyResult, okr, coach);
@@ -647,9 +673,11 @@ function DrawerKeyResult({
         <span className="text-xs tabular-nums text-ink-3">
           {keyResult.confidence === null
             ? t("okrList.noConfidence")
-            : t("okrList.confidence", {
-                value: String(Math.round(keyResult.confidence * 10)),
-              })}
+            : formatConfidence(
+                keyResult.confidence,
+                coach.practice["confidence.display"],
+                t,
+              )}
         </span>
       </div>
       <dl className="grid grid-cols-[7rem_1fr] items-center gap-x-3 gap-y-1 text-xs">
@@ -720,11 +748,11 @@ function DrawerKeyResult({
                 wide
                 onSave={cells.saveTarget}
               />
-              <InlineText
+              <InlineUnit
                 value={keyResult.unit ?? ""}
                 label={t("okrList.unitOf", { title })}
+                known={units}
                 readOnly={!canEdit}
-                allowEmpty
                 placeholder={t("okrList.unit")}
                 onSave={(unit) =>
                   cells.patch(
@@ -774,6 +802,7 @@ function DrawerKeyResult({
             value={keyResult.dueOn}
             label={t("okrList.dueOf", { title })}
             readOnly={!canEdit}
+            cycle={cycle}
             onSave={(dueOn) =>
               cells.patch({ dueOn }, { dueOn: keyResult.dueOn })
             }
@@ -784,6 +813,8 @@ function DrawerKeyResult({
           <InlineNumber
             value={keyResult.weight}
             label={t("okrDrawer.weightOf", { title })}
+            min={WEIGHT_MIN}
+            max={WEIGHT_MAX}
             readOnly={!canEdit}
             onSave={(weight) =>
               cells.patch({ weight }, { weight: keyResult.weight })
@@ -849,9 +880,12 @@ const STATUS = {
 function History({
   goal,
   detail,
+  display,
 }: {
   readonly goal: OkrGoal;
   readonly detail: OkrDetail;
+  /** The workspace's "Confidence shown as" (guided-inputs §4.8). */
+  readonly display: ConfidenceDisplay;
 }) {
   const { t } = useTranslations();
   return (
@@ -887,9 +921,7 @@ function History({
                   ) : null}
                   {checkIn.confidence === null ? null : (
                     <span>
-                      {t("okrList.confidence", {
-                        value: String(Math.round(checkIn.confidence * 10)),
-                      })}
+                      {formatConfidence(checkIn.confidence, display, t)}
                     </span>
                   )}
                 </span>

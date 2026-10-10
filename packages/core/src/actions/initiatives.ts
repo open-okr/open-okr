@@ -53,17 +53,12 @@ import {
 } from "../initiatives/service.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { localDate } from "./local-date.ts";
 
-const richText = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const richText = richTextSchema();
 
 const initiativeOutput = z.object({
   id: z.uuid(),
@@ -150,6 +145,8 @@ async function requireInitiative(
   readonly spaceId: string;
   readonly ownerId: string;
   readonly title: string;
+  readonly startsOn: string | null;
+  readonly endsOn: string | null;
 }> {
   const scoped = await getAccessScoped(tx, {
     workspaceId,
@@ -163,6 +160,8 @@ async function requireInitiative(
       spaceId: initiatives.spaceId,
       ownerId: initiatives.ownerId,
       title: initiatives.title,
+      startsOn: initiatives.startsOn,
+      endsOn: initiatives.endsOn,
     })
     .from(initiatives)
     .where(
@@ -185,7 +184,23 @@ async function requireInitiative(
     spaceId: row.spaceId,
     ownerId: row.ownerId,
     title: row.title,
+    startsOn: row.startsOn,
+    endsOn: row.endsOn,
   };
+}
+
+/**
+ * The table refuses an end before the start (migration 0064), and this says
+ * so in a sentence instead of a constraint name. Leave and a holiday refuse
+ * the same way.
+ */
+function assertWindow(startsOn: string | null, endsOn: string | null): void {
+  if (startsOn !== null && endsOn !== null && endsOn < startsOn) {
+    throw new OperationError(
+      "forbidden",
+      "An initiative ends on or after the day it starts.",
+    );
+  }
 }
 
 /** Every cycle this initiative's key results belong to, so gate five follows. */
@@ -503,8 +518,8 @@ export const createInitiative = defineWriteAction({
     title: z.string().trim().min(1).max(500),
     description: richText.optional(),
     ownerId: z.uuid(),
-    startsOn: z.string().optional(),
-    endsOn: z.string().optional(),
+    startsOn: localDate.optional(),
+    endsOn: localDate.optional(),
     status: z.enum(INITIATIVE_STATUSES).optional(),
     confidence: z.number().min(0).max(1).optional(),
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
@@ -528,6 +543,7 @@ export const createInitiative = defineWriteAction({
       return undefined;
     },
     async execute({ tx, workspaceId, actor }) {
+      assertWindow(input.startsOn ?? null, input.endsOn ?? null);
       await assertLegacyKeyFree(
         tx,
         workspaceId,
@@ -607,8 +623,8 @@ export const updateInitiative = defineWriteAction({
       title: z.string().trim().min(1).max(500).optional(),
       description: richText.optional(),
       ownerId: z.uuid().optional(),
-      startsOn: z.string().nullable().optional(),
-      endsOn: z.string().nullable().optional(),
+      startsOn: localDate.nullable().optional(),
+      endsOn: localDate.nullable().optional(),
       status: z.enum(INITIATIVE_STATUSES).optional(),
       confidence: z.number().min(0).max(1).nullable().optional(),
       capacity: z.enum(CAPACITY_VERDICTS).nullable().optional(),
@@ -635,6 +651,11 @@ export const updateInitiative = defineWriteAction({
       );
     },
     async execute({ tx, workspaceId, loaded }) {
+      // A change to one end is checked against the other as it is stored.
+      assertWindow(
+        input.startsOn === undefined ? loaded.startsOn : input.startsOn,
+        input.endsOn === undefined ? loaded.endsOn : input.endsOn,
+      );
       if (input.ownerId && input.ownerId !== loaded.ownerId) {
         await reassignInitiativeOwnerInTx(tx, {
           workspaceId,

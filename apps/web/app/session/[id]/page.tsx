@@ -20,12 +20,7 @@
  * filled every panel (the gap audit's B-10, closed by P6-G19a to P6-G19c).
  */
 
-import {
-  ACCESS_LEVELS,
-  callAction,
-  excerptRichText,
-  OperationError,
-} from "@openokr/core";
+import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
 import {
   canonThresholds,
   REVIEW_STAGE_KEYS,
@@ -44,6 +39,8 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
+import { confidenceDisplay } from "../../../lib/confidence-display.ts";
+import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -488,10 +485,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
   }
   // Stage three: the mic and the narratives (METHOD.md §8.1, P4-T10c).
   //
-  // The stored body is turned into a plain-text excerpt here, on the server,
-  // through the one shared rich text module. The panel is a client component and
-  // handing it editor JSON would mean a second renderer in the browser for a
-  // stage that shows two lines.
+  // The stored body is rendered here, on the server, through the one shared
+  // rich text renderer, so the panel shows it as written without a second
+  // renderer in the browser. The document goes too, for the editor to open on.
   let narratives: Narratives | null = null;
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[2]) {
     const read = (await callAction(context, "sessions.narratives", {
@@ -519,10 +515,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
         championName: objective.championName,
         hasMic: objective.hasMic,
         spokenAt: objective.spokenAt,
-        excerpt:
-          objective.body === null
-            ? null
-            : excerptRichText(objective.body as never, 2000) || null,
+        body: objective.body,
+        html: richTextHtml(objective.body),
         authorName: objective.authorName,
       })),
     };
@@ -822,6 +816,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           names={Object.fromEntries(
             participants.map((one) => [one.memberId, one.name]),
           )}
+          display={await confidenceDisplay()}
         />
       )}
 
@@ -840,6 +835,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           scores={diagnoseStage.scores}
           owners={diagnoseStage.owners}
           canWrite={isFacilitator}
+          display={await confidenceDisplay()}
         />
       )}
 

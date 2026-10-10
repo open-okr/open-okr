@@ -461,10 +461,22 @@ test("the planning phases complete from the browser, and the gaps clear", async 
 
   // Phase 2: baseline health and three ranked issues.
   await page.goto("/cycle?phase=2");
-  const baseline = page.locator("form", { has: page.getByLabel("Stable") });
-  await baseline.getByLabel("Stable").fill("Churn holds at 2% a month");
+  // The compact editor (guided-inputs §4.7): the column is typed in bold, and
+  // opens on what was written once the page is read again.
+  const stable = page.getByRole("textbox", { name: "Stable", exact: true });
+  const baseline = page.locator("form", { has: stable });
+  await baseline
+    .getByRole("group", { name: "Stable", exact: true })
+    .getByRole("button", { name: "Bold", exact: true })
+    .click();
+  await stable.pressSequentially("Churn holds at 2% a month");
+  await expect(stable.locator("strong")).toHaveText("Churn holds at 2% a month");
   await baseline.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Recorded", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(stable.locator("strong")).toHaveText(
+    "Churn holds at 2% a month",
+  );
   for (const issue of [
     "Trials stall before the first project",
     "Support answers take a day",
@@ -533,8 +545,8 @@ test("drafting a goal with key results persists at zero percent and pending", as
     ["Cut median first response from 6h to 2h", "6", "2"],
   ] as const) {
     await page.getByRole("textbox", { name: "The key result" }).fill(title);
-    await page.getByRole("spinbutton", { name: "Baseline" }).fill(baseline);
-    await page.getByRole("spinbutton", { name: "Target" }).fill(target);
+    await page.getByRole("textbox", { name: "Baseline" }).fill(baseline);
+    await page.getByRole("textbox", { name: "Target" }).fill(target);
     await page.getByRole("button", { name: "Add key result" }).click();
     // Exact, because the row's own title is also inside the label of the field
     // that records a new value for it.
@@ -715,10 +727,11 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
   await page.getByRole("link", { name: "Open" }).first().click();
   await expect(page).toHaveURL(/\/goals\//);
 
-  // The server refuses an empty retrospective. The textarea's own `required`
-  // would stop the request, so the field is filled with whitespace, which passes
-  // the browser and fails the rule.
-  await page.getByRole("textbox", { name: "The retrospective" }).fill("   ");
+  // The server refuses an empty retrospective, and a run of spaces is empty.
+  const retrospective = page.getByRole("textbox", {
+    name: "The retrospective",
+  });
+  await retrospective.fill("   ");
   await page.getByRole("button", { name: "Close this goal" }).click();
   // Filtered rather than the bare role: Next's own route announcer is also an
   // alert, so the page has two and only one of them is ours.
@@ -726,14 +739,24 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
     page.getByRole("alert").filter({ hasText: "retrospective" }),
   ).toBeVisible();
 
+  // The compact editor (guided-inputs §4.7): the account is bolded from its
+  // toolbar, and the closed goal shows it as written.
+  await retrospective.fill(
+    "Activation moved. Onboarding did the work, not the campaign.",
+  );
+  await retrospective.press("ControlOrMeta+a");
+  // Within the field: the discussion below has a toolbar of its own.
   await page
-    .getByRole("textbox", { name: "The retrospective" })
-    .fill("Activation moved. Onboarding did the work, not the campaign.");
+    .getByRole("group", { name: "The retrospective" })
+    .getByRole("button", { name: "Bold", exact: true })
+    .click();
   await page.getByRole("button", { name: "Close this goal" }).click();
 
   await expect(page.getByText("closed · achieved")).toBeVisible();
   await expect(
-    page.getByText("Activation moved. Onboarding did the work"),
+    page.locator(".rich-text strong", {
+      hasText: "Activation moved. Onboarding did the work",
+    }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Reopen this goal" }).click();

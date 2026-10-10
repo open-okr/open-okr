@@ -233,13 +233,19 @@ test("a task carries a discussion and files", async () => {
   await expect(thread).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("attachment-input")).toBeVisible();
 
+  // The composer is the compact editor since guided-inputs §4.7, found by
+  // its name. The posted comment is looked for among the posted ones: the
+  // editor holds the same text until the post lands, so the thread as a whole
+  // would contain it before anything was saved.
   await thread
-    .getByPlaceholder("Write a comment...")
+    .getByRole("textbox", { name: "Your comment" })
     .fill("The copy is with legal.");
   await thread.getByRole("button", { name: "Post" }).click();
-  await expect(thread).toContainText("The copy is with legal.", {
-    timeout: 15_000,
-  });
+  await expect(
+    thread
+      .locator('[id^="comment-"]')
+      .filter({ hasText: "The copy is with legal." }),
+  ).toBeVisible({ timeout: 15_000 });
 
   await expect(async () => {
     const { rows } = await pool.query<{ subject_type: string }>(

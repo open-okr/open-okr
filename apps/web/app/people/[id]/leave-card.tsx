@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  DateRangeInput,
   useTranslations,
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
@@ -111,29 +112,15 @@ export function LeaveCard({
 
         {canEdit ? (
           <div className="flex flex-wrap items-end gap-2 rounded-md border border-line p-2.5">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("people.detail.leave.from")}
-              </span>
-              <input
-                type="date"
-                value={startsOn}
-                onChange={(event) => setStartsOn(event.target.value)}
-                className="rounded-md border border-line bg-bg px-2 py-1"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("people.detail.leave.to")}
-              </span>
-              <input
-                type="date"
-                value={endsOn}
-                min={startsOn || undefined}
-                onChange={(event) => setEndsOn(event.target.value)}
-                className="rounded-md border border-line bg-bg px-2 py-1"
-              />
-            </label>
+            <DateRangeInput
+              startLabel={t("people.detail.leave.from")}
+              endLabel={t("people.detail.leave.to")}
+              value={{ start: startsOn || null, end: endsOn || null }}
+              onValueChange={(range) => {
+                setStartsOn(range.start ?? "");
+                setEndsOn(range.end ?? "");
+              }}
+            />
             <label className="flex flex-col gap-1">
               <span className="text-xs text-ink-3">
                 {t("people.detail.leave.delegate")}
@@ -188,11 +175,8 @@ export function LeaveCard({
           </div>
         ) : null}
 
-        {backwards ? (
-          <p role="alert" className="text-xs text-bad">
-            {t("people.detail.leave.endsBeforeItStarts")}
-          </p>
-        ) : result && !result.ok ? (
+        {/* An end before the start is said under the end date itself. */}
+        {result && !result.ok ? (
           <p role="alert" className="text-xs text-bad">
             {result.message}
           </p>

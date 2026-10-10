@@ -44,17 +44,11 @@ import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
 import { diffLines } from "../rich-text/diff.ts";
 import { plainTextLines } from "../rich-text/excerpt.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
-const richText = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const richText = richTextSchema();
 
 const subjectType = z.enum(DOCUMENT_SUBJECT_TYPES);
 

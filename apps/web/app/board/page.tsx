@@ -1,5 +1,5 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip, DateInput } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../lib/access";
@@ -270,14 +270,7 @@ export default async function BoardPage({
                       </select>
                     </label>
                   )}
-                  <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                    {t("board.due")}
-                    <input
-                      type="date"
-                      name="dueOn"
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    />
-                  </label>
+                  <DateInput label={t("board.due")} name="dueOn" />
                 </div>
                 <button
                   type="submit"

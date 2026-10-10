@@ -93,20 +93,23 @@ describe("the reading assists", () => {
 });
 
 describe("the close form's retrospective", () => {
-  test("is the plain required field with the assist not offered", () => {
+  // The compact editor (guided-inputs §4.7), which the server renders empty
+  // and the browser fills. Nothing is posted until something is written, and
+  // the close action refuses that in words.
+  test("is the labelled field with the assist not offered", () => {
     const html = render(<RetrospectiveField goalId={ID} offered={false} />);
-    expect(html).toContain('name="retrospective"');
-    expect(html).toContain("required");
+    expect(html).toContain("The retrospective</legend>");
+    expect(html).not.toContain('name="retrospective"');
     expect(html).not.toContain("Draft from the check-ins");
     expect(html).not.toContain('data-testid="retrospective-draft"');
   });
 
   test("offers a draft beside the same field when a provider may write one", () => {
     const html = render(<RetrospectiveField goalId={ID} offered />);
-    expect(html).toContain('name="retrospective"');
+    expect(html).toContain("The retrospective</legend>");
     expect(html).toContain("Draft from the check-ins");
     // The field starts empty: a draft only reaches it when somebody chooses.
-    expect(html).toMatch(/<textarea[^>]*><\/textarea>/);
+    expect(html).not.toContain('name="retrospective"');
   });
 });
 
