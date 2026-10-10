@@ -2,10 +2,11 @@
 
 import { Field } from "@base-ui-components/react/field";
 import type { FocusEvent, KeyboardEvent, ReactNode, Ref } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import { browserToday, relativeDate } from "./date-format.ts";
+import { useFormReset } from "./form-reset.ts";
 import { FIELD_CONTROL_CLASS } from "./text-input.tsx";
 
 export interface DateInputProps {
@@ -30,6 +31,8 @@ export interface DateInputProps {
   readonly description?: ReactNode;
   /** Something worth saying about the date that does not refuse it. */
   readonly warning?: ReactNode;
+  /** Why the date cannot be saved as it is. Shown and announced while set. */
+  readonly error?: string | null;
   readonly required?: boolean;
   readonly disabled?: boolean;
   readonly className?: string;
@@ -61,6 +64,7 @@ export function DateInput({
   today,
   description,
   warning,
+  error,
   required,
   disabled,
   className,
@@ -72,6 +76,8 @@ export function DateInput({
   const { locale } = useTranslations();
   const [own, setOwn] = useState(defaultValue ?? "");
   const current = value !== undefined ? (value ?? "") : own;
+  const wrapper = useRef<HTMLSpanElement>(null);
+  useFormReset(wrapper, () => setOwn(defaultValue ?? ""));
   const words =
     current === ""
       ? null
@@ -85,6 +91,7 @@ export function DateInput({
     <Field.Root
       name={name}
       disabled={disabled}
+      invalid={error ? true : undefined}
       className={cn("flex flex-col gap-1", className)}
     >
       {hideLabel ? null : (
@@ -92,7 +99,7 @@ export function DateInput({
           {label}
         </Field.Label>
       )}
-      <span className="flex flex-wrap items-center gap-1.5">
+      <span ref={wrapper} className="flex flex-wrap items-center gap-1.5">
         <Field.Control
           ref={inputRef}
           id={id}
@@ -135,6 +142,15 @@ export function DateInput({
         </Field.Description>
       ) : null}
       <Field.Error role="alert" className="text-xs font-medium text-bad" />
+      {error ? (
+        <Field.Error
+          match
+          role="alert"
+          className="text-xs font-medium text-bad"
+        >
+          {error}
+        </Field.Error>
+      ) : null}
     </Field.Root>
   );
 }

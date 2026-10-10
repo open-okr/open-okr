@@ -3,9 +3,11 @@
 import { Field } from "@base-ui-components/react/field";
 import { NumberField } from "@base-ui-components/react/number-field";
 import type { FocusEvent, KeyboardEvent, ReactNode, Ref } from "react";
+import { useRef, useState } from "react";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import { formatMeasure } from "../lib/format-measure.ts";
+import { useFormReset } from "./form-reset.ts";
 import { FIELD_CONTROL_CLASS } from "./text-input.tsx";
 
 export interface NumberInputProps {
@@ -72,9 +74,15 @@ export function NumberInput({
 }: NumberInputProps) {
   const { t, locale } = useTranslations();
   const suffix = unit?.trim() || null;
+  // Base UI holds the number itself, so a reset starts it again from its
+  // default rather than leaving the last row's number in the next one.
+  const root = useRef<HTMLDivElement>(null);
+  const [generation, setGeneration] = useState(0);
+  useFormReset(root, () => setGeneration((one) => one + 1));
 
   return (
     <Field.Root
+      ref={root}
       name={name}
       disabled={disabled}
       className={cn("flex flex-col gap-1", className)}
@@ -86,6 +94,7 @@ export function NumberInput({
         </Field.Label>
       )}
       <NumberField.Root
+        key={generation}
         id={id}
         name={name}
         {...(value !== undefined ? { value } : {})}

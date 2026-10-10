@@ -16,6 +16,7 @@
  * The escalation ladder itself lives in `packages/method`, because which roles it
  * widens to is §11 practice rather than date arithmetic.
  */
+import { zoneOffsetAt } from "@openokr/formats";
 import {
   type CheckInFrequency,
   type Holiday,
@@ -236,8 +237,8 @@ export function dueInstant(due: LocalDate, timeZone: string): Date {
   // instant reads as. One correction is enough for every real zone; a second
   // pass settles the rare case where the first lands on the other side of a
   // transition.
-  let instant = naive - offsetAt(naive, timeZone);
-  instant = naive - offsetAt(instant, timeZone);
+  let instant = naive - zoneOffsetAt(naive, timeZone);
+  instant = naive - zoneOffsetAt(instant, timeZone);
   return new Date(instant);
 }
 
@@ -257,37 +258,9 @@ export function localInstant(
   timeZone: string,
 ): Date {
   const naive = Date.UTC(on.year, on.month - 1, on.day, hour, minute);
-  let instant = naive - offsetAt(naive, timeZone);
-  instant = naive - offsetAt(instant, timeZone);
+  let instant = naive - zoneOffsetAt(naive, timeZone);
+  instant = naive - zoneOffsetAt(instant, timeZone);
   return new Date(instant);
-}
-
-/** How far ahead of UTC a zone is at an instant, in milliseconds. */
-function offsetAt(instant: number, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(new Date(instant));
-  const read = (type: string): number =>
-    Number(parts.find((part) => part.type === type)?.value);
-  // `en-CA` renders midnight as 24 in some runtimes.
-  const hour = read("hour") % 24;
-  const asUtc = Date.UTC(
-    read("year"),
-    read("month") - 1,
-    read("day"),
-    hour,
-    read("minute"),
-    read("second"),
-    instant % 1000,
-  );
-  return asUtc - instant;
 }
 
 /**

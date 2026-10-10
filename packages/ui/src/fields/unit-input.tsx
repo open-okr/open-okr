@@ -7,9 +7,12 @@ import {
   type Ref,
   useId,
   useMemo,
+  useRef,
+  useState,
 } from "react";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
+import { useFormReset } from "./form-reset.ts";
 import { FIELD_CONTROL_CLASS } from "./text-input.tsx";
 
 export interface UnitInputProps {
@@ -72,6 +75,9 @@ export function UnitInput({
     t("fields.unit.points"),
   ];
   const commonKey = common.join("\n");
+  const wrapper = useRef<HTMLDivElement>(null);
+  const [generation, setGeneration] = useState(0);
+  useFormReset(wrapper, () => setGeneration((one) => one + 1));
   // The workspace's own first, then the common ones, each once.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `common` is rebuilt each render; its joined key is what changes
   const items = useMemo(() => {
@@ -89,13 +95,14 @@ export function UnitInput({
   }, [known, commonKey]);
 
   return (
-    <div className={cn("flex flex-col gap-1", className)}>
+    <div ref={wrapper} className={cn("flex flex-col gap-1", className)}>
       {hideLabel ? null : (
         <label htmlFor={inputId} className="text-sm font-medium text-ink-2">
           {label}
         </label>
       )}
       <Autocomplete.Root
+        key={generation}
         items={items}
         {...(value !== undefined ? { value } : {})}
         {...(defaultValue !== undefined ? { defaultValue } : {})}

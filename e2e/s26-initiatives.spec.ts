@@ -97,6 +97,40 @@ test("adding one puts it in the list with its owner and its space", async () => 
   await expect(row).toContainText("not yet behind a key result");
 });
 
+/**
+ * guided-inputs §4.9: the two dates are one range. The end says when it is
+ * before the start, and a save leaves the form empty for the next row rather
+ * than holding the last one's dates.
+ */
+test("its dates are one range, and the form is empty again after a save", async () => {
+  const dated = "Move the help centre";
+  await goTo(page, "/initiatives");
+  await page.getByLabel("What work is this").fill(dated);
+  const starts = page.getByLabel("Starts", { exact: true });
+  const ends = page.getByLabel("Ends", { exact: true });
+  await starts.fill("2026-11-09");
+  await ends.fill("2026-11-02");
+  await expect(
+    page.getByText("Ends before it starts. Pick a date on or after 2026-11-09."),
+  ).toBeVisible();
+
+  await ends.fill("2026-12-18");
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(
+    page.getByTestId("initiative").filter({ hasText: dated }),
+  ).toBeVisible({ timeout: 15_000 });
+  const { rows } = await pool.query<{ starts: string; ends: string }>(
+    `select to_char(starts_on, 'YYYY-MM-DD') as starts,
+            to_char(ends_on, 'YYYY-MM-DD') as ends
+       from initiatives
+      where workspace_id = $1 and title = $2 and deleted_at is null`,
+    [workspaceId, dated],
+  );
+  expect(rows).toEqual([{ starts: "2026-11-09", ends: "2026-12-18" }]);
+  await expect(starts).toHaveValue("");
+  await expect(ends).toHaveValue("");
+});
+
 test("the capacity select saves from the row itself", async () => {
   const row = page.getByTestId("initiative").filter({ hasText: TITLE });
   await row.getByLabel(`Capacity of ${TITLE}`).selectOption("exceeds");

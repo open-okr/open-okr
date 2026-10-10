@@ -448,4 +448,50 @@ describe("a second entity, against the rows the first one wrote", () => {
     ).rows;
     expect(goal?.champion).toBe(member?.id);
   });
+
+  it("keeps the start of an initiative that ends before it, and says so in both runs", async () => {
+    await callAction(
+      { pool, workspaceId, actor: { kind: "human", userId: OWNER } },
+      "spaces.create",
+      { name: "Platform" },
+    );
+    const file = await fileWith(
+      "initiatives.csv",
+      [
+        "ID,Initiative,Space,Owner,Start,End",
+        `in-1,Ends before it starts,Platform,${OWNER_EMAIL},2026-03-01,2026-02-01`,
+        `in-2,In the right order,Platform,${OWNER_EMAIL},2026-03-01,2026-04-01`,
+      ].join("\n"),
+    );
+    const note =
+      "endsOn, 2026-02-01, is before startsOn, 2026-03-01. Imported with the start and no end date.";
+
+    for (const dryRun of [true, false]) {
+      const { report } = await runImport({
+        pool,
+        workspaceId,
+        userId: OWNER,
+        entity: "initiatives",
+        file,
+        dryRun,
+      });
+      expect(report.skipped).toBe(0);
+      expect(report.rows.map((row) => row.notes ?? [])).toEqual([[note], []]);
+    }
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      legacy_id: string;
+      starts_on: string | null;
+      ends_on: string | null;
+    }>(
+      `select legacy_id, to_char(starts_on, 'YYYY-MM-DD') as starts_on,
+              to_char(ends_on, 'YYYY-MM-DD') as ends_on
+         from initiatives order by legacy_id`,
+    );
+    expect(rows).toEqual([
+      { legacy_id: "in-1", starts_on: "2026-03-01", ends_on: null },
+      { legacy_id: "in-2", starts_on: "2026-03-01", ends_on: "2026-04-01" },
+    ]);
+  });
 });

@@ -2,9 +2,17 @@
 
 import { Combobox } from "@base-ui-components/react/combobox";
 import { ChevronDown } from "lucide-react";
-import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
+import { useFormReset } from "./form-reset.ts";
 import { FIELD_CONTROL_CLASS } from "./text-input.tsx";
 
 interface ZoneOption {
@@ -170,6 +178,8 @@ export function TimezoneSelect({
   const locale = catalogue === "pseudo" ? "en" : catalogue;
   const [own, setOwn] = useState<string | null>(defaultValue ?? null);
   const chosen = value !== undefined ? value : own;
+  const wrapper = useRef<HTMLDivElement>(null);
+  useFormReset(wrapper, () => setOwn(defaultValue ?? null));
   const [device, setDevice] = useState<string | null>(null);
 
   // Read after mounting: the server rendering this has no device to ask.
@@ -239,7 +249,7 @@ export function TimezoneSelect({
   // borrows its name too, so three elements answered to one label and a
   // screen reader heard the toggle called "Timezone".
   return (
-    <div className="flex flex-col gap-1">
+    <div ref={wrapper} className="flex flex-col gap-1">
       <label htmlFor={inputId} className="text-sm font-medium text-ink-2">
         {label}
       </label>

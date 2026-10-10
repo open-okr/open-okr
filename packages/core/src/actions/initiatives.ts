@@ -145,6 +145,8 @@ async function requireInitiative(
   readonly spaceId: string;
   readonly ownerId: string;
   readonly title: string;
+  readonly startsOn: string | null;
+  readonly endsOn: string | null;
 }> {
   const scoped = await getAccessScoped(tx, {
     workspaceId,
@@ -158,6 +160,8 @@ async function requireInitiative(
       spaceId: initiatives.spaceId,
       ownerId: initiatives.ownerId,
       title: initiatives.title,
+      startsOn: initiatives.startsOn,
+      endsOn: initiatives.endsOn,
     })
     .from(initiatives)
     .where(
@@ -180,7 +184,23 @@ async function requireInitiative(
     spaceId: row.spaceId,
     ownerId: row.ownerId,
     title: row.title,
+    startsOn: row.startsOn,
+    endsOn: row.endsOn,
   };
+}
+
+/**
+ * The table refuses an end before the start (migration 0064), and this says
+ * so in a sentence instead of a constraint name. Leave and a holiday refuse
+ * the same way.
+ */
+function assertWindow(startsOn: string | null, endsOn: string | null): void {
+  if (startsOn !== null && endsOn !== null && endsOn < startsOn) {
+    throw new OperationError(
+      "forbidden",
+      "An initiative ends on or after the day it starts.",
+    );
+  }
 }
 
 /** Every cycle this initiative's key results belong to, so gate five follows. */
@@ -523,6 +543,7 @@ export const createInitiative = defineWriteAction({
       return undefined;
     },
     async execute({ tx, workspaceId, actor }) {
+      assertWindow(input.startsOn ?? null, input.endsOn ?? null);
       await assertLegacyKeyFree(
         tx,
         workspaceId,
@@ -630,6 +651,11 @@ export const updateInitiative = defineWriteAction({
       );
     },
     async execute({ tx, workspaceId, loaded }) {
+      // A change to one end is checked against the other as it is stored.
+      assertWindow(
+        input.startsOn === undefined ? loaded.startsOn : input.startsOn,
+        input.endsOn === undefined ? loaded.endsOn : input.endsOn,
+      );
       if (input.ownerId && input.ownerId !== loaded.ownerId) {
         await reassignInitiativeOwnerInTx(tx, {
           workspaceId,

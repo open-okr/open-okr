@@ -16,6 +16,8 @@ import {
   isLocalDate,
   LOCAL_DATE_PATTERN,
   listTimezones,
+  localDayBounds,
+  zonedInstant,
 } from "../src/index.ts";
 
 /**
@@ -94,6 +96,30 @@ describe("a local date", () => {
       expect(isLocalDate(value)).toBe(false);
     },
   );
+});
+
+describe("a local day in a zone", () => {
+  it("starts at the zone's midnight and ends just before the next", () => {
+    const day = localDayBounds("2026-10-31", "Asia/Jakarta");
+    expect(day.start.toISOString()).toBe("2026-10-30T17:00:00.000Z");
+    expect(day.end.toISOString()).toBe("2026-10-31T16:59:59.999Z");
+  });
+
+  it("reads the offset from the date, so a day a clock changes on is right", () => {
+    // London moves back an hour on 25 October 2026, so the day is 25 hours.
+    const day = localDayBounds("2026-10-25", "Europe/London");
+    expect(day.start.toISOString()).toBe("2026-10-24T23:00:00.000Z");
+    expect(day.end.toISOString()).toBe("2026-10-25T23:59:59.999Z");
+  });
+
+  it("names the same wall-clock time as a different instant in each zone", () => {
+    expect(zonedInstant("2026-10-12", "UTC", 9, 30).toISOString()).toBe(
+      "2026-10-12T09:30:00.000Z",
+    );
+    expect(
+      zonedInstant("2026-10-12", "America/New_York", 9, 30).toISOString(),
+    ).toBe("2026-10-12T13:30:00.000Z");
+  });
 });
 
 describe("a hex colour", () => {

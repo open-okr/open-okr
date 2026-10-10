@@ -5,7 +5,7 @@ import {
   confidenceBand,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import {
@@ -14,6 +14,7 @@ import {
   confidenceShown,
   confidenceStored,
 } from "./confidence-format.ts";
+import { useFormReset } from "./form-reset.ts";
 import { NumberInput } from "./number-input.tsx";
 
 const BAND_CLASS: Readonly<Record<ConfidenceBand, string>> = {
@@ -71,6 +72,8 @@ export function ConfidenceInput({
   const { t } = useTranslations();
   const [own, setOwn] = useState<number | null>(defaultValue ?? null);
   const stored = value !== undefined ? value : own;
+  const wrapper = useRef<HTMLDivElement>(null);
+  useFormReset(wrapper, () => setOwn(defaultValue ?? null));
   const scale = CONFIDENCE_SCALE[display];
   const band =
     thresholds && stored !== null
@@ -84,7 +87,7 @@ export function ConfidenceInput({
   };
 
   return (
-    <div className={cn("flex items-end gap-1.5", className)}>
+    <div ref={wrapper} className={cn("flex items-end gap-1.5", className)}>
       <NumberInput
         id={id}
         label={label}

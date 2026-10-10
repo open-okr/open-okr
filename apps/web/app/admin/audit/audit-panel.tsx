@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, DateRangeInput, useTranslations } from "@openokr/ui";
 import { useRef, useState } from "react";
 import {
   type AuditFilterRequest,
@@ -257,25 +257,20 @@ export function AuditPanel({
         </p>
 
         <form onSubmit={show} className="flex flex-col gap-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label htmlFor="audit-from" className={LABEL_CLASS}>
-              {t("admin.audit.from")}
-              <input
-                id="audit-from"
-                name="from"
-                type="date"
-                className={INPUT_CLASS}
-              />
-            </label>
-            <label htmlFor="audit-to" className={LABEL_CLASS}>
-              {t("admin.audit.to")}
-              <input
-                id="audit-to"
-                name="to"
-                type="date"
-                className={INPUT_CLASS}
-              />
-            </label>
+          <div className="flex flex-col gap-1">
+            <DateRangeInput
+              startLabel={t("admin.audit.from")}
+              endLabel={t("admin.audit.to")}
+              startName="from"
+              endName="to"
+              startId="audit-from"
+              endId="audit-to"
+            />
+            {/* The server reads the two days in this zone, which is the one
+                the rows below are stamped in. */}
+            <p className="text-xs text-ink-3">
+              {t("admin.audit.daysIn", { zone: timeZone })}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

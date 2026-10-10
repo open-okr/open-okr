@@ -17,6 +17,7 @@ export * from "./fields/confidence-format.ts";
 export * from "./fields/confidence-input.tsx";
 export * from "./fields/date-format.ts";
 export * from "./fields/date-input.tsx";
+export * from "./fields/date-range-input.tsx";
 export * from "./fields/email-input.tsx";
 export * from "./fields/number-input.tsx";
 export * from "./fields/secret-input.tsx";
