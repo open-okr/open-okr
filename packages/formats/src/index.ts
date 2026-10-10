@@ -32,4 +32,15 @@ export {
   isListedTimezone,
   listTimezones,
 } from "./timezone.ts";
-export { localDayBounds, zonedInstant, zoneOffsetAt } from "./zoned.ts";
+export {
+  isWallClock,
+  normaliseWallClock,
+  parseWallClock,
+  WALL_CLOCK_PATTERN,
+} from "./wall-clock.ts";
+export {
+  localDateTimeInstant,
+  localDayBounds,
+  zonedInstant,
+  zoneOffsetAt,
+} from "./zoned.ts";

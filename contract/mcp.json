@@ -314,11 +314,11 @@
                 "properties": {
                   "start": {
                     "type": "string",
-                    "pattern": "^\\d{1,2}:\\d{2}$"
+                    "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                   },
                   "end": {
                     "type": "string",
-                    "pattern": "^\\d{1,2}:\\d{2}$"
+                    "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                   }
                 },
                 "required": [
@@ -2463,7 +2463,7 @@
           },
           "dailySummaryTime": {
             "type": "string",
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
           },
           "routing": {
             "type": "object",
@@ -12955,7 +12955,7 @@
           },
           "time": {
             "type": "string",
-            "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$"
+            "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
           },
           "facilitatorId": {
             "type": "string",

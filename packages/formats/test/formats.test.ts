@@ -16,7 +16,10 @@ import {
   isLocalDate,
   LOCAL_DATE_PATTERN,
   listTimezones,
+  localDateTimeInstant,
   localDayBounds,
+  normaliseWallClock,
+  parseWallClock,
   zonedInstant,
 } from "../src/index.ts";
 
@@ -98,6 +101,25 @@ describe("a local date", () => {
   );
 });
 
+describe("a wall-clock time", () => {
+  it("takes an hour of one digit or two, and stores two", () => {
+    expect(normaliseWallClock("9:30")).toBe("09:30");
+    expect(normaliseWallClock("09:30")).toBe("09:30");
+    expect(normaliseWallClock(" 23:59 ")).toBe("23:59");
+    expect(normaliseWallClock("0:00")).toBe("00:00");
+  });
+
+  it("refuses a time no clock shows", () => {
+    for (const text of ["99:99", "24:00", "12:60", "9:5", "930", "", "noon"]) {
+      expect(parseWallClock(text)).toBeNull();
+    }
+  });
+
+  it("reads the hour and the minute", () => {
+    expect(parseWallClock("7:05")).toEqual({ hour: 7, minute: 5 });
+  });
+});
+
 describe("a local day in a zone", () => {
   it("starts at the zone's midnight and ends just before the next", () => {
     const day = localDayBounds("2026-10-31", "Asia/Jakarta");
@@ -110,6 +132,18 @@ describe("a local day in a zone", () => {
     const day = localDayBounds("2026-10-25", "Europe/London");
     expect(day.start.toISOString()).toBe("2026-10-24T23:00:00.000Z");
     expect(day.end.toISOString()).toBe("2026-10-25T23:59:59.999Z");
+  });
+
+  it("reads what a date and time control posts on the clock of the zone given", () => {
+    // guided-inputs §7: an operator in Kuala Lumpur, a server in UTC.
+    expect(
+      localDateTimeInstant(
+        "2026-10-12T09:00",
+        "Asia/Kuala_Lumpur",
+      )?.toISOString(),
+    ).toBe("2026-10-12T01:00:00.000Z");
+    expect(localDateTimeInstant("2026-10-12T09:00:00+08:00", "UTC")).toBeNull();
+    expect(localDateTimeInstant("next Monday", "UTC")).toBeNull();
   });
 
   it("names the same wall-clock time as a different instant in each zone", () => {

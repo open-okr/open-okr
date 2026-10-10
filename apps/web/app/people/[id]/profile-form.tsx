@@ -6,6 +6,7 @@ import {
   CardBody,
   CardHeader,
   RichTextField,
+  TimeRangeInput,
   TimezoneSelect,
   useTranslations,
 } from "@openokr/ui";
@@ -107,30 +108,14 @@ export function ProfileForm({
             description={t("people.detail.profileForm.emptyTheBioTo")}
           />
 
-          <fieldset className="flex flex-col gap-1">
-            <legend className="text-xs text-ink-3">
-              {t("people.detail.profileForm.quietHoursLeaveEmpty")}
-            </legend>
-            <div className="flex gap-2">
-              <input
-                name="quietStart"
-                type="time"
-                defaultValue={quietHours?.start ?? ""}
-                aria-label={t("people.detail.profileForm.quietStart")}
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-              />
-              <span className="self-center text-xs text-ink-3">
-                {t("common.to")}
-              </span>
-              <input
-                name="quietEnd"
-                type="time"
-                defaultValue={quietHours?.end ?? ""}
-                aria-label={t("people.detail.profileForm.quietEnd")}
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-              />
-            </div>
-          </fieldset>
+          <TimeRangeInput
+            label={t("people.detail.profileForm.quietHoursLeaveEmpty")}
+            startLabel={t("people.detail.profileForm.quietStart")}
+            endLabel={t("people.detail.profileForm.quietEnd")}
+            startName="quietStart"
+            endName="quietEnd"
+            defaultValue={quietHours ?? null}
+          />
 
           <div className="flex items-center gap-3 pt-1">
             <Button type="submit" variant="primary" disabled={pending}>

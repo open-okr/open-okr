@@ -57,7 +57,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { LOCAL_DATE_PATTERN } from "@openokr/formats";
+import { LOCAL_DATE_PATTERN, parseWallClock } from "@openokr/formats";
 import {
   afterCheckIn,
   CLOSE_DECISION_MEANINGS,
@@ -146,6 +146,7 @@ import { sessionChannel } from "../sessions/live.ts";
 import { measuredRhythmInTx } from "../sessions/measured-rhythm.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { wallClock } from "./wall-clock.ts";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -634,9 +635,6 @@ async function requireOpenCycle(
   return cycle;
 }
 
-/** `HH:MM`, read as a wall-clock time where the workspace is. */
-const WALL_CLOCK = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
 /**
  * An instant from a caller's time. A time with no offset is read in the
  * workspace timezone, which is what a person typing "Monday 09:00" means.
@@ -810,7 +808,7 @@ export const bookCycleSessions = defineWriteAction({
     /** 1 for Monday to 5 for Friday. */
     weekday: z.number().int().min(1).max(5),
     /** `HH:MM` where the workspace is. */
-    time: z.string().regex(WALL_CLOCK, "Give the time as HH:MM."),
+    time: wallClock,
     facilitatorId: z.uuid(),
   }),
   output: z.object({
@@ -856,18 +854,12 @@ export const bookCycleSessions = defineWriteAction({
       }
       const cycle = await requireOpenCycle(tx, workspaceId, cycleId);
 
-      const [, hour, minute] = WALL_CLOCK.exec(input.time) as unknown as [
-        string,
-        string,
-        string,
-      ];
+      const { hour, minute } = parseWallClock(input.time) as {
+        hour: number;
+        minute: number;
+      };
       const at = (on: string) =>
-        localInstant(
-          parseLocalDate(on),
-          Number(hour),
-          Number(minute),
-          timeZone,
-        );
+        localInstant(parseLocalDate(on), hour, minute, timeZone);
       // Today still counts while its hour is ahead.
       const from =
         at(today) > now

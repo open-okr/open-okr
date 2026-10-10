@@ -86,3 +86,35 @@ export function localDayBounds(
     end: zonedInstant(on, timeZone, 23, 59, 59, 999),
   };
 }
+
+/**
+ * The instant a `YYYY-MM-DDTHH:MM` reading on a zone's clock names: what a
+ * `datetime-local` control posts, which carries no zone of its own. Null when
+ * the text is not one, so a caller holding an instant with an offset can
+ * read it as it is.
+ */
+export function localDateTimeInstant(
+  value: string,
+  timeZone: string,
+): Date | null {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(
+    value.trim(),
+  );
+  if (!match) {
+    return null;
+  }
+  const [, on, hour, minute, second] = match as unknown as [
+    string,
+    string,
+    string,
+    string,
+    string | undefined,
+  ];
+  return zonedInstant(
+    on,
+    timeZone,
+    Number(hour),
+    Number(minute),
+    Number(second ?? 0),
+  );
+}

@@ -109,7 +109,10 @@ test.beforeAll(async ({ browser }) => {
      on conflict (key) do update set value = excluded.value`,
   );
   customer = await browser.newContext();
-  operator = await browser.newContext();
+  // The operator's browser is in São Paulo: UTC-3 all year since Brazil
+  // dropped summer time, and the zone of neither the machine running this
+  // nor continuous integration, so a time read in the server's zone fails.
+  operator = await browser.newContext({ timezoneId: "America/Sao_Paulo" });
   customerPage = await customer.newPage();
   operatorPage = await operator.newPage();
 });
@@ -228,4 +231,35 @@ test("the instance page says what is true of the deployment", async () => {
   await expect(
     operatorPage.getByRole("heading", { name: "Messages" }),
   ).toBeVisible();
+});
+
+/**
+ * guided-inputs §7: a site message's window is read on the operator's own
+ * clock. The form posts the browser's zone beside each time, where it used to
+ * post the time alone and the server read it in its own zone.
+ */
+test("a site message's window is read on the operator's own clock", async () => {
+  await goTo(operatorPage, "/operator/instance");
+  const body = `Planned maintenance ${Date.now()}`;
+  await operatorPage.getByLabel("Message", { exact: true }).fill(body);
+  // Years ahead, so the message is never live for a later spec.
+  await operatorPage.getByLabel("Shows from").fill("2031-03-04T09:00");
+  await operatorPage.getByLabel("Stops at").fill("2031-03-04T10:30");
+  await expect(
+    operatorPage.getByText("In America/Sao_Paulo time.").first(),
+  ).toBeVisible();
+  await operatorPage.getByRole("button", { name: "Show this message" }).click();
+
+  await expect(async () => {
+    const { rows } = await pool.query<{ starts: string; ends: string }>(
+      `select to_char(starts_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI') as starts,
+              to_char(ends_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI') as ends
+         from site_messages where body = $1`,
+      [body],
+    );
+    expect(rows).toEqual([
+      { starts: "2031-03-04T12:00", ends: "2031-03-04T13:30" },
+    ]);
+  }).toPass({ timeout: 15_000 });
+  await pool.query("delete from site_messages where body = $1", [body]);
 });

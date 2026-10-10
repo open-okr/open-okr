@@ -242,7 +242,7 @@ test("saving your profile keeps the quiet hours set here", async () => {
   await expect(page.locator('input[name="quietEnd"]')).toHaveValue("07:00");
 });
 
-test("one time without the other is refused, and the window stays", async () => {
+test("one time without the other is held back, and the window stays", async () => {
   await goTo(page, "/account/channels");
   const delivery = page
     .locator("form")
@@ -257,10 +257,18 @@ test("one time without the other is refused, and the window stays", async () => 
   }).toPass({ timeout: 20_000 });
   await delivery.getByRole("button", { name: "Save" }).click();
 
-  await expect(delivery.getByRole("alert")).toContainText(
-    "Set both times, or clear both",
+  // guided-inputs §4.9: the empty half is required while the other is set,
+  // so the browser holds the save, and the field says why under it. The
+  // server would refuse it too (apps/web/test/quiet-hours.test.ts).
+  await expect(delivery.getByRole("alert")).toHaveText(
+    "Give both times, or clear both.",
     { timeout: 10_000 },
   );
+  expect(
+    await delivery
+      .locator('input[name="quietEnd"]')
+      .evaluate((input: HTMLInputElement) => input.validity.valueMissing),
+  ).toBe(true);
 
   await goTo(page, "/account/channels");
   await expect(page.locator('input[name="quietStart"]')).toHaveValue("22:00", {

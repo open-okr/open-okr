@@ -58,6 +58,7 @@ import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { resolveMemberSettings } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { wallClock } from "./wall-clock.ts";
 
 /** `null` clears the bio; anything else must be a valid rich text
  * document (docs/design/rich-text-editor.md). Validated at the input
@@ -146,10 +147,7 @@ export const updateOwnProfile = defineWriteAction({
      * nothing.
      */
     quietHours: z
-      .object({
-        start: z.string().regex(/^\d{1,2}:\d{2}$/, "Use HH:MM."),
-        end: z.string().regex(/^\d{1,2}:\d{2}$/, "Use HH:MM."),
-      })
+      .object({ start: wallClock, end: wallClock })
       .nullable()
       .optional(),
   }),

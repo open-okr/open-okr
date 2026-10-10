@@ -13,9 +13,10 @@ export function useFormReset(
   onReset: () => void,
 ): void {
   const latest = useRef(onReset);
-  useEffect(() => {
-    latest.current = onReset;
-  });
+  // Kept in render, not in an effect: a save that succeeds brings the new
+  // saved value in the same commit React resets the form in, before any
+  // effect runs, and the reset has to go back to that value.
+  latest.current = onReset;
   useEffect(() => {
     const form = within.current?.closest("form");
     if (!form) {
