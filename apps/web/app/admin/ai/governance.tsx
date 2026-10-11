@@ -4,6 +4,7 @@ import {
   type AIContextEgressLevel,
   type AIPrivacySettings,
   ASSIST_FEATURE_KEYS,
+  MAX_ALLOWED_HOSTS,
   REVIEW_ASSIST_KEYS,
   RHYTHM_ASSIST_KEYS,
 } from "@openokr/core";
@@ -20,6 +21,7 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  TokenInput,
 } from "@openokr/ui";
 import { type MemberLike, memberOption } from "../../../lib/entity-options.ts";
 import {
@@ -678,26 +680,19 @@ export async function PrivacyCard({
               </span>
             </label>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="ai-privacy-hosts"
-                className="text-xs font-semibold text-ink-2"
-              >
-                {t("admin.ai.privacy.allowedHosts")}
-              </label>
-              <textarea
-                id="ai-privacy-hosts"
-                name="allowedHosts"
-                rows={3}
-                defaultValue={privacy.allowedHosts.join("\n")}
-                placeholder={t("admin.ai.privacy.allowedHostsPlaceholder")}
-                aria-describedby="ai-privacy-hosts-help"
-                className="rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-xs text-ink"
-              />
-              <p id="ai-privacy-hosts-help" className="text-xs text-ink-3">
-                {t("admin.ai.privacy.allowedHostsHelp")}
-              </p>
-            </div>
+            {/* A chip each, checked as it is made by the rule the action
+                applies, a pasted address reduced to its host (§4.11). */}
+            <TokenInput
+              id="ai-privacy-hosts"
+              label={t("admin.ai.privacy.allowedHosts")}
+              name="allowedHosts"
+              joiner={"\n"}
+              rule="host"
+              max={MAX_ALLOWED_HOSTS}
+              defaultValue={privacy.allowedHosts}
+              placeholder={t("admin.ai.privacy.allowedHostsPlaceholder")}
+              description={t("admin.ai.privacy.allowedHostsHelp")}
+            />
 
             <div>
               <Button type="submit" variant="default" size="sm">

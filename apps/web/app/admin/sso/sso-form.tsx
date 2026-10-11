@@ -1,7 +1,7 @@
 "use client";
 
 import type { SSOConnectionDetails } from "@openokr/core";
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, TokenInput, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Field, fieldInputClass } from "../../(auth)/auth-card";
@@ -313,12 +313,15 @@ export function SSOForm({
           {problem("clientId")}
           {problem("clientSecret")}
 
-          <Field
+          {/* A chip each, posted space-separated as the provider reads
+              them (guided-inputs §4.11). */}
+          <TokenInput
             id={idFor("scopes")}
             label={t("account.apiTokens.scopes")}
             name="scopes"
+            joiner=" "
             placeholder={t("admin.sso.ssoForm.scopesPlaceholder")}
-            defaultValue={connection?.scopes}
+            defaultValue={(connection?.scopes ?? "").split(" ").filter(Boolean)}
           />
         </>
       ) : (
@@ -377,12 +380,17 @@ export function SSOForm({
         </>
       )}
 
-      <Field
+      {/* Each a domain, on the rule the server now applies (§4.11). */}
+      <TokenInput
         id={idFor("emailDomains")}
         label={t("admin.sso.ssoForm.emailDomains")}
         name="emailDomains"
+        rule="domain"
         placeholder={t("admin.sso.ssoForm.emailDomainsPlaceholder")}
-        defaultValue={connection?.emailDomains}
+        defaultValue={(connection?.emailDomains ?? "")
+          .split(",")
+          .map((one) => one.trim())
+          .filter(Boolean)}
       />
       {problem("emailDomains")}
 

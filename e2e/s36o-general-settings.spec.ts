@@ -12,7 +12,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
-const DOMAIN_FIELD = "Trusted email domains (comma-separated)";
+const DOMAIN_FIELD = "Trusted email domains";
 
 test.describe.configure({ mode: "serial" });
 
@@ -71,18 +71,22 @@ test("a zone off the list matches nothing, and one on it is found by its offset"
 
 test("an entry that is not a domain is refused, and named", async () => {
   await goTo(page, "/admin/general");
-  const before = await page.getByLabel(DOMAIN_FIELD).inputValue();
+  // What the form posts: the chips, joined (guided-inputs §4.11).
+  const posted = page.locator('input[name="trustedEmailDomains"]');
+  const before = await posted.inputValue();
 
+  // Marked where it stands as it is made, and the save is held: the server
+  // refuses it too, which `apps/web/test/general-settings.test.ts` checks.
   await type(DOMAIN_FIELD, "priya@northwind");
+  await page.getByLabel(DOMAIN_FIELD, { exact: true }).press("Enter");
+  await expect(
+    generalForm().getByText(/^priya@northwind is not a domain\./),
+  ).toBeVisible({ timeout: 10_000 });
   await generalForm().getByRole("button", { name: "Save", exact: true }).click();
 
-  await expect(generalForm().getByRole("alert")).toContainText(
-    "priya@northwind is not a domain",
+  await goTo(page, "/admin/general");
+  await expect(page.locator('input[name="trustedEmailDomains"]')).toHaveValue(
+    before,
     { timeout: 10_000 },
   );
-
-  await goTo(page, "/admin/general");
-  await expect(page.getByLabel(DOMAIN_FIELD)).toHaveValue(before, {
-    timeout: 10_000,
-  });
 });

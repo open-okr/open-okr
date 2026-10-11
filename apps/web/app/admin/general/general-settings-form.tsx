@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   TimezoneSelect,
+  TokenInput,
   useTranslations,
 } from "@openokr/ui";
 import { type FormEvent, startTransition, useActionState } from "react";
@@ -61,8 +62,8 @@ export function GeneralSettingsForm({
   };
 
   const trustedEmailDomains = Array.isArray(settings.trustedEmailDomains)
-    ? (settings.trustedEmailDomains as string[]).join(", ")
-    : "";
+    ? (settings.trustedEmailDomains as string[])
+    : [];
 
   return (
     <Card>
@@ -114,26 +115,25 @@ export function GeneralSettingsForm({
               ) : null}
             </select>
           </label>
-          <label htmlFor="trustedEmailDomains" className={LABEL_CLASS}>
-            {t("admin.general.generalSettingsForm.trustedEmailDomainsComma")}
-            <input
-              id="trustedEmailDomains"
-              name="trustedEmailDomains"
-              defaultValue={trustedEmailDomains}
-              aria-describedby="trustedEmailDomainsHint"
-              className={INPUT_CLASS}
-            />
-          </label>
-          {/* What the setting does, and the one condition it needs
-              (completeness review M-34): it saved and did nothing for as long
-              as nothing offered it, and an instance with no mail confirms no
-              address, so it still admits nobody there. */}
-          <p
-            id="trustedEmailDomainsHint"
-            className="-mt-1.5 max-w-sm text-xs text-ink-3"
-          >
-            {t("admin.general.generalSettingsForm.trustedEmailDomainsHint")}
-          </p>
+          {/* Each domain a chip, checked by the rule the server applies
+              (guided-inputs §4.11). The hint says what the setting does and
+              the one condition it needs (completeness review M-34): it saved
+              and did nothing for as long as nothing offered it, and an
+              instance with no mail confirms no address, so it still admits
+              nobody there. */}
+          <TokenInput
+            id="trustedEmailDomains"
+            label={t(
+              "admin.general.generalSettingsForm.trustedEmailDomainsComma",
+            )}
+            name="trustedEmailDomains"
+            rule="domain"
+            defaultValue={trustedEmailDomains}
+            description={t(
+              "admin.general.generalSettingsForm.trustedEmailDomainsHint",
+            )}
+            className="max-w-sm"
+          />
           <div className="flex flex-col gap-1 border-t border-line pt-3">
             <label
               htmlFor="requireSecondFactor"

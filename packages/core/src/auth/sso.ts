@@ -12,6 +12,7 @@
  */
 import { X509Certificate } from "node:crypto";
 import { withSSOLookup, withWorkspace } from "@openokr/db";
+import { isDomain } from "@openokr/formats";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
@@ -532,6 +533,19 @@ export function validateSSOConnectionInput(
       message:
         "The display name is what the button on the sign-in page says. " +
         "Give it one.",
+    };
+  }
+  // Each a domain, on the rule trusted domains use (guided-inputs §4.11):
+  // "acme" was stored and matched nobody's address.
+  const notADomain = (input.emailDomains ?? "")
+    .split(",")
+    .map((one) => one.trim().toLowerCase())
+    .filter((one) => one !== "")
+    .find((one) => !isDomain(one));
+  if (notADomain !== undefined) {
+    return {
+      field: "emailDomains",
+      message: `"${notADomain}" is not a domain. Write each like acme.com, without @ or https://.`,
     };
   }
   if (input.enforce && !input.emailDomains?.trim()) {

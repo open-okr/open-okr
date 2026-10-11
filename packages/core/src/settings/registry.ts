@@ -1,6 +1,7 @@
 import {
   DOMAIN_PATTERN,
   HEX_COLOUR_PATTERN,
+  isHostName,
   isKnownTimezone,
   isListedTimezone,
 } from "@openokr/formats";
@@ -274,31 +275,8 @@ export type AIContextEgressLevel = (typeof AI_CONTEXT_EGRESS_LEVELS)[number];
 
 export const aiContextEgressSchema = z.enum(AI_CONTEXT_EGRESS_LEVELS);
 
-/** One DNS label: letters, digits and inner hyphens, 63 at most. */
-const isHostLabel = (label: string): boolean =>
-  /^[a-z0-9-]{1,63}$/.test(label) &&
-  !label.startsWith("-") &&
-  !label.endsWith("-");
-
-/**
- * A host an AI call may reach: a name, or an address written as one.
- *
- * Checked label by label rather than with one pattern over the whole name,
- * which is the shape a backtracking engine takes polynomial time over. An
- * IPv6 address is accepted as its own characters, without brackets.
- */
-function isHostName(value: string): boolean {
-  if (value.length === 0 || value.length > 253) {
-    return false;
-  }
-  if (value.includes(":")) {
-    return /^[0-9a-f:.]{2,45}$/.test(value);
-  }
-  return value.split(".").every(isHostLabel);
-}
-
 /** Fifty hosts is past any real list, and a list is read on every AI call. */
-const MAX_ALLOWED_HOSTS = 50;
+export const MAX_ALLOWED_HOSTS = 50;
 
 export const aiEgressAllowListSchema = z
   .array(

@@ -29,6 +29,7 @@ import type {
   BudgetScope,
   ModelTier,
 } from "@openokr/db";
+import { hostOf } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { testWorkspaceKey } from "../../../lib/ai-key-test";
 import { getPool } from "../../../lib/pool";
@@ -357,16 +358,7 @@ function hostsFrom(raw: string): string[] {
     .split(/[\s,]/)
     .map((entry) => entry.trim())
     .filter((entry) => entry !== "")
-    .map((entry) => {
-      if (!entry.includes("://")) {
-        return entry;
-      }
-      try {
-        return new URL(entry).hostname;
-      } catch {
-        return entry;
-      }
-    });
+    .map(hostOf);
 }
 
 /**

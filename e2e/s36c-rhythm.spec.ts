@@ -36,6 +36,7 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { setTokens } from "./tokens.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -195,7 +196,9 @@ test("a word list takes this workspace's own terms, and keeps the method's", asy
   // than replaces, because replacing would let a workspace switch a quality
   // rule off by storing an empty list.
   await goTo(page, "/admin/rhythm");
-  const field = page.locator(
+  // The list's own box, and what the form posts for it (guided-inputs §4.11).
+  const field = page.getByLabel("Your own output verbs terms", { exact: true });
+  const posted = page.locator(
     "input[name='words:quality.wordLists:outputVerbs']",
   );
   await expect(field).toBeVisible();
@@ -206,7 +209,7 @@ test("a word list takes this workspace's own terms, and keeps the method's", asy
     .textContent();
   expect(before).toContain("launch");
 
-  await field.fill("luncurkan, terbitkan");
+  await setTokens(field, ["luncurkan", "terbitkan"]);
   await page
     .getByTestId("rhythm-card-quality")
     .getByRole("button", { name: "Save" })
@@ -216,12 +219,12 @@ test("a word list takes this workspace's own terms, and keeps the method's", asy
   });
 
   await goTo(page, "/admin/rhythm");
-  await expect(field).toHaveValue("luncurkan, terbitkan");
+  await expect(posted).toHaveValue("luncurkan, terbitkan");
   // The method's own terms are still there, and still not editable.
   await expect(page.getByText(/^launch, build, ship/).first()).toBeVisible();
 
   // Put it back, so no later spec inherits this workspace's vocabulary.
-  await field.fill("");
+  await setTokens(field, []);
   await page
     .getByTestId("rhythm-card-quality")
     .getByRole("button", { name: "Save" })

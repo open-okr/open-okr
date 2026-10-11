@@ -86,6 +86,23 @@ describe("what the screen refuses rather than stores", () => {
     expect(problem?.message).toContain("sign-on URL");
   });
 
+  it("refuses an email domain that is not a domain, naming it", () => {
+    // guided-inputs §4.11: the third of three domain rules was none at all,
+    // so "acme" was stored and matched nobody's address.
+    const problem = validateSSOConnectionInput({
+      ...samlInput(),
+      emailDomains: "acme.example, acme",
+    });
+    expect(problem?.field).toBe("emailDomains");
+    expect(problem?.message).toContain('"acme"');
+    expect(
+      validateSSOConnectionInput({
+        ...samlInput(),
+        emailDomains: "acme.example, Acme.Org",
+      }),
+    ).toBeNull();
+  });
+
   it("refuses a certificate that is not one", () => {
     const problem = validateSSOConnectionInput({
       ...samlInput(),

@@ -1,5 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip, EntityPicker } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+  TokenInput,
+} from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { namedOption } from "../../../lib/entity-options.ts";
 import { getPool } from "../../../lib/pool";
@@ -256,17 +263,15 @@ export default async function InvitationsPage() {
                   />
                 </label>
               </div>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("admin.invitations.allowedDomains")}
-                <input
-                  name="allowedDomains"
-                  placeholder={t("admin.invitations.exampleComExampleOrg")}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-                <span className="text-ink-4">
-                  {t("admin.invitations.leaveEmptyToAccept")}
-                </span>
-              </label>
+              {/* Each domain a chip, checked by the rule trusted domains use
+                  (guided-inputs §4.11). */}
+              <TokenInput
+                label={t("admin.invitations.allowedDomains")}
+                name="allowedDomains"
+                rule="domain"
+                placeholder={t("admin.invitations.exampleComExampleOrg")}
+                description={t("admin.invitations.leaveEmptyToAccept")}
+              />
             </InviteForm>
           </CardBody>
         </Card>

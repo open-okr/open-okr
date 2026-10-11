@@ -201,7 +201,10 @@ describe("reading the card back", () => {
     expect(ticked(html, 'value="none"')).toBe(false);
     expect(ticked(html, 'name="redactPersonalData"')).toBe(true);
     expect(ticked(html, 'name="noTraining"')).toBe(false);
-    expect(html).toContain("api.anthropic.com\nopenrouter.ai</textarea>");
+    // A chip each, posted one per line (guided-inputs §4.11).
+    expect(html).toContain(
+      'name="allowedHosts" value="api.anthropic.com\nopenrouter.ai"',
+    );
   });
 
   it("says what each control does and where it stops", async () => {

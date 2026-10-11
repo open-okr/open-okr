@@ -9,6 +9,7 @@ import {
   CardHeader,
   Chip,
   cn,
+  TokenInput,
   useFormDirty,
   useKeyboardRegistry,
   useSubmitShortcut,
@@ -175,13 +176,14 @@ function WordLists({
           ? (added[name] as readonly string[])
           : [];
         const theirs = terms.filter((term) => !ours.includes(term));
+        const spaced = name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
         return (
           <div key={name} className="flex flex-col gap-0.5">
             <dt className="text-xs font-semibold text-ink-2">
               {/* The registry's own camelCase key, spaced out. Renaming these
                   would mean renaming them in `packages/method`, and they are
                   the method's names rather than this screen's. */}
-              {name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()}
+              {spaced}
               <span className="ml-1.5 font-normal text-ink-4">
                 {theirs.length}
                 {ours.length > 0 ? ` + ${ours.length}` : ""}
@@ -194,16 +196,20 @@ function WordLists({
               {theirs.join(", ")}
             </dd>
             <dd>
-              <label className="flex flex-col gap-0.5 text-xs text-ink-4">
-                {t("admin.rhythm.rhythmForm.yourOwnTerms")}
-                <input
-                  name={`words:${entryKey}:${name}`}
-                  disabled={!canManage}
-                  defaultValue={ours.join(", ")}
-                  placeholder={t("admin.rhythm.rhythmForm.noneAdded")}
-                  className="w-full rounded-md border border-line bg-bg px-2 py-1 text-sm text-ink"
-                />
-              </label>
+              {/* A chip each, split on commas only, because a term can be two
+                  words (guided-inputs §4.11). Named with its list, where six
+                  boxes all answered to "Your own terms". */}
+              <TokenInput
+                label={t("admin.rhythm.rhythmForm.yourOwnTermsIn", {
+                  list: spaced,
+                })}
+                name={`words:${entryKey}:${name}`}
+                separators="commas"
+                normalise={(term) => term.toLowerCase()}
+                disabled={!canManage}
+                defaultValue={ours}
+                placeholder={t("admin.rhythm.rhythmForm.noneAdded")}
+              />
             </dd>
           </div>
         );

@@ -26,6 +26,7 @@ export * from "./fields/secret-input.tsx";
 export * from "./fields/text-input.tsx";
 export * from "./fields/time-input.tsx";
 export * from "./fields/timezone-select.tsx";
+export * from "./fields/token-input.tsx";
 export * from "./fields/unit-input.tsx";
 export * from "./forms/unsaved-changes.tsx";
 export * from "./forms/use-form-dirty.ts";

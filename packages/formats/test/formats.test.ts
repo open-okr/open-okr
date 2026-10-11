@@ -8,9 +8,11 @@ import {
   formatDeviceUserCode,
   HEX_COLOUR_HTML_PATTERN,
   HEX_COLOUR_PATTERN,
+  hostOf,
   isDomain,
   isEmailAddress,
   isHexColour,
+  isHostName,
   isKnownTimezone,
   isListedTimezone,
   isLocalDate,
@@ -153,6 +155,28 @@ describe("a local day in a zone", () => {
     expect(
       zonedInstant("2026-10-12", "America/New_York", 9, 30).toISOString(),
     ).toBe("2026-10-12T13:30:00.000Z");
+  });
+});
+
+describe("a host an AI call may reach", () => {
+  it("is a name or an address, never a URL", () => {
+    for (const host of ["api.openai.com", "localhost", "10.0.0.7", "::1"]) {
+      expect(isHostName(host)).toBe(true);
+    }
+    for (const host of [
+      "https://api.openai.com",
+      "api.openai.com/v1",
+      "-bad.example",
+      "",
+    ]) {
+      expect(isHostName(host)).toBe(false);
+    }
+  });
+
+  it("is what a pasted address leaves once its host is taken", () => {
+    expect(hostOf("https://openrouter.ai/api/v1")).toBe("openrouter.ai");
+    expect(hostOf(" API.Anthropic.com ")).toBe("api.anthropic.com");
+    expect(hostOf("not_a_host!")).toBe("not_a_host!");
   });
 });
 

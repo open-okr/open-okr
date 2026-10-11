@@ -1107,6 +1107,7 @@ export {
   findWorkspaceSetting,
   INSTANCE_DEFAULT_LANGUAGE,
   languageSchema,
+  MAX_ALLOWED_HOSTS,
   type ProvisioningContext,
   primaryChannelSchema,
   resolveMemberSettings,
