@@ -114,6 +114,16 @@ test("a notification is listed, links to its goal, and clears the badge", async 
     throw new Error("No goal in the workspace to notify about");
   }
 
+  // **Only this test's notification is unread.** The badge below is read
+  // as an exact count, and the Champion's hourly run, which the server's own
+  // scheduler fires on the hour, can leave a real nudge for this member
+  // between the specs before this one and here. Continuous integration met
+  // it at 16:01 and read "2" where the test had added one.
+  await pool.query(
+    `update notifications set read_at = now()
+      where recipient_member_id = $1 and read_at is null`,
+    [member.id],
+  );
   await pool.query(
     `insert into notifications
        (id, workspace_id, recipient_member_id, subject_type, subject_id,
