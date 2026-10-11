@@ -1,4 +1,4 @@
-import { Button } from "@openokr/ui";
+import { Button, EntityPicker } from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
 
@@ -71,19 +71,15 @@ export async function CycleSwitcher({
           method="get"
           className="flex items-center gap-1.5"
         >
-          <select
+          <EntityPicker
+            label={t("cycle.switcher.whichCycle")}
+            hideLabel
             name="cycle"
-            defaultValue={currentId ?? undefined}
-            aria-label={t("cycle.switcher.whichCycle")}
-            data-testid="cycle-picker"
-            className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
-          >
-            {inMode.map((one) => (
-              <option key={one.id} value={one.id}>
-                {one.name}
-              </option>
-            ))}
-          </select>
+            defaultValue={currentId ?? null}
+            options={inMode.map((one) => ({ id: one.id, label: one.name }))}
+            className="w-56"
+            inputClassName="text-xs"
+          />
           <Button type="submit" variant="ghost" size="sm">
             {t("cycle.switcher.open")}
           </Button>

@@ -1,9 +1,17 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip, DateInput } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  DateInput,
+  EntityPicker,
+} from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { namedOption } from "../../lib/entity-options.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -240,35 +248,29 @@ export default async function BoardPage({
                   {scope.spaceId ? null : (
                     // A key result whose goal belongs to no space: the person
                     // adding the work says where it lives.
-                    <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                      {t("board.scope.spaceItLivesIn")}
-                      <select
-                        name="spaceId"
-                        className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                      >
-                        {spaces.map((one) => (
-                          <option key={one.id} value={one.id}>
-                            {one.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    // It opens on the first space, as the select it replaced
+                    // did, and a space is required.
+                    <EntityPicker
+                      label={t("board.scope.spaceItLivesIn")}
+                      name="spaceId"
+                      required
+                      defaultValue={spaces[0]?.id ?? null}
+                      options={spaces.map(namedOption)}
+                      className="w-56"
+                    />
                   )}
                   {scope.kind === "key_result" ? null : (
-                    <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                      {t("board.keyResultItMoves")}
-                      <select
-                        name="keyResultId"
-                        className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                      >
-                        <option value="">{t("board.noneYet")}</option>
-                        {keyResults.map((one) => (
-                          <option key={one.id} value={one.id}>
-                            {one.title}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <EntityPicker
+                      label={t("board.keyResultItMoves")}
+                      name="keyResultId"
+                      defaultValue={null}
+                      options={keyResults.map((one) => ({
+                        id: one.id,
+                        label: one.title,
+                      }))}
+                      noneLabel={t("board.noneYet")}
+                      className="w-64"
+                    />
                   )}
                   <DateInput label={t("board.due")} name="dueOn" />
                 </div>

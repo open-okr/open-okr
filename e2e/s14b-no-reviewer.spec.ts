@@ -17,6 +17,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 const ON = `${new Date().getUTCFullYear() + 3}-08-15`;
 const TITLE = "Answer once, in the product, without a reviewer";
@@ -69,9 +70,7 @@ test("an objective drafted with no reviewer reads as having none", async ({
     await page
       .getByRole("textbox", { name: "What it contributes to" })
       .fill("Carries the support load priority");
-    await page
-      .getByLabel("Reviewer", { exact: true })
-      .selectOption({ label: "No reviewer" });
+    await choose(page.getByLabel("Reviewer", { exact: true }), "No reviewer");
     await page.getByRole("button", { name: "Add objective" }).click();
   }
   await expect(drafted).toBeVisible({ timeout: 15_000 });

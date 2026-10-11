@@ -88,6 +88,32 @@ function folded(text: string): string {
     .trim();
 }
 
+/** What an option says, as one string: two options saying it alike are one. */
+function said(option: EntityOption | null | undefined): string {
+  return option
+    ? [option.id, option.label, option.detail ?? "", option.badge ?? ""].join(
+        "\u0000",
+      )
+    : "";
+}
+
+/**
+ * The value from the render that first said it, for as long as `key` stays
+ * the same.
+ *
+ * A screen draws its options anew whenever it draws, and the combobox tells a
+ * changed value by its identity rather than its content: a new chosen option
+ * put the stored name back over what the person was typing. A diagram card
+ * draws whenever anything on the canvas moves, so it happened mid-word.
+ */
+function useSame<T>(value: T, key: string): T {
+  const held = useRef({ key, value });
+  if (held.current.key !== key) {
+    held.current = { key, value };
+  }
+  return held.current.value;
+}
+
 function matches(option: EntityOption, query: string): boolean {
   const wanted = folded(query);
   if (wanted === "") {
@@ -139,14 +165,19 @@ export function EntityPicker({
     () => (noneLabel === undefined ? null : { id: "", label: noneLabel }),
     [noneLabel],
   );
+  const sameOptions = useSame(
+    options,
+    options.map((option) => said(option)).join("\u0001"),
+  );
+  const sameCurrent = useSame(current ?? null, said(current));
   // The stored choice first when the list has lost it, then the list.
   const listed = useMemo(() => {
     const all =
-      current && !options.some((option) => option.id === current.id)
-        ? [current, ...options]
-        : [...options];
+      sameCurrent && !sameOptions.some((option) => option.id === sameCurrent.id)
+        ? [sameCurrent, ...sameOptions]
+        : [...sameOptions];
     return none ? [none, ...all] : all;
-  }, [options, current, none]);
+  }, [sameOptions, sameCurrent, none]);
 
   // Above the browser's share, the server answers what is typed.
   const remote =

@@ -23,6 +23,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import pg from "pg";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { chooseAt } from "./pickers.ts";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
@@ -157,7 +158,7 @@ test("linking it to a key result is done from the initiative itself", async () =
 
   const picker = page.getByLabel("Key result to link");
   await expect(picker).toBeVisible({ timeout: 10_000 });
-  await picker.selectOption({ index: 0 });
+  await chooseAt(picker, 0);
   // Exact: the comment editor's toolbar on this page has "Insert link".
   await page.getByRole("button", { name: "Link", exact: true }).click();
 

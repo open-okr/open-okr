@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { INSTANCE_ACCOUNT, skipOnboarding } from "./instance-account.ts";
+import { choose, chooseAt } from "./pickers.ts";
 
 /**
  * Registration to dashboard, in a real browser (P1-T08).
@@ -446,8 +447,9 @@ test("the planning phases complete from the browser, and the gaps clear", async 
 
   // Roles, the first planning session two weeks out, and a first cycle.
   const setup = page.locator("form", { has: page.getByLabel("Sponsor") });
-  await setup.getByLabel("Sponsor").selectOption({ index: 1 });
-  await setup.getByLabel("Facilitator").selectOption({ index: 1 });
+  // The first person each picker offers, after "Nobody".
+  await chooseAt(setup.getByLabel("Sponsor"), 1);
+  await chooseAt(setup.getByLabel("Facilitator"), 1);
   const inTwoWeeks = new Date(Date.now() + 14 * 86_400_000)
     .toISOString()
     .slice(0, 10);
@@ -658,11 +660,12 @@ test("the quality panel groups every issue and links at the field", async () => 
   // The form now gives each key result an owner and a date (H-09), so KR-3
   // passes as drafted. Clearing one owner with the inline control is what
   // makes it fire, and proves the control writes.
-  await page
-    .getByRole("combobox", {
+  await choose(
+    page.getByRole("combobox", {
       name: "Owner of Raise mobile activation from 41% to 60%",
-    })
-    .selectOption("");
+    }),
+    "No owner",
+  );
   await page
     .locator("form", {
       has: page.getByRole("combobox", {

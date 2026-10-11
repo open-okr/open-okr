@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { describe, expect, test, vi } from "vitest";
 import {
   type EntityOption,
@@ -159,6 +159,42 @@ describe("an entity picker", () => {
     await user.click(await screen.findByRole("option", { name: /Mei Tan/ }));
     expect(chose).toHaveBeenLastCalledWith("m-3");
     expect(pressed).not.toHaveBeenCalled();
+  });
+
+  test("keeps what is typed when what holds it draws again with new options", async () => {
+    // A diagram card draws again whenever anything on the canvas moves, each
+    // time with a new list of the same targets, and the box went back to
+    // the stored choice's name under the person typing.
+    const user = userEvent.setup();
+    function Card() {
+      const [tick, setTick] = useState(0);
+      useEffect(() => {
+        const timer = setInterval(() => setTick((one) => one + 1), 20);
+        return () => clearInterval(timer);
+      }, []);
+      return (
+        <EntityPicker
+          label={`Move ${tick % 1}`}
+          options={PEOPLE.map((one) => ({ ...one }))}
+          defaultValue="m-2"
+        />
+      );
+    }
+    inEnglish(<Card />);
+    const box = screen.getByLabelText("Move 0") as HTMLInputElement;
+    await user.click(box);
+    // Typed over the stored name rather than cleared first: clearing drops
+    // the choice, and a choice still held is what the redraw put back.
+    await user.type(box, "Mei", {
+      initialSelectionStart: 0,
+      initialSelectionEnd: box.value.length,
+    });
+    await act(async () => new Promise((done) => setTimeout(done, 100)));
+    expect(box.value).toBe("Mei");
+    const options = await screen.findAllByRole("option");
+    expect(options.map((one) => one.textContent)).toEqual([
+      expect.stringContaining("Mei Tan"),
+    ]);
   });
 
   test("in a table cell is named by its label alone", () => {

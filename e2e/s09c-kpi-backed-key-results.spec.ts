@@ -91,11 +91,9 @@ test("drafting names the KPI, and the key result starts where it stands", async 
   goalId = await form.locator('input[name="goalId"]').inputValue();
 
   // By hand unless somebody chooses otherwise.
-  await expect(form.getByLabel("Measured by")).toHaveValue("");
+  await expect(form.getByLabel("Measured by")).toHaveValue("Measured by hand");
   await form.getByRole("textbox", { name: "The key result" }).fill(READ_FROM_KPI);
-  await form
-    .getByLabel("Measured by")
-    .selectOption({ label: `Read from ${KPI}` });
+  await choose(form.getByLabel("Measured by"), KPI);
   await form.getByRole("textbox", { name: "Baseline" }).fill("40");
   await form.getByRole("textbox", { name: "Target" }).fill("200");
   await form.getByRole("button", { name: "Add key result" }).click();

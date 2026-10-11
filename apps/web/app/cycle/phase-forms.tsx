@@ -6,9 +6,12 @@ import {
   CardHeader,
   Chip,
   DateInput,
+  EntityPicker,
   RichTextField,
   RichTextView,
 } from "@openokr/ui";
+import { type MemberLike, memberOption } from "../../lib/entity-options.ts";
+import { searchPeople } from "../../lib/member-search.ts";
 import { richTextHtml } from "../../lib/rich-text-html.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
@@ -34,8 +37,6 @@ const FIELD =
   "rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink";
 const LABEL = "flex flex-col gap-1 text-xs text-ink-3";
 
-type Person = { readonly id: string; readonly name: string };
-
 const SESSIONS = [
   { key: "diagnose", label: "cycle.setup.session.diagnose" },
   { key: "set-direction", label: "cycle.setup.session.setDirection" },
@@ -53,7 +54,7 @@ export async function CycleSetup({
   sessionDates,
 }: {
   readonly cycleId: string;
-  readonly people: readonly Person[];
+  readonly people: readonly MemberLike[];
   readonly sponsorId: string | null;
   readonly facilitatorId: string | null;
   readonly firstCycle: boolean;
@@ -63,17 +64,14 @@ export async function CycleSetup({
   const dateOf = (key: string) =>
     sessionDates.find((entry) => entry.key === key)?.on ?? "";
   const picker = (name: string, label: string, value: string | null) => (
-    <label className={LABEL}>
-      {label}
-      <select name={name} defaultValue={value ?? ""} className={FIELD}>
-        <option value="">{t("cycle.setup.nobody")}</option>
-        {people.map((person) => (
-          <option key={person.id} value={person.id}>
-            {person.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <EntityPicker
+      label={label}
+      name={name}
+      defaultValue={value}
+      options={people.map((person) => memberOption(person, t("common.agent")))}
+      noneLabel={t("cycle.setup.nobody")}
+      search={searchPeople}
+    />
   );
 
   return (

@@ -5,11 +5,14 @@ import {
   CardHeader,
   Chip,
   DateRangeInput,
+  EntityPicker,
   type MessageValues,
 } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { memberOption, namedOption } from "../../lib/entity-options.ts";
+import { searchHumans } from "../../lib/member-search.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -204,34 +207,27 @@ export default async function InitiativesPage({
               />
 
               <div className="flex flex-wrap gap-2">
-                <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                  {t("initiatives.space")}
-                  <select
-                    name="spaceId"
-                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  >
-                    {spaces.map((one) => (
-                      <option key={one.id} value={one.id}>
-                        {one.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                  {t("common.owner")}
-                  <select
-                    name="ownerId"
-                    defaultValue={workspace.memberId}
-                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  >
-                    {members.map((one) => (
-                      <option key={one.id} value={one.id}>
-                        {one.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {/* Each opens where the select it replaced did: the first
+                 * space, and whoever is adding it as the owner. */}
+                <EntityPicker
+                  label={t("initiatives.space")}
+                  name="spaceId"
+                  required
+                  defaultValue={spaces[0]?.id ?? null}
+                  options={spaces.map(namedOption)}
+                  className="w-56"
+                />
+                <EntityPicker
+                  label={t("common.owner")}
+                  name="ownerId"
+                  required
+                  defaultValue={workspace.memberId}
+                  options={members.map((one) =>
+                    memberOption(one, t("common.agent")),
+                  )}
+                  search={searchHumans}
+                  className="w-56"
+                />
 
                 <DateRangeInput
                   startLabel={t("initiatives.starts")}

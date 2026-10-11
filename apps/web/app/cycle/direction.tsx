@@ -1,4 +1,11 @@
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+} from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { addPriority } from "./actions.ts";
@@ -116,27 +123,23 @@ export async function Direction({
               className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
             />
             <div className="flex items-center gap-1.5">
-              <label className="sr-only" htmlFor="new-priority-issue">
-                {t("cycle.direction.theIssueThisAnswers")}
-              </label>
-              <select
+              <EntityPicker
+                label={t("cycle.direction.theIssueThisAnswers")}
+                hideLabel
                 id="new-priority-issue"
                 name="fromIssueId"
-                defaultValue=""
-                className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink-2"
-              >
-                <option value="">
-                  {t("cycle.direction.answersNoIssueOn")}
-                </option>
-                {unpromoted.map((issue) => (
-                  <option key={issue.id} value={issue.id}>
-                    {t("common.impact5", {
-                      impact: issue.impact,
-                      text: issue.text,
-                    })}
-                  </option>
-                ))}
-              </select>
+                defaultValue={null}
+                options={unpromoted.map((issue) => ({
+                  id: issue.id,
+                  label: t("common.impact5", {
+                    impact: issue.impact,
+                    text: issue.text,
+                  }),
+                }))}
+                noneLabel={t("cycle.direction.answersNoIssueOn")}
+                className="min-w-0 flex-1"
+                inputClassName="text-xs"
+              />
               <Button type="submit">{t("common.add")}</Button>
             </div>
           </ActionForm>

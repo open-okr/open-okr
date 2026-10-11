@@ -329,7 +329,11 @@ export default async function CyclePage({
             .filter(
               (member) => member.kind === "human" || member.kind === "guest",
             )
-            .map((member) => ({ id: member.id, name: member.name })),
+            .map((member) => ({
+              id: member.id,
+              name: member.name,
+              title: member.title,
+            })),
           // The coach runs in the browser and cannot read the settings row, so
           // the resolved thresholds travel with the page. Sending them rather
           // than letting the client fall back to the canon is what keeps a
@@ -366,7 +370,11 @@ export default async function CyclePage({
           .filter(
             (member) => member.kind === "human" || member.kind === "guest",
           )
-          .map((member) => ({ id: member.id, name: member.name }))
+          .map((member) => ({
+            id: member.id,
+            name: member.name,
+            title: member.title,
+          }))
       : [];
 
   // Only phase 5 needs the capacity check, and only phase 5 pays for reading
@@ -399,6 +407,8 @@ export default async function CyclePage({
       ? (await callAction(context, "people.directory", {})).map((member) => ({
           id: member.id,
           name: member.name,
+          title: member.title,
+          kind: member.kind,
         }))
       : null;
 

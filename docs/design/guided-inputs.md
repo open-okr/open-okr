@@ -289,6 +289,7 @@ As built in 8a:
 | Agents | A member list that offered agents before still does, each marked "Agent". No list changes who can be chosen (decision of 11 October 2026) |
 | Plans | The admin's and the operator's plan selects stay native: an operator's short catalogue, not records to search (decision of 11 October 2026) |
 | A press | A press on the picker or in its list is the picker's and goes no further. React bubbles a press in the list through the picker's own parents though the list is drawn elsewhere, and on a diagram card it opened the drawer, which took the focus "move under" needed |
+| A redraw | Options drawn anew with the same content keep the objects they had. The combobox tells a changed choice by identity, and on a diagram card, which draws whenever the canvas moves, it put the stored name back over what was being typed (found in 8b) |
 | Specs | `choose` in `e2e/pickers.ts` types the name and presses the match, since a combobox has nothing for `selectOption` to select |
 
 ### 4.11 Lists, identifiers, secrets, colour, URLs and search
@@ -361,7 +362,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 7b | Date ranges | `DateRangeInput`, an initiative refused for ending before it starts (an import keeps the start and reports the end it left out), the audit filter at midnight in the workspace's zone, and a form reset that reaches every field holding its own value. Done 10 October 2026 | Initiatives, leave, holidays, audit, the spreadsheet import report |
 | 7c | Times | `DateTimeInput` and its zone, `TimeInput`, `TimeRangeInput`, one `HH:MM` rule, a local time and zone turned into an instant on the server, and F6's site messages. Done 10 October 2026 | Site messages, scheduling a session, quiet hours, the daily summary |
 | 8a | The picker, on the goals screens | `EntityPicker`, the directory's name search, `searchMembers`. Done 11 October 2026 | OKR list and drawer champion, owner and space, the two list filters, the diagram's "move under", decompose's space, the goal page's cycle, key result, KPI and reassigned member |
-| 8b | The rest of the OKR forms | `EntityPicker` | Cycle phases, drafting, the dependency register, the board, initiatives |
+| 8b | The rest of the OKR forms | `EntityPicker`; a new objective's champion opens on whoever is drafting and its reviewer on nobody, where the selects opened on whoever was first in the directory. Done 11 October 2026 | Cycle setup's sponsor and facilitator, drafting (owner, KPI, champion, reviewer, space), the dependency register, the issue a priority answers, the strategy an annual objective serves, the cycle switcher, the board, initiatives |
 | 8c | KPI and session screens | `EntityPicker` | KPIs, recovery, KPI trees, every session panel, scheduling |
 | 8d | People, spaces, admin and the 3 pasted ids | `EntityPicker` | Manager, leave delegate, space members and manager, audit "who", roles, invitations, templates, workspace switchers, agent scope, budget owner, tier model |
 | 9 | `feat/list-identifier-fields` | `TokenInput`, `IdentifierInput`, `ColourInput`, `UrlInput`, the channel fields per provider, one domain rule | Admin > General, invitations, SSO, AI, channels, audit, branding, rhythm |

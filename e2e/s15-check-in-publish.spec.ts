@@ -29,6 +29,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -82,12 +83,8 @@ test("a goal of this reader's own, with one key result, is due", async () => {
   const existing = page.getByRole("heading", { level: 2, name: OBJECTIVE });
   if ((await existing.count()) === 0) {
     await page.getByLabel("The objective").first().fill(OBJECTIVE);
-    await page
-      .locator("#goal-champion")
-      .selectOption({ label: `Champion: ${INSTANCE_ACCOUNT.name}` });
-    await page
-      .locator("#goal-reviewer")
-      .selectOption({ label: `Reviewer: ${INSTANCE_ACCOUNT.name}` });
+    await choose(page.locator("#goal-champion"), INSTANCE_ACCOUNT.name);
+    await choose(page.locator("#goal-reviewer"), INSTANCE_ACCOUNT.name);
     await page.getByRole("button", { name: "Add objective" }).first().click();
     await expect(existing).toBeVisible({ timeout: 15_000 });
   }

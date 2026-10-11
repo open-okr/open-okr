@@ -23,6 +23,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import pg from "pg";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { chooseAt } from "./pickers.ts";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
@@ -102,7 +103,8 @@ test("a card added against a key result lands in its column", async () => {
   await page.getByRole("combobox", { name: /^Column/ }).selectOption("todo");
   // The instance's own cycle has key results from the claiming spec; whichever
   // one is first is the one this work is recorded against.
-  await page.getByLabel("Key result it moves").selectOption({ index: 1 });
+  // The first key result, after "None yet".
+  await chooseAt(page.getByLabel("Key result it moves"), 1);
   await page.getByRole("button", { name: "Add" }).click();
 
   const card = page.getByTestId("board-card").filter({ hasText: TASK });

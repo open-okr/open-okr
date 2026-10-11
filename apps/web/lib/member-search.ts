@@ -52,3 +52,22 @@ export async function searchMembers(
     return [];
   }
 }
+
+/**
+ * People only, for a server page to hand straight to a picker: a server
+ * action passes into a client component where a closure cannot. A champion,
+ * an owner, a sponsor and a facilitator are people (H-09).
+ */
+export async function searchPeople(text: string): Promise<EntityOption[]> {
+  return searchMembers(text, ["human", "guest"]);
+}
+
+/** Every active member, agents among them, badged, for the lists that offered them. */
+export async function searchAnyone(text: string): Promise<EntityOption[]> {
+  return searchMembers(text);
+}
+
+/** People with an account here and no guests, for an initiative's owner. */
+export async function searchHumans(text: string): Promise<EntityOption[]> {
+  return searchMembers(text, ["human"]);
+}
