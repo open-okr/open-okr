@@ -7,10 +7,12 @@ import {
   CardHeader,
   Chip,
   type ConfidenceDisplay,
+  EntityPicker,
   formatConfidence,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import { setNextActionAction } from "./blocker-actions.ts";
 import type { Option } from "./blocker-panel.tsx";
 import { NO_ERROR } from "./commitment-state.ts";
@@ -73,19 +75,14 @@ function NextActionForm({
           placeholder={t("session.detail.blockerPanel.theNextActionAnd")}
           className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
         />
-        <select
+        <EntityPicker
+          label={t("session.detail.nextActions.whoOwnsIt")}
+          hideLabel
           name="ownerId"
-          defaultValue=""
-          aria-label={t("session.detail.nextActions.whoOwnsIt")}
-          className="w-48 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-        >
-          <option value="">{t("session.detail.nextActions.whoOwnsIt")}</option>
-          {owners.map((owner) => (
-            <option key={owner.id} value={owner.id}>
-              {owner.label}
-            </option>
-          ))}
-        </select>
+          placeholder={t("session.detail.nextActions.whoOwnsIt")}
+          options={peopleOptions(owners)}
+          className="w-48"
+        />
         <Button type="submit" variant="primary" size="sm" disabled={pending}>
           {t("session.detail.nextActions.setIt")}
         </Button>

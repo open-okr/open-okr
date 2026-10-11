@@ -38,3 +38,13 @@ export function namedOption(row: {
 }): EntityOption {
   return { id: row.id, label: row.name };
 }
+
+/**
+ * People as a session's reads give them, an id and the words to show, with
+ * the avatar a member has everywhere else.
+ */
+export function peopleOptions(
+  rows: readonly { readonly id: string; readonly label: string }[],
+): EntityOption[] {
+  return rows.map((row) => ({ id: row.id, label: row.label, avatar: true }));
+}

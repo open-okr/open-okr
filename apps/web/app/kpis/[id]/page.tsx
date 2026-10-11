@@ -4,13 +4,22 @@ import {
   OperationError,
   RHYTHM_ASSIST_KEYS,
 } from "@openokr/core";
-import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Bar,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+} from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { assistOffered } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
+import { memberOption } from "../../../lib/entity-options.ts";
+import { searchHumans } from "../../../lib/member-search.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -265,25 +274,19 @@ export default async function KpiDetailPage({
                 }}
               />
               <div className="flex flex-wrap items-center gap-2.5">
-                <label
-                  className="text-xs text-ink-3"
-                  htmlFor="edit-ownerMemberId"
-                >
-                  {t("kpis.rule.owner")}
-                </label>
-                <select
+                <EntityPicker
                   id="edit-ownerMemberId"
+                  label={t("kpis.rule.owner")}
                   name="ownerMemberId"
-                  defaultValue={kpi.namedOwnerId ?? ""}
-                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
-                >
-                  <option value="">{t("kpis.rule.nobodyNamedOption")}</option>
-                  {people.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {person.name}
-                    </option>
-                  ))}
-                </select>
+                  defaultValue={kpi.namedOwnerId}
+                  options={people.map((person) =>
+                    memberOption(person, t("common.agent")),
+                  )}
+                  noneLabel={t("kpis.rule.nobodyNamedOption")}
+                  search={searchHumans}
+                  className="w-56"
+                  inputClassName="text-xs"
+                />
                 <label className="text-xs text-ink-3" htmlFor="edit-tier">
                   {t("kpis.rule.tier")}
                 </label>

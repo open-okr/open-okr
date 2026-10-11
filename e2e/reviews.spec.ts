@@ -22,6 +22,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
+import { choose, chooseAt, chooseContaining, offered } from "./pickers.ts";
 import pg from "pg";
 
 // **Not an address of this spec's own.** The application instance is claimed by
@@ -216,17 +217,9 @@ test("a monthly review records a trend and a decision, and the goal shows it", a
   // position: the panel lists every objective in the space, so "the first
   // option with a separator" was landing the decision on whichever objective
   // happened to sort first and then checking a different goal's page.
-  const subject = page.getByLabel("What it affects");
-  const options = await subject.locator("option").allTextContents();
-  const keyResultOption = options.find((label) =>
-    label.endsWith(`· ${keyResult.title}`),
-  );
-  if (!keyResultOption) {
-    throw new Error(
-      `The review offered no option for "${keyResult.title}". Offered: ${options.join(" | ")}`,
-    );
-  }
-  await subject.selectOption({ label: keyResultOption });
+  // Found by typing its title into the picker, which offers it as
+  // "objective · key result".
+  await chooseContaining(page.getByLabel("What it affects"), keyResult.title);
   await page
     .getByLabel("The decision")
     .fill("Move two engineers off billing onto activation");
@@ -745,14 +738,11 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   });
   // The agents are members of every workspace and are deliberately not offered:
   // recognition names a person's effort, not a scheduler's.
-  await expect(withColleague.getByRole("combobox")).toContainText(
-    "Priya Raman",
-  );
-  await expect(withColleague.getByRole("combobox")).not.toContainText(
-    "OKR Coach",
-  );
+  const names = await offered(withColleague.getByLabel("Who"));
+  expect(names.some((name) => name.includes("Priya Raman"))).toBe(true);
+  expect(names.some((name) => name.includes("OKR Coach"))).toBe(false);
 
-  await withColleague.getByLabel("Who").selectOption({ label: "Priya Raman" });
+  await choose(withColleague.getByLabel("Who"), "Priya Raman");
   await withColleague
     .getByLabel("What they did")
     .fill("Rewrote the onboarding emails twice in a week and said nothing.");
@@ -963,7 +953,8 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     name: "Make it an action",
   });
   await expect(makeIt).toBeDisabled();
-  await processHealth.getByLabel("Who owns it").selectOption({ index: 1 });
+  // The first person offered: the picker has no "choose" row to skip.
+  await chooseAt(processHealth.getByLabel("Who owns it"), 0);
   await processHealth.getByLabel("By when").fill("2026-12-15");
   await makeIt.click();
   await expect(processHealth).toContainText("Added to the actions", {
@@ -1069,7 +1060,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await actions.getByRole("button", { name: "Agree it" }).click();
   await expect(actions).toContainText("or it is a wish");
 
-  await actions.getByLabel("Owner").selectOption({ index: 1 });
+  await chooseAt(actions.getByLabel("Owner"), 0);
   await actions.getByLabel("By", { exact: true }).fill("2026-12-31");
   await actions.getByRole("button", { name: "Agree it" }).click();
   await expect(actions).toContainText("2 actions", { timeout: 10_000 });

@@ -18,6 +18,7 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose, chooseContaining } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -175,7 +176,7 @@ test("adds a key result for the other KPI to an objective that exists", async ()
     timeout: 15_000,
   });
   await card.getByText("Add a key result", { exact: true }).click();
-  await card.getByLabel("Objective").selectOption({ label: OBJECTIVE });
+  await choose(card.getByLabel("Objective"), OBJECTIVE);
   // Mid-cycle, a key result may be asked why it starts now.
   await card.getByLabel("Why now").fill("Margin fell this month");
   await card.getByRole("button", { name: "Add the key result" }).click();
@@ -202,13 +203,16 @@ test("names a key result that already exists as another KPI's answer", async () 
     timeout: 15_000,
   });
   await card.getByText("Add a key result", { exact: true }).click();
-  const existing = card.getByLabel("Or one that already exists");
-  const keyResultId = await existing
-    .locator("option")
-    .filter({ hasText: KR_KPI })
-    .first()
-    .getAttribute("value");
-  await existing.selectOption(keyResultId as string);
+  // The key result the test before added, titled after its KPI, and its id
+  // read from the objective rather than from the picker.
+  const objective = await get<{
+    keyResults: { id: string; title: string }[];
+  }>(`goals/read?id=${objectiveId}`);
+  const keyResultId = objective.keyResults.find((one) =>
+    one.title.includes(KR_KPI),
+  )?.id;
+  expect(keyResultId).toBeTruthy();
+  await chooseContaining(card.getByLabel("Or one that already exists"), KR_KPI);
   await card.getByRole("button", { name: "That one answers it" }).click();
 
   await expect(card.getByTestId("kpi-response")).toContainText(

@@ -23,10 +23,12 @@ import {
   CardHeader,
   Chip,
   DateInput,
+  EntityPicker,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import { addActionAction, submitProcessHealthAction } from "./actions";
 
 const SCORES = [1, 2, 3, 4, 5] as const;
@@ -217,25 +219,14 @@ export function ProcessHealthPanel({
             </p>
             {canAnswer && !actionAdded ? (
               <span className="flex flex-wrap items-end gap-2">
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs text-ink-3">
-                    {t("session.detail.processHealth.whoOwnsIt")}
-                  </span>
-                  <select
-                    value={actionOwner}
-                    onChange={(event) => setActionOwner(event.target.value)}
-                    className="rounded-md border border-line bg-surface p-1.5 text-sm text-ink"
-                  >
-                    <option value="">
-                      {t("session.detail.processHealth.chooseAnOwner")}
-                    </option>
-                    {owners.map((owner) => (
-                      <option key={owner.id} value={owner.id}>
-                        {owner.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <EntityPicker
+                  label={t("session.detail.processHealth.whoOwnsIt")}
+                  value={actionOwner === "" ? null : actionOwner}
+                  onValueChange={(next) => setActionOwner(next ?? "")}
+                  placeholder={t("session.detail.processHealth.chooseAnOwner")}
+                  options={peopleOptions(owners)}
+                  className="w-48"
+                />
                 <DateInput
                   label={t("session.detail.processHealth.byWhen")}
                   value={actionDue}

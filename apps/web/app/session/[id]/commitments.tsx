@@ -6,9 +6,11 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  EntityPicker,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import {
   closeCommitmentsAction,
   setCommitmentsAction,
@@ -218,36 +220,26 @@ function ThisWeek({
               )}
               className="w-80 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             />
-            <select
+            <EntityPicker
+              label={t("common.owner")}
+              hideLabel
               name="ownerId"
-              defaultValue=""
-              aria-label={t("common.owner")}
-              className="w-48 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            >
-              <option value="">
-                {t("session.detail.commitments.whoOwnsIt")}
-              </option>
-              {owners.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.label}
-                </option>
-              ))}
-            </select>
-            <select
+              placeholder={t("session.detail.commitments.whoOwnsIt")}
+              options={peopleOptions(owners)}
+              className="w-48"
+            />
+            <EntityPicker
+              label={t("common.keyResult")}
+              hideLabel
               name="keyResultId"
-              defaultValue=""
-              aria-label={t("common.keyResult")}
-              className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            >
-              <option value="">
-                {t("session.detail.commitments.noKeyResult")}
-              </option>
-              {keyResults.map((keyResult) => (
-                <option key={keyResult.id} value={keyResult.id}>
-                  {keyResult.label}
-                </option>
-              ))}
-            </select>
+              defaultValue={null}
+              noneLabel={t("session.detail.commitments.noKeyResult")}
+              options={keyResults.map((keyResult) => ({
+                id: keyResult.id,
+                label: keyResult.label,
+              }))}
+              className="w-64"
+            />
           </div>
         ))}
         <Button

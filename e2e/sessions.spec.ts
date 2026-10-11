@@ -15,6 +15,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
+import { chooseAt } from "./pickers.ts";
 import pg from "pg";
 
 // **Not an address of this spec's own.** The application instance is claimed by
@@ -325,16 +326,23 @@ test("the commitment stage closes last week and sets this week", async () => {
   // Three or four since P9-T19a-d-c.
   await expect(page.getByText("3 to 4 a week")).toBeVisible();
 
-  // Three commitments, each with an owner. The owner select lists the
-  // session's participants.
+  // Three commitments, each with an owner. The owner picker offers the
+  // session's participants; scoped to the commitments form, because the
+  // blocker panel on the same page has an "Owner" too.
   const texts = page.locator("input[name='text']");
-  const owners = page.locator("select[name='ownerId']");
+  const commitments = page
+    .locator("form")
+    .filter({ has: page.locator("input[name='text']") });
+  const owners = commitments.getByRole("combobox", {
+    name: "Owner",
+    exact: true,
+  });
   await texts.nth(0).fill("Ship the onboarding flow");
-  await owners.nth(0).selectOption({ index: 1 });
+  await chooseAt(owners.nth(0), 0);
   await texts.nth(1).fill("Review the pipeline");
-  await owners.nth(1).selectOption({ index: 1 });
+  await chooseAt(owners.nth(1), 0);
   await texts.nth(2).fill("Call the two stalled accounts");
-  await owners.nth(2).selectOption({ index: 1 });
+  await chooseAt(owners.nth(2), 0);
 
   await page
     .getByRole("button", { name: "Set this week's commitments" })

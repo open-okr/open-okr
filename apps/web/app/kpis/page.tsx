@@ -5,12 +5,15 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  EntityPicker,
   NumberInput,
   UnitInput,
 } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { assistOffered } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
+import { memberOption } from "../../lib/entity-options.ts";
+import { searchHumans } from "../../lib/member-search.ts";
 import { KPI_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -313,21 +316,19 @@ export default async function KpisPage({
                 </div>
                 <JudgedBy idPrefix="add" />
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <label className="text-xs text-ink-3" htmlFor="ownerMemberId">
-                    {t("kpis.rule.owner")}
-                  </label>
-                  <select
+                  <EntityPicker
                     id="ownerMemberId"
+                    label={t("kpis.rule.owner")}
                     name="ownerMemberId"
+                    required
                     defaultValue={workspace.memberId}
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
-                  >
-                    {people.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {person.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={people.map((person) =>
+                      memberOption(person, t("common.agent")),
+                    )}
+                    search={searchHumans}
+                    className="w-56"
+                    inputClassName="text-xs"
+                  />
                   <label className="text-xs text-ink-3" htmlFor="tier">
                     {t("kpis.rule.tier")}
                   </label>

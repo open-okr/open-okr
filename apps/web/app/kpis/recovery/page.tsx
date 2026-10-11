@@ -6,6 +6,7 @@ import {
   CardHeader,
   Chip,
   DateInput,
+  EntityPicker,
   type MessageValues,
   NumberInput,
 } from "@openokr/ui";
@@ -13,6 +14,8 @@ import Link from "next/link";
 import { workspaceReaderLevel } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX, progressCeiling } from "../../../lib/ceilings.ts";
+import { memberOption, namedOption } from "../../../lib/entity-options.ts";
+import { searchHumans } from "../../../lib/member-search.ts";
 import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -357,26 +360,21 @@ export default async function RecoveryBoardPage() {
                           />
                         </div>
                         <div className="flex flex-wrap items-center gap-2.5">
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`fix-owner-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.owner")}
-                          </label>
-                          <select
+                          <EntityPicker
                             id={`fix-owner-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.owner")}
                             name="ownerId"
+                            required
                             defaultValue={
                               card.ownerMemberId ?? workspace.memberId
                             }
-                            className={FIELD}
-                          >
-                            {people.map((person) => (
-                              <option key={person.id} value={person.id}>
-                                {person.name}
-                              </option>
-                            ))}
-                          </select>
+                            options={people.map((person) =>
+                              memberOption(person, t("common.agent")),
+                            )}
+                            search={searchHumans}
+                            className="w-48"
+                            inputClassName="text-xs"
+                          />
                           <DateInput
                             id={`fix-due-${card.kpiId}`}
                             label={t("kpis.recovery.respond.due")}
@@ -384,24 +382,16 @@ export default async function RecoveryBoardPage() {
                             required
                             inputClassName="h-auto py-1 text-xs"
                           />
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`fix-space-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.space")}
-                          </label>
-                          <select
+                          <EntityPicker
                             id={`fix-space-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.space")}
                             name="spaceId"
-                            defaultValue={card.spaceId ?? spaces[0]?.id ?? ""}
-                            className={FIELD}
-                          >
-                            {spaces.map((space) => (
-                              <option key={space.id} value={space.id}>
-                                {space.name}
-                              </option>
-                            ))}
-                          </select>
+                            required
+                            defaultValue={card.spaceId ?? spaces[0]?.id ?? null}
+                            options={spaces.map(namedOption)}
+                            className="w-48"
+                            inputClassName="text-xs"
+                          />
                         </div>
                         <div>
                           <button
@@ -447,23 +437,20 @@ export default async function RecoveryBoardPage() {
                             }
                           />
                           <div className="flex flex-wrap items-center gap-2.5">
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-goal-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.objective")}
-                            </label>
-                            <select
+                            {/* Chosen, where the select it replaced opened on
+                             * whichever objective came first. */}
+                            <EntityPicker
                               id={`kr-goal-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.objective")}
                               name="goalId"
-                              className={`${FIELD} min-w-0 flex-1`}
-                            >
-                              {objectives.map((goal) => (
-                                <option key={goal.id} value={goal.id}>
-                                  {goal.title}
-                                </option>
-                              ))}
-                            </select>
+                              required
+                              options={objectives.map((goal) => ({
+                                id: goal.id,
+                                label: goal.title,
+                              }))}
+                              className="min-w-0 flex-1"
+                              inputClassName="text-xs"
+                            />
                           </div>
                           <div className="flex flex-wrap items-center gap-2.5">
                             <label
@@ -542,32 +529,23 @@ export default async function RecoveryBoardPage() {
                             name="kpiId"
                             value={card.kpiId}
                           />
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`kr-existing-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.orOneThatExists")}
-                          </label>
-                          <select
+                          {/* Each key result reads with its objective, where
+                           * the select grouped them under it. */}
+                          <EntityPicker
                             id={`kr-existing-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.orOneThatExists")}
                             name="keyResultId"
-                            className={`${FIELD} min-w-0 flex-1`}
-                          >
-                            {objectives.map((goal) =>
-                              goal.keyResults.length === 0 ? null : (
-                                <optgroup key={goal.id} label={goal.title}>
-                                  {goal.keyResults.map((keyResult) => (
-                                    <option
-                                      key={keyResult.id}
-                                      value={keyResult.id}
-                                    >
-                                      {keyResult.title}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              ),
+                            required
+                            options={objectives.flatMap((goal) =>
+                              goal.keyResults.map((keyResult) => ({
+                                id: keyResult.id,
+                                label: keyResult.title,
+                                detail: goal.title,
+                              })),
                             )}
-                          </select>
+                            className="min-w-0 flex-1"
+                            inputClassName="text-xs"
+                          />
                           <button
                             type="submit"
                             className="rounded-md border border-line px-3 py-1 text-xs font-semibold text-ink-2"

@@ -37,10 +37,12 @@ import {
   CardHeader,
   Chip,
   DateInput,
+  EntityPicker,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import {
   addActionAction,
   captureLearningAction,
@@ -372,27 +374,23 @@ export function ForwardPanel({
                 />
               </label>
               <span className="flex flex-wrap items-end gap-2">
-                <label className="flex flex-col gap-1" htmlFor="action-owner">
-                  <span className="text-xs font-medium text-ink-3">
-                    {t("common.owner")}
-                  </span>
-                  <select
-                    id="action-owner"
-                    className="rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                    value={ownerId}
-                    disabled={pending}
-                    onChange={(event) => setOwnerId(event.target.value)}
-                  >
-                    {/* No default owner. An action assigned by the form is an
-                        action nobody in the room accepted. */}
-                    <option value="">{t("common.chooseSomebody")}</option>
-                    {forward.owners.map((person) => (
-                      <option key={person.memberId} value={person.memberId}>
-                        {person.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {/* No default owner. An action assigned by the form is an
+                    action nobody in the room accepted. */}
+                <EntityPicker
+                  id="action-owner"
+                  label={t("common.owner")}
+                  value={ownerId === "" ? null : ownerId}
+                  disabled={pending}
+                  onValueChange={(next) => setOwnerId(next ?? "")}
+                  placeholder={t("common.chooseSomebody")}
+                  options={peopleOptions(
+                    forward.owners.map((person) => ({
+                      id: person.memberId,
+                      label: person.name,
+                    })),
+                  )}
+                  className="w-56"
+                />
                 <DateInput
                   id="action-due"
                   label={t("session.detail.forward.by")}

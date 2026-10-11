@@ -7,9 +7,11 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  EntityPicker,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import {
   raiseBlockerAction,
   reassignBlockerAction,
@@ -136,27 +138,21 @@ function OneBlocker({
             className="flex items-center gap-1.5"
           >
             <input type="hidden" name="blockerId" value={blocker.id} />
-            <select
-              name="ownerId"
-              defaultValue=""
-              aria-label={
+            <EntityPicker
+              label={
                 blocker.keyResultTitle === null
                   ? t("session.detail.blockerPanel.reassignThisBlocker")
                   : t("session.detail.blockerPanel.reassignTitle", {
                       title: blocker.keyResultTitle,
                     })
               }
-              className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
-            >
-              <option value="">
-                {t("session.detail.blockerPanel.moveItTo")}
-              </option>
-              {owners.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.label}
-                </option>
-              ))}
-            </select>
+              hideLabel
+              name="ownerId"
+              placeholder={t("session.detail.blockerPanel.moveItTo")}
+              options={peopleOptions(owners)}
+              className="w-48"
+              inputClassName="text-xs"
+            />
             <Button type="submit" variant="ghost" size="sm" disabled={moving}>
               {t("common.reassign")}
             </Button>
@@ -185,21 +181,17 @@ function Raise({
     <form action={submit} aria-busy={pending} className="flex flex-col gap-2">
       <input type="hidden" name="sessionId" value={sessionId} />
       <div className="flex flex-wrap gap-2">
-        <select
+        <EntityPicker
+          label={t("common.keyResult")}
+          hideLabel
           name="keyResultId"
-          defaultValue=""
-          aria-label={t("common.keyResult")}
-          className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-        >
-          <option value="">
-            {t("session.detail.blockerPanel.whichKeyResult")}
-          </option>
-          {keyResults.map((keyResult) => (
-            <option key={keyResult.id} value={keyResult.id}>
-              {keyResult.label}
-            </option>
-          ))}
-        </select>
+          placeholder={t("session.detail.blockerPanel.whichKeyResult")}
+          options={keyResults.map((keyResult) => ({
+            id: keyResult.id,
+            label: keyResult.label,
+          }))}
+          className="w-64"
+        />
         <select
           name="type"
           defaultValue=""
@@ -213,21 +205,14 @@ function Raise({
             </option>
           ))}
         </select>
-        <select
+        <EntityPicker
+          label={t("common.owner")}
+          hideLabel
           name="ownerId"
-          defaultValue=""
-          aria-label={t("common.owner")}
-          className="w-48 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-        >
-          <option value="">
-            {t("session.detail.blockerPanel.whoOwnsClearingIt")}
-          </option>
-          {owners.map((owner) => (
-            <option key={owner.id} value={owner.id}>
-              {owner.label}
-            </option>
-          ))}
-        </select>
+          placeholder={t("session.detail.blockerPanel.whoOwnsClearingIt")}
+          options={peopleOptions(owners)}
+          className="w-48"
+        />
       </div>
       <input
         name="nextAction"

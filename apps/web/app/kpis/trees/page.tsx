@@ -3,6 +3,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  EntityPicker,
   NumberInput,
   UnitInput,
 } from "@openokr/ui";
@@ -253,21 +254,18 @@ export default async function KpiTreesPage({
           <CardBody>
             <ActionForm action={fileIntoTree} className="flex flex-col gap-2">
               <input type="hidden" name="treeId" value={tree.treeId} />
-              <label className="sr-only" htmlFor="kpiId">
-                {t("kpis.trees.whichKpi")}
-              </label>
-              <select
+              <EntityPicker
                 id="kpiId"
+                label={t("kpis.trees.whichKpi")}
+                hideLabel
                 name="kpiId"
                 required
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-              >
-                {unfiled.map((node) => (
-                  <option key={node.id} value={node.id}>
-                    {node.title}
-                  </option>
-                ))}
-              </select>
+                options={unfiled.map((node) => ({
+                  id: node.id,
+                  label: node.title,
+                }))}
+                className="max-w-96"
+              />
               <button
                 type="submit"
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"

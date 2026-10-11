@@ -21,10 +21,12 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  EntityPicker,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import { giveKudosAction } from "./actions";
 
 export interface Recognition {
@@ -132,27 +134,22 @@ export function RecognitionPanel({
 
         {canGive && recognition.recipients.length > 0 ? (
           <div className="flex flex-col gap-2 rounded-md border border-line p-2.5">
-            <label className="flex flex-col gap-1" htmlFor="kudos-to">
-              <span className="text-xs font-medium text-ink-3">
-                {t("session.detail.recognition.who")}
-              </span>
-              <select
-                id="kudos-to"
-                className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                value={toMemberId}
-                disabled={pending}
-                onChange={(event) => setToMemberId(event.target.value)}
-              >
-                {/* No default selection. A pre-picked name is a name the room
-                    did not choose. */}
-                <option value="">{t("common.chooseSomebody")}</option>
-                {recognition.recipients.map((person) => (
-                  <option key={person.memberId} value={person.memberId}>
-                    {person.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {/* No default selection. A pre-picked name is a name the room
+                did not choose. */}
+            <EntityPicker
+              id="kudos-to"
+              label={t("session.detail.recognition.who")}
+              value={toMemberId === "" ? null : toMemberId}
+              disabled={pending}
+              onValueChange={(next) => setToMemberId(next ?? "")}
+              placeholder={t("common.chooseSomebody")}
+              options={peopleOptions(
+                recognition.recipients.map((person) => ({
+                  id: person.memberId,
+                  label: person.name,
+                })),
+              )}
+            />
             <label className="flex flex-col gap-1" htmlFor="kudos-text">
               <span className="text-xs font-medium text-ink-3">
                 {t("common.whatTheyDid")}

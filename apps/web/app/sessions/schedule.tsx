@@ -4,9 +4,12 @@ import {
   CardBody,
   CardHeader,
   DateTimeInput,
+  EntityPicker,
   TimeInput,
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
+import { memberOption, namedOption } from "../../lib/entity-options.ts";
+import { searchPeople } from "../../lib/member-search.ts";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -90,33 +93,24 @@ export async function ScheduleSessions({
   const spaceField = spaceId ? (
     <input type="hidden" name="spaceId" value={spaceId} />
   ) : (
-    <label className={LABEL}>
-      {t("sessions.schedule.space")}
-      <select name="spaceId" required className={FIELD}>
-        {choices.map((space) => (
-          <option key={space.id} value={space.id}>
-            {space.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    // Opens on the first space, as the select it replaced did.
+    <EntityPicker
+      label={t("sessions.schedule.space")}
+      name="spaceId"
+      required
+      defaultValue={choices[0]?.id ?? null}
+      options={choices.map(namedOption)}
+    />
   );
   const facilitatorField = (
-    <label className={LABEL}>
-      {t("sessions.schedule.facilitator")}
-      <select
-        name="facilitatorId"
-        required
-        defaultValue={workspace.memberId}
-        className={FIELD}
-      >
-        {people.map((member) => (
-          <option key={member.id} value={member.id}>
-            {member.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <EntityPicker
+      label={t("sessions.schedule.facilitator")}
+      name="facilitatorId"
+      required
+      defaultValue={workspace.memberId}
+      options={people.map((member) => memberOption(member, t("common.agent")))}
+      search={searchPeople}
+    />
   );
 
   return (

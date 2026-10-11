@@ -30,6 +30,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  EntityPicker,
   useTranslations,
 } from "@openokr/ui";
 import Link from "next/link";
@@ -452,29 +453,21 @@ export function MonthlyReview({
 
           {canEdit && objectives.length > 0 ? (
             <div className="flex flex-col gap-2 rounded-md border border-line p-2.5">
-              <label
-                className="text-xs font-medium text-ink-3"
-                htmlFor="stop-objective"
-              >
-                {t("session.detail.monthlyReview.objectiveToStop")}
-              </label>
-              <select
+              {/* Nothing chosen to begin with: a stop closes an objective,
+                  and the first in the list is not a default anybody chose. */}
+              <EntityPicker
                 id="stop-objective"
-                className="rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                value={stopGoalId}
-                onChange={(event) => setStopGoalId(event.target.value)}
-              >
-                {/* Nothing chosen to begin with: a stop closes an objective,
-                    and the first in the list is not a default anybody chose. */}
-                <option value="">
-                  {t("session.detail.monthlyReview.chooseAnObjective")}
-                </option>
-                {objectives.map((objective) => (
-                  <option key={objective.goalId} value={objective.goalId}>
-                    {objective.goalTitle}
-                  </option>
-                ))}
-              </select>
+                label={t("session.detail.monthlyReview.objectiveToStop")}
+                value={stopGoalId === "" ? null : stopGoalId}
+                onValueChange={(next) => setStopGoalId(next ?? "")}
+                placeholder={t(
+                  "session.detail.monthlyReview.chooseAnObjective",
+                )}
+                options={objectives.map((objective) => ({
+                  id: objective.goalId,
+                  label: objective.goalTitle,
+                }))}
+              />
               <label
                 className="text-xs font-medium text-ink-3"
                 htmlFor="stop-reason"
@@ -547,27 +540,20 @@ export function MonthlyReview({
 
           {canEdit && subjects.length > 0 ? (
             <div className="flex flex-col gap-2 rounded-md border border-line p-2.5">
-              <label
-                className="text-xs font-medium text-ink-3"
-                htmlFor="decision-subject"
-              >
-                {t("session.detail.monthlyReview.whatItAffects")}
-              </label>
-              <select
+              <EntityPicker
                 id="decision-subject"
-                className="rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                value={subjectKey}
-                onChange={(event) => setSubjectKey(event.target.value)}
-              >
-                {subjects.map((subject) => (
-                  <option
-                    key={`${subject.kind}:${subject.id}`}
-                    value={`${subject.kind}:${subject.id}`}
-                  >
-                    {subject.label}
-                  </option>
-                ))}
-              </select>
+                label={t("session.detail.monthlyReview.whatItAffects")}
+                value={subjectKey === "" ? null : subjectKey}
+                onValueChange={(next) => {
+                  if (next !== null) {
+                    setSubjectKey(next);
+                  }
+                }}
+                options={subjects.map((subject) => ({
+                  id: `${subject.kind}:${subject.id}`,
+                  label: subject.label,
+                }))}
+              />
               <label
                 className="text-xs font-medium text-ink-3"
                 htmlFor="decision-text"

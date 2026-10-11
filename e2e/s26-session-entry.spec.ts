@@ -43,9 +43,8 @@ test("sign in, and schedule a session the way a coordinator would", async () => 
     has: page.getByRole("heading", { name: "Schedule one session" }),
   });
   await expect(form).toBeVisible({ timeout: 10_000 });
-  spaceName =
-    (await form.getByLabel("Space").locator("option:checked").textContent()) ??
-    "";
+  // The picker shows the chosen space's name in its box.
+  spaceName = await form.getByLabel("Space").inputValue();
   expect(spaceName).not.toBe("");
 
   // **Only if it is not already there.** This file is a serial group, and a
