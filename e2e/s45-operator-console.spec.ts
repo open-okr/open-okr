@@ -212,6 +212,10 @@ test("the operator suspends the workspace with a reason, and lifts it again", as
   await expect(
     operatorPage.getByText("This workspace is suspended"),
   ).toBeVisible({ timeout: 15_000 });
+  // And the form says it was done, rather than simply being there again.
+  await expect(
+    operatorPage.getByText("Applied. The workspace's members see the change now."),
+  ).toBeVisible();
 
   // The last step puts it back, so the tenant this file made is left active.
   await moveTo.selectOption("active");
@@ -220,6 +224,32 @@ test("the operator suspends the workspace with a reason, and lifts it again", as
   await expect(
     operatorPage.getByText("This workspace is suspended"),
   ).toHaveCount(0, { timeout: 15_000 });
+});
+
+/**
+ * guided-inputs §5, F5: a refused lifecycle change left the form as it was
+ * and said nothing, which read as a change still on its way.
+ */
+test("a lifecycle change with no real reason is refused in words, and nothing moves", async () => {
+  await goTo(operatorPage, `/operator/${workspaceId}`);
+  const moveTo = operatorPage.locator("#lifecycle-state");
+  const lifecycle = operatorPage.locator("form").filter({ has: moveTo });
+  await moveTo.selectOption("suspended");
+  // Spaces pass the browser's `required` and not the domain's trim.
+  await operatorPage.locator("#lifecycle-reason").fill("   ");
+  await operatorPage
+    .getByRole("button", { name: `Apply to ${CUSTOMER_WORKSPACE}` })
+    .click();
+
+  await expect(lifecycle.getByRole("alert")).toHaveText(
+    "A lifecycle change needs a reason.",
+    { timeout: 15_000 },
+  );
+  await expect(operatorPage.getByText("This workspace is suspended")).toHaveCount(
+    0,
+  );
+  // What was chosen is still chosen, to be corrected rather than redone.
+  await expect(moveTo).toHaveValue("suspended");
 });
 
 test("the instance page says what is true of the deployment", async () => {
@@ -249,6 +279,9 @@ test("a site message's window is read on the operator's own clock", async () => 
     operatorPage.getByText("In America/Sao_Paulo time.").first(),
   ).toBeVisible();
   await operatorPage.getByRole("button", { name: "Show this message" }).click();
+  await expect(
+    operatorPage.getByText("Saved. It shows in the window you set."),
+  ).toBeVisible({ timeout: 15_000 });
 
   await expect(async () => {
     const { rows } = await pool.query<{ starts: string; ends: string }>(
@@ -262,4 +295,26 @@ test("a site message's window is read on the operator's own clock", async () => 
     ]);
   }).toPass({ timeout: 15_000 });
   await pool.query("delete from site_messages where body = $1", [body]);
+});
+
+test("a site message that ends before it starts is refused in words, and keeps what was typed", async () => {
+  await goTo(operatorPage, "/operator/instance");
+  const body = `Refused window ${Date.now()}`;
+  const message = operatorPage.getByLabel("Message", { exact: true });
+  await message.fill(body);
+  await operatorPage.getByLabel("Shows from").fill("2031-03-04T10:00");
+  await operatorPage.getByLabel("Stops at").fill("2031-03-04T09:00");
+  await operatorPage.getByRole("button", { name: "Show this message" }).click();
+
+  const form = operatorPage.locator("form").filter({ has: message });
+  await expect(form.getByRole("alert")).toHaveText(
+    "The message has to end after it starts.",
+    { timeout: 15_000 },
+  );
+  await expect(message).toHaveValue(body);
+  const { rows } = await pool.query(
+    "select 1 from site_messages where body = $1",
+    [body],
+  );
+  expect(rows).toHaveLength(0);
 });

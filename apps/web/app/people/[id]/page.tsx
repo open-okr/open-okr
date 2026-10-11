@@ -26,6 +26,7 @@ import {
 import { AvatarForm } from "./avatar-form.tsx";
 import { LeaveCard } from "./leave-card.tsx";
 import { LifecycleControls } from "./lifecycle-controls.tsx";
+import { MemberFieldsForm } from "./member-fields-form.tsx";
 import { ProfileForm } from "./profile-form.tsx";
 
 /**
@@ -368,13 +369,7 @@ export default async function MemberProfilePage({
             </h2>
           </CardHeader>
           <CardBody>
-            <form
-              action={async (form: FormData) => {
-                "use server";
-                await updateMemberFields(null, form);
-              }}
-              className="flex flex-col gap-2"
-            >
+            <MemberFieldsForm action={updateMemberFields}>
               <input type="hidden" name="memberId" value={id} />
               <label className="flex flex-col gap-1 text-xs text-ink-3">
                 {t("common.name")}
@@ -410,13 +405,7 @@ export default async function MemberProfilePage({
                   ))}
                 </select>
               </label>
-              <button
-                type="submit"
-                className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
-              >
-                {t("common.save")}
-              </button>
-            </form>
+            </MemberFieldsForm>
           </CardBody>
         </Card>
       ) : null}

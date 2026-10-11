@@ -10,6 +10,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
 import { quietHoursFromForm } from "../../lib/quiet-hours";
+import { refusalOf } from "../../lib/refusal";
 import { getStorage } from "../../lib/storage";
 import { getTranslations } from "../../lib/translations";
 import { getImageProcessor } from "../../lib/upload-ports";
@@ -209,17 +210,17 @@ export async function updateMemberFields(
     }
 
     await callAction(ctx, "people.updateMember", input);
-    revalidatePath(`/people/${memberId}`);
-    return { ok: true, message: t("people.actions.memberUpdated") };
   } catch (error) {
-    return {
-      ok: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : t("people.actions.updateFailed"),
-    };
+    // A refusal is the sentence the action wrote. Anything else, a session
+    // that has gone (which redirects) or a database that has, is thrown on.
+    const refusal = refusalOf(error);
+    if (refusal === null) {
+      throw error;
+    }
+    return { ok: false, message: refusal };
   }
+  revalidatePath(`/people/${memberId}`);
+  return { ok: true, message: t("people.actions.memberUpdated") };
 }
 
 /**

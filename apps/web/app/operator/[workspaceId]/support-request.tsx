@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
+import { refusalOf } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -32,14 +33,14 @@ async function ask(formData: FormData): Promise<void> {
     });
   } catch (error) {
     // A blank reason, a request that already exists and an operator who is
-    // already a member all arrive as errors, and none should show a stack
+    // already a member all arrive as refusals, and none should show a stack
     // trace. They used to vanish, so the page looked as if the request had
     // gone and nothing had (UAT BUG-020). The sentence is carried back to the
-    // form instead.
-    if (!(error instanceof Error)) {
+    // form instead, and a schema's is its sentence rather than its JSON.
+    refused = refusalOf(error);
+    if (refused === null) {
       throw error;
     }
-    refused = error.message;
   }
   if (refused !== null) {
     redirect(

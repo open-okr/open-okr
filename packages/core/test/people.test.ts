@@ -134,6 +134,20 @@ describe("the manager chain", () => {
     ).rejects.toMatchObject({ code: "forbidden" });
   });
 
+  it("refuses a name of only spaces, in a sentence", async () => {
+    // guided-inputs F5: the administrator's edit now shows what it is told,
+    // so what it is told has to be a sentence rather than zod's own words.
+    const wb = await workerDb();
+    const a = await addMember("A");
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "people.updateMember",
+        { memberId: a, name: "   " },
+      ),
+    ).rejects.toThrow("A member needs a name.");
+  });
+
   it("refuses making someone their own manager", async () => {
     const wb = await workerDb();
     const a = await addMember("A");

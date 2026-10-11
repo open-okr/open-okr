@@ -9,6 +9,7 @@ import Link from "next/link";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
+import { publishSiteMessage } from "./site-message-actions";
 import { SiteMessageForm } from "./site-message-form";
 
 /**
@@ -74,6 +75,7 @@ export default async function OperatorInstancePage() {
           {t("operator.instance.saySomething")}
         </h2>
         <SiteMessageForm
+          action={publishSiteMessage}
           workspaces={tenants.map((tenant) => ({
             id: tenant.workspaceId,
             name: tenant.name,

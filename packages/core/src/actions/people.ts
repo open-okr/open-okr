@@ -300,7 +300,12 @@ export const updateMember = defineWriteAction({
   summary: "Update another member's name, title or manager (org fields).",
   input: z.object({
     memberId: z.uuid(),
-    name: z.string().trim().min(1).max(200).optional(),
+    name: z
+      .string()
+      .trim()
+      .min(1, "A member needs a name.")
+      .max(200)
+      .optional(),
     title: z.string().trim().max(200).nullable().optional(),
     managerId: z.uuid().nullable().optional(),
   }),

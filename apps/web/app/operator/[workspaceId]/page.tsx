@@ -10,6 +10,7 @@ import { notFound } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
+import { moveLifecycle } from "./lifecycle-actions";
 import { LifecycleForm } from "./lifecycle-form";
 import { setPlan } from "./plan-actions";
 import { OperatorPlanForm } from "./plan-form";
@@ -361,6 +362,7 @@ export default async function OperatorWorkspacePage({
       />
 
       <LifecycleForm
+        action={moveLifecycle}
         currentState={tenant.tenantState}
         workspaceName={tenant.name}
         workspaceId={tenant.workspaceId}

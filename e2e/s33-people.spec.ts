@@ -83,6 +83,34 @@ test("the directory lists the two agents as members, badged", async () => {
   }
 });
 
+/**
+ * guided-inputs §5, F5: an administrator's edit of somebody else threw its
+ * answer away, so a refused save and a saved one looked the same. On the
+ * Coach's profile, and put back as it was.
+ */
+test("an administrator's edit of somebody else says what happened", async () => {
+  await goTo(page, "/people");
+  await page.locator("a[href^='/people/']", { hasText: "OKR Coach" }).click();
+  await page.waitForURL(/\/people\/[0-9a-f-]{36}/);
+  const card = page.getByTestId("member-fields");
+  const name = card.getByLabel("Name", { exact: true });
+  await expect(name).toHaveValue("OKR Coach", { timeout: 15_000 });
+
+  // Spaces pass the browser's `required` and not the action's trim.
+  await name.fill("   ");
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(card.getByRole("alert")).toHaveText("A member needs a name.", {
+    timeout: 15_000,
+  });
+  await expect(name).toHaveValue("   ");
+
+  await name.fill("OKR Coach");
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(card.getByRole("status")).toHaveText("Member updated.", {
+    timeout: 15_000,
+  });
+});
+
 test("search filters the member list", async () => {
   await goTo(page, "/people");
   const searchInput = page.getByPlaceholder("Search by name or title");
