@@ -11,10 +11,17 @@ import {
   type AIProviderKind,
   BUDGET_METRICS,
   BUDGET_PERIODS,
-  BUDGET_SCOPES,
   MODEL_TIERS,
 } from "@openokr/db";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+} from "@openokr/ui";
+import { type MemberLike, memberOption } from "../../../lib/entity-options.ts";
 import {
   ASSIST_NAME_KEYS,
   PROMPT_NAME_KEYS,
@@ -29,6 +36,7 @@ import {
   savePrompt,
 } from "./actions.ts";
 import { AIForm } from "./ai-form.tsx";
+import { budgetOwnerValue } from "./choices.ts";
 
 /**
  * The AI console's second half: features, prompts, budgets and usage
@@ -168,10 +176,35 @@ export async function UsageCard({
 
 export async function BudgetsCard({
   budgets,
+  people,
+  agents,
 }: {
   readonly budgets: readonly Budget[];
+  /** The people a budget can bound, by their member id. */
+  readonly people: readonly MemberLike[];
+  /** The agents a budget can bound, by their agent id. */
+  readonly agents: readonly { readonly id: string; readonly name: string }[];
 }) {
   const { t } = await getTranslations();
+  const agentWord = t("common.agent");
+  // One picker says whose a budget is, and so its scope (guided-inputs
+  // §4.10), where a scope select stood beside a pasted id.
+  const owners = [
+    ...people.map((person) => ({
+      ...memberOption(person, agentWord),
+      id: budgetOwnerValue("user", person.id),
+    })),
+    ...agents.map((agent) => ({
+      id: budgetOwnerValue("agent", agent.id),
+      label: agent.name,
+      avatar: true,
+      badge: agentWord,
+    })),
+  ];
+  const nameOf = (scope: string, ref: string) =>
+    (scope === "agent"
+      ? agents.find((agent) => agent.id === ref)?.name
+      : people.find((person) => person.id === ref)?.name) ?? ref.slice(0, 8);
 
   return (
     <Card>
@@ -216,8 +249,8 @@ export async function BudgetsCard({
                     <td className="py-1.5 pr-3 text-ink">
                       {budget.scope}
                       {budget.scopeRef ? (
-                        <span className="ml-1.5 font-mono text-ink-3">
-                          {budget.scopeRef.slice(0, 8)}
+                        <span className="ml-1.5 text-ink-3">
+                          {nameOf(budget.scope, budget.scopeRef)}
                         </span>
                       ) : null}
                     </td>
@@ -245,27 +278,14 @@ export async function BudgetsCard({
           action={saveBudget}
           className="flex flex-wrap items-end gap-2 border-t border-line pt-3"
         >
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.scope")}
-            <select
-              name="scope"
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            >
-              {BUDGET_SCOPES.map((scope) => (
-                <option key={scope} value={scope}>
-                  {scope}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("admin.ai.governance.whoseForAUser")}
-            <input
-              name="scopeRef"
-              placeholder={t("admin.ai.governance.leaveEmptyForThe")}
-              className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-          </label>
+          <EntityPicker
+            label={t("admin.ai.governance.whoseForAUser")}
+            name="owner"
+            defaultValue={null}
+            options={owners}
+            noneLabel={t("admin.ai.governance.wholeWorkspace")}
+            className="w-64"
+          />
           <label className="flex flex-col gap-1 text-xs text-ink-3">
             {t("admin.ai.governance.metric")}
             <select

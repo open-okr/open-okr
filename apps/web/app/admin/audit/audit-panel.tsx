@@ -1,7 +1,13 @@
 "use client";
 
-import { Button, DateRangeInput, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  DateRangeInput,
+  EntityPicker,
+  useTranslations,
+} from "@openokr/ui";
 import { useRef, useState } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import {
   type AuditFilterRequest,
   type AuditPageResult,
@@ -283,22 +289,19 @@ export function AuditPanel({
                 className={INPUT_CLASS}
               />
             </label>
-            <label htmlFor="audit-actor" className={LABEL_CLASS}>
-              {t("admin.audit.actor")}
-              <select
-                id="audit-actor"
-                name="actorMemberId"
-                defaultValue=""
-                className={INPUT_CLASS}
-              >
-                <option value="">{t("admin.audit.anyone")}</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <EntityPicker
+              id="audit-actor"
+              label={t("admin.audit.actor")}
+              name="actorMemberId"
+              defaultValue={null}
+              options={peopleOptions(
+                members.map((member) => ({
+                  id: member.id,
+                  label: member.name,
+                })),
+              )}
+              noneLabel={t("admin.audit.anyone")}
+            />
             <label htmlFor="audit-target-type" className={LABEL_CLASS}>
               {t("admin.audit.targetType")}
               <input

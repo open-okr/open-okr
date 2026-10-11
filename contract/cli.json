@@ -5189,6 +5189,12 @@
           "field": "limit",
           "type": "integer",
           "required": false
+        },
+        {
+          "name": "kinds",
+          "field": "kinds",
+          "type": "array",
+          "required": false
         }
       ],
       "pages": false

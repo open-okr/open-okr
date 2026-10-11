@@ -35,6 +35,7 @@ import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
+import { budgetOwnerFrom, tierModelFrom } from "./choices.ts";
 import type { FormResult } from "./form-state.ts";
 
 // **Taken from the schema, not written out.** The first draft of this file
@@ -247,11 +248,16 @@ export async function saveTier(
   const { t } = await getTranslations();
   const temperature = String(form.get("temperature") ?? "").trim();
   const maxTokens = String(form.get("maxTokens") ?? "").trim();
+  // The model chosen says its provider (guided-inputs §4.10).
+  const model = tierModelFrom(String(form.get("model") ?? ""));
+  if (model === null) {
+    return { ok: false, message: t("admin.ai.actions.whichModel") };
+  }
   try {
     await callAction(await context(), "ai.setTierPolicy", {
       tier: String(form.get("tier") ?? "") as Tier,
-      provider: String(form.get("provider") ?? "") as Provider,
-      modelId: String(form.get("modelId") ?? ""),
+      provider: model.provider as Provider,
+      modelId: model.modelId,
       // Absent means "leave it to the driver", which is null rather than zero:
       // a temperature of 0 is a real and different choice.
       temperature: temperature === "" ? null : Number(temperature),
@@ -409,13 +415,16 @@ export async function saveBudget(
   form: FormData,
 ): Promise<FormResult> {
   const { t } = await getTranslations();
-  const scopeRef = String(form.get("scopeRef") ?? "").trim();
+  // One picker says whose it is: nobody for the whole workspace, or a person
+  // or an agent, which also says the scope (guided-inputs §4.10).
+  const owner = budgetOwnerFrom(String(form.get("owner") ?? ""));
+  if (owner === null) {
+    return { ok: false, message: t("admin.ai.actions.whoseBudget") };
+  }
   try {
     await callAction(await context(), "ai.setBudget", {
-      scope: String(form.get("scope") ?? "workspace") as BudgetScope,
-      // Workspace-wide budgets name nothing; a per-user or per-agent one
-      // names the one it bounds.
-      scopeRef: scopeRef === "" ? null : scopeRef,
+      scope: owner.scope as BudgetScope,
+      scopeRef: owner.scopeRef,
       metric: String(form.get("metric") ?? "cost") as BudgetMetric,
       period: String(form.get("period") ?? "month") as BudgetPeriod,
       limitValue: Number(form.get("limitValue") ?? 0),

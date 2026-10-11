@@ -1,7 +1,8 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, EntityPicker, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
+import { searchGoals } from "../../../lib/entity-search.ts";
 import { bindAgentScopeAction, setAgentAutonomyAction } from "./actions";
 
 /**
@@ -71,6 +72,8 @@ export function AgentPolicy({
   name,
   autonomies,
   levels,
+  spaces,
+  trees,
 }: {
   readonly agentId: string;
   readonly autonomy: string;
@@ -82,9 +85,17 @@ export function AgentPolicy({
     readonly value: number;
     readonly label: string;
   }[];
+  /** The spaces and KPI trees an agent can be bound to, by name. */
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
+  readonly trees: readonly { readonly id: string; readonly name: string }[];
 }) {
   const { t } = useTranslations();
   const POLICY = policies(t);
+  // What the binding names decides what the picker offers (guided-inputs
+  // §4.10), where an id was pasted from the thing's own page. Goals can be
+  // tens of thousands, so they are searched rather than listed.
+  const [kind, setKind] = useState<(typeof BINDABLE)[number]["type"]>("space");
+  const choices = kind === "space" ? spaces : kind === "kpi_tree" ? trees : [];
 
   const [pending, start] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -164,6 +175,10 @@ export function AgentPolicy({
             {t("admin.agents.agentPolicy.what")}
             <select
               name="resourceType"
+              value={kind}
+              onChange={(event) =>
+                setKind(event.target.value as (typeof BINDABLE)[number]["type"])
+              }
               className="rounded-md border border-line bg-bg px-2 py-1 text-sm text-ink"
             >
               {BINDABLE.map((one) => (
@@ -173,14 +188,15 @@ export function AgentPolicy({
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-0.5 text-xs text-ink-3">
-            {t("admin.agents.agentPolicy.itsId")}
-            <input
-              name="resourceId"
-              placeholder={t("admin.agents.agentPolicy.pasteTheIdFrom")}
-              className="w-80 rounded-md border border-line bg-bg px-2 py-1 text-sm text-ink"
-            />
-          </label>
+          <EntityPicker
+            key={kind}
+            label={t("admin.agents.agentPolicy.which")}
+            name="resourceId"
+            required
+            options={choices.map((one) => ({ id: one.id, label: one.name }))}
+            {...(kind === "goal" ? { search: searchGoals } : {})}
+            className="w-80"
+          />
           <label className="flex flex-col gap-0.5 text-xs text-ink-3">
             {t("common.level")}
             <select

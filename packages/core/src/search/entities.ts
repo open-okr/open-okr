@@ -107,6 +107,12 @@ export interface FindByNameInput {
   readonly memberId: string;
   readonly text: string;
   readonly limit?: number;
+  /**
+   * Only these kinds. A picker of goals asks for goals, so the twenty kept
+   * are twenty goals rather than whatever people and spaces matched first
+   * (guided-inputs §4.10). Absent means every kind, as the palette asks.
+   */
+  readonly kinds?: readonly NamedKind[];
 }
 
 const DEFAULT_LIMIT = 8;
@@ -167,6 +173,9 @@ export async function findByName(
   const limit = input.limit ?? DEFAULT_LIMIT;
   const workspaceId = input.workspaceId;
   const phrase = input.text.trim();
+  const wants = (kind: NamedKind) =>
+    input.kinds === undefined || input.kinds.includes(kind);
+  const indexedKinds = INDEXED_KINDS.filter(wants);
 
   return withWorkspace(drizzle(pool), workspaceId, async (rawTx) => {
     const tx = rawTx as unknown as OperationTx;
@@ -196,23 +205,26 @@ export async function findByName(
     const found: { entityType: NamedKind; entityId: string; title: string }[] =
       [];
 
-    const indexed = await tx
-      .select({
-        entityType: searchDocuments.entityType,
-        entityId: searchDocuments.entityId,
-        title: searchDocuments.title,
-      })
-      .from(searchDocuments)
-      .where(
-        and(
-          eq(searchDocuments.workspaceId, workspaceId),
-          inArray(searchDocuments.entityType, [...INDEXED_KINDS]),
-          ...named(searchDocuments.title),
-          visible(searchDocuments.contextId),
-        ),
-      )
-      .orderBy(...startsFirst(searchDocuments.title))
-      .limit(limit);
+    const indexed =
+      indexedKinds.length === 0
+        ? []
+        : await tx
+            .select({
+              entityType: searchDocuments.entityType,
+              entityId: searchDocuments.entityId,
+              title: searchDocuments.title,
+            })
+            .from(searchDocuments)
+            .where(
+              and(
+                eq(searchDocuments.workspaceId, workspaceId),
+                inArray(searchDocuments.entityType, [...indexedKinds]),
+                ...named(searchDocuments.title),
+                visible(searchDocuments.contextId),
+              ),
+            )
+            .orderBy(...startsFirst(searchDocuments.title))
+            .limit(limit);
     for (const row of indexed) {
       found.push({
         entityType: row.entityType as NamedKind,
@@ -221,92 +233,99 @@ export async function findByName(
       });
     }
 
-    const spaceRows = await tx
-      .select({ id: spaces.id, name: spaces.name })
-      // openokr:allow-raw-read: the list form of the getter, as `spaces.list`
-      // reads it: every row is filtered by accessScopeFilter on the space's own
-      // context below.
-      .from(spaces)
-      .innerJoin(
-        accessContexts,
-        activeOnly(
-          accessContexts,
-          eq(accessContexts.workspaceId, workspaceId),
-          eq(accessContexts.resourceType, "space"),
-          eq(accessContexts.resourceId, spaces.id),
-        ),
-      )
-      .where(
-        and(
-          activeOnly(
-            spaces,
-            eq(spaces.workspaceId, workspaceId),
-            ...named(spaces.name),
-          ),
-          visible(accessContexts.id),
-        ),
-      )
-      .orderBy(...startsFirst(spaces.name))
-      .limit(limit);
+    const spaceRows = !wants("space")
+      ? []
+      : await tx
+          .select({ id: spaces.id, name: spaces.name })
+          // openokr:allow-raw-read: the list form of the getter, as `spaces.list`
+          // reads it: every row is filtered by accessScopeFilter on the space's own
+          // context below.
+          .from(spaces)
+          .innerJoin(
+            accessContexts,
+            activeOnly(
+              accessContexts,
+              eq(accessContexts.workspaceId, workspaceId),
+              eq(accessContexts.resourceType, "space"),
+              eq(accessContexts.resourceId, spaces.id),
+            ),
+          )
+          .where(
+            and(
+              activeOnly(
+                spaces,
+                eq(spaces.workspaceId, workspaceId),
+                ...named(spaces.name),
+              ),
+              visible(accessContexts.id),
+            ),
+          )
+          .orderBy(...startsFirst(spaces.name))
+          .limit(limit);
     for (const row of spaceRows) {
       found.push({ entityType: "space", entityId: row.id, title: row.name });
     }
 
-    found.push(
-      ...(await sessionsNamed(tx, {
-        workspaceId,
-        memberId: input.memberId,
-        member,
-        words: named(okrSessions.title),
-        order: startsFirst(okrSessions.title),
-        limit,
-      })),
-    );
+    if (wants("session"))
+      found.push(
+        ...(await sessionsNamed(tx, {
+          workspaceId,
+          memberId: input.memberId,
+          member,
+          words: named(okrSessions.title),
+          order: startsFirst(okrSessions.title),
+          limit,
+        })),
+      );
 
     // A cycle belongs to the workspace, so the workspace's own context is
     // what decides, exactly as `cycles.list` asks it.
-    const cycleRows = await tx
-      .select({ id: cycles.id, name: cycles.name })
-      .from(cycles)
-      .innerJoin(
-        accessContexts,
-        activeOnly(
-          accessContexts,
-          eq(accessContexts.workspaceId, workspaceId),
-          eq(accessContexts.resourceType, "workspace"),
-          eq(accessContexts.resourceId, cycles.workspaceId),
-        ),
-      )
-      .where(
-        and(
-          activeOnly(
-            cycles,
-            eq(cycles.workspaceId, workspaceId),
-            ...named(cycles.name),
-          ),
-          visible(accessContexts.id),
-        ),
-      )
-      .orderBy(...startsFirst(cycles.name))
-      .limit(limit);
+    const cycleRows = !wants("cycle")
+      ? []
+      : await tx
+          .select({ id: cycles.id, name: cycles.name })
+          .from(cycles)
+          .innerJoin(
+            accessContexts,
+            activeOnly(
+              accessContexts,
+              eq(accessContexts.workspaceId, workspaceId),
+              eq(accessContexts.resourceType, "workspace"),
+              eq(accessContexts.resourceId, cycles.workspaceId),
+            ),
+          )
+          .where(
+            and(
+              activeOnly(
+                cycles,
+                eq(cycles.workspaceId, workspaceId),
+                ...named(cycles.name),
+              ),
+              visible(accessContexts.id),
+            ),
+          )
+          .orderBy(...startsFirst(cycles.name))
+          .limit(limit);
     for (const row of cycleRows) {
       found.push({ entityType: "cycle", entityId: row.id, title: row.name });
     }
 
     // The directory's own rule: every active member, and nobody suspended.
-    const people = await tx
-      .select({ id: workspaceMembers.id, name: workspaceMembers.name })
-      .from(workspaceMembers)
-      .where(
-        activeOnly(
-          workspaceMembers,
-          eq(workspaceMembers.workspaceId, workspaceId),
-          eq(workspaceMembers.status, "active"),
-          ...named(workspaceMembers.name),
-        ),
-      )
-      .orderBy(...startsFirst(workspaceMembers.name))
-      .limit(limit);
+    const people = !wants("person")
+      ? []
+      : await tx
+          .select({ id: workspaceMembers.id, name: workspaceMembers.name })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, workspaceId),
+              eq(workspaceMembers.status, "active"),
+              ...named(workspaceMembers.name),
+            ),
+          )
+          .orderBy(...startsFirst(workspaceMembers.name))
+          .limit(limit);
     for (const row of people) {
       found.push({ entityType: "person", entityId: row.id, title: row.name });
     }

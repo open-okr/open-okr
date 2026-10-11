@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, EntityPicker, useTranslations } from "@openokr/ui";
 import { useState } from "react";
 import { saveTemplateMapping } from "./actions.ts";
 import { ChannelForm } from "./channel-form.tsx";
@@ -87,24 +87,19 @@ export function TemplateMappingForm({
         </select>
       </label>
 
-      <label className="flex flex-col gap-1 text-xs text-ink-2">
-        {t("admin.channels.templateMappingForm.template")}
-        <select
-          name="templateId"
-          className={FIELD}
-          value={templateId}
-          onChange={(event) => setTemplateId(event.target.value)}
-        >
-          <option value="" disabled>
-            {t("admin.channels.templateMappingForm.chooseATemplate")}
-          </option>
-          {templates.map((template) => (
-            <option key={template.id} value={template.id}>
-              {template.name} ({template.language})
-            </option>
-          ))}
-        </select>
-      </label>
+      <EntityPicker
+        label={t("admin.channels.templateMappingForm.template")}
+        name="templateId"
+        required
+        value={templateId === "" ? null : templateId}
+        onValueChange={(next) => setTemplateId(next ?? "")}
+        placeholder={t("admin.channels.templateMappingForm.chooseATemplate")}
+        options={templates.map((template) => ({
+          id: template.id,
+          label: template.name,
+          detail: template.language,
+        }))}
+      />
 
       {chosen?.bodyText ? (
         <p className="whitespace-pre-wrap rounded-md bg-raised px-2.5 py-1.5 text-xs text-ink-3">

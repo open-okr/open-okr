@@ -1,6 +1,13 @@
 import { ACCESS_LEVELS, callAction, knownPromptKeys } from "@openokr/core";
 import { AI_PROVIDER_KINDS, MODEL_TIERS } from "@openokr/db";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+} from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
@@ -18,6 +25,7 @@ import {
   testWorkspaceKeyAction,
 } from "./actions.ts";
 import { AIForm } from "./ai-form.tsx";
+import { tierModelValue } from "./choices.ts";
 import {
   BudgetsCard,
   egressStateOf,
@@ -153,6 +161,8 @@ export default async function AdminAIPage() {
     usage,
     prompts,
     privacy,
+    directory,
+    agents,
   ] = await Promise.all([
     callAction(context, "ai.readProviderConfig", {}),
     callAction(context, "ai.readModelCatalog", {}),
@@ -166,9 +176,20 @@ export default async function AdminAIPage() {
       ),
     ),
     callAction(context, "ai.readPrivacySettings", {}),
+    // Whose a budget can be: a person, by member id, or an agent.
+    callAction(context, "people.directory", {}),
+    callAction(context, "agents.list", {}),
   ]);
 
   const configured = providers.filter((one) => one.hasWorkspaceCredential);
+  // What a tier can route to: every model the catalogue holds active.
+  const modelChoices = models
+    .filter((model) => model.active)
+    .map((model) => ({
+      id: tierModelValue(model.provider, model.modelId),
+      label: model.displayName,
+      detail: `${providerWord(model.provider)} · ${model.modelId}`,
+    }));
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -542,29 +563,31 @@ export default async function AdminAIPage() {
                   className="flex flex-wrap items-end gap-2"
                 >
                   <input type="hidden" name="tier" value={route.tier} />
-                  <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    {t("admin.ai.provider")}
-                    <select
-                      name="provider"
-                      defaultValue={route.provider ?? AI_PROVIDER_KINDS[0]}
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    >
-                      {AI_PROVIDER_KINDS.map((kind) => (
-                        <option key={kind} value={kind}>
-                          {providerWord(kind)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    {t("admin.ai.modelId")}
-                    <input
-                      name="modelId"
-                      defaultValue={route.modelId ?? ""}
-                      required
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    />
-                  </label>
+                  {/* One model from the catalogue above, which says its
+                   * provider, where a provider select stood beside a name
+                   * typed by hand (guided-inputs §4.10). A route to a model
+                   * no longer listed still shows as what it is. */}
+                  <EntityPicker
+                    label={t("admin.ai.modelId")}
+                    name="model"
+                    required
+                    defaultValue={
+                      route.provider && route.modelId
+                        ? tierModelValue(route.provider, route.modelId)
+                        : null
+                    }
+                    options={modelChoices}
+                    current={
+                      route.provider && route.modelId
+                        ? {
+                            id: tierModelValue(route.provider, route.modelId),
+                            label: route.modelId,
+                            detail: providerWord(route.provider),
+                          }
+                        : null
+                    }
+                    className="w-72"
+                  />
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
                     {t("admin.ai.temperature")}
                     <input
@@ -612,7 +635,13 @@ export default async function AdminAIPage() {
           live in `governance.tsx` because the console is one screen and one
           file for it was getting long, not because it is a second screen. */}
       <UsageCard usage={usage} days={USAGE_WINDOW_DAYS} />
-      <BudgetsCard budgets={budgets} />
+      <BudgetsCard
+        budgets={budgets}
+        people={directory.filter(
+          (member) => member.kind === "human" || member.kind === "guest",
+        )}
+        agents={agents.map((agent) => ({ id: agent.id, name: agent.name }))}
+      />
       <FeaturesCard features={features} />
       <PromptsCard prompts={prompts} />
       <PrivacyCard

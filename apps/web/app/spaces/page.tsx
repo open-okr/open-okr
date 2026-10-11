@@ -1,8 +1,10 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip, EntityPicker } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { memberOption } from "../../lib/entity-options.ts";
+import { searchAnyone } from "../../lib/member-search.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { createSpace } from "./actions.ts";
@@ -134,20 +136,17 @@ export default async function SpacesPage() {
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("common.manager")}
-                <select
-                  name="managerMemberId"
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                >
-                  <option value="">{t("spaces.nobodyYet")}</option>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <EntityPicker
+                label={t("common.manager")}
+                name="managerMemberId"
+                defaultValue={null}
+                options={members.map((member) =>
+                  memberOption(member, t("common.agent")),
+                )}
+                noneLabel={t("spaces.nobodyYet")}
+                search={searchAnyone}
+                className="w-60"
+              />
               <button
                 type="submit"
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"

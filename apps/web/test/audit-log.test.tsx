@@ -244,12 +244,12 @@ describe("the panel", () => {
     }
   });
 
-  test("filters by who from the directory, with anyone first", () => {
-    const select = panel.slice(panel.indexOf('<select id="audit-actor"'));
-    expect(select.indexOf(">Anyone</option>")).toBeLessThan(
-      select.indexOf(">Priya Raman</option>"),
-    );
-    expect(select).toContain(`value="${MEMBERS[0]?.id}"`);
+  test("filters by who from the directory, opening on anyone", () => {
+    // A picker (guided-inputs §4.10), which draws the directory only when it
+    // is opened; closed, it reads "Anyone" and posts nothing.
+    const box = panel.slice(panel.indexOf('id="audit-actor"') - 200);
+    expect(box).toContain('value="Anyone"');
+    expect(panel).toContain('name="actorMemberId"');
   });
 
   test("shows a refusal handed to it by the server", () => {

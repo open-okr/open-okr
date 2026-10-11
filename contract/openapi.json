@@ -27579,6 +27579,30 @@
               "minimum": 1,
               "maximum": 20
             }
+          },
+          {
+            "name": "kinds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "goal",
+                  "key_result",
+                  "kpi",
+                  "space",
+                  "person",
+                  "initiative",
+                  "task",
+                  "document",
+                  "session",
+                  "cycle"
+                ]
+              }
+            }
           }
         ]
       }

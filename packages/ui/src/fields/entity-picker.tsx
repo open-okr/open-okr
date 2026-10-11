@@ -56,8 +56,9 @@ export interface EntityPickerProps {
   readonly noneLabel?: string;
   /**
    * Asks the server for matches as the person types, once there are more
-   * options than the browser filters (§4.10). Only a list longer than that
-   * uses it; a shorter one is filtered where it is.
+   * options than the browser filters (§4.10), or when there are none at all:
+   * a page that cannot send every goal sends none and lets the picker ask.
+   * A list in between is filtered where it is.
    */
   readonly search?: (text: string) => Promise<readonly EntityOption[]>;
   readonly placeholder?: string;
@@ -181,7 +182,8 @@ export function EntityPicker({
 
   // Above the browser's share, the server answers what is typed.
   const remote =
-    search !== undefined && options.length > ENTITY_PICKER_BROWSER_LIMIT;
+    search !== undefined &&
+    (options.length === 0 || options.length > ENTITY_PICKER_BROWSER_LIMIT);
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<readonly EntityOption[]>([]);
   const [looking, setLooking] = useState(false);
@@ -221,13 +223,32 @@ export function EntityPicker({
     };
   }, [remote, search, query]);
 
+  // The server's answer the person chose, kept once the answers move on.
+  const [picked, setPicked] = useState<EntityOption | null>(null);
+  // **Everything the combobox may hold as chosen is among its items.** It
+  // drops a chosen value its items do not include, so a choice from the
+  // server's answers posted nothing until they were here too.
+  const items = useMemo(() => {
+    if (!remote) {
+      return listed;
+    }
+    const seen = new Set<string>();
+    const all: EntityOption[] = [];
+    for (const option of [...listed, ...(picked ? [picked] : []), ...found]) {
+      if (!seen.has(option.id)) {
+        seen.add(option.id);
+        all.push(option);
+      }
+    }
+    return all;
+  }, [remote, listed, picked, found]);
   const byId = useMemo(() => {
     const map = new Map<string, EntityOption>();
-    for (const option of [...listed, ...found]) {
+    for (const option of items) {
       map.set(option.id, option);
     }
     return map;
-  }, [listed, found]);
+  }, [items]);
   const selected =
     chosen === null || chosen === ""
       ? (none ?? null)
@@ -235,6 +256,9 @@ export function EntityPicker({
 
   const choose = (option: EntityOption | null) => {
     const next = option === null || option.id === "" ? null : option.id;
+    if (remote && option !== null && option.id !== "") {
+      setPicked(option);
+    }
     if (value === undefined) {
       setOwn(next);
     }
@@ -271,7 +295,7 @@ export function EntityPicker({
         </label>
       )}
       <Combobox.Root<EntityOption | null>
-        items={listed}
+        items={items}
         {...(remote ? { filteredItems: typing ? remoteItems : listed } : {})}
         value={selected}
         onValueChange={choose}
@@ -325,7 +349,9 @@ export function EntityPicker({
             >
               {remote && !typing ? (
                 <p className="px-2.5 py-1.5 text-xs text-ink-3">
-                  {t("fields.entity.typeToFind", { count: options.length })}
+                  {options.length === 0
+                    ? t("fields.entity.typeToSearch")
+                    : t("fields.entity.typeToFind", { count: options.length })}
                 </p>
               ) : null}
               {remote && typing && looking ? (

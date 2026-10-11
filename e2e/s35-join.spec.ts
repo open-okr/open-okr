@@ -24,6 +24,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import pg from "pg";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
+import { chooseAt } from "./pickers.ts";
 
 const { email: OWNER_EMAIL, password: OWNER_PASSWORD } = INSTANCE_ACCOUNT;
 
@@ -236,12 +237,11 @@ test("the owner invites a guest into one space", async () => {
   }).toPass({ timeout: 30_000 });
 
   await page.getByLabel("The guest's email address").fill(VISITOR_EMAIL);
-  const space = page.getByLabel("Guest of");
-  // The first real option; the one before it is the "choose" prompt.
-  guestSpaceId =
-    (await space.locator("option").nth(1).getAttribute("value")) ?? "";
+  // The first space the picker offers, and its id read from the value the
+  // form posts.
+  await chooseAt(page.getByLabel("Guest of"), 0);
+  guestSpaceId = await page.locator('input[name="spaceId"]').inputValue();
   expect(guestSpaceId).toMatch(/^[0-9a-f-]{36}$/);
-  await space.selectOption(guestSpaceId);
   await page.getByRole("button", { name: "Invite the guest" }).click();
 
   const link = page.getByTestId("invite-link");

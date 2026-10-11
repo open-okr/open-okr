@@ -1,4 +1,5 @@
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { Card, CardBody, CardHeader, EntityPicker } from "@openokr/ui";
+import { type MemberLike, memberOption } from "../../../lib/entity-options.ts";
 import { getTranslations } from "../../../lib/translations";
 import {
   addSpaceMember,
@@ -66,7 +67,7 @@ export async function SpaceManagement({
   readonly mission: string | null;
   readonly members: readonly ManageMember[];
   /** Everyone in the workspace who is not already in this space. */
-  readonly candidates: readonly { id: string; name: string }[];
+  readonly candidates: readonly MemberLike[];
   readonly canManage: boolean;
   readonly canArchive: boolean;
 }) {
@@ -196,20 +197,18 @@ export async function SpaceManagement({
             className="flex flex-wrap items-end gap-2 rounded-md bg-raised p-2.5"
           >
             <input type="hidden" name="spaceId" value={spaceId} />
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("spaces.detail.manage.addSomebody")}
-              <select
-                name="memberId"
-                required
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-              >
-                {candidates.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {/* Chosen, where the select opened on the first candidate. No
+             * directory search: it would offer back the people already in
+             * the space, whom this list leaves out. */}
+            <EntityPicker
+              label={t("spaces.detail.manage.addSomebody")}
+              name="memberId"
+              required
+              options={candidates.map((candidate) =>
+                memberOption(candidate, t("common.agent")),
+              )}
+              className="w-60"
+            />
             <label className="flex flex-col gap-1 text-xs text-ink-3">
               {t("spaces.detail.manage.as")}
               <select

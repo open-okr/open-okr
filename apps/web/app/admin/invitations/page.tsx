@@ -1,6 +1,7 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip, EntityPicker } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { namedOption } from "../../../lib/entity-options.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -193,24 +194,14 @@ export default async function InvitationsPage() {
                   />
                 </label>
                 <div className="flex flex-wrap gap-2.5">
-                  <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    {t("admin.invitations.guestOf")}
-                    <select
-                      name="spaceId"
-                      required
-                      defaultValue=""
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    >
-                      <option value="" disabled>
-                        {t("admin.invitations.chooseTheSpace")}
-                      </option>
-                      {spaces.map((space) => (
-                        <option key={space.id} value={space.id}>
-                          {space.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <EntityPicker
+                    label={t("admin.invitations.guestOf")}
+                    name="spaceId"
+                    required
+                    placeholder={t("admin.invitations.chooseTheSpace")}
+                    options={spaces.map(namedOption)}
+                    className="w-60"
+                  />
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
                     {t("admin.invitations.expiresInDays")}
                     <input

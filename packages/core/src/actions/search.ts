@@ -139,6 +139,8 @@ export const runSearch = defineReadAction({
 const entitiesInput = z.object({
   text: z.string().trim().min(1).max(200),
   limit: z.number().int().min(1).max(20).optional(),
+  /** Only these kinds; every kind when absent. */
+  kinds: z.array(z.enum(NAMED_KINDS)).min(1).optional(),
 });
 
 export const findEntities = defineReadAction({
@@ -179,6 +181,7 @@ export const findEntities = defineReadAction({
       memberId,
       text: input.text,
       ...(input.limit ? { limit: input.limit } : {}),
+      ...(input.kinds ? { kinds: input.kinds } : {}),
     });
   },
 });

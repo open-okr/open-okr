@@ -7341,6 +7341,25 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 20
+          },
+          "kinds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "goal",
+                "key_result",
+                "kpi",
+                "space",
+                "person",
+                "initiative",
+                "task",
+                "document",
+                "session",
+                "cycle"
+              ]
+            }
           }
         },
         "required": [

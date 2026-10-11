@@ -132,7 +132,14 @@ describe("an entity picker", () => {
         ? [{ id: "m-1", label: "Priya Raman", detail: "Head of Growth" }]
         : [],
     );
-    inEnglish(<EntityPicker label="Champion" options={MANY} search={search} />);
+    const { container } = inEnglish(
+      <EntityPicker
+        label="Champion"
+        name="championId"
+        options={MANY}
+        search={search}
+      />,
+    );
     await user.type(screen.getByLabelText("Champion"), "pri");
     await waitFor(() => expect(search).toHaveBeenLastCalledWith("pri"));
     const options = await screen.findAllByRole("option");
@@ -140,6 +147,9 @@ describe("an entity picker", () => {
       expect.stringContaining("Priya Raman"),
     ]);
     expect(options[0]?.textContent).toContain("Head of Growth");
+    // And the server's answer can be chosen, though it is not in the list.
+    await user.click(options[0] as HTMLElement);
+    expect(posted(container, "championId")).toBe("m-1");
   });
 
   test("keeps a press on itself or its list from reaching what holds it", async () => {
@@ -195,6 +205,33 @@ describe("an entity picker", () => {
     expect(options.map((one) => one.textContent)).toEqual([
       expect.stringContaining("Mei Tan"),
     ]);
+  });
+
+  test("given no list and a search, finds everything by asking", async () => {
+    // A goal for an agent's scope: a workspace can hold tens of thousands,
+    // so the page sends none and the picker asks as the person types.
+    const user = userEvent.setup();
+    const search = vi.fn(async (text: string) =>
+      text.toLowerCase().startsWith("grow")
+        ? [{ id: "g-1", label: "Grow revenue in the mid-market" }]
+        : [],
+    );
+    const { container } = inEnglish(
+      <EntityPicker
+        label="Goal"
+        name="resourceId"
+        options={[]}
+        search={search}
+      />,
+    );
+    await user.click(screen.getByLabelText("Goal"));
+    expect(await screen.findByText("Type a name to find one.")).not.toBeNull();
+    await user.type(screen.getByLabelText("Goal"), "grow");
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith("grow"));
+    await user.click(
+      await screen.findByRole("option", { name: /Grow revenue/ }),
+    );
+    expect(posted(container, "resourceId")).toBe("g-1");
   });
 
   test("in a table cell is named by its label alone", () => {

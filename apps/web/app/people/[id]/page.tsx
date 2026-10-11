@@ -6,12 +6,14 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  EntityPicker,
   RichTextView,
 } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppearanceControl } from "../../../lib/appearance.tsx";
+import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { getPool } from "../../../lib/pool";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
@@ -357,7 +359,11 @@ export default async function MemberProfilePage({
         // People, not agents: an agent cannot read a review it is handed.
         delegates={directory
           .filter((person) => person.id !== id && person.kind === "human")
-          .map((person) => ({ id: person.id, name: person.name }))}
+          .map((person) => ({
+            id: person.id,
+            name: person.name,
+            title: person.title,
+          }))}
       />
 
       {/* Admin org-field edit */}
@@ -390,21 +396,17 @@ export default async function MemberProfilePage({
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("common.manager")}
-                <select
-                  name="managerId"
-                  defaultValue={member.managerId ?? ""}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                >
-                  <option value="">{t("people.detail.noManager")}</option>
-                  {possibleManagers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* The managers who would not close a loop, so no directory
+               * search, which would offer the others back. */}
+              <EntityPicker
+                label={t("common.manager")}
+                name="managerId"
+                defaultValue={member.managerId}
+                options={possibleManagers.map((one) =>
+                  memberOption(one, t("common.agent")),
+                )}
+                noneLabel={t("people.detail.noManager")}
+              />
             </MemberFieldsForm>
           </CardBody>
         </Card>

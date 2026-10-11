@@ -6,9 +6,11 @@ import {
   CardBody,
   CardHeader,
   DateRangeInput,
+  EntityPicker,
   useTranslations,
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
+import { type MemberLike, memberOption } from "../../../lib/entity-options.ts";
 import { type ProfileResult, setLeaveAction } from "../actions.ts";
 
 /**
@@ -43,7 +45,7 @@ export function LeaveCard({
   readonly canEdit: boolean;
   readonly leave: readonly LeaveSpan[];
   /** Who may stand in: active people other than the member. */
-  readonly delegates: readonly { readonly id: string; readonly name: string }[];
+  readonly delegates: readonly MemberLike[];
 }) {
   const { t } = useTranslations();
   const [list, setList] = useState<readonly LeaveSpan[]>(leave);
@@ -121,25 +123,16 @@ export function LeaveCard({
                 setEndsOn(range.end ?? "");
               }}
             />
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("people.detail.leave.delegate")}
-              </span>
-              <select
-                value={delegateId}
-                onChange={(event) => setDelegateId(event.target.value)}
-                className="w-56 rounded-md border border-line bg-bg px-2 py-1"
-              >
-                <option value="">
-                  {t("people.detail.leave.chooseADelegate")}
-                </option>
-                {delegates.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <EntityPicker
+              label={t("people.detail.leave.delegate")}
+              value={delegateId === "" ? null : delegateId}
+              onValueChange={(next) => setDelegateId(next ?? "")}
+              placeholder={t("people.detail.leave.chooseADelegate")}
+              options={delegates.map((person) =>
+                memberOption(person, t("common.agent")),
+              )}
+              className="w-56"
+            />
             <Button
               type="button"
               disabled={
