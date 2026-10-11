@@ -10,6 +10,7 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -99,9 +100,9 @@ test("acceptance: SU1 moves to Customer Success from the list, and stays there",
   await goTo(page, "/goals");
   const space = main().getByRole("combobox", { name: `Space of ${SU1}` });
   await expect(space).toBeVisible({ timeout: 15_000 });
-  await expect(space.locator("option:checked")).toHaveText(SUPPORT);
+  await expect(space).toHaveValue(SUPPORT);
 
-  await space.selectOption({ label: SUCCESS });
+  await choose(space, SUCCESS);
   await expect
     .poll(
       async () =>
@@ -118,10 +119,8 @@ test("acceptance: SU1 moves to Customer Success from the list, and stays there",
 
   await page.reload();
   await expect(
-    main()
-      .getByRole("combobox", { name: `Space of ${SU1}` })
-      .locator("option:checked"),
-  ).toHaveText(SUCCESS, { timeout: 15_000 });
+    main().getByRole("combobox", { name: `Space of ${SU1}` }),
+  ).toHaveValue(SUCCESS, { timeout: 15_000 });
 });
 
 function main() {

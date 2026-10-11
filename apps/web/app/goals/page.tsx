@@ -20,6 +20,7 @@ import type { ReactNode } from "react";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
+import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { filterGoals, type OkrScope } from "../../lib/okr-tree/cache.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -184,7 +185,11 @@ export default async function GoalsPage({
   // objective or own a key result (H-09).
   const members = directory
     .filter((member) => member.kind === "human" || member.kind === "guest")
-    .map((member) => ({ id: member.id, name: member.name }));
+    .map((member) => ({
+      id: member.id,
+      name: member.name,
+      title: member.title,
+    }));
   const spaces = spaceRows.map((space) => ({ id: space.id, name: space.name }));
   const mySpaceIds = spaceRows
     .filter((space) => space.ownRole !== null)
@@ -943,7 +948,10 @@ async function Filters({
         <FilterSelect
           label={t("okrList.champion")}
           value={champion}
-          options={members}
+          options={members.map((member) =>
+            memberOption(member, t("common.agent")),
+          )}
+          people
           anyLabel={t("common.any")}
           hrefTemplate={href({ champion: FILTER_PLACEHOLDER })}
           anyHref={href({ champion: null })}
@@ -951,7 +959,7 @@ async function Filters({
         <FilterSelect
           label={t("okrList.space")}
           value={space}
-          options={spaces}
+          options={spaces.map(namedOption)}
           anyLabel={t("common.any")}
           hrefTemplate={href({ space: FILTER_PLACEHOLDER })}
           anyHref={href({ space: null })}

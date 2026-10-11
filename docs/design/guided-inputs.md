@@ -279,6 +279,18 @@ UIUX-PLAN §2 already names `EntityPicker`. This plan builds it on Base UI `Comb
   - a budget's owner (`ai.setBudget`, `scopeRef`);
   - a model tier's model (`setTierPolicy`, `modelId`), picked from the models already listed on the same page.
 
+As built in 8a:
+
+| Point | Decision |
+|---|---|
+| Server search | A member picker over more than 200 members asks `people.directory`, which gained `search` (every word in the name or title, the closest name first), `kinds` and `limit`. `searchMembers` in `apps/web/lib/member-search.ts` is the one server action the pickers call. The answer is handed to the combobox as `filteredItems`, so nothing is filtered twice |
+| A member's avatar | The initials avatar the kit draws everywhere. The directory carries no picture, and no list screen draws one |
+| A goal's short id | Goals have none; KPIs do. A KPI shows its short id and unit, and a key result in "move under" shows the objective it belongs to |
+| Agents | A member list that offered agents before still does, each marked "Agent". No list changes who can be chosen (decision of 11 October 2026) |
+| Plans | The admin's and the operator's plan selects stay native: an operator's short catalogue, not records to search (decision of 11 October 2026) |
+| A press | A press on the picker or in its list is the picker's and goes no further. React bubbles a press in the list through the picker's own parents though the list is drawn elsewhere, and on a diagram card it opened the drawer, which took the focus "move under" needed |
+| Specs | `choose` in `e2e/pickers.ts` types the name and presses the match, since a combobox has nothing for `selectOption` to select |
+
 ### 4.11 Lists, identifiers, secrets, colour, URLs and search
 
 - **`TokenInput`**: each entry becomes a chip. Entries can be typed or pasted, separated by commas, spaces or new lines, and each chip is checked and marked in place. It is used for:
@@ -348,7 +360,10 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 7a | Dates | `DateInput` with the date in words, the warning outside a cycle, and `YYYY-MM-DD` on task and initiative dates (one `localDate` schema). Done 10 October 2026 | Key result due dates, cycle and phase 1 dates, a new cycle, tasks, the board, recovery, the session's actions |
 | 7b | Date ranges | `DateRangeInput`, an initiative refused for ending before it starts (an import keeps the start and reports the end it left out), the audit filter at midnight in the workspace's zone, and a form reset that reaches every field holding its own value. Done 10 October 2026 | Initiatives, leave, holidays, audit, the spreadsheet import report |
 | 7c | Times | `DateTimeInput` and its zone, `TimeInput`, `TimeRangeInput`, one `HH:MM` rule, a local time and zone turned into an instant on the server, and F6's site messages. Done 10 October 2026 | Site messages, scheduling a session, quiet hours, the daily summary |
-| 8 | `feat/entity-picker` | `EntityPicker` | About 60 selects and the 3 pasted ids |
+| 8a | The picker, on the goals screens | `EntityPicker`, the directory's name search, `searchMembers`. Done 11 October 2026 | OKR list and drawer champion, owner and space, the two list filters, the diagram's "move under", decompose's space, the goal page's cycle, key result, KPI and reassigned member |
+| 8b | The rest of the OKR forms | `EntityPicker` | Cycle phases, drafting, the dependency register, the board, initiatives |
+| 8c | KPI and session screens | `EntityPicker` | KPIs, recovery, KPI trees, every session panel, scheduling |
+| 8d | People, spaces, admin and the 3 pasted ids | `EntityPicker` | Manager, leave delegate, space members and manager, audit "who", roles, invitations, templates, workspace switchers, agent scope, budget owner, tier model |
 | 9 | `feat/list-identifier-fields` | `TokenInput`, `IdentifierInput`, `ColourInput`, `UrlInput`, the channel fields per provider, one domain rule | Admin > General, invitations, SSO, AI, channels, audit, branding, rhythm |
 | 10 | `feat/text-limits` | `TextArea`, then `TextInput` and `TextArea` on every remaining title and reason, every label fixed. The ratchet reaches zero | Everything that is left |
 | 11 | `feat/rich-session-prose` | First release for five fields: the rich columns, writing both, the readers, the data-change backfill, the editor on screen | Monthly review (shifts, decision), quarterly review (management answers, private stage note), weekly session (coordinator note) |

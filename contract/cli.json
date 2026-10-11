@@ -425,6 +425,24 @@
           "field": "includeSuspended",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "search",
+          "field": "search",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "kinds",
+          "field": "kinds",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false

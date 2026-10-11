@@ -1,7 +1,7 @@
 "use client";
 
 import { okrKindsInUse } from "@openokr/method";
-import { Bar, useTranslations } from "@openokr/ui";
+import { Bar, EntityPicker, useTranslations } from "@openokr/ui";
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
@@ -430,31 +430,53 @@ function KeyResultRow({
 
 /**
  * "Move under…", the keyboard's way to re-parent (§5.4): every place the
- * card may hang from, chosen and saved at once, with the same six-second
- * undo a drag gets. Escape leaves it where it was.
+ * card may hang from, found by typing (guided-inputs §4.10), chosen and saved
+ * at once, with the same six-second undo a drag gets. Escape leaves it where
+ * it was, and so does leaving it.
  */
 function MoveUnder({ goal }: { readonly goal: OkrGoal }) {
   const { t } = useTranslations();
   const shared = useDiagram();
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    box.current?.querySelector<HTMLSelectElement>("select")?.focus();
+    box.current?.querySelector<HTMLInputElement>("input")?.focus();
   }, []);
   const current = goal.parentKeyResultId
     ? `kr:${goal.parentKeyResultId}`
     : goal.parentGoalId
       ? `goal:${goal.parentGoalId}`
       : "cycle";
+  const targets = shared.targetsFor(goal.id).map((target) => ({
+    id: target.value,
+    label:
+      target.kind === "cycle"
+        ? t("okrDiagram.underTheCycle", { cycle: target.title })
+        : target.kind === "keyResult"
+          ? t("okrDiagram.underKeyResult", {
+              title: target.title,
+              objective: target.of ?? "",
+            })
+          : target.title,
+  }));
   return (
     <span
       ref={box}
       className="nodrag mt-auto flex items-center gap-1 border-t border-line px-2 py-1"
     >
-      <select
-        aria-label={t("okrDiagram.moveUnderOf", { title: goal.title })}
+      <EntityPicker
+        label={t("okrDiagram.moveUnderOf", { title: goal.title })}
+        hideLabel
         defaultValue={current}
-        onChange={(event) => {
-          shared.moveTo(goal.id, event.target.value);
+        options={targets}
+        onValueChange={(next) => {
+          // Only a choice moves it or closes it: typing that clears the box
+          // is not one.
+          if (next === null) {
+            return;
+          }
+          if (next !== current) {
+            shared.moveTo(goal.id, next);
+          }
           shared.setMoving(null);
         }}
         onKeyDown={(event) => {
@@ -462,22 +484,22 @@ function MoveUnder({ goal }: { readonly goal: OkrGoal }) {
             shared.setMoving(null);
           }
         }}
-        onBlur={() => shared.setMoving(null)}
-        className="min-w-0 flex-1 rounded-control border border-line bg-surface px-1 py-0.5 text-[11px] text-ink"
-      >
-        {shared.targetsFor(goal.id).map((target) => (
-          <option key={target.value} value={target.value}>
-            {target.kind === "cycle"
-              ? t("okrDiagram.underTheCycle", { cycle: target.title })
-              : target.kind === "keyResult"
-                ? t("okrDiagram.underKeyResult", {
-                    title: target.title,
-                    objective: target.of ?? "",
-                  })
-                : target.title}
-          </option>
-        ))}
-      </select>
+        onBlur={(event) => {
+          // Closed when focus goes to something else on the page. The list
+          // is drawn outside the card and can take focus as it opens, and
+          // that is not focus leaving; neither is focus going nowhere.
+          const next = event.relatedTarget as Element | null;
+          if (
+            next !== null &&
+            !box.current?.contains(next) &&
+            next.closest("[role='listbox'], [role='presentation']") === null
+          ) {
+            shared.setMoving(null);
+          }
+        }}
+        className="flex-1"
+        inputClassName="h-auto py-0.5 text-[11px]"
+      />
     </span>
   );
 }

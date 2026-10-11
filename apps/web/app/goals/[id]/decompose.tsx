@@ -21,10 +21,17 @@
  * had counted as the server counts it.
  */
 import { richTextLength } from "@openokr/formats";
-import { Button, Chip, RichTextEditor, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  Chip,
+  EntityPicker,
+  RichTextEditor,
+  useTranslations,
+} from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { namedOption } from "../../../lib/entity-options.ts";
 import {
   createDecomposedWorkAction,
   decomposeKeyResultAction,
@@ -256,21 +263,15 @@ export function DecomposeKeyResult({
           </li>
         ))}
       </ul>
-      <label className="flex flex-wrap items-center gap-2 text-xs text-ink-3">
-        {t("goals.detail.decompose.createThemIn")}
-        <select
-          value={spaceId}
-          disabled={pending}
-          onChange={(event) => setSpaceId(event.target.value)}
-          className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
-        >
-          {spaces.map((space) => (
-            <option key={space.id} value={space.id}>
-              {space.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <EntityPicker
+        label={t("goals.detail.decompose.createThemIn")}
+        value={spaceId === "" ? null : spaceId}
+        options={spaces.map(namedOption)}
+        disabled={pending}
+        onValueChange={(next) => setSpaceId(next ?? "")}
+        className="max-w-72"
+        inputClassName="text-xs"
+      />
       <span className="flex flex-wrap gap-2">
         <Button
           type="button"

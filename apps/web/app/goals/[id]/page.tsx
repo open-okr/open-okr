@@ -20,6 +20,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  EntityPicker,
   formatMeasure,
   NumberInput,
   RichTextView,
@@ -33,6 +34,7 @@ import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { readConversation } from "../../../lib/conversation.ts";
+import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { healthWord } from "../../../lib/health-words.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
@@ -594,26 +596,26 @@ export default async function GoalPage({
                   <option value="champion">{t("common.champion")}</option>
                   <option value="reviewer">{t("common.reviewer")}</option>
                 </select>
-                <label className="sr-only" htmlFor="reassign-member">
-                  {t("goals.detail.member")}
-                </label>
-                <select
+                {/* Opens on the champion, as the role beside it does, so a
+                 * press with nothing chosen names somebody rather than
+                 * whoever came first in the directory. "Nobody" takes the
+                 * reviewer off (P9-T04); it is refused for the champion,
+                 * who is always somebody, and where the workspace requires
+                 * reviewers, each with the reason. */}
+                <EntityPicker
+                  label={t("goals.detail.member")}
+                  hideLabel
                   id="reassign-member"
                   name="memberId"
-                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                >
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}
-                    </option>
-                  ))}
-                  {/* Takes the reviewer off (P9-T04). Refused for the
-                   * champion, who is always somebody, and where the
-                   * workspace requires reviewers, each with the reason. */}
-                  <option value="">
-                    {t("goals.detail.nobodyReviewerOnly")}
-                  </option>
-                </select>
+                  defaultValue={goal.champion.id}
+                  options={members.map((member) =>
+                    memberOption(member, t("common.agent")),
+                  )}
+                  current={memberOption(goal.champion, t("common.agent"))}
+                  noneLabel={t("goals.detail.nobodyReviewerOnly")}
+                  className="w-56"
+                  inputClassName="text-xs"
+                />
                 <Button type="submit" variant="ghost">
                   {t("common.reassign")}
                 </Button>

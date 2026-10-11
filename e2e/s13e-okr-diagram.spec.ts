@@ -18,6 +18,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -346,7 +347,7 @@ test("U9's moving half: Move under… with the keyboard, back to the key result 
     name: `Move ${TEAM} under another objective or key result`,
   });
   await expect(choice).toBeFocused();
-  await choice.selectOption({ label: OTHER });
+  await choose(choice, OTHER);
   await expect(teamLine()).toHaveAttribute(
     "aria-label",
     `${TEAM} aligns to ${OTHER}`,
@@ -359,11 +360,12 @@ test("U9's moving half: Move under… with the keyboard, back to the key result 
     })
     .focus();
   await page.keyboard.press("Enter");
-  await card(teamId)
-    .getByRole("combobox", {
+  await choose(
+    card(teamId).getByRole("combobox", {
       name: `Move ${TEAM} under another objective or key result`,
-    })
-    .selectOption({ label: `${KEY_RESULT}, a key result of ${RENAMED}` });
+    }),
+    `${KEY_RESULT}, a key result of ${RENAMED}`,
+  );
   await expect(teamLine()).toHaveAttribute(
     "aria-label",
     `${TEAM} aligns to ${RENAMED}`,

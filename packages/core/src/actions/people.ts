@@ -24,7 +24,18 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import { EMAIL_PATTERN, isListedTimezone } from "@openokr/formats";
-import { and, eq, isNull, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
@@ -992,6 +1003,19 @@ export const directory = defineReadAction({
      * default (P6-G09).
      */
     includeSuspended: z.boolean().optional(),
+    /**
+     * Only members whose name or title holds every word typed, the closest
+     * name first (guided-inputs §4.10): a picker over more members than the
+     * browser filters asks this as the person types.
+     */
+    search: z.string().trim().min(1).max(200).optional(),
+    /** Only these kinds: a champion is a person, never an agent. */
+    kinds: z
+      .array(z.enum(["human", "guest", "agent", "placeholder"]))
+      .min(1)
+      .optional(),
+    /** At most this many, for a search. */
+    limit: z.number().int().min(1).max(100).optional(),
   }),
   output: z.array(memberSummary),
   access: ACCESS_LEVELS.view,
@@ -1002,7 +1026,20 @@ export const directory = defineReadAction({
       if (!input.includeSuspended) {
         filters.push(eq(workspaceMembers.status, "active"));
       }
-      return tx
+      if (input.kinds) {
+        filters.push(inArray(workspaceMembers.kind, input.kinds));
+      }
+      const phrase = input.search ?? "";
+      for (const word of phrase.split(/\s+/).filter(Boolean).slice(0, 6)) {
+        const like = `%${escapeLike(word)}%`;
+        filters.push(
+          or(
+            ilike(workspaceMembers.name, like),
+            ilike(workspaceMembers.title, like),
+          ) as SQL,
+        );
+      }
+      const query = tx
         .select({
           id: workspaceMembers.id,
           name: workspaceMembers.name,
@@ -1015,9 +1052,30 @@ export const directory = defineReadAction({
         })
         .from(workspaceMembers)
         .where(activeOnly(workspaceMembers, ...filters));
+      if (phrase === "") {
+        return input.limit ? query.limit(input.limit) : query;
+      }
+      // A name that starts with it, then a word in the name that does, then
+      // the rest, which matched on a title or inside a word.
+      const start = escapeLike(phrase);
+      return query
+        .orderBy(
+          desc(ilike(workspaceMembers.name, `${start}%`)),
+          desc(ilike(workspaceMembers.name, `% ${start}%`)),
+          desc(ilike(workspaceMembers.name, `%${start}%`)),
+          asc(workspaceMembers.name),
+        )
+        .limit(input.limit ?? 50);
     });
   },
 });
+
+/**
+ * `%`, `_` and the backslash mean something to `LIKE`, and a person typing
+ * "50%" means the character. Backslash is Postgres's default escape.
+ */
+const escapeLike = (text: string) =>
+  text.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
 
 const memberProfile = z.object({
   id: z.uuid(),

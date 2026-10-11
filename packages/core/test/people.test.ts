@@ -161,6 +161,45 @@ describe("the manager chain", () => {
   });
 });
 
+describe("finding a member by name", () => {
+  // guided-inputs §4.10: a picker over more members than the browser filters
+  // asks the directory as the person types.
+  it("answers what is typed from a name or a title, the closest first, of the kinds asked for", async () => {
+    const wb = await workerDb();
+    const priya = await addMember("Priya Raman");
+    await addMember("Ana Priyanka");
+    await addMember("Daniel Okafor");
+    await wb.admin.query(
+      "update workspace_members set title = 'Pricing lead' where id = $1",
+      [await addMember("Mei Tan")],
+    );
+    await wb.admin.query(
+      `insert into workspace_members (id, workspace_id, name, kind, status)
+       values (gen_random_uuid(), $1, 'Prism Bot', 'agent', 'active')`,
+      [workspaceId],
+    );
+
+    const found = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.directory",
+      { search: "pri", kinds: ["human", "guest"], limit: 10 },
+    );
+    expect(found.map((one) => one.name)).toEqual([
+      "Priya Raman",
+      "Ana Priyanka",
+      "Mei Tan",
+    ]);
+    expect(found[0]?.id).toBe(priya);
+
+    const one = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.directory",
+      { search: "pri", limit: 1 },
+    );
+    expect(one).toHaveLength(1);
+  });
+});
+
 describe("suspend and restore", () => {
   it("suspend removes every access a binding would otherwise grant, and restore returns it", async () => {
     const wb = await workerDb();

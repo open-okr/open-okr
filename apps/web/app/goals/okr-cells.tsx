@@ -13,13 +13,16 @@ import {
   Chip,
   cn,
   DateInput,
+  EntityPicker,
   formatMeasure,
   NumberInput,
   UnitInput,
   useTranslations,
 } from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
+import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
+import { searchMembers } from "../../lib/member-search.ts";
 
 /**
  * The cells of the OKR list, each edited where it is read (P9-T07a-a,
@@ -335,11 +338,20 @@ export function InlineDate({
 export interface Person {
   readonly id: string;
   readonly name: string;
+  /** Their job title, read with their name in the picker. */
+  readonly title?: string | null;
 }
 
+/** A champion or an owner is a person: the search never offers an agent. */
+const PEOPLE_ONLY = ["human", "guest"] as const;
+
+/** The cell's own skin on the picker: no border until it is reached. */
+const PICKER_CELL = cn("h-auto w-36 text-xs", FIELD);
+
 /**
- * A champion or a key result owner. Saved as soon as it changes: a choice
- * from a list has no half-typed state to protect.
+ * A champion or a key result owner (docs/design/guided-inputs.md §4.10).
+ * Saved as soon as it changes: a choice from a list has no half-typed state
+ * to protect. Typing finds somebody by name or title.
  */
 export function MemberPicker({
   value,
@@ -365,32 +377,26 @@ export function MemberPicker({
       </span>
     );
   }
-  // Somebody no longer in the directory still shows as who they are.
-  const options =
-    value && !members.some((member) => member.id === value.id)
-      ? [value, ...members]
-      : members;
+  const agent = t("common.agent");
   return (
-    <select
-      aria-label={label}
-      value={value?.id ?? ""}
-      onChange={(event) => {
-        const next = event.target.value === "" ? null : event.target.value;
+    <EntityPicker
+      label={label}
+      hideLabel
+      value={value?.id ?? null}
+      options={members.map((member) => memberOption(member, agent))}
+      // Somebody no longer in the directory still shows as who they are.
+      current={value ? memberOption(value, agent) : null}
+      {...(allowNone || value === null
+        ? { noneLabel: t("okrList.nobody") }
+        : {})}
+      search={(text) => searchMembers(text, PEOPLE_ONLY)}
+      onValueChange={(next) => {
         if (next !== (value?.id ?? null)) {
           onSave(next);
         }
       }}
-      className={cn("max-w-36 truncate text-xs", FIELD)}
-    >
-      {allowNone || value === null ? (
-        <option value="">{t("okrList.nobody")}</option>
-      ) : null}
-      {options.map((member) => (
-        <option key={member.id} value={member.id}>
-          {member.name}
-        </option>
-      ))}
-    </select>
+      inputClassName={PICKER_CELL}
+    />
   );
 }
 
@@ -426,25 +432,19 @@ export function SpacePicker({
     return <span className="truncate px-1 text-xs text-ink-2">{current}</span>;
   }
   return (
-    <select
-      aria-label={label}
+    <EntityPicker
+      label={label}
+      hideLabel
       value={value}
-      onChange={(event) => {
-        if (event.target.value !== value) {
-          onSave(event.target.value);
+      options={spaces.map(namedOption)}
+      current={{ id: value, label: current }}
+      onValueChange={(next) => {
+        if (next !== null && next !== value) {
+          onSave(next);
         }
       }}
-      className={cn("max-w-36 truncate text-xs", FIELD)}
-    >
-      {spaces.some((space) => space.id === value) ? null : (
-        <option value={value}>{current}</option>
-      )}
-      {spaces.map((space) => (
-        <option key={space.id} value={space.id}>
-          {space.name}
-        </option>
-      ))}
-    </select>
+      inputClassName={PICKER_CELL}
+    />
   );
 }
 

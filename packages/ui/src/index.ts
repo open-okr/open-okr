@@ -20,6 +20,7 @@ export * from "./fields/date-input.tsx";
 export * from "./fields/date-range-input.tsx";
 export * from "./fields/date-time-input.tsx";
 export * from "./fields/email-input.tsx";
+export * from "./fields/entity-picker.tsx";
 export * from "./fields/number-input.tsx";
 export * from "./fields/secret-input.tsx";
 export * from "./fields/text-input.tsx";

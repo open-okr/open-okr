@@ -19,6 +19,7 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -143,7 +144,7 @@ test("the goal page links the key result drafted by hand", async () => {
 
   // The only key result left to link is the one measured by hand.
   await expect(page.getByLabel("Key result to link")).toHaveValue(/.+/);
-  await page.getByLabel("KPI it reads from").selectOption({ label: KPI });
+  await choose(page.getByRole("combobox", { name: "KPI it reads from" }), KPI);
   await page.getByTestId("link-kpi").click();
 
   await expect(page.getByText("from a KPI", { exact: true })).toHaveCount(2, {
