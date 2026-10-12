@@ -857,6 +857,11 @@ export {
   trustedDomainOffers,
 } from "./invitations/trusted-domain.ts";
 export {
+  type EmailBlock,
+  type EmailFrame,
+  renderEmail,
+} from "./mail/render.ts";
+export {
   findNavigationItem,
   isRouteAllowed,
   MODULE_REGISTRY,
