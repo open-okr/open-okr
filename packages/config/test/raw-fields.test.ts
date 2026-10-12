@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { compareRawFields, countRawFields } from "../src/raw-fields.ts";
+import { countRawFields, rawFieldFindings } from "../src/raw-fields.ts";
 
 /**
- * The raw-field ratchet (docs/design/guided-inputs.md §6): what counts as a
- * field the kit should draw, and how a file's count is held to the baseline.
+ * The raw-field gate (docs/design/guided-inputs.md §6): what counts as a
+ * field the kit should draw, and that a screen drawing one is refused.
  */
 
 describe("counting raw fields", () => {
@@ -74,35 +74,21 @@ describe("counting raw fields", () => {
   });
 });
 
-describe("holding a file to the baseline", () => {
-  it("passes a file at its baseline, and one with none", () => {
-    expect(
-      compareRawFields(
-        new Map([
-          ["a.tsx", 2],
-          ["b.tsx", 0],
-        ]),
-        { "a.tsx": 2 },
-      ),
-    ).toEqual([]);
+describe("holding every screen to the kit", () => {
+  it("passes a screen that draws none", () => {
+    expect(rawFieldFindings(new Map([["a.tsx", 0]]))).toEqual([]);
+    expect(rawFieldFindings(new Map())).toEqual([]);
   });
 
-  it("refuses a file that draws more than the baseline allows", () => {
-    const findings = compareRawFields(new Map([["a.tsx", 3]]), { "a.tsx": 2 });
-    expect(findings).toHaveLength(1);
-    expect(findings[0]?.message).toContain("allows 2");
-  });
-
-  it("refuses a new file that draws one, since a missing entry allows none", () => {
-    expect(compareRawFields(new Map([["new.tsx", 1]]), {})).toHaveLength(1);
-  });
-
-  it("refuses a file below its entry until the entry is lowered", () => {
-    const findings = compareRawFields(new Map([["a.tsx", 1]]), { "a.tsx": 2 });
-    expect(findings[0]?.message).toContain("fewer than the baseline's 2");
-  });
-
-  it("refuses an entry for a file that is gone", () => {
-    expect(compareRawFields(new Map(), { "gone.tsx": 1 })).toHaveLength(1);
+  it("refuses any screen that draws one, and says where the kit is", () => {
+    const findings = rawFieldFindings(
+      new Map([
+        ["b.tsx", 2],
+        ["a.tsx", 1],
+      ]),
+    );
+    expect(findings.map((finding) => finding.path)).toEqual(["a.tsx", "b.tsx"]);
+    expect(findings[1]?.message).toContain("draws 2 raw field(s)");
+    expect(findings[1]?.message).toContain("packages/ui");
   });
 });

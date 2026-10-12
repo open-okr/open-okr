@@ -318,9 +318,15 @@ test("erasure asks for the name typed, and a wrong one erases nothing", async ()
   // depending on the machine, and fails on strict mode rather than on the
   // behaviour. Two refusals for two refused actions is correct; what this
   // line means is that the erase card is one of them.
+  // The innermost block holding both the confirm box and the erase button:
+  // the box sits in a field wrapper of its own since guided-inputs 10d, so
+  // the innermost block holding the box alone is that wrapper.
   const eraseCard = page
     .locator("div")
     .filter({ has: page.getByLabel(`Type ${INSTANCE_ACCOUNT.name} to confirm`) })
+    .filter({
+      has: page.getByRole("button", { name: "Erase this member", exact: true }),
+    })
     .last();
   await expect(
     eraseCard.getByText(

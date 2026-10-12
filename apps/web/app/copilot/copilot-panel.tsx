@@ -26,6 +26,7 @@ import {
   Button,
   Chip,
   Kbd,
+  TextArea,
   useKeyboardShortcut,
   useTranslations,
 } from "@openokr/ui";
@@ -724,30 +725,29 @@ export function CopilotPanel({
               </p>
             )}
             <div className="flex items-end gap-2">
-              <label className="flex-1">
-                <span className="sr-only">
-                  {t("copilot.copilotPanel.yourQuestion")}
-                </span>
-                <textarea
-                  ref={inputRef}
-                  rows={2}
-                  value={question}
-                  disabled={busy}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      void send();
-                    }
-                  }}
-                  placeholder={
-                    canAsk
-                      ? t("copilot.copilotPanel.askAQuestion")
-                      : t("copilot.copilotPanel.searchForMatchingPassages")
+              <TextArea
+                label={t("copilot.copilotPanel.yourQuestion")}
+                hideLabel
+                ref={inputRef}
+                rows={2}
+                value={question}
+                disabled={busy}
+                onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void send();
                   }
-                  className="w-full resize-none rounded-md border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none placeholder:text-ink-4"
-                />
-              </label>
+                }}
+                placeholder={
+                  canAsk
+                    ? t("copilot.copilotPanel.askAQuestion")
+                    : t("copilot.copilotPanel.searchForMatchingPassages")
+                }
+                maxLength={4000}
+                className="flex-1"
+                inputClassName="resize-none placeholder:text-ink-4"
+              />
               {busy && availability.streaming ? (
                 <Button
                   variant="ghost"

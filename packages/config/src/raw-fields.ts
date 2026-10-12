@@ -97,36 +97,23 @@ export interface RawFieldFinding {
 }
 
 /**
- * Every file whose count differs from the baseline, either way.
+ * Every screen file that draws a raw field (guided-inputs §6, as of 10d).
  *
- * More than the baseline is a field drawn without the kit. Fewer is progress
- * the baseline has not recorded yet, and is refused until it does, which is
- * what makes this a ratchet rather than a ceiling.
+ * It was a ratchet: each file could draw as many as a baseline allowed, and
+ * the baseline only went down, from 336 fields to none across change 10.
+ * With none left there is nothing to hold, so the rule is the plain one: a
+ * screen draws its fields with the kit.
  */
-export function compareRawFields(
+export function rawFieldFindings(
   counts: ReadonlyMap<string, number>,
-  baseline: Readonly<Record<string, number>>,
 ): RawFieldFinding[] {
-  const findings: RawFieldFinding[] = [];
-  const paths = new Set([...counts.keys(), ...Object.keys(baseline)]);
-  for (const path of [...paths].sort()) {
-    const now = counts.get(path) ?? 0;
-    const allowed = baseline[path] ?? 0;
-    if (now > allowed) {
-      findings.push({
-        path,
-        message:
-          `draws ${now} raw field(s) where the baseline allows ${allowed}. ` +
-          "Use the field kit in packages/ui (docs/design/guided-inputs.md §4).",
-      });
-    } else if (now < allowed) {
-      findings.push({
-        path,
-        message:
-          `draws ${now} raw field(s), fewer than the baseline's ${allowed}. ` +
-          "Lower its entry so the gain holds: pnpm check:boundaries --update-field-baseline.",
-      });
-    }
-  }
-  return findings;
+  return [...counts]
+    .filter(([, count]) => count > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([path, count]) => ({
+      path,
+      message:
+        `draws ${count} raw field(s). ` +
+        "Use the field kit in packages/ui (docs/design/guided-inputs.md §4).",
+    }));
 }

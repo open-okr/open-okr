@@ -6,6 +6,7 @@ import {
   CardBody,
   CardHeader,
   RichTextField,
+  SelectInput,
   TimeRangeInput,
   TimezoneSelect,
   useTranslations,
@@ -72,33 +73,28 @@ export function ProfileForm({
             defaultValue={timezone}
           />
 
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.primaryChannel")}
-            <select
-              name="primaryChannel"
-              defaultValue={primaryChannel ?? "app"}
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            >
-              <option value="app">
-                {t("people.detail.profileForm.inApp")}
-              </option>
-              <option value="email">
-                {t("people.detail.profileForm.email")}
-              </option>
-              <option value="slack">
-                {t("people.detail.profileForm.slack")}
-              </option>
-              <option value="teams">
-                {t("people.detail.profileForm.teams")}
-              </option>
-              <option value="whatsapp">
-                {t("people.detail.profileForm.whatsapp")}
-              </option>
-              <option value="telegram">
-                {t("people.detail.profileForm.telegram")}
-              </option>
-            </select>
-          </label>
+          <SelectInput
+            label={t("common.primaryChannel")}
+            name="primaryChannel"
+            defaultValue={primaryChannel ?? "app"}
+          >
+            <option value="app">{t("people.detail.profileForm.inApp")}</option>
+            <option value="email">
+              {t("people.detail.profileForm.email")}
+            </option>
+            <option value="slack">
+              {t("people.detail.profileForm.slack")}
+            </option>
+            <option value="teams">
+              {t("people.detail.profileForm.teams")}
+            </option>
+            <option value="whatsapp">
+              {t("people.detail.profileForm.whatsapp")}
+            </option>
+            <option value="telegram">
+              {t("people.detail.profileForm.telegram")}
+            </option>
+          </SelectInput>
 
           <RichTextField
             label={t("people.detail.bio")}

@@ -8,6 +8,7 @@ import {
   CardHeader,
   Chip,
   IdentifierInput,
+  SelectInput,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
@@ -249,59 +250,47 @@ export function SpaceSettingsCard({
             </span>
           </label>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-ink">
-              {t("spaces.detail.spaceSettings.coachingStrictness")}
-            </span>
-            <select
-              name="coachStrictness"
-              defaultValue={settings.coachStrictness ?? ""}
-              className="w-72 rounded-md border border-line bg-bg px-2 py-1"
-            >
-              <option value="">
-                {t("spaces.detail.spaceSettings.theWorkspaceS", {
-                  workspaceStrictness,
-                })}
+          <SelectInput
+            label={t("spaces.detail.spaceSettings.coachingStrictness")}
+            name="coachStrictness"
+            defaultValue={settings.coachStrictness ?? ""}
+            description={t("spaces.detail.spaceSettings.appliesToThisSpace")}
+            className="w-72"
+          >
+            <option value="">
+              {t("spaces.detail.spaceSettings.theWorkspaceS", {
+                workspaceStrictness,
+              })}
+            </option>
+            {COACH_STRICTNESS.map((option) => (
+              <option key={option} value={option}>
+                {option}: {strictnessMeaning(option, t)}
               </option>
-              {COACH_STRICTNESS.map((option) => (
-                <option key={option} value={option}>
-                  {option}: {strictnessMeaning(option, t)}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-ink-3">
-              {t("spaces.detail.spaceSettings.appliesToThisSpace")}
-            </span>
-          </label>
+            ))}
+          </SelectInput>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-ink">
-              {t("spaces.detail.spaceSettings.defaultCheckInFrequency")}
-            </span>
-            <select
-              name="defaultCheckInFrequency"
-              defaultValue={settings.defaultCheckInFrequency ?? ""}
-              className="w-72 rounded-md border border-line bg-bg px-2 py-1"
-            >
-              <option value="">
-                {t("spaces.detail.spaceSettings.theWorkspaceS3", {
-                  workspaceFrequency,
-                })}
-              </option>
-              {/* Not quarterly: no goal checks in at it (P9-T19a-d-a), so a
+          <SelectInput
+            label={t("spaces.detail.spaceSettings.defaultCheckInFrequency")}
+            name="defaultCheckInFrequency"
+            defaultValue={settings.defaultCheckInFrequency ?? ""}
+            description={t("spaces.detail.spaceSettings.aTeamShippingDaily")}
+            className="w-72"
+          >
+            <option value="">
+              {t("spaces.detail.spaceSettings.theWorkspaceS3", {
+                workspaceFrequency,
+              })}
+            </option>
+            {/* Not quarterly: no goal checks in at it (P9-T19a-d-a), so a
                   space set to it would change nothing it says it changes. */}
-              {CHECK_IN_FREQUENCIES.filter(
-                (option) => option !== "quarterly",
-              ).map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-ink-3">
-              {t("spaces.detail.spaceSettings.aTeamShippingDaily")}
-            </span>
-          </label>
+            {CHECK_IN_FREQUENCIES.filter(
+              (option) => option !== "quarterly",
+            ).map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </SelectInput>
 
           <ChannelFields settings={settings} connected={connectedProviders} />
 

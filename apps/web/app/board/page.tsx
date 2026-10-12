@@ -6,6 +6,8 @@ import {
   Chip,
   DateInput,
   EntityPicker,
+  SelectInput,
+  TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -216,35 +218,23 @@ export default async function BoardPage({
                 {scope.kind === "key_result" ? (
                   <input type="hidden" name="keyResultId" value={scope.id} />
                 ) : null}
-                <label
-                  className="text-xs font-semibold text-ink-2"
-                  htmlFor="title"
-                >
-                  {t("board.whatHasToHappen")}
-                </label>
-                <input
+                <TextInput
+                  label={t("board.whatHasToHappen")}
                   id="title"
                   name="title"
                   required
                   maxLength={500}
                   placeholder={t("board.rewriteTheFirstRun")}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
                 />
                 <div className="flex flex-wrap gap-2">
-                  <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                    {t("board.column")}
-                    <select
-                      name="status"
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    >
-                      <option value="backlog">{t("board.backlog")}</option>
-                      <option value="todo">{t("board.toDo")}</option>
-                      <option value="in_progress">
-                        {t("common.inProgress")}
-                      </option>
-                      <option value="done">{t("board.done")}</option>
-                    </select>
-                  </label>
+                  <SelectInput label={t("board.column")} name="status">
+                    <option value="backlog">{t("board.backlog")}</option>
+                    <option value="todo">{t("board.toDo")}</option>
+                    <option value="in_progress">
+                      {t("common.inProgress")}
+                    </option>
+                    <option value="done">{t("board.done")}</option>
+                  </SelectInput>
                   {scope.spaceId ? null : (
                     // A key result whose goal belongs to no space: the person
                     // adding the work says where it lives.

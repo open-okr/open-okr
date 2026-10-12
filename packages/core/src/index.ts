@@ -54,6 +54,7 @@ export {
   callAction,
   getAction,
 } from "./actions/registry.ts";
+export { SEARCH_TEXT_MAX_LENGTH } from "./actions/search.ts";
 export {
   readSettingsForMember,
   readWorkspaceSettings,

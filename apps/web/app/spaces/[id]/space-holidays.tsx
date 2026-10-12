@@ -6,6 +6,7 @@ import {
   CardBody,
   CardHeader,
   DateRangeInput,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
@@ -118,18 +119,14 @@ export function SpaceHolidaysCard({
                 setEndsOn(range.end ?? "");
               }}
             />
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("spaces.detail.holidays.label")}
-              </span>
-              <input
-                value={label}
-                maxLength={80}
-                placeholder={t("spaces.detail.holidays.labelPlaceholder")}
-                onChange={(event) => setLabel(event.target.value)}
-                className="w-48 rounded-md border border-line bg-bg px-2 py-1"
-              />
-            </label>
+            <TextInput
+              label={t("spaces.detail.holidays.label")}
+              value={label}
+              maxLength={80}
+              placeholder={t("spaces.detail.holidays.labelPlaceholder")}
+              onChange={(event) => setLabel(event.target.value)}
+              className="w-48"
+            />
             <Button
               type="button"
               disabled={

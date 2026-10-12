@@ -1,6 +1,6 @@
 "use client";
 
-import { Kbd, useTheme, useTranslations } from "@openokr/ui";
+import { Kbd, TextInput, useTheme, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { setAppearance } from "../../lib/appearance-action.ts";
@@ -320,7 +320,9 @@ export function CommandPalette({
          * carries its own outline below.
          */}
         <div className="flex items-center gap-2 border-line border-b-2 px-3 py-2 focus-within:border-brand">
-          <input
+          <TextInput
+            label={t("search.palette.searchEverything")}
+            hideLabel
             ref={input}
             value={text}
             role="combobox"
@@ -330,10 +332,8 @@ export function CommandPalette({
               current ? `palette-${current.id}` : undefined
             }
             aria-autocomplete="list"
-            aria-label={t("search.palette.searchEverything")}
             placeholder={t("search.palette.searchOrTypeA")}
             maxLength={200}
-            className="flex-1 bg-transparent text-sm text-ink outline-none"
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "ArrowDown") {
@@ -372,6 +372,8 @@ export function CommandPalette({
                 event.preventDefault();
               }
             }}
+            className="min-w-0 flex-1"
+            inputClassName="h-auto border-0 bg-transparent px-0 focus:ring-0"
           />
           <Kbd>{t("common.esc")}</Kbd>
         </div>

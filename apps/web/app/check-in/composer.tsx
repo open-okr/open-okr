@@ -10,6 +10,7 @@ import {
   formatMeasure,
   MetricInput,
   RichTextField,
+  SelectInput,
 } from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -85,22 +86,17 @@ export async function Composer({
           <input type="hidden" name="checkInId" value={checkInId} />
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <label
-              className="text-xs font-semibold text-ink-2"
-              htmlFor="status"
-            >
-              {t("checkIn.composer.status")}
-            </label>
-            <select
+            <SelectInput
+              label={t("checkIn.composer.status")}
               id="status"
               name="status"
               defaultValue="on_track"
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink-2"
+              inputClassName="w-auto text-xs text-ink-2"
             >
               <option value="on_track">{t("common.onTrack")}</option>
               <option value="caution">{t("common.caution")}</option>
               <option value="off_track">{t("common.offTrack")}</option>
-            </select>
+            </SelectInput>
 
             {/* guided-inputs §4.8: shown the way the workspace's practice
                 says, "7 in 10" by default, with its §3.2 band beside it, and

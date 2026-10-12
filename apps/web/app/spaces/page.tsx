@@ -1,5 +1,13 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip, EntityPicker } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+  TextArea,
+  TextInput,
+} from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
@@ -117,25 +125,20 @@ export default async function SpacesPage() {
           </CardHeader>
           <CardBody>
             <SpaceForm action={createSpace} className="flex flex-col gap-2">
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("common.name")}
-                <input
-                  name="name"
-                  required
-                  maxLength={80}
-                  placeholder={t("spaces.productSalesPlatform")}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("common.mission")}
-                <input
-                  name="mission"
-                  maxLength={280}
-                  placeholder={t("common.whatThisTeamIs")}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
+              <TextInput
+                label={t("common.name")}
+                name="name"
+                required
+                maxLength={80}
+                placeholder={t("spaces.productSalesPlatform")}
+              />
+              <TextArea
+                label={t("common.mission")}
+                name="mission"
+                maxLength={280}
+                placeholder={t("common.whatThisTeamIs")}
+                rows={2}
+              />
               <EntityPicker
                 label={t("common.manager")}
                 name="managerMemberId"

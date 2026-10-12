@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { RangeInput } from "../src/fields/range-input.tsx";
+import { SearchInput } from "../src/fields/search-input.tsx";
 import { SelectInput } from "../src/fields/select-input.tsx";
 import { TextArea } from "../src/fields/text-area.tsx";
 import { TextInput } from "../src/fields/text-input.tsx";
@@ -151,5 +152,20 @@ describe("a slider", () => {
     expect(screen.getByRole("slider", { name: "Weight" })).not.toBeNull();
     expect(screen.queryByText("Score")).toBeNull();
     expect(screen.getByText("Weight")).not.toBeNull();
+  });
+});
+
+describe("a search box", () => {
+  it("is a search field, named, held to the server's limit, and not remembered", () => {
+    inEnglish(
+      <SearchInput label="What are you looking for" name="q" maxLength={500} />,
+    );
+    const box = screen.getByRole("searchbox", {
+      name: "What are you looking for",
+    }) as HTMLInputElement;
+    expect(box.type).toBe("search");
+    expect(box.maxLength).toBe(500);
+    expect(box.getAttribute("autocomplete")).toBe("off");
+    expect(box.getAttribute("enterkeyhint")).toBe("search");
   });
 });

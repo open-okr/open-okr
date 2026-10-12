@@ -8,6 +8,7 @@ import {
   Chip,
   EntityPicker,
   RichTextView,
+  TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -377,25 +378,19 @@ export default async function MemberProfilePage({
           <CardBody>
             <MemberFieldsForm action={updateMemberFields}>
               <input type="hidden" name="memberId" value={id} />
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("common.name")}
-                <input
-                  name="name"
-                  defaultValue={member.name}
-                  required
-                  maxLength={200}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("people.detail.title")}
-                <input
-                  name="title"
-                  defaultValue={member.title ?? ""}
-                  maxLength={200}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
+              <TextInput
+                label={t("common.name")}
+                name="name"
+                defaultValue={member.name}
+                required
+                maxLength={200}
+              />
+              <TextInput
+                label={t("people.detail.title")}
+                name="title"
+                defaultValue={member.title ?? ""}
+                maxLength={200}
+              />
               {/* The managers who would not close a loop, so no directory
                * search, which would offer the others back. */}
               <EntityPicker

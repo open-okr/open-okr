@@ -10,6 +10,7 @@ import {
   type MessageValues,
   RichTextField,
   RichTextView,
+  SelectInput,
 } from "@openokr/ui";
 import { richTextHtml } from "../../lib/rich-text-html.ts";
 import { getTranslations } from "../../lib/translations";
@@ -223,22 +224,18 @@ export async function Timeline({
                   className="flex flex-wrap items-center gap-1.5 border-line border-t pt-2"
                 >
                   <input type="hidden" name="checkInId" value={entry.id} />
-                  <label
-                    className="text-xs text-ink-3"
-                    htmlFor={`edit-status-${entry.id}`}
-                  >
-                    {t("checkIn.timeline.correctIt")}
-                  </label>
-                  <select
+                  <SelectInput
+                    label={t("checkIn.timeline.correctIt")}
                     id={`edit-status-${entry.id}`}
                     name="status"
                     defaultValue={entry.status ?? "on_track"}
-                    className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
+                    className="flex-row items-center gap-1.5"
+                    inputClassName="h-6.5 w-auto text-xs text-ink-2"
                   >
                     <option value="on_track">{t("common.onTrack")}</option>
                     <option value="caution">{t("common.caution")}</option>
                     <option value="off_track">{t("common.offTrack")}</option>
-                  </select>
+                  </SelectInput>
                   {/* The slider this replaces never showed its value.
                       Emptied, the confidence is kept as it was. */}
                   <ConfidenceInput

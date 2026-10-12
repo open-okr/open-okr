@@ -87,10 +87,8 @@ export async function WorkspaceSwitcher({
         </div>
         {memberships.length > 1 ? (
           <form action={switchWorkspace}>
-            <label htmlFor="workspaceId" className="sr-only">
-              {t("workspaceSwitcher.workspace")}
-            </label>
             <WorkspaceSelect
+              label={t("workspaceSwitcher.workspace")}
               memberships={memberships}
               activeWorkspaceId={active.workspaceId}
             />
