@@ -3005,6 +3005,21 @@
       "example": {}
     },
     {
+      "name": "audit.names",
+      "description": "The action and target type names this workspace's audit trail holds, so a filter offers only names it finds rows for.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "settings.readWorkspaceSettings",
       "description": "The workspace's own settings map, for the admin cards.",
       "inputSchema": {
@@ -3465,7 +3480,9 @@
           },
           "modelId": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^\\S+$"
           },
           "displayName": {
             "type": "string",
@@ -3568,7 +3585,9 @@
           },
           "modelId": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^\\S+$"
           },
           "displayName": {
             "type": "string",

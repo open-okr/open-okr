@@ -2094,6 +2094,16 @@
       "pages": true
     },
     {
+      "name": "audit names",
+      "action": "audit.names",
+      "method": "GET",
+      "path": "/audit/names",
+      "scope": "read",
+      "summary": "The action and target type names this workspace's audit trail holds, so a filter offers only names it finds rows for.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "settings readWorkspaceSettings",
       "action": "settings.readWorkspaceSettings",
       "method": "GET",

@@ -20,7 +20,6 @@ import {
   type AIContextEgressLevel,
   aiEgressAllowListSchema,
   callAction,
-  OperationError,
 } from "@openokr/core";
 import type {
   AIProviderKind,
@@ -33,6 +32,7 @@ import { hostOf } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { testWorkspaceKey } from "../../../lib/ai-key-test";
 import { getPool } from "../../../lib/pool";
+import { refusalOf } from "../../../lib/refusal";
 import { getKeyRing } from "../../../lib/secrets";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -60,8 +60,11 @@ async function context() {
 }
 
 async function reason(error: unknown): Promise<string> {
-  if (error instanceof OperationError) {
-    return error.message;
+  // A schema's own sentence, not the JSON of every issue (F5): a base URL or
+  // a model id refused by its rule says why.
+  const refused = refusalOf(error);
+  if (refused !== null) {
+    return refused;
   }
   if (error instanceof Error) {
     return error.message;

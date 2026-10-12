@@ -16,6 +16,9 @@ import {
   isKnownTimezone,
   isListedTimezone,
   isLocalDate,
+  isOneWord,
+  isSlug,
+  isWebUrl,
   LOCAL_DATE_PATTERN,
   listTimezones,
   localDateTimeInstant,
@@ -177,6 +180,53 @@ describe("a host an AI call may reach", () => {
     expect(hostOf("https://openrouter.ai/api/v1")).toBe("openrouter.ai");
     expect(hostOf(" API.Anthropic.com ")).toBe("api.anthropic.com");
     expect(hostOf("not_a_host!")).toBe("not_a_host!");
+  });
+});
+
+describe("web addresses and identifiers (guided-inputs §4.11)", () => {
+  it("takes a whole http or https address, and only https when asked", () => {
+    for (const url of [
+      "https://idp.example/.well-known/openid-configuration",
+      "http://localhost:11434/v1",
+      "http://127.0.0.1:8080",
+    ]) {
+      expect(isWebUrl(url)).toBe(true);
+    }
+    for (const url of [
+      "",
+      "idp.example/token",
+      "localhost:11434",
+      "ftp://idp.example/file",
+      "javascript:alert(1)",
+      "https://",
+      "mailto:priya@northwind.example",
+    ]) {
+      expect(isWebUrl(url)).toBe(false);
+    }
+    expect(isWebUrl("https://idp.example/token", { secure: true })).toBe(true);
+    expect(isWebUrl("http://idp.example/token", { secure: true })).toBe(false);
+    // Plain http that never leaves this machine is still taken.
+    for (const url of [
+      "http://localhost:8080/realms/acme",
+      "http://127.0.0.1:9000/token",
+      "http://[::1]:9000/token",
+    ]) {
+      expect(isWebUrl(url, { secure: true })).toBe(true);
+    }
+    expect(isWebUrl("http://localhost.example/token", { secure: true })).toBe(
+      false,
+    );
+  });
+
+  it("tells one word from a phrase, and a slug from anything else", () => {
+    expect(isOneWord("C0123ABCD")).toBe(true);
+    expect(isOneWord("19:abc@thread.tacv2")).toBe(true);
+    expect(isOneWord("team updates")).toBe(false);
+    expect(isOneWord("")).toBe(false);
+    expect(isSlug("acme-idp-2")).toBe(true);
+    for (const id of ["Acme", "acme_idp", "acme idp", ""]) {
+      expect(isSlug(id)).toBe(false);
+    }
   });
 });
 

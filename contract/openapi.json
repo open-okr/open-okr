@@ -11206,6 +11206,83 @@
         ]
       }
     },
+    "/audit/names": {
+      "get": {
+        "operationId": "audit.names",
+        "summary": "The action and target type names this workspace's audit trail holds, so a filter offers only names it finds rows for.",
+        "tags": [
+          "audit"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "targetTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "actions",
+                        "targetTypes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
+      }
+    },
     "/settings/readWorkspaceSettings": {
       "get": {
         "operationId": "settings.readWorkspaceSettings",
@@ -13137,7 +13214,9 @@
                   },
                   "modelId": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "pattern": "^\\S+$"
                   },
                   "displayName": {
                     "type": "string",
@@ -13389,7 +13468,9 @@
                   },
                   "modelId": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "pattern": "^\\S+$"
                   },
                   "displayName": {
                     "type": "string",

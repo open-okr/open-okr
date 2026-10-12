@@ -12,7 +12,7 @@
  */
 import { X509Certificate } from "node:crypto";
 import { withSSOLookup, withWorkspace } from "@openokr/db";
-import { isDomain } from "@openokr/formats";
+import { isDomain, isSlug, isWebUrl } from "@openokr/formats";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
@@ -484,17 +484,13 @@ export function normaliseCertificate(value: string): string | null {
   }
 }
 
-function isAbsoluteUrl(value: string | null | undefined): boolean {
-  if (!value) {
-    return false;
-  }
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
+/** The four addresses an OIDC provider is called at, as the screen names them. */
+const OIDC_ADDRESSES = [
+  ["discoveryUrl", "discovery URL"],
+  ["authorizationUrl", "authorization URL"],
+  ["tokenUrl", "token URL"],
+  ["userInfoUrl", "user info URL"],
+] as const;
 
 /**
  * What an administrator may store, and which field to name when they may not.
@@ -520,7 +516,7 @@ export function validateSSOConnectionInput(
     readonly keepsSecret?: boolean;
   } = {},
 ): SSOConnectionProblem | null {
-  if (!input.providerId || !/^[a-z0-9-]+$/.test(input.providerId)) {
+  if (!input.providerId || !isSlug(input.providerId)) {
     return {
       field: "providerId",
       message:
@@ -562,7 +558,7 @@ export function validateSSOConnectionInput(
   }
 
   if (input.kind === "saml") {
-    if (!isAbsoluteUrl(input.samlEntryPoint)) {
+    if (!isWebUrl(input.samlEntryPoint ?? "")) {
       return {
         field: "samlEntryPoint",
         message:
@@ -593,6 +589,20 @@ export function validateSSOConnectionInput(
     return null;
   }
 
+  // Each address the provider is called at, when given, is a whole https
+  // one (guided-inputs §4.11). Nothing checked their shape before, so a typo
+  // was stored and found at somebody's sign-in. OAuth 2.0 requires TLS for
+  // the authorisation and token endpoints (RFC 6749 §3.1, §3.2); plain http
+  // to this machine's own address is still taken, since it never leaves it.
+  for (const [name, said] of OIDC_ADDRESSES) {
+    const address = input[name]?.trim();
+    if (address && !isWebUrl(address, { secure: true })) {
+      return {
+        field: name,
+        message: `The ${said} is a whole address starting with https://. Plain http is taken only for localhost.`,
+      };
+    }
+  }
   if (!input.clientId || input.clientId.trim() === "") {
     return {
       field: "clientId",

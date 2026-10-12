@@ -139,6 +139,41 @@ describe("what the screen refuses rather than stores", () => {
     ).toBe("clientSecret");
   });
 
+  it("refuses an OIDC address that is not a whole https one, naming it", () => {
+    // guided-inputs §4.11: nothing checked these, so a typo was stored and
+    // found at somebody's sign-in.
+    const oidc = {
+      kind: "oidc" as const,
+      providerId: "okta",
+      displayName: "Okta",
+      clientId: "id",
+      clientSecret: "secret",
+      discoveryUrl: "https://idp.example/.well-known/openid-configuration",
+    };
+    expect(validateSSOConnectionInput(oidc)).toBeNull();
+    const plain = validateSSOConnectionInput({
+      ...oidc,
+      tokenUrl: "http://idp.example/token",
+    });
+    expect(plain?.field).toBe("tokenUrl");
+    expect(plain?.message).toContain("https://");
+    expect(
+      validateSSOConnectionInput({ ...oidc, discoveryUrl: "idp.example" })
+        ?.field,
+    ).toBe("discoveryUrl");
+    // An identity provider tried out on this machine is still reachable.
+    expect(
+      validateSSOConnectionInput({
+        ...oidc,
+        discoveryUrl: "http://localhost:8080/.well-known/openid-configuration",
+      }),
+    ).toBeNull();
+    // An address left out is not a wrong one.
+    expect(
+      validateSSOConnectionInput({ ...oidc, userInfoUrl: "  " }),
+    ).toBeNull();
+  });
+
   it("refuses a provider id that is not a provider id, whichever protocol", () => {
     expect(
       validateSSOConnectionInput({ ...samlInput(), providerId: "Not Valid" })

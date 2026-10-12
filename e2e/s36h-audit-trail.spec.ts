@@ -15,11 +15,15 @@
 import type { BrowserContext, Download, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose, offered } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
 let context: BrowserContext;
 let page: Page;
+
+/** The filter's action picker, which offers the names the trail holds. */
+const ACTION = () => page.getByLabel("Action", { exact: true });
 
 test.beforeAll(async ({ browser }) => {
   context = await browser.newContext({ acceptDownloads: true });
@@ -76,7 +80,10 @@ test("the trail comes out as a file, with the columns an auditor needs", async (
 
 test("a filter that matches nothing says so rather than handing over everything", async () => {
   await goTo(page, "/admin/audit");
-  await page.getByLabel("Action").fill("nothing.everHappened");
+  // The action is chosen from the names the trail holds, so "nothing" is a
+  // day before any of them.
+  await page.getByLabel("From", { exact: true }).fill("2000-01-01");
+  await page.getByLabel("To", { exact: true }).fill("2000-01-02");
 
   const [download] = await Promise.all([
     page.waitForEvent("download", { timeout: 15_000 }),
@@ -89,7 +96,7 @@ test("a filter that matches nothing says so rather than handing over everything"
 
 test("the export is itself in the trail", async () => {
   await goTo(page, "/admin/audit");
-  await page.getByLabel("Action").fill("audit.export");
+  await choose(ACTION(), "audit.export");
 
   await Promise.all([
     page.waitForEvent("download", { timeout: 15_000 }),
@@ -121,7 +128,11 @@ test("the trail can be read on the screen, narrowed by the same filter as the fi
     table.getByRole("columnheader", { name: /^When \(.+\)$/ }),
   ).toBeVisible();
 
-  await page.getByLabel("Action").fill("audit.export");
+  // The names the trail holds are offered, and only those (§4.11).
+  const names = await offered(ACTION());
+  expect(names).toContain("audit.export");
+  expect(names).not.toContain("audit.list");
+  await choose(ACTION(), "audit.export");
   await page.getByRole("button", { name: "Show matching rows" }).click();
 
   // The exports this spec took are in the trail, and nothing else matches.
@@ -140,7 +151,8 @@ test("the trail can be read on the screen, narrowed by the same filter as the fi
 
 test("a filter the trail has nothing for says so on the screen", async () => {
   await goTo(page, "/admin/audit");
-  await page.getByLabel("Action").fill("nothing.everHappened");
+  await page.getByLabel("From", { exact: true }).fill("2000-01-01");
+  await page.getByLabel("To", { exact: true }).fill("2000-01-02");
   await page.getByRole("button", { name: "Show matching rows" }).click();
 
   await expect(page.getByTestId("audit-log-empty")).toHaveText(
@@ -165,7 +177,7 @@ test("a day is the workspace's day, from its midnight to its next", async () => 
 
   await page.getByLabel("From", { exact: true }).fill(today);
   await page.getByLabel("To", { exact: true }).fill(today);
-  await page.getByLabel("Action").fill("audit.export");
+  await choose(ACTION(), "audit.export");
   await page.getByRole("button", { name: "Show matching rows" }).click();
   // The exports this spec took were today, wherever the workspace is.
   await expect(page.getByTestId("audit-row").first()).toContainText(

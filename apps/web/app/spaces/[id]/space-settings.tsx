@@ -7,6 +7,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  IdentifierInput,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
@@ -96,18 +97,17 @@ function ChannelFields({
         </span>
       ) : (
         <>
+          {/* One word up to the server's 200, as the provider issued it
+              (guided-inputs §4.11). */}
           {offered.map((field) => (
-            <label key={field.name} className="flex flex-col gap-1">
-              <span className="text-sm text-ink-2">{t(field.label)}</span>
-              <input
-                name={field.name}
-                defaultValue={settings[field.name] ?? ""}
-                placeholder={field.placeholder}
-                spellCheck={false}
-                autoComplete="off"
-                className="w-72 rounded-md border border-line bg-bg px-2 py-1 font-mono text-xs"
-              />
-            </label>
+            <IdentifierInput
+              key={field.name}
+              label={t(field.label)}
+              name={field.name}
+              defaultValue={settings[field.name] ?? ""}
+              placeholder={field.placeholder}
+              className="w-72"
+            />
           ))}
           <span className="text-xs text-ink-3">
             {t("spaces.detail.spaceSettings.channelHint")}

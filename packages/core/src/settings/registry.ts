@@ -1,9 +1,11 @@
 import {
   DOMAIN_PATTERN,
   HEX_COLOUR_PATTERN,
+  IDENTIFIER_MAX_LENGTH,
   isHostName,
   isKnownTimezone,
   isListedTimezone,
+  ONE_WORD_PATTERN,
 } from "@openokr/formats";
 import type { CheckInFrequency, CoachStrictness } from "@openokr/method";
 import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
@@ -321,8 +323,8 @@ export const spaceChannelSchema = z
   .string()
   .trim()
   .min(1)
-  .max(200)
-  .regex(/^\S+$/)
+  .max(IDENTIFIER_MAX_LENGTH)
+  .regex(ONE_WORD_PATTERN)
   .nullable();
 
 /**

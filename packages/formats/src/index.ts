@@ -23,6 +23,13 @@ export { DOMAIN_PATTERN, isDomain } from "./domain.ts";
 export { EMAIL_PATTERN, isEmailAddress } from "./email.ts";
 export { hostOf, isHostName } from "./host.ts";
 export {
+  IDENTIFIER_MAX_LENGTH,
+  isOneWord,
+  isSlug,
+  ONE_WORD_PATTERN,
+  SLUG_PATTERN,
+} from "./identifier.ts";
+export {
   type MentionName,
   richTextAsLine,
   richTextLength,
@@ -33,6 +40,7 @@ export {
   isListedTimezone,
   listTimezones,
 } from "./timezone.ts";
+export { isWebUrl } from "./url.ts";
 export {
   isWallClock,
   normaliseWallClock,

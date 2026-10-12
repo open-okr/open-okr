@@ -7,6 +7,8 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  IdentifierInput,
+  UrlInput,
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
@@ -269,15 +271,15 @@ export default async function AdminAIPage() {
                   <p className="pl-6 text-xs text-ink-3">
                     {t("admin.ai.membersStoreTheirs")}
                   </p>
-                  <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    {t("admin.ai.baseUrlForA")}
-                    <input
-                      name="baseUrl"
-                      defaultValue={config?.baseUrl ?? ""}
-                      placeholder={t("admin.ai.leaveEmptyForThe")}
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    />
-                  </label>
+                  {/* A whole http or https address, the server's rule: a
+                      local Ollama is plain http (guided-inputs §4.11). */}
+                  <UrlInput
+                    id={`${kind}-baseUrl`}
+                    label={t("admin.ai.baseUrlForA")}
+                    name="baseUrl"
+                    defaultValue={config?.baseUrl ?? ""}
+                    placeholder={t("admin.ai.leaveEmptyForThe")}
+                  />
                   <Button type="submit" variant="ghost" size="sm">
                     {t("common.save")}
                   </Button>
@@ -449,14 +451,12 @@ export default async function AdminAIPage() {
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("admin.ai.modelId")}
-                <input
-                  name="modelId"
-                  required
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
+              <IdentifierInput
+                id="custom-modelId"
+                label={t("admin.ai.modelId")}
+                name="modelId"
+                required
+              />
               <label className="flex flex-col gap-1 text-xs text-ink-3">
                 {t("common.name")}
                 <input

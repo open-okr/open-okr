@@ -1,5 +1,11 @@
-import { Card, CardBody, FIELD_CONTROL_CLASS, TextInput } from "@openokr/ui";
-import type { InputHTMLAttributes, ReactNode } from "react";
+import {
+  Card,
+  CardBody,
+  FIELD_CONTROL_CLASS,
+  TextInput,
+  type TextInputProps,
+} from "@openokr/ui";
+import type { ReactNode } from "react";
 
 /**
  * The single clean card every authentication screen sits in (screen S-35,
@@ -80,10 +86,7 @@ export const fieldInputClass = FIELD_CONTROL_CLASS;
  * the description and the error are linked by Base UI `Field` rather than by
  * an id this function made up.
  */
-export function Field({
-  label,
-  ...input
-}: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
+export function Field({ label, ...input }: TextInputProps) {
   // A caller's own id wins, so one screen can hold two forms that ask for
   // the same field, as the single sign-on screen does while a connection is
   // being edited beside the add form.
