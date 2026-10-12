@@ -73,18 +73,25 @@ test("every provider offers a form, because every one has a driver now", async (
   // protected is still enforced by the page: `ready: false` on a provider
   // shows the notice instead of the form, and the next provider added without
   // a driver will meet it.
-  await expect(slackForm().getByLabel("Bot token")).toBeVisible();
+  // Each names its boxes as its provider does (guided-inputs §4.11).
+  await expect(slackForm().getByLabel("Bot User OAuth Token")).toBeVisible();
   await expect(telegramForm().getByLabel("Bot token")).toBeVisible();
-  await expect(teamsForm().getByLabel("Bot token")).toBeVisible();
-  await expect(whatsAppForm().getByLabel("Bot token")).toBeVisible();
+  await expect(whatsAppForm().getByLabel("Permanent access token")).toBeVisible();
+  // Teams' App ID is not a secret, so it is shown as typed, not masked.
+  const appId = teamsForm().getByLabel("Application (client) ID");
+  await expect(appId).toBeVisible();
+  await expect(appId).not.toHaveAttribute("type", "password");
+  // WhatsApp's verify token has a box of its own, rather than sharing one
+  // with the app secret, split on a space.
+  await expect(whatsAppForm().getByLabel("Verify token")).toBeVisible();
   await expect(page.getByText("No driver yet")).toHaveCount(0);
 });
 
 test("connecting Slack stores it and does not claim it is verified", async () => {
   const form = slackForm();
-  await form.getByLabel("Bot token").fill(BOT_TOKEN);
-  await form.getByLabel("Signing or webhook secret").fill(SIGNING_SECRET);
-  await form.getByLabel("Provider workspace id").fill(TEAM_ID);
+  await form.getByLabel("Bot User OAuth Token").fill(BOT_TOKEN);
+  await form.getByLabel("Signing Secret").fill(SIGNING_SECRET);
+  await form.getByLabel("Workspace ID").fill(TEAM_ID);
   await form.getByRole("button", { name: "Connect" }).click();
 
   // The confirmation comes from the card, not from the form: a successful
@@ -105,7 +112,7 @@ test("the token is nowhere on the page, and the form is empty again", async () =
   expect(await page.content()).not.toContain(SIGNING_SECRET);
 
   await page.getByText("Replace the credentials").click();
-  await expect(slackForm().getByLabel("Bot token")).toHaveValue("");
+  await expect(slackForm().getByLabel("Bot User OAuth Token")).toHaveValue("");
 });
 
 test("the workspace id is shown, because it is not a secret and routing needs it", async () => {

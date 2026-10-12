@@ -14,23 +14,16 @@
  * form cannot nest inside another and the two belong on one row.
  */
 
-import { callAction, OperationError, statusHueOf } from "@openokr/core";
-import { HEX_COLOUR_PATTERN } from "@openokr/formats";
+import { callAction, OperationError } from "@openokr/core";
+import { HEX_COLOUR_PATTERN, statusHueOf } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
-import type { BrandingState } from "./branding-state.ts";
+import { type BrandingState, REFUSED_HUE } from "./branding-state.ts";
 
 /** What the settings schema accepts. The input's `pattern` is the same rule. */
 const HEX = HEX_COLOUR_PATTERN;
-
-/** Why each status family is refused, one whole sentence per family. */
-const REFUSED = {
-  red: "admin.branding.brandingSettingsForm.refusedRed",
-  amber: "admin.branding.brandingSettingsForm.refusedAmber",
-  green: "admin.branding.brandingSettingsForm.refusedGreen",
-} as const;
 
 async function context() {
   const { session, workspace } = await requireWorkspace();
@@ -80,7 +73,10 @@ export async function submitBranding(
   // administrator in their own language rather than as the schema's English.
   const family = primaryColor === "" ? null : statusHueOf(primaryColor);
   if (family !== null) {
-    return { error: t(REFUSED[family], { colour: primaryColor }), saved: null };
+    return {
+      error: t(REFUSED_HUE[family], { colour: primaryColor }),
+      saved: null,
+    };
   }
 
   try {

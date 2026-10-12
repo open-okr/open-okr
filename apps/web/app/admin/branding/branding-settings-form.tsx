@@ -1,10 +1,16 @@
 "use client";
 
-import { HEX_COLOUR_HTML_PATTERN } from "@openokr/formats";
-import { Button, Card, CardBody, useTranslations } from "@openokr/ui";
+import { statusHueOf } from "@openokr/formats";
+import {
+  Button,
+  Card,
+  CardBody,
+  ColourInput,
+  useTranslations,
+} from "@openokr/ui";
 import { type FormEvent, startTransition, useActionState } from "react";
 import { submitBranding } from "./actions.ts";
-import { NOTHING_SAVED } from "./branding-state.ts";
+import { NOTHING_SAVED, REFUSED_HUE } from "./branding-state.ts";
 
 /**
  * The branding admin card (screen S-36, P2-T08). One field: the primary
@@ -30,12 +36,6 @@ import { NOTHING_SAVED } from "./branding-state.ts";
  * colour stays in the field under the sentence explaining why rather than
  * being reset out from under it.
  */
-
-const INPUT_CLASS =
-  "rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm font-normal text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line";
-
-const LABEL_CLASS =
-  "flex w-full max-w-sm flex-col gap-1 text-xs font-semibold text-ink-2";
 
 export interface BrandingStatus {
   /** The stored colour when it is a six-digit hex, otherwise null. */
@@ -91,45 +91,35 @@ export function BrandingSettingsForm({ status }: { status: BrandingStatus }) {
           aria-busy={pending}
           className="flex flex-col gap-3"
         >
-          <label htmlFor="primaryColor" className={LABEL_CLASS}>
-            {t("admin.branding.brandingSettingsForm.primaryColourHex")}
-            <span className="flex items-center gap-2">
-              <input
-                id="primaryColor"
-                name="primaryColor"
-                placeholder="#336699"
-                defaultValue={stored ?? ""}
-                pattern={HEX_COLOUR_HTML_PATTERN}
-                title={t("admin.branding.brandingSettingsForm.sixHexDigits")}
-                spellCheck={false}
-                autoComplete="off"
-                aria-invalid={state.error === null ? undefined : true}
-                aria-describedby="primaryColorStatus"
-                className={`${INPUT_CLASS} flex-1 font-mono`}
-              />
-              {/*
-               * The colour in force, drawn rather than described. A hex code
-               * is not something a person can picture, and this card exists to
-               * choose one. It is the fill the layout applies, which is not the
-               * typed colour when that one was darkened. `aria-hidden` because
-               * the sentence below says the same in text.
-               */}
+          {/* Picked or typed, and a status hue refused as it is chosen
+              rather than after Save (guided-inputs §4.11). */}
+          <ColourInput
+            id="primaryColor"
+            name="primaryColor"
+            label={t("admin.branding.brandingSettingsForm.primaryColourHex")}
+            defaultValue={stored ?? ""}
+            description={statusLine}
+            error={state.error}
+            check={(hex) => {
+              const family = statusHueOf(hex);
+              return family === null
+                ? null
+                : t(REFUSED_HUE[family], { colour: hex });
+            }}
+            className="max-w-sm"
+            trailing={
+              // The colour in force, drawn rather than described. It is the
+              // fill the layout applies, which is not the typed colour when
+              // that one was darkened. `aria-hidden` because the sentence
+              // below says the same in text.
               <span
                 aria-hidden
                 data-testid="brand-swatch"
                 className="size-7 flex-none rounded-control border border-line-2"
                 style={fill === null ? undefined : { backgroundColor: fill }}
               />
-            </span>
-          </label>
-          <p id="primaryColorStatus" className="max-w-sm text-xs text-ink-3">
-            {statusLine}
-          </p>
-          {state.error === null ? null : (
-            <p role="alert" className="max-w-sm text-xs font-medium text-bad">
-              {state.error}
-            </p>
-          )}
+            }
+          />
           {state.saved === null ? null : (
             <p role="status" className="max-w-sm text-xs text-ink-2">
               {state.saved}
@@ -153,6 +143,8 @@ export function BrandingSettingsForm({ status }: { status: BrandingStatus }) {
               variant="ghost"
               size="sm"
               disabled={pending}
+              // Reset whatever the box holds, a refused colour included.
+              formNoValidate
             >
               {t("common.resetToDefaults")}
             </Button>

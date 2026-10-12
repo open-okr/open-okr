@@ -11,7 +11,12 @@ export const PACKAGE_NAME = "@openokr/formats";
 export {
   HEX_COLOUR_HTML_PATTERN,
   HEX_COLOUR_PATTERN,
+  type Hsl,
+  hexChannels,
+  hexToHsl,
   isHexColour,
+  type StatusHue,
+  statusHueOf,
 } from "./colour.ts";
 export { isLocalDate, LOCAL_DATE_PATTERN } from "./date.ts";
 export {

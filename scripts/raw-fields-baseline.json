@@ -6,8 +6,6 @@
   "apps/web/app/admin/agents/agent-policy.tsx": 2,
   "apps/web/app/admin/ai/governance.tsx": 5,
   "apps/web/app/admin/ai/page.tsx": 8,
-  "apps/web/app/admin/branding/branding-settings-form.tsx": 1,
-  "apps/web/app/admin/channels/page.tsx": 3,
   "apps/web/app/admin/channels/template-mapping-form.tsx": 2,
   "apps/web/app/admin/general/general-settings-form.tsx": 1,
   "apps/web/app/admin/general/instance-name-card.tsx": 1,
