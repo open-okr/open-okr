@@ -37,6 +37,8 @@ export async function sendMail(message: {
   to: string;
   subject: string;
   text: string;
+  /** The shared layout's HTML part (lib/account-mail.ts). */
+  html?: string;
 }): Promise<void> {
   const settings = await getMailSettings();
   // openokr:allow-side-effect: password reset is the only caller, and it has

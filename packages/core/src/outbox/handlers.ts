@@ -23,6 +23,7 @@ import {
   activeOnly,
   channelConnections,
   channelMessages,
+  inviteLinks,
   users,
   withWorkspace,
   workspaceMembers,
@@ -55,9 +56,16 @@ import {
   parseExportJob,
   runExportJob,
 } from "../exports/worker.ts";
+import {
+  invitationMail,
+  notificationDigestMail,
+  renderStoredEmail,
+  type StoredEmail,
+} from "../mail/mails.ts";
+import { mailWords } from "../mail/words.ts";
+import { workspaceMail, workspaceMailInTx } from "../mail/workspace.ts";
 import { digestItemsFor } from "../notifications/digest.ts";
 import { DIGEST_TOPIC } from "../notifications/drain.ts";
-import { renderDigest } from "../notifications/templates.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
@@ -118,6 +126,8 @@ export interface OutboxHandlerDeps {
     readonly provider: string;
     readonly memberId: string | null;
     readonly text: string;
+    /** The email layout's HTML part, for an email message that has one. */
+    readonly html?: string;
     readonly subject?: string;
     readonly buttons?: readonly { label: string; url: string }[];
     /** The approved template, for a provider that will carry nothing else. */
@@ -309,19 +319,52 @@ const sendInvitation: OutboxHandler = async (delivery, deps) => {
 
   const link = `${withoutTrailingSlashes(deps.baseUrl)}/join/${token}`;
   const name = instanceNameOr(deps.instanceName);
-  await deps.sendMail({
-    to,
-    subject: `You have been invited to ${name}`,
-    // Plain text, and short. The link is the message; anything else is
-    // decoration around a URL somebody is about to click.
-    text: [
-      `You have been invited to a workspace on ${name}.`,
-      "",
-      link,
-      "",
-      "If you were not expecting this, you can ignore it.",
-    ].join("\n"),
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const linkId = asString(delivery.payload.linkId);
+  // The workspace's name, colour and language, and who sent the invitation
+  // and until when (docs/design/email-templates.md). A row queued before
+  // these were read, or one whose link has gone, still sends: the link is
+  // the message, and the rest is said where it can be.
+  const context = workspaceId
+    ? await withWorkspace(drizzle(deps.pool), workspaceId, async (tx) => {
+        const mail = await workspaceMailInTx(tx, workspaceId);
+        const [invite] = linkId
+          ? await tx
+              .select({
+                inviterName: workspaceMembers.name,
+                expiresAt: inviteLinks.expiresAt,
+              })
+              .from(inviteLinks)
+              .leftJoin(
+                workspaceMembers,
+                eq(workspaceMembers.id, inviteLinks.invitedByMemberId),
+              )
+              .where(
+                activeOnly(
+                  inviteLinks,
+                  eq(inviteLinks.workspaceId, workspaceId),
+                  eq(inviteLinks.id, linkId),
+                ),
+              )
+              .limit(1)
+          : [];
+        return { mail, invite };
+      })
+    : null;
+  const built = invitationMail({
+    mail: context?.mail ?? {
+      name: "",
+      color: null,
+      locale: "en",
+      words: mailWords("en"),
+    },
+    instanceName: name,
+    baseUrl: deps.baseUrl,
+    link,
+    inviterName: context?.invite?.inviterName ?? null,
+    expiresAt: context?.invite?.expiresAt ?? null,
   });
+  await deps.sendMail({ to, ...built });
 };
 
 /**
@@ -388,20 +431,17 @@ const sendDigest: OutboxHandler = async (delivery, deps) => {
     return;
   }
 
-  const mail = renderDigest({ items: contents.items });
   // Never silently truncated. A digest is capped at twenty lines because a
   // hundred-line mail is not read, and saying how many were left is what keeps
-  // the cap from hiding them.
-  const tail =
-    contents.omitted > 0
-      ? `\n\nand ${contents.omitted} more in your inbox.`
-      : "";
-  await deps.sendMail({
-    to,
-    subject: mail.subject,
-    text: `${mail.text}${tail}`,
-    html: mail.html,
+  // the cap from hiding them. Both parts say it now: the line used to be in
+  // the text part only.
+  const built = notificationDigestMail({
+    mail: await workspaceMail(deps.pool, workspaceId),
+    baseUrl: deps.baseUrl,
+    items: contents.items,
+    omitted: contents.omitted,
   });
+  await deps.sendMail({ to, ...built });
 };
 
 /**
@@ -497,8 +537,21 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     templateKey?: unknown;
     templateParameters?: unknown;
     target?: unknown;
+    email?: unknown;
   };
   const text = asString(payload.text);
+  // The email layout, framed in the workspace as it is at sending time.
+  const html =
+    row.provider === "email" &&
+    payload.email &&
+    typeof payload.email === "object" &&
+    deps.baseUrl
+      ? renderStoredEmail({
+          mail: await workspaceMail(deps.pool, workspaceId),
+          baseUrl: deps.baseUrl,
+          stored: payload.email as StoredEmail,
+        }).html
+      : null;
   const templateKey = asString(payload.templateKey);
   // A post to a space's own channel names where it goes and nobody it is for
   // (M-23). Only ever read on a row with no member: a member's message goes to
@@ -519,6 +572,7 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
       // Empty for a template-only send, which is the shape the driver expects:
       // it decides on the template key, not on whether there are words.
       text: text ?? "",
+      ...(html ? { html } : {}),
       ...(asString(payload.subject)
         ? { subject: payload.subject as string }
         : {}),

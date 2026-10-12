@@ -10,6 +10,7 @@ import {
   closeSessionFor,
   dispatchResource,
   dispatchTool,
+  initializeVersion,
   MCP_RESOURCES,
   matchTemplate,
   negotiateVersion,
@@ -299,6 +300,14 @@ describe("the protocol version", () => {
     for (const version of SUPPORTED_PROTOCOL_VERSIONS) {
       expect(negotiateVersion(version), version).toBe(version);
     }
+  });
+
+  it("answers an initialize asking for a newer version with its own newest, so the next request is accepted", () => {
+    const answered = initializeVersion("2025-11-25");
+    expect(answered).toBe(SUPPORTED_PROTOCOL_VERSIONS[0]);
+    expect(negotiateVersion(answered)).toBe(answered);
+    expect(initializeVersion("2025-03-26")).toBe("2025-03-26");
+    expect(initializeVersion(undefined)).toBe(SUPPORTED_PROTOCOL_VERSIONS[0]);
   });
 
   it("refuses one it cannot speak, rather than guessing", () => {

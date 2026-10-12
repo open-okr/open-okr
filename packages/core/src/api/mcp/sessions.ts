@@ -54,6 +54,27 @@ export function negotiateVersion(asked: string | null): string | null {
 }
 
 /**
+ * The version an `initialize` answers with: the client's own when this server
+ * speaks it, this server's newest otherwise.
+ *
+ * **The protocol library answers `initialize` with any version the library
+ * knows**, which is a longer list than this server's. A client on a newer
+ * release asked for 2025-11-25, was told 2025-11-25, sent it in the version
+ * header on its next request, and was refused by `negotiateVersion` above:
+ * every current agent failed to connect after a successful handshake (found
+ * by the MCP test against the UAT instance, 9 October 2026). Settling the
+ * version here, before the library sees the request, is the specification's
+ * own rule: a server that does not support the requested version answers
+ * with one it does support.
+ */
+export function initializeVersion(asked: unknown): string {
+  return typeof asked === "string" &&
+    (SUPPORTED_PROTOCOL_VERSIONS as readonly string[]).includes(asked)
+    ? asked
+    : SUPPORTED_PROTOCOL_VERSIONS[0];
+}
+
+/**
  * Whether an origin header may open a session here.
  *
  * **This is the rebinding defence and it is not optional.** An agent runtime

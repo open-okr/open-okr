@@ -199,6 +199,36 @@ test("initialise, and hold the session the transport gives back", async () => {
   expect((result.serverInfo as Record<string, string>).name).toBe("OpenOKR");
 });
 
+test("a client on a newer protocol is answered with this server's, and its next request is accepted", async () => {
+  // The SDK release current agents ship asks for 2025-11-25. The handshake
+  // used to echo it and the very next request was then refused for naming it
+  // (found by the MCP test against the UAT instance, 9 October 2026).
+  const response = await rpc(
+    "initialize",
+    {
+      protocolVersion: "2025-11-25",
+      capabilities: {},
+      clientInfo: { name: "a newer agent", version: "1.0.0" },
+    },
+    { session: "" },
+  );
+  expect(response.status()).toBe(200);
+  const result = (await bodyOf(response)).result as Record<string, unknown>;
+  expect(result.protocolVersion).toBe("2025-06-18");
+
+  const listed = await rpc("tools/list", {}, {
+    session: response.headers()["mcp-session-id"] ?? "",
+  });
+  expect(listed.status()).toBe(200);
+});
+
+test("answers a plain resource list, since it declares resources", async () => {
+  // Every resource is a template, so the list is empty, but it is an answer:
+  // a client that lists on connect read "method not found" as a fault.
+  const body = await bodyOf(await rpc("resources/list"));
+  expect((body.result as { resources: unknown[] }).resources).toEqual([]);
+});
+
 test("lists the tools, with their scopes and safety hints intact", async () => {
   const body = await bodyOf(await rpc("tools/list"));
   const tools = (body.result as { tools: Record<string, unknown>[] }).tools;

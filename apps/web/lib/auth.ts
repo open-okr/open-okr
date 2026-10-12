@@ -107,36 +107,22 @@ function buildAuth(
     // module and lib/mail.ts import each other's pool accessor. The name in
     // the mail is read when it is sent, so a rename reaches the next one.
     sendResetPassword: async ({ to, url }) => {
-      const { sendMail } = await import("./mail");
-      await sendMail({
-        to,
-        subject: `Reset your ${await getInstanceName()} password`,
-        text: [
-          "Someone asked to reset the password for this address.",
-          "",
-          `Reset it here: ${url}`,
-          "",
-          "If this was not you, ignore this message. The link expires.",
-        ].join("\n"),
-      });
+      const [{ sendMail }, { resetPasswordMail }] = await Promise.all([
+        import("./mail"),
+        import("./account-mail"),
+      ]);
+      await sendMail({ to, ...(await resetPasswordMail(to, url)) });
     },
     // Resolved at boot from `mail.transport`: the question is whether a
     // link can arrive, not whether this is a managed cloud (P8-T02b).
     requireEmailVerification: globals.openokrRequireEmailVerification ?? false,
     sendVerificationEmail: globals.openokrRequireEmailVerification
       ? async ({ to, url }) => {
-          const { sendMail } = await import("./mail");
-          await sendMail({
-            to,
-            subject: "Confirm your email address",
-            text: [
-              `Confirm this address to finish setting up your ${await getInstanceName()} account.`,
-              "",
-              `Confirm it here: ${url}`,
-              "",
-              "If you did not sign up, ignore this message. The link expires.",
-            ].join("\n"),
-          });
+          const [{ sendMail }, { verifyEmailMail }] = await Promise.all([
+            import("./mail"),
+            import("./account-mail"),
+          ]);
+          await sendMail({ to, ...(await verifyEmailMail(to, url)) });
         }
       : undefined,
     // From sso_connections, as last read (P8-T07, L-15).

@@ -85,6 +85,8 @@ export async function queueChannelMessageInTx(
         ...(input.message.templateParameters
           ? { templateParameters: input.message.templateParameters }
           : {}),
+        // The email layout's blocks, rendered when the relay sends it.
+        ...(input.message.email ? { email: input.message.email } : {}),
         ...(input.message.degraded.length > 0
           ? { degraded: input.message.degraded }
           : {}),

@@ -1,5 +1,6 @@
 "use server";
 
+import { loadEnv } from "@openokr/config";
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
@@ -46,6 +47,11 @@ export async function runChampionAction(
       ...(drafter ? { drafter } : {}),
       // The name what it sends carries, as the scheduler's runs do (M-33).
       instanceName: await getInstanceName(),
+      // And the links inside it, as the scheduler's runs have (H-12). A run
+      // pressed here sent every nudge with no link and no daily summary.
+      ...(loadEnv().BETTER_AUTH_URL
+        ? { baseUrl: loadEnv().BETTER_AUTH_URL }
+        : {}),
     },
     "agents.runChampion",
     { cadence },
@@ -64,6 +70,9 @@ export async function runCoachAction() {
       actor: { kind: "human", userId: session.user.id },
       ...(drafter ? { drafter } : {}),
       instanceName: await getInstanceName(),
+      ...(loadEnv().BETTER_AUTH_URL
+        ? { baseUrl: loadEnv().BETTER_AUTH_URL }
+        : {}),
     },
     "agents.runCoach",
     {},

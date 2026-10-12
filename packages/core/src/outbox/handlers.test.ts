@@ -39,7 +39,12 @@ const noPool = new Proxy({} as Pool, {
 
 const recorder = () => {
   const published: Array<[string, string, Record<string, unknown>]> = [];
-  const sent: Array<{ to: string; subject: string; text: string }> = [];
+  const sent: Array<{
+    to: string;
+    subject: string;
+    text: string;
+    html?: string;
+  }> = [];
   const skipped: Array<[string, string]> = [];
   const deps: OutboxHandlerDeps = {
     pool: noPool,
@@ -132,9 +137,8 @@ describe("invitation email", () => {
       { ...deps, instanceName: "OKR Goal" },
     );
     expect(sent[0]?.subject).toBe("You have been invited to OKR Goal");
-    expect(sent[0]?.text).toContain(
-      "You have been invited to a workspace on OKR Goal.",
-    );
+    expect(sent[0]?.text).toContain("Join a workspace on OKR Goal");
+    expect(sent[0]?.html).toContain("Join a workspace on OKR Goal");
     expect(JSON.stringify(sent[0])).not.toContain("OpenOKR");
   });
 
@@ -145,9 +149,7 @@ describe("invitation email", () => {
       deps,
     );
     expect(sent[0]?.subject).toBe("You have been invited to OpenOKR");
-    expect(sent[0]?.text).toContain(
-      "You have been invited to a workspace on OpenOKR.",
-    );
+    expect(sent[0]?.text).toContain("Join a workspace on OpenOKR");
   });
 
   it("fails permanently when the row has no token, because no retry will add one", async () => {

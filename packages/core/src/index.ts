@@ -284,6 +284,7 @@ export {
 export {
   closeSession,
   closeSessionFor,
+  initializeVersion,
   negotiateVersion,
   newSessionId,
   originAllowed,
@@ -855,6 +856,12 @@ export {
   type TrustedDomainOffer,
   trustedDomainOffers,
 } from "./invitations/trusted-domain.ts";
+export {
+  type EmailBlock,
+  type EmailFrame,
+  renderEmail,
+} from "./mail/render.ts";
+export { mailLocale, mailWords } from "./mail/words.ts";
 export {
   findNavigationItem,
   isRouteAllowed,

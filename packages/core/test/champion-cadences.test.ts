@@ -790,7 +790,18 @@ describe("the daily run: KPI corridors and the morning summary", () => {
     const summary = rows.find((row) =>
       String(row.payload.text).includes("Rule: digest.daily"),
     );
-    expect(summary?.payload.subject?.startsWith("OKR Goal: ")).toBe(true);
+    // It goes by email, and a mail is from the workspace, so its subject
+    // starts with the workspace's name (docs/design/email-templates.md §5).
+    // The software's own name still appears nowhere.
+    const [workspace] = (
+      await wb.admin.query<{ name: string }>(
+        "select name from workspaces where id = $1",
+        [workspaceId],
+      )
+    ).rows;
+    expect(summary?.payload.subject?.startsWith(`${workspace?.name}: `)).toBe(
+      true,
+    );
     expect(JSON.stringify(summary?.payload)).not.toContain("OpenOKR");
   });
 

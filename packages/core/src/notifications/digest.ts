@@ -4,9 +4,11 @@ import {
   notifications,
   nudges,
   type WorkspaceTx,
+  workspaceMembers,
 } from "@openokr/db";
 import { trigger } from "@openokr/method";
 import { and, asc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { renderActivity } from "../activities/renderers.ts";
 import { subjectUrl } from "./links.ts";
 import type { DigestItem } from "./templates.ts";
@@ -58,6 +60,9 @@ export interface DigestItemsInput {
  * signal that there is more, and the inbox is where the rest is.
  */
 export const DIGEST_ITEM_LIMIT = 20;
+
+/** The member behind an activity, under its own name in the join. */
+const actors = alias(workspaceMembers, "digest_actors");
 
 export interface DigestContents {
   readonly items: readonly DigestItem[];
@@ -112,9 +117,11 @@ export async function digestItemsFor(
       ruleKey: nudges.ruleKey,
       nudgeSubjectType: nudges.subjectType,
       nudgeSubjectId: nudges.subjectId,
+      actorName: actors.name,
     })
     .from(notifications)
     .leftJoin(activities, eq(activities.id, notifications.activityId))
+    .leftJoin(actors, eq(actors.id, activities.actorMemberId))
     .leftJoin(nudges, eq(nudges.id, notifications.nudgeId))
     .where(activeOnly(notifications, and(...conditions)))
     .orderBy(asc(notifications.createdAt), asc(notifications.id))
@@ -145,6 +152,8 @@ export async function digestItemsFor(
     }
     items.push({
       summary: summaryFor(row),
+      reason: row.reason,
+      actorName: row.actorName ?? null,
       // The inbox is the fallback target, not the workspace root: a line whose
       // subject has no page still has somewhere honest to go, and it is the
       // screen the row is sitting in.
