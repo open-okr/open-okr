@@ -185,16 +185,14 @@ export const kpis = pgTable("kpis", {
   isCalculated: boolean("is_calculated").notNull().default(false),
   formula: jsonb("formula"),
   /**
-   * The corridor, per KPI. Stored rather than resolved on every read because a
-   * KPI may deviate by design, and the grid colours thousands of cells from it.
-   *
-   * `kpis.create` always writes both from the workspace's resolved
-   * `kpi.healthyThreshold` and `kpi.watchThreshold` (completeness review
-   * H-17). The column defaults are the canon's values, for a row written some
-   * other way, and are not what a new KPI takes.
+   * The corridor, when this KPI deviates from the workspace by design. Null
+   * means the workspace's `kpi.healthyThreshold` and `kpi.watchThreshold` as
+   * they are now, so moving them on /admin/rhythm recolours every KPI that
+   * follows them (UAT BUG-011, migration 0139). Resolve through
+   * `corridorOf` in `packages/core/src/kpis/service.ts`, never read raw.
    */
-  healthyPct: numeric("healthy_pct").notNull().default("90"),
-  watchPct: numeric("watch_pct").notNull().default("70"),
+  healthyPct: numeric("healthy_pct"),
+  watchPct: numeric("watch_pct"),
   /** Derived. Written only by the recompute entry point. */
   state: text("state", { enum: KPI_STATES }).notNull().default("no_data"),
   achievementPct: numeric("achievement_pct"),

@@ -1,6 +1,6 @@
 -- The outbox learns whose row it is holding (P8-T06b).
 --
--- Design: docs/design/tenant-limits.md §5, which asks the relay to
+-- Design: docs/design/p8-t01a-tenant-limits.md §5, which asks the relay to
 -- read "round-robin by workspace" and does not say how it would know. This
 -- migration is the answer, and Agung chose it on 15 September 2026 over
 -- partitioning on `payload->>'workspaceId'`.

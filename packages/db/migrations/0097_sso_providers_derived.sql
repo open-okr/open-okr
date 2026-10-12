@@ -4,7 +4,7 @@
 -- passkey and two-factor plugins do. This is that table.
 --
 -- **It is derived, and sso_connections is the authority.** Agung settled that
--- on 18 September 2026; `docs/design/saml.md` records the three
+-- on 18 September 2026; `docs/design/p8-t07c-saml.md` records the three
 -- options and what the other two cost. Nothing in the product reads this
 -- table to answer a question: every read goes to sso_connections. A row here
 -- that has drifted makes a sign-in fail, which is loud, rather than making an

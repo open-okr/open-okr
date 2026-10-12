@@ -31,13 +31,20 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { eq, isNull, lte } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { z } from "zod";
-import { ACCESS_LEVELS } from "../access/levels.ts";
+import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
+import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
+import { resolveSubjectContext } from "../access/reads.ts";
+import { builtinRoleId } from "../access/roles.ts";
 import { provisionMemberForInvite } from "../invitations/provisioning.ts";
-import { OperationError, runOperation } from "../operations/operation.ts";
+import {
+  OperationError,
+  type OperationTx,
+  runOperation,
+} from "../operations/operation.ts";
 import { isLiveOperator } from "./store.ts";
 
 /** How long a session may run. */
@@ -118,6 +125,12 @@ export async function requestSupportSession(
           workspaceMembers,
           eq(workspaceMembers.workspaceId, input.workspaceId),
           eq(workspaceMembers.userId, input.operatorUserId),
+          // The suspended guest an ended session left is not a membership
+          // (UAT BUG-029): the grant wakes it rather than refusing.
+          or(
+            ne(workspaceMembers.kind, "guest"),
+            ne(workspaceMembers.status, "suspended"),
+          ),
         ),
       )
       .limit(1),
@@ -149,6 +162,80 @@ export async function requestSupportSession(
     );
   }
   return row;
+}
+
+/**
+ * The guest an earlier, ended session of this operator left behind, if it is
+ * still there and suspended. Only a guest that a session made: a person who is
+ * a real member stays refused below, which is the September 2026 lesson.
+ */
+async function suspendedGuestOf(
+  tx: OperationTx,
+  workspaceId: string,
+  operatorUserId: string,
+): Promise<string | null> {
+  const [row] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .innerJoin(
+      operatorSessions,
+      and(
+        eq(operatorSessions.memberId, workspaceMembers.id),
+        isNotNull(operatorSessions.endedAt),
+      ),
+    )
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, operatorUserId),
+        eq(workspaceMembers.kind, "guest"),
+        eq(workspaceMembers.status, "suspended"),
+      ),
+    )
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/**
+ * Makes a suspended session guest a live one again, with the role and the
+ * workspace binding the new grant's level asks for. A binding left higher by
+ * an earlier session is harmless: access is capped at the live session's
+ * level (`support_level` in `access/reads.ts`).
+ */
+async function wakeGuest(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  level: number,
+  guestRole: "member" | "viewer",
+): Promise<void> {
+  const now = new Date();
+  // openokr:allow-mutation: the Operation's own transaction.
+  await tx
+    .update(workspaceMembers)
+    .set({
+      status: "active",
+      suspendedAt: null,
+      roleId: await builtinRoleId(tx, workspaceId, guestRole),
+      updatedAt: now,
+    })
+    .where(activeOnly(workspaceMembers, eq(workspaceMembers.id, memberId)));
+  const groupId = await ensureMemberGroup(tx, { workspaceId, memberId });
+  const context = await resolveSubjectContext(
+    tx,
+    "workspace",
+    workspaceId,
+    workspaceId,
+  );
+  if (context) {
+    await bindGroup(tx, {
+      workspaceId,
+      groupId,
+      contextId: context.contextId,
+      level: level as AccessLevel,
+    });
+  }
 }
 
 export interface GrantSupportInput {
@@ -215,17 +302,38 @@ export async function grantSupportSession(
           );
         }
 
+        // **A second session reuses the guest the first one left** (UAT
+        // BUG-029). Ending a session suspends its guest rather than deleting
+        // it, so the funnel below found that row, reported it as an existing
+        // membership, and the operator could never be let in again. The row
+        // is woken instead: the same member, so everything they did in either
+        // session stays attributed to one author.
+        const returning = await suspendedGuestOf(
+          tx,
+          workspaceId,
+          loaded.operatorUserId,
+        );
+        const guestRole = level >= ACCESS_LEVELS.edit ? "member" : "viewer";
+        if (returning) {
+          await wakeGuest(tx, workspaceId, returning, level, guestRole);
+        }
+
         // The one funnel. A guest member, bound at the level the customer
         // chose, so `can()` is what answers from here on.
-        const member = await provisionMemberForInvite(tx, {
-          workspaceId,
-          user: {
-            id: loaded.operatorUserId,
-            name: "OpenOKR support",
-          },
-          kind: "guest",
-          level: level as (typeof GRANTABLE_LEVELS)[number],
-        });
+        const member = returning
+          ? { memberId: returning, created: true }
+          : await provisionMemberForInvite(tx, {
+              workspaceId,
+              user: {
+                id: loaded.operatorUserId,
+                name: "OpenOKR support",
+              },
+              kind: "guest",
+              level: level as (typeof GRANTABLE_LEVELS)[number],
+              // What a member sees, never more than the customer granted
+              // (BUG-021): `viewer` reads every domain, `member` also edits.
+              guestRole,
+            });
 
         // **The funnel is idempotent, and that is a hazard here rather than a
         // convenience.** It returns an existing membership rather than

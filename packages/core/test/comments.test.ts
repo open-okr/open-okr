@@ -289,6 +289,15 @@ describe("who a comment tells", () => {
     expect((await notified(ownerMemberId)).map((row) => row.reason)).toEqual([
       "joined",
     ]);
+    // The inbox says who commented and what, not "Something new here"
+    // (UAT M10-04).
+    const inbox = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "notifications.list",
+      {},
+    )) as { rendered: string | null; actorName: string | null }[];
+    expect(inbox[0]?.rendered).toMatch(/^Commented on a goal: Blocked\?/);
+    expect(inbox[0]?.actorName).toBeTruthy();
     const read = (await callAction(
       { pool: wb.appPool, ...context() },
       "subscriptions.read",

@@ -680,3 +680,56 @@ describe("brute force protection", () => {
     expect(other.status).toBe(200);
   });
 });
+
+describe("the first account where mail is configured (UAT BUG-028)", () => {
+  beforeEach(async () => {
+    const wb = await workerDb();
+    auth = createAuth({
+      pool: wb.appPool,
+      secret: SECRET,
+      baseUrl: BASE_URL,
+      rateLimit: { enabled: false },
+      requireEmailVerification: true,
+      sendVerificationEmail: async () => {},
+    });
+  });
+
+  it("arrives verified and signs in", async () => {
+    expect((await register()).status).toBe(200);
+    const response = await post("/sign-in/email", {
+      email: EMAIL,
+      password: PASSWORD,
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("leaves a later account to prove its address", async () => {
+    await register();
+    // Kept open so the second sign-up is refused by nothing but the rule
+    // under test.
+    await (await workerDb()).admin.query(
+      `insert into system_settings (key, value, source)
+       values ('registration.policy', '"open"'::jsonb, 'admin')`,
+    );
+    const later = "later@example.com";
+    await post("/sign-up/email", {
+      email: later,
+      password: PASSWORD,
+      name: "Later",
+    });
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select email, email_verified as verified from users order by created_at",
+    );
+    expect(rows).toEqual([
+      { email: EMAIL, verified: true },
+      { email: later, verified: false },
+    ]);
+    const response = await post("/sign-in/email", {
+      email: later,
+      password: PASSWORD,
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).code).toBe("EMAIL_NOT_VERIFIED");
+  });
+});

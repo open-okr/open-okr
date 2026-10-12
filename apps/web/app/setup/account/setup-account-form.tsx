@@ -35,11 +35,23 @@ export function SetupAccountForm() {
     setPending(true);
     const form = new FormData(event.currentTarget);
 
-    const { error: failure } = await authClient.signUp.email({
-      email: String(form.get("email")),
-      password: String(form.get("password")),
+    const email = String(form.get("email"));
+    const password = String(form.get("password"));
+    const { data, error: signUpFailure } = await authClient.signUp.email({
+      email,
+      password,
       name: String(form.get("name")),
     });
+
+    // An instance with mail configured before its first run requires a
+    // verified address, and Better Auth then signs nobody in at sign-up. The
+    // first account is created verified (BUG-028), so signing in straight
+    // away is what gives finishing setup its session.
+    const failure =
+      signUpFailure ??
+      (data && !data.token
+        ? (await authClient.signIn.email({ email, password })).error
+        : null);
 
     if (failure) {
       setPending(false);

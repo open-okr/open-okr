@@ -43,9 +43,12 @@ test("sign in, and schedule a session the way a coordinator would", async () => 
     has: page.getByRole("heading", { name: "Schedule one session" }),
   });
   await expect(form).toBeVisible({ timeout: 10_000 });
-  spaceName =
+  // The company space's option says what its review covers after the name
+  // (UAT M18-03), so the name is the text before that note.
+  spaceName = (
     (await form.getByLabel("Space").locator("option:checked").textContent()) ??
-    "";
+    ""
+  ).replace(/ \(the whole workspace[^)]*\)$/, "");
   expect(spaceName).not.toBe("");
 
   // **Only if it is not already there.** This file is a serial group, and a

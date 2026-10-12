@@ -12,7 +12,7 @@
 -- So the answer is produced by a background job, the row is created empty when
 -- the question is asked, and the text accumulates into it. A reader who comes
 -- back reads the row and subscribes to the rest. Agung chose this shape on
--- 20 September 2026 over two narrower readings; `docs/design/copilot-background-runs.md`
+-- 20 September 2026 over two narrower readings; `docs/design/p4-t14b-b-copilot-background-runs.md`
 -- records what the other two cost.
 --
 -- No new table, so no new policy. These columns join `ai_messages`, which has

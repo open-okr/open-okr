@@ -8740,13 +8740,13 @@
         {
           "name": "healthy-pct",
           "field": "healthyPct",
-          "type": "number",
+          "type": "string",
           "required": false
         },
         {
           "name": "watch-pct",
           "field": "watchPct",
-          "type": "number",
+          "type": "string",
           "required": false
         }
       ],

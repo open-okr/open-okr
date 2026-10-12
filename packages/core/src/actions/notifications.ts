@@ -19,6 +19,7 @@ import {
 } from "@openokr/db";
 import { and, count, desc, eq, isNull, lt, lte, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { renderActivity } from "../activities/renderers.ts";
@@ -71,6 +72,8 @@ const notificationRow = z.object({
    * differently. Null for a nudge, which has no activity behind it.
    */
   rendered: z.string().nullable(),
+  /** Who did it, for a row with an activity whose actor is a member. */
+  actorName: z.string().nullable(),
   /**
    * The rule a proactive message cites (UIUX-PLAN §3: "Every proactive
    * message shows its rule"). Null for everything that is not a nudge.
@@ -86,6 +89,9 @@ const notificationRow = z.object({
 
 /** The page the screen draws, and the ceiling the read will not go above. */
 const INBOX_PAGE_SIZE = 50;
+
+/** The member behind an activity, joined under its own name. */
+const actors = alias(workspaceMembers, "actors");
 
 /**
  * The acting member, or null when the caller is not one.
@@ -187,6 +193,7 @@ export const listNotifications = defineReadAction({
           ownSubjectId: notifications.subjectId,
           activityKind: activities.kind,
           activityPayload: activities.payload,
+          actorName: actors.name,
           activitySubjectType: activities.subjectType,
           activitySubjectId: activities.subjectId,
           ruleKey: nudges.ruleKey,
@@ -195,6 +202,7 @@ export const listNotifications = defineReadAction({
         })
         .from(notifications)
         .leftJoin(activities, eq(activities.id, notifications.activityId))
+        .leftJoin(actors, eq(actors.id, activities.actorMemberId))
         .leftJoin(nudges, eq(nudges.id, notifications.nudgeId))
         .where(
           activeOnly(
@@ -258,6 +266,7 @@ export const listNotifications = defineReadAction({
           rendered: row.activityKind
             ? renderActivity(row.activityKind, row.activityPayload ?? {})
             : null,
+          actorName: row.actorName ?? null,
           ruleKey: row.ruleKey ?? null,
           watching:
             subjectType !== null &&

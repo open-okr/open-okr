@@ -89,7 +89,11 @@ export async function ScheduleSessions({
       <select name="spaceId" required className={FIELD}>
         {choices.map((space) => (
           <option key={space.id} value={space.id}>
-            {space.name}
+            {/* The first space's review grades every objective in the cycle,
+                the workspace's own included, so it says so (UAT M18-03). */}
+            {space.isCompany
+              ? t("sessions.schedule.companySpace", { name: space.name })
+              : space.name}
           </option>
         ))}
       </select>

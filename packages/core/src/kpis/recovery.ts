@@ -11,10 +11,12 @@ import { createGoalInTx, createKeyResultInTx } from "../goals/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import {
+  corridorOf,
   KPI_RULE_COLUMNS,
   recomputeKpi,
   targetTypeOf,
   thresholdsOf,
+  workspaceKpiCorridor,
 } from "./service.ts";
 
 /**
@@ -192,10 +194,7 @@ async function loadRecoveryTree(
         thresholds: thresholdsOf(root),
         target: rootValue?.target ?? null,
         current: rootValue?.actual ?? null,
-        corridor: {
-          healthyPct: Number(root.healthyPct),
-          watchPct: Number(root.watchPct),
-        },
+        corridor: corridorOf(root, await workspaceKpiCorridor(tx, workspaceId)),
       }),
       owner: root.ownerMemberId ?? root.memberId,
     },

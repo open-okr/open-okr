@@ -12131,14 +12131,28 @@
             ]
           },
           "healthyPct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 200
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "watchPct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 200
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
