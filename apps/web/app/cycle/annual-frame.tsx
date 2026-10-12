@@ -6,6 +6,8 @@ import {
   Chip,
   RichTextField,
   RichTextView,
+  TextArea,
+  TextInput,
 } from "@openokr/ui";
 import { richTextHtml } from "../../lib/rich-text-html.ts";
 import { getTranslations } from "../../lib/translations";
@@ -114,26 +116,25 @@ export async function AnnualFrame({
           {canEdit ? (
             <ActionForm action={setFrame} className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2">
-                <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  {t("cycle.annualFrame.year")}
-                  <input
-                    name="yearLabel"
-                    required
-                    defaultValue={
-                      frame?.yearLabel ?? String(new Date().getFullYear())
-                    }
-                    className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  {t("cycle.annualFrame.horizonTheMidTerm")}
-                  <input
-                    name="horizonLabel"
-                    defaultValue={frame?.horizonLabel ?? ""}
-                    placeholder={t("cycle.annualFrame.threeYearsOutSay")}
-                    className="w-72 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
+                {/* The server's 40 and 80 (cycles.setAnnualFrame). */}
+                <TextInput
+                  label={t("cycle.annualFrame.year")}
+                  name="yearLabel"
+                  required
+                  maxLength={40}
+                  defaultValue={
+                    frame?.yearLabel ?? String(new Date().getFullYear())
+                  }
+                  className="w-32"
+                />
+                <TextInput
+                  label={t("cycle.annualFrame.horizonTheMidTerm")}
+                  name="horizonLabel"
+                  maxLength={80}
+                  defaultValue={frame?.horizonLabel ?? ""}
+                  placeholder={t("cycle.annualFrame.threeYearsOutSay")}
+                  className="w-72"
+                />
                 <label className="flex items-end gap-2 pb-1.5 text-sm text-ink">
                   <input
                     type="checkbox"
@@ -189,37 +190,40 @@ export async function AnnualFrame({
                   {t("cycle.annualFrame.twoToFiveEach")}
                 </p>
                 {[0, 1, 2, 3, 4].map((index) => (
-                  <div key={index} className="flex flex-wrap gap-2">
-                    <input
-                      name="strategyText"
-                      defaultValue={strategies[index]?.text ?? ""}
-                      placeholder={t("cycle.annualFrame.strategyNumber", {
+                  <div key={index} className="flex flex-wrap items-start gap-2">
+                    {/* Labelled, where a placeholder named them and went
+                        away as soon as anything was typed (§4.11). */}
+                    <TextInput
+                      label={t("cycle.annualFrame.strategyNumber", {
                         number: index + 1,
                       })}
-                      className="w-72 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                      name="strategyText"
+                      maxLength={280}
+                      defaultValue={strategies[index]?.text ?? ""}
+                      className="w-72"
                     />
-                    <input
+                    <TextArea
+                      label={t("cycle.annualFrame.strategyNoteLabel", {
+                        number: index + 1,
+                      })}
                       name="strategyNote"
+                      maxLength={1000}
+                      rows={1}
                       defaultValue={strategies[index]?.note ?? ""}
-                      placeholder={t("cycle.annualFrame.whatItMeansIn")}
-                      className="w-96 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                      className="w-96"
                     />
                   </div>
                 ))}
               </fieldset>
 
               {frame?.agreed ? (
-                <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  {t("cycle.annualFrame.revisionReason")}
-                  <span className="text-ink-4">
-                    {t("cycle.annualFrame.revisionReasonHint")}
-                  </span>
-                  <input
-                    name="reason"
-                    maxLength={500}
-                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
+                <TextArea
+                  label={t("cycle.annualFrame.revisionReason")}
+                  description={t("cycle.annualFrame.revisionReasonHint")}
+                  name="reason"
+                  maxLength={500}
+                  rows={2}
+                />
               ) : null}
 
               <Button type="submit" variant="default" size="sm">

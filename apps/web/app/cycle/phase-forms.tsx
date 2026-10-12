@@ -9,6 +9,8 @@ import {
   EntityPicker,
   RichTextField,
   RichTextView,
+  SelectInput,
+  TextArea,
 } from "@openokr/ui";
 import { type MemberLike, memberOption } from "../../lib/entity-options.ts";
 import { searchPeople } from "../../lib/member-search.ts";
@@ -32,10 +34,6 @@ import {
  * phases could go green from the browser, and every publish needed the
  * override. One card per missing piece, beside the phase that reads it.
  */
-
-const FIELD =
-  "rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink";
-const LABEL = "flex flex-col gap-1 text-xs text-ink-3";
 
 const SESSIONS = [
   { key: "diagnose", label: "cycle.setup.session.diagnose" },
@@ -253,45 +251,33 @@ export async function Revalidation({
             className="flex flex-col gap-2.5"
           >
             <input type="hidden" name="cycleId" value={cycleId} />
-            <label className={LABEL}>
-              {t("cycle.revalidation.verdict")}
-              <select
-                name="verdict"
-                disabled={!canEdit}
-                defaultValue={saved?.changed ? "changed" : "holds"}
-                className={FIELD}
-              >
-                <option value="holds">{t("cycle.revalidation.holds")}</option>
-                <option value="changed">
-                  {t("cycle.revalidation.changed")}
-                </option>
-              </select>
-            </label>
-            <label className={LABEL}>
-              {t("cycle.revalidation.changeNote")}
-              <textarea
-                name="changeNote"
-                rows={2}
-                maxLength={2000}
-                disabled={!canEdit}
-                defaultValue={saved?.changeNote ?? ""}
-                className={FIELD}
-              />
-            </label>
-            <label className={LABEL}>
-              {t("cycle.revalidation.focusNote")}
-              <textarea
-                name="focusNote"
-                rows={2}
-                maxLength={2000}
-                disabled={!canEdit}
-                defaultValue={saved?.focusNote ?? ""}
-                className={FIELD}
-              />
-              <span className="text-ink-4">
-                {t("cycle.revalidation.focusNoteHint")}
-              </span>
-            </label>
+            <SelectInput
+              label={t("cycle.revalidation.verdict")}
+              name="verdict"
+              disabled={!canEdit}
+              defaultValue={saved?.changed ? "changed" : "holds"}
+            >
+              <option value="holds">{t("cycle.revalidation.holds")}</option>
+              <option value="changed">{t("cycle.revalidation.changed")}</option>
+            </SelectInput>
+            {/* Plain for now: change 12 makes both notes rich text. */}
+            <TextArea
+              label={t("cycle.revalidation.changeNote")}
+              name="changeNote"
+              rows={2}
+              maxLength={2000}
+              disabled={!canEdit}
+              defaultValue={saved?.changeNote ?? ""}
+            />
+            <TextArea
+              label={t("cycle.revalidation.focusNote")}
+              description={t("cycle.revalidation.focusNoteHint")}
+              name="focusNote"
+              rows={2}
+              maxLength={2000}
+              disabled={!canEdit}
+              defaultValue={saved?.focusNote ?? ""}
+            />
             {canEdit ? (
               <Button type="submit" className="self-start">
                 {t("common.save")}

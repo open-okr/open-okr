@@ -16,6 +16,8 @@ import {
   EntityPicker,
   formatMeasure,
   NumberInput,
+  SelectInput,
+  TextInput,
   UnitInput,
   useTranslations,
 } from "@openokr/ui";
@@ -84,11 +86,14 @@ export function InlineText({
   bold,
   allowEmpty,
   placeholder,
+  maxLength,
   onDraft,
   onSave,
 }: {
   readonly value: string;
   readonly label: string;
+  /** The server's limit for what this cell holds. */
+  readonly maxLength: number;
   readonly readOnly: boolean;
   readonly bold?: boolean;
   /** For a unit, where nothing is a real answer. */
@@ -118,10 +123,12 @@ export function InlineText({
   };
 
   return (
-    <input
+    <TextInput
       ref={field}
       value={draft}
-      aria-label={label}
+      label={label}
+      hideLabel
+      maxLength={maxLength}
       placeholder={placeholder}
       onChange={(event) => {
         setDraft(event.target.value);
@@ -132,7 +139,8 @@ export function InlineText({
         setDraft(value);
         onDraft?.(null);
       })}
-      className={cn("w-full truncate", FIELD, size)}
+      className="w-full min-w-0"
+      inputClassName={cn("h-auto w-full truncate", FIELD, size)}
     />
   );
 }
@@ -520,16 +528,17 @@ export function KindControl({
         floating && "nodrag relative normal-case tracking-normal",
       )}
     >
-      <select
-        aria-label={t("okrKind.kindOf", { title })}
+      <SelectInput
+        label={t("okrKind.kindOf", { title })}
+        hideLabel
         data-kind={kind}
         value={shown}
         onChange={(event) => {
           const next = event.target.value as OkrKind;
           setPending(next === kind ? null : next);
         }}
-        className={cn(
-          "h-4.5 rounded-full border-0 px-2 text-[11px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand",
+        inputClassName={cn(
+          "h-4.5 w-auto rounded-full border-0 px-2 text-[11px] font-semibold outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-brand",
           KIND_TONE[shown],
         )}
       >
@@ -538,7 +547,7 @@ export function KindControl({
             {name(entry)}
           </option>
         ))}
-      </select>
+      </SelectInput>
       {pending ? (
         <span
           data-testid="kind-reason"
@@ -547,12 +556,14 @@ export function KindControl({
             floating && "absolute top-full left-0 z-10 mt-1 w-64 shadow-md",
           )}
         >
-          <input
+          <TextInput
             ref={focusOnMount}
             value={reason}
-            aria-label={t("okrKind.why", {
+            label={t("okrKind.why", {
               kind: name(pending).toLowerCase(),
             })}
+            hideLabel
+            maxLength={500}
             placeholder={t("okrKind.whyPlaceholder")}
             onChange={(event) => setReason(event.target.value)}
             onKeyDown={(event) => {
@@ -563,7 +574,8 @@ export function KindControl({
                 cancel();
               }
             }}
-            className="min-w-40 flex-1 rounded-control border border-line bg-surface px-2 py-0.5 text-ink outline-none focus:border-brand"
+            className="min-w-40 flex-1"
+            inputClassName="h-6 px-2 text-xs"
           />
           <button
             type="button"
@@ -622,8 +634,9 @@ export function KeyResultKindPicker({
   }
   const offered = kinds.includes(kind) ? kinds : [kind, ...kinds];
   return (
-    <select
-      aria-label={t("keyResultKind.kindOf", { title })}
+    <SelectInput
+      label={t("keyResultKind.kindOf", { title })}
+      hideLabel
       data-key-result-kind={kind}
       value={kind}
       onChange={(event) => {
@@ -632,14 +645,14 @@ export function KeyResultKindPicker({
           onSave(next);
         }
       }}
-      className={cn("text-[11px]", FIELD)}
+      inputClassName={cn("h-auto w-auto text-[11px]", FIELD)}
     >
       {offered.map((entry) => (
         <option key={entry} value={entry}>
           {t(KEY_RESULT_KIND_LABEL[entry])}
         </option>
       ))}
-    </select>
+    </SelectInput>
   );
 }
 
@@ -843,12 +856,16 @@ export function ReasonField({
         inset ? "border-b border-line px-3.5 pl-14" : "rounded-control px-2",
       )}
     >
-      <label className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="text-ink-2">{label}</span>
-        <input
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span aria-hidden className="text-ink-2">
+          {label}
+        </span>
+        <TextInput
           ref={focusOnMount}
           value={reason}
-          aria-label={label}
+          label={label}
+          hideLabel
+          maxLength={500}
           placeholder={t("okrList.reasonPlaceholder")}
           onChange={(event) => setReason(event.target.value)}
           onKeyDown={(event) => {
@@ -859,9 +876,10 @@ export function ReasonField({
               onCancel();
             }
           }}
-          className="min-w-0 flex-1 rounded-control border border-line bg-surface px-2 py-1 text-ink outline-none focus:border-brand"
+          className="min-w-0 flex-1"
+          inputClassName="h-6.5 px-2 text-xs"
         />
-      </label>
+      </div>
       <button
         type="button"
         disabled={reason.trim() === ""}

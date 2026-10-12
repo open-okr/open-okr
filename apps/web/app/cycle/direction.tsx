@@ -5,6 +5,7 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  TextInput,
 } from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
@@ -101,26 +102,24 @@ export async function Direction({
         {canEdit ? (
           <ActionForm action={addPriority} className="flex flex-col gap-1.5">
             <input type="hidden" name="cycleId" value={cycleId} />
-            <label className="sr-only" htmlFor="new-priority">
-              {t("cycle.direction.thePriority")}
-            </label>
-            <input
+            <TextInput
               id="new-priority"
+              label={t("cycle.direction.thePriority")}
+              hideLabel
               name="text"
               required
               maxLength={500}
               placeholder={t("cycle.direction.whatHasToBe")}
-              className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+              inputClassName="placeholder:text-ink-4"
             />
-            <label className="sr-only" htmlFor="new-priority-success">
-              {t("cycle.direction.theSuccessStatement")}
-            </label>
-            <input
+            <TextInput
               id="new-priority-success"
+              label={t("cycle.direction.theSuccessStatement")}
+              hideLabel
               name="successStatement"
               maxLength={1000}
               placeholder={t("cycle.direction.howWeWillKnow")}
-              className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+              inputClassName="placeholder:text-ink-4"
             />
             <div className="flex items-center gap-1.5">
               <EntityPicker

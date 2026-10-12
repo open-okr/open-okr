@@ -14,6 +14,7 @@ import {
   isBlankDocument,
   MetricInput,
   RichTextEditor,
+  SelectInput,
   useTranslations,
 } from "@openokr/ui";
 import { useState } from "react";
@@ -185,17 +186,18 @@ export function CheckInTab({
       }}
     >
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        <label className="flex items-center gap-1.5">
-          <span className="font-semibold text-ink-2">
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="font-semibold text-ink-2">
             {t("okrDrawer.status")}
           </span>
-          {/* Named on the control: a label wrapped round a select reads the
-           * chosen option into the name as well. */}
-          <select
-            aria-label={t("okrDrawer.status")}
+          {/* Named by its own label, not a label wrapped round it, which
+           * reads the chosen option into the name as well. */}
+          <SelectInput
+            label={t("okrDrawer.status")}
+            hideLabel
             value={status}
             onChange={(event) => setStatus(event.target.value as Status | "")}
-            className="rounded-control border border-line bg-surface px-2 py-1 text-ink-2"
+            inputClassName="h-6.5 w-auto px-2 text-xs text-ink-2"
           >
             {last ? null : (
               <option value="">{t("okrDrawer.chooseStatus")}</option>
@@ -205,8 +207,8 @@ export function CheckInTab({
                 {t(entry.label)}
               </option>
             ))}
-          </select>
-        </label>
+          </SelectInput>
+        </span>
         <span className="flex items-center gap-1.5">
           <span aria-hidden="true" className="font-semibold text-ink-2">
             {t("okrDrawer.objectiveConfidence")}

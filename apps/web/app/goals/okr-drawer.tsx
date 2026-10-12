@@ -339,6 +339,7 @@ function DrawerBody({
           <InlineText
             value={goal.title}
             label={t("goals.editor.objectiveTitle")}
+            maxLength={500}
             readOnly={!canEdit}
             bold
             onDraft={objective.onDraft}
@@ -422,6 +423,7 @@ function DrawerBody({
               <InlineText
                 value={goal.contributionStatement ?? ""}
                 label={t("common.whatItContributesTo")}
+                maxLength={1000}
                 readOnly={!canEdit}
                 allowEmpty
                 placeholder={t("common.thePriorityThisMoves")}
@@ -653,6 +655,7 @@ function DrawerKeyResult({
       <InlineText
         value={title}
         label={t("okrDrawer.keyResultTitleOf", { title })}
+        maxLength={500}
         readOnly={!canEdit}
         onDraft={cells.onDraft}
         onSave={(next) => cells.patch({ title: next }, { title })}
@@ -1093,6 +1096,7 @@ function Alignment({
                 <InlineText
                   value={goal.standaloneReason ?? ""}
                   label={t("okrDrawer.standsAloneBecause")}
+                  maxLength={1000}
                   readOnly={!canEdit}
                   allowEmpty
                   placeholder={t("okrDrawer.standsAlonePlaceholder")}

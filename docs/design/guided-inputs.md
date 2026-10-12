@@ -107,6 +107,7 @@ Today a refused write goes one of three ways. Its error is swallowed (the operat
 - `maxLength` is always set from the server's limit. A counter appears once 80% of it is used.
 - `TextArea` grows with its text: CSS `field-sizing: content` where the browser supports it, and a fixed number of rows where it does not.
 - These replace the one-line boxes that accept up to 2000 characters, such as the close reason, the gate override reason and the operator reasons.
+- As built in 10a: `TextArea` is a plain `<textarea>` with its label, description, counter and refusal linked by ids, rather than Base UI `Field`, whose control is an `<input>`. A box inside a table cell or a card names itself with `hideLabel`, which puts the label on the control as `aria-label`, the convention `NumberInput` and `EntityPicker` already kept. A title or reason with a server limit takes it as `maxLength`; the check-in's narrative has none, so the one-line note that feeds it has none either.
 
 ### 4.4 EmailInput
 
@@ -294,6 +295,7 @@ As built in 8a:
 | Budget owner | One picker: the whole workspace, a person (by member id) or an agent (by agent id), whose choice also says the budget's scope. It replaces a scope select and a pasted id, and the budget list names its owners rather than printing an id's first eight characters |
 | Tier model | One picker over the catalogue already on the page, each model with its provider and id, whose choice also says the provider. It replaces a provider select and a model name typed by hand; a route to a model no longer listed still shows |
 | Agent scope | "What" stays a select of the three kinds, and the picker beside it offers that kind: spaces and KPI trees from the page, goals by search |
+| Fixed lists | **`SelectInput`** (decided 13 October 2026): a list that never grows past a handful (a status, a level, a kind, an impact, a weekday) stays the browser's own dropdown, which works without JavaScript and opens a phone's own picker, and gains the kit's label, description, refusal and skin. The raw-field gate counts every `<select>`, so wrapping them, rather than exempting them, is what lets it reach zero |
 | Not moved | The workspace switcher and the OAuth consent screen's workspace choice stay native selects. Both work without JavaScript, which the switcher has a `noscript` button for, and they list only the workspaces a person belongs to |
 | Specs | `choose` in `e2e/pickers.ts` types the name and presses the match, since a combobox has nothing for `selectOption` to select |
 
@@ -378,7 +380,10 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 9a | Lists and one domain rule | `TokenInput`; invitation and SSO email domains checked as domains on the server, as trusted domains were; `isHostName` and `hostOf` in `packages/formats`. Done 12 October 2026 | Trusted domains, invitation domains, SSO scopes and email domains, AI egress hosts, the rhythm word lists |
 | 9b | URLs and identifiers | `UrlInput`, `IdentifierInput`, and `isWebUrl` with the identifier rules in `packages/formats`; the server takes SSO's four OIDC addresses on https only (plain http on localhost), the AI base URL on http or https, and a model id as one word of 200 at most; `audit.names`. Done 12 October 2026 | SSO's four URLs, sign-on URL and provider id, the AI base URL and custom model id, space channel ids, the audit filter's action and target type |
 | 9c | Colour and the channel form | `ColourInput`, `statusHueOf` moved to `packages/formats`, the channel connection fields per provider. Done 12 October 2026 | Branding, channels |
-| 10 | `feat/text-limits` | `TextArea`, then `TextInput` and `TextArea` on every remaining title and reason, every label fixed. The ratchet reaches zero | Everything that is left |
+| 10a | Prose boxes and fixed lists, on the goals and cycle screens | `TextArea`, `SelectInput`, `TextInput`'s `hideLabel`; every title and reason takes the server's `maxLength`. Done 13 October 2026 | The OKR list, drawer and diagram cells, the goal page, decompose, the cycle picker, the filter assist, every cycle phase form |
+| 10b | Session and KPI screens | The same kit | Sessions, KPIs |
+| 10c | Admin, account and operator | The same kit | Admin, account, operator |
+| 10d | The rest, and the ratchet at zero | `SearchInput`; the baseline file is deleted and the gate refuses any raw field | Spaces, people, search, the board and everything left |
 | 11 | `feat/rich-session-prose` | First release for five fields: the rich columns, writing both, the readers, the data-change backfill, the editor on screen | Monthly review (shifts, decision), quarterly review (management answers, private stage note), weekly session (coordinator note) |
 | 12 | `feat/rich-revalidation-notes` | The same, for the two revalidation notes | Quarterly revalidation |
 | 13 | `chore/drop-plain-prose-columns` | Second release, one release after 11 and 12: drop the six old `text` columns, and stop accepting string stage notes | None. Nothing a person sees changes |

@@ -1,7 +1,7 @@
 "use client";
 
 import { okrKindsInUse } from "@openokr/method";
-import { Bar, EntityPicker, useTranslations } from "@openokr/ui";
+import { Bar, EntityPicker, TextInput, useTranslations } from "@openokr/ui";
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
@@ -338,6 +338,7 @@ function TitleEditor({
       <InlineText
         value={value}
         label={t("goals.editor.objectiveTitle")}
+        maxLength={500}
         readOnly={false}
         bold
         onDraft={onDraft}
@@ -525,12 +526,14 @@ function EasingReason({
       data-testid="target-reason"
       className="nodrag flex min-w-0 flex-1 items-center gap-1 rounded-control bg-warn-bg px-1"
     >
-      <input
+      <TextInput
         value={reason}
-        aria-label={t("okrList.whyEase", {
+        label={t("okrList.whyEase", {
           from: String(from),
           to: String(to),
         })}
+        hideLabel
+        maxLength={500}
         placeholder={t("okrList.whyEase", {
           from: String(from),
           to: String(to),
@@ -544,7 +547,8 @@ function EasingReason({
             onCancel();
           }
         }}
-        className="min-w-0 flex-1 bg-transparent text-[11px] text-ink outline-none placeholder:text-ink-3"
+        className="min-w-0 flex-1"
+        inputClassName="h-auto border-0 bg-transparent px-0 text-[11px] focus:ring-0 placeholder:text-ink-3"
       />
     </span>
   );
@@ -601,9 +605,11 @@ function DraftField({
   };
   return (
     <span ref={box} className="nodrag flex min-w-0 flex-1 flex-col">
-      <input
+      <TextInput
         value={title}
-        aria-label={label}
+        label={label}
+        hideLabel
+        maxLength={500}
         placeholder={placeholder}
         disabled={saving}
         onChange={(event) => setTitle(event.target.value)}
@@ -616,7 +622,8 @@ function DraftField({
             onClose();
           }
         }}
-        className="min-w-0 rounded-control border border-line bg-surface px-1.5 py-0.5 text-[11px] text-ink outline-none focus:border-brand"
+        className="min-w-0"
+        inputClassName="h-auto px-1.5 py-0.5 text-[11px]"
       />
       {problem ? (
         <span role="alert" className="truncate text-[10px] text-bad">

@@ -20,6 +20,11 @@ export interface TextInputProps
   extends Omit<ComponentProps<"input">, "children"> {
   /** The visible label, linked to the control. Never a placeholder's job. */
   readonly label: string;
+  /**
+   * The label names the control without being drawn, for a box inside a
+   * table cell or a card whose row already says what it is.
+   */
+  readonly hideLabel?: boolean;
   /** What the field is for, linked by `aria-describedby`. */
   readonly description?: ReactNode;
   /** Why the server refused this field. Shown and announced while set. */
@@ -46,6 +51,7 @@ export interface TextInputProps
  */
 export function TextInput({
   label,
+  hideLabel,
   description,
   error,
   check,
@@ -72,12 +78,15 @@ export function TextInput({
       validationMode="onBlur"
       className={cn("flex flex-col gap-1", className)}
     >
-      <Field.Label className="text-sm font-medium text-ink-2">
-        {label}
-      </Field.Label>
+      {hideLabel ? null : (
+        <Field.Label className="text-sm font-medium text-ink-2">
+          {label}
+        </Field.Label>
+      )}
       <div className={trailing ? "relative" : undefined}>
         <Field.Control
           {...input}
+          aria-label={hideLabel ? label : input["aria-label"]}
           name={name}
           maxLength={maxLength}
           onChange={(event) => {

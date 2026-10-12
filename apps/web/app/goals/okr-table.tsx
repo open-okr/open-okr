@@ -7,6 +7,7 @@ import {
   Button,
   Chip,
   formatConfidence,
+  TextInput,
   useIsMutating,
   useQueryClient,
   useTranslations,
@@ -693,6 +694,7 @@ function ObjectiveRow({
           <InlineText
             value={goal.title}
             label={t("goals.editor.objectiveTitle")}
+            maxLength={500}
             readOnly={!canEdit}
             bold
             onDraft={cells.onDraft}
@@ -853,6 +855,7 @@ function KeyResultRow({
           <InlineText
             value={keyResult.title}
             label={t("goals.editor.keyResultTitle")}
+            maxLength={500}
             readOnly={!canEdit}
             onDraft={cells.onDraft}
             onSave={(title) => patch({ title }, { title: keyResult.title })}
@@ -1086,14 +1089,14 @@ function RowActions({
     };
     return (
       <div className="flex items-center justify-end gap-1">
-        <input
+        <TextInput
           // The reason is the whole point of the control, so it takes the
           // focus the moment the control opens.
-          // biome-ignore lint/a11y/noAutofocus: opened by the reader's own press, to type the one thing it asks.
-          autoFocus
+          ref={focusOnMount}
           value={reason}
           maxLength={280}
-          aria-label={t("okrList.stopReason")}
+          label={t("okrList.stopReason")}
+          hideLabel
           placeholder={t("okrList.stopReason")}
           onChange={(event) => setReason(event.target.value)}
           onKeyDown={(event) => {
@@ -1106,7 +1109,8 @@ function RowActions({
               setReason("");
             }
           }}
-          className="h-7 w-56 rounded-control border border-line bg-surface px-2 text-xs"
+          className="w-56"
+          inputClassName="h-7 px-2 text-xs"
         />
         <Button
           type="button"
@@ -1346,14 +1350,16 @@ function AddRow({
       className={`flex flex-col gap-1 border-b border-line py-2 pr-3.5 ${padding}`}
     >
       <div className="flex items-center gap-2">
-        <input
+        <TextInput
           // Focused through a ref rather than `autoFocus`: the field exists
           // because somebody just pressed the control that creates it, so the
           // caret belongs here, and the attribute that does it declaratively
           // also steals focus when a page loads with one of these already open.
           ref={focusOnMount}
           value={title}
-          aria-label={label}
+          label={label}
+          hideLabel
+          maxLength={500}
           placeholder={placeholder}
           disabled={saving}
           onChange={(event) => setTitle(event.target.value)}
@@ -1365,7 +1371,8 @@ function AddRow({
               close();
             }
           }}
-          className="min-w-0 flex-1 rounded-control border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-brand"
+          className="min-w-0 flex-1"
+          inputClassName="h-6.5 px-2 text-xs"
         />
         <Button
           type="button"
@@ -1381,13 +1388,15 @@ function AddRow({
       </div>
       {askReason ? (
         // §2.9: after the plan is set, a start says why it starts now.
-        <input
+        <TextInput
           value={reason}
-          aria-label={
+          label={
             askReason === "required"
               ? t("midCycle.whyNowRequired")
               : t("midCycle.whyNowOptional")
           }
+          hideLabel
+          maxLength={500}
           placeholder={t("midCycle.whyNowPlaceholder")}
           disabled={saving}
           onChange={(event) => setReason(event.target.value)}
@@ -1399,7 +1408,8 @@ function AddRow({
               close();
             }
           }}
-          className="min-w-0 rounded-control border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-brand"
+          className="min-w-0"
+          inputClassName="h-6.5 px-2 text-xs"
         />
       ) : null}
       {problem ? (

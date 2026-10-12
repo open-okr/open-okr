@@ -92,7 +92,7 @@ test("acceptance: a not-doing item removed from the agreed frame keeps its reaso
   // text through that, and the edit is typed again anyway, now with its
   // reason, so the spec does not depend on which.
   await notDoing.fill(REGIONS);
-  await page.locator('input[name="reason"]').fill(REASON);
+  await page.getByLabel("Why it changes", { exact: true }).fill(REASON);
   await page.getByRole("button", { name: "Replace the frame" }).click();
 
   const history = page.getByTestId("frame-revisions");

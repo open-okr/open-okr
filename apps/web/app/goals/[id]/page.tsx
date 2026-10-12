@@ -24,6 +24,9 @@ import {
   formatMeasure,
   NumberInput,
   RichTextView,
+  SelectInput,
+  TextArea,
+  TextInput,
 } from "@openokr/ui";
 
 import Link from "next/link";
@@ -524,27 +527,24 @@ export default async function GoalPage({
             <CardBody>
               <ActionForm action={editGoal} className="flex flex-col gap-1.5">
                 <input type="hidden" name="id" value={goal.id} />
-                <label className="sr-only" htmlFor="edit-title">
-                  {t("common.theObjective")}
-                </label>
-                <input
+                <TextInput
                   id="edit-title"
+                  label={t("common.theObjective")}
+                  hideLabel
                   name="title"
                   required
                   maxLength={500}
                   defaultValue={goal.title}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
                 />
-                <label className="sr-only" htmlFor="edit-contribution">
-                  {t("common.whatItContributesTo")}
-                </label>
-                <input
+                <TextInput
                   id="edit-contribution"
+                  label={t("common.whatItContributesTo")}
+                  hideLabel
                   name="contributionStatement"
                   maxLength={1000}
                   defaultValue={goal.contributionStatement ?? ""}
                   placeholder={t("common.thePriorityThisMoves")}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  inputClassName="placeholder:text-ink-4"
                 />
                 <div className="flex items-end gap-1.5">
                   {/* guided-inputs §4.8: held to the method's 0 to 100,
@@ -584,18 +584,17 @@ export default async function GoalPage({
                 className="flex flex-wrap items-center gap-1.5"
               >
                 <input type="hidden" name="id" value={goal.id} />
-                <label className="sr-only" htmlFor="reassign-role">
-                  {t("goals.detail.role")}
-                </label>
-                <select
+                <SelectInput
                   id="reassign-role"
+                  label={t("goals.detail.role")}
+                  hideLabel
                   name="role"
                   defaultValue="champion"
-                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                  inputClassName="w-auto px-1.5 text-xs text-ink-2"
                 >
                   <option value="champion">{t("common.champion")}</option>
                   <option value="reviewer">{t("common.reviewer")}</option>
-                </select>
+                </SelectInput>
                 {/* Opens on the champion, as the role beside it does, so a
                  * press with nothing chosen names somebody rather than
                  * whoever came first in the directory. "Nobody" takes the
@@ -719,28 +718,26 @@ export default async function GoalPage({
                 >
                   <input type="hidden" name="id" value={goal.id} />
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <label className="sr-only" htmlFor="close-outcome">
-                      {t("goals.detail.outcome")}
-                    </label>
-                    <select
+                    <SelectInput
                       id="close-outcome"
+                      label={t("goals.detail.outcome")}
+                      hideLabel
                       name="successStatus"
                       defaultValue="achieved"
-                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                      inputClassName="w-auto px-1.5 text-xs text-ink-2"
                     >
                       <option value="achieved">
                         {t("goals.detail.achieved")}
                       </option>
                       <option value="missed">{t("goals.detail.missed")}</option>
-                    </select>
-                    <label className="sr-only" htmlFor="close-decision">
-                      {t("goals.detail.decision")}
-                    </label>
-                    <select
+                    </SelectInput>
+                    <SelectInput
                       id="close-decision"
+                      label={t("goals.detail.decision")}
+                      hideLabel
                       name="closeDecision"
                       defaultValue="keep"
-                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                      inputClassName="w-auto px-1.5 text-xs text-ink-2"
                     >
                       {/* §8.8's five, in its order (P9-T20e-a). */}
                       <option value="achieved">
@@ -752,15 +749,16 @@ export default async function GoalPage({
                       <option value="abandon">
                         {t("goals.detail.abandon")}
                       </option>
-                    </select>
-                    <input
-                      name="closeReason"
-                      maxLength={2000}
-                      placeholder={t("goals.detail.whyThatDecision")}
-                      aria-label={t("goals.detail.whyThatDecision")}
-                      className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
-                    />
+                    </SelectInput>
                   </div>
+                  {/* Up to the server's 2000, on lines of its own rather
+                      than one box that scrolled sideways (§4.3). */}
+                  <TextArea
+                    name="closeReason"
+                    label={t("goals.detail.whyThatDecision")}
+                    maxLength={2000}
+                    rows={2}
+                  />
                   <RetrospectiveField
                     goalId={goal.id}
                     offered={retrospectiveOffered}

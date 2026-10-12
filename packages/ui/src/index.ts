@@ -25,6 +25,8 @@ export * from "./fields/entity-picker.tsx";
 export * from "./fields/identifier-input.tsx";
 export * from "./fields/number-input.tsx";
 export * from "./fields/secret-input.tsx";
+export * from "./fields/select-input.tsx";
+export * from "./fields/text-area.tsx";
 export * from "./fields/text-input.tsx";
 export * from "./fields/time-input.tsx";
 export * from "./fields/timezone-select.tsx";

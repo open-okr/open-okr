@@ -6,6 +6,8 @@ import {
   type ConfidenceDisplay,
   ConfidenceInput,
   MetricInput,
+  SelectInput,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -132,11 +134,12 @@ export function KeyResultUpdate({
           data-testid="confidence-check-in"
           className="flex flex-wrap items-center justify-end gap-1"
         >
-          <select
-            aria-label={t("goals.detail.statusFor", { title: keyResult.title })}
+          <SelectInput
+            label={t("goals.detail.statusFor", { title: keyResult.title })}
+            hideLabel
             value={status}
             onChange={(event) => setStatus(event.target.value as Status | "")}
-            className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink-2"
+            inputClassName="h-6 w-auto px-1.5 text-xs text-ink-2"
           >
             {lastStatus ? null : (
               <option value="">{t("okrDrawer.chooseStatus")}</option>
@@ -144,15 +147,18 @@ export function KeyResultUpdate({
             <option value="on_track">{t("common.onTrack")}</option>
             <option value="caution">{t("common.caution")}</option>
             <option value="off_track">{t("common.offTrack")}</option>
-          </select>
-          <input
-            aria-label={t("goals.detail.whyConfidenceMoved", {
+          </SelectInput>
+          {/* The check-in's narrative, which has no length limit. */}
+          <TextInput
+            label={t("goals.detail.whyConfidenceMoved", {
               title: keyResult.title,
             })}
+            hideLabel
             value={note}
             placeholder={t("goals.detail.whyConfidenceMovedPlaceholder")}
             onChange={(event) => setNote(event.target.value)}
-            className="w-64 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink placeholder:text-ink-4"
+            className="w-64"
+            inputClassName="h-6 px-1.5 text-xs placeholder:text-ink-4"
           />
         </span>
       ) : null}
@@ -233,10 +239,12 @@ export function AddKeyResult({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <input
+        <TextInput
           ref={(node) => node?.focus()}
           value={title}
-          aria-label={t("goals.editor.addKeyResult")}
+          label={t("goals.editor.addKeyResult")}
+          hideLabel
+          maxLength={500}
           placeholder={t("goals.editor.keyResultPlaceholder")}
           disabled={saving}
           onChange={(event) => setTitle(event.target.value)}
@@ -249,7 +257,8 @@ export function AddKeyResult({
               close();
             }
           }}
-          className="min-w-0 flex-1 rounded-control border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-brand"
+          className="min-w-0 flex-1"
+          inputClassName="h-6.5 px-2 text-xs"
         />
         <Button
           type="button"

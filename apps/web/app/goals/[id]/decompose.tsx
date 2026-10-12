@@ -26,6 +26,7 @@ import {
   Chip,
   EntityPicker,
   RichTextEditor,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { Sparkles } from "lucide-react";
@@ -206,13 +207,13 @@ export function DecomposeKeyResult({
               />
               {t("goals.detail.decompose.createThisInitiative")}
             </label>
-            <input
-              aria-label={t("goals.detail.decompose.initiativeTitle")}
+            <TextInput
+              label={t("goals.detail.decompose.initiativeTitle")}
+              hideLabel
               value={row.title}
               maxLength={500}
               disabled={pending || !row.keep}
               onChange={(event) => change(index, { title: event.target.value })}
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             />
             <div className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink-2">
               <RichTextEditor
@@ -246,15 +247,17 @@ export function DecomposeKeyResult({
                         })
                       }
                     />
-                    <input
-                      aria-label={t("goals.detail.decompose.taskTitle")}
+                    <TextInput
+                      label={t("goals.detail.decompose.taskTitle")}
+                      hideLabel
                       value={task.title}
                       maxLength={500}
                       disabled={pending || !row.keep || !task.keep}
                       onChange={(event) =>
                         changeTask(index, which, { title: event.target.value })
                       }
-                      className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+                      className="min-w-0 flex-1"
+                      inputClassName="h-6.5 px-2 text-xs"
                     />
                   </span>
                 ))}

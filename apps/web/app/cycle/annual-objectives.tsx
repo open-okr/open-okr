@@ -5,6 +5,7 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
@@ -137,13 +138,16 @@ async function Objective({
           <input type="hidden" name="goalId" value={objective.id} />
           <input type="hidden" name="championId" value={championId} />
           <input type="hidden" name="reviewerId" value={reviewerId} />
-          <input
+          <TextInput
             name="title"
             defaultValue={objective.title}
-            aria-label={t("cycle.annualObjectives.thisQuarterObjectiveUnder", {
+            label={t("cycle.annualObjectives.thisQuarterObjectiveUnder", {
               title: objective.title,
             })}
-            className="w-96 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+            hideLabel
+            maxLength={500}
+            className="w-96"
+            inputClassName="h-6.5 px-2 text-xs"
           />
           <Button type="submit" variant="default" size="sm">
             {t("cycle.annualObjectives.sendIntoThisQuarter")}

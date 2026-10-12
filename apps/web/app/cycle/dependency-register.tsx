@@ -5,6 +5,7 @@ import {
   Chip,
   EntityPicker,
   type MessageValues,
+  TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
@@ -317,25 +318,23 @@ export async function DependencyRegister({
                 defaultValue={null}
                 className="w-56"
               />
-              <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-ink-3">
-                {t("cycle.dependencyRegister.orNameThem")}
-                <input
-                  name="providerText"
-                  placeholder={t(
-                    "cycle.dependencyRegister.thePlatformVendorLegal",
-                  )}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
-            </div>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("cycle.dependencyRegister.whatIsNeeded")}
-              <input
-                name="note"
-                placeholder={t("cycle.dependencyRegister.theRateLimitChange")}
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+              {/* The server's 200 and 500 (alignment.addDependency). */}
+              <TextInput
+                label={t("cycle.dependencyRegister.orNameThem")}
+                name="providerText"
+                maxLength={200}
+                placeholder={t(
+                  "cycle.dependencyRegister.thePlatformVendorLegal",
+                )}
+                className="min-w-48 flex-1"
               />
-            </label>
+            </div>
+            <TextInput
+              label={t("cycle.dependencyRegister.whatIsNeeded")}
+              name="note"
+              maxLength={500}
+              placeholder={t("cycle.dependencyRegister.theRateLimitChange")}
+            />
             <button
               type="submit"
               className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"

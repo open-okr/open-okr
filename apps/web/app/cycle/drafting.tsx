@@ -16,6 +16,8 @@ import {
   formatMeasure,
   MetricInput,
   NumberInput,
+  SelectInput,
+  TextInput,
   UnitInput,
 } from "@openokr/ui";
 import {
@@ -466,16 +468,15 @@ export async function Drafting({
                 className="flex flex-col gap-1.5 rounded-md border border-line border-dashed p-2.5"
               >
                 <input type="hidden" name="goalId" value={goal.id} />
-                <label className="sr-only" htmlFor={`kr-title-${goal.id}`}>
-                  {t("cycle.drafting.theKeyResult")}
-                </label>
-                <input
+                <TextInput
                   id={`kr-title-${goal.id}`}
+                  label={t("cycle.drafting.theKeyResult")}
+                  hideLabel
                   name="title"
                   required
                   maxLength={500}
                   placeholder={t("cycle.drafting.whatChangesMeasuredHow")}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  inputClassName="placeholder:text-ink-4"
                 />
                 <div className="flex flex-wrap items-center gap-1.5">
                   {kpis && kpis.length > 0 ? (
@@ -505,36 +506,34 @@ export async function Drafting({
                       />
                     </>
                   ) : null}
-                  <label className="sr-only" htmlFor={`kr-dir-${goal.id}`}>
-                    {t("cycle.drafting.direction")}
-                  </label>
-                  <select
+                  <SelectInput
                     id={`kr-dir-${goal.id}`}
+                    label={t("cycle.drafting.direction")}
+                    hideLabel
                     name="direction"
                     defaultValue="increase"
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    inputClassName="w-auto px-1.5 text-xs text-ink-2"
                   >
                     {["increase", "reduce", "maintain", "move"].map((value) => (
                       <option key={value} value={value}>
                         {value}
                       </option>
                     ))}
-                  </select>
-                  <label className="sr-only" htmlFor={`kr-ind-${goal.id}`}>
-                    {t("common.indicator")}
-                  </label>
-                  <select
+                  </SelectInput>
+                  <SelectInput
                     id={`kr-ind-${goal.id}`}
+                    label={t("common.indicator")}
+                    hideLabel
                     name="indicatorType"
                     defaultValue="leading"
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    inputClassName="w-auto px-1.5 text-xs text-ink-2"
                   >
                     {["leading", "lagging"].map((value) => (
                       <option key={value} value={value}>
                         {value}
                       </option>
                     ))}
-                  </select>
+                  </SelectInput>
                   {/* `w-32`, because a measure in rupiah or impressions
                       runs to nine digits. No `max`: the ceiling on a measure
                       is the unit's, not the product's. */}
@@ -625,43 +624,40 @@ export async function Drafting({
           <CardBody>
             <ActionForm action={createGoal} className="flex flex-col gap-1.5">
               <input type="hidden" name="cycleId" value={cycleId} />
-              <label className="sr-only" htmlFor="goal-title">
-                {t("common.theObjective")}
-              </label>
-              <input
+              <TextInput
                 id="goal-title"
+                label={t("common.theObjective")}
+                hideLabel
                 name="title"
                 required
                 maxLength={500}
                 placeholder={t("cycle.drafting.whatIsDifferentAt")}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                inputClassName="placeholder:text-ink-4"
               />
-              <label className="sr-only" htmlFor="goal-contribution">
-                {t("common.whatItContributesTo")}
-              </label>
-              <input
+              <TextInput
                 id="goal-contribution"
+                label={t("common.whatItContributesTo")}
+                hideLabel
                 name="contributionStatement"
                 maxLength={1000}
                 placeholder={t("common.thePriorityThisMoves")}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                inputClassName="placeholder:text-ink-4"
               />
               <div className="flex flex-wrap items-center gap-1.5">
-                <label className="sr-only" htmlFor="goal-level">
-                  {t("common.level")}
-                </label>
-                <select
+                <SelectInput
                   id="goal-level"
+                  label={t("common.level")}
+                  hideLabel
                   name="level"
                   defaultValue={levels[0] ?? "company"}
-                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                  inputClassName="w-auto px-1.5 text-xs text-ink-2"
                 >
                   {levels.map((value) => (
                     <option key={value} value={value}>
                       {value}
                     </option>
                   ))}
-                </select>
+                </SelectInput>
                 {/* Opens on whoever is drafting, where the select it replaced
                  * opened on whoever came first in the directory. */}
                 <EntityPicker
@@ -684,24 +680,19 @@ export async function Drafting({
                  * only where the workspace uses both, and starting at its
                  * default (decision D2). */}
                 {okrKindsInUse(practice).length > 1 ? (
-                  <>
-                    <label className="sr-only" htmlFor="goal-kind">
-                      {t("okrKind.label")}
-                    </label>
-                    <select
-                      id="goal-kind"
-                      name="kind"
-                      defaultValue={defaultOkrKind(practice)}
-                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                    >
-                      <option value="aspirational">
-                        {t("okrKind.aspirational")}
-                      </option>
-                      <option value="committed">
-                        {t("okrKind.committed")}
-                      </option>
-                    </select>
-                  </>
+                  <SelectInput
+                    id="goal-kind"
+                    label={t("okrKind.label")}
+                    hideLabel
+                    name="kind"
+                    defaultValue={defaultOkrKind(practice)}
+                    inputClassName="w-auto px-1.5 text-xs text-ink-2"
+                  >
+                    <option value="aspirational">
+                      {t("okrKind.aspirational")}
+                    </option>
+                    <option value="committed">{t("okrKind.committed")}</option>
+                  </SelectInput>
                 ) : null}
                 {/* The reviewer follows the practice (METHOD.md §2.5, P9-T04):
                  * off asks for none, so there is no picker; optional offers
