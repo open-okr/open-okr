@@ -1,6 +1,11 @@
 "use client";
 
-import { DateTimeInput, useTranslations } from "@openokr/ui";
+import {
+  DateTimeInput,
+  SelectInput,
+  TextArea,
+  useTranslations,
+} from "@openokr/ui";
 import {
   type FormEvent,
   startTransition,
@@ -60,11 +65,8 @@ export function SiteMessageForm({
       className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-4"
     >
       <div className="flex flex-col gap-1.5">
-        <label className="font-medium text-ink text-sm" htmlFor="body">
-          {t("operator.siteMessage.message")}
-        </label>
-        <textarea
-          className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+        <TextArea
+          label={t("operator.siteMessage.message")}
           id="body"
           maxLength={1000}
           name="body"
@@ -79,11 +81,8 @@ export function SiteMessageForm({
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="level">
-            {t("operator.siteMessage.tone")}
-          </label>
-          <select
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+          <SelectInput
+            label={t("operator.siteMessage.tone")}
             defaultValue="info"
             id="level"
             name="level"
@@ -97,7 +96,7 @@ export function SiteMessageForm({
             <option value="bad">
               {t("operator.siteMessage.toneIncident")}
             </option>
-          </select>
+          </SelectInput>
         </div>
         <DateTimeInput
           label={t("operator.siteMessage.showsFrom")}

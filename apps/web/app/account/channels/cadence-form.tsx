@@ -1,6 +1,12 @@
 "use client";
 
-import { Button, TimeInput, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  NumberInput,
+  SelectInput,
+  TimeInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useActionState } from "react";
 import type { LinkResult } from "./link-state.ts";
 
@@ -73,24 +79,16 @@ export function CadenceForm({
           </span>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          <span>
-            {t("account.channels.cadenceForm.groupEverythingElseInto")}
-          </span>
-          <span className="flex items-center gap-2">
-            <input
-              type="number"
-              name="batchWindowMinutes"
-              min={1}
-              max={1440}
-              defaultValue={settings.batchWindowMinutes}
-              className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-sm"
-            />
-            <span className="text-xs text-ink-3">
-              {t("account.channels.cadenceForm.minutesAShorterWindow")}
-            </span>
-          </span>
-        </label>
+        <NumberInput
+          label={t("account.channels.cadenceForm.groupEverythingElseInto")}
+          name="batchWindowMinutes"
+          min={1}
+          max={1440}
+          step={1}
+          defaultValue={settings.batchWindowMinutes}
+          description={t("account.channels.cadenceForm.minutesAShorterWindow")}
+          inputClassName="w-24"
+        />
 
         <label className="flex items-center gap-2.5 text-sm text-ink">
           <input
@@ -120,26 +118,23 @@ export function CadenceForm({
           {t("account.channels.cadenceForm.leaveOneOnWherever")}
         </p>
         {reasons.map((reason) => (
-          <label
+          <SelectInput
+            label={reason.label}
+            name={`routing.${reason.id}`}
+            defaultValue={settings.routing[reason.id] ?? ""}
+            className="flex-row items-center justify-between gap-2.5"
+            inputClassName="w-auto"
             key={reason.id}
-            className="flex items-center justify-between gap-2.5 text-sm text-ink"
           >
-            <span>{reason.label}</span>
-            <select
-              name={`routing.${reason.id}`}
-              defaultValue={settings.routing[reason.id] ?? ""}
-              className="rounded-md border border-line bg-surface px-2 py-1 text-sm"
-            >
-              <option value="">
-                {t("account.channels.cadenceForm.whereverISaid")}
+            <option value="">
+              {t("account.channels.cadenceForm.whereverISaid")}
+            </option>
+            {channels.map((channel) => (
+              <option key={channel.id} value={channel.id}>
+                {channel.label}
               </option>
-              {channels.map((channel) => (
-                <option key={channel.id} value={channel.id}>
-                  {channel.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            ))}
+          </SelectInput>
         ))}
       </fieldset>
 

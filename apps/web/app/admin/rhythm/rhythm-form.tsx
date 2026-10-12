@@ -8,7 +8,9 @@ import {
   CardBody,
   CardHeader,
   Chip,
-  cn,
+  NumberInput,
+  SelectInput,
+  TextInput,
   TokenInput,
   useFormDirty,
   useKeyboardRegistry,
@@ -18,9 +20,11 @@ import {
   useUnsavedGuard,
 } from "@openokr/ui";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import {
   createContext,
+  Fragment,
+  startTransition,
   useActionState,
   useCallback,
   useContext,
@@ -269,55 +273,48 @@ function Parameter({
       <p className="text-sm text-ink-3">{entry.why}</p>
 
       {typeof resolved === "number" ? (
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="number"
-            step="any"
+        <div className="flex items-center gap-2 text-sm">
+          {/* No min or max: the field would pull an out-of-range number back
+              to the nearest bound without a word, where the server refuses
+              it in words under the box (guided-inputs §6, 10c). */}
+          <NumberInput
+            label={entry.label}
+            hideLabel
             name={`threshold:${entry.key}`}
+            step={Number.isInteger(resolved) ? 1 : 0.01}
             disabled={!canManage}
-            defaultValue={override === undefined ? "" : String(override)}
+            defaultValue={typeof override === "number" ? override : null}
             placeholder={String(resolved)}
-            aria-invalid={refusal !== null}
+            invalid={refusal !== null}
             aria-describedby={refusal === null ? undefined : errorId}
-            className={cn(
-              "w-28 rounded-md border bg-bg px-2 py-1 tabular",
-              refusal === null ? "border-line" : "border-bad-dot",
-            )}
+            inputClassName="w-28"
           />
           <span className="text-ink-3">
             {t("admin.rhythm.rhythmForm.inForceLeaveBlankFor", {
               resolved: String(resolved),
             })}
           </span>
-        </label>
+        </div>
       ) : parts ? (
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap gap-2.5">
             {parts.map(([part, inForce]) => (
-              <label
+              <NumberInput
                 key={part}
-                className="flex flex-col gap-0.5 text-xs text-ink-3"
-              >
-                {part}
-                <input
-                  type="number"
-                  step="any"
-                  name={`${prefix}:${entry.key}:${part}`}
-                  disabled={!canManage}
-                  defaultValue={
-                    overrideParts && typeof overrideParts[part] === "number"
-                      ? String(overrideParts[part])
-                      : ""
-                  }
-                  placeholder={String(inForce)}
-                  aria-invalid={refusal !== null}
-                  aria-describedby={refusal === null ? undefined : errorId}
-                  className={cn(
-                    "w-24 rounded-md border bg-bg px-2 py-1 text-sm tabular",
-                    refusal === null ? "border-line" : "border-bad-dot",
-                  )}
-                />
-              </label>
+                label={part}
+                name={`${prefix}:${entry.key}:${part}`}
+                step={Number.isInteger(inForce) ? 1 : 0.01}
+                disabled={!canManage}
+                defaultValue={
+                  overrideParts && typeof overrideParts[part] === "number"
+                    ? overrideParts[part]
+                    : null
+                }
+                placeholder={String(inForce)}
+                invalid={refusal !== null}
+                aria-describedby={refusal === null ? undefined : errorId}
+                inputClassName="w-24"
+              />
             ))}
           </div>
           <span className="text-xs text-ink-4">
@@ -424,54 +421,6 @@ function focusRefused(
   field.focus({ preventScroll: true });
 }
 
-/** What a card's fields held when it was submitted. */
-type Submitted = ReadonlyMap<string, string>;
-
-/**
- * The card's own fields, as they stand.
- *
- * Next writes its hidden server-action fields into the same form; they are not
- * this card's values and putting them back is neither possible nor wanted.
- */
-function readSubmitted(element: HTMLFormElement): Submitted {
-  const held = new Map<string, string>();
-  for (const [name, value] of new FormData(element).entries()) {
-    if (!name.startsWith("$ACTION") && typeof value === "string") {
-      held.set(name, value);
-    }
-  }
-  return held;
-}
-
-/**
- * Puts them back after React has reset the form.
- *
- * **React resets a form with an `action` as soon as that action resolves.**
- * For a refusal that is the wrong behaviour twice over: the value somebody
- * typed is gone before they have read why it was refused, and the message then
- * describes a number no longer on screen. Measured on 23 September 2026: 500
- * typed, refused with "expected number to be <=200", and the box already back
- * to 200 within 500ms.
- */
-function restoreSubmitted(
-  element: HTMLFormElement | null,
-  held: Submitted | null,
-): void {
-  if (element === null || held === null) {
-    return;
-  }
-  for (const [name, value] of held) {
-    const field = element.elements.namedItem(name);
-    if (
-      (field instanceof HTMLInputElement ||
-        field instanceof HTMLSelectElement) &&
-      field.value !== value
-    ) {
-      field.value = value;
-    }
-  }
-}
-
 /**
  * "Return this card to its defaults", for one group.
  *
@@ -564,15 +513,29 @@ function SettingsCard({
   const { dirty, markSaved } = useFormDirty(form);
   const onKeyDown = useSubmitShortcut(canManage);
 
-  // Read on the way out, restored once the action has resolved and React has
-  // reset the form under us. Captured here rather than returned by the server,
-  // which would mean sending 123 values back to say one of them was refused.
-  const submitted = useRef<Submitted | null>(null);
-  const onSubmit = useCallback(() => {
-    if (form.current !== null) {
-      submitted.current = readSubmitted(form.current);
-    }
-  }, []);
+  // **Sent through a transition, not the form's own action**, because React
+  // resets a form with an `action` as soon as that action resolves. For a
+  // refusal that was wrong twice over: the value somebody typed was gone
+  // before they had read why (500 typed, refused as "<=200", and the box
+  // already back to 200 within 500ms, measured on 23 September 2026), and the
+  // message then described a number no longer on screen. The card used to put
+  // the typed values back by name afterwards, which a kit field holding its
+  // own value (a number field, a word list) never hears (guided-inputs 10c).
+  // Not reset, everything stays where it was typed, refused or saved.
+  const onSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const data = new FormData(
+        event.currentTarget,
+        (event.nativeEvent as SubmitEvent).submitter,
+      );
+      startTransition(() => submit(data));
+    },
+    [submit],
+  );
+  // Bumped when a reset clears the card, so its fields are drawn again on
+  // what the server now holds.
+  const [generation, setGeneration] = useState(0);
 
   useUnsavedGuard(`rhythm:${id}`, dirty);
 
@@ -599,23 +562,11 @@ function SettingsCard({
       if (!cleared) {
         return;
       }
-      // Blanked rather than re-read from the server. Blank is exactly what
-      // reset wrote: the field means "this workspace has no opinion" and the
-      // placeholder beside it is the canon's own number. Calling `reset()` on
-      // the element instead would restore whatever `defaultValue` React last
-      // rendered, which is the pre-reset value until the revalidation lands.
-      const element = form.current;
-      if (!element) {
-        return;
-      }
-      for (const field of element.querySelectorAll<HTMLInputElement>(
-        'input[name^="threshold:"], input[name^="composite:"], input[name^="list:"]',
-      )) {
-        field.value = "";
-      }
-      // The blanks are what the card holds now, so a later save must not put
-      // the pre-reset values back over them.
-      submitted.current = readSubmitted(element);
+      // Drawn again rather than blanked by hand. The reset's own response
+      // carries the page as the server now holds it, and every field, a kit
+      // field holding its own value included, starts again from that: blank,
+      // with the canon's number as its placeholder.
+      setGeneration((one) => one + 1);
       markSaved();
     },
     [markSaved],
@@ -645,14 +596,6 @@ function SettingsCard({
       return;
     }
     shown.current = outcome;
-    // **React resets a form with an `action` once that action resolves**, so
-    // without this a refused value is gone the moment it is refused: you are
-    // told 500 is too big while the box has already gone back to 200, and the
-    // sentence reads as nonsense. Putting the submitted values back is right
-    // for both outcomes. On a refusal they are what somebody typed and has not
-    // finished with; on a save they are what the server now holds, which is
-    // also what the next render will resolve to.
-    restoreSubmitted(form.current, submitted.current);
     if (message !== null) {
       toast.show({ tone: "bad", title, message, source: id });
       focusRefused(form.current, refused);
@@ -724,7 +667,7 @@ function SettingsCard({
            * knowing about refusals it cannot produce.
            */}
           <RefusedContext.Provider value={refused}>
-            {children}
+            <Fragment key={generation}>{children}</Fragment>
           </RefusedContext.Provider>
         </CardBody>
       </Card>
@@ -783,42 +726,36 @@ export function RhythmForm({
         canManage={canManage}
       >
         <div className="flex flex-col gap-3 text-sm">
-          <label className="flex items-center justify-between gap-3">
-            <span className="text-ink-2">
-              {t("admin.rhythm.rhythmForm.checkInFrequency")}
-            </span>
-            <select
-              name="defaultCheckInFrequency"
-              disabled={!canManage}
-              defaultValue={rhythm.defaultCheckInFrequency}
-              className="rounded-md border border-line bg-bg px-2 py-1"
-            >
-              {["daily", "weekly", "biweekly", "monthly", "quarterly"].map(
-                (option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ),
-              )}
-            </select>
-          </label>
-          <label className="flex items-center justify-between gap-3">
-            <span className="text-ink-2">
-              {t("admin.rhythm.rhythmForm.anchorDay")}
-            </span>
-            <select
-              name="checkInAnchorDay"
-              disabled={!canManage}
-              defaultValue={String(rhythm.checkInAnchorDay)}
-              className="rounded-md border border-line bg-bg px-2 py-1"
-            >
-              {WEEKDAYS.map(([value, labelKey]) => (
-                <option key={value} value={value}>
-                  {t(labelKey)}
+          <SelectInput
+            label={t("admin.rhythm.rhythmForm.checkInFrequency")}
+            name="defaultCheckInFrequency"
+            disabled={!canManage}
+            defaultValue={rhythm.defaultCheckInFrequency}
+            className="flex-row items-center justify-between gap-3"
+            inputClassName="w-auto"
+          >
+            {["daily", "weekly", "biweekly", "monthly", "quarterly"].map(
+              (option) => (
+                <option key={option} value={option}>
+                  {option}
                 </option>
-              ))}
-            </select>
-          </label>
+              ),
+            )}
+          </SelectInput>
+          <SelectInput
+            label={t("admin.rhythm.rhythmForm.anchorDay")}
+            name="checkInAnchorDay"
+            disabled={!canManage}
+            defaultValue={String(rhythm.checkInAnchorDay)}
+            className="flex-row items-center justify-between gap-3"
+            inputClassName="w-auto"
+          >
+            {WEEKDAYS.map(([value, labelKey]) => (
+              <option key={value} value={value}>
+                {t(labelKey)}
+              </option>
+            ))}
+          </SelectInput>
           {/*
            * **Coach strictness left this card at P9-T05.** Every check now has
            * its own level (METHOD.md §4), and strict mode, which raises them
@@ -873,17 +810,25 @@ export function RhythmForm({
             return (
               <div key={term} className="flex flex-wrap items-center gap-2">
                 <span className="w-32 text-ink-3">{term}</span>
-                <input
+                {/* Each named, where the two boxes had no label, and held
+                    to the method's 40 (termLabelSchema). */}
+                <TextInput
+                  label={t("admin.rhythm.rhythmForm.termSingular", { term })}
+                  hideLabel
                   name={`label:${term}:singular`}
+                  maxLength={40}
                   disabled={!canManage}
                   defaultValue={value.singular}
-                  className="w-40 rounded-md border border-line bg-bg px-2 py-1"
+                  className="w-40"
                 />
-                <input
+                <TextInput
+                  label={t("admin.rhythm.rhythmForm.termPlural", { term })}
+                  hideLabel
                   name={`label:${term}:plural`}
+                  maxLength={40}
                   disabled={!canManage}
                   defaultValue={value.plural}
-                  className="w-40 rounded-md border border-line bg-bg px-2 py-1"
+                  className="w-40"
                 />
                 {suggested &&
                 canManage &&

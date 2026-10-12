@@ -15,6 +15,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  SecretInput,
   useTranslations,
 } from "@openokr/ui";
 import { useCallback, useState, useTransition } from "react";
@@ -76,20 +77,17 @@ export function ExportCard() {
 
         {!result ? (
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("admin.imports.exportCard.passphrase")}
-              <input
-                type="password"
-                autoComplete="new-password"
-                minLength={12}
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-                className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-              />
-              <span className="text-ink-4">
-                {t("admin.imports.exportCard.passphraseHint")}
-              </span>
-            </label>
+            {/* The server's 12 to 1024 (workspace.exportArchive). */}
+            <SecretInput
+              label={t("admin.imports.exportCard.passphrase")}
+              description={t("admin.imports.exportCard.passphraseHint")}
+              autoComplete="new-password"
+              minLength={12}
+              maxLength={1024}
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              className="w-64"
+            />
             <label className="flex items-center gap-2 text-sm text-ink-3">
               <input
                 type="checkbox"

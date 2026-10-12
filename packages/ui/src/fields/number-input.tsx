@@ -36,6 +36,12 @@ export interface NumberInputProps {
   readonly inputRef?: Ref<HTMLInputElement>;
   readonly onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
   readonly onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
+  /**
+   * Marked wrong by a refusal the caller draws once for several fields,
+   * which `aria-describedby` names (the rhythm card's composite parts).
+   */
+  readonly invalid?: boolean;
+  readonly "aria-describedby"?: string;
 }
 
 /**
@@ -71,6 +77,8 @@ export function NumberInput({
   inputRef,
   onBlur,
   onKeyDown,
+  invalid,
+  "aria-describedby": describedBy,
 }: NumberInputProps) {
   const { t, locale } = useTranslations();
   const suffix = unit?.trim() || null;
@@ -85,6 +93,7 @@ export function NumberInput({
       ref={root}
       name={name}
       disabled={disabled}
+      invalid={invalid ? true : undefined}
       className={cn("flex flex-col gap-1", className)}
     >
       {hideLabel ? null : (
@@ -135,6 +144,7 @@ export function NumberInput({
             }}
             onBlur={onBlur}
             onKeyDown={onKeyDown}
+            {...(describedBy ? { "aria-describedby": describedBy } : {})}
             className={cn(FIELD_CONTROL_CLASS, "tabular-nums", inputClassName)}
           />
           {suffix ? (

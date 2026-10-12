@@ -1,6 +1,11 @@
 "use client";
 
-import { Button, EntityPicker, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  EntityPicker,
+  SelectInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { searchGoals } from "../../../lib/entity-search.ts";
 import { bindAgentScopeAction, setAgentAutonomyAction } from "./actions";
@@ -171,23 +176,20 @@ export function AgentPolicy({
             });
           }}
         >
-          <label className="flex flex-col gap-0.5 text-xs text-ink-3">
-            {t("admin.agents.agentPolicy.what")}
-            <select
-              name="resourceType"
-              value={kind}
-              onChange={(event) =>
-                setKind(event.target.value as (typeof BINDABLE)[number]["type"])
-              }
-              className="rounded-md border border-line bg-bg px-2 py-1 text-sm text-ink"
-            >
-              {BINDABLE.map((one) => (
-                <option key={one.type} value={one.type}>
-                  {t(one.labelKey)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectInput
+            label={t("admin.agents.agentPolicy.what")}
+            name="resourceType"
+            value={kind}
+            onChange={(event) =>
+              setKind(event.target.value as (typeof BINDABLE)[number]["type"])
+            }
+          >
+            {BINDABLE.map((one) => (
+              <option key={one.type} value={one.type}>
+                {t(one.labelKey)}
+              </option>
+            ))}
+          </SelectInput>
           <EntityPicker
             key={kind}
             label={t("admin.agents.agentPolicy.which")}
@@ -197,20 +199,17 @@ export function AgentPolicy({
             {...(kind === "goal" ? { search: searchGoals } : {})}
             className="w-80"
           />
-          <label className="flex flex-col gap-0.5 text-xs text-ink-3">
-            {t("common.level")}
-            <select
-              name="level"
-              defaultValue={String(levels[2]?.value ?? 70)}
-              className="rounded-md border border-line bg-bg px-2 py-1 text-sm text-ink"
-            >
-              {levels.map((one) => (
-                <option key={one.value} value={one.value}>
-                  {one.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectInput
+            label={t("common.level")}
+            name="level"
+            defaultValue={String(levels[2]?.value ?? 70)}
+          >
+            {levels.map((one) => (
+              <option key={one.value} value={one.value}>
+                {one.label}
+              </option>
+            ))}
+          </SelectInput>
           <Button type="submit" size="sm" disabled={pending}>
             {pending
               ? t("admin.agents.agentPolicy.binding")

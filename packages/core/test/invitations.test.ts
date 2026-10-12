@@ -460,4 +460,22 @@ describe("listing invitations", () => {
       ).rejects.toThrow("An allowed domain is written like example.com");
     }
   });
+
+  it("opens a link for a year at most", async () => {
+    // guided-inputs §6: no limit on either side, so a link could stay open
+    // for as long as somebody typed.
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.createWorkspaceLink",
+      { expiresInDays: 365 },
+    );
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...ownerContext() },
+        "invitations.createWorkspaceLink",
+        { expiresInDays: 366 },
+      ),
+    ).rejects.toThrow();
+  });
 });

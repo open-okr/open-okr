@@ -71,7 +71,9 @@ describe("the AI console", () => {
     // you can check it" would be a screen that displays a provider key.
     expect(pageSource).toContain("workspaceKeyHint");
     expect(pageSource).not.toMatch(/defaultValue=\{[^}]*apiKey/);
-    expect(pageSource).toMatch(/name="apiKey"[\s\S]{0,120}type="password"/);
+    // A secret field, masked until its own reveal is pressed (guided-inputs
+    // §4.11), where a raw password box stood.
+    expect(pageSource).toMatch(/<SecretInput\b[^>]*name="apiKey"/);
   });
 
   test("offers every provider and every tier the schema declares", () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { SelectInput, TextArea, useTranslations } from "@openokr/ui";
 import { type FormEvent, startTransition, useActionState } from "react";
 import type { OperatorLifecycleState } from "./lifecycle-actions";
 
@@ -77,14 +77,8 @@ export function LifecycleForm({
         <p className="text-ink-2 text-sm">{t("operator.lifecycle.intro")}</p>
 
         <div className="flex flex-col gap-1.5">
-          <label
-            className="font-medium text-ink text-sm"
-            htmlFor="lifecycle-state"
-          >
-            {t("operator.lifecycle.moveTo")}
-          </label>
-          <select
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+          <SelectInput
+            label={t("operator.lifecycle.moveTo")}
             defaultValue={currentState}
             id="lifecycle-state"
             name="state"
@@ -94,27 +88,22 @@ export function LifecycleForm({
                 {option.label}
               </option>
             ))}
-          </select>
+          </SelectInput>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label
-            className="font-medium text-ink text-sm"
-            htmlFor="lifecycle-reason"
-          >
-            {t("operator.lifecycle.reason")}
-          </label>
           {/* Written for the customer rather than as an internal note: this
            * is the sentence the workspace's own members are shown, and it
-           * stays on their audit log after the change is lifted. */}
-          <input
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+           * stays on their audit log after the change is lifted. Lines of
+           * its own, up to the server's 500 (guided-inputs §4.3). */}
+          <TextArea
+            label={t("operator.lifecycle.reason")}
             id="lifecycle-reason"
             maxLength={500}
+            rows={2}
             name="reason"
             placeholder={t("operator.lifecycle.reasonPlaceholder")}
             required
-            type="text"
           />
         </div>
 

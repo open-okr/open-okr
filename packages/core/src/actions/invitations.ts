@@ -184,7 +184,9 @@ export const createWorkspaceLink = defineWriteAction({
   summary: "Create a reusable link anyone holding it may join through.",
   input: z.object({
     maxUses: z.number().int().positive().optional(),
-    expiresInDays: z.number().int().positive().optional(),
+    // A year at most (guided-inputs §6): a link open for longer is a
+    // standing door rather than an invitation.
+    expiresInDays: z.number().int().positive().max(365).optional(),
     /** Each a domain, on the rule trusted domains use (guided-inputs §4.11). */
     allowedDomains: z
       .array(
@@ -287,7 +289,9 @@ export const createPersonalLink = defineWriteAction({
     "Invite one email address, usable once, as a member or as a guest of one space.",
   input: z.object({
     email: z.string().trim().toLowerCase().email({ pattern: EMAIL_PATTERN }),
-    expiresInDays: z.number().int().positive().optional(),
+    // A year at most (guided-inputs §6): a link open for longer is a
+    // standing door rather than an invitation.
+    expiresInDays: z.number().int().positive().max(365).optional(),
     /**
      * Makes the invitation a guest's, of this space and nothing else. Absent
      * invites a member, as every invitation did before.

@@ -9,6 +9,7 @@ import {
   CardHeader,
   Chip,
   cn,
+  SelectInput,
   useFormDirty,
   useKeyboardRegistry,
   useSubmitShortcut,
@@ -469,19 +470,21 @@ function GroupCard({
                   {differs ? (
                     <Chip tone="brand">{t("admin.practice.differs")}</Chip>
                   ) : null}
-                  <select
+                  <SelectInput
+                    label={nameOf(setting)}
+                    hideLabel
                     id={fieldId}
                     name={`practice:${setting.key}`}
                     disabled={!canManage}
                     defaultValue={practice.practice[setting.key]}
-                    className="rounded-md border border-line bg-bg px-2 py-1 text-sm"
+                    inputClassName="h-7 w-auto"
                   >
                     {setting.options.map((option) => (
                       <option key={option} value={option}>
                         {setting.optionLabels[option] ?? option}
                       </option>
                     ))}
-                  </select>
+                  </SelectInput>
                 </div>
               </div>
             );

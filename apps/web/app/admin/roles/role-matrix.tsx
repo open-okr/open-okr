@@ -1,7 +1,7 @@
 "use client";
 
 import type { RoleDomain } from "@openokr/db";
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, SelectInput, TextInput, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -170,9 +170,10 @@ export function RoleMatrix({
                   return (
                     <td key={domain} className="px-2 py-2.5">
                       {role.editable ? (
-                        <select
+                        <SelectInput
+                          label={label}
+                          hideLabel
                           value={level}
-                          aria-label={label}
                           disabled={pending}
                           onChange={(event) =>
                             run(() =>
@@ -188,14 +189,14 @@ export function RoleMatrix({
                               }),
                             )
                           }
-                          className="h-7 w-full rounded-control border border-line-2 bg-surface px-1.5 text-xs text-ink outline-none focus:border-brand"
+                          inputClassName="h-7 px-1.5 text-xs"
                         >
                           {LEVELS.map((entry) => (
                             <option key={entry.value} value={entry.value}>
                               {t(entry.key)}
                             </option>
                           ))}
-                        </select>
+                        </SelectInput>
                       ) : (
                         <span className="text-xs text-ink-3">
                           {t(
@@ -256,12 +257,13 @@ export function RoleMatrix({
 
       {adding ? (
         <div className="flex flex-wrap items-center gap-2">
-          <input
+          <TextInput
+            label={t("admin.roles.addRole")}
+            hideLabel
             // Focused through a ref rather than `autoFocus`, which also steals
             // focus when a page loads with one of these already open.
             ref={(node) => node?.focus()}
             value={name}
-            aria-label={t("admin.roles.addRole")}
             placeholder={t("admin.roles.namePlaceholder")}
             disabled={pending}
             onChange={(event) => setName(event.target.value)}
@@ -271,7 +273,9 @@ export function RoleMatrix({
                 setAdding(false);
               }
             }}
-            className="h-7.5 w-56 rounded-control border border-line bg-surface px-2 text-xs text-ink outline-none focus:border-brand"
+            maxLength={60}
+            className="w-56"
+            inputClassName="px-2 text-xs"
           />
           <Button
             type="button"

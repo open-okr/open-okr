@@ -1,10 +1,4 @@
-import {
-  Card,
-  CardBody,
-  FIELD_CONTROL_CLASS,
-  TextInput,
-  type TextInputProps,
-} from "@openokr/ui";
+import { Card, CardBody, TextInput, type TextInputProps } from "@openokr/ui";
 import type { ReactNode } from "react";
 
 /**
@@ -71,14 +65,6 @@ export function FormError({ children }: { children: ReactNode }) {
     </p>
   );
 }
-
-/**
- * The one input skin every field wears, now the field kit's own
- * (docs/design/guided-inputs.md §4.3). Still exported here for the single
- * sign-on screen, which draws a select and a textarea of its own beside its
- * fields.
- */
-export const fieldInputClass = FIELD_CONTROL_CLASS;
 
 /**
  * A labelled text field, as the kit's `TextInput` draws it. Kept under this

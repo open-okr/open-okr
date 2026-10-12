@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   CardBody,
+  SelectInput,
   TimezoneSelect,
   TokenInput,
   useTranslations,
@@ -31,12 +32,6 @@ import { NOTHING_SAVED } from "./general-state.ts";
  * action, because a form cannot nest inside another and the two controls
  * belong on one row.
  */
-
-const INPUT_CLASS =
-  "rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm font-normal text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line";
-
-const LABEL_CLASS =
-  "flex w-full max-w-sm flex-col gap-1 text-xs font-semibold text-ink-2";
 
 export function GeneralSettingsForm({
   settings,
@@ -92,29 +87,27 @@ export function GeneralSettingsForm({
               }
             />
           </div>
-          <label htmlFor="language" className={LABEL_CLASS}>
-            {t("admin.general.generalSettingsForm.language")}
-            {/* A picker of the catalogues that exist, not a text box that
-             * expected somebody to know to type "ms" (completeness review
-             * M-15). A value stored before this that is neither stays
-             * listed, so saving the card never changes it by accident. */}
-            <select
-              id="language"
-              name="language"
-              defaultValue={String(settings.language ?? "en")}
-              className={INPUT_CLASS}
-            >
-              <option value="en">{t("appearance.english")}</option>
-              <option value="ms">{t("appearance.bahasaMelayu")}</option>
-              {settings.language &&
-              settings.language !== "en" &&
-              settings.language !== "ms" ? (
-                <option value={String(settings.language)}>
-                  {String(settings.language)}
-                </option>
-              ) : null}
-            </select>
-          </label>
+          {/* A picker of the catalogues that exist, not a text box that
+           * expected somebody to know to type "ms" (completeness review
+           * M-15). A value stored before this that is neither stays
+           * listed, so saving the card never changes it by accident. */}
+          <SelectInput
+            id="language"
+            label={t("admin.general.generalSettingsForm.language")}
+            name="language"
+            defaultValue={String(settings.language ?? "en")}
+            className="max-w-sm"
+          >
+            <option value="en">{t("appearance.english")}</option>
+            <option value="ms">{t("appearance.bahasaMelayu")}</option>
+            {settings.language &&
+            settings.language !== "en" &&
+            settings.language !== "ms" ? (
+              <option value={String(settings.language)}>
+                {String(settings.language)}
+              </option>
+            ) : null}
+          </SelectInput>
           {/* Each domain a chip, checked by the rule the server applies
               (guided-inputs §4.11). The hint says what the setting does and
               the one condition it needs (completeness review M-34): it saved

@@ -6,6 +6,7 @@ import {
   CardBody,
   CardHeader,
   CodeInput,
+  SecretInput,
   useTranslations,
 } from "@openokr/ui";
 import { useCallback, useEffect, useState } from "react";
@@ -31,12 +32,6 @@ import { FormError } from "../../(auth)/auth-card";
  * its own scope rather than appearing under whichever control the reader was
  * not using.
  */
-
-const INPUT_CLASS =
-  "rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm font-normal text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line";
-
-const LABEL_CLASS =
-  "flex w-full max-w-xs flex-col gap-1 text-xs font-semibold text-ink-2";
 
 /** One row of Better Auth's passkey list, the fields this screen shows. */
 type Passkey = {
@@ -326,18 +321,16 @@ export function SecuritySettings({
               onSubmit={startTwoFactor}
               className="flex flex-col items-start gap-3"
             >
-              <label htmlFor="confirm-password" className={LABEL_CLASS}>
-                {t("account.security.securitySettings.confirmYourPassword")}
-                <input
-                  id="confirm-password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className={INPUT_CLASS}
-                />
-              </label>
+              <SecretInput
+                label={t(
+                  "account.security.securitySettings.confirmYourPassword",
+                )}
+                id="confirm-password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
               <Button type="submit" variant="primary" size="sm">
                 {t("account.security.securitySettings.setUpOneTime")}
               </Button>

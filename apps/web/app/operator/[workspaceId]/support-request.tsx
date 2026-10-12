@@ -1,4 +1,5 @@
 import { requestSupportSession } from "@openokr/core";
+import { TextArea } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
@@ -85,20 +86,14 @@ export async function SupportRequest({
         {/* Distinct from the lifecycle form's own reason field, which sits
          * on this same page. Two controls sharing an id make every `for`
          * ambiguous and a screen reader announce the wrong label. */}
-        <label
-          className="font-medium text-ink text-sm"
-          htmlFor="support-reason"
-        >
-          {t("operator.supportRequest.why")}
-        </label>
-        <input
-          className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+        <TextArea
+          label={t("operator.supportRequest.why")}
           id="support-reason"
           maxLength={500}
           name="reason"
           placeholder={t("operator.supportRequest.placeholder")}
           required
-          type="text"
+          rows={2}
         />
         <p className="text-ink-3 text-xs">
           {t("operator.supportRequest.adminDecides")}

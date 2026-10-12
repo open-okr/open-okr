@@ -6,6 +6,8 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  NumberInput,
+  SelectInput,
   useTranslations,
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
@@ -77,6 +79,17 @@ export interface ChannelChoice {
  * anything look like one that chose exactly the default, and stores a copy
  * that would survive a change to §11.
  */
+
+/** Each ladder rung's name, where its key was shown. */
+const RUNG_LABEL: Readonly<Record<string, string>> = {
+  championRepeat: "admin.nudges.ruleCards.rung.championRepeat",
+  coordinator: "admin.nudges.ruleCards.rung.coordinator",
+  sponsor: "admin.nudges.ruleCards.rung.sponsor",
+  nudge: "admin.nudges.ruleCards.rung.nudge",
+  escalate: "admin.nudges.ruleCards.rung.escalate",
+  reminder: "admin.nudges.ruleCards.rung.reminder",
+};
+
 function LadderEditor({
   rule,
   pending,
@@ -129,29 +142,41 @@ function LadderEditor({
         })}
       </span>
       <div className="flex flex-wrap items-end gap-2.5">
-        {ladder.rungs.map((rung) => (
-          <label
-            key={rung}
-            className="flex flex-col gap-0.5 text-xs text-ink-3"
-          >
-            {rung}
-            <input
-              type="number"
-              min={0}
-              value={draft[rung] ?? ""}
-              disabled={pending}
-              placeholder={String(ladder.canon[rung] ?? "")}
-              aria-label={t("admin.nudges.ruleCards.rungFor", {
-                rung,
-                rule: label,
-              })}
-              onChange={(event) =>
-                setDraft((held) => ({ ...held, [rung]: event.target.value }))
-              }
-              className="w-20 rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
-            />
-          </label>
-        ))}
+        {ladder.rungs.map((rung) => {
+          // The rung by name, in days, where its camelCase key used to be
+          // the label (guided-inputs §6).
+          const named =
+            RUNG_LABEL[rung] === undefined ? rung : t(RUNG_LABEL[rung]);
+          const held = draft[rung]?.trim() ?? "";
+          return (
+            <div
+              key={rung}
+              className="flex flex-col gap-0.5 text-xs text-ink-3"
+            >
+              <span aria-hidden="true">{named}</span>
+              <NumberInput
+                label={t("admin.nudges.ruleCards.rungFor", {
+                  rung: named,
+                  rule: label,
+                })}
+                hideLabel
+                unit={t("admin.nudges.ruleCards.days")}
+                min={0}
+                step={1}
+                value={held === "" ? null : Number(held)}
+                disabled={pending}
+                placeholder={String(ladder.canon[rung] ?? "")}
+                onValueChange={(next) =>
+                  setDraft((before) => ({
+                    ...before,
+                    [rung]: next === null ? "" : String(next),
+                  }))
+                }
+                inputClassName="h-6.5 w-16 text-xs"
+              />
+            </div>
+          );
+        })}
         <Button
           type="button"
           size="sm"
@@ -260,14 +285,15 @@ function Rule({
             : t("account.security.securitySettings.turnOn")}
         </Button>
 
-        <label className="flex items-center gap-1.5 text-xs text-ink-3">
-          {t("admin.nudges.ruleCards.sendOn")}
-          <select
+        {/* Named for its rule, as every card has one: "Send on" alone
+            would name a dozen dropdowns the same. */}
+        <span className="flex items-center gap-1.5 text-xs text-ink-3">
+          <span aria-hidden="true">{t("admin.nudges.ruleCards.sendOn")}</span>
+          <SelectInput
+            label={t("admin.nudges.ruleCards.channelFor", { rule: label })}
+            hideLabel
             value={rule.channelOverride ?? ""}
             disabled={pending}
-            aria-label={t("admin.nudges.ruleCards.channelFor", {
-              rule: label,
-            })}
             onChange={(event) =>
               change({
                 ruleKey: rule.key,
@@ -281,7 +307,7 @@ function Rule({
                       >),
               })
             }
-            className="rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
+            inputClassName="h-6.5 w-auto text-xs"
           >
             <option value="">
               {t("admin.nudges.ruleCards.eachMemberSOwn")}
@@ -291,8 +317,8 @@ function Rule({
                 {channel.label}
               </option>
             ))}
-          </select>
-        </label>
+          </SelectInput>
+        </span>
 
         <label className="flex items-center gap-1.5 text-xs text-ink-3">
           <input

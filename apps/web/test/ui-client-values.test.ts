@@ -37,12 +37,7 @@ function filesUnder(directory: string): string[] {
 const isClient = (source: string) => /^\s*"use client"/.test(source);
 
 /** A server module that imports one, and why that is safe. */
-const EXCEPTIONS: Readonly<Record<string, string>> = {
-  // Re-exported as `fieldInputClass` for `admin/sso/sso-form.tsx`, a client
-  // component, which is the only place that renders it.
-  "apps/web/app/(auth)/auth-card.tsx FIELD_CONTROL_CLASS":
-    "used by a client component only",
-};
+const EXCEPTIONS: Readonly<Record<string, string>> = {};
 
 it("no server module uses a value a client module of packages/ui exports", () => {
   const clientValues = new Set<string>();

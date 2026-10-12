@@ -8,6 +8,10 @@ import {
   Chip,
   EntityPicker,
   IdentifierInput,
+  NumberInput,
+  SecretInput,
+  SelectInput,
+  TextInput,
   UrlInput,
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -290,18 +294,17 @@ export default async function AdminAIPage() {
                   className="flex flex-col gap-2 border-t border-line pt-3"
                 >
                   <input type="hidden" name="provider" value={kind} />
-                  <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    {config?.hasWorkspaceCredential
-                      ? t("admin.ai.replaceTheKeyHelp")
-                      : t("admin.ai.pasteTheProviderKey")}
-                    <input
-                      name="apiKey"
-                      type="password"
-                      autoComplete="off"
-                      required
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    />
-                  </label>
+                  <SecretInput
+                    label={
+                      config?.hasWorkspaceCredential
+                        ? t("admin.ai.replaceTheKeyHelp")
+                        : t("admin.ai.pasteTheProviderKey")
+                    }
+                    name="apiKey"
+                    autoComplete="off"
+                    required
+                    maxLength={4096}
+                  />
                   <Button type="submit" variant="default" size="sm">
                     {config?.hasWorkspaceCredential
                       ? t("admin.ai.replace")
@@ -438,65 +441,46 @@ export default async function AdminAIPage() {
               {t("admin.ai.addAModel")}
             </h3>
             <div className="flex flex-wrap gap-2">
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("admin.ai.provider")}
-                <select
-                  name="provider"
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                >
-                  {AI_PROVIDER_KINDS.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {providerWord(kind)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <SelectInput label={t("admin.ai.provider")} name="provider">
+                {AI_PROVIDER_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {providerWord(kind)}
+                  </option>
+                ))}
+              </SelectInput>
               <IdentifierInput
                 id="custom-modelId"
                 label={t("admin.ai.modelId")}
                 name="modelId"
                 required
               />
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("common.name")}
-                <input
-                  name="displayName"
-                  required
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("admin.ai.contextWindow")}
-                <input
-                  name="contextWindow"
-                  type="number"
-                  min={1}
-                  defaultValue={8192}
-                  className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("admin.ai.costInPerMillion")}
-                <input
-                  name="costInPerMillion"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  defaultValue={0}
-                  className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("admin.ai.costOutPerMillion")}
-                <input
-                  name="costOutPerMillion"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  defaultValue={0}
-                  className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
+              <TextInput label={t("common.name")} name="displayName" required />
+              <NumberInput
+                label={t("admin.ai.contextWindow")}
+                name="contextWindow"
+                min={1}
+                step={1}
+                defaultValue={8192}
+                inputClassName="w-32"
+              />
+              <NumberInput
+                label={t("admin.ai.costInPerMillion")}
+                name="costInPerMillion"
+                min={0}
+                step={0.01}
+                defaultValue={0}
+                unit={t("admin.ai.usdPerMillionTokens")}
+                inputClassName="w-32"
+              />
+              <NumberInput
+                label={t("admin.ai.costOutPerMillion")}
+                name="costOutPerMillion"
+                min={0}
+                step={0.01}
+                defaultValue={0}
+                unit={t("admin.ai.usdPerMillionTokens")}
+                inputClassName="w-32"
+              />
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-ink-2">
               {CAPABILITIES.map(([name, labelKey]) => (
@@ -588,30 +572,25 @@ export default async function AdminAIPage() {
                     }
                     className="w-72"
                   />
-                  <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    {t("admin.ai.temperature")}
-                    <input
-                      name="temperature"
-                      type="number"
-                      min={0}
-                      max={2}
-                      step="0.1"
-                      defaultValue={route.temperature ?? ""}
-                      placeholder={t("admin.ai.driverSOwn")}
-                      className="w-28 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    {t("admin.ai.maxTokens")}
-                    <input
-                      name="maxTokens"
-                      type="number"
-                      min={1}
-                      defaultValue={route.maxTokens ?? ""}
-                      placeholder={t("admin.ai.driverSOwn")}
-                      className="w-28 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    />
-                  </label>
+                  <NumberInput
+                    label={t("admin.ai.temperature")}
+                    name="temperature"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    defaultValue={route.temperature ?? null}
+                    placeholder={t("admin.ai.driverSOwn")}
+                    inputClassName="w-28"
+                  />
+                  <NumberInput
+                    label={t("admin.ai.maxTokens")}
+                    name="maxTokens"
+                    min={1}
+                    step={1}
+                    defaultValue={route.maxTokens ?? null}
+                    placeholder={t("admin.ai.driverSOwn")}
+                    inputClassName="w-28"
+                  />
                   <Button type="submit" variant="ghost" size="sm">
                     {t("admin.ai.route")}
                   </Button>

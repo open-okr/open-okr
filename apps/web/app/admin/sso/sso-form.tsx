@@ -4,13 +4,15 @@ import type { SSOConnectionDetails } from "@openokr/core";
 import {
   Button,
   IdentifierInput,
+  SelectInput,
+  TextArea,
   TokenInput,
   UrlInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Field, fieldInputClass } from "../../(auth)/auth-card";
+import { Field } from "../../(auth)/auth-card";
 import { updateSSOConnectionAction } from "./actions";
 
 /**
@@ -173,13 +175,6 @@ export function SSOForm({
    * §4.11). Three of the four OIDC addresses had nowhere to show one.
    */
   const errorFor = (name: string) => (field === name ? error : null);
-  /** The same, under the one field the kit does not draw: the certificate. */
-  const problem = (name: string) =>
-    field === name ? (
-      <p className="text-sm text-bad" role="alert">
-        {error}
-      </p>
-    ) : null;
 
   const protocolName =
     kind === "saml"
@@ -205,16 +200,10 @@ export function SSOForm({
         </p>
       ) : (
         <div className="flex flex-col gap-1">
-          <label
-            htmlFor={idFor("kind")}
-            className="text-sm font-medium text-ink-2"
-          >
-            {t("admin.sso.ssoForm.protocol")}
-          </label>
-          <select
+          <SelectInput
+            label={t("admin.sso.ssoForm.protocol")}
             id={idFor("kind")}
             name="kind"
-            className={fieldInputClass}
             value={kind}
             onChange={(event) =>
               setKind(event.target.value === "saml" ? "saml" : "oidc")
@@ -224,7 +213,7 @@ export function SSOForm({
               {t("admin.sso.ssoForm.oidcOpenIdConnect")}
             </option>
             <option value="saml">{t("admin.sso.saml2")}</option>
-          </select>
+          </SelectInput>
         </div>
       )}
 
@@ -362,23 +351,18 @@ export function SSOForm({
           />
 
           <div className="flex flex-col gap-1">
-            <label
-              htmlFor={idFor("samlCertificate")}
-              className="text-sm font-medium text-ink-2"
-            >
-              {t("admin.sso.ssoForm.signingCertificate")}
-            </label>
-            <textarea
+            <TextArea
+              label={t("admin.sso.ssoForm.signingCertificate")}
               id={idFor("samlCertificate")}
               name="samlCertificate"
               rows={5}
               required
-              className={`${fieldInputClass} h-auto py-2 font-mono text-xs`}
               placeholder={t("admin.sso.ssoForm.certificatePlaceholder")}
               defaultValue={connection?.samlCertificate ?? undefined}
+              inputClassName="font-mono text-xs"
+              error={errorFor("samlCertificate")}
             />
           </div>
-          {problem("samlCertificate")}
 
           <p className="text-xs text-ink-3">
             {t("admin.sso.ssoForm.pasteTheCertificate")}

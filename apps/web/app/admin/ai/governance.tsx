@@ -21,6 +21,9 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  NumberInput,
+  SelectInput,
+  TextArea,
   TokenInput,
 } from "@openokr/ui";
 import { type MemberLike, memberOption } from "../../../lib/entity-options.ts";
@@ -288,43 +291,30 @@ export async function BudgetsCard({
             noneLabel={t("admin.ai.governance.wholeWorkspace")}
             className="w-64"
           />
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("admin.ai.governance.metric")}
-            <select
-              name="metric"
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            >
-              {BUDGET_METRICS.map((metric) => (
-                <option key={metric} value={metric}>
-                  {metric}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.period")}
-            <select
-              name="period"
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            >
-              {BUDGET_PERIODS.map((period) => (
-                <option key={period} value={period}>
-                  {period}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("admin.ai.governance.limit")}
-            <input
-              name="limitValue"
-              type="number"
-              min={0}
-              step="0.01"
-              required
-              className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-          </label>
+          <SelectInput label={t("admin.ai.governance.metric")} name="metric">
+            {BUDGET_METRICS.map((metric) => (
+              <option key={metric} value={metric}>
+                {metric}
+              </option>
+            ))}
+          </SelectInput>
+          <SelectInput label={t("common.period")} name="period">
+            {BUDGET_PERIODS.map((period) => (
+              <option key={period} value={period}>
+                {period}
+              </option>
+            ))}
+          </SelectInput>
+          {/* Above 0, as the server holds it: a budget of nothing would
+              stop every call (guided-inputs §4.11). */}
+          <NumberInput
+            label={t("admin.ai.governance.limit")}
+            name="limitValue"
+            min={0.01}
+            step={0.01}
+            required
+            inputClassName="w-32"
+          />
           <Button type="submit" variant="default" size="sm">
             {t("common.set")}
           </Button>
@@ -380,23 +370,22 @@ export async function FeaturesCard({
                   {named === undefined ? featureKey : t(named)}
                 </span>
               </label>
-              <label className="flex items-center gap-1.5 text-xs text-ink-3">
-                {t("admin.ai.governance.tier")}
-                <select
-                  name="tierOverride"
-                  defaultValue={setting?.tierOverride ?? ""}
-                  className="rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink"
-                >
-                  <option value="">
-                    {t("admin.ai.governance.whateverTheAssistAsks")}
+              <SelectInput
+                label={t("admin.ai.governance.tier")}
+                name="tierOverride"
+                defaultValue={setting?.tierOverride ?? ""}
+                className="flex-row items-center gap-1.5"
+                inputClassName="w-auto"
+              >
+                <option value="">
+                  {t("admin.ai.governance.whateverTheAssistAsks")}
+                </option>
+                {MODEL_TIERS.map((tier) => (
+                  <option key={tier} value={tier}>
+                    {TIER_WORDS[tier] ?? tier}
                   </option>
-                  {MODEL_TIERS.map((tier) => (
-                    <option key={tier} value={tier}>
-                      {TIER_WORDS[tier] ?? tier}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                ))}
+              </SelectInput>
               <Button type="submit" variant="ghost" size="sm">
                 {t("common.save")}
               </Button>
@@ -453,11 +442,15 @@ export async function PromptsCard({
             </span>
             <AIForm action={savePrompt} className="flex flex-col gap-1.5">
               <input type="hidden" name="promptKey" value={prompt.promptKey} />
-              <textarea
+              <TextArea
+                label={t("admin.ai.governance.systemPromptFor", {
+                  prompt: promptName(prompt.promptKey, t),
+                })}
+                hideLabel
                 name="systemPrompt"
                 rows={4}
                 defaultValue={prompt.systemPrompt}
-                className="rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-xs text-ink"
+                inputClassName="font-mono text-xs"
               />
               <Button type="submit" variant="ghost" size="sm">
                 {t("admin.ai.governance.saveANewVersion")}
