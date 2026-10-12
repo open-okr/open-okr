@@ -18,6 +18,7 @@
  * text at all, and sending the body as a second message would be a message the
  * member never agreed to receive.
  */
+import type { StoredEmail } from "../mail/mails.ts";
 import { type ChannelProviderKey, capabilitiesFor } from "./capabilities.ts";
 
 export interface MessageButton {
@@ -42,6 +43,12 @@ export interface MessageDraft {
   readonly templateKey?: string;
   /** The values that template's placeholders take, in placeholder order. */
   readonly templateParameters?: readonly string[];
+  /**
+   * The same message in the email layout (docs/design/email-templates.md).
+   * Kept only when the provider is email; every other provider has its own
+   * shape for buttons and cards and ignores it.
+   */
+  readonly email?: StoredEmail;
 }
 
 export interface BuiltMessage {
@@ -51,6 +58,7 @@ export interface BuiltMessage {
   readonly buttons?: readonly MessageButton[];
   readonly templateKey?: string;
   readonly templateParameters?: readonly string[];
+  readonly email?: StoredEmail;
   /**
    * What the provider could not take, in the words a log entry wants.
    *
@@ -165,6 +173,7 @@ export function buildMessage(
     ...(draft.blocks && capabilities.richCards ? { blocks: draft.blocks } : {}),
     ...(keepsButtons && draft.buttons ? { buttons: draft.buttons } : {}),
     ...(draft.templateKey ? { templateKey: draft.templateKey } : {}),
+    ...(draft.email && provider === "email" ? { email: draft.email } : {}),
     degraded,
   };
 }

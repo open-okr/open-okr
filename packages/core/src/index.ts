@@ -861,6 +861,7 @@ export {
   type EmailFrame,
   renderEmail,
 } from "./mail/render.ts";
+export { mailLocale, mailWords } from "./mail/words.ts";
 export {
   findNavigationItem,
   isRouteAllowed,

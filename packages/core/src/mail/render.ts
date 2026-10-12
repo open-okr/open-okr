@@ -256,7 +256,9 @@ function blockHtml(
           return (
             `<tr><td class="em-line" style="padding:12px 0;border-top:1px solid ${LINE};${last ? `border-bottom:1px solid ${LINE};` : ""}">` +
             head +
-            `<p class="em-ink" style="margin:${head ? "6px" : "0"} 0 2px;font-size:14px;line-height:1.5;color:${INK};">${inlineHtml(item.parts)}</p>` +
+            (item.parts.length > 0
+              ? `<p class="em-ink" style="margin:${head ? "6px" : "0"} 0 2px;font-size:14px;line-height:1.5;color:${INK};">${inlineHtml(item.parts)}</p>`
+              : "") +
             link +
             `</td></tr>`
           );
@@ -322,10 +324,18 @@ function blockText(block: EmailBlock): string[] {
       return [`${block.name} (${block.badge})`, ""];
     case "items":
       return [
-        ...block.items.flatMap((item) => [
-          `- ${item.chip ? `[${item.chip.label}] ` : ""}${inlineText(item.parts)}`,
-          ...(item.link ? [`  ${item.link.label}: ${item.link.href}`] : []),
-        ]),
+        ...block.items.flatMap((item) =>
+          item.parts.length > 0
+            ? [
+                `- ${item.chip ? `[${item.chip.label}] ` : ""}${inlineText(item.parts)}`,
+                ...(item.link
+                  ? [`  ${item.link.label}: ${item.link.href}`]
+                  : []),
+              ]
+            : item.link
+              ? [`- ${item.link.label}: ${item.link.href}`]
+              : [],
+        ),
         ...(block.more ? ["", block.more] : []),
         "",
       ];

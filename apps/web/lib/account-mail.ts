@@ -1,5 +1,9 @@
-import { renderEmail, resolveInstanceDefaultLanguage } from "@openokr/core";
-import { CATALOGUES, type Locale, translate } from "@openokr/ui";
+import {
+  mailLocale,
+  mailWords,
+  renderEmail,
+  resolveInstanceDefaultLanguage,
+} from "@openokr/core";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 
@@ -28,10 +32,8 @@ async function mailContext() {
     getInstanceName(),
     resolveInstanceDefaultLanguage(getPool()).catch(() => "en"),
   ]);
-  const locale: Locale = language === "ms" ? "ms" : "en";
-  const t = (key: string, values?: Record<string, string>) =>
-    translate(CATALOGUES[locale], key, values);
-  return { instance, locale, t };
+  const locale = mailLocale(language);
+  return { instance, locale, t: mailWords(locale) };
 }
 
 export async function resetPasswordMail(
@@ -44,26 +46,22 @@ export async function resetPasswordMail(
     {
       lang: locale,
       brand: { name: instance },
-      preheader: t("mail.reset.preheader"),
-      footer: [t("mail.reset.footer", { instance, host })],
-      labels: { linkFallback: t("mail.linkFallback") },
+      preheader: t("reset.preheader"),
+      footer: [t("reset.footer", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
     },
     [
-      { kind: "eyebrow", text: t("mail.reset.eyebrow") },
-      { kind: "heading", text: t("mail.reset.heading") },
+      { kind: "eyebrow", text: t("reset.eyebrow") },
+      { kind: "heading", text: t("reset.heading") },
       {
         kind: "paragraph",
-        parts: [
-          t("mail.reset.bodyBefore"),
-          { bold: to },
-          t("mail.reset.bodyAfter"),
-        ],
+        parts: [t("reset.bodyBefore"), { bold: to }, t("reset.bodyAfter")],
       },
-      { kind: "action", label: t("mail.reset.action"), href: url },
-      { kind: "notice", parts: [t("mail.reset.notice")] },
+      { kind: "action", label: t("reset.action"), href: url },
+      { kind: "notice", parts: [t("reset.notice")] },
     ],
   );
-  return { subject: t("mail.reset.subject", { instance }), html, text };
+  return { subject: t("reset.subject", { instance }), html, text };
 }
 
 export async function verifyEmailMail(
@@ -75,23 +73,23 @@ export async function verifyEmailMail(
     {
       lang: locale,
       brand: { name: instance },
-      preheader: t("mail.verify.preheader"),
-      footer: [t("mail.verify.footer")],
-      labels: { linkFallback: t("mail.linkFallback") },
+      preheader: t("verify.preheader"),
+      footer: [t("verify.footer")],
+      labels: { linkFallback: t("linkFallback") },
     },
     [
-      { kind: "eyebrow", text: t("mail.verify.eyebrow") },
-      { kind: "heading", text: t("mail.verify.heading") },
+      { kind: "eyebrow", text: t("verify.eyebrow") },
+      { kind: "heading", text: t("verify.heading") },
       {
         kind: "paragraph",
         parts: [
-          t("mail.verify.bodyBefore"),
+          t("verify.bodyBefore"),
           { bold: to },
-          t("mail.verify.bodyAfter", { instance }),
+          t("verify.bodyAfter", { instance }),
         ],
       },
-      { kind: "action", label: t("mail.verify.action"), href: url },
+      { kind: "action", label: t("verify.action"), href: url },
     ],
   );
-  return { subject: t("mail.verify.subject", { instance }), html, text };
+  return { subject: t("verify.subject", { instance }), html, text };
 }

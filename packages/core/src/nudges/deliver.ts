@@ -22,6 +22,7 @@ import {
   nudges,
   type WorkspaceTx,
 } from "@openokr/db";
+import { trigger } from "@openokr/method";
 import { and, asc, desc, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { buildMessage } from "../channels/builder.ts";
 import type { ChannelProviderKey } from "../channels/capabilities.ts";
@@ -29,7 +30,13 @@ import { queueChannelMessageInTx } from "../channels/log.ts";
 import { connectedProviders, loadRoutingMembers } from "../channels/members.ts";
 import { type PrimaryChannel, resolveDelivery } from "../channels/routing.ts";
 import { whatsAppEnvelope } from "../channels/whatsapp-window.ts";
-import { digestItemsFor, heldByCeilingFor } from "../notifications/digest.ts";
+import { nudgeEmail } from "../mail/mails.ts";
+import { type WorkspaceMail, workspaceMailInTx } from "../mail/workspace.ts";
+import {
+  type DigestContents,
+  digestItemsFor,
+  heldByCeilingFor,
+} from "../notifications/digest.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { primaryChannelSchema } from "../settings/registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
@@ -71,7 +78,16 @@ async function dailyDigestDraft(
     readonly now: Date;
     readonly instanceName?: string;
   },
-): Promise<{ subject: string; text: string } | null> {
+): Promise<{
+  subject: string;
+  text: string;
+  /** The rows themselves, for the email layout's list. */
+  summary: {
+    items: DigestContents["items"];
+    omitted: number;
+    held: DigestContents["items"];
+  };
+} | null> {
   const contents = await digestItemsFor(tx, {
     workspaceId: input.workspaceId,
     memberId: input.memberId,
@@ -137,6 +153,11 @@ async function dailyDigestDraft(
   return {
     subject: count === 1 ? `${name}: 1 update` : `${name}: ${count} updates`,
     text: lines.join("\n"),
+    summary: {
+      items: contents.items,
+      omitted: contents.omitted,
+      held: held.items,
+    },
   };
 }
 
@@ -199,6 +220,9 @@ export async function deliverDueNudges(
   },
 ): Promise<DeliveryResult> {
   const named = input.instanceName ? { instanceName: input.instanceName } : {};
+  // Read once for the run, and only when a mail goes: the workspace's name,
+  // colour and language for the email layout.
+  let mailIdentity: WorkspaceMail | null = null;
   const due = await tx
     .select({
       id: nudges.id,
@@ -378,27 +402,58 @@ export async function deliverDueNudges(
           ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
           ...named,
         });
-      const draft =
-        isBlockerRule(row.ruleKey) && row.subjectType === "blocker"
-          ? ((await blockerDraft(tx, {
+      const blocker =
+        isBlockerRule(row.ruleKey) && row.subjectType === "blocker";
+      // **The daily summary carries what it is summarising** (P6-G01b): it is
+      // a list of things rather than a sentence about one.
+      const summary =
+        !blocker && row.ruleKey === DAILY_DIGEST_RULE && input.baseUrl
+          ? await dailyDigestDraft(tx, {
               workspaceId: input.workspaceId,
-              blockerId: row.subjectId,
-              ruleKey: row.ruleKey,
+              memberId: row.recipientMemberId,
+              baseUrl: input.baseUrl,
               now: input.now,
-              ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
               ...named,
-            })) ?? (await plain()))
-          : // **The daily summary carries what it is summarising** (P6-G01b):
-            // it is a list of things rather than a sentence about one.
-            row.ruleKey === DAILY_DIGEST_RULE && input.baseUrl
-            ? ((await dailyDigestDraft(tx, {
-                workspaceId: input.workspaceId,
-                memberId: row.recipientMemberId,
-                baseUrl: input.baseUrl,
-                now: input.now,
-                ...named,
-              })) ?? (await plain()))
-            : await plain();
+            })
+          : null;
+      const plainDraft = blocker
+        ? ((await blockerDraft(tx, {
+            workspaceId: input.workspaceId,
+            blockerId: row.subjectId,
+            ruleKey: row.ruleKey,
+            now: input.now,
+            ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+            ...named,
+          })) ?? (await plain()))
+        : (summary ?? (await plain()));
+      // The same message in the email layout, when it goes by email
+      // (docs/design/email-templates.md). Built from the draft every channel
+      // shares, so a mail cannot say what the chat message does not.
+      if (provider === "email" && !mailIdentity) {
+        mailIdentity = await workspaceMailInTx(tx, input.workspaceId);
+      }
+      const draft =
+        provider === "email" && mailIdentity
+          ? {
+              ...plainDraft,
+              // A workspace mail's subject starts with the workspace's name
+              // (docs/design/email-templates.md §5); the chat message keeps
+              // the instance's.
+              ...(plainDraft.subject && mailIdentity.name
+                ? {
+                    subject: `${mailIdentity.name}: ${plainDraft.subject.replace(/^[^:]*:\s*/, "")}`,
+                  }
+                : {}),
+              email: nudgeEmail({
+                mail: mailIdentity,
+                owner: trigger(row.ruleKey)?.owner ?? "champion",
+                ruleKey: row.ruleKey,
+                draft: plainDraft,
+                ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+                ...(summary ? { summary: summary.summary } : {}),
+              }),
+            }
+          : plainDraft;
       // WhatsApp is the one provider with a clock on it (P5-T04b-b). Outside
       // Meta's twenty-four hour window the body will not go at all, so the
       // rule's approved template and its filled-in variables are looked up and

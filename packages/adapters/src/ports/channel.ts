@@ -20,6 +20,11 @@ export type ChannelProvider =
 export interface ChannelMessage {
   /** Always required: the fallback every provider can render. */
   readonly text: string;
+  /**
+   * The HTML part, for the email driver only (docs/design/email-templates.md).
+   * Every other driver ignores it, as they ignore `subject`.
+   */
+  readonly html?: string;
   readonly subject?: string;
   /** Rich blocks, already shaped for the provider by the message builder. */
   readonly blocks?: readonly Record<string, unknown>[];

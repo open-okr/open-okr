@@ -1,6 +1,6 @@
 # Email templates
 
-Status: design approved on 12 October 2026, with one condition: every button and link in a mail opens a page that works. Change 1 (the renderer and the two account mails) is built.
+Status: design approved on 12 October 2026, with one condition: every button and link in a mail opens a page that works. Built: the renderer, the account mails, the invitation, the notification digest and every agent nudge by email.
 
 Every mail the product sends is plain text today. The one exception is the notification digest, which carries a bare `<ul>`. AI-NATIVE-PLAN §5 asks for email as "HTML and plain text, one-click action links". This design gives every mail one shared layout, in both parts.
 
@@ -80,7 +80,11 @@ Dark mode is an enhancement. A client that strips the `<style>` block (Gmail) sh
 | Invitation | outbox `invitation.email` | workspace name | Accept the invitation |
 | Notification digest | outbox, `renderDigest` | workspace name | Open your inbox |
 | Agent nudges | email channel, `nudges/deliver.ts` | workspace name | one link per nudge |
-| Weekly digest post | `actions/digest-posts.ts` | workspace name | Open the space |
+| ~~Weekly digest post~~ | `actions/digest-posts.ts` | | |
+
+**The weekly digest is not a mail.** `sessions.postDigest` posts it to the Slack or Teams channel a space links, and the email driver refuses a space channel by design. The drawing shows it as a proposal only. Sending it by email would be a new proactive message kind, which is a human decision (CLAUDE.md), so it is not built.
+
+**An agent nudge by email** is one of three shapes, all from the draft the chat channels share: a single nudge (headline, the coach's line, the action, the rule key), a blocker card (its own lines), and the daily summary (the rows since the member last looked, and what the weekly ceiling held). The drawing's "2 things need you today" combines two nudges, which the product does not do: each nudge is its own message.
 
 The subject of every workspace mail starts with the workspace name, as the nudge digest already does. "3 updates" alone does not say where from.
 
@@ -128,7 +132,7 @@ One change is one commit (CLAUDE.md), and six mails plus a port change do not fi
 | Question | Decided |
 |---|---|
 | The button colour | Indigo for account mails. The workspace's `branding.primaryColor` for workspace mails when white text on it reads at 4.5:1, indigo otherwise (`buttonColour`) |
-| Language | The catalogue (en, ms). Account mails use `instance.language`, because the person may belong to no workspace yet. Workspace mails use the workspace's language |
+| Language | `packages/core/src/mail/words.ts` (en, ms), because most mails are built in core, which may not read the web catalogue. Account mails use `instance.language`, because the person may belong to no workspace yet. Workspace mails use the workspace's language. The rule titles and the coach's lines inside a nudge come from METHOD.md and stay in English |
 | A real logo image | Not now. A logo needs storage and a url the instance serves, which is a separate change |
 | The inviter's name in the invitation | Yes, when the invitation records who sent it |
 | Every link works | Every link is a real route, checked by following it in a test (§7) |
@@ -141,4 +145,8 @@ The condition the approval carried: every button and link opens a page that work
 |---|---|---|---|
 | Password reset | Better Auth's reset url | `/reset-password`, then sign-in | Followed end to end from Mailpit on the UAT instance, 12 October 2026 |
 | Confirm email | Better Auth's verification url | The home screen, signed in | `account-mail.test.ts` checks the url is the one handed over |
-| Invitation and the three digests | Change 2 and 3 | | |
+| Invitation | `/join/<token>` | The join page, then sign-up | Followed end to end from Mailpit |
+| Notification digest | each row's subject page, `/inbox`, `/account/channels` | The goal, the inbox, notification settings | Followed end to end from Mailpit |
+| Agent nudge | the nudge's own link (the goal, the check-in, the inbox), `/account/channels` | That page, then snooze and channel settings | Followed end to end from Mailpit |
+
+Chat-only buttons (`okr:checkin <goal>`) are left out of a mail: a command in an email is a line nothing happens to.

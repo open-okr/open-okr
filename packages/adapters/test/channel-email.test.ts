@@ -127,6 +127,20 @@ describe("sending", () => {
     expect(mailer.sent[0]?.subject).toBe("OpenOKR");
   });
 
+  it("sends the layout's HTML part beside the text, when the message has one", async () => {
+    const { mailer } = mailerFor();
+    const channel = new EmailChannel({
+      mailer,
+      addressFor: () => "sam@example.com",
+    });
+    await channel.send(
+      { memberId: "m-1" },
+      message({ html: "<p>Your check-in is due.</p>" }),
+    );
+    expect(mailer.sent[0]?.html).toBe("<p>Your check-in is due.</p>");
+    expect(mailer.sent[0]?.text).toBe("Your check-in is due.");
+  });
+
   it("will not treat a space channel name as a mailbox", async () => {
     const { mailer } = mailerFor();
     const channel = new EmailChannel({
