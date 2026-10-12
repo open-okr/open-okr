@@ -3265,6 +3265,7 @@
   "session.detail.roomPulse.giveMyPulse": "Beri denyut saya",
   "session.detail.roomPulse.oneToFiveFor": "Satu hingga lima bagi kitaran yang baru berlalu, dan satu perkataan. Sebelum angka, orangnya dahulu.",
   "session.detail.roomPulse.oneWordForThe": "Satu perkataan untuk kitaran ini",
+  "session.detail.roomPulse.oneWordNotASentence": "Satu perkataan, bukan ayat.",
   "session.detail.roomPulse.onlyYouSeeThis": "Hanya anda melihat ini. Jika seisi bilik melihat purata mereka sendiri sebelum memberi skor, ia menjadi penambat, iaitu perkara yang cuba dielakkan oleh skor objektif tersembunyi.",
   "session.detail.roomPulse.relieved": "lega",
   "session.detail.roomPulse.theRoom": "Seisi bilik",

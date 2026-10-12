@@ -10,7 +10,16 @@
  * presses Add. A formula §6's parser refused is not offered at all; the reason
  * is shown instead, and the metric can still be added by hand-entry.
  */
-import { Button, Chip, NumberInput, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  Chip,
+  NumberInput,
+  SelectInput,
+  TextArea,
+  TextInput,
+  UnitInput,
+  useTranslations,
+} from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
 import {
@@ -72,9 +81,6 @@ const healthyBelowWatch = (editing: {
   return healthy !== null && watch !== null && healthy < watch;
 };
 
-const FIELD =
-  "rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink";
-
 export function KpiSuggestion() {
   const { t } = useTranslations();
   const [pending, start] = useTransition();
@@ -98,18 +104,16 @@ export function KpiSuggestion() {
       </h3>
       {editing === null ? (
         <>
-          <label className="sr-only" htmlFor="kpi-sentence">
-            {t("kpis.suggestion.describeIt")}
-          </label>
-          <textarea
+          <TextArea
             id="kpi-sentence"
+            label={t("kpis.suggestion.describeIt")}
+            hideLabel
             rows={2}
             maxLength={1000}
             value={sentence}
             disabled={pending}
             placeholder={t("kpis.suggestion.describeIt")}
             onChange={(event) => setSentence(event.target.value)}
-            className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
           />
           <Button
             type="button"
@@ -150,62 +154,52 @@ export function KpiSuggestion() {
           {editing.why === "" ? null : (
             <p className="text-xs text-ink-3">{editing.why}</p>
           )}
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("kpis.whatIsBeingMeasured")}
-            <input
-              value={editing.title}
-              maxLength={500}
-              disabled={pending}
-              onChange={(event) => set({ title: event.target.value })}
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-          </label>
+          <TextInput
+            label={t("kpis.whatIsBeingMeasured")}
+            value={editing.title}
+            maxLength={500}
+            disabled={pending}
+            onChange={(event) => set({ title: event.target.value })}
+          />
           <div className="flex flex-wrap items-end gap-2.5">
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("kpis.suggestion.unit")}
-              <input
-                value={editing.unit}
-                maxLength={60}
-                disabled={pending}
-                onChange={(event) => set({ unit: event.target.value })}
-                className={`w-24 ${FIELD}`}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("common.frequency")}
-              <select
-                value={editing.frequency}
-                disabled={pending}
-                onChange={(event) =>
-                  set({
-                    frequency: event.target.value as KeptKpi["frequency"],
-                  })
-                }
-                className={FIELD}
-              >
-                <option value="daily">{t("common.daily")}</option>
-                <option value="weekly">{t("common.weekly")}</option>
-                <option value="monthly">{t("common.monthly")}</option>
-                <option value="quarterly">{t("common.quarterly")}</option>
-                <option value="yearly">{t("common.yearly")}</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("common.betterWhen")}
-              <select
-                value={editing.direction}
-                disabled={pending}
-                onChange={(event) =>
-                  set({
-                    direction: event.target.value as KeptKpi["direction"],
-                  })
-                }
-                className={FIELD}
-              >
-                <option value="higher_better">{t("common.higher")}</option>
-                <option value="lower_better">{t("common.lower")}</option>
-              </select>
-            </label>
+            <UnitInput
+              label={t("kpis.suggestion.unit")}
+              value={editing.unit}
+              disabled={pending}
+              onValueChange={(unit) => set({ unit })}
+              inputClassName="h-6.5 w-24 text-xs"
+            />
+            <SelectInput
+              label={t("common.frequency")}
+              value={editing.frequency}
+              disabled={pending}
+              onChange={(event) =>
+                set({
+                  frequency: event.target.value as KeptKpi["frequency"],
+                })
+              }
+              inputClassName="h-6.5 w-auto text-xs"
+            >
+              <option value="daily">{t("common.daily")}</option>
+              <option value="weekly">{t("common.weekly")}</option>
+              <option value="monthly">{t("common.monthly")}</option>
+              <option value="quarterly">{t("common.quarterly")}</option>
+              <option value="yearly">{t("common.yearly")}</option>
+            </SelectInput>
+            <SelectInput
+              label={t("common.betterWhen")}
+              value={editing.direction}
+              disabled={pending}
+              onChange={(event) =>
+                set({
+                  direction: event.target.value as KeptKpi["direction"],
+                })
+              }
+              inputClassName="h-6.5 w-auto text-xs"
+            >
+              <option value="higher_better">{t("common.higher")}</option>
+              <option value="lower_better">{t("common.lower")}</option>
+            </SelectInput>
             {/* guided-inputs §4.8: numbers, and the two thresholds held to
                 the 0 to 200 the share of a target runs to. */}
             <NumberInput

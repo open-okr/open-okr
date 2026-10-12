@@ -2,6 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
+import { RangeInput } from "../src/fields/range-input.tsx";
 import { SelectInput } from "../src/fields/select-input.tsx";
 import { TextArea } from "../src/fields/text-area.tsx";
 import { TextInput } from "../src/fields/text-input.tsx";
@@ -124,5 +125,31 @@ describe("a text field inside a row", () => {
     const box = screen.getByRole("textbox", { name: "Key result title" });
     expect(box).not.toBeNull();
     expect(screen.queryByText("Key result title")).toBeNull();
+  });
+});
+
+describe("a slider", () => {
+  it("is the browser's own, named by its label, drawn or not", () => {
+    inEnglish(
+      <>
+        <RangeInput
+          label="Score"
+          hideLabel
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={0.7}
+        />
+        <RangeInput label="Weight" min={0} max={100} defaultValue={50} />
+      </>,
+    );
+    const score = screen.getByRole("slider", {
+      name: "Score",
+    }) as HTMLInputElement;
+    expect(score.type).toBe("range");
+    expect(score.value).toBe("0.7");
+    expect(screen.getByRole("slider", { name: "Weight" })).not.toBeNull();
+    expect(screen.queryByText("Score")).toBeNull();
+    expect(screen.getByText("Weight")).not.toBeNull();
   });
 });

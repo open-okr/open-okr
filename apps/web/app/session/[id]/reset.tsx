@@ -26,6 +26,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -163,23 +164,15 @@ function ObjectiveRow({
               </Button>
             ))}
           </fieldset>
-          <label
-            className="flex flex-col gap-1"
-            htmlFor={`why-${objective.goalId}`}
-          >
-            <span className="text-xs font-medium text-ink-3">
-              {t("common.oneLineOnWhy")}
-            </span>
-            <input
-              id={`why-${objective.goalId}`}
-              type="text"
-              className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-              value={why}
-              disabled={pending}
-              placeholder={t("session.detail.reset.whatTheRoomActually")}
-              onChange={(event) => setWhy(event.target.value)}
-            />
-          </label>
+          <TextInput
+            label={t("common.oneLineOnWhy")}
+            id={`why-${objective.goalId}`}
+            value={why}
+            disabled={pending}
+            placeholder={t("session.detail.reset.whatTheRoomActually")}
+            onChange={(event) => setWhy(event.target.value)}
+            maxLength={1000}
+          />
           <span>
             <Button type="button" size="sm" disabled={pending} onClick={save}>
               {objective.decision === null

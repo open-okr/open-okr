@@ -7,6 +7,7 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
@@ -132,14 +133,15 @@ function LastWeek({
             </label>
           </span>
           {/* §7.2 step 3: "with a line on why where it helps". */}
-          <input
-            name={`note:${one.id}`}
-            aria-label={t("session.detail.commitments.whyFor", {
+          <TextInput
+            label={t("session.detail.commitments.whyFor", {
               text: one.text,
             })}
+            hideLabel
+            name={`note:${one.id}`}
             placeholder={t("session.detail.commitments.aLineOnWhy")}
             maxLength={300}
-            className="w-full rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+            inputClassName="h-6.5 text-xs"
           />
         </div>
       ))}
@@ -212,13 +214,18 @@ function ThisWeek({
         <input type="hidden" name="sessionId" value={sessionId} />
         {Array.from({ length: rows }, (_, index) => index).map((index) => (
           <div key={index} className="flex flex-wrap gap-2">
-            <input
+            <TextInput
+              label={t("session.detail.commitments.whatWillMoveByNextWeek", {
+                number: index + 1,
+              })}
+              hideLabel
               name="text"
               placeholder={t(
                 "session.detail.commitments.whatWillMoveByNextWeek",
                 { number: index + 1 },
               )}
-              className="w-80 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+              maxLength={500}
+              className="w-80"
             />
             <EntityPicker
               label={t("common.owner")}
@@ -285,17 +292,17 @@ function Wins({
     <form action={submit} aria-busy={pending} className="flex flex-col gap-2">
       <input type="hidden" name="sessionId" value={sessionId} />
       {lines.map((win, index) => (
-        <input
+        <TextInput
+          label={t("session.detail.commitments.winNumber", {
+            number: index + 1,
+          })}
+          hideLabel
           // biome-ignore lint/suspicious/noArrayIndexKey: a line's position is its identity in a list written whole.
           key={index}
           name="win"
           defaultValue={win}
-          aria-label={t("session.detail.commitments.winNumber", {
-            number: index + 1,
-          })}
           placeholder={t("session.detail.commitments.aWin")}
           maxLength={200}
-          className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
         />
       ))}
       <Button

@@ -29,6 +29,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  TextArea,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -327,17 +328,18 @@ export function QuarterlyReview({
                 </span>
               </CardHeader>
               <CardBody className="flex flex-col gap-2">
-                <textarea
-                  className="min-h-20 w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
+                <TextArea
+                  label={t("session.detail.quarterlyReview.privateNoteFor", {
+                    title: current.title,
+                  })}
+                  hideLabel
                   value={noteDraft}
-                  aria-label={t(
-                    "session.detail.quarterlyReview.privateNoteFor",
-                    { title: current.title },
-                  )}
                   placeholder={t(
                     "session.detail.quarterlyReview.onlyYouCanRead",
                   )}
                   onChange={(event) => setNoteDraft(event.target.value)}
+                  maxLength={4000}
+                  inputClassName="min-h-20"
                 />
                 <span className="flex flex-wrap items-center gap-2">
                   <Button

@@ -11,6 +11,7 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  SelectInput,
 } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -287,21 +288,20 @@ export default async function KpiDetailPage({
                   className="w-56"
                   inputClassName="text-xs"
                 />
-                <label className="text-xs text-ink-3" htmlFor="edit-tier">
-                  {t("kpis.rule.tier")}
-                </label>
-                <select
+                <SelectInput
                   id="edit-tier"
+                  label={t("kpis.rule.tier")}
                   name="tier"
                   defaultValue={kpi.tier ?? ""}
-                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                  className="flex-row items-center gap-2.5"
+                  inputClassName="h-6.5 w-auto text-xs text-ink-2"
                 >
                   <option value="">{t("kpis.rule.noTier")}</option>
                   <option value="input">{t("kpis.rule.tierInput")}</option>
                   <option value="output">{t("kpis.rule.tierOutput")}</option>
                   <option value="outcome">{t("kpis.rule.tierOutcome")}</option>
                   <option value="impact">{t("kpis.rule.tierImpact")}</option>
-                </select>
+                </SelectInput>
               </div>
               <button
                 type="submit"

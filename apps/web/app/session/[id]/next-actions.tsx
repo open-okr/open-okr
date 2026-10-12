@@ -9,6 +9,7 @@ import {
   type ConfidenceDisplay,
   EntityPicker,
   formatConfidence,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
@@ -69,11 +70,13 @@ function NextActionForm({
       <input type="hidden" name="sessionId" value={sessionId} />
       <input type="hidden" name="keyResultId" value={score.keyResultId} />
       <div className="flex flex-wrap gap-2">
-        <input
+        <TextInput
+          label={t("session.detail.nextActions.theNextAction")}
+          hideLabel
           name="nextAction"
-          aria-label={t("session.detail.nextActions.theNextAction")}
           placeholder={t("session.detail.blockerPanel.theNextActionAnd")}
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+          maxLength={500}
+          className="min-w-0 flex-1"
         />
         <EntityPicker
           label={t("session.detail.nextActions.whoOwnsIt")}

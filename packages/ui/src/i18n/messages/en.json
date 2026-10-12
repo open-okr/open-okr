@@ -3265,6 +3265,7 @@
   "session.detail.roomPulse.giveMyPulse": "Give my pulse",
   "session.detail.roomPulse.oneToFiveFor": "One to five for the cycle just gone, and one word. Before the\n            numbers, the people.",
   "session.detail.roomPulse.oneWordForThe": "One word for the cycle",
+  "session.detail.roomPulse.oneWordNotASentence": "One word, not a sentence.",
   "session.detail.roomPulse.onlyYouSeeThis": "Only you see this. The room seeing its own average before scoring\n              is an anchor, which is the thing the hidden objective score exists\n              to avoid.",
   "session.detail.roomPulse.relieved": "relieved",
   "session.detail.roomPulse.theRoom": "The room",

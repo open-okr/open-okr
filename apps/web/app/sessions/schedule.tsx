@@ -5,6 +5,8 @@ import {
   CardHeader,
   DateTimeInput,
   EntityPicker,
+  SelectInput,
+  TextInput,
   TimeInput,
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
@@ -46,10 +48,6 @@ const WEEKDAYS = [
   { id: 4, key: "sessions.schedule.weekday.thursday" },
   { id: 5, key: "sessions.schedule.weekday.friday" },
 ] as const;
-
-const FIELD =
-  "rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink";
-const LABEL = "flex flex-col gap-1 text-xs text-ink-3";
 
 export async function ScheduleSessions({
   spaceId,
@@ -155,16 +153,17 @@ export async function ScheduleSessions({
               <input type="hidden" name="cycleId" value={openCycle.id} />
               {spaceField}
               <div className="flex flex-wrap gap-2">
-                <label className={LABEL}>
-                  {t("sessions.schedule.weekday")}
-                  <select name="weekday" defaultValue="1" className={FIELD}>
-                    {WEEKDAYS.map((day) => (
-                      <option key={day.id} value={day.id}>
-                        {t(day.key)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <SelectInput
+                  label={t("sessions.schedule.weekday")}
+                  name="weekday"
+                  defaultValue="1"
+                >
+                  {WEEKDAYS.map((day) => (
+                    <option key={day.id} value={day.id}>
+                      {t(day.key)}
+                    </option>
+                  ))}
+                </SelectInput>
                 <TimeInput
                   label={t("sessions.schedule.time")}
                   name="time"
@@ -209,25 +208,23 @@ export async function ScheduleSessions({
               <input type="hidden" name="cycleId" value={openCycle.id} />
             ) : null}
             {spaceField}
-            <label className={LABEL}>
-              {t("sessions.schedule.kind")}
-              <select name="kind" defaultValue="weekly" className={FIELD}>
-                {KINDS.map((kind) => (
-                  <option key={kind.id} value={kind.id}>
-                    {t(kind.key)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={LABEL}>
-              {t("sessions.schedule.titleLabel")}
-              <input
-                name="title"
-                maxLength={200}
-                placeholder={t("sessions.schedule.titlePlaceholder")}
-                className={FIELD}
-              />
-            </label>
+            <SelectInput
+              label={t("sessions.schedule.kind")}
+              name="kind"
+              defaultValue="weekly"
+            >
+              {KINDS.map((kind) => (
+                <option key={kind.id} value={kind.id}>
+                  {t(kind.key)}
+                </option>
+              ))}
+            </SelectInput>
+            <TextInput
+              label={t("sessions.schedule.titleLabel")}
+              name="title"
+              maxLength={200}
+              placeholder={t("sessions.schedule.titlePlaceholder")}
+            />
             {/* The local time alone: the action reads a time with no offset
                 in the workspace's zone, which is the one named here. */}
             <DateTimeInput

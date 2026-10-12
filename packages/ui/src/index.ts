@@ -24,6 +24,7 @@ export * from "./fields/email-input.tsx";
 export * from "./fields/entity-picker.tsx";
 export * from "./fields/identifier-input.tsx";
 export * from "./fields/number-input.tsx";
+export * from "./fields/range-input.tsx";
 export * from "./fields/secret-input.tsx";
 export * from "./fields/select-input.tsx";
 export * from "./fields/text-area.tsx";

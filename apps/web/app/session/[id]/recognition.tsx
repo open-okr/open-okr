@@ -22,6 +22,7 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -150,22 +151,17 @@ export function RecognitionPanel({
                 })),
               )}
             />
-            <label className="flex flex-col gap-1" htmlFor="kudos-text">
-              <span className="text-xs font-medium text-ink-3">
-                {t("common.whatTheyDid")}
-              </span>
-              <input
-                id="kudos-text"
-                type="text"
-                className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                value={text}
-                disabled={pending}
-                placeholder={t(
-                  "session.detail.recognition.specificBeatsGenerous",
-                )}
-                onChange={(event) => setText(event.target.value)}
-              />
-            </label>
+            <TextInput
+              label={t("common.whatTheyDid")}
+              id="kudos-text"
+              value={text}
+              disabled={pending}
+              placeholder={t(
+                "session.detail.recognition.specificBeatsGenerous",
+              )}
+              onChange={(event) => setText(event.target.value)}
+              maxLength={500}
+            />
             <span>
               <Button
                 type="button"

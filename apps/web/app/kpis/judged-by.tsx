@@ -1,7 +1,7 @@
 "use client";
 
 import { thresholdsComplete, thresholdsProblem } from "@openokr/method";
-import { NumberInput, useTranslations } from "@openokr/ui";
+import { NumberInput, SelectInput, useTranslations } from "@openokr/ui";
 import { useState } from "react";
 
 /**
@@ -120,22 +120,21 @@ export function JudgedBy({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2.5">
-        <label className="text-xs text-ink-3" htmlFor={id("targetType")}>
-          {t("kpis.rule.targetType")}
-        </label>
-        <select
+        <SelectInput
           id={id("targetType")}
+          label={t("kpis.rule.targetType")}
           name="targetType"
           value={type}
           onChange={(event) => setType(event.target.value as TargetType)}
-          className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+          className="flex-row items-center gap-2.5"
+          inputClassName="h-6.5 w-auto text-xs text-ink-2"
         >
           {TYPES.map((entry) => (
             <option key={entry.value} value={entry.value}>
               {t(entry.key)}
             </option>
           ))}
-        </select>
+        </SelectInput>
       </div>
 
       {type === "range" ? (

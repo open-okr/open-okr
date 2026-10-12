@@ -38,6 +38,7 @@ import {
   Chip,
   DateInput,
   EntityPicker,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -227,20 +228,15 @@ export function ForwardPanel({
 
           {canEdit ? (
             <div className="flex flex-col gap-1.5">
-              <label className="flex flex-col gap-1" htmlFor="learning-text">
-                <span className="text-xs font-medium text-ink-3">
-                  {t("session.detail.forward.whatWeNowKnow")}
-                </span>
-                <input
-                  id="learning-text"
-                  type="text"
-                  className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                  value={learning}
-                  disabled={pending}
-                  placeholder={t("session.detail.forward.weLearnedThat")}
-                  onChange={(event) => setLearning(event.target.value)}
-                />
-              </label>
+              <TextInput
+                label={t("session.detail.forward.whatWeNowKnow")}
+                id="learning-text"
+                value={learning}
+                disabled={pending}
+                placeholder={t("session.detail.forward.weLearnedThat")}
+                onChange={(event) => setLearning(event.target.value)}
+                maxLength={1000}
+              />
               <span className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
@@ -360,19 +356,14 @@ export function ForwardPanel({
 
           {canEdit && forward.owners.length > 0 ? (
             <div className="flex flex-col gap-1.5">
-              <label className="flex flex-col gap-1" htmlFor="action-what">
-                <span className="text-xs font-medium text-ink-3">
-                  {t("common.whatHappens")}
-                </span>
-                <input
-                  id="action-what"
-                  type="text"
-                  className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                  value={what}
-                  disabled={pending}
-                  onChange={(event) => setWhat(event.target.value)}
-                />
-              </label>
+              <TextInput
+                label={t("common.whatHappens")}
+                id="action-what"
+                value={what}
+                disabled={pending}
+                onChange={(event) => setWhat(event.target.value)}
+                maxLength={500}
+              />
               <span className="flex flex-wrap items-end gap-2">
                 {/* No default owner. An action assigned by the form is an
                     action nobody in the room accepted. */}

@@ -31,6 +31,8 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  TextArea,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import Link from "next/link";
@@ -312,15 +314,15 @@ export function MonthlyReview({
           {t("session.detail.monthlyReview.resourceOrPriorityShifts")}
         </CardHeader>
         <CardBody className="flex flex-col gap-2">
-          <textarea
-            className="min-h-24 w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
+          <TextArea
+            label={t("session.detail.monthlyReview.resourceOrPriorityShifts")}
+            hideLabel
             value={shiftsDraft}
             disabled={!canEdit}
-            aria-label={t(
-              "session.detail.monthlyReview.resourceOrPriorityShifts",
-            )}
             placeholder={t("session.detail.monthlyReview.whatMovedAndWhy")}
             onChange={(event) => setShiftsDraft(event.target.value)}
+            maxLength={4000}
+            inputClassName="min-h-24"
           />
           {canEdit ? (
             <span>
@@ -468,15 +470,9 @@ export function MonthlyReview({
                   label: objective.goalTitle,
                 }))}
               />
-              <label
-                className="text-xs font-medium text-ink-3"
-                htmlFor="stop-reason"
-              >
-                {t("okrList.stopReason")}
-              </label>
-              <input
+              <TextInput
+                label={t("okrList.stopReason")}
                 id="stop-reason"
-                className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
                 value={stopReason}
                 maxLength={280}
                 onChange={(event) => setStopReason(event.target.value)}
@@ -554,18 +550,14 @@ export function MonthlyReview({
                   label: subject.label,
                 }))}
               />
-              <label
-                className="text-xs font-medium text-ink-3"
-                htmlFor="decision-text"
-              >
-                {t("session.detail.monthlyReview.theDecision")}
-              </label>
-              <textarea
+              <TextArea
+                label={t("session.detail.monthlyReview.theDecision")}
                 id="decision-text"
-                className="min-h-20 w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
                 value={decisionText}
                 placeholder={t("session.detail.monthlyReview.whatWasDecided")}
                 onChange={(event) => setDecisionText(event.target.value)}
+                maxLength={2000}
+                inputClassName="min-h-20"
               />
               <span>
                 <Button

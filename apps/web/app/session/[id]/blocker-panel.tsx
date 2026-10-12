@@ -8,6 +8,8 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  SelectInput,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
@@ -192,11 +194,12 @@ function Raise({
           }))}
           className="w-64"
         />
-        <select
+        <SelectInput
+          label={t("session.detail.blockerPanel.blockerType")}
+          hideLabel
           name="type"
           defaultValue=""
-          aria-label={t("session.detail.blockerPanel.blockerType")}
-          className="w-48 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+          className="w-48"
         >
           <option value="">{t("session.detail.blockerPanel.whatKind")}</option>
           {BLOCKER_TYPE_DEFINITIONS.map((one) => (
@@ -204,7 +207,7 @@ function Raise({
               {one.label}
             </option>
           ))}
-        </select>
+        </SelectInput>
         <EntityPicker
           label={t("common.owner")}
           hideLabel
@@ -214,10 +217,13 @@ function Raise({
           className="w-48"
         />
       </div>
-      <input
+      <TextInput
+        label={t("session.detail.blockerPanel.theNextActionAnd")}
+        hideLabel
         name="nextAction"
         placeholder={t("session.detail.blockerPanel.theNextActionAnd")}
-        className="w-full max-w-prose rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+        maxLength={500}
+        className="w-full max-w-prose"
       />
       <Button
         type="submit"

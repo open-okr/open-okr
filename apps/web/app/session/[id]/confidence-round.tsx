@@ -27,6 +27,7 @@ import {
   CardHeader,
   type ConfidenceDisplay,
   formatConfidence,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -268,20 +269,14 @@ function KrVoteCard({
 
       {canConfirm ? (
         <div className="space-y-2 border-t border-line pt-3">
-          <label
-            htmlFor={`what-changed-${kr.keyResultId}`}
-            className="block text-xs font-medium text-ink-2"
-          >
-            {t("session.detail.confidenceRound.whatChangedThisWeek")}
-          </label>
-          <input
+          <TextInput
+            label={t("session.detail.confidenceRound.whatChangedThisWeek")}
             id={`what-changed-${kr.keyResultId}`}
-            type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={t("common.factsNotFeelings")}
-            className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
             disabled={isPending}
+            maxLength={500}
           />
           <Button
             type="button"

@@ -9,6 +9,7 @@ import {
   EntityPicker,
   type MessageValues,
   NumberInput,
+  TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
 import { workspaceReaderLevel } from "../../../lib/access";
@@ -65,9 +66,6 @@ const BAND_WORD: Readonly<Record<string, string>> = {
 };
 
 type Translate = (key: string, values?: MessageValues) => string;
-
-const FIELD =
-  "rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink";
 
 const percent = (value: number | null, t: Translate) =>
   value === null ? t("kpis.recovery.noData") : `${Math.round(value)}%`;
@@ -344,19 +342,16 @@ export default async function RecoveryBoardPage() {
                       >
                         <input type="hidden" name="kpiId" value={card.kpiId} />
                         <div className="flex flex-wrap items-center gap-2.5">
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`fix-title-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.task")}
-                          </label>
-                          <input
+                          <TextInput
                             id={`fix-title-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.task")}
                             name="title"
+                            maxLength={500}
                             defaultValue={t("kpis.recovery.respond.fixTitle", {
                               kpi: card.title,
                             })}
-                            className={`${FIELD} min-w-0 flex-1`}
+                            className="min-w-0 flex-1 flex-row items-center gap-2.5"
+                            inputClassName="h-6.5 text-xs"
                           />
                         </div>
                         <div className="flex flex-wrap items-center gap-2.5">
@@ -453,20 +448,17 @@ export default async function RecoveryBoardPage() {
                             />
                           </div>
                           <div className="flex flex-wrap items-center gap-2.5">
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-title-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.keyResult")}
-                            </label>
-                            <input
+                            <TextInput
                               id={`kr-title-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.keyResult")}
                               name="title"
+                              maxLength={500}
                               defaultValue={
                                 recoveryDrafts.get(card.kpiId)?.keyResults[0]
                                   ?.title ?? card.title
                               }
-                              className={`${FIELD} min-w-0 flex-1`}
+                              className="min-w-0 flex-1 flex-row items-center gap-2.5"
+                              inputClassName="h-6.5 text-xs"
                             />
                           </div>
                           {/* guided-inputs §4.8: numbers, grouped as the
@@ -494,16 +486,13 @@ export default async function RecoveryBoardPage() {
                             />
                           </div>
                           <div className="flex flex-wrap items-center gap-2.5">
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-reason-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.whyNow")}
-                            </label>
-                            <input
+                            <TextInput
                               id={`kr-reason-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.whyNow")}
                               name="reason"
-                              className={`${FIELD} min-w-0 flex-1`}
+                              maxLength={500}
+                              className="min-w-0 flex-1 flex-row items-center gap-2.5"
+                              inputClassName="h-6.5 text-xs"
                             />
                           </div>
                           <div>

@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  TextArea,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
@@ -59,11 +60,14 @@ export function CoordinatorNote({
           className="flex flex-col gap-2"
         >
           <input type="hidden" name="sessionId" value={sessionId} />
-          <textarea
+          <TextArea
+            label={t("session.detail.coordinatorNote.theCoordinatorSNote")}
+            hideLabel
             name="note"
             rows={3}
             defaultValue={note ?? ""}
-            className="w-full max-w-prose rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+            maxLength={2000}
+            className="w-full max-w-prose"
           />
           <Button
             type="submit"
