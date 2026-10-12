@@ -8796,6 +8796,12 @@
                               "null"
                             ]
                           },
+                          "actorName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "ruleKey": {
                             "type": [
                               "string",
@@ -8816,6 +8822,7 @@
                           "subjectType",
                           "subjectId",
                           "rendered",
+                          "actorName",
                           "ruleKey",
                           "watching"
                         ],
@@ -18227,6 +18234,9 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "isCompany": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -18234,7 +18244,8 @@
                           "name",
                           "mission",
                           "memberCount",
-                          "ownRole"
+                          "ownRole",
+                          "isCompany"
                         ],
                         "additionalProperties": false
                       }
@@ -48693,6 +48704,9 @@
                             "watchPct": {
                               "type": "number"
                             },
+                            "corridorFollowsWorkspace": {
+                              "type": "boolean"
+                            },
                             "targetType": {
                               "type": "string",
                               "enum": [
@@ -48806,6 +48820,7 @@
                             "effectivePct",
                             "healthyPct",
                             "watchPct",
+                            "corridorFollowsWorkspace",
                             "targetType",
                             "greenLow",
                             "greenHigh",
@@ -49273,14 +49288,28 @@
                     ]
                   },
                   "healthyPct": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 200
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "watchPct": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 200
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [

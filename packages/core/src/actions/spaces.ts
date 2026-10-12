@@ -73,6 +73,15 @@ const spaceSummary = z.object({
   ownRole: spaceRole.nullable(),
 });
 
+const spaceListRow = spaceSummary.extend({
+  /**
+   * The workspace's first space, which the product reads as the company: its
+   * quarterly review grades every objective of the cycle, the workspace's
+   * own included (`reviewObjectiveConditions` in actions/sessions.ts).
+   */
+  isCompany: z.boolean(),
+});
+
 const spaceDetail = spaceSummary.extend({
   members: z.array(
     z.object({
@@ -103,7 +112,6 @@ const spaceDetail = spaceSummary.extend({
   }),
 });
 
-export type SpaceSummary = z.infer<typeof spaceSummary>;
 export type SpaceDetail = z.infer<typeof spaceDetail>;
 
 /** The acting member's id, or a refusal shaped like every other refusal. */
@@ -211,9 +219,9 @@ export const listSpaces = defineReadAction({
   name: "spaces.list",
   summary: "Every space this member can see, with their own role in each.",
   input: z.object({}),
-  output: z.array(spaceSummary),
+  output: z.array(spaceListRow),
   access: ACCESS_LEVELS.view,
-  async handler(context): Promise<SpaceSummary[]> {
+  async handler(context): Promise<z.infer<typeof spaceListRow>[]> {
     const db = drizzle(context.pool);
     const userId = context.actor.userId;
     if (!userId) {
@@ -251,6 +259,13 @@ export const listSpaces = defineReadAction({
                where sm.space_id = ${spaces.id}
                  and sm.workspace_id = ${context.workspaceId}
                  and sm.deleted_at is null
+            )`,
+            isCompany: sql<boolean>`${spaces.id} = (
+              select first.id from spaces first
+               where first.workspace_id = ${context.workspaceId}
+                 and first.deleted_at is null
+               order by first.created_at
+               limit 1
             )`,
           })
           // openokr:allow-raw-read: this *is* the getter's list form. Every row
@@ -297,6 +312,7 @@ export const listSpaces = defineReadAction({
           name: row.name,
           mission: row.mission,
           memberCount: Number(row.memberCount),
+          isCompany: row.isCompany === true,
           ownRole: row.ownRole ?? null,
         }));
       },

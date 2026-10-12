@@ -52,7 +52,18 @@ export async function resolveMemberAccessLevel<
 >(tx: AnyTx<TSchema>, input: MemberContextInput): Promise<number> {
   const result = await tx.execute<{ level: number }>(sql`
     with actor as (
-      select kind, role_id from workspace_members
+      select kind, role_id,
+             -- A guest let in by a support session reads as a member does,
+             -- capped at the level the customer granted (UAT BUG-021).
+             -- Null for everybody else. No backticks: a tagged template.
+             (select s.level from operator_sessions s
+               where s.member_id = workspace_members.id
+                 and s.granted_at is not null
+                 and s.ended_at is null
+                 and s.expires_at > now()
+                 and s.deleted_at is null
+               limit 1) as support_level
+        from workspace_members
        where id = ${input.memberId}
          and workspace_id = ${input.workspaceId}
          and status = 'active'
@@ -79,9 +90,10 @@ export async function resolveMemberAccessLevel<
     -- maximum, not a second model: a champion's binding still outranks a
     -- role that grants less, exactly as two bindings already compose.
     --
-    -- A human only. A guest, an agent and a placeholder hold no role and must
-    -- not inherit one, for the same reason written beside the blanket tiers
-    -- below: an agent holds nothing but its own named bindings.
+    -- A human only, and a guest let in by a support session. Any other
+    -- guest, an agent and a placeholder hold no role and must not inherit
+    -- one, for the same reason written beside the blanket tiers below: an
+    -- agent holds nothing but its own named bindings.
     role_level as (
       select coalesce(max(rp.level), 0)::int as level
         from role_permissions rp
@@ -94,7 +106,7 @@ export async function resolveMemberAccessLevel<
          and rp.deleted_at is null
          and exists (
            select 1 from actor
-            where actor.kind = 'human'
+            where (actor.kind = 'human' or actor.support_level is not null)
               and actor.role_id is not null
               and actor.role_id = rp.role_id
          )
@@ -121,11 +133,17 @@ export async function resolveMemberAccessLevel<
          -- hand straight back.
          or (
            g.kind = 'workspace_standard'
-           and exists (select 1 from actor where kind = 'human')
+           and exists (
+             select 1 from actor
+              where kind = 'human' or support_level is not null
+           )
          )
          or (
            g.kind = 'space_standard'
-           and exists (select 1 from actor where kind = 'human')
+           and exists (
+             select 1 from actor
+              where kind = 'human' or support_level is not null
+           )
            and exists (
              select 1 from access_group_memberships gm
               where gm.group_id = g.id
@@ -136,9 +154,13 @@ export async function resolveMemberAccessLevel<
        )
     )
     -- The two sources, composed the way §4.1 composes two overlapping grants.
-    select greatest(
-             (select level from binding_level),
-             (select level from role_level)
+    -- A support session never reaches past what the customer granted.
+    select least(
+             greatest(
+               (select level from binding_level),
+               (select level from role_level)
+             ),
+             coalesce((select support_level from actor), ${ACCESS_LEVELS.full})
            )::int as level
   `);
   return Number(result.rows[0]?.level ?? 0);
@@ -237,6 +259,12 @@ export interface AccessFilterMember {
   readonly active: boolean;
   /** A person rather than an agent. Only a person gets the blanket tiers. */
   readonly human: boolean;
+  /**
+   * The level a support session was granted at, for the guest it let in, who
+   * then reads as a member does up to that level (UAT BUG-021). Absent for
+   * everybody else.
+   */
+  readonly supportLevel?: number;
 }
 
 /** Reads the two facts `accessScopeFilter` needs, in one query. */
@@ -246,8 +274,19 @@ export async function accessFilterMember<
   tx: AnyTx<TSchema>,
   input: { workspaceId: string; memberId: string },
 ): Promise<AccessFilterMember> {
-  const result = await tx.execute<{ active: boolean; human: boolean }>(sql`
-    select (m.status = 'active') as active, (m.kind = 'human') as human
+  const result = await tx.execute<{
+    active: boolean;
+    human: boolean;
+    support_level: number | null;
+  }>(sql`
+    select (m.status = 'active') as active, (m.kind = 'human') as human,
+           (select s.level from operator_sessions s
+             where s.member_id = m.id
+               and s.granted_at is not null
+               and s.ended_at is null
+               and s.expires_at > now()
+               and s.deleted_at is null
+             limit 1) as support_level
       from workspace_members m
      where m.id = ${input.memberId}
        and m.workspace_id = ${input.workspaceId}
@@ -255,9 +294,14 @@ export async function accessFilterMember<
      limit 1
   `);
   const row = result.rows[0];
+  const supportLevel =
+    row?.support_level === null || row?.support_level === undefined
+      ? undefined
+      : Number(row.support_level);
   return {
     active: row?.active === true,
-    human: row?.human === true,
+    human: row?.human === true || supportLevel !== undefined,
+    ...(supportLevel === undefined ? {} : { supportLevel }),
   };
 }
 
@@ -303,6 +347,13 @@ export function accessScopeFilter(
   if (!input.member.active) {
     // A suspended, deleted or unknown member sees nothing. Said here rather
     // than left to an `EXISTS` that cannot match, so the planner is told too.
+    return sql`false`;
+  }
+  if (
+    input.member.supportLevel !== undefined &&
+    input.minLevel > input.member.supportLevel
+  ) {
+    // Past what the customer granted the support session (UAT BUG-021).
     return sql`false`;
   }
   // A literal rather than a bound parameter: it is a boolean this function
@@ -812,7 +863,16 @@ export async function visibleResourceIds<
   const requires = input.requires ?? ACCESS_LEVELS.view;
   const result = await tx.execute<{ resource_id: string }>(sql`
     with actor as (
-      select kind from workspace_members
+      select kind,
+             -- As in resolveMemberAccessLevel (UAT BUG-021).
+             (select s.level from operator_sessions s
+               where s.member_id = workspace_members.id
+                 and s.granted_at is not null
+                 and s.ended_at is null
+                 and s.expires_at > now()
+                 and s.deleted_at is null
+               limit 1) as support_level
+        from workspace_members
        where id = ${input.memberId}
          and workspace_id = ${input.workspaceId}
          and status = 'active'
@@ -834,16 +894,26 @@ export async function visibleResourceIds<
        -- sql.param, not the bare array: Drizzle expands a plain array into a
        -- row of values, which Postgres then refuses to cast to uuid[].
        and c.resource_id = any(${sql.param([...input.ids])}::uuid[])
-       and exists (select 1 from actor)
+       -- A support session reaches nothing past its grant (UAT BUG-021).
+       and exists (
+         select 1 from actor
+          where coalesce(support_level, ${ACCESS_LEVELS.full}) >= ${requires}
+       )
        and (
          (g.kind = 'member' and g.member_id = ${input.memberId})
          or (
            g.kind = 'workspace_standard'
-           and exists (select 1 from actor where kind = 'human')
+           and exists (
+             select 1 from actor
+              where kind = 'human' or support_level is not null
+           )
          )
          or (
            g.kind = 'space_standard'
-           and exists (select 1 from actor where kind = 'human')
+           and exists (
+             select 1 from actor
+              where kind = 'human' or support_level is not null
+           )
            and exists (
              select 1 from access_group_memberships gm
               where gm.group_id = g.id
@@ -867,13 +937,20 @@ export async function visibleResourceIds<
        and c.deleted_at is null
        and c.resource_id = any(${sql.param([...input.ids])}::uuid[])
        and exists (
+         select 1 from actor
+          where coalesce(support_level, ${ACCESS_LEVELS.full}) >= ${requires}
+       )
+       and exists (
          select 1
            from role_permissions rp
            join workspace_members m
              on m.role_id = rp.role_id
             and m.id = ${input.memberId}
             and m.workspace_id = ${input.workspaceId}
-            and m.kind = 'human'
+            and (
+              m.kind = 'human'
+              or exists (select 1 from actor where support_level is not null)
+            )
             and m.status = 'active'
             and m.deleted_at is null
           where rp.workspace_id = ${input.workspaceId}

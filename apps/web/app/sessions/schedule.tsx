@@ -93,13 +93,22 @@ export async function ScheduleSessions({
   const spaceField = spaceId ? (
     <input type="hidden" name="spaceId" value={spaceId} />
   ) : (
-    // Opens on the first space, as the select it replaced did.
+    // Opens on the first space, as the select it replaced did. That space's
+    // review grades every objective in the cycle, the workspace's own
+    // included, so it says so (UAT M18-03).
     <EntityPicker
       label={t("sessions.schedule.space")}
       name="spaceId"
       required
       defaultValue={choices[0]?.id ?? null}
-      options={choices.map(namedOption)}
+      options={choices.map((space) =>
+        namedOption({
+          id: space.id,
+          name: space.isCompany
+            ? t("sessions.schedule.companySpace", { name: space.name })
+            : space.name,
+        }),
+      )}
     />
   );
   const facilitatorField = (

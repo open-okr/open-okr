@@ -43,8 +43,13 @@ test("sign in, and schedule a session the way a coordinator would", async () => 
     has: page.getByRole("heading", { name: "Schedule one session" }),
   });
   await expect(form).toBeVisible({ timeout: 10_000 });
-  // The picker shows the chosen space's name in its box.
-  spaceName = await form.getByLabel("Space").inputValue();
+  // The picker shows the chosen space's option in its box. The company
+  // space's says what its review covers after the name (UAT M18-03), so the
+  // name is the text before that note.
+  spaceName = (await form.getByLabel("Space").inputValue()).replace(
+    / \(the whole workspace[^)]*\)$/,
+    "",
+  );
   expect(spaceName).not.toBe("");
 
   // **Only if it is not already there.** This file is a serial group, and a

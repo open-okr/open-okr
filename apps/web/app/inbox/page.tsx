@@ -285,8 +285,12 @@ async function NotificationRow({
       : named === undefined
         ? row.ruleKey
         : t(named);
+  // Who did it, when a person did (UAT M10-04): "Commented on a goal" alone
+  // left the reader guessing who had written to them.
   const line =
-    row.rendered ??
+    (row.rendered && row.actorName
+      ? `${row.actorName} · ${row.rendered}`
+      : row.rendered) ??
     (rule ? rule.fires : null) ??
     (ruleName === null
       ? t(REASON_FALLBACK_KEYS[row.reason] ?? "inbox.somethingHappenedHere")

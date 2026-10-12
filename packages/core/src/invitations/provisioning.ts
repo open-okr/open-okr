@@ -11,6 +11,7 @@
 import {
   accessBindings,
   activeOnly,
+  type BuiltinRoleKey,
   users,
   type WorkspaceTx,
   workspaceMembers,
@@ -19,7 +20,7 @@ import { eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
-import { defaultRoleId } from "../access/roles.ts";
+import { builtinRoleId, defaultRoleId } from "../access/roles.ts";
 import { resolveMemberSettings } from "../settings/registry.ts";
 import { requireSeatInTx } from "../tenancy/plans.ts";
 
@@ -59,6 +60,15 @@ export interface ProvisionMemberInput {
    * workspace binding, because the level the owner chose is on the workspace.
    */
   readonly bindWorkspace?: boolean;
+  /**
+   * A built-in role for a guest, which otherwise holds none.
+   *
+   * The support session only (UAT BUG-021). Its binding is on the workspace
+   * context, and goals and spaces have contexts of their own, so a support
+   * operator with no role saw an empty workspace. The role gives them what a
+   * member sees, at no more than the level the customer granted.
+   */
+  readonly guestRole?: BuiltinRoleKey;
 }
 
 export interface ProvisionedMember {
@@ -119,7 +129,9 @@ export async function provisionMemberForInvite<
   const roleId =
     (input.kind ?? "human") === "human"
       ? await defaultRoleId(tx, input.workspaceId)
-      : null;
+      : input.guestRole
+        ? await builtinRoleId(tx, input.workspaceId, input.guestRole)
+        : null;
   // openokr:allow-mutation: this helper is called only from inside an
   // Operation's execute (invitations.acceptLink, invitations
   // .joinByTrustedDomain), on the transaction that Operation opened.
