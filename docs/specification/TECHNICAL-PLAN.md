@@ -106,7 +106,7 @@ This is the METHOD.md §2 model made concrete.
 | `cycle_baseline_health` | `cycle_id`, `stable` (rich), `declining` (rich), `business_as_usual` (rich) | Phase 2 KPI reading |
 | `cycle_issues` | `cycle_id`, `text`, `impact smallint` (1 to 5), `source` (`manual` / `carry_forward` / `process_health` / `coach`), `promoted_to_priority_id?` | The ranked strategic issue list |
 | `cycle_priorities` | `cycle_id`, `text`, `success_statement`, `position`, `promoted_to_goal_id?` | Phase 3 priorities with their 12-month success |
-| `cycle_revalidations` | `cycle_id`, `holds bool`, `changed bool`, `change_note?`, `focus_note?` | Quarterly Phase 3 |
+| `cycle_revalidations` | `cycle_id`, `holds bool`, `changed bool`, `change_note?`, `focus_note?`, `change_note_document jsonb?`, `change_note_document_version?`, `focus_note_document jsonb?`, `focus_note_document_version?` | Quarterly Phase 3. Each note is editor JSON in its `_document` column since guided-inputs change 12, with the plain column its plain text for one release |
 | `cycle_focus_key_results` | `cycle_id`, `annual_key_result_id` | Which annual key results this quarter must move |
 | `cycle_gate_state` | `cycle_id`, `gate_key` (1 to 6), `passed bool`, `evaluated_at`, `detail jsonb` | The publish gates, recomputed on every relevant write |
 | `cycle_capacity_notes` | `cycle_id`, `cuts` (rich) | What was cut. Required to pass gate 5 |

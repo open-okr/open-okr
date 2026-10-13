@@ -44,12 +44,18 @@ import {
   loadFocusCandidates,
   readPackItems,
   recomputeGateState,
+  revalidationOfRow,
 } from "../cycles/workflow.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { policyDecisionInTx, requirePolicy } from "../practice/policy.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { plainTextLines } from "../rich-text/excerpt.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
+import {
+  documentOfInput,
+  plainTextOfDocument,
+  richTextOrPlainTextSchema,
+} from "../rich-text/moving.ts";
 import {
   RICH_TEXT_SCHEMA_VERSION,
   type RichTextDocument,
@@ -67,6 +73,36 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
 export const CYCLE_NOTE_MAX_CHARACTERS = 4000;
 
 const cycleNote = richTextSchema({ maxCharacters: CYCLE_NOTE_MAX_CHARACTERS });
+
+/**
+ * The most a revalidation note may hold, the textarea's limit before it was
+ * an editor (guided-inputs change 12). No importer writes either note.
+ */
+export const REVALIDATION_NOTE_MAX_CHARACTERS = 2000;
+
+/**
+ * A revalidation note: editor JSON, or for this release the plain text it
+ * took before, which is wrapped as a document. Null or absent clears it.
+ */
+const revalidationNote = richTextOrPlainTextSchema({
+  maxCharacters: REVALIDATION_NOTE_MAX_CHARACTERS,
+})
+  .nullable()
+  .optional();
+
+/** One note's two columns, written together for one release. */
+function revalidationNoteColumns(value: unknown): {
+  text: string | null;
+  document: RichTextDocument | null;
+  version: number | null;
+} {
+  const document = documentOfInput(value);
+  return {
+    text: document === null ? null : plainTextOfDocument(document),
+    document,
+    version: document === null ? null : RICH_TEXT_SCHEMA_VERSION,
+  };
+}
 
 const phaseResult = z.object({
   phase: z.number().int(),
@@ -315,6 +351,14 @@ export const readWorkflow = defineReadAction({
         focusNote: z.string().nullable(),
       })
       .nullable(),
+    /**
+     * The two notes as stored, formatting and all, for the editors to open on
+     * (guided-inputs change 12). Beside the plain text rather than instead of
+     * it, so a client reading the plain text today keeps working.
+     */
+    revalidationDocuments: z
+      .object({ changeNote: z.unknown(), focusNote: z.unknown() })
+      .nullable(),
     focus: z.object({
       chosen: z.array(z.uuid()),
       candidates: z.array(
@@ -479,6 +523,8 @@ export const readWorkflow = defineReadAction({
             changed: cycleRevalidations.changed,
             changeNote: cycleRevalidations.changeNote,
             focusNote: cycleRevalidations.focusNote,
+            changeNoteDocument: cycleRevalidations.changeNoteDocument,
+            focusNoteDocument: cycleRevalidations.focusNoteDocument,
           })
           .from(cycleRevalidations)
           .where(
@@ -489,6 +535,9 @@ export const readWorkflow = defineReadAction({
             ),
           )
           .limit(1);
+        const revalidated = revalidation
+          ? revalidationOfRow(revalidation)
+          : null;
         const [capacity] = await tx
           .select({ cuts: cycleCapacityNotes.cuts })
           .from(cycleCapacityNotes)
@@ -611,7 +660,20 @@ export const readWorkflow = defineReadAction({
                 businessAsUsual: plainOf(baseline.businessAsUsual),
               }
             : null,
-          revalidation: revalidation ?? null,
+          revalidation: revalidated
+            ? {
+                holds: revalidated.holds,
+                changed: revalidated.changed,
+                changeNote: revalidated.changeNote,
+                focusNote: revalidated.focusNote,
+              }
+            : null,
+          revalidationDocuments: revalidated
+            ? {
+                changeNote: revalidated.changeNoteDocument,
+                focusNote: revalidated.focusNoteDocument,
+              }
+            : null,
           focus: {
             chosen: chosen.map((row) => row.id),
             candidates:
@@ -940,22 +1002,34 @@ export const setRevalidation = defineWriteAction({
       cycleId: z.uuid(),
       holds: z.boolean(),
       changed: z.boolean(),
-      changeNote: z.string().trim().max(2000).nullable().optional(),
-      focusNote: z.string().trim().max(2000).nullable().optional(),
+      /** Editor JSON, or until change 13 plain text (guided-inputs change 12). */
+      changeNote: revalidationNote,
+      focusNote: revalidationNote,
     })
-    .refine((value) => !(value.changed && !value.changeNote?.trim()), {
-      message:
-        "A frame recorded as changed needs a note saying what changed (§2.1: it holds, or it changes with a documented reason)",
-    }),
+    .refine(
+      (value) => !(value.changed && documentOfInput(value.changeNote) === null),
+      {
+        message:
+          "A frame recorded as changed needs a note saying what changed (§2.1: it holds, or it changes with a documented reason)",
+      },
+    ),
   output: z.object({ cycleId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
+      // Both columns of each note, the plain one for the previous release
+      // during a rolling upgrade.
+      const changeNote = revalidationNoteColumns(input.changeNote);
+      const focusNote = revalidationNoteColumns(input.focusNote);
       const values = {
         holds: input.holds,
         changed: input.changed,
-        changeNote: input.changeNote ?? null,
-        focusNote: input.focusNote ?? null,
+        changeNote: changeNote.text,
+        changeNoteDocument: changeNote.document,
+        changeNoteDocumentVersion: changeNote.version,
+        focusNote: focusNote.text,
+        focusNoteDocument: focusNote.document,
+        focusNoteDocumentVersion: focusNote.version,
         updatedAt: new Date(),
       };
       const [existing] = await tx

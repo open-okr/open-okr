@@ -552,7 +552,20 @@ export default async function CyclePage({
           {viewing === 3 && workflow.mode === "quarterly" ? (
             <Revalidation
               cycleId={workflow.cycleId}
-              saved={workflow.revalidation}
+              // The verdict, with each note as editor JSON for the editors
+              // to open on (guided-inputs change 12).
+              saved={
+                workflow.revalidation
+                  ? {
+                      holds: workflow.revalidation.holds,
+                      changed: workflow.revalidation.changed,
+                      changeNote:
+                        workflow.revalidationDocuments?.changeNote ?? null,
+                      focusNote:
+                        workflow.revalidationDocuments?.focusNote ?? null,
+                    }
+                  : null
+              }
               focus={workflow.focus}
               canEdit={canEdit}
             />

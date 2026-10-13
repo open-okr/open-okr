@@ -37,7 +37,10 @@ export {
 } from "./access/reads.ts";
 export { AUDIT_EXPORT_CEILING } from "./actions/audit.ts";
 export { CHANNEL_MESSAGE_TOPIC } from "./actions/channels.ts";
-export { CYCLE_NOTE_MAX_CHARACTERS } from "./actions/cycle-workflow.ts";
+export {
+  CYCLE_NOTE_MAX_CHARACTERS,
+  REVALIDATION_NOTE_MAX_CHARACTERS,
+} from "./actions/cycle-workflow.ts";
 export {
   type ActionCallContext,
   type ActionDefinition,

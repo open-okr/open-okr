@@ -24638,6 +24638,25 @@
                             }
                           ]
                         },
+                        "revalidationDocuments": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "changeNote": {},
+                                "focusNote": {}
+                              },
+                              "required": [
+                                "changeNote",
+                                "focusNote"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "focus": {
                           "type": "object",
                           "properties": {
@@ -24859,6 +24878,7 @@
                         "sessionDates",
                         "baselineHealth",
                         "revalidation",
+                        "revalidationDocuments",
                         "focus",
                         "capacityCuts",
                         "baselineHealthDocuments",
@@ -25542,8 +25562,13 @@
                   "changeNote": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "maxLength": 2000
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {}
+                        ]
                       },
                       {
                         "type": "null"
@@ -25553,8 +25578,13 @@
                   "focusNote": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "maxLength": 2000
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {}
+                        ]
                       },
                       {
                         "type": "null"

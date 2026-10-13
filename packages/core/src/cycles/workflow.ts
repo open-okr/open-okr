@@ -63,11 +63,60 @@ import {
   or,
 } from "drizzle-orm";
 import { practiceFromRow } from "../practice/settings.ts";
+import {
+  documentOrPlainText,
+  plainTextOfDocument,
+} from "../rich-text/moving.ts";
+import type { RichTextDocument } from "../rich-text/schema.ts";
 import { loadCycleCadence } from "../sessions/booking.ts";
 import { readRhythmRow, workspaceTimeZone } from "./service.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
+
+/**
+ * A revalidation row as its readers take it (guided-inputs change 12): each
+ * note as a document, with the old column wrapped while data change 0032 has
+ * not reached the row, and as the plain text phase 3's check reads.
+ */
+export function revalidationOfRow(row: {
+  readonly holds: boolean;
+  readonly changed: boolean;
+  readonly changeNote: string | null;
+  readonly focusNote: string | null;
+  readonly changeNoteDocument: unknown;
+  readonly focusNoteDocument: unknown;
+}): {
+  readonly holds: boolean;
+  readonly changed: boolean;
+  readonly changeNote: string | null;
+  readonly focusNote: string | null;
+  readonly changeNoteDocument: RichTextDocument | null;
+  readonly focusNoteDocument: RichTextDocument | null;
+} {
+  const changeNoteDocument = documentOrPlainText(
+    row.changeNoteDocument,
+    row.changeNote,
+  );
+  const focusNoteDocument = documentOrPlainText(
+    row.focusNoteDocument,
+    row.focusNote,
+  );
+  return {
+    holds: row.holds,
+    changed: row.changed,
+    changeNote:
+      changeNoteDocument === null
+        ? null
+        : plainTextOfDocument(changeNoteDocument),
+    focusNote:
+      focusNoteDocument === null
+        ? null
+        : plainTextOfDocument(focusNoteDocument),
+    changeNoteDocument,
+    focusNoteDocument,
+  };
+}
 
 export interface WorkflowSnapshot {
   readonly input: CycleWorkflowInput;
@@ -193,6 +242,8 @@ export async function loadWorkflowInput<
       changed: cycleRevalidations.changed,
       changeNote: cycleRevalidations.changeNote,
       focusNote: cycleRevalidations.focusNote,
+      changeNoteDocument: cycleRevalidations.changeNoteDocument,
+      focusNoteDocument: cycleRevalidations.focusNoteDocument,
     })
     .from(cycleRevalidations)
     .where(
@@ -273,7 +324,7 @@ export async function loadWorkflowInput<
     hasBaselineHealth: Boolean(baseline),
     issues,
     priorities,
-    revalidation: revalidation ?? null,
+    revalidation: revalidation ? revalidationOfRow(revalidation) : null,
     focusKeyResultCount: focusRows.length,
     annualKeyResultCount: (await loadFocusCandidates(tx, workspaceId, cycle))
       .length,

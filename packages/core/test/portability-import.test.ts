@@ -307,9 +307,9 @@ describe("what a move keeps", () => {
     });
   });
 
-  it("points a mention in a stage note or a management answer at the member's new id", async () => {
-    // Guided-inputs change 11b. The notes are a map of documents, one per
-    // stage, which the import walks key by key.
+  it("points a mention in a stage note, a management answer or a revalidation note at the member's new id", async () => {
+    // Guided-inputs changes 11b and 12. The stage notes are a map of
+    // documents, one per stage, which the import walks key by key.
     const source = (input: unknown, name: string) =>
       callAction(
         {
@@ -361,6 +361,22 @@ describe("what a move keeps", () => {
       { sessionId: session.id, questionKey: 1, body: mentioning },
       "sessions.setManagementAnswer",
     );
+    // A quarter the target has no cycle for, so the cycle and its
+    // revalidation are not skipped on import.
+    const later = (await source(
+      { on: "2030-02-15", mode: "quarterly" },
+      "cycles.create",
+    )) as { id: string };
+    await source(
+      {
+        cycleId: later.id,
+        holds: false,
+        changed: true,
+        changeNote: mentioning,
+        focusNote: mentioning,
+      },
+      "workflow.setRevalidation",
+    );
 
     const exported = await exportSource();
     await importIntoTarget(exported.bytes, false);
@@ -381,9 +397,19 @@ describe("what a move keeps", () => {
       "select body_document from management_answers where workspace_id = $1",
       [targetWorkspaceId],
     );
+    const revalidations = await wb.admin.query<{
+      change_note_document: unknown;
+      focus_note_document: unknown;
+    }>(
+      `select change_note_document, focus_note_document
+         from cycle_revalidations where workspace_id = $1`,
+      [targetWorkspaceId],
+    );
     for (const document of [
       Object.values(notes.rows[0]?.notes ?? {})[0],
       answers.rows[0]?.body_document,
+      revalidations.rows[0]?.change_note_document,
+      revalidations.rows[0]?.focus_note_document,
     ]) {
       expect(JSON.stringify(document)).toContain(movedMemberId);
       expect(JSON.stringify(document)).not.toContain(ownerMemberId);

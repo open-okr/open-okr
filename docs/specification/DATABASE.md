@@ -268,7 +268,9 @@ The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An i
 `cycle_id` to cycles, `text`, `success_statement`, `position`, `promoted_to_goal_id?` to goals.
 
 ### cycle_revalidations
-`cycle_id` to cycles, `holds bool`, `changed bool`, `change_note?`, `focus_note?`.
+`cycle_id` to cycles, `holds bool`, `changed bool`, `change_note?`, `focus_note?`, `change_note_document jsonb?`, `change_note_document_version?`, `focus_note_document jsonb?`, `focus_note_document_version?`.
+
+Since guided-inputs change 12 (migration 0143) each note is editor JSON in its `_document` column, checked to be set with its version, and the plain column holds its plain text for one release so the release before reads it, and so phase 3's check reads text. Data change 0032 fills the documents and change 13 drops `change_note` and `focus_note`.
 
 ### cycle_focus_key_results
 `cycle_id` to cycles, `annual_key_result_id` to key_results.

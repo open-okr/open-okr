@@ -1,4 +1,7 @@
-import { CYCLE_NOTE_MAX_CHARACTERS } from "@openokr/core";
+import {
+  CYCLE_NOTE_MAX_CHARACTERS,
+  REVALIDATION_NOTE_MAX_CHARACTERS,
+} from "@openokr/core";
 import {
   Button,
   Card,
@@ -10,7 +13,6 @@ import {
   RichTextField,
   RichTextView,
   SelectInput,
-  TextArea,
 } from "@openokr/ui";
 import { type MemberLike, memberOption } from "../../lib/entity-options.ts";
 import { searchPeople } from "../../lib/member-search.ts";
@@ -218,8 +220,9 @@ export async function Revalidation({
   readonly saved: {
     readonly holds: boolean;
     readonly changed: boolean;
-    readonly changeNote: string | null;
-    readonly focusNote: string | null;
+    /** Editor JSON, or null for none. */
+    readonly changeNote: unknown;
+    readonly focusNote: unknown;
   } | null;
   readonly focus: {
     readonly chosen: readonly string[];
@@ -246,44 +249,84 @@ export async function Revalidation({
           </div>
         </CardHeader>
         <CardBody>
-          <ActionForm
-            action={saveRevalidation}
-            className="flex flex-col gap-2.5"
-          >
-            <input type="hidden" name="cycleId" value={cycleId} />
-            <SelectInput
-              label={t("cycle.revalidation.verdict")}
-              name="verdict"
-              disabled={!canEdit}
-              defaultValue={saved?.changed ? "changed" : "holds"}
+          {canEdit ? (
+            <ActionForm
+              action={saveRevalidation}
+              className="flex flex-col gap-2.5"
             >
-              <option value="holds">{t("cycle.revalidation.holds")}</option>
-              <option value="changed">{t("cycle.revalidation.changed")}</option>
-            </SelectInput>
-            {/* Plain for now: change 12 makes both notes rich text. */}
-            <TextArea
-              label={t("cycle.revalidation.changeNote")}
-              name="changeNote"
-              rows={2}
-              maxLength={2000}
-              disabled={!canEdit}
-              defaultValue={saved?.changeNote ?? ""}
-            />
-            <TextArea
-              label={t("cycle.revalidation.focusNote")}
-              description={t("cycle.revalidation.focusNoteHint")}
-              name="focusNote"
-              rows={2}
-              maxLength={2000}
-              disabled={!canEdit}
-              defaultValue={saved?.focusNote ?? ""}
-            />
-            {canEdit ? (
+              <input type="hidden" name="cycleId" value={cycleId} />
+              <SelectInput
+                label={t("cycle.revalidation.verdict")}
+                name="verdict"
+                defaultValue={saved?.changed ? "changed" : "holds"}
+              >
+                <option value="holds">{t("cycle.revalidation.holds")}</option>
+                <option value="changed">
+                  {t("cycle.revalidation.changed")}
+                </option>
+              </SelectInput>
+              {/* The compact editor since guided-inputs change 12, each note
+                  sent as it stands, so a note nobody touched is kept. */}
+              <RichTextField
+                label={t("cycle.revalidation.changeNote")}
+                name="changeNote"
+                content={saved?.changeNote ?? null}
+                maxCharacters={REVALIDATION_NOTE_MAX_CHARACTERS}
+                sendUnchanged
+              />
+              <RichTextField
+                label={t("cycle.revalidation.focusNote")}
+                description={t("cycle.revalidation.focusNoteHint")}
+                name="focusNote"
+                content={saved?.focusNote ?? null}
+                maxCharacters={REVALIDATION_NOTE_MAX_CHARACTERS}
+                sendUnchanged
+              />
               <Button type="submit" className="self-start">
                 {t("common.save")}
               </Button>
-            ) : null}
-          </ActionForm>
+            </ActionForm>
+          ) : (
+            // Read, not a form somebody cannot submit, as the baseline card
+            // does: an editor has no disabled state worth drawing.
+            <dl className="flex flex-col gap-2 text-sm">
+              {[
+                {
+                  key: "verdict",
+                  label: t("cycle.revalidation.verdict"),
+                  html: null,
+                  text: saved
+                    ? saved.changed
+                      ? t("cycle.revalidation.changed")
+                      : t("cycle.revalidation.holds")
+                    : null,
+                },
+                {
+                  key: "changeNote",
+                  label: t("cycle.revalidation.changeNote"),
+                  html: richTextHtml(saved?.changeNote),
+                  text: null,
+                },
+                {
+                  key: "focusNote",
+                  label: t("cycle.revalidation.focusNote"),
+                  html: richTextHtml(saved?.focusNote),
+                  text: null,
+                },
+              ].map((row) => (
+                <div key={row.key} className="flex flex-col gap-0.5">
+                  <dt className="text-xs font-bold text-ink-3">{row.label}</dt>
+                  <dd className="text-ink-2">
+                    {row.html !== null ? (
+                      <RichTextView html={row.html} />
+                    ) : (
+                      (row.text ?? t("cycle.baseline.notRecorded"))
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </CardBody>
       </Card>
 

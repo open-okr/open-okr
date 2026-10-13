@@ -88,6 +88,9 @@ const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   "decisions.text_document",
   // Change 11b: the quarterly review's prose.
   "management_answers.body_document",
+  // Change 12: the quarterly revalidation's two notes.
+  "cycle_revalidations.change_note_document",
+  "cycle_revalidations.focus_note_document",
 ]);
 
 /**

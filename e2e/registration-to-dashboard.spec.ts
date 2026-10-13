@@ -492,17 +492,30 @@ test("the planning phases complete from the browser, and the gaps clear", async 
 
   // Phase 3, quarterly: the frame holds, and the quarter names its focus.
   await page.goto("/cycle?phase=3");
-  const revalidation = page.locator("form", {
-    has: page.getByLabel("Focus areas for this quarter"),
-  });
+  // The compact editor since guided-inputs change 12, so the note is read
+  // back after a reload: the editor holds what was typed whether or not it
+  // was stored. The save is waited for first, because a reload can abort the
+  // server action in flight.
+  const focusNote = () =>
+    page.getByRole("textbox", {
+      name: "Focus areas for this quarter",
+      exact: true,
+    });
+  const revalidation = page.locator("form", { has: focusNote() });
   await revalidation.getByLabel("The annual frame").selectOption("holds");
-  await revalidation
-    .getByLabel("Focus areas for this quarter")
-    .fill("Mobile activation");
+  await focusNote().click();
+  await focusNote().pressSequentially("Mobile activation");
+  const revalidated = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.request().headers()["next-action"] !== undefined,
+  );
   await revalidation.getByRole("button", { name: "Save" }).click();
-  await expect(
-    revalidation.getByLabel("Focus areas for this quarter"),
-  ).toHaveValue("Mobile activation");
+  await revalidated;
+  await page.reload();
+  await expect(focusNote()).toContainText("Mobile activation", {
+    timeout: 15_000,
+  });
 
   await page.goto("/cycle?phase=4");
   await expect(page.getByText("Earlier phases still have gaps")).toHaveCount(0);

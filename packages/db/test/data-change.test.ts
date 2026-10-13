@@ -34,6 +34,7 @@ import { decisionTextDocument } from "../src/data-changes/0028_decision_text_doc
 import { managementAnswerDocument } from "../src/data-changes/0029_management_answer_document.ts";
 import { stageNoteDocuments } from "../src/data-changes/0030_stage_note_documents.ts";
 import { digestNoteDocument } from "../src/data-changes/0031_digest_note_document.ts";
+import { revalidationNoteDocuments } from "../src/data-changes/0032_revalidation_note_documents.ts";
 import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { runMigrations } from "../src/migrate.ts";
 
@@ -1770,6 +1771,87 @@ describe("0031: the weekly coordinator note as a document", () => {
     await client.query("delete from _data_changes");
     const [again] = await runDataChanges(client, {
       scripts: [digestNoteDocument],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0032: the revalidation notes as documents", () => {
+  it("fills each note still missing a document, never one already written, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const written = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Already rich" }],
+        },
+      ],
+    };
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), c as (
+         insert into cycles (id, workspace_id, name, mode, starts_on, ends_on)
+         select gen_random_uuid(), w.id, n.name, 'quarterly', n.starts, n.ends
+           from w,
+                (values ('Q1', '2026-01-01'::date, '2026-03-31'::date),
+                        ('Q2', '2026-04-01'::date, '2026-06-30'::date)) as n(name, starts, ends)
+         returning id, workspace_id, name
+       )
+       insert into cycle_revalidations
+         (cycle_id, workspace_id, holds, changed, change_note, focus_note,
+          focus_note_document, focus_note_document_version)
+       select c.id, c.workspace_id, c.name = 'Q2', c.name = 'Q1',
+              case when c.name = 'Q1' then 'Dropped the ASEAN thrust.\n\nMobile first.' end,
+              case when c.name = 'Q1' then 'Mobile activation' else 'Old text' end,
+              case when c.name = 'Q2' then $1::jsonb end,
+              case when c.name = 'Q2' then 1 end
+         from c`,
+      [JSON.stringify(written)],
+    );
+
+    const [outcome] = await runDataChanges(client, {
+      scripts: [revalidationNoteDocuments],
+    });
+    // Q1 gains both. Q2 has its focus document already and no change note.
+    expect(outcome?.rowsChanged).toBe(1);
+
+    const { rows } = await client.query<{
+      name: string;
+      change_note_document: unknown;
+      change_note_document_version: number | null;
+      focus_note_document: unknown;
+      focus_note_document_version: number | null;
+    }>(
+      `select c.name, r.change_note_document, r.change_note_document_version,
+              r.focus_note_document, r.focus_note_document_version
+         from cycle_revalidations r join cycles c on c.id = r.cycle_id
+        order by c.name`,
+    );
+    expect(rows[0]).toEqual({
+      name: "Q1",
+      change_note_document: plainTextDocument(
+        "Dropped the ASEAN thrust.\n\nMobile first.",
+      ),
+      change_note_document_version: 1,
+      focus_note_document: plainTextDocument("Mobile activation"),
+      focus_note_document_version: 1,
+    });
+    expect(rows[1]).toEqual({
+      name: "Q2",
+      change_note_document: null,
+      change_note_document_version: null,
+      focus_note_document: written,
+      focus_note_document_version: 1,
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [revalidationNoteDocuments],
     });
     expect(again?.rowsChanged).toBe(0);
   });

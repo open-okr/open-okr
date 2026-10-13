@@ -113,15 +113,21 @@ export async function saveRevalidation(
   formData: FormData,
 ): Promise<WriteState> {
   const changed = text(formData, "verdict") === "changed";
-  const changeNote = text(formData, "changeNote");
-  const focusNote = text(formData, "focusNote");
+  // The compact editor's documents since guided-inputs change 12, both sent
+  // as they stand, so an empty note is null and a kept one is kept.
+  const changeNote = documentOrNull(formData, "changeNote");
+  const focusNote = documentOrNull(formData, "focusNote");
+  if (changeNote === "malformed" || focusNote === "malformed") {
+    const { t } = await getTranslations();
+    return { error: t("fields.richTextUnreadable") };
+  }
   return run((context) =>
     callAction(context, "workflow.setRevalidation", {
       cycleId: text(formData, "cycleId"),
       holds: !changed,
       changed,
-      changeNote: changeNote === "" ? null : changeNote,
-      focusNote: focusNote === "" ? null : focusNote,
+      changeNote,
+      focusNote,
     }),
   );
 }

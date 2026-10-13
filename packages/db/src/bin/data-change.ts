@@ -41,6 +41,7 @@ import { decisionTextDocument } from "../data-changes/0028_decision_text_documen
 import { managementAnswerDocument } from "../data-changes/0029_management_answer_document.ts";
 import { stageNoteDocuments } from "../data-changes/0030_stage_note_documents.ts";
 import { digestNoteDocument } from "../data-changes/0031_digest_note_document.ts";
+import { revalidationNoteDocuments } from "../data-changes/0032_revalidation_note_documents.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -92,6 +93,8 @@ try {
       stageNoteDocuments,
       // Change 11c: the weekly coordinator note as a document.
       digestNoteDocument,
+      // Change 12: the quarterly revalidation's two notes as documents.
+      revalidationNoteDocuments,
     ],
   });
   process.stdout.write(
