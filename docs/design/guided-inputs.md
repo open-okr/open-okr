@@ -186,7 +186,7 @@ The existing `RichTextEditor` gains a `variant` prop:
 **It ships in two steps, as PLAN.md §5.1 asks of anything a newer release writes and an older one reads.** An editor built without the underline mark cannot load a document that carries one: ProseMirror refuses a mark its schema does not know. During a rolling upgrade, or in a browser tab left open across one, an older editor would meet underlined text written by a newer one. So:
 
 1. Change 4a teaches every reader the mark: the allow-list, the renderer and the editor's schema. The editor's mark is defined in `packages/ui/src/rich-text/underline.ts` with no keyboard shortcut and no rule for pasted `<u>`, and the HTML import (`from-html.ts`) does not map `<u>` yet, so nothing writes underline. A local mark rather than TipTap's underline extension, which `packages/ui` does not depend on.
-2. Change 4b, a release later, turns on the button and the shortcut.
+2. Change 4b, a release later, turns on the button and the shortcut. As built, after 0.3.0 shipped step 1: `underline.ts` defines the mark with the three commands StarterKit's own underline declares (`setUnderline`, `toggleUnderline`, `unsetUnderline`), Mod-U and a parse rule for `<u>` (the tag only, unlike StarterKit's: a `text-decoration` style is how a pasted link often looks), the toolbar offers it after Italic, and the HTML import maps `<u>`.
 
 **Moves now, with no migration:** these already store editor JSON in `jsonb` with a version column.
 
@@ -399,7 +399,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 4a | `feat/compact-editor` | The `compact` variant, the toolbar, `RichTextField`. Underline step 1: every reader knows the mark, nothing writes it. Done 9 October 2026 | Comments, new and edit, with `@` mentions; the profile bio |
 | 4c | Check-in narratives | `RichTextField` on the composer and the timeline's edit, and the compact editor itself in the drawer, which keeps its own state rather than posting a form. The history card shows the narrative as written. Done 9 October 2026 | Check-in composer, the OKR drawer's check-in tab, the timeline's edit |
 | 4d | The rest of change 4 | The length limit in `richTextSchema`, with its first capped field. The stored text is shown as written on the goal page and the review stage. Done 9 October 2026 | Goal retrospective, initiative description, review narrative |
-| 4b | `feat/underline` | Underline step 2, one release after 4a: the button, Mod-U, pasted `<u>`, and the HTML import's `<u>` | Every editor |
+| 4b | `feat/underline` | Underline step 2, one release after 4a: the button, Mod-U, pasted `<u>`, and the HTML import's `<u>`. Done 13 October 2026, after 0.3.0 | Every editor |
 | 5a | The cycle's rich fields | `RichTextField` with `sendUnchanged` for forms that write every field, the 4000-character cap on `workflow.setBaselineHealth` and `workflow.setCapacityNotes`, `workflow.read`'s documents beside its plain text, and `asText` and `asDocument` removed. Done 9 October 2026 | Annual frame ×4, baseline health ×3, capacity cuts |
 | 5b | The full editor's toolbar | The compact buttons plus Heading 1, Heading 2, Quote and Table, each offered only where the stored format can hold what it makes. Done 9 October 2026 | The minutes write-up, and every document editor |
 | 6a | OKR numbers | `NumberInput`, `MetricInput`, `UnitInput`, weight bounds. Done 10 October 2026 | OKR list, drawer and diagram cells, the goal page's weight and value, drafting |

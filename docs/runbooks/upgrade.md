@@ -78,8 +78,9 @@ root key, and refuses to finish without it rather than report them sealed.
 
 ## 0.2 to 0.3: fields that guide, and prose written with the editor
 
-0.3.0 changes how fields look and what they accept. Nothing about the
-practice changes, and no setting needs choosing.
+0.3 changes how fields look and what they accept. Nothing about the
+practice changes, and no setting needs choosing. Its first published
+release is 0.3.1: 0.3.0 was tagged and never published.
 
 What people will notice:
 
