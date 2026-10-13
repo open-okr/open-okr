@@ -37,6 +37,8 @@ test.describe.configure({ mode: "serial" });
 
 let context: BrowserContext;
 let page: Page;
+/** The enrolled factor's secret, so a later sign-in can answer the challenge. */
+let secret = "";
 
 const POLICY_LABEL = "Require a second factor for everybody in this workspace";
 
@@ -156,13 +158,14 @@ test("enrolling a factor lets them back in", async () => {
 
   const uri = page.locator("code").filter({ hasText: "otpauth://" }).first();
   await expect(uri).toBeVisible({ timeout: 15_000 });
-  const secret = new URL(
+  secret = new URL(
     ((await uri.textContent()) ?? "").trim(),
   ).searchParams.get("secret") as string;
   expect(secret).toBeTruthy();
 
+  // The code submits itself once its sixth digit is in, so there is no
+  // button to press (guided-inputs §4.5).
   await page.getByLabel("Code from your app").fill(totp(secret));
-  await page.getByRole("button", { name: "Turn on" }).click();
   await expect(page.getByRole("status")).toContainText("One-time codes are on", {
     timeout: 15_000,
   });
@@ -171,4 +174,32 @@ test("enrolling a factor lets them back in", async () => {
   // own flag rather than a cached answer.
   await goTo(page, "/goals");
   expect(new URL(page.url()).pathname).toBe("/goals");
+});
+
+test("the next sign-in asks for the code, and the code sends itself", async ({
+  browser,
+}) => {
+  // Signed out, in a context of its own: the enrolled account now answers a
+  // password with a challenge. `afterAll` removes the factor again.
+  const fresh = await browser.newContext();
+  const signingIn = await fresh.newPage();
+  try {
+    await goTo(signingIn, "/sign-in");
+    await signingIn.getByLabel("Email").fill(INSTANCE_ACCOUNT.email);
+    await signingIn.getByLabel("Password").fill(INSTANCE_ACCOUNT.password);
+    await signingIn
+      .getByRole("button", { name: "Sign in", exact: true })
+      .first()
+      .click();
+
+    const code = signingIn.getByLabel("Six-digit code");
+    await expect(code).toBeVisible({ timeout: 15_000 });
+    // No Verify press: the sixth digit sends it (guided-inputs §4.5).
+    await code.fill(totp(secret));
+    await signingIn.waitForURL((url) => url.pathname === "/", {
+      timeout: 15_000,
+    });
+  } finally {
+    await fresh.close();
+  }
 });

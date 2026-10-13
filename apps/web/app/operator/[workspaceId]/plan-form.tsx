@@ -1,6 +1,11 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import {
+  NumberInput,
+  SelectInput,
+  TextArea,
+  useTranslations,
+} from "@openokr/ui";
 import {
   type FormEvent,
   startTransition,
@@ -69,11 +74,8 @@ export function OperatorPlanForm({
         <p className="text-ink-2 text-sm">{t("operator.plan.intro")}</p>
         <div className="flex flex-wrap gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="font-medium text-ink text-sm" htmlFor="plan-key">
-              {t("operator.plan.plan")}
-            </label>
-            <select
-              className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+            <SelectInput
+              label={t("operator.plan.plan")}
               defaultValue={current ?? ""}
               id="plan-key"
               name="planKey"
@@ -84,41 +86,29 @@ export function OperatorPlanForm({
                   {plan.label}
                 </option>
               ))}
-            </select>
+            </SelectInput>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label
-              className="font-medium text-ink text-sm"
-              htmlFor="plan-seats"
-            >
-              {t("operator.plan.seats")}
-            </label>
-            <input
-              aria-describedby="plan-seats-hint"
-              className="w-28 rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+            <NumberInput
+              label={t("operator.plan.seats")}
               id="plan-seats"
               min={1}
               name="seats"
               step={1}
-              type="number"
+              description={t("operator.plan.seatsHint")}
+              inputClassName="w-28"
             />
           </div>
         </div>
-        <p className="-mt-2 text-ink-3 text-xs" id="plan-seats-hint">
-          {t("operator.plan.seatsHint")}
-        </p>
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="plan-reason">
-            {t("operator.plan.reason")}
-          </label>
-          <input
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+          <TextArea
+            label={t("operator.plan.reason")}
             id="plan-reason"
             maxLength={500}
             name="reason"
             placeholder={t("operator.plan.reasonPlaceholder")}
             required
-            type="text"
+            rows={2}
           />
         </div>
         <button

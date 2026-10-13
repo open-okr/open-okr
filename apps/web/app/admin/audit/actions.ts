@@ -5,6 +5,7 @@ import {
   callAction,
   OperationError,
 } from "@openokr/core";
+import { localDayBounds } from "@openokr/formats";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -76,15 +77,30 @@ export interface AuditFilterRequest {
  * The filter as the actions take it.
  *
  * A date arrives from the form as `YYYY-MM-DD` and the actions want an
- * instant, so the start of the day and the end of it are filled in here. The
- * end is inclusive: somebody asking for "to the 31st" means the whole of the
- * 31st, and a range that quietly stopped at midnight would drop a day's rows
+ * instant, so the start of the day and the end of it are filled in here, in
+ * the workspace's timezone: the day the screen lists the rows under. The end
+ * is inclusive: somebody asking for "to the 31st" means the whole of the 31st,
+ * and a range that quietly stopped at midnight would drop a day's rows
  * without saying so.
  */
-function filterInput(request: AuditFilterRequest) {
+async function filterInput(
+  context: Awaited<ReturnType<typeof actionContext>>,
+  request: AuditFilterRequest,
+) {
+  const timeZone =
+    request.from || request.to
+      ? String(
+          (await callAction(context, "settings.readForMember", {})).settings
+            .timezone ?? "UTC",
+        )
+      : "UTC";
   return {
-    ...(request.from ? { from: `${request.from}T00:00:00.000Z` } : {}),
-    ...(request.to ? { to: `${request.to}T23:59:59.999Z` } : {}),
+    ...(request.from
+      ? { from: localDayBounds(request.from, timeZone).start.toISOString() }
+      : {}),
+    ...(request.to
+      ? { to: localDayBounds(request.to, timeZone).end.toISOString() }
+      : {}),
     ...(request.action ? { action: request.action } : {}),
     ...(request.actorMemberId ? { actorMemberId: request.actorMemberId } : {}),
     ...(request.targetType ? { targetType: request.targetType } : {}),
@@ -135,7 +151,7 @@ export async function browseAudit(
   const context = await actionContext();
   try {
     const page = await callAction(context, "audit.list", {
-      ...filterInput(request),
+      ...(await filterInput(context, request)),
       ...(request.cursor ? { cursor: request.cursor } : {}),
     });
     return { rows: page.rows, more: page.more };
@@ -168,9 +184,10 @@ export async function exportAudit(
 ): Promise<AuditExportResult> {
   const { t } = await getTranslations();
   try {
-    const result = await callAction(await actionContext(), "audit.export", {
+    const context = await actionContext();
+    const result = await callAction(context, "audit.export", {
       limit: AUDIT_EXPORT_CEILING,
-      ...filterInput(request),
+      ...(await filterInput(context, request)),
     });
     return {
       filename: result.filename,

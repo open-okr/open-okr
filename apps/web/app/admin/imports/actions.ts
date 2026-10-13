@@ -55,6 +55,7 @@ interface RowOutcomeView {
   readonly outcome: "created" | "updated" | "skipped";
   readonly externalId?: string;
   readonly reason?: string;
+  readonly notes?: readonly string[];
 }
 
 export interface ReportView {

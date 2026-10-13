@@ -42,6 +42,7 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
+import { isWebUrl } from "@openokr/formats";
 import { eq, isNull, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -264,7 +265,19 @@ export const updateProviderConfig = defineWriteAction({
     provider: providerSchema,
     enabled: z.boolean().optional(),
     allowUserKeys: z.boolean().optional(),
-    baseUrl: z.string().trim().min(1).nullable().optional(),
+    // A whole http or https address (guided-inputs §4.11). Any string was
+    // stored before, and found when the first request went nowhere. Plain
+    // http stays, because a local Ollama is http://localhost:11434.
+    baseUrl: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((value) => isWebUrl(value), {
+        message:
+          "A base URL is a whole address starting with https:// or http://, like http://localhost:11434/v1.",
+      })
+      .nullable()
+      .optional(),
   }),
   output: providerConfigOutput,
   access: ACCESS_LEVELS.full,

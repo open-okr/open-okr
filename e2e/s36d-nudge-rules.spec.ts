@@ -18,7 +18,7 @@
  * and a rule left off or a workspace left quiet would change what later specs
  * see.
  */
-import type { BrowserContext, Page } from "@playwright/test";
+import type { BrowserContext, Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
@@ -132,6 +132,16 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   // What the screen calls it, for the labels and the sentence. The key is
   // still what the test ids and the stored row carry.
   const OWNER_NAME = "Check-in overdue";
+  /** Each rung by its name, in days, as the card labels it. */
+  const RUNGS = {
+    championRepeat: "Champion, again",
+    coordinator: "Then the coordinator",
+    sponsor: "Then the sponsor",
+  } as const;
+  // By role: a number field is found by its box, not by a label a hidden
+  // copy of it also carries.
+  const rung = (scope: Locator, name: string) =>
+    scope.getByRole("textbox", { name: `${name} for ${OWNER_NAME} (days)` });
   await goTo(page, "/admin/nudges");
 
   const editor = page.getByTestId(`ladder-${OWNER}`);
@@ -144,9 +154,9 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   // Out of order first: the top rung fires before the ones below it, which is
   // not a ladder. §11's schema types each rung and says nothing about order,
   // so this refusal is the product's own.
-  await editor.getByLabel(`championRepeat for ${OWNER_NAME}`).fill("8");
-  await editor.getByLabel(`coordinator for ${OWNER_NAME}`).fill("7");
-  await editor.getByLabel(`sponsor for ${OWNER_NAME}`).fill("14");
+  await rung(editor, "Champion, again").fill("8");
+  await rung(editor, "Then the coordinator").fill("7");
+  await rung(editor, "Then the sponsor").fill("14");
   await editor.getByTestId(`save-ladder-${OWNER}`).click();
   await expect(page.getByRole("alert").first()).toContainText(
     "must come after",
@@ -154,9 +164,9 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   );
 
   // Then one §11 accepts.
-  await editor.getByLabel(`championRepeat for ${OWNER_NAME}`).fill("2");
-  await editor.getByLabel(`coordinator for ${OWNER_NAME}`).fill("8");
-  await editor.getByLabel(`sponsor for ${OWNER_NAME}`).fill("12");
+  await rung(editor, "Champion, again").fill("2");
+  await rung(editor, "Then the coordinator").fill("8");
+  await rung(editor, "Then the sponsor").fill("12");
   await editor.getByTestId(`save-ladder-${OWNER}`).click();
 
   // **Wait for the write, not for the click.** The button is disabled while
@@ -168,15 +178,15 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   });
 
   await goTo(page, "/admin/nudges");
-  await expect(page.getByTestId(`ladder-${OWNER}`).getByLabel(
-    `championRepeat for ${OWNER_NAME}`,
-  )).toHaveValue("2", { timeout: 15_000 });
+  await expect(
+    rung(page.getByTestId(`ladder-${OWNER}`), "Champion, again"),
+  ).toHaveValue("2", { timeout: 15_000 });
 
   // And away again. A row kept only to hold a copy of §11's numbers would
   // survive a change to §11, so emptying every rung removes it.
   const back = page.getByTestId(`ladder-${OWNER}`);
-  for (const rung of ["championRepeat", "coordinator", "sponsor"]) {
-    await back.getByLabel(`${rung} for ${OWNER_NAME}`).fill("");
+  for (const name of Object.values(RUNGS)) {
+    await rung(back, name).fill("");
   }
   await back.getByTestId(`save-ladder-${OWNER}`).click();
   await expect(back.getByTestId(`save-ladder-${OWNER}`)).toBeEnabled({
@@ -184,7 +194,7 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   });
 
   await goTo(page, "/admin/nudges");
-  await expect(page.getByTestId(`ladder-${OWNER}`).getByLabel(
-    `championRepeat for ${OWNER_NAME}`,
-  )).toHaveValue("", { timeout: 15_000 });
+  await expect(
+    rung(page.getByTestId(`ladder-${OWNER}`), "Champion, again"),
+  ).toHaveValue("", { timeout: 15_000 });
 });

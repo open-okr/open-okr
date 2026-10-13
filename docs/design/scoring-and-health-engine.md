@@ -26,7 +26,7 @@ recomputeGoal(graph, change, thresholds) -> { goals: GoalDerived[], keyResults: 
 | Pure | No database, no clock, no network. The clock is an argument (`now`), the thresholds are an argument |
 | Total | Every input produces an answer. Nothing throws on bad data. Impossible states become a diagnostic and a defined value |
 | Rounding | Stored percentages carry 2 decimals, rounded half away from zero. Rounding happens once, at the boundary, never between cascade levels |
-| Clamping | Progress is clamped to 0 to 100 after the direction formula, before weighting. Weights are clamped to 0 to 100 inside the average as well as on write, because an imported row carrying 150 must not dominate a company figure |
+| Clamping | Progress is clamped to 0 to 100 after the direction formula, before weighting. Weights are clamped to 0 to 100 inside the average as well as on write, because an imported row carrying 150 must not dominate a company figure. Since guided-inputs §4.8 an action refuses a weight outside the range rather than clamping it; the service and the importers still clamp |
 
 Three numbers stay separate everywhere and are never averaged together
 (METHOD.md §3): progress is backward-looking 0 to the progress ceiling,
@@ -130,7 +130,7 @@ the weighted contribution of goals aligned beneath it.
 | Rule | Detail |
 |---|---|
 | Items | Every key result of the goal, plus every goal whose parent pointer targets this goal **or any of its key results** |
-| Weights | `weight` clamped to 0 to 100 on write. Weight 0 excludes an item from the average while keeping it visible |
+| Weights | `weight` held to 0 to 100: refused outside it by an action, clamped by the service and the importers. Weight 0 excludes an item from the average while keeping it visible |
 | No items, or total weight 0 | Progress 0 (decision D-3) |
 | A child aligned to a key result | Contributes to this **goal**, and leaves that key result's own measured progress alone (decision D-2) |
 | Cycle | Broken before any arithmetic runs, deterministically, and reported |

@@ -18,6 +18,7 @@ import {
   recomputeGateState,
 } from "../src/cycles/workflow.ts";
 import { runOperation } from "../src/operations/operation.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -687,6 +688,101 @@ describe("the workflow actions", () => {
       { cycleId },
     );
     expect(read.phases[3]?.state).toBe("pass");
+  });
+
+  it("keeps both notes written as documents, with their plain text beside them", async () => {
+    // Guided-inputs change 12. The plain text is what the release before
+    // reads during an upgrade, and what phase 3's check reads.
+    const wb = await workerDb();
+    const changeNote = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Dropped the ASEAN thrust." }],
+        },
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Mobile first" }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.setRevalidation",
+      {
+        cycleId,
+        holds: false,
+        changed: true,
+        changeNote: changeNote as never,
+        focusNote: "Mobile activation",
+      },
+    );
+    const read = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    )) as {
+      revalidation: { changeNote: string | null; focusNote: string | null };
+      revalidationDocuments: { changeNote: unknown; focusNote: unknown };
+      phases: { state: string }[];
+    };
+    expect(read.revalidationDocuments.changeNote).toEqual(changeNote);
+    expect(read.revalidationDocuments.focusNote).toEqual(
+      richTextFromPlainText("Mobile activation"),
+    );
+    expect(read.revalidation.changeNote).toBe(
+      "Dropped the ASEAN thrust.\n\nMobile first",
+    );
+    expect(read.phases[3]?.state).toBe("pass");
+  });
+
+  it("refuses a change recorded with a blank note, and wraps a note stored as text", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.setRevalidation",
+        {
+          cycleId,
+          holds: false,
+          changed: true,
+          changeNote: {
+            type: "doc",
+            content: [{ type: "paragraph" }],
+          } as never,
+        },
+      ),
+    ).rejects.toThrow(/what changed/);
+
+    // As the release before wrote it, with no document beside it.
+    await wb.admin.query(
+      `insert into cycle_revalidations (cycle_id, workspace_id, holds, focus_note)
+       values ($1, $2, true, 'Written last release')`,
+      [cycleId, workspaceId],
+    );
+    const read = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    )) as {
+      revalidation: { focusNote: string | null };
+      revalidationDocuments: { focusNote: unknown };
+    };
+    expect(read.revalidation.focusNote).toBe("Written last release");
+    expect(read.revalidationDocuments.focusNote).toEqual(
+      richTextFromPlainText("Written last release"),
+    );
   });
 
   it("records no calibration any more: a target moves under §2.9's one rule instead", () => {

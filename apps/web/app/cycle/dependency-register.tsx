@@ -3,9 +3,13 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  EntityPicker,
   type MessageValues,
+  TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
+import { memberOption, namedOption } from "../../lib/entity-options.ts";
+import { searchAnyone } from "../../lib/member-search.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import {
@@ -66,6 +70,8 @@ export interface RegisterKeyResult {
 export interface RegisterMember {
   readonly id: string;
   readonly name: string;
+  readonly title?: string | null;
+  readonly kind?: string;
 }
 
 export interface RegisterSpace {
@@ -235,23 +241,29 @@ export async function DependencyRegister({
                         className="flex items-center gap-1.5"
                       >
                         <input type="hidden" name="id" value={entry.id} />
-                        <label className="text-xs text-ink-3">
-                          {t("cycle.dependencyRegister.riskOwner")}
-                          <select
-                            name="memberId"
-                            defaultValue={entry.riskOwnerId ?? ""}
-                            className="ml-1.5 rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink"
-                          >
-                            <option value="">
-                              {t("cycle.dependencyRegister.nobody")}
-                            </option>
-                            {members.map((member) => (
-                              <option key={member.id} value={member.id}>
-                                {member.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                        <EntityPicker
+                          label={t("cycle.dependencyRegister.riskOwner")}
+                          name="memberId"
+                          defaultValue={entry.riskOwnerId}
+                          options={members.map((member) =>
+                            memberOption(member, t("common.agent")),
+                          )}
+                          current={
+                            entry.riskOwnerId && entry.riskOwnerName
+                              ? memberOption(
+                                  {
+                                    id: entry.riskOwnerId,
+                                    name: entry.riskOwnerName,
+                                  },
+                                  t("common.agent"),
+                                )
+                              : null
+                          }
+                          noneLabel={t("cycle.dependencyRegister.nobody")}
+                          search={searchAnyone}
+                          className="w-56"
+                          inputClassName="text-xs"
+                        />
                         <button
                           type="submit"
                           className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2"
@@ -285,56 +297,44 @@ export async function DependencyRegister({
             <h3 className="text-xs font-bold text-ink-2">
               {t("cycle.dependencyRegister.recordADependency")}
             </h3>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("common.keyResult")}
-              <select
-                name="keyResultId"
-                required
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-              >
-                {keyResults.map((keyResult) => (
-                  <option key={keyResult.id} value={keyResult.id}>
-                    {keyResult.goalTitle}: {keyResult.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <EntityPicker
+              label={t("common.keyResult")}
+              name="keyResultId"
+              required
+              options={keyResults.map((keyResult) => ({
+                id: keyResult.id,
+                label: keyResult.title,
+                detail: keyResult.goalTitle,
+              }))}
+            />
             <div className="flex flex-wrap gap-2.5">
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("cycle.dependencyRegister.providingSpace")}
-                <select
-                  name="providerSpaceId"
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                >
-                  <option value="">
-                    {t("cycle.dependencyRegister.somebodyOutsideThisWorkspace")}
-                  </option>
-                  {spaces.map((space) => (
-                    <option key={space.id} value={space.id}>
-                      {space.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-ink-3">
-                {t("cycle.dependencyRegister.orNameThem")}
-                <input
-                  name="providerText"
-                  placeholder={t(
-                    "cycle.dependencyRegister.thePlatformVendorLegal",
-                  )}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
-            </div>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("cycle.dependencyRegister.whatIsNeeded")}
-              <input
-                name="note"
-                placeholder={t("cycle.dependencyRegister.theRateLimitChange")}
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+              <EntityPicker
+                label={t("cycle.dependencyRegister.providingSpace")}
+                name="providerSpaceId"
+                options={spaces.map(namedOption)}
+                noneLabel={t(
+                  "cycle.dependencyRegister.somebodyOutsideThisWorkspace",
+                )}
+                defaultValue={null}
+                className="w-56"
               />
-            </label>
+              {/* The server's 200 and 500 (alignment.addDependency). */}
+              <TextInput
+                label={t("cycle.dependencyRegister.orNameThem")}
+                name="providerText"
+                maxLength={200}
+                placeholder={t(
+                  "cycle.dependencyRegister.thePlatformVendorLegal",
+                )}
+                className="min-w-48 flex-1"
+              />
+            </div>
+            <TextInput
+              label={t("cycle.dependencyRegister.whatIsNeeded")}
+              name="note"
+              maxLength={500}
+              placeholder={t("cycle.dependencyRegister.theRateLimitChange")}
+            />
             <button
               type="submit"
               className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"

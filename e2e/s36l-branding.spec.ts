@@ -98,11 +98,15 @@ test("a saved colour is what every screen is drawn in", async () => {
 
 test("a status hue is refused in words, and nothing changes", async () => {
   await goTo(page, "/admin/branding");
-  await save(page, "#22c55e");
+  await field(page).fill("#22c55e");
 
+  // Said as the colour is chosen, before Save (guided-inputs §4.11).
   // Filtered, because Next's route announcer is an alert region too.
   const refusal = page.getByRole("alert").filter({ hasText: "reads as green" });
   await expect(refusal).toBeVisible({ timeout: 15_000 });
+  // And Save is held: the browser will not send a refused colour.
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toHaveCount(0);
   // Refused means kept in the field, under the sentence saying why.
   await expect(field(page)).toHaveValue("#22c55e");
 

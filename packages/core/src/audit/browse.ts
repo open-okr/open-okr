@@ -23,7 +23,7 @@
  * rest takes the export, which records that they did.
  */
 import { auditEvents, withWorkspace } from "@openokr/db";
-import { and, desc, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type AuditFilter, auditFilterClauses } from "./export.ts";
@@ -105,4 +105,38 @@ export async function listAuditRows(
     })),
     more: rows.length > page.limit,
   };
+}
+
+/**
+ * The action and target type names this workspace's trail holds, so the
+ * filter offers only names it finds rows for (guided-inputs §4.11).
+ *
+ * Read from the rows rather than from the action registry, because the two
+ * differ both ways: a registry read writes no row, and a write may record a
+ * name the registry does not hold, such as `support.grant`. Sorted here
+ * rather than by the database, whose collation would order `_` and `.`
+ * differently from one locale to the next.
+ */
+export async function listAuditNames(
+  pool: Pool,
+  workspaceId: string,
+): Promise<{
+  readonly actions: readonly string[];
+  readonly targetTypes: readonly string[];
+}> {
+  return withWorkspace(drizzle(pool), workspaceId, async (tx) => {
+    const own = eq(auditEvents.workspaceId, workspaceId);
+    const actions = await tx
+      .selectDistinct({ name: auditEvents.action })
+      .from(auditEvents)
+      .where(own);
+    const targetTypes = await tx
+      .selectDistinct({ name: auditEvents.targetType })
+      .from(auditEvents)
+      .where(own);
+    return {
+      actions: actions.map((row) => row.name).sort(),
+      targetTypes: targetTypes.map((row) => row.name).sort(),
+    };
+  });
 }

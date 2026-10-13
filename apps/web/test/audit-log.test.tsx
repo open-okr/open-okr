@@ -36,6 +36,12 @@ const MEMBERS = [
   { id: "00000000-0000-4000-8000-00000000000b", name: "OKR Coach" },
 ];
 
+/** The names the trail holds, as `audit.names` answers them. */
+const NAMES = {
+  actions: ["audit.export", "people.suspend"],
+  targetTypes: ["workspace", "workspace_member"],
+};
+
 const row = (overrides: Partial<AuditRow>): AuditRow => ({
   id: "00000000-0000-4000-8000-000000000001",
   seq: 7,
@@ -218,6 +224,7 @@ describe("the panel", () => {
   const panel = inEnglish(
     <AuditPanel
       members={MEMBERS}
+      names={NAMES}
       timeZone="UTC"
       initial={{ rows: [row({})], more: true }}
     />,
@@ -244,18 +251,31 @@ describe("the panel", () => {
     }
   });
 
-  test("filters by who from the directory, with anyone first", () => {
-    const select = panel.slice(panel.indexOf('<select id="audit-actor"'));
-    expect(select.indexOf(">Anyone</option>")).toBeLessThan(
-      select.indexOf(">Priya Raman</option>"),
-    );
-    expect(select).toContain(`value="${MEMBERS[0]?.id}"`);
+  test("filters by who from the directory, opening on anyone", () => {
+    // A picker (guided-inputs §4.10), which draws the directory only when it
+    // is opened; closed, it reads "Anyone" and posts nothing.
+    const box = panel.slice(panel.indexOf('id="audit-actor"') - 200);
+    expect(box).toContain('value="Anyone"');
+    expect(panel).toContain('name="actorMemberId"');
+  });
+
+  test("offers the action and target type the trail holds, opening on any", () => {
+    // guided-inputs §4.11: two free-text boxes asked for names nobody could
+    // know. Each is a picker now, closed on "Any", posting nothing.
+    for (const [id, any] of [
+      ["audit-action", "Any action"],
+      ["audit-target-type", "Any target type"],
+    ]) {
+      const box = panel.slice(panel.indexOf(`id="${id}"`) - 200);
+      expect(box).toContain(`value="${any}"`);
+    }
   });
 
   test("shows a refusal handed to it by the server", () => {
     const refused = inEnglish(
       <AuditPanel
         members={MEMBERS}
+        names={NAMES}
         timeZone="UTC"
         initial={{ denied: true }}
       />,
@@ -274,6 +294,8 @@ describe("the page", () => {
     expect(page.indexOf("level < ACCESS_LEVELS.full")).toBeLessThan(
       page.indexOf("browseAudit({})"),
     );
+    // The filter's names are the trail's own, read at the same level.
+    expect(page).toContain('callAction(context, "audit.names", {})');
     // Suspended members still acted, and their rows still name them.
     expect(page).toContain(
       'callAction(context, "people.directory", { includeSuspended: true })',

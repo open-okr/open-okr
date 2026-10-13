@@ -1,7 +1,12 @@
 "use client";
 
 import { confidenceBand, type ResolvedThresholds } from "@openokr/method";
-import { useTranslations } from "@openokr/ui";
+import {
+  type ConfidenceDisplay,
+  confidenceShown,
+  formatConfidence,
+  useTranslations,
+} from "@openokr/ui";
 
 /**
  * Confidence dial: 0.0 to 1.0 in 0.1 steps (METHOD.md §7.2, P4-T07b).
@@ -36,6 +41,8 @@ interface ConfidenceDialProps {
   readonly onChange: (value: number) => void;
   readonly disabled?: boolean;
   readonly thresholds: ResolvedThresholds;
+  /** The workspace's "Confidence shown as" (guided-inputs §4.8). */
+  readonly display: ConfidenceDisplay;
 }
 
 export function ConfidenceDial({
@@ -43,8 +50,14 @@ export function ConfidenceDial({
   onChange,
   disabled = false,
   thresholds,
+  display,
 }: ConfidenceDialProps) {
   const { t } = useTranslations();
+  // Each stop and the value on the workspace's scale: 7, 0.7 or 70%.
+  const shown = (confidence: number) =>
+    formatConfidence(confidence, display, t);
+  const stop = (confidence: number) =>
+    `${confidenceShown(confidence, display)}${display === "percent" ? "%" : ""}`;
   const bandOf = (confidence: number) =>
     confidenceBand(confidence, thresholds).band;
   const shortcuts = [
@@ -81,7 +94,7 @@ export function ConfidenceDial({
               .filter(Boolean)
               .join(" ")}
           >
-            {shortcut.label} ({shortcut.value})
+            {shortcut.label} ({stop(shortcut.value)})
           </button>
         ))}
       </div>
@@ -103,16 +116,18 @@ export function ConfidenceDial({
             ]
               .filter(Boolean)
               .join(" ")}
-            aria-label={`Set confidence to ${step}`}
+            aria-label={t("session.confidenceDial.setTo", {
+              value: shown(step),
+            })}
           >
-            {step.toFixed(1)}
+            {stop(step)}
           </button>
         ))}
       </div>
 
       {/* Current value display */}
       <p className="text-sm text-ink-2">
-        {value.toFixed(1)} / {t(BAND_LABEL[bandOf(value)])}
+        {shown(value)} / {t(BAND_LABEL[bandOf(value)])}
       </p>
     </div>
   );

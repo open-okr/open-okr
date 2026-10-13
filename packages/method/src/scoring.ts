@@ -213,6 +213,15 @@ export function computedScore(input: ComputedScoreInput): number {
   return round2(Math.min(100, Math.max(0, input.progressPct)) / 100);
 }
 
+/**
+ * §3.1's weight: how much a goal or a key result counts toward what it sits
+ * under. 0 keeps it visible without counting it. The field and the action
+ * hold it to this range (guided-inputs §4.8), and the average clamps to it
+ * for a row that reached the table another way.
+ */
+export const WEIGHT_MIN = 0;
+export const WEIGHT_MAX = 100;
+
 /** One weighted item in a goal's average: a key result or an aligned child. */
 export interface WeightedItem {
   readonly weight: number;
@@ -235,7 +244,7 @@ export function weightedProgress(
   // pure function that trusted its input would let one team's bad data dominate a
   // company average.
   const weightOf = (item: WeightedItem): number =>
-    Math.min(100, Math.max(0, item.weight));
+    Math.min(WEIGHT_MAX, Math.max(WEIGHT_MIN, item.weight));
 
   const total = items.reduce((sum, item) => sum + weightOf(item), 0);
   if (total <= 0) {

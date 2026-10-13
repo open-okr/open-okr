@@ -29,6 +29,13 @@ import { blockerClockToCheckIn } from "../src/data-changes/0023_blocker_clock_to
 import { retireRhythmScoreThreshold } from "../src/data-changes/0024_retire_rhythm_score_threshold.ts";
 import { verifyFirstAccount } from "../src/data-changes/0025_verify_first_account.ts";
 import { kpiCorridorFollowsWorkspace } from "../src/data-changes/0026_kpi_corridor_follows_workspace.ts";
+import { sessionShiftsDocument } from "../src/data-changes/0027_session_shifts_document.ts";
+import { decisionTextDocument } from "../src/data-changes/0028_decision_text_document.ts";
+import { managementAnswerDocument } from "../src/data-changes/0029_management_answer_document.ts";
+import { stageNoteDocuments } from "../src/data-changes/0030_stage_note_documents.ts";
+import { digestNoteDocument } from "../src/data-changes/0031_digest_note_document.ts";
+import { revalidationNoteDocuments } from "../src/data-changes/0032_revalidation_note_documents.ts";
+import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1541,5 +1548,311 @@ describe("0026: a KPI's corridor follows the workspace", () => {
       // 85 now, so 87% is healthy.
       { short_id: "K-4", healthy_pct: null, watch_pct: null, state: "healthy" },
     ]);
+  });
+});
+
+describe("0027 and 0028: the monthly review's prose as documents", () => {
+  it("splits plain text the way richTextFromPlainText does", () => {
+    // packages/core's rule, held here by example because packages/db cannot
+    // import it: blank lines split, each block trimmed, empties dropped, and
+    // nothing interpreted.
+    expect(
+      plainTextDocument("  One *line*\r\n\r\n\n Two \nlines\n\n\n"),
+    ).toEqual({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "One *line*" }] },
+        { type: "paragraph", content: [{ type: "text", text: "Two \nlines" }] },
+      ],
+    });
+    expect(plainTextDocument("   \n\n  ").content).toEqual([]);
+  });
+
+  it("writes each shifts note and decision as a document, keeps one already written, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe)
+         select gen_random_uuid(), m.workspace_id, 'Keep customers', 'company',
+                'workspace', m.id, m.id,
+                '{"start": "2026-07-01", "end": "2026-09-30"}'::jsonb
+           from m
+         returning id, workspace_id
+       ), s as (
+         insert into okr_sessions (id, workspace_id, kind, title,
+                                   scheduled_for, facilitator_id, shifts,
+                                   shifts_document, shifts_document_version)
+         select gen_random_uuid(), m.workspace_id, 'monthly', d.title, now(),
+                m.id, d.shifts, d.document, d.version
+           from m,
+                (values ('Noted', 'Two people to support.\n\nThe rest stays.',
+                         null::jsonb, null::int),
+                        ('Silent', null, null, null),
+                        ('Blank', '   ', null, null),
+                        ('Edited', 'old words',
+                         '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Written in the editor"}]}]}'::jsonb,
+                         1))
+                  as d(title, shifts, document, version)
+         returning id
+       )
+       insert into decisions (id, workspace_id, goal_id, at, text,
+                              author_member_id)
+       select gen_random_uuid(), g.workspace_id, g.id, '2026-08-01',
+              'Pause the self-serve tier', m.id
+         from g, m`,
+    );
+
+    const [shifts, decisionsRun] = await runDataChanges(client, {
+      scripts: [sessionShiftsDocument, decisionTextDocument],
+    });
+    expect(shifts?.rowsChanged).toBe(1);
+    expect(decisionsRun?.rowsChanged).toBe(1);
+
+    const { rows: sessionRows } = await client.query<{
+      title: string;
+      shifts_document: unknown;
+      shifts_document_version: number | null;
+    }>(
+      "select title, shifts_document, shifts_document_version from okr_sessions order by title",
+    );
+    const byTitle = Object.fromEntries(
+      sessionRows.map((row) => [row.title, row]),
+    );
+    expect(byTitle.Noted?.shifts_document).toEqual(
+      plainTextDocument("Two people to support.\n\nThe rest stays."),
+    );
+    expect(byTitle.Noted?.shifts_document_version).toBe(1);
+    expect(byTitle.Silent?.shifts_document).toBeNull();
+    expect(byTitle.Blank?.shifts_document).toBeNull();
+    // Already written in the editor: left alone, not rewritten from the
+    // plain column.
+    expect(JSON.stringify(byTitle.Edited?.shifts_document)).toContain(
+      "Written in the editor",
+    );
+
+    const { rows: decisionRows } = await client.query<{
+      text_document: unknown;
+      text_document_version: number | null;
+    }>("select text_document, text_document_version from decisions");
+    expect(decisionRows[0]?.text_document).toEqual(
+      plainTextDocument("Pause the self-serve tier"),
+    );
+    expect(decisionRows[0]?.text_document_version).toBe(1);
+
+    await client.query("delete from _data_changes");
+    const again = await runDataChanges(client, {
+      scripts: [sessionShiftsDocument, decisionTextDocument],
+    });
+    expect(again.map((outcome) => outcome.rowsChanged)).toEqual([0, 0]);
+  });
+});
+
+describe("0029 and 0030: the quarterly review's prose as documents", () => {
+  it("writes each answer as a document, turns each text stage note into one, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const written = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Already rich" }],
+        },
+      ],
+    };
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       ), s as (
+         insert into okr_sessions (id, workspace_id, kind, title,
+                                   scheduled_for, facilitator_id, notes)
+         select gen_random_uuid(), m.workspace_id, 'quarterly', 'Q3 review',
+                now(), m.id,
+                jsonb_build_object(
+                  'open', 'Pulse was low.\n\nName it first.',
+                  'score', '   ',
+                  'retro', $1::jsonb)
+           from m
+         returning id, workspace_id
+       )
+       insert into management_answers (id, workspace_id, session_id,
+                                       question_key, body, answered_by_id)
+       select gen_random_uuid(), s.workspace_id, s.id, 1,
+              'Mostly. Two were leftovers.', m.id
+         from s, m`,
+      [JSON.stringify(written)],
+    );
+
+    const [answers, notes] = await runDataChanges(client, {
+      scripts: [managementAnswerDocument, stageNoteDocuments],
+    });
+    expect(answers?.rowsChanged).toBe(1);
+    expect(notes?.rowsChanged).toBe(1);
+
+    const { rows: answerRows } = await client.query<{
+      body_document: unknown;
+      body_document_version: number | null;
+    }>("select body_document, body_document_version from management_answers");
+    expect(answerRows[0]?.body_document).toEqual(
+      plainTextDocument("Mostly. Two were leftovers."),
+    );
+    expect(answerRows[0]?.body_document_version).toBe(1);
+
+    const { rows: sessionRows } = await client.query<{
+      notes: Record<string, unknown>;
+    }>("select notes from okr_sessions");
+    expect(sessionRows[0]?.notes).toEqual({
+      open: plainTextDocument("Pulse was low.\n\nName it first."),
+      // Whitespace alone was a note nobody wrote, and its key goes.
+      retro: written,
+    });
+
+    await client.query("delete from _data_changes");
+    const again = await runDataChanges(client, {
+      scripts: [managementAnswerDocument, stageNoteDocuments],
+    });
+    expect(again.map((outcome) => outcome.rowsChanged)).toEqual([0, 0]);
+  });
+});
+
+describe("0031: the weekly coordinator note as a document", () => {
+  it("writes each note as a document, leaves a digest with none, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       )
+       insert into digests (id, workspace_id, scope, period, period_start, note)
+       select gen_random_uuid(), w.id, 'space', 'weekly', d.week, d.note
+         from w,
+              (values ('2026-08-24'::date, 'Hiring is the constraint.\n\nNot the roadmap.'),
+                      ('2026-08-31'::date, null)) as d(week, note)`,
+    );
+
+    const [outcome] = await runDataChanges(client, {
+      scripts: [digestNoteDocument],
+    });
+    expect(outcome?.rowsChanged).toBe(1);
+
+    const { rows } = await client.query<{
+      note_document: unknown;
+      note_document_version: number | null;
+    }>(
+      "select note_document, note_document_version from digests order by period_start",
+    );
+    expect(rows[0]?.note_document).toEqual(
+      plainTextDocument("Hiring is the constraint.\n\nNot the roadmap."),
+    );
+    expect(rows[0]?.note_document_version).toBe(1);
+    expect(rows[1]).toEqual({
+      note_document: null,
+      note_document_version: null,
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [digestNoteDocument],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0032: the revalidation notes as documents", () => {
+  it("fills each note still missing a document, never one already written, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const written = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Already rich" }],
+        },
+      ],
+    };
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), c as (
+         insert into cycles (id, workspace_id, name, mode, starts_on, ends_on)
+         select gen_random_uuid(), w.id, n.name, 'quarterly', n.starts, n.ends
+           from w,
+                (values ('Q1', '2026-01-01'::date, '2026-03-31'::date),
+                        ('Q2', '2026-04-01'::date, '2026-06-30'::date)) as n(name, starts, ends)
+         returning id, workspace_id, name
+       )
+       insert into cycle_revalidations
+         (cycle_id, workspace_id, holds, changed, change_note, focus_note,
+          focus_note_document, focus_note_document_version)
+       select c.id, c.workspace_id, c.name = 'Q2', c.name = 'Q1',
+              case when c.name = 'Q1' then 'Dropped the ASEAN thrust.\n\nMobile first.' end,
+              case when c.name = 'Q1' then 'Mobile activation' else 'Old text' end,
+              case when c.name = 'Q2' then $1::jsonb end,
+              case when c.name = 'Q2' then 1 end
+         from c`,
+      [JSON.stringify(written)],
+    );
+
+    const [outcome] = await runDataChanges(client, {
+      scripts: [revalidationNoteDocuments],
+    });
+    // Q1 gains both. Q2 has its focus document already and no change note.
+    expect(outcome?.rowsChanged).toBe(1);
+
+    const { rows } = await client.query<{
+      name: string;
+      change_note_document: unknown;
+      change_note_document_version: number | null;
+      focus_note_document: unknown;
+      focus_note_document_version: number | null;
+    }>(
+      `select c.name, r.change_note_document, r.change_note_document_version,
+              r.focus_note_document, r.focus_note_document_version
+         from cycle_revalidations r join cycles c on c.id = r.cycle_id
+        order by c.name`,
+    );
+    expect(rows[0]).toEqual({
+      name: "Q1",
+      change_note_document: plainTextDocument(
+        "Dropped the ASEAN thrust.\n\nMobile first.",
+      ),
+      change_note_document_version: 1,
+      focus_note_document: plainTextDocument("Mobile activation"),
+      focus_note_document_version: 1,
+    });
+    expect(rows[1]).toEqual({
+      name: "Q2",
+      change_note_document: null,
+      change_note_document_version: null,
+      focus_note_document: written,
+      focus_note_document_version: 1,
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [revalidationNoteDocuments],
+    });
+    expect(again?.rowsChanged).toBe(0);
   });
 });

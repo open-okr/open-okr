@@ -57,6 +57,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { LOCAL_DATE_PATTERN, parseWallClock } from "@openokr/formats";
 import {
   afterCheckIn,
   CLOSE_DECISION_MEANINGS,
@@ -137,14 +138,24 @@ import {
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
-import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
+import {
+  documentOfInput,
+  documentOrPlainText,
+  plainTextOfDocument,
+  richTextOrPlainTextSchema,
+} from "../rich-text/moving.ts";
+import {
+  RICH_TEXT_SCHEMA_VERSION,
+  type RichTextDocument,
+} from "../rich-text/schema.ts";
 import { computedScoresInTx } from "../scoring/computed.ts";
 import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
 import { sessionChannel } from "../sessions/live.ts";
 import { measuredRhythmInTx } from "../sessions/measured-rhythm.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { wallClock } from "./wall-clock.ts";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -501,6 +512,10 @@ const sessionOutput = z.object({
    * `toOutput` returned the whole map to every caller from P4-T07a until
    * P4-T10a-a. Nothing wrote notes in between, so nothing leaked, and the
    * shape was still wrong.
+   *
+   * Each value is editor JSON since guided-inputs change 11b. A note still
+   * stored as text, before data change 0030 reaches its row, is handed back
+   * wrapped, so no reader meets both shapes.
    */
   notes: z.record(z.string(), z.unknown()),
   /** Whole minutes added per stage by the facilitator (METHOD.md §8.1). */
@@ -521,6 +536,23 @@ const sessionOutput = z.object({
 });
 
 type SessionOutput = z.infer<typeof sessionOutput>;
+
+/** The stage notes as documents, with text the backfill has not reached wrapped. */
+function stageNotesAsDocuments(notes: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [stageKey, note] of Object.entries(
+    (notes ?? {}) as Record<string, unknown>,
+  )) {
+    const document = documentOrPlainText(
+      typeof note === "string" ? null : note,
+      typeof note === "string" ? note : null,
+    );
+    if (document !== null) {
+      out[stageKey] = document;
+    }
+  }
+  return out;
+}
 
 /**
  * A session as a caller may see it.
@@ -548,7 +580,7 @@ function toOutput(
     stageKey: row.stageKey ?? null,
     stageStartedAt: row.stageStartedAt?.toISOString() ?? null,
     elapsed: (row.elapsed ?? {}) as Record<string, number>,
-    notes: isFacilitator ? ((row.notes ?? {}) as Record<string, unknown>) : {},
+    notes: isFacilitator ? stageNotesAsDocuments(row.notes) : {},
     addedMinutes: (row.addedMinutes ?? {}) as Record<string, number>,
     wins: (row.wins ?? []) as string[],
     reviewPart: row.reviewPart ?? null,
@@ -632,9 +664,6 @@ async function requireOpenCycle(
   }
   return cycle;
 }
-
-/** `HH:MM`, read as a wall-clock time where the workspace is. */
-const WALL_CLOCK = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 /**
  * An instant from a caller's time. A time with no offset is read in the
@@ -809,7 +838,7 @@ export const bookCycleSessions = defineWriteAction({
     /** 1 for Monday to 5 for Friday. */
     weekday: z.number().int().min(1).max(5),
     /** `HH:MM` where the workspace is. */
-    time: z.string().regex(WALL_CLOCK, "Give the time as HH:MM."),
+    time: wallClock,
     facilitatorId: z.uuid(),
   }),
   output: z.object({
@@ -855,18 +884,12 @@ export const bookCycleSessions = defineWriteAction({
       }
       const cycle = await requireOpenCycle(tx, workspaceId, cycleId);
 
-      const [, hour, minute] = WALL_CLOCK.exec(input.time) as unknown as [
-        string,
-        string,
-        string,
-      ];
+      const { hour, minute } = parseWallClock(input.time) as {
+        hour: number;
+        minute: number;
+      };
       const at = (on: string) =>
-        localInstant(
-          parseLocalDate(on),
-          Number(hour),
-          Number(minute),
-          timeZone,
-        );
+        localInstant(parseLocalDate(on), hour, minute, timeZone);
       // Today still counts while its hour is ahead.
       const from =
         at(today) > now
@@ -3821,12 +3844,23 @@ export const confidenceTrend = defineReadAction({
   },
 });
 
+/** The longest coordinator note, the textarea's limit before it was an editor. */
+const COORDINATOR_NOTE_MAX_CHARACTERS = 2000;
+
 export const setCoordinatorNote = defineWriteAction({
   name: "sessions.setCoordinatorNote",
   summary: "Adds the coordinator's note to the session digest.",
   input: z.object({
     sessionId: z.uuid(),
-    note: z.string().trim().min(1).max(2000),
+    /**
+     * Editor JSON, or for this release the plain text it took before
+     * (guided-inputs change 11c), which is wrapped as a document.
+     */
+    note: richTextOrPlainTextSchema({
+      maxCharacters: COORDINATOR_NOTE_MAX_CHARACTERS,
+    }).refine((value) => documentOfInput(value) !== null, {
+      message: "A note says something for leadership.",
+    }),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -3852,9 +3886,17 @@ export const setCoordinatorNote = defineWriteAction({
         );
       }
 
+      // Both columns, the plain one for the previous release during a rolling
+      // upgrade. The schema has already refused a blank note.
+      const document = documentOfInput(input.note) as RichTextDocument;
       await tx
         .update(digests)
-        .set({ note: input.note, updatedAt: new Date() })
+        .set({
+          note: plainTextOfDocument(document),
+          noteDocument: document,
+          noteDocumentVersion: RICH_TEXT_SCHEMA_VERSION,
+          updatedAt: new Date(),
+        })
         .where(activeOnly(digests, eq(digests.id, session.digestId)));
 
       return {
@@ -4114,13 +4156,42 @@ export const setTrend = defineWriteAction({
   }),
 });
 
+/** The longest shifts note, the textarea's limit before it was an editor. */
+const SHIFTS_MAX_CHARACTERS = 4000;
+
+/** The longest decision, the textarea's limit before it was an editor. */
+const DECISION_MAX_CHARACTERS = 2000;
+
+/** The longest private stage note, the textarea's limit before it was an editor. */
+const STAGE_NOTE_MAX_CHARACTERS = 4000;
+
+/** The longest management retro answer, the textarea's limit before it was an editor. */
+const MANAGEMENT_ANSWER_MAX_CHARACTERS = 2000;
+
+/** A decision's two text columns, written together for one release. */
+function decisionTextColumns(document: RichTextDocument | null): {
+  text: string;
+  textDocument: RichTextDocument | null;
+  textDocumentVersion: number | null;
+} {
+  return {
+    text: document === null ? "" : plainTextOfDocument(document),
+    textDocument: document,
+    textDocumentVersion: document === null ? null : RICH_TEXT_SCHEMA_VERSION,
+  };
+}
+
 export const setShifts = defineWriteAction({
   name: "sessions.setShifts",
   summary:
     "Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5).",
   input: z.object({
     sessionId: z.uuid(),
-    shifts: z.string().trim().max(4000),
+    /**
+     * Editor JSON, or for this release the plain text it took before
+     * (guided-inputs change 11a), which is wrapped as a document.
+     */
+    shifts: richTextOrPlainTextSchema({ maxCharacters: SHIFTS_MAX_CHARACTERS }),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -4140,12 +4211,17 @@ export const setShifts = defineWriteAction({
       );
 
       // Empty is a real answer and means the room noted no shift, so the
-      // column goes back to null rather than holding an empty string that
-      // reads on screen as somebody having written nothing.
+      // columns go back to null rather than holding an empty note that reads
+      // on screen as somebody having written nothing. Both are written, the
+      // plain one for the previous release during a rolling upgrade.
+      const document = documentOfInput(input.shifts);
       await tx
         .update(sessions)
         .set({
-          shifts: input.shifts.length === 0 ? null : input.shifts,
+          shifts: document === null ? null : plainTextOfDocument(document),
+          shiftsDocument: document,
+          shiftsDocumentVersion:
+            document === null ? null : RICH_TEXT_SCHEMA_VERSION,
           updatedAt: new Date(),
         })
         .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
@@ -4249,7 +4325,15 @@ export const recordDecision = defineWriteAction({
       sessionId: z.uuid(),
       goalId: z.uuid().optional(),
       keyResultId: z.uuid().optional(),
-      text: z.string().trim().min(1).max(2000),
+      /**
+       * Editor JSON, or for this release the plain text it took before
+       * (guided-inputs change 11a), which is wrapped as a document.
+       */
+      text: richTextOrPlainTextSchema({
+        maxCharacters: DECISION_MAX_CHARACTERS,
+      }).refine((value) => documentOfInput(value) !== null, {
+        message: "A decision says what was decided.",
+      }),
     })
     // §7.5: "Every decision names the key result it affects." A decision with
     // no subject is a meeting note, and the log is not a notepad. Refused at
@@ -4333,7 +4417,9 @@ export const recordDecision = defineWriteAction({
           sessionId: input.sessionId,
           goalId,
           keyResultId: input.keyResultId ?? null,
-          text: input.text,
+          // Both, the plain one for the previous release during a rolling
+          // upgrade. The refinement above means there is a document.
+          ...decisionTextColumns(documentOfInput(input.text)),
           // The day the review sat, or today while it has not passed: a
           // decision recorded after the session belongs to the session's day
           // (P9-T22c-b-b), as its diagnostic does.
@@ -4378,7 +4464,10 @@ export const recordDecision = defineWriteAction({
 
 const decisionOutput = z.object({
   id: z.uuid(),
+  /** The decision as plain text, as it always was. */
   text: z.string(),
+  /** The decision as editor JSON (guided-inputs change 11a). */
+  textDocument: z.unknown(),
   at: z.string(),
   authorMemberId: z.uuid(),
   authorName: z.string(),
@@ -4395,6 +4484,7 @@ type DecisionOutput = z.infer<typeof decisionOutput>;
 function decisionRow(row: {
   id: string;
   text: string;
+  textDocument: unknown;
   at: string;
   authorMemberId: string;
   authorName: string | null;
@@ -4407,6 +4497,9 @@ function decisionRow(row: {
   return {
     id: row.id,
     text: row.text,
+    // The stored document, or the plain text wrapped while data change
+    // 0028 has not reached this row.
+    textDocument: documentOrPlainText(row.textDocument, row.text),
     at: row.at,
     authorMemberId: row.authorMemberId,
     // Left-joined, so a decision by a member who has since been removed still
@@ -4423,6 +4516,7 @@ function decisionRow(row: {
 const decisionColumns = {
   id: decisions.id,
   text: decisions.text,
+  textDocument: decisions.textDocument,
   at: decisions.at,
   authorMemberId: decisions.authorMemberId,
   authorName: workspaceMembers.name,
@@ -4439,7 +4533,10 @@ export const readMonthlyRecord = defineReadAction({
     "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
+    /** The shifts as plain text, as they always were. */
     shifts: z.string().nullable(),
+    /** The shifts as editor JSON, or null when none were noted (change 11a). */
+    shiftsDocument: z.unknown(),
     trends: z.array(
       z.object({
         goalId: z.uuid(),
@@ -4779,6 +4876,12 @@ export const readMonthlyRecord = defineReadAction({
 
         return {
           shifts: session.shifts,
+          // The stored document, or the plain text wrapped while data
+          // change 0027 has not reached this session.
+          shiftsDocument: documentOrPlainText(
+            session.shiftsDocument,
+            session.shifts,
+          ),
           trends,
           untrended,
           additions,
@@ -5022,7 +5125,13 @@ export const setStageNote = defineWriteAction({
     "Writes the facilitator's private note for the running stage (METHOD.md §8.1).",
   input: z.object({
     id: z.uuid(),
-    note: z.string().trim().max(4000),
+    /**
+     * Editor JSON, or for this release the plain text it took before
+     * (guided-inputs change 11b), which is wrapped as a document.
+     */
+    note: richTextOrPlainTextSchema({
+      maxCharacters: STAGE_NOTE_MAX_CHARACTERS,
+    }),
   }),
   output: z.object({ id: z.uuid(), stageKey: z.string() }),
   access: ACCESS_LEVELS.edit,
@@ -5052,12 +5161,16 @@ export const setStageNote = defineWriteAction({
       // facilitator reads these back stage by stage while the review runs.
       const notes = (session.notes ?? {}) as Record<string, unknown>;
       const next = { ...notes };
-      if (input.note.length === 0) {
+      const document = documentOfInput(input.note);
+      if (document === null) {
         // Cleared rather than stored empty, so the screen can tell "nothing
         // written" from "written and then emptied".
         delete next[session.stageKey];
       } else {
-        next[session.stageKey] = input.note;
+        // The map has no second column to keep text in for the previous
+        // release, and needs none: the facilitator alone reads it, and that
+        // release shows a note it cannot read as empty rather than failing.
+        next[session.stageKey] = document;
       }
 
       await tx
@@ -5561,13 +5674,7 @@ export const scoreKeyResult = defineWriteAction({
 // ---------------------------------------------------------------------------
 
 /** Editor JSON for the current rich text schema, or null. */
-const narrativeBody = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const narrativeBody = richTextSchema();
 
 /**
  * The review's own objectives: this space, this cycle, still open.
@@ -6848,7 +6955,21 @@ export const setManagementAnswer = defineWriteAction({
     // `packages/method` and never in a row: §11 lists the management-retro
     // questions as unchangeable structure.
     questionKey: z.number().int().min(1).max(4),
-    body: z.string().trim().min(1).max(2000),
+    /**
+     * Editor JSON, or for this release the plain text it took before
+     * (guided-inputs change 11b), which is wrapped as a document. Words
+     * rather than only a mention or an attachment, because the plain column
+     * the previous release reads may not be empty.
+     */
+    body: richTextOrPlainTextSchema({
+      maxCharacters: MANAGEMENT_ANSWER_MAX_CHARACTERS,
+    }).refine(
+      (value) => {
+        const document = documentOfInput(value);
+        return document !== null && plainTextOfDocument(document).trim() !== "";
+      },
+      { message: "An answer says what leadership said." },
+    ),
   }),
   output: z.object({ questionKey: z.number().int() }),
   access: ACCESS_LEVELS.edit,
@@ -6867,6 +6988,14 @@ export const setManagementAnswer = defineWriteAction({
       );
 
       const now = new Date();
+      // Both columns, the plain one for the previous release during a rolling
+      // upgrade. The schema has already refused a blank answer.
+      const document = documentOfInput(input.body) as RichTextDocument;
+      const body = {
+        body: plainTextOfDocument(document),
+        bodyDocument: document,
+        bodyDocumentVersion: RICH_TEXT_SCHEMA_VERSION,
+      };
       const [existing] = await tx
         .select({ id: managementAnswers.id })
         .from(managementAnswers)
@@ -6885,7 +7014,7 @@ export const setManagementAnswer = defineWriteAction({
         // record is one answer; a second row would list the question twice.
         await tx
           .update(managementAnswers)
-          .set({ body: input.body, answeredById: memberId, updatedAt: now })
+          .set({ ...body, answeredById: memberId, updatedAt: now })
           .where(
             activeOnly(
               managementAnswers,
@@ -6897,7 +7026,7 @@ export const setManagementAnswer = defineWriteAction({
           workspaceId,
           sessionId: input.sessionId,
           questionKey: input.questionKey,
-          body: input.body,
+          ...body,
           answeredById: memberId,
         });
       }
@@ -6937,7 +7066,10 @@ export const readManagementRetro = defineReadAction({
         questionKey: z.number().int(),
         /** The canon text, from `packages/method`. Never stored on the row. */
         question: z.string(),
+        /** Plain text, as before guided-inputs change 11b. */
         body: z.string().nullable(),
+        /** The answer as editor JSON, which the screen shows. */
+        bodyDocument: z.unknown().nullable(),
         answeredByName: z.string().nullable(),
       }),
     ),
@@ -6972,6 +7104,7 @@ export const readManagementRetro = defineReadAction({
           .select({
             questionKey: managementAnswers.questionKey,
             body: managementAnswers.body,
+            bodyDocument: managementAnswers.bodyDocument,
             answeredByName: answerers.name,
           })
           .from(managementAnswers)
@@ -6997,6 +7130,9 @@ export const readManagementRetro = defineReadAction({
             questionKey: index + 1,
             question,
             body: answer?.body ?? null,
+            bodyDocument: answer
+              ? documentOrPlainText(answer.bodyDocument, answer.body)
+              : null,
             answeredByName: answer?.answeredByName ?? null,
           };
         });
@@ -8502,7 +8638,7 @@ export const addReviewAction = defineWriteAction({
      * exact thing the stage exists to prevent.
      */
     ownerId: z.uuid(),
-    dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    dueOn: z.string().regex(LOCAL_DATE_PATTERN),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -9147,6 +9283,7 @@ export const readMinutes = defineReadAction({
             .select({
               questionKey: managementAnswers.questionKey,
               body: managementAnswers.body,
+              bodyDocument: managementAnswers.bodyDocument,
             })
             .from(managementAnswers)
             .where(
@@ -9161,7 +9298,16 @@ export const readMinutes = defineReadAction({
             question:
               MANAGEMENT_RETRO_QUESTIONS[row.questionKey - 1] ??
               `Question ${row.questionKey}`,
-            body: row.body,
+            // One line, as every other row of the minutes is: the markdown
+            // indents it under its question, and a blank line between two
+            // paragraphs would end the list.
+            body: excerptRichText(
+              documentOrPlainText(
+                row.bodyDocument,
+                row.body,
+              ) as RichTextDocument,
+              4000,
+            ),
           }));
         }
 

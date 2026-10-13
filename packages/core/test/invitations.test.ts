@@ -445,4 +445,37 @@ describe("listing invitations", () => {
     );
     expect(link?.allowedDomains).toEqual(["example.com"]);
   });
+
+  it("refuses an allowed domain that is not a domain, as a trusted domain is", async () => {
+    // guided-inputs §4.11: one domain rule. This took any word, so a link
+    // bounded by "@example.com" or "example" let nobody in.
+    const wb = await workerDb();
+    for (const entry of ["@example.com", "example", "https://example.com"]) {
+      await expect(
+        callAction(
+          { pool: wb.appPool, ...ownerContext() },
+          "invitations.createWorkspaceLink",
+          { allowedDomains: [entry] },
+        ),
+      ).rejects.toThrow("An allowed domain is written like example.com");
+    }
+  });
+
+  it("opens a link for a year at most", async () => {
+    // guided-inputs §6: no limit on either side, so a link could stay open
+    // for as long as somebody typed.
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.createWorkspaceLink",
+      { expiresInDays: 365 },
+    );
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...ownerContext() },
+        "invitations.createWorkspaceLink",
+        { expiresInDays: 366 },
+      ),
+    ).rejects.toThrow();
+  });
 });

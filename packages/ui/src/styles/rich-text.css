@@ -1,0 +1,61 @@
+/*
+ * Rich text as it is read and as it is written (guided-inputs §4.7).
+ *
+ * One set of rules for the editing surface and for the HTML
+ * `renderRichTextToHtml` produces, so a comment or a narrative looks the same
+ * in the editor as on the card. Tailwind's Preflight takes the markers off
+ * every list and the margins off every paragraph, and nothing put them back:
+ * the `prose` classes these surfaces carried belong to a typography plugin
+ * this product does not install, so a bulleted list read as plain lines.
+ *
+ * Each selector sits in `:where()`, which leaves it at the weight of the
+ * `.rich-text` class alone, so a utility on the same element still wins.
+ */
+
+.rich-text
+  :where(p, ul, ol, blockquote, pre)
+  + :where(p, ul, ol, blockquote, pre) {
+  margin-top: 0.5em;
+}
+
+.rich-text :where(ul, ol) {
+  padding-inline-start: 1.25em;
+}
+
+.rich-text :where(ul) {
+  list-style-type: disc;
+}
+
+.rich-text :where(ul ul) {
+  list-style-type: circle;
+}
+
+.rich-text :where(ol) {
+  list-style-type: decimal;
+}
+
+.rich-text :where(li + li) {
+  margin-top: 0.125em;
+}
+
+/* The brand colour as well as the line, so a link never reads as underlined
+ * text beside it. */
+.rich-text :where(a) {
+  color: var(--color-brand-text);
+  text-decoration-line: underline;
+  text-underline-offset: 2px;
+}
+
+.rich-text :where(code) {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--color-raised);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+}
+
+.rich-text :where(blockquote) {
+  border-inline-start: 2px solid var(--color-line-2);
+  padding-inline-start: 0.75em;
+  color: var(--color-ink-3);
+}

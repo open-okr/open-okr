@@ -1,5 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip, SecretInput } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -151,19 +151,20 @@ export default async function PersonalAIKeysPage() {
                         name="provider"
                         value={key.provider}
                       />
-                      <label className="flex max-w-sm flex-col gap-1 text-xs text-ink-3">
-                        {key.hasPersonalCredential
-                          ? t("account.aiKeys.replaceHelp", { provider: name })
-                          : t("account.aiKeys.pasteHelp", { provider: name })}
-                        <input
-                          name="apiKey"
-                          type="password"
-                          autoComplete="off"
-                          spellCheck={false}
-                          required
-                          className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                        />
-                      </label>
+                      <SecretInput
+                        label={
+                          key.hasPersonalCredential
+                            ? t("account.aiKeys.replaceHelp", {
+                                provider: name,
+                              })
+                            : t("account.aiKeys.pasteHelp", { provider: name })
+                        }
+                        name="apiKey"
+                        autoComplete="off"
+                        required
+                        maxLength={4096}
+                        className="max-w-sm"
+                      />
                     </KeyForm>
                   ) : null}
 

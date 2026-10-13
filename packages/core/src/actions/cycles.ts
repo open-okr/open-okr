@@ -7,6 +7,7 @@
  * rewrite it"), so `frame.update` refuses while a quarterly cycle is the one
  * being run, and superseding rather than editing is how a new year begins.
  */
+
 import {
   activeOnly,
   annualFrameRevisions,
@@ -24,6 +25,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { LOCAL_DATE_PATTERN } from "@openokr/formats";
 import {
   CHECK_IN_FREQUENCIES,
   COACH_STRICTNESS,
@@ -72,8 +74,8 @@ import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { recomputeKpisFollowingWorkspace } from "../kpis/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { cycleLevelsInTx } from "../practice/levels.ts";
+import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
-import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /** The two §11 keys a KPI that follows the workspace is read by. */
@@ -498,7 +500,7 @@ export const createCycle = defineWriteAction({
   summary: "Creates a named cycle for the period containing a chosen date.",
   input: z.object({
     /** A date inside the period to create, not the period's own start. */
-    on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    on: z.string().regex(LOCAL_DATE_PATTERN),
     cadence: z.enum(CYCLE_CADENCES).optional(),
     /**
      * Which of METHOD.md §2.1's two horizons to create, when no cadence is
@@ -517,7 +519,7 @@ export const createCycle = defineWriteAction({
     facilitatorId: z.uuid().nullable().optional(),
     publicationDeadline: z
       .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .regex(LOCAL_DATE_PATTERN)
       .nullable()
       .optional(),
     /**
@@ -648,7 +650,7 @@ export const updateCycle = defineWriteAction({
     facilitatorId: z.uuid().nullable().optional(),
     publicationDeadline: z
       .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .regex(LOCAL_DATE_PATTERN)
       .nullable()
       .optional(),
     levels: z.array(z.enum(GOAL_LEVELS)).min(1).optional(),
@@ -658,7 +660,7 @@ export const updateCycle = defineWriteAction({
       .array(
         z.object({
           key: z.string().min(1).max(60),
-          on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          on: z.string().regex(LOCAL_DATE_PATTERN),
         }),
       )
       .max(20)
@@ -1051,13 +1053,7 @@ export const updateRhythmSettings = defineWriteAction({
  * the same shape a task description takes, because METHOD.md §2.1 expects a
  * mission somebody wrote in sentences rather than a single line.
  */
-const frameProse = z
-  .unknown()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    { message: "not valid editor JSON for the current rich text schema" },
-  );
+const frameProse = richTextSchema();
 
 const frameOutput = z.object({
   id: z.uuid(),

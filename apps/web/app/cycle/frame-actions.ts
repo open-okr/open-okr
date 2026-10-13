@@ -7,48 +7,39 @@
  * `apps/web`, which is the data half of what the gap audit recorded as B-03:
  * phase 0 could not be filled in from the browser at all.
  *
- * The four prose fields arrive as plain text from textareas and are wrapped
- * into editor JSON here, because that is what the column holds and what the
- * shared rich-text module validates. A member who wants formatting writes a
- * document; a mission is three sentences.
+ * The four prose fields are the compact editor's documents
+ * (docs/design/guided-inputs.md §4.7), sent on every save as they stand. An
+ * empty field is null rather than an empty document: "we have not written a
+ * vision yet" and "our vision is blank" are different answers and the column
+ * can hold both.
  */
-import type { RichTextDocument } from "@openokr/core";
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
+import { documentOrNull } from "../../lib/rich-text-form.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
-
-/**
- * Plain text as editor JSON, or null for an empty box.
- *
- * One paragraph per line, which is the shape the editor produces for the same
- * typing and what `isValidRichText` accepts. An empty field is null rather
- * than an empty document: "we have not written a vision yet" and "our vision
- * is blank" are different answers and the column can hold both.
- */
-function asDocument(value: string): RichTextDocument | null {
-  const text = value.trim();
-  if (text === "") {
-    return null;
-  }
-  return {
-    type: "doc",
-    content: text.split(/\r?\n/).map((line) => ({
-      type: "paragraph",
-      ...(line.trim() === ""
-        ? {}
-        : { content: [{ type: "text", text: line }] }),
-    })),
-  };
-}
 
 export async function setFrame(
   _previous: WriteState,
   form: FormData,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
+
+  const mission = documentOrNull(form, "mission");
+  const vision = documentOrNull(form, "vision");
+  const strategy = documentOrNull(form, "strategy");
+  const notDoing = documentOrNull(form, "notDoing");
+  if (
+    mission === "malformed" ||
+    vision === "malformed" ||
+    strategy === "malformed" ||
+    notDoing === "malformed"
+  ) {
+    const { t } = await getTranslations();
+    return { error: t("fields.richTextUnreadable") };
+  }
 
   // The two lists arrive positionally, one entry per row of the fieldset, and
   // a row with no text is a row nobody filled in rather than a strategy with
@@ -83,10 +74,10 @@ export async function setFrame(
         yearLabel: String(form.get("yearLabel") ?? "").trim(),
         horizonLabel: horizon === "" ? null : horizon,
         agreed: form.get("agreed") !== null,
-        mission: asDocument(String(form.get("mission") ?? "")),
-        vision: asDocument(String(form.get("vision") ?? "")),
-        strategy: asDocument(String(form.get("strategy") ?? "")),
-        notDoing: asDocument(String(form.get("notDoing") ?? "")),
+        mission,
+        vision,
+        strategy,
+        notDoing,
         strategies,
         ...(reason === "" ? {} : { reason }),
       },

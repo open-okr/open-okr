@@ -116,16 +116,28 @@ export const initiativesTemplate: EntityTemplate = {
       );
     }
 
+    // An end before the start is one the product cannot hold. The start
+    // stays, the end is left out, and the row's report says so.
+    const startsOn = values.startsOn
+      ? asDay("startsOn", values.startsOn)
+      : undefined;
+    const givenEnd = values.endsOn ? asDay("endsOn", values.endsOn) : undefined;
+    const reversed =
+      startsOn !== undefined && givenEnd !== undefined && givenEnd < startsOn;
+    const notes = reversed
+      ? [
+          `endsOn, ${givenEnd}, is before startsOn, ${startsOn}. Imported with the start and no end date.`,
+        ]
+      : [];
+
     const shared = {
       title,
       ...(description ? { description } : {}),
       ...(values.status
         ? { status: asEnum("status", values.status, INITIATIVE_STATUSES) }
         : {}),
-      ...(values.startsOn
-        ? { startsOn: asDay("startsOn", values.startsOn) }
-        : {}),
-      ...(values.endsOn ? { endsOn: asDay("endsOn", values.endsOn) } : {}),
+      ...(startsOn ? { startsOn } : {}),
+      ...(givenEnd && !reversed ? { endsOn: givenEnd } : {}),
       ...(confidence === undefined ? {} : { confidence }),
     };
 
@@ -138,8 +150,12 @@ export const initiativesTemplate: EntityTemplate = {
         input: {
           id: existingId,
           ...shared,
+          // Cleared rather than left alone, or an end an earlier run stored
+          // could now fall before the new start.
+          ...(reversed ? { endsOn: null } : {}),
           ownerId: await references.member(values.owner ?? ""),
         },
+        notes,
       };
     }
 
@@ -155,6 +171,7 @@ export const initiativesTemplate: EntityTemplate = {
           : {}),
         legacy: { type: "csv", id: legacyId },
       },
+      notes,
     };
   },
 };

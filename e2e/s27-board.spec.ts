@@ -23,6 +23,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import pg from "pg";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { chooseAt } from "./pickers.ts";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
@@ -102,7 +103,8 @@ test("a card added against a key result lands in its column", async () => {
   await page.getByRole("combobox", { name: /^Column/ }).selectOption("todo");
   // The instance's own cycle has key results from the claiming spec; whichever
   // one is first is the one this work is recorded against.
-  await page.getByLabel("Key result it moves").selectOption({ index: 1 });
+  // The first key result, after "None yet".
+  await chooseAt(page.getByLabel("Key result it moves"), 1);
   await page.getByRole("button", { name: "Add" }).click();
 
   const card = page.getByTestId("board-card").filter({ hasText: TASK });
@@ -233,13 +235,19 @@ test("a task carries a discussion and files", async () => {
   await expect(thread).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("attachment-input")).toBeVisible();
 
+  // The composer is the compact editor since guided-inputs §4.7, found by
+  // its name. The posted comment is looked for among the posted ones: the
+  // editor holds the same text until the post lands, so the thread as a whole
+  // would contain it before anything was saved.
   await thread
-    .getByPlaceholder("Write a comment...")
+    .getByRole("textbox", { name: "Your comment" })
     .fill("The copy is with legal.");
   await thread.getByRole("button", { name: "Post" }).click();
-  await expect(thread).toContainText("The copy is with legal.", {
-    timeout: 15_000,
-  });
+  await expect(
+    thread
+      .locator('[id^="comment-"]')
+      .filter({ hasText: "The copy is with legal." }),
+  ).toBeVisible({ timeout: 15_000 });
 
   await expect(async () => {
     const { rows } = await pool.query<{ subject_type: string }>(

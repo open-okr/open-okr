@@ -64,8 +64,6 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // Code, commands, formats and example values a person types as shown.
   "activity.pnpmAuditVerify",
   "admin.ai.privacy.allowedHostsPlaceholder",
-  "admin.audit.actionPlaceholder",
-  "admin.audit.targetTypePlaceholder",
   "admin.imports.exportCard.kb",
   "admin.imports.exportCard.sha",
   "admin.invitations.exampleComExampleOrg",
@@ -123,7 +121,6 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "workMapHeader.scopeSummary",
   // Only a term, which each language fills with its own word or the
   // workspace's rename (M-14), sometimes beside a hole or a bracket.
-  "cycle.drafting.inSpace",
   "cycle.drafting.space",
   "board.scope.inSpace",
   "board.scope.ofObjective",

@@ -16,6 +16,7 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -118,7 +119,7 @@ test("a new objective outside the window is refused with the reason", async () =
 
 test("the audit trail records the change", async () => {
   await goTo(page, "/admin/audit");
-  await page.getByLabel("Action").fill("practice.update");
+  await choose(page.getByLabel("Action", { exact: true }), "practice.update");
   await page.getByRole("button", { name: "Show matching rows" }).click();
   await expect(page.getByTestId("audit-row").first()).toContainText(
     "practice.update",

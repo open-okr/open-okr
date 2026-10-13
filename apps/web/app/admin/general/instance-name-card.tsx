@@ -6,7 +6,7 @@ import {
   renameInstance,
   type SettingSource,
 } from "@openokr/core";
-import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
+import { Button, Card, CardBody, CardHeader, TextInput } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { requireAccessLevel } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
@@ -31,9 +31,6 @@ import { getTranslations } from "../../../lib/translations";
  * passkey prompt show a new name after a restart. Everything else follows on
  * the next page, email and nudge.
  */
-
-const INPUT_CLASS =
-  "rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm font-normal text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line";
 
 async function rename(formData: FormData): Promise<void> {
   "use server";
@@ -85,20 +82,15 @@ export async function InstanceNameCard({
       </CardHeader>
       <CardBody>
         <form action={rename} className="flex flex-col gap-3">
-          <label
-            htmlFor="instanceName"
-            className="flex w-full max-w-sm flex-col gap-1 text-xs font-semibold text-ink-2"
-          >
-            {t("admin.general.instanceName.label")}
-            <input
-              id="instanceName"
-              name="instanceName"
-              defaultValue={name}
-              maxLength={INSTANCE_NAME_MAX_LENGTH}
-              autoComplete="off"
-              className={INPUT_CLASS}
-            />
-          </label>
+          <TextInput
+            label={t("admin.general.instanceName.label")}
+            id="instanceName"
+            name="instanceName"
+            defaultValue={name}
+            maxLength={INSTANCE_NAME_MAX_LENGTH}
+            className="max-w-sm"
+            autoComplete="off"
+          />
           <p className="text-xs text-ink-3">
             {t("admin.general.instanceName.hint")}
           </p>

@@ -7,6 +7,7 @@
  */
 import {
   date,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -46,7 +47,14 @@ export const digests = pgTable("digests", {
   period: text("period", { enum: DIGEST_PERIODS }).notNull(),
   periodStart: date("period_start").notNull(),
   body: jsonb("body").$type<DigestBody>().notNull().default({}),
+  /**
+   * The coordinator's note for leadership as plain text. Since guided-inputs
+   * change 11c it is the plain text of `noteDocument`, kept for one release
+   * so the release before reads it; change 13 drops it.
+   */
   note: text("note"),
+  noteDocument: jsonb("note_document"),
+  noteDocumentVersion: integer("note_document_version"),
   generatedAt: timestamp("generated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

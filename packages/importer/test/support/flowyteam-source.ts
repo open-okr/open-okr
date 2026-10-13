@@ -629,13 +629,14 @@ export async function seedSource(
     // **Two projects that place and one that cannot.** Project 1's admin has no
     // team and a member does, which is the shape a live company has: none of
     // its 128 projects has an admin with a team and 125 have a member with one.
+    // Project 3's deadline is before its start, which a FlowyTeam form allows.
     await source.query(
       `insert into projects
          (id, company_id, project_name, project_summary, project_admin,
           start_date, deadline, status) values
          (1, 7, 'Onboarding rebuild', 'Everything a new customer touches', 1, '2026-01-05', '2026-03-31', 'in progress'),
          (2, 7, 'Nobody is on it',    null,                                 1, null,         null,         'not started'),
-         (3, 7, 'Unknown status',     null,                                 1, null,         null,         'archived')`,
+         (3, 7, 'Unknown status',     null,                                 1, '2026-04-01', '2026-02-15', 'archived')`,
     );
     await source.query(
       `insert into project_members (id, company_id, user_id, project_id) values

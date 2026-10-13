@@ -255,6 +255,36 @@ describe("the jump by name, which reaches every kind", () => {
     );
   });
 
+  it("answers only the kinds asked for, so a picker of goals is not crowded out", async () => {
+    // guided-inputs §4.10: an agent's scope binding finds a goal by name,
+    // and the twenty the jump keeps should all be goals.
+    const wb = await workerDb();
+    const goalsOnly = await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+      },
+      "search.entities",
+      { text: "aurora", kinds: ["goal"] },
+    );
+    expect(goalsOnly.map((one) => one.entityType)).toEqual(["goal"]);
+    expect(goalsOnly[0]?.entityId).toBe(goalId);
+
+    const two = await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+      },
+      "search.entities",
+      { text: "aurora", kinds: ["space", "person"] },
+    );
+    expect(new Set(two.map((one) => one.entityType))).toEqual(
+      new Set(["space", "person"]),
+    );
+  });
+
   it("offers a cycle by its name", async () => {
     const found = await jump(cycle.name);
     expect(found.find((one) => one.entityType === "cycle")?.href).toBe(

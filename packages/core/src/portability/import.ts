@@ -69,9 +69,11 @@ function isUuid(value: unknown): value is string {
 
 /**
  * Columns that hold rich text and need uuid rewriting. Identified by
- * having a companion `*_version` column in the schema.
+ * having a companion `*_version` column in the schema, which
+ * `portability-policy.test.ts` checks against the database, so a rich text
+ * column added to an exported table without a line here fails the build.
  */
-const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
+export const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   "workspace_members.bio",
   "goals.description",
   "comments.body",
@@ -80,10 +82,55 @@ const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   "tasks.description",
   "initiatives.description",
   "kpis.description",
-  "kpi_categories.description",
+  "kpi_trees.description",
   "review_narratives.body",
   "goal_retrospectives.body",
+  "check_ins.narrative",
+  // The cycle's planning prose: the annual frame and phases 2 and 5.
+  "annual_frames.mission",
+  "annual_frames.vision",
+  "annual_frames.strategy",
+  "annual_frames.open_issues",
+  "annual_frames.not_doing",
+  "cycle_baseline_health.stable",
+  "cycle_baseline_health.declining",
+  "cycle_baseline_health.business_as_usual",
+  "cycle_capacity_notes.cuts",
+  // Guided inputs change 11a: the monthly review's prose as documents.
+  "okr_sessions.shifts_document",
+  "decisions.text_document",
+  // Change 11b: the quarterly review's prose.
+  "management_answers.body_document",
+  // Change 12: the quarterly revalidation's two notes.
+  "cycle_revalidations.change_note_document",
+  "cycle_revalidations.focus_note_document",
 ]);
+
+/**
+ * Columns that hold a map of rich text documents, one per key: the
+ * facilitator's private stage notes since guided-inputs change 11b, and what
+ * an agreed annual frame's revised fields held before. The walk above
+ * reaches a document's nodes, not the documents inside a map, and leaves a
+ * value that is not a document, such as the strategies list, as it is.
+ */
+export const RICH_TEXT_MAP_COLUMNS: ReadonlySet<string> = new Set([
+  "okr_sessions.notes",
+  "annual_frame_revisions.before",
+]);
+
+/**
+ * A one-dimensional Postgres array literal, `{"a","b"}`, for an array column.
+ * Every element is quoted, so a comma, a brace or the word NULL inside one
+ * stays text, and a null element is written as NULL.
+ */
+export function postgresArrayLiteral(values: readonly unknown[]): string {
+  const elements = values.map((value) =>
+    value === null || value === undefined
+      ? "NULL"
+      : `"${String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`,
+  );
+  return `{${elements.join(",")}}`;
+}
 
 function isRichTextColumn(table: string, column: string): boolean {
   return RICH_TEXT_COLUMNS.has(`${table}.${column}`);
@@ -307,6 +354,21 @@ function remapRow(
       result[column] = remapRichText(value, keyMap);
       continue;
     }
+    if (
+      RICH_TEXT_MAP_COLUMNS.has(`${table}.${column}`) &&
+      typeof value === "object" &&
+      value !== null
+    ) {
+      // A note still stored as text, from before the backfill, has no node
+      // to rewrite and passes through as it is.
+      result[column] = Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([key, doc]) => [
+          key,
+          remapRichText(doc, keyMap),
+        ]),
+      );
+      continue;
+    }
 
     result[column] = value;
   }
@@ -375,6 +437,18 @@ export async function importWorkspace(
     const rows = rowsByTable.get(table);
     if (!rows || rows.length === 0) continue;
 
+    // The table's Postgres array columns, asked of the database rather than
+    // listed, so a column added later is written too.
+    const arrayColumns = new Set(
+      (
+        await tx.execute<{ column_name: string }>(
+          sql`select column_name from information_schema.columns
+               where table_schema = 'public' and table_name = ${table}
+                 and data_type = 'ARRAY'`,
+        )
+      ).rows.map((row) => row.column_name),
+    );
+
     let tableCreated = 0;
     let tableSkipped = 0;
 
@@ -419,15 +493,21 @@ export async function importWorkspace(
         continue;
       }
 
-      // Serialise array/object values as JSON strings before interpolation.
-      // Drizzle's sql template tag treats JS arrays as SQL tuples `(a, b)`
-      // instead of Postgres array literals, which breaks array columns
-      // like `session_dates` and `levels`. JSON strings let Postgres cast
-      // to the column's own type.
+      // Serialise array/object values as strings before interpolation.
+      // Drizzle's sql template tag treats JS arrays as SQL tuples `(a, b)`.
+      // A `jsonb` column, `session_dates` and `levels` among them, takes the
+      // value as JSON. A Postgres array column takes an array literal: sent
+      // as JSON it refused the insert, and the row was counted as skipped,
+      // which lost every revision of an agreed annual frame and a
+      // workspace's own AI models in a move.
       const columns = Object.keys(remapped);
-      const values = Object.values(remapped).map((v) =>
-        v !== null && typeof v === "object" ? JSON.stringify(v) : v,
-      );
+      const values = columns.map((column) => {
+        const v = remapped[column];
+        if (Array.isArray(v) && arrayColumns.has(column)) {
+          return postgresArrayLiteral(v);
+        }
+        return v !== null && typeof v === "object" ? JSON.stringify(v) : v;
+      });
 
       const columnList = columns
         .map((c) => sql.identifier(c))

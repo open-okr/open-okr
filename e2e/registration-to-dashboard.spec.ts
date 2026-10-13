@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { INSTANCE_ACCOUNT, skipOnboarding } from "./instance-account.ts";
+import { choose, chooseAt } from "./pickers.ts";
 
 /**
  * Registration to dashboard, in a real browser (P1-T08).
@@ -446,8 +447,9 @@ test("the planning phases complete from the browser, and the gaps clear", async 
 
   // Roles, the first planning session two weeks out, and a first cycle.
   const setup = page.locator("form", { has: page.getByLabel("Sponsor") });
-  await setup.getByLabel("Sponsor").selectOption({ index: 1 });
-  await setup.getByLabel("Facilitator").selectOption({ index: 1 });
+  // The first person each picker offers, after "Nobody".
+  await chooseAt(setup.getByLabel("Sponsor"), 1);
+  await chooseAt(setup.getByLabel("Facilitator"), 1);
   const inTwoWeeks = new Date(Date.now() + 14 * 86_400_000)
     .toISOString()
     .slice(0, 10);
@@ -461,10 +463,22 @@ test("the planning phases complete from the browser, and the gaps clear", async 
 
   // Phase 2: baseline health and three ranked issues.
   await page.goto("/cycle?phase=2");
-  const baseline = page.locator("form", { has: page.getByLabel("Stable") });
-  await baseline.getByLabel("Stable").fill("Churn holds at 2% a month");
+  // The compact editor (guided-inputs §4.7): the column is typed in bold, and
+  // opens on what was written once the page is read again.
+  const stable = page.getByRole("textbox", { name: "Stable", exact: true });
+  const baseline = page.locator("form", { has: stable });
+  await baseline
+    .getByRole("group", { name: "Stable", exact: true })
+    .getByRole("button", { name: "Bold", exact: true })
+    .click();
+  await stable.pressSequentially("Churn holds at 2% a month");
+  await expect(stable.locator("strong")).toHaveText("Churn holds at 2% a month");
   await baseline.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Recorded", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(stable.locator("strong")).toHaveText(
+    "Churn holds at 2% a month",
+  );
   for (const issue of [
     "Trials stall before the first project",
     "Support answers take a day",
@@ -478,17 +492,30 @@ test("the planning phases complete from the browser, and the gaps clear", async 
 
   // Phase 3, quarterly: the frame holds, and the quarter names its focus.
   await page.goto("/cycle?phase=3");
-  const revalidation = page.locator("form", {
-    has: page.getByLabel("Focus areas for this quarter"),
-  });
+  // The compact editor since guided-inputs change 12, so the note is read
+  // back after a reload: the editor holds what was typed whether or not it
+  // was stored. The save is waited for first, because a reload can abort the
+  // server action in flight.
+  const focusNote = () =>
+    page.getByRole("textbox", {
+      name: "Focus areas for this quarter",
+      exact: true,
+    });
+  const revalidation = page.locator("form", { has: focusNote() });
   await revalidation.getByLabel("The annual frame").selectOption("holds");
-  await revalidation
-    .getByLabel("Focus areas for this quarter")
-    .fill("Mobile activation");
+  await focusNote().click();
+  await focusNote().pressSequentially("Mobile activation");
+  const revalidated = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.request().headers()["next-action"] !== undefined,
+  );
   await revalidation.getByRole("button", { name: "Save" }).click();
-  await expect(
-    revalidation.getByLabel("Focus areas for this quarter"),
-  ).toHaveValue("Mobile activation");
+  await revalidated;
+  await page.reload();
+  await expect(focusNote()).toContainText("Mobile activation", {
+    timeout: 15_000,
+  });
 
   await page.goto("/cycle?phase=4");
   await expect(page.getByText("Earlier phases still have gaps")).toHaveCount(0);
@@ -533,8 +560,8 @@ test("drafting a goal with key results persists at zero percent and pending", as
     ["Cut median first response from 6h to 2h", "6", "2"],
   ] as const) {
     await page.getByRole("textbox", { name: "The key result" }).fill(title);
-    await page.getByRole("spinbutton", { name: "Baseline" }).fill(baseline);
-    await page.getByRole("spinbutton", { name: "Target" }).fill(target);
+    await page.getByRole("textbox", { name: "Baseline" }).fill(baseline);
+    await page.getByRole("textbox", { name: "Target" }).fill(target);
     await page.getByRole("button", { name: "Add key result" }).click();
     // Exact, because the row's own title is also inside the label of the field
     // that records a new value for it.
@@ -646,11 +673,12 @@ test("the quality panel groups every issue and links at the field", async () => 
   // The form now gives each key result an owner and a date (H-09), so KR-3
   // passes as drafted. Clearing one owner with the inline control is what
   // makes it fire, and proves the control writes.
-  await page
-    .getByRole("combobox", {
+  await choose(
+    page.getByRole("combobox", {
       name: "Owner of Raise mobile activation from 41% to 60%",
-    })
-    .selectOption("");
+    }),
+    "No owner",
+  );
   await page
     .locator("form", {
       has: page.getByRole("combobox", {
@@ -715,10 +743,11 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
   await page.getByRole("link", { name: "Open" }).first().click();
   await expect(page).toHaveURL(/\/goals\//);
 
-  // The server refuses an empty retrospective. The textarea's own `required`
-  // would stop the request, so the field is filled with whitespace, which passes
-  // the browser and fails the rule.
-  await page.getByRole("textbox", { name: "The retrospective" }).fill("   ");
+  // The server refuses an empty retrospective, and a run of spaces is empty.
+  const retrospective = page.getByRole("textbox", {
+    name: "The retrospective",
+  });
+  await retrospective.fill("   ");
   await page.getByRole("button", { name: "Close this goal" }).click();
   // Filtered rather than the bare role: Next's own route announcer is also an
   // alert, so the page has two and only one of them is ours.
@@ -726,14 +755,24 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
     page.getByRole("alert").filter({ hasText: "retrospective" }),
   ).toBeVisible();
 
+  // The compact editor (guided-inputs §4.7): the account is bolded from its
+  // toolbar, and the closed goal shows it as written.
+  await retrospective.fill(
+    "Activation moved. Onboarding did the work, not the campaign.",
+  );
+  await retrospective.press("ControlOrMeta+a");
+  // Within the field: the discussion below has a toolbar of its own.
   await page
-    .getByRole("textbox", { name: "The retrospective" })
-    .fill("Activation moved. Onboarding did the work, not the campaign.");
+    .getByRole("group", { name: "The retrospective" })
+    .getByRole("button", { name: "Bold", exact: true })
+    .click();
   await page.getByRole("button", { name: "Close this goal" }).click();
 
   await expect(page.getByText("closed · achieved")).toBeVisible();
   await expect(
-    page.getByText("Activation moved. Onboarding did the work"),
+    page.locator(".rich-text strong", {
+      hasText: "Activation moved. Onboarding did the work",
+    }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Reopen this goal" }).click();

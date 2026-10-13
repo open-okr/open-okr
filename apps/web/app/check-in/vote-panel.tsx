@@ -1,4 +1,10 @@
-import { Button, Chip } from "@openokr/ui";
+import {
+  Button,
+  Chip,
+  type ConfidenceDisplay,
+  ConfidenceInput,
+  formatConfidence,
+} from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { castVote, revealVotes } from "./actions.ts";
@@ -24,11 +30,16 @@ export interface VoteState {
 export async function VotePanel({
   vote,
   canReveal,
+  display,
 }: {
   readonly vote: VoteState;
   readonly canReveal: boolean;
+  /** The workspace's "Confidence shown as" (guided-inputs §4.8). */
+  readonly display: ConfidenceDisplay;
 }) {
   const { t } = await getTranslations();
+  const shown = (confidence: number) =>
+    formatConfidence(confidence, display, t);
 
   return (
     <div className="flex flex-col gap-1.5 rounded-md border border-line p-2.5">
@@ -37,7 +48,7 @@ export async function VotePanel({
         <Chip tone={vote.revealed ? "ok" : "neutral"}>
           {vote.revealed
             ? t("checkIn.votePanel.revealedAverage", {
-                average: vote.average ?? 0,
+                average: shown(vote.average ?? 0),
               })
             : t("checkIn.votePanel.votesIn", {
                 votes:
@@ -50,31 +61,29 @@ export async function VotePanel({
 
       {vote.revealed ? (
         <p className="text-xs text-ink-2">
-          {vote.votes.map((entry) => entry.confidence).join(", ")}
+          {vote.votes.map((entry) => shown(entry.confidence)).join(", ")}
         </p>
       ) : (
         <p className="text-xs text-ink-3">
           {vote.own === null
             ? t("checkIn.votePanel.youHaveNotVotedYet")
-            : t("checkIn.votePanel.yourVote", { vote: vote.own })}
+            : t("checkIn.votePanel.yourVote", { vote: shown(vote.own) })}
         </p>
       )}
 
       {vote.revealed ? null : (
         <ActionForm action={castVote} className="flex items-center gap-1.5">
           <input type="hidden" name="keyResultId" value={vote.keyResultId} />
-          <label className="sr-only" htmlFor={`vote-${vote.keyResultId}`}>
-            {t("checkIn.votePanel.yourConfidenceIn", { title: vote.title })}
-          </label>
-          <input
+          {/* The slider this replaces never showed its value. */}
+          <ConfidenceInput
             id={`vote-${vote.keyResultId}`}
+            label={t("checkIn.votePanel.yourConfidenceIn", {
+              title: vote.title,
+            })}
+            hideLabel
             name="confidence"
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
             defaultValue={vote.own ?? 0.5}
-            className="w-32"
+            display={display}
           />
           <Button type="submit" variant="ghost" className="h-7 px-2 text-xs">
             {vote.own === null

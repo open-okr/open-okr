@@ -1,4 +1,4 @@
-import { Button } from "@openokr/ui";
+import { Button, SelectInput } from "@openokr/ui";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -32,9 +32,6 @@ export interface ConsentRequest {
   readonly resource: string;
 }
 
-const FIELD =
-  "rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink";
-
 export async function ConsentForm({
   request,
   clientName,
@@ -67,25 +64,22 @@ export async function ConsentForm({
       <input type="hidden" name="resource" value={request.resource} />
 
       {workspaces.length > 1 ? (
-        <label className="flex flex-col gap-1 text-xs text-ink-2">
-          {t("oauth.authorize.consentForm.whichWorkspace")}
-          <select
-            name="workspaceId"
-            className={FIELD}
-            defaultValue={activeWorkspaceId}
-          >
-            {workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
-          <span className="text-ink-3">
-            {t("oauth.authorize.consentForm.willReachThisOneAnd", {
-              clientName,
-            })}
-          </span>
-        </label>
+        // Still the browser's own dropdown, which works without JavaScript
+        // and lists only this person's workspaces (decided 12 October 2026).
+        <SelectInput
+          label={t("oauth.authorize.consentForm.whichWorkspace")}
+          name="workspaceId"
+          defaultValue={activeWorkspaceId}
+          description={t("oauth.authorize.consentForm.willReachThisOneAnd", {
+            clientName,
+          })}
+        >
+          {workspaces.map((workspace) => (
+            <option key={workspace.id} value={workspace.id}>
+              {workspace.name}
+            </option>
+          ))}
+        </SelectInput>
       ) : (
         <input type="hidden" name="workspaceId" value={activeWorkspaceId} />
       )}

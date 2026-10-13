@@ -75,6 +75,29 @@ it("refuses a time that is not a time", async () => {
   ).rejects.toThrow();
 });
 
+it("takes 9:30 as people write it, stores 09:30, and refuses 99:99", async () => {
+  // guided-inputs §4.9: one HH:MM rule, where this one took any two digits
+  // after any one or two.
+  const wb = await workerDb();
+  await callAction(
+    { pool: wb.appPool, ...context() },
+    "people.updateOwnProfile",
+    { quietHours: { start: "22:00", end: "7:00" } },
+  );
+  const settings = await callAction(
+    { pool: wb.appPool, ...context() },
+    "channels.mySettings",
+    {},
+  );
+  expect(settings.quietHours).toEqual({ start: "22:00", end: "07:00" });
+
+  await expect(
+    callAction({ pool: wb.appPool, ...context() }, "people.updateOwnProfile", {
+      quietHours: { start: "99:99", end: "07:00" },
+    }),
+  ).rejects.toThrow("Give the time as HH:MM, from 00:00 to 23:59.");
+});
+
 it("clears the window with null rather than storing two equal times", async () => {
   const wb = await workerDb();
   await callAction(

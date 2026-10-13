@@ -20,7 +20,7 @@
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
-import { goTo, signIn } from "./instance-account.ts";
+import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
 
 const BOT_TOKEN = "xoxb-a-token-nobody-should-ever-see-on-a-screen";
 const SIGNING_SECRET = "8f742231b10e8888abcd99yyyzzz85a5";
@@ -73,18 +73,25 @@ test("every provider offers a form, because every one has a driver now", async (
   // protected is still enforced by the page: `ready: false` on a provider
   // shows the notice instead of the form, and the next provider added without
   // a driver will meet it.
-  await expect(slackForm().getByLabel("Bot token")).toBeVisible();
+  // Each names its boxes as its provider does (guided-inputs §4.11).
+  await expect(slackForm().getByLabel("Bot User OAuth Token")).toBeVisible();
   await expect(telegramForm().getByLabel("Bot token")).toBeVisible();
-  await expect(teamsForm().getByLabel("Bot token")).toBeVisible();
-  await expect(whatsAppForm().getByLabel("Bot token")).toBeVisible();
+  await expect(whatsAppForm().getByLabel("Permanent access token")).toBeVisible();
+  // Teams' App ID is not a secret, so it is shown as typed, not masked.
+  const appId = teamsForm().getByLabel("Application (client) ID");
+  await expect(appId).toBeVisible();
+  await expect(appId).not.toHaveAttribute("type", "password");
+  // WhatsApp's verify token has a box of its own, rather than sharing one
+  // with the app secret, split on a space.
+  await expect(whatsAppForm().getByLabel("Verify token")).toBeVisible();
   await expect(page.getByText("No driver yet")).toHaveCount(0);
 });
 
 test("connecting Slack stores it and does not claim it is verified", async () => {
   const form = slackForm();
-  await form.getByLabel("Bot token").fill(BOT_TOKEN);
-  await form.getByLabel("Signing or webhook secret").fill(SIGNING_SECRET);
-  await form.getByLabel("Provider workspace id").fill(TEAM_ID);
+  await form.getByLabel("Bot User OAuth Token").fill(BOT_TOKEN);
+  await form.getByLabel("Signing Secret").fill(SIGNING_SECRET);
+  await form.getByLabel("Workspace ID").fill(TEAM_ID);
   await form.getByRole("button", { name: "Connect" }).click();
 
   // The confirmation comes from the card, not from the form: a successful
@@ -105,7 +112,7 @@ test("the token is nowhere on the page, and the form is empty again", async () =
   expect(await page.content()).not.toContain(SIGNING_SECRET);
 
   await page.getByText("Replace the credentials").click();
-  await expect(slackForm().getByLabel("Bot token")).toHaveValue("");
+  await expect(slackForm().getByLabel("Bot User OAuth Token")).toHaveValue("");
 });
 
 test("the workspace id is shown, because it is not a secret and routing needs it", async () => {
@@ -199,12 +206,82 @@ test("quiet hours save, and the copy says a reminder waits rather than vanishes"
   // The confirmation is the saved value coming back, not a message: a write
   // revalidates and can unmount the form a message would be rendered in. The
   // card's own copy carries the meaning, permanently.
+  //
+  // **The reload is retried.** It began 38 ms after the save was sent while the
+  // save took 183 ms, so the page could be drawn from the window before the
+  // write committed, and on 8 October the spec read "19:00" back. Waiting on
+  // the save's response instead hung on the streamed answer.
+  await expect(async () => {
+    await goTo(page, "/account/channels");
+    await expect(page.locator('input[name="quietStart"]')).toHaveValue(
+      "22:00",
+      { timeout: 1_000 },
+    );
+  }).toPass({ timeout: 20_000 });
+  await expect(page.locator('input[name="quietEnd"]')).toHaveValue("07:00");
+  await expect(page.getByText("waits until it ends")).toBeVisible();
+});
+
+test("saving your profile keeps the quiet hours set here", async () => {
+  // The profile form's quiet-hours boxes were always empty, and an empty pair
+  // means "off", so saving anything on the profile deleted this window.
+  await goTo(page, "/people");
+  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
+  await page.waitForURL(/\/people\//);
+  const profile = page
+    .locator("form")
+    .filter({ has: page.locator('input[name="quietStart"]') });
+  await expect(profile.locator('input[name="quietStart"]')).toHaveValue(
+    "22:00",
+    { timeout: 10_000 },
+  );
+  await expect(profile.locator('input[name="quietEnd"]')).toHaveValue("07:00");
+
+  await profile.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Profile updated.")).toBeVisible({
+    timeout: 10_000,
+  });
+
   await goTo(page, "/account/channels");
   await expect(page.locator('input[name="quietStart"]')).toHaveValue("22:00", {
     timeout: 10_000,
   });
   await expect(page.locator('input[name="quietEnd"]')).toHaveValue("07:00");
-  await expect(page.getByText("waits until it ends")).toBeVisible();
+});
+
+test("one time without the other is held back, and the window stays", async () => {
+  await goTo(page, "/account/channels");
+  const delivery = page
+    .locator("form")
+    .filter({ has: page.locator('input[name="quietStart"]') });
+  // Retried for the same reason as the fill above: an uncontrolled input
+  // filled before hydration goes back to what the server rendered.
+  await expect(async () => {
+    await delivery.locator('input[name="quietEnd"]').fill("");
+    await expect(delivery.locator('input[name="quietEnd"]')).toHaveValue("", {
+      timeout: 1_000,
+    });
+  }).toPass({ timeout: 20_000 });
+  await delivery.getByRole("button", { name: "Save" }).click();
+
+  // guided-inputs §4.9: the empty half is required while the other is set,
+  // so the browser holds the save, and the field says why under it. The
+  // server would refuse it too (apps/web/test/quiet-hours.test.ts).
+  await expect(delivery.getByRole("alert")).toHaveText(
+    "Give both times, or clear both.",
+    { timeout: 10_000 },
+  );
+  expect(
+    await delivery
+      .locator('input[name="quietEnd"]')
+      .evaluate((input: HTMLInputElement) => input.validity.valueMissing),
+  ).toBe(true);
+
+  await goTo(page, "/account/channels");
+  await expect(page.locator('input[name="quietStart"]')).toHaveValue("22:00", {
+    timeout: 10_000,
+  });
+  await expect(page.locator('input[name="quietEnd"]')).toHaveValue("07:00");
 });
 
 test("disconnecting removes the provider and leaves nothing behind", async () => {

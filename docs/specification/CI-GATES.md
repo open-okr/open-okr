@@ -180,6 +180,19 @@ await tx.update(table).set(...)
 The marker sits on the line **immediately above the statement**, and it needs
 the colon and a reason. A marker without them is invisible to the gate.
 
+**It also holds every field to the kit** ([guided-inputs.md](../design/guided-inputs.md) §6).
+No screen file in `apps/web` may draw a raw `<input>`, `<textarea>` or
+`<select>`: hidden inputs, checkboxes, radios, file pickers and buttons are
+not counted. It was a ratchet with a baseline that only went down, from 336
+fields to none; with none left, the baseline is gone and the rule is plain.
+
+| It refuses | Because |
+|---|---|
+| A screen file drawing a raw field | A field drawn without the kit has no linked label and error and no format check shared with the server. Use the kit in `packages/ui` |
+
+The count reads the syntax tree, so a field mentioned in a comment does not
+count.
+
 ### `pnpm dead-code`
 
 Reports files nothing imports and exports nothing names. It is the only gate

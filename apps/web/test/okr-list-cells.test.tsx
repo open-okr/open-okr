@@ -465,12 +465,17 @@ describe("a target", () => {
 describe("the other cells", () => {
   test("an owner is chosen from the people who can own one", async () => {
     await render({});
-    const picker = field(
-      "Owner of Activation from 30% to 45%",
-    ) as HTMLSelectElement;
+    // A picker found by typing (guided-inputs §4.10): type the name, then
+    // press the match, which the list draws outside the table.
+    await type("Owner of Activation from 30% to 45%", "Pri");
+    // The list opens a tick after the typing.
+    await act(async () => new Promise((done) => setTimeout(done, 50)));
+    const option = [
+      ...document.querySelectorAll<HTMLElement>('[role="option"]'),
+    ].find((one) => one.textContent?.includes(PRIYA.name));
+    expect(option).toBeDefined();
     await act(async () => {
-      picker.value = PRIYA.id;
-      picker.dispatchEvent(new Event("change", { bubbles: true }));
+      option?.click();
     });
     expect(runOkrMutation).toHaveBeenCalledWith({
       kind: "patchKeyResult",

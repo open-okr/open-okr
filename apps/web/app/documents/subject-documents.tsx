@@ -1,5 +1,5 @@
 import { type ActionCallContext, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip, TextInput } from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -146,15 +146,13 @@ export async function SubjectDocuments({
           >
             <input type="hidden" name="subjectType" value={subjectType} />
             <input type="hidden" name="subjectId" value={subjectId} />
-            <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
-              {t("documents.subjectDocuments.startADocument")}
-              <input
-                name="title"
-                maxLength={300}
-                placeholder={t("documents.subjectDocuments.howWeWillWin")}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-              />
-            </label>
+            <TextInput
+              label={t("documents.subjectDocuments.startADocument")}
+              name="title"
+              maxLength={300}
+              placeholder={t("documents.subjectDocuments.howWeWillWin")}
+              className="flex-1"
+            />
             <button
               type="submit"
               className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"

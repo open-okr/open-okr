@@ -134,6 +134,20 @@ describe("the manager chain", () => {
     ).rejects.toMatchObject({ code: "forbidden" });
   });
 
+  it("refuses a name of only spaces, in a sentence", async () => {
+    // guided-inputs F5: the administrator's edit now shows what it is told,
+    // so what it is told has to be a sentence rather than zod's own words.
+    const wb = await workerDb();
+    const a = await addMember("A");
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "people.updateMember",
+        { memberId: a, name: "   " },
+      ),
+    ).rejects.toThrow("A member needs a name.");
+  });
+
   it("refuses making someone their own manager", async () => {
     const wb = await workerDb();
     const a = await addMember("A");
@@ -144,6 +158,45 @@ describe("the manager chain", () => {
         { memberId: a, managerId: a },
       ),
     ).rejects.toMatchObject({ code: "forbidden" });
+  });
+});
+
+describe("finding a member by name", () => {
+  // guided-inputs §4.10: a picker over more members than the browser filters
+  // asks the directory as the person types.
+  it("answers what is typed from a name or a title, the closest first, of the kinds asked for", async () => {
+    const wb = await workerDb();
+    const priya = await addMember("Priya Raman");
+    await addMember("Ana Priyanka");
+    await addMember("Daniel Okafor");
+    await wb.admin.query(
+      "update workspace_members set title = 'Pricing lead' where id = $1",
+      [await addMember("Mei Tan")],
+    );
+    await wb.admin.query(
+      `insert into workspace_members (id, workspace_id, name, kind, status)
+       values (gen_random_uuid(), $1, 'Prism Bot', 'agent', 'active')`,
+      [workspaceId],
+    );
+
+    const found = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.directory",
+      { search: "pri", kinds: ["human", "guest"], limit: 10 },
+    );
+    expect(found.map((one) => one.name)).toEqual([
+      "Priya Raman",
+      "Ana Priyanka",
+      "Mei Tan",
+    ]);
+    expect(found[0]?.id).toBe(priya);
+
+    const one = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.directory",
+      { search: "pri", limit: 1 },
+    );
+    expect(one).toHaveLength(1);
   });
 });
 
@@ -1077,4 +1130,36 @@ describe("what erasure leaves behind (completeness review M-18)", () => {
     expect(mine.memberId).toBe(member);
     expect(mine.tables.length).toBeGreaterThan(0);
   });
+});
+
+/**
+ * A member's own timezone is one on the list the screen offers
+ * (docs/design/guided-inputs.md §4.6). The runtime accepts an abbreviation,
+ * an offset and a name in the wrong case, and each was stored as typed.
+ */
+describe("a member's own timezone", () => {
+  it.each(["UTC", "Asia/Kuala_Lumpur"])(
+    "accepts %s, which is listed",
+    (zone) => {
+      expect(updateOwnProfile.input.safeParse({ timezone: zone }).success).toBe(
+        true,
+      );
+    },
+  );
+
+  it("takes the spaces off a listed name", () => {
+    const result = updateOwnProfile.input.safeParse({
+      timezone: " Asia/Kuala_Lumpur ",
+    });
+    expect(result.success && result.data.timezone).toBe("Asia/Kuala_Lumpur");
+  });
+
+  it.each(["EST", "asia/kuala_lumpur", "+08:00", "US/Eastern"])(
+    "refuses %s, which the runtime resolves but the list does not hold",
+    (zone) => {
+      expect(updateOwnProfile.input.safeParse({ timezone: zone }).success).toBe(
+        false,
+      );
+    },
+  );
 });

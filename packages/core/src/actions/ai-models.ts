@@ -14,6 +14,7 @@ import {
   MODEL_TIERS,
   withWorkspace,
 } from "@openokr/db";
+import { IDENTIFIER_MAX_LENGTH, ONE_WORD_PATTERN } from "@openokr/formats";
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -105,7 +106,14 @@ export const readModelCatalog = defineReadAction({
 
 const customModelInput = z.object({
   provider: providerSchema,
-  modelId: z.string().trim().min(1),
+  // One word, as every provider writes its ids (guided-inputs §4.11). There
+  // was no limit before.
+  modelId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(IDENTIFIER_MAX_LENGTH)
+    .regex(ONE_WORD_PATTERN, "A model id is one word, with no spaces."),
   displayName: z.string().trim().min(1),
   contextWindow: z.number().int().positive(),
   costInPerMillion: z.number().min(0).default(0),

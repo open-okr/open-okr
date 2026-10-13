@@ -29,6 +29,8 @@ import {
   CardHeader,
   Chip,
   formatMeasure,
+  RangeInput,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -244,17 +246,15 @@ function ScoreRow({
 
       {canScore ? (
         <>
-          <label
-            className="flex flex-wrap items-center gap-2"
-            htmlFor={`score-${keyResult.keyResultId}`}
-          >
-            <span className="text-xs font-medium text-ink-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span aria-hidden="true" className="text-xs font-medium text-ink-3">
               {t("session.detail.scoring.score")}
             </span>
             {adjustable || keyResult.computed === null ? (
-              <input
+              <RangeInput
                 id={`score-${keyResult.keyResultId}`}
-                type="range"
+                label={t("session.detail.scoring.score")}
+                hideLabel
                 min={0}
                 max={1}
                 // Hundredths, so the computed score is a stop on the slider
@@ -273,24 +273,16 @@ function ScoreRow({
             <span className="w-10 text-sm tabular-nums text-ink">
               {score.toFixed(2)}
             </span>
-          </label>
-          <label
-            className="flex flex-col gap-1"
-            htmlFor={`reason-${keyResult.keyResultId}`}
-          >
-            <span className="text-xs font-medium text-ink-3">
-              {t("common.oneLineOnWhy")}
-            </span>
-            <input
-              id={`reason-${keyResult.keyResultId}`}
-              type="text"
-              className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-              value={reason}
-              disabled={pending}
-              placeholder={t("common.factsNotFeelings")}
-              onChange={(event) => setReason(event.target.value)}
-            />
-          </label>
+          </div>
+          <TextInput
+            label={t("common.oneLineOnWhy")}
+            id={`reason-${keyResult.keyResultId}`}
+            value={reason}
+            disabled={pending}
+            placeholder={t("common.factsNotFeelings")}
+            onChange={(event) => setReason(event.target.value)}
+            maxLength={500}
+          />
           <span>
             <Button type="button" size="sm" disabled={pending} onClick={save}>
               {keyResult.score === null

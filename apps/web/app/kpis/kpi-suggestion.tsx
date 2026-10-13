@@ -10,7 +10,16 @@
  * presses Add. A formula §6's parser refused is not offered at all; the reason
  * is shown instead, and the metric can still be added by hand-entry.
  */
-import { Button, Chip, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  Chip,
+  NumberInput,
+  SelectInput,
+  TextArea,
+  TextInput,
+  UnitInput,
+  useTranslations,
+} from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
 import {
@@ -62,8 +71,15 @@ const numberOrNull = (text: string): number | null => {
   return Number.isFinite(value) ? value : null;
 };
 
-const FIELD =
-  "rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink";
+/** Both thresholds set, and healthy below watch, which reads backwards. */
+const healthyBelowWatch = (editing: {
+  readonly healthy: string;
+  readonly watch: string;
+}): boolean => {
+  const healthy = numberOrNull(editing.healthy);
+  const watch = numberOrNull(editing.watch);
+  return healthy !== null && watch !== null && healthy < watch;
+};
 
 export function KpiSuggestion() {
   const { t } = useTranslations();
@@ -88,18 +104,16 @@ export function KpiSuggestion() {
       </h3>
       {editing === null ? (
         <>
-          <label className="sr-only" htmlFor="kpi-sentence">
-            {t("kpis.suggestion.describeIt")}
-          </label>
-          <textarea
+          <TextArea
             id="kpi-sentence"
+            label={t("kpis.suggestion.describeIt")}
+            hideLabel
             rows={2}
             maxLength={1000}
             value={sentence}
             disabled={pending}
             placeholder={t("kpis.suggestion.describeIt")}
             onChange={(event) => setSentence(event.target.value)}
-            className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
           />
           <Button
             type="button"
@@ -140,100 +154,93 @@ export function KpiSuggestion() {
           {editing.why === "" ? null : (
             <p className="text-xs text-ink-3">{editing.why}</p>
           )}
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("kpis.whatIsBeingMeasured")}
-            <input
-              value={editing.title}
-              maxLength={500}
-              disabled={pending}
-              onChange={(event) => set({ title: event.target.value })}
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-          </label>
+          <TextInput
+            label={t("kpis.whatIsBeingMeasured")}
+            value={editing.title}
+            maxLength={500}
+            disabled={pending}
+            onChange={(event) => set({ title: event.target.value })}
+          />
           <div className="flex flex-wrap items-end gap-2.5">
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("kpis.suggestion.unit")}
-              <input
-                value={editing.unit}
-                maxLength={60}
-                disabled={pending}
-                onChange={(event) => set({ unit: event.target.value })}
-                className={`w-24 ${FIELD}`}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("common.frequency")}
-              <select
-                value={editing.frequency}
-                disabled={pending}
-                onChange={(event) =>
-                  set({
-                    frequency: event.target.value as KeptKpi["frequency"],
-                  })
-                }
-                className={FIELD}
-              >
-                <option value="daily">{t("common.daily")}</option>
-                <option value="weekly">{t("common.weekly")}</option>
-                <option value="monthly">{t("common.monthly")}</option>
-                <option value="quarterly">{t("common.quarterly")}</option>
-                <option value="yearly">{t("common.yearly")}</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("common.betterWhen")}
-              <select
-                value={editing.direction}
-                disabled={pending}
-                onChange={(event) =>
-                  set({
-                    direction: event.target.value as KeptKpi["direction"],
-                  })
-                }
-                className={FIELD}
-              >
-                <option value="higher_better">{t("common.higher")}</option>
-                <option value="lower_better">{t("common.lower")}</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("common.standingTarget")}
-              <input
-                type="number"
-                step="any"
-                value={editing.target}
-                disabled={pending}
-                onChange={(event) => set({ target: event.target.value })}
-                className={`w-24 ${FIELD}`}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("kpis.suggestion.healthyAt")}
-              <input
-                type="number"
-                step="any"
-                min={0}
-                max={200}
-                value={editing.healthy}
-                disabled={pending}
-                onChange={(event) => set({ healthy: event.target.value })}
-                className={`w-20 ${FIELD}`}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("kpis.suggestion.watchAt")}
-              <input
-                type="number"
-                step="any"
-                min={0}
-                max={200}
-                value={editing.watch}
-                disabled={pending}
-                onChange={(event) => set({ watch: event.target.value })}
-                className={`w-20 ${FIELD}`}
-              />
-            </label>
+            <UnitInput
+              label={t("kpis.suggestion.unit")}
+              value={editing.unit}
+              disabled={pending}
+              onValueChange={(unit) => set({ unit })}
+              inputClassName="h-6.5 w-24 text-xs"
+            />
+            <SelectInput
+              label={t("common.frequency")}
+              value={editing.frequency}
+              disabled={pending}
+              onChange={(event) =>
+                set({
+                  frequency: event.target.value as KeptKpi["frequency"],
+                })
+              }
+              inputClassName="h-6.5 w-auto text-xs"
+            >
+              <option value="daily">{t("common.daily")}</option>
+              <option value="weekly">{t("common.weekly")}</option>
+              <option value="monthly">{t("common.monthly")}</option>
+              <option value="quarterly">{t("common.quarterly")}</option>
+              <option value="yearly">{t("common.yearly")}</option>
+            </SelectInput>
+            <SelectInput
+              label={t("common.betterWhen")}
+              value={editing.direction}
+              disabled={pending}
+              onChange={(event) =>
+                set({
+                  direction: event.target.value as KeptKpi["direction"],
+                })
+              }
+              inputClassName="h-6.5 w-auto text-xs"
+            >
+              <option value="higher_better">{t("common.higher")}</option>
+              <option value="lower_better">{t("common.lower")}</option>
+            </SelectInput>
+            {/* guided-inputs §4.8: numbers, and the two thresholds held to
+                the 0 to 200 the share of a target runs to. */}
+            <NumberInput
+              label={t("common.standingTarget")}
+              value={numberOrNull(editing.target)}
+              onValueChange={(next) =>
+                set({ target: next === null ? "" : String(next) })
+              }
+              disabled={pending}
+              inputClassName="h-auto w-24 py-1 text-xs"
+            />
+            <NumberInput
+              label={t("kpis.suggestion.healthyAt")}
+              value={numberOrNull(editing.healthy)}
+              onValueChange={(next) =>
+                set({ healthy: next === null ? "" : String(next) })
+              }
+              min={0}
+              max={200}
+              disabled={pending}
+              inputClassName="h-auto w-20 py-1 text-xs"
+            />
+            <NumberInput
+              label={t("kpis.suggestion.watchAt")}
+              value={numberOrNull(editing.watch)}
+              onValueChange={(next) =>
+                set({ watch: next === null ? "" : String(next) })
+              }
+              min={0}
+              max={200}
+              disabled={pending}
+              inputClassName="h-auto w-20 py-1 text-xs"
+            />
           </div>
+          {/* The order is said, where it was only implied: below watch is
+              where the alarm is, so healthy sits at or above it. */}
+          {healthyBelowWatch(editing) ? (
+            <p role="status" className="text-xs font-medium text-bad">
+              {t("kpis.suggestion.healthyAboveWatch")}
+            </p>
+          ) : null}
           {editing.formula !== null ? (
             <label className="flex items-center gap-2 text-xs text-ink-3">
               <input

@@ -255,7 +255,9 @@ test("NW-Q3-13: a milestone is done from the check-in composer", async () => {
   await done.check();
   await page.getByLabel("Status", { exact: true }).selectOption("on_track");
   await page
-    .getByLabel("What moved, what is in the way, what happens next")
+    .getByRole("textbox", {
+      name: "What moved, what is in the way, what happens next",
+    })
     .fill(NARRATIVE);
   await page
     .getByRole("main")

@@ -17,6 +17,7 @@
     "@openokr/agents": "workspace:*",
     "@openokr/config": "workspace:*",
     "@openokr/core": "workspace:*",
+    "@openokr/formats": "workspace:*",
     "@openokr/method": "workspace:*",
     "@openokr/ui": "workspace:*",
     "@react-pdf/renderer": "^4.9.0",

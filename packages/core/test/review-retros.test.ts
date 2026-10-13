@@ -19,6 +19,7 @@ import { resolveThresholds } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "retro-facilitator";
@@ -68,6 +69,7 @@ const management = async (userId = FACILITATOR) =>
       questionKey: number;
       question: string;
       body: string | null;
+      bodyDocument: unknown;
       answeredByName: string | null;
     }[];
     answered: number;
@@ -386,6 +388,83 @@ describe("the management retro", () => {
     const status = await management(MANAGER);
     expect(status.questions[0]?.body).toBe("Second, after the argument.");
     expect(status.answered).toBe(1);
+  });
+
+  it("keeps an answer written as a document, with its plain text beside it", async () => {
+    // Guided-inputs change 11b. The plain column is what the previous
+    // release reads during a rolling upgrade.
+    const answer = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Mostly." }],
+        },
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Two were leftovers." }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    await call(
+      "sessions.setManagementAnswer",
+      { sessionId, questionKey: 1, body: answer },
+      MANAGER,
+    );
+
+    const first = (await management(MANAGER)).questions[0];
+    expect(first?.bodyDocument).toEqual(answer);
+    expect(first?.body).toBe("Mostly.\n\nTwo were leftovers.");
+  });
+
+  it("wraps a text answer as a document, and refuses a blank one", async () => {
+    await call(
+      "sessions.setManagementAnswer",
+      { sessionId, questionKey: 2, body: "Yes.\n\nAfter the reset." },
+      MANAGER,
+    );
+    expect((await management(MANAGER)).questions[1]?.bodyDocument).toEqual(
+      richTextFromPlainText("Yes.\n\nAfter the reset."),
+    );
+
+    await expect(
+      call(
+        "sessions.setManagementAnswer",
+        {
+          sessionId,
+          questionKey: 3,
+          body: { type: "doc", content: [{ type: "paragraph" }] },
+        },
+        MANAGER,
+      ),
+    ).rejects.toThrow(/what leadership said/);
+  });
+
+  it("reads an answer the backfill has not reached as a document", async () => {
+    await call(
+      "sessions.setManagementAnswer",
+      { sessionId, questionKey: 1, body: "Written last release." },
+      MANAGER,
+    );
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update management_answers
+          set body_document = null, body_document_version = null`,
+    );
+
+    expect((await management(MANAGER)).questions[0]?.bodyDocument).toEqual(
+      richTextFromPlainText("Written last release."),
+    );
   });
 
   it("refuses a question outside the four", async () => {

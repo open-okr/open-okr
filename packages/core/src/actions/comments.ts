@@ -270,7 +270,7 @@ export const createCommentAction = defineWriteAction({
   input: z.object({
     subjectType: subjectTypeSchema,
     subjectId: z.string().uuid(),
-    body: z.unknown(),
+    body: richText,
   }),
   output: z.object({ id: z.string().uuid() }),
   access: ACCESS_LEVELS.comment,
@@ -560,7 +560,7 @@ export const updateCommentAction = defineWriteAction({
   summary: "Edit a comment (author only)",
   input: z.object({
     commentId: z.string().uuid(),
-    body: z.unknown(),
+    body: richText,
   }),
   output: z.object({}),
   access: ACCESS_LEVELS.comment,

@@ -21,6 +21,7 @@
 import type { BrowserContext, Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { setTokens } from "./tokens.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -53,7 +54,7 @@ test.afterAll(async () => {
   await form
     .getByLabel("Ask the provider not to keep or train on what is sent")
     .uncheck();
-  await form.getByLabel("Hosts an AI request may reach").fill("");
+  await setTokens(form.getByLabel("Hosts an AI request may reach"), []);
   await save(page);
   await expect(form.getByRole("status")).toHaveText("Saved.", {
     timeout: 15_000,
@@ -76,9 +77,8 @@ test("a fresh workspace sends what features need, with addresses replaced", asyn
   await expect(
     form.getByLabel("Ask the provider not to keep or train on what is sent"),
   ).not.toBeChecked();
-  await expect(form.getByLabel("Hosts an AI request may reach")).toHaveValue(
-    "",
-  );
+  // What the form posts: the chips, one per line (guided-inputs §4.11).
+  await expect(form.locator('input[name="allowedHosts"]')).toHaveValue("");
 });
 
 test("a narrowed card is what the page reads after a reload", async () => {
@@ -88,9 +88,10 @@ test("a narrowed card is what the page reads after a reload", async () => {
   await form
     .getByLabel("Ask the provider not to keep or train on what is sent")
     .check();
-  await form
-    .getByLabel("Hosts an AI request may reach")
-    .fill("https://openrouter.ai/api/v1\napi.anthropic.com");
+  await setTokens(form.getByLabel("Hosts an AI request may reach"), [
+    "https://openrouter.ai/api/v1",
+    "api.anthropic.com",
+  ]);
   await save(page);
   await expect(form.getByRole("status")).toHaveText("Saved.", {
     timeout: 15_000,
@@ -103,23 +104,26 @@ test("a narrowed card is what the page reads after a reload", async () => {
     reloaded.getByLabel("Ask the provider not to keep or train on what is sent"),
   ).toBeChecked();
   // A pasted address is kept as the host the guard compares.
-  await expect(
-    reloaded.getByLabel("Hosts an AI request may reach"),
-  ).toHaveValue("openrouter.ai\napi.anthropic.com");
+  await expect(reloaded.locator('input[name="allowedHosts"]')).toHaveValue(
+    "openrouter.ai\napi.anthropic.com",
+  );
 });
 
 test("a host that is not one is refused by name, and nothing changes", async () => {
   await goTo(page, "/admin/ai");
   const form = card(page);
-  await form.getByLabel("Hosts an AI request may reach").fill("not_a_host!");
+  // Marked where it stands as it is made, and the save is held. The action
+  // refuses it too, for REST and the command line.
+  await setTokens(form.getByLabel("Hosts an AI request may reach"), [
+    "not_a_host!",
+  ]);
+  await expect(form.getByText(/^not_a_host! is not a host\./)).toBeVisible({
+    timeout: 15_000,
+  });
   await save(page);
-  await expect(form.getByRole("alert")).toContainText(
-    "not_a_host! is not a host name",
-    { timeout: 15_000 },
-  );
 
   await goTo(page, "/admin/ai");
-  await expect(
-    card(page).getByLabel("Hosts an AI request may reach"),
-  ).toHaveValue("openrouter.ai\napi.anthropic.com");
+  await expect(card(page).locator('input[name="allowedHosts"]')).toHaveValue(
+    "openrouter.ai\napi.anthropic.com",
+  );
 });

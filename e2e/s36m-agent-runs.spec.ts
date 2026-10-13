@@ -19,6 +19,7 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -113,4 +114,31 @@ test("a run started over the API is carried by the relay, and stops with its rea
     headers: authed(),
   });
   expect((await after.json()).data.name).toBe(spaceName);
+});
+
+/**
+ * guided-inputs §4.10: a scope names a goal by finding it, where its id was
+ * pasted from the goal's own page. Goals are searched rather than listed,
+ * since a workspace can hold tens of thousands. Bound to this file's own
+ * agent, so the seeded two are left as every later spec expects them.
+ */
+test("a scope names a goal found by typing, not a pasted id", async () => {
+  const goals = await api.get("/api/v1/goals/list", { headers: authed() });
+  expect(goals.status()).toBe(200);
+  const goal = ((await goals.json()).data.goals as { title: string }[])[0];
+  expect(goal).toBeTruthy();
+  const title = goal?.title as string;
+
+  await goTo(page, "/admin/agents");
+  const runner = page.getByRole("listitem").filter({ hasText: "E2E runner" }).first();
+  await runner.getByRole("button", { name: "Bind a scope" }).click();
+  await runner.locator("select[name='resourceType']").selectOption("goal");
+  await choose(runner.getByLabel("Which one"), title);
+  await runner.getByRole("button", { name: "Bind", exact: true }).click();
+
+  // The form closes only when the binding is saved, and says why otherwise.
+  await expect(
+    runner.getByRole("button", { name: "Bind a scope" }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(runner.getByRole("alert")).toHaveCount(0);
 });

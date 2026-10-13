@@ -80,9 +80,9 @@ test("a space with nothing connected says who can change that", async () => {
 test("once Slack is connected, the space can link a channel", async () => {
   await goTo(page, "/admin/channels");
   const form = slackForm();
-  await form.getByLabel("Bot token").fill("xoxb-e2e-space-post");
-  await form.getByLabel("Signing or webhook secret").fill("e2e-space-secret");
-  await form.getByLabel("Provider workspace id").fill(TEAM_ID);
+  await form.getByLabel("Bot User OAuth Token").fill("xoxb-e2e-space-post");
+  await form.getByLabel("Signing Secret").fill("e2e-space-secret");
+  await form.getByLabel("Workspace ID").fill(TEAM_ID);
   await form.getByRole("button", { name: "Connect" }).click();
   await expect(page.getByText("connected rather than verified")).toBeVisible({
     timeout: 10_000,

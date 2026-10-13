@@ -1,7 +1,13 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  DateRangeInput,
+  EntityPicker,
+  useTranslations,
+} from "@openokr/ui";
 import { useRef, useState } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import {
   type AuditFilterRequest,
   type AuditPageResult,
@@ -27,12 +33,6 @@ import { AuditLog, type LogState, type Member } from "./audit-log";
  * to answer a question this answer already holds. The same trade
  * `exports.list` makes.
  */
-
-const INPUT_CLASS =
-  "rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm font-normal text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line";
-
-const LABEL_CLASS =
-  "flex w-full flex-col gap-1 text-xs font-semibold text-ink-2";
 
 /** The filter a form holds right now, empty fields left out. */
 function readFilter(form: HTMLFormElement): AuditFilterRequest {
@@ -81,13 +81,27 @@ function settle(
   };
 }
 
+/** A name as the filter offers it: the name itself, as the rows print it. */
+const nameOptions = (names: readonly string[]) =>
+  names.map((name) => ({ id: name, label: name }));
+
 export function AuditPanel({
   members,
+  names,
   timeZone,
   initial,
 }: {
   /** Everybody who can have acted, for the filter and for naming rows. */
   readonly members: readonly Member[];
+  /**
+   * The action and target type names the trail holds (guided-inputs §4.11).
+   * Two free-text boxes asked for names nobody could know, and a typo found
+   * no rows rather than the wrong ones.
+   */
+  readonly names: {
+    readonly actions: readonly string[];
+    readonly targetTypes: readonly string[];
+  };
   readonly timeZone: string;
   /** The newest page, read on the server so the first paint has rows. */
   readonly initial: AuditPageResult;
@@ -257,62 +271,52 @@ export function AuditPanel({
         </p>
 
         <form onSubmit={show} className="flex flex-col gap-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label htmlFor="audit-from" className={LABEL_CLASS}>
-              {t("admin.audit.from")}
-              <input
-                id="audit-from"
-                name="from"
-                type="date"
-                className={INPUT_CLASS}
-              />
-            </label>
-            <label htmlFor="audit-to" className={LABEL_CLASS}>
-              {t("admin.audit.to")}
-              <input
-                id="audit-to"
-                name="to"
-                type="date"
-                className={INPUT_CLASS}
-              />
-            </label>
+          <div className="flex flex-col gap-1">
+            <DateRangeInput
+              startLabel={t("admin.audit.from")}
+              endLabel={t("admin.audit.to")}
+              startName="from"
+              endName="to"
+              startId="audit-from"
+              endId="audit-to"
+            />
+            {/* The server reads the two days in this zone, which is the one
+                the rows below are stamped in. */}
+            <p className="text-xs text-ink-3">
+              {t("admin.audit.daysIn", { zone: timeZone })}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <label htmlFor="audit-action" className={LABEL_CLASS}>
-              {t("admin.audit.action")}
-              <input
-                id="audit-action"
-                name="action"
-                placeholder={t("admin.audit.actionPlaceholder")}
-                className={INPUT_CLASS}
-              />
-            </label>
-            <label htmlFor="audit-actor" className={LABEL_CLASS}>
-              {t("admin.audit.actor")}
-              <select
-                id="audit-actor"
-                name="actorMemberId"
-                defaultValue=""
-                className={INPUT_CLASS}
-              >
-                <option value="">{t("admin.audit.anyone")}</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label htmlFor="audit-target-type" className={LABEL_CLASS}>
-              {t("admin.audit.targetType")}
-              <input
-                id="audit-target-type"
-                name="targetType"
-                placeholder={t("admin.audit.targetTypePlaceholder")}
-                className={INPUT_CLASS}
-              />
-            </label>
+            <EntityPicker
+              id="audit-action"
+              label={t("admin.audit.action")}
+              name="action"
+              defaultValue={null}
+              options={nameOptions(names.actions)}
+              noneLabel={t("admin.audit.anyAction")}
+            />
+            <EntityPicker
+              id="audit-actor"
+              label={t("admin.audit.actor")}
+              name="actorMemberId"
+              defaultValue={null}
+              options={peopleOptions(
+                members.map((member) => ({
+                  id: member.id,
+                  label: member.name,
+                })),
+              )}
+              noneLabel={t("admin.audit.anyone")}
+            />
+            <EntityPicker
+              id="audit-target-type"
+              label={t("admin.audit.targetType")}
+              name="targetType"
+              defaultValue={null}
+              options={nameOptions(names.targetTypes)}
+              noneLabel={t("admin.audit.anyTargetType")}
+            />
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

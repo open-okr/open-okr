@@ -33,6 +33,7 @@ COPY packages/agents/package.json packages/agents/
 COPY packages/config/package.json packages/config/
 COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
+COPY packages/formats/package.json packages/formats/
 COPY packages/importer/package.json packages/importer/
 COPY packages/method/package.json packages/method/
 COPY packages/test-support/package.json packages/test-support/

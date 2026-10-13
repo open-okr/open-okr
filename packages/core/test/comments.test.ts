@@ -5,7 +5,9 @@
  */
 import { workerDb } from "@openokr/test-support/db";
 import { beforeEach, describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { callAction } from "../src/actions/registry.ts";
+import type { RichTextDocument } from "../src/rich-text/schema.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const OWNER = "comment-owner";
@@ -21,7 +23,7 @@ const context = (userId = OWNER) => ({
   actor: { kind: "human" as const, userId },
 });
 
-const richText = (text: string) => ({
+const richText = (text: string): RichTextDocument => ({
   type: "doc",
   content: [{ type: "paragraph", content: [{ type: "text", text }] }],
 });
@@ -183,11 +185,95 @@ describe("comments", () => {
 });
 
 /**
+ * The write boundary holds a typed comment to the rich text schema, as it
+ * already held an imported one. Both actions took `z.unknown()`, so anything
+ * an API client sent was stored as the body.
+ */
+describe("a comment body that is not editor JSON", () => {
+  const notADocument = [
+    ["a plain string", "just text"],
+    [
+      "a node the schema does not allow",
+      { type: "doc", content: [{ type: "script", text: "alert(1)" }] },
+    ],
+    [
+      "a link to javascript:",
+      {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "click",
+                marks: [
+                  { type: "link", attrs: { href: "javascript:alert(1)" } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  ] as const;
+
+  for (const [what, refused] of notADocument) {
+    // Typed as a document so it reaches the schema, which is what is tested.
+    const body = refused as never;
+    it(`is refused on create: ${what}`, async () => {
+      const wb = await workerDb();
+      const goalId = await createGoal();
+
+      await expect(
+        callAction({ pool: wb.appPool, ...context() }, "comments.create", {
+          subjectType: "goal" as const,
+          subjectId: goalId,
+          body,
+        }),
+      ).rejects.toBeInstanceOf(ZodError);
+
+      const list = await callAction(
+        { pool: wb.appPool, ...context() },
+        "comments.list",
+        { subjectType: "goal" as const, subjectId: goalId },
+      );
+      expect(list).toHaveLength(0);
+    });
+
+    it(`is refused on edit, and the comment keeps its body: ${what}`, async () => {
+      const wb = await workerDb();
+      const goalId = await createGoal();
+      const original = richText("What I meant to say.");
+      const created = await callAction(
+        { pool: wb.appPool, ...context() },
+        "comments.create",
+        { subjectType: "goal" as const, subjectId: goalId, body: original },
+      );
+
+      await expect(
+        callAction({ pool: wb.appPool, ...context() }, "comments.update", {
+          commentId: created.id,
+          body,
+        }),
+      ).rejects.toBeInstanceOf(ZodError);
+
+      const list = await callAction(
+        { pool: wb.appPool, ...context() },
+        "comments.list",
+        { subjectType: "goal" as const, subjectId: goalId },
+      );
+      expect(list[0]?.body).toEqual(original);
+    });
+  }
+});
+
+/**
  * Who hears about a comment (completeness review H-13). A mention subscribed
  * the person and told them nothing, and a new comment told no one.
  */
 describe("who a comment tells", () => {
-  const mentioning = (memberId: string, text: string) => ({
+  const mentioning = (memberId: string, text: string): RichTextDocument => ({
     type: "doc",
     content: [
       {

@@ -1,4 +1,4 @@
-import { Button } from "@openokr/ui";
+import { Button, NumberInput } from "@openokr/ui";
 import { getTranslations } from "../lib/translations";
 import { ActionForm } from "./cycle/action-form.tsx";
 import { recordFromMap } from "./work-map-actions.ts";
@@ -35,22 +35,20 @@ export async function QuickCheckIn({
     <ActionForm action={recordFromMap} className="flex flex-col gap-1.5">
       <input type="hidden" name="goalId" value={goalId} />
       <input type="hidden" name="keyResultId" value={keyResultId} />
-      <label
-        className="text-xs font-semibold text-ink-2"
-        htmlFor={`map-value-${keyResultId}`}
-      >
-        {t("quickCheckIn.recordAValue", { unit: unit ? ` (${unit})` : "" })}
-      </label>
-      <span className="flex items-center gap-1.5">
-        <input
+      <span className="flex items-end gap-1.5">
+        {/* guided-inputs §4.8: the unit beside the number and in its name,
+            and an emptied field posts nothing, which the action refuses in
+            words rather than recording 0. */}
+        <NumberInput
           id={`map-value-${keyResultId}`}
+          label={t("quickCheckIn.recordAValue", { unit: "" })}
           name="value"
-          type="number"
-          step="any"
+          unit={unit}
+          required
           defaultValue={currentValue}
           // Nine digits fit. A measure in rupiah or impressions reaches them
           // and `w-24` hid half of what was being typed.
-          className="w-32 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+          inputClassName="h-auto w-32 px-2 py-1 text-xs"
         />
         <Button type="submit" variant="primary" size="sm">
           {t("common.save")}

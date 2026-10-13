@@ -61,10 +61,11 @@ export default async function AuditPage() {
   // The newest page is read here so the first paint has rows in it, which is
   // TECHNICAL-PLAN §13.3's line for settings. Suspended members are in the
   // directory because their rows are still in the trail and still theirs.
-  const [first, directory, settings] = await Promise.all([
+  const [first, directory, settings, names] = await Promise.all([
     browseAudit({}),
     callAction(context, "people.directory", { includeSuspended: true }),
     callAction(context, "settings.readForMember", {}),
+    callAction(context, "audit.names", {}),
   ]);
 
   const members = directory
@@ -82,7 +83,12 @@ export default async function AuditPage() {
           <p className="text-sm text-ink-3">{t("admin.audit.intro")}</p>
         </CardHeader>
         <CardBody>
-          <AuditPanel members={members} timeZone={timeZone} initial={first} />
+          <AuditPanel
+            members={members}
+            names={names}
+            timeZone={timeZone}
+            initial={first}
+          />
         </CardBody>
       </Card>
 

@@ -1,5 +1,14 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  EntityPicker,
+  NumberInput,
+  SelectInput,
+  TextInput,
+  UnitInput,
+} from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
@@ -148,65 +157,68 @@ export default async function KpiTreesPage({
             <ActionForm action={addDriver} className="flex flex-col gap-2">
               <input type="hidden" name="parentKpiId" value={params.under} />
               <input type="hidden" name="treeId" value={tree.treeId ?? ""} />
-              <label className="sr-only" htmlFor="driver-title">
-                {t("kpis.trees.whatTheDriverMeasures")}
-              </label>
-              <input
+              <TextInput
                 id="driver-title"
+                label={t("kpis.trees.whatTheDriverMeasures")}
+                hideLabel
                 name="title"
                 required
+                maxLength={500}
                 placeholder={t("kpis.trees.qualifiedLeads")}
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                inputClassName="placeholder:text-ink-4"
               />
               <div className="flex flex-wrap items-center gap-2.5">
-                <label className="text-xs text-ink-3" htmlFor="indicatorType">
-                  {t("common.indicator")}
-                </label>
-                <select
+                <SelectInput
                   id="indicatorType"
+                  label={t("common.indicator")}
                   name="indicatorType"
                   defaultValue="leading"
-                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                  className="flex-row items-center gap-2.5"
+                  inputClassName="h-6.5 w-auto text-xs text-ink-2"
                 >
                   <option value="leading">{t("kpis.trees.leading")}</option>
                   <option value="lagging">{t("kpis.trees.lagging")}</option>
-                </select>
-                <label className="text-xs text-ink-3" htmlFor="driver-freq">
-                  {t("common.frequency")}
-                </label>
-                <select
+                </SelectInput>
+                <SelectInput
                   id="driver-freq"
+                  label={t("common.frequency")}
                   name="frequency"
                   defaultValue="monthly"
-                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                  className="flex-row items-center gap-2.5"
+                  inputClassName="h-6.5 w-auto text-xs text-ink-2"
                 >
                   <option value="daily">{t("common.daily")}</option>
                   <option value="weekly">{t("common.weekly")}</option>
                   <option value="monthly">{t("common.monthly")}</option>
                   <option value="quarterly">{t("common.quarterly")}</option>
                   <option value="yearly">{t("common.yearly")}</option>
-                </select>
-                <label className="text-xs text-ink-3" htmlFor="driver-dir">
-                  {t("common.betterWhen")}
-                </label>
-                <select
+                </SelectInput>
+                <SelectInput
                   id="driver-dir"
+                  label={t("common.betterWhen")}
                   name="direction"
                   defaultValue="higher_better"
-                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                  className="flex-row items-center gap-2.5"
+                  inputClassName="h-6.5 w-auto text-xs text-ink-2"
                 >
                   <option value="higher_better">{t("common.higher")}</option>
                   <option value="lower_better">{t("common.lower")}</option>
-                </select>
-                <label className="text-xs text-ink-3" htmlFor="driver-target">
-                  {t("common.standingTarget")}
-                </label>
-                <input
+                </SelectInput>
+              </div>
+              {/* guided-inputs §4.8: the target as a number, and the unit
+                  it is measured in, which the form did not ask for. */}
+              <div className="flex flex-wrap items-end gap-2.5">
+                <NumberInput
                   id="driver-target"
+                  label={t("common.standingTarget")}
                   name="targetDefault"
-                  type="number"
-                  step="any"
-                  className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+                  inputClassName="h-auto w-24 py-1 text-xs"
+                />
+                <UnitInput
+                  id="driver-unit"
+                  label={t("kpis.unit")}
+                  name="unit"
+                  inputClassName="h-auto w-28 py-1 text-xs"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -241,21 +253,18 @@ export default async function KpiTreesPage({
           <CardBody>
             <ActionForm action={fileIntoTree} className="flex flex-col gap-2">
               <input type="hidden" name="treeId" value={tree.treeId} />
-              <label className="sr-only" htmlFor="kpiId">
-                {t("kpis.trees.whichKpi")}
-              </label>
-              <select
+              <EntityPicker
                 id="kpiId"
+                label={t("kpis.trees.whichKpi")}
+                hideLabel
                 name="kpiId"
                 required
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-              >
-                {unfiled.map((node) => (
-                  <option key={node.id} value={node.id}>
-                    {node.title}
-                  </option>
-                ))}
-              </select>
+                options={unfiled.map((node) => ({
+                  id: node.id,
+                  label: node.title,
+                }))}
+                className="max-w-96"
+              />
               <button
                 type="submit"
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
@@ -279,15 +288,15 @@ export default async function KpiTreesPage({
           </CardHeader>
           <CardBody>
             <ActionForm action={addTree} className="flex flex-col gap-2">
-              <label className="sr-only" htmlFor="name">
-                {t("kpis.trees.treeName")}
-              </label>
-              <input
+              <TextInput
                 id="name"
+                label={t("kpis.trees.treeName")}
+                hideLabel
                 name="name"
                 required
+                maxLength={120}
                 placeholder={t("kpis.trees.operatingMargin")}
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                inputClassName="placeholder:text-ink-4"
               />
               <button
                 type="submit"

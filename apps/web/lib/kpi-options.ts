@@ -5,6 +5,8 @@ export interface KpiOption {
   readonly id: string;
   readonly title: string;
   readonly unit: string | null;
+  /** Its short id, read with its title in a picker (guided-inputs §4.10). */
+  readonly shortId: string;
 }
 
 /**
@@ -27,6 +29,7 @@ export async function readKpiOptions(
       id: kpi.id,
       title: kpi.title,
       unit: kpi.unit,
+      shortId: kpi.shortId,
     }));
   } catch {
     // The rest of either screen is the work itself, so it has to render when

@@ -1,18 +1,20 @@
 "use server";
 
-import { OperationError, setPlanAsOperator } from "@openokr/core";
+import { setPlanAsOperator } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
+import { refusalOf } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 
 /**
  * The operator's plan change on S-46 (completeness review H-21).
  *
  * The grant is re-checked here and again at the domain door, for the reason
- * the lifecycle form gives. Unlike that form, a refusal is returned rather
- * than swallowed: "12 seats are in use" is what the operator has to tell the
- * customer, so the screen has to say it.
+ * the lifecycle form gives. A refusal is returned rather than swallowed: "12
+ * seats are in use" is what the operator has to tell the customer, so the
+ * screen has to say it. A schema's refusal too, which used to reach the error
+ * page instead (guided-inputs §5, F5).
  */
 export interface OperatorPlanState {
   readonly error?: string;
@@ -44,10 +46,11 @@ export async function setPlan(formData: FormData): Promise<OperatorPlanState> {
       reason,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const refusal = refusalOf(error);
+    if (refusal === null) {
+      throw error;
     }
-    throw error;
+    return { error: refusal };
   }
   revalidatePath(`/operator/${workspaceId}`);
   revalidatePath("/operator");

@@ -36,6 +36,12 @@ import { blockerClockToCheckIn } from "../data-changes/0023_blocker_clock_to_che
 import { retireRhythmScoreThreshold } from "../data-changes/0024_retire_rhythm_score_threshold.ts";
 import { verifyFirstAccount } from "../data-changes/0025_verify_first_account.ts";
 import { kpiCorridorFollowsWorkspace } from "../data-changes/0026_kpi_corridor_follows_workspace.ts";
+import { sessionShiftsDocument } from "../data-changes/0027_session_shifts_document.ts";
+import { decisionTextDocument } from "../data-changes/0028_decision_text_document.ts";
+import { managementAnswerDocument } from "../data-changes/0029_management_answer_document.ts";
+import { stageNoteDocuments } from "../data-changes/0030_stage_note_documents.ts";
+import { digestNoteDocument } from "../data-changes/0031_digest_note_document.ts";
+import { revalidationNoteDocuments } from "../data-changes/0032_revalidation_note_documents.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -79,6 +85,16 @@ try {
       retireRhythmScoreThreshold,
       verifyFirstAccount,
       kpiCorridorFollowsWorkspace,
+      // Guided inputs change 11a: the monthly review's prose as documents.
+      sessionShiftsDocument,
+      decisionTextDocument,
+      // Change 11b: the quarterly review's prose as documents.
+      managementAnswerDocument,
+      stageNoteDocuments,
+      // Change 11c: the weekly coordinator note as a document.
+      digestNoteDocument,
+      // Change 12: the quarterly revalidation's two notes as documents.
+      revalidationNoteDocuments,
     ],
   });
   process.stdout.write(

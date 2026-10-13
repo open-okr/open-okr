@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
     "@openokr/config",
     "@openokr/core",
     "@openokr/db",
+    "@openokr/formats",
     "@openokr/method",
     "@openokr/ui",
   ],

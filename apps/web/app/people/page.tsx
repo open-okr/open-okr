@@ -1,5 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip, SearchInput } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/pool";
@@ -137,12 +137,14 @@ export default async function PeoplePage({
             <>
               {/* Search */}
               <form method="get" action="/people" className="flex gap-2">
-                <input
+                <SearchInput
+                  label={t("people.searchByNameOr")}
+                  hideLabel
                   name="q"
-                  type="search"
                   defaultValue={query}
                   placeholder={t("people.searchByNameOr")}
-                  className="flex-1 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                  maxLength={200}
+                  className="flex-1"
                 />
                 <button
                   type="submit"

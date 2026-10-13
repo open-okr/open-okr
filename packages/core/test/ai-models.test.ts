@@ -118,6 +118,28 @@ describe("readModelCatalog combines the seeded list with custom entries", () => 
     });
   });
 
+  it("refuses a model id with a space in it, or longer than any provider's", async () => {
+    // guided-inputs §4.11: a pasted display name was stored as the id.
+    const wb = await workerDb();
+    const add = (modelId: string) =>
+      callAction({ pool: wb.appPool, ...context(OWNER) }, "ai.addCustomModel", {
+        provider: "ollama",
+        modelId,
+        displayName: "Typed by hand",
+        contextWindow: 8192,
+        costInPerMillion: 0,
+        costOutPerMillion: 0,
+        supportsTools: false,
+        supportsVision: false,
+        supportsJsonMode: false,
+        supportsStreaming: false,
+        embeddingDimensions: null,
+        tiers: [],
+      });
+    await expect(add("My Fine Tune")).rejects.toThrow(/one word/);
+    await expect(add("m".repeat(201))).rejects.toThrow();
+  });
+
   it("a custom model still meters cost from its own figures", async () => {
     const wb = await workerDb();
     const added = await callAction(

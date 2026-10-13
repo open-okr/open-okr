@@ -217,4 +217,13 @@ describe("notifications.updateSettings", () => {
       ),
     ).rejects.toThrow();
   });
+
+  it("takes an hour of one digit, and stores it with two", async () => {
+    const updated = await callAction(
+      { pool: await pool(), ...context(OWNER) },
+      "notifications.updateSettings",
+      { dailySummaryTime: "7:30" },
+    );
+    expect(updated.dailySummaryTime).toBe("07:30");
+  });
 });

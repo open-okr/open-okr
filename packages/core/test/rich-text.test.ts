@@ -4,6 +4,7 @@ import {
   extractAttachments,
   extractMentionIds,
 } from "../src/rich-text/extract.ts";
+import { richTextSchema } from "../src/rich-text/field-schema.ts";
 import { renderRichTextToHtml } from "../src/rich-text/render.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../src/rich-text/schema.ts";
 import {
@@ -217,13 +218,15 @@ describe("parseRichText: rejects what is not on the allow-list", () => {
   });
 
   test("an unknown mark type", () => {
+    // Text colour, which the allow-list still leaves out. Underline was the
+    // example here until it joined the list (guided-inputs §4.7).
     const doc = {
       type: "doc",
       content: [
         {
           type: "paragraph",
           content: [
-            { type: "text", text: "x", marks: [{ type: "underline" }] },
+            { type: "text", text: "x", marks: [{ type: "textStyle" }] },
           ],
         },
       ],
@@ -475,5 +478,95 @@ describe("extractMentionIds / extractAttachments: decode-safe", () => {
     expect(extractAttachments(doc)).toEqual([
       { blobId: undefined, status: "uploading" },
     ]);
+  });
+});
+
+/**
+ * Underline, step 1 (docs/design/guided-inputs.md §4.7): every reader knows
+ * the mark before anything can write it, so a document carrying one, written
+ * by a later release, still validates and still renders during a rolling
+ * upgrade. Nothing in this release adds the mark: not the editor's keyboard,
+ * not a paste, and not the HTML import.
+ */
+describe("underline, which readers know before anything writes it", () => {
+  const underlined = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Mind " },
+          { type: "text", text: "this", marks: [{ type: "underline" }] },
+        ],
+      },
+    ],
+  };
+
+  test("validates as a document", () => {
+    expect(isValidRichText(underlined, RICH_TEXT_SCHEMA_VERSION)).toBe(true);
+  });
+
+  test("renders as <u>, on the screen, in email and in exports alike", () => {
+    const doc = parseRichText(underlined, RICH_TEXT_SCHEMA_VERSION);
+    expect(renderRichTextToHtml(doc)).toContain("<u>this</u>");
+  });
+
+  test("reads as its text in an excerpt", () => {
+    const doc = parseRichText(underlined, RICH_TEXT_SCHEMA_VERSION);
+    expect(excerptRichText(doc, 100)).toBe("Mind this");
+  });
+});
+
+describe("richTextSchema: the one input schema for a rich text field", () => {
+  const words = (value: string) => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text: value }] }],
+  });
+
+  test("takes a valid document or null, and refuses anything else", () => {
+    const schema = richTextSchema();
+    expect(schema.safeParse(words("Shipped")).success).toBe(true);
+    expect(schema.safeParse(null).success).toBe(true);
+    const refused = schema.safeParse({ type: "script" });
+    expect(refused.success).toBe(false);
+    expect(refused.error?.issues[0]?.message).toBe(
+      "not valid editor JSON for the current rich text schema",
+    );
+  });
+
+  test("with a limit, counts what a reader sees and refuses one over it", () => {
+    const schema = richTextSchema({ maxCharacters: 10 });
+    const bold = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "0123456789", marks: [{ type: "bold" }] },
+          ],
+        },
+      ],
+    };
+    expect(schema.safeParse(bold).success).toBe(true);
+    const over = schema.safeParse(words("0123456789X"));
+    expect(over.success).toBe(false);
+    expect(over.error?.issues[0]?.message).toBe(
+      "Keep it to 10 characters. This has 11.",
+    );
+    expect(schema.safeParse(null).success).toBe(true);
+  });
+
+  test("counts the way an excerpt reads, so the two cannot disagree", () => {
+    const doc = parseRichText(
+      GOLDEN_DOCUMENTS.mentionEntityLinkAttachment,
+      RICH_TEXT_SCHEMA_VERSION,
+    );
+    const length = excerptRichText(doc, 10_000).length;
+    expect(
+      richTextSchema({ maxCharacters: length }).safeParse(doc).success,
+    ).toBe(true);
+    expect(
+      richTextSchema({ maxCharacters: length - 1 }).safeParse(doc).success,
+    ).toBe(false);
   });
 });

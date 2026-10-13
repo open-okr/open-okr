@@ -139,7 +139,7 @@ test("a complete one is stored and reads back as SAML", async () => {
     .getByLabel("Issuer (the provider's entity ID)")
     .fill("https://idp.test/entity/acme");
   await page.getByLabel("Signing certificate").fill(certificate);
-  await page.getByLabel("Email domains (comma-separated)").fill("acme.test");
+  await page.getByLabel("Email domains", { exact: true }).fill("acme.test");
 
   await page.getByRole("button", { name: "Add provider" }).click();
 
@@ -230,7 +230,7 @@ test("a connection is changed from the screen, with its secret kept and its prov
   await page.getByLabel("Client ID").fill("globex-client");
   await page.getByLabel("Client secret").fill("globex-secret");
   await page
-    .getByLabel("Email domains (comma-separated)")
+    .getByLabel("Email domains", { exact: true })
     .fill(GLOBEX.domain);
   await page.getByRole("button", { name: "Add provider" }).click();
   await expect(page.getByRole("status")).toContainText("Provider saved");

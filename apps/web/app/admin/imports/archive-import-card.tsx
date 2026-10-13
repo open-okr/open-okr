@@ -15,6 +15,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  SecretInput,
   useTranslations,
 } from "@openokr/ui";
 import { useCallback, useState, useTransition } from "react";
@@ -130,24 +131,21 @@ export function ArchiveImportCard() {
 
         {/* Stage: idle or analyzing */}
         {(stage === "idle" || stage === "analyzing") && (
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("admin.imports.archiveImportCard.passphrase")}
-            <input
-              type="password"
-              autoComplete="off"
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-              className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-            <span className="text-ink-4">
-              {t("admin.imports.archiveImportCard.passphraseHint")}
-            </span>
-          </label>
+          <SecretInput
+            label={t("admin.imports.archiveImportCard.passphrase")}
+            description={t("admin.imports.archiveImportCard.passphraseHint")}
+            autoComplete="off"
+            maxLength={1024}
+            value={passphrase}
+            onChange={(e) => setPassphrase(e.target.value)}
+            className="w-64"
+          />
         )}
         {(stage === "idle" || stage === "analyzing") && (
           <div className="flex items-center gap-3">
             <input
               type="file"
+              aria-label={t("admin.imports.archiveImportCard.theArchiveFile")}
               accept=".okr"
               onChange={handleFileChange}
               disabled={pending}

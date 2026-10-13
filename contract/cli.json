@@ -425,6 +425,24 @@
           "field": "includeSuspended",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "search",
+          "field": "search",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "kinds",
+          "field": "kinds",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false
@@ -2074,6 +2092,16 @@
         }
       ],
       "pages": true
+    },
+    {
+      "name": "audit names",
+      "action": "audit.names",
+      "method": "GET",
+      "path": "/audit/names",
+      "scope": "read",
+      "summary": "The action and target type names this workspace's audit trail holds, so a filter offers only names it finds rows for.",
+      "flags": [],
+      "pages": false
     },
     {
       "name": "settings readWorkspaceSettings",
@@ -5170,6 +5198,12 @@
           "name": "limit",
           "field": "limit",
           "type": "integer",
+          "required": false
+        },
+        {
+          "name": "kinds",
+          "field": "kinds",
+          "type": "array",
           "required": false
         }
       ],

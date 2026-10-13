@@ -15,18 +15,34 @@ import {
   callAction,
   OperationError,
   richTextFromPlainText,
+  richTextSchema,
 } from "@openokr/core";
+import { isBlankDocument } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { assistContext } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
+import { DESCRIPTION_MAX_CHARACTERS } from "./decompose-limits.ts";
 
-/** The closing retrospective drafted from the goal's own check-ins, or null. */
+/**
+ * The closing retrospective drafted from the goal's own check-ins, or null.
+ *
+ * With the draft as a document too, since the field it goes into is the
+ * compact editor and `richTextFromPlainText` runs on the server only.
+ */
 export async function draftRetrospectiveAction(goalId: string) {
-  return callAction(await assistContext(), "goals.draftRetrospective", {
-    goalId,
-  });
+  const drafted = await callAction(
+    await assistContext(),
+    "goals.draftRetrospective",
+    { goalId },
+  );
+  return drafted === null
+    ? null
+    : {
+        narrative: drafted.narrative,
+        document: richTextFromPlainText(drafted.narrative),
+      };
 }
 
 /** The discussion on this goal, summarised, or null. Writes nothing. */
@@ -46,16 +62,28 @@ export async function decomposeKeyResultAction(
   goalId: string,
   keyResultId: string,
 ) {
-  return callAction(await assistContext("deep"), "goals.decomposeKeyResult", {
-    goalId,
-    keyResultId,
-  });
+  const drafted = await callAction(
+    await assistContext("deep"),
+    "goals.decomposeKeyResult",
+    { goalId, keyResultId },
+  );
+  // Each description as a document, for the compact editor it is edited in.
+  return drafted === null
+    ? null
+    : {
+        ...drafted,
+        initiatives: drafted.initiatives.map((initiative) => ({
+          ...initiative,
+          description: richTextFromPlainText(initiative.description),
+        })),
+      };
 }
 
 /** What the person kept from a decomposition, edited, to be created. */
 export interface KeptInitiative {
   readonly title: string;
-  readonly description: string;
+  /** The editor's document, checked here before anything is written. */
+  readonly description: unknown;
   readonly tasks: readonly string[];
 }
 
@@ -105,16 +133,30 @@ export async function createDecomposedWorkAction(input: {
     if (title === "") {
       continue;
     }
+    // The panel's own cap, held here rather than on `initiatives.create`
+    // (decompose-limits.ts says why), with the schema every rich text write
+    // uses, so a description that is not a document is refused too.
+    const description = richTextSchema({
+      maxCharacters: DESCRIPTION_MAX_CHARACTERS,
+    }).safeParse(kept.description);
+    if (!description.success) {
+      refused.push(
+        t("goals.detail.decompose.refused", {
+          title,
+          reason: description.error.issues[0]?.message ?? "",
+        }),
+      );
+      continue;
+    }
     let initiativeId: string;
     try {
-      const description = kept.description.trim();
       initiativeId = (
         await callAction(context, "initiatives.create", {
           spaceId: input.spaceId,
           title,
-          ...(description === ""
+          ...(isBlankDocument(description.data)
             ? {}
-            : { description: richTextFromPlainText(description) }),
+            : { description: description.data }),
           ownerId: workspace.memberId,
           keyResultIds: [input.keyResultId],
         })

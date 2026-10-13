@@ -4,6 +4,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  TextArea,
   VerdictDot,
 } from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
@@ -256,24 +257,21 @@ export async function Gates({
               className="mt-2 flex flex-col gap-1.5"
             >
               <input type="hidden" name="cycleId" value={cycleId} />
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-ink-2">
-                  {t("cycle.gates.whyIsThisSetPublished", {
-                    gates:
-                      unmet === 1
-                        ? t("common.count.gateOne", { count: unmet })
-                        : t("common.count.gateOther", { count: unmet }),
-                  })}
-                </span>
-                <textarea
-                  name="override.reason"
-                  required
-                  minLength={20}
-                  rows={3}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                  placeholder={t("cycle.gates.theReasonSomebodyWill")}
-                />
-              </label>
+              {/* The server's 20 to 2000 (cycle.publish's override). */}
+              <TextArea
+                label={t("cycle.gates.whyIsThisSetPublished", {
+                  gates:
+                    unmet === 1
+                      ? t("common.count.gateOne", { count: unmet })
+                      : t("common.count.gateOther", { count: unmet }),
+                })}
+                name="override.reason"
+                required
+                minLength={20}
+                maxLength={2000}
+                rows={3}
+                placeholder={t("cycle.gates.theReasonSomebodyWill")}
+              />
               <Button type="submit">
                 {t("cycle.gates.overrideAndPublish")}
               </Button>

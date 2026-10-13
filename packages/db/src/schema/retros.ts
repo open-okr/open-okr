@@ -9,7 +9,15 @@
  * to a space's managers and coordinators only, and one table with a visibility
  * column would put both audiences a forgotten predicate away from each other.
  */
-import { pgTable, smallint, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  integer,
+  jsonb,
+  pgTable,
+  smallint,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
 import { sessions } from "./sessions.ts";
 import { workspaceMembers, workspaces } from "./workspaces.ts";
@@ -90,7 +98,15 @@ export const managementAnswers = pgTable("management_answers", {
    * asked.
    */
   questionKey: smallint("question_key").notNull(),
+  /**
+   * The answer as plain text. Since change 11b of guided inputs (migration
+   * 0141) it is written beside `bodyDocument` for one release, so the
+   * previous release still reads it, and it goes in change 13.
+   */
   body: text("body").notNull(),
+  /** The answer as editor JSON, and its rich text schema version. */
+  bodyDocument: jsonb("body_document"),
+  bodyDocumentVersion: integer("body_document_version"),
   answeredById: uuid("answered_by_id")
     .notNull()
     .references(() => workspaceMembers.id),

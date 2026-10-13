@@ -87,7 +87,10 @@ describe("the rhythm and thresholds card", () => {
     // field brought into view and marked invalid.
     expect(form).toContain("refusedParameter");
     expect(form).toContain("focusRefused");
-    expect(form).toContain("aria-invalid={refusal !== null}");
+    expect(form).toContain("invalid={refusal !== null}");
+    expect(form).toContain(
+      "aria-describedby={refusal === null ? undefined : errorId}",
+    );
     // The card no longer carries a status strip of its own, because two
     // places saying the same thing is how one of them goes stale.
     expect(form).not.toContain('data-testid="rhythm-save"');

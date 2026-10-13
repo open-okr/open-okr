@@ -5,12 +5,18 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateInput,
+  EntityPicker,
   type MessageValues,
+  NumberInput,
+  TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
 import { workspaceReaderLevel } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX, progressCeiling } from "../../../lib/ceilings.ts";
+import { memberOption, namedOption } from "../../../lib/entity-options.ts";
+import { searchHumans } from "../../../lib/member-search.ts";
 import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -60,9 +66,6 @@ const BAND_WORD: Readonly<Record<string, string>> = {
 };
 
 type Translate = (key: string, values?: MessageValues) => string;
-
-const FIELD =
-  "rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink";
 
 const percent = (value: number | null, t: Translate) =>
   value === null ? t("kpis.recovery.noData") : `${Math.round(value)}%`;
@@ -339,73 +342,51 @@ export default async function RecoveryBoardPage() {
                       >
                         <input type="hidden" name="kpiId" value={card.kpiId} />
                         <div className="flex flex-wrap items-center gap-2.5">
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`fix-title-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.task")}
-                          </label>
-                          <input
+                          <TextInput
                             id={`fix-title-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.task")}
                             name="title"
+                            maxLength={500}
                             defaultValue={t("kpis.recovery.respond.fixTitle", {
                               kpi: card.title,
                             })}
-                            className={`${FIELD} min-w-0 flex-1`}
+                            className="min-w-0 flex-1 flex-row items-center gap-2.5"
+                            inputClassName="h-6.5 text-xs"
                           />
                         </div>
                         <div className="flex flex-wrap items-center gap-2.5">
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`fix-owner-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.owner")}
-                          </label>
-                          <select
+                          <EntityPicker
                             id={`fix-owner-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.owner")}
                             name="ownerId"
+                            required
                             defaultValue={
                               card.ownerMemberId ?? workspace.memberId
                             }
-                            className={FIELD}
-                          >
-                            {people.map((person) => (
-                              <option key={person.id} value={person.id}>
-                                {person.name}
-                              </option>
-                            ))}
-                          </select>
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`fix-due-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.due")}
-                          </label>
-                          <input
-                            id={`fix-due-${card.kpiId}`}
-                            name="dueOn"
-                            type="date"
-                            required
-                            className={FIELD}
+                            options={people.map((person) =>
+                              memberOption(person, t("common.agent")),
+                            )}
+                            search={searchHumans}
+                            className="w-48"
+                            inputClassName="text-xs"
                           />
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`fix-space-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.space")}
-                          </label>
-                          <select
+                          <DateInput
+                            id={`fix-due-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.due")}
+                            name="dueOn"
+                            required
+                            inputClassName="h-auto py-1 text-xs"
+                          />
+                          <EntityPicker
                             id={`fix-space-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.space")}
                             name="spaceId"
-                            defaultValue={card.spaceId ?? spaces[0]?.id ?? ""}
-                            className={FIELD}
-                          >
-                            {spaces.map((space) => (
-                              <option key={space.id} value={space.id}>
-                                {space.name}
-                              </option>
-                            ))}
-                          </select>
+                            required
+                            defaultValue={card.spaceId ?? spaces[0]?.id ?? null}
+                            options={spaces.map(namedOption)}
+                            className="w-48"
+                            inputClassName="text-xs"
+                          />
                         </div>
                         <div>
                           <button
@@ -451,88 +432,67 @@ export default async function RecoveryBoardPage() {
                             }
                           />
                           <div className="flex flex-wrap items-center gap-2.5">
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-goal-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.objective")}
-                            </label>
-                            <select
+                            {/* Chosen, where the select it replaced opened on
+                             * whichever objective came first. */}
+                            <EntityPicker
                               id={`kr-goal-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.objective")}
                               name="goalId"
-                              className={`${FIELD} min-w-0 flex-1`}
-                            >
-                              {objectives.map((goal) => (
-                                <option key={goal.id} value={goal.id}>
-                                  {goal.title}
-                                </option>
-                              ))}
-                            </select>
+                              required
+                              options={objectives.map((goal) => ({
+                                id: goal.id,
+                                label: goal.title,
+                              }))}
+                              className="min-w-0 flex-1"
+                              inputClassName="text-xs"
+                            />
                           </div>
                           <div className="flex flex-wrap items-center gap-2.5">
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-title-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.keyResult")}
-                            </label>
-                            <input
+                            <TextInput
                               id={`kr-title-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.keyResult")}
                               name="title"
+                              maxLength={500}
                               defaultValue={
                                 recoveryDrafts.get(card.kpiId)?.keyResults[0]
                                   ?.title ?? card.title
                               }
-                              className={`${FIELD} min-w-0 flex-1`}
+                              className="min-w-0 flex-1 flex-row items-center gap-2.5"
+                              inputClassName="h-6.5 text-xs"
                             />
                           </div>
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-baseline-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.from")}
-                            </label>
-                            <input
+                          {/* guided-inputs §4.8: numbers, grouped as the
+                              reader reads them, and nothing sent empty. */}
+                          <div className="flex flex-wrap items-end gap-2.5">
+                            <NumberInput
                               id={`kr-baseline-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.from")}
                               name="baseline"
-                              type="number"
-                              step="any"
                               defaultValue={
                                 recoveryDrafts.get(card.kpiId)?.keyResults[0]
-                                  ?.baseline
+                                  ?.baseline ?? null
                               }
-                              className={`${FIELD} w-24`}
+                              inputClassName="h-auto w-24 py-1 text-xs"
                             />
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-target-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.to")}
-                            </label>
-                            <input
+                            <NumberInput
                               id={`kr-target-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.to")}
                               name="target"
-                              type="number"
-                              step="any"
                               defaultValue={
                                 recoveryDrafts.get(card.kpiId)?.keyResults[0]
-                                  ?.target
+                                  ?.target ?? null
                               }
-                              className={`${FIELD} w-24`}
+                              inputClassName="h-auto w-24 py-1 text-xs"
                             />
                           </div>
                           <div className="flex flex-wrap items-center gap-2.5">
-                            <label
-                              className="text-xs text-ink-3"
-                              htmlFor={`kr-reason-${card.kpiId}`}
-                            >
-                              {t("kpis.recovery.respond.whyNow")}
-                            </label>
-                            <input
+                            <TextInput
                               id={`kr-reason-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.whyNow")}
                               name="reason"
-                              className={`${FIELD} min-w-0 flex-1`}
+                              maxLength={500}
+                              className="min-w-0 flex-1 flex-row items-center gap-2.5"
+                              inputClassName="h-6.5 text-xs"
                             />
                           </div>
                           <div>
@@ -558,32 +518,23 @@ export default async function RecoveryBoardPage() {
                             name="kpiId"
                             value={card.kpiId}
                           />
-                          <label
-                            className="text-xs text-ink-3"
-                            htmlFor={`kr-existing-${card.kpiId}`}
-                          >
-                            {t("kpis.recovery.respond.orOneThatExists")}
-                          </label>
-                          <select
+                          {/* Each key result reads with its objective, where
+                           * the select grouped them under it. */}
+                          <EntityPicker
                             id={`kr-existing-${card.kpiId}`}
+                            label={t("kpis.recovery.respond.orOneThatExists")}
                             name="keyResultId"
-                            className={`${FIELD} min-w-0 flex-1`}
-                          >
-                            {objectives.map((goal) =>
-                              goal.keyResults.length === 0 ? null : (
-                                <optgroup key={goal.id} label={goal.title}>
-                                  {goal.keyResults.map((keyResult) => (
-                                    <option
-                                      key={keyResult.id}
-                                      value={keyResult.id}
-                                    >
-                                      {keyResult.title}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              ),
+                            required
+                            options={objectives.flatMap((goal) =>
+                              goal.keyResults.map((keyResult) => ({
+                                id: keyResult.id,
+                                label: keyResult.title,
+                                detail: goal.title,
+                              })),
                             )}
-                          </select>
+                            className="min-w-0 flex-1"
+                            inputClassName="text-xs"
+                          />
                           <button
                             type="submit"
                             className="rounded-md border border-line px-3 py-1 text-xs font-semibold text-ink-2"

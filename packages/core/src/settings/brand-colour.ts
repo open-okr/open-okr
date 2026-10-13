@@ -1,3 +1,17 @@
+import {
+  HEX_COLOUR_PATTERN,
+  type Hsl,
+  hexChannels,
+  hexToHsl,
+  type StatusHue,
+  statusHueOf,
+} from "@openokr/formats";
+
+// The status hue rule lives in `packages/formats` since guided-inputs 9c, so
+// the branding field can refuse a colour as it is picked. Exported here as it
+// always was.
+export { type StatusHue, statusHueOf };
+
 /**
  * A workspace's brand colour, turned into the brand token family (completeness
  * review M-14, UIUX-PLAN §2, docs/design/colour-system.md).
@@ -32,7 +46,7 @@
  * Pure: no database, no DOM. The web app turns the palette into CSS.
  */
 
-const HEX = /^#[0-9a-fA-F]{6}$/;
+const HEX = HEX_COLOUR_PATTERN;
 
 /** The tokens a workspace's colour sets, in `tokens.css` order. */
 export const BRAND_TOKENS = [
@@ -77,15 +91,6 @@ const ON_BRAND = "#ffffff";
 const TEXT_CONTRAST = 4.5;
 const UI_CONTRAST = 3;
 
-/**
- * Below this HSL saturation a colour is a grey, whatever its hue says. A grey
- * brand is allowed: it is not a status colour, and its derived shades stay
- * grey because they keep its saturation.
- */
-const NEUTRAL_SATURATION = 0.15;
-
-export type StatusHue = "red" | "amber" | "green";
-
 export interface BrandPalette {
   /** What the administrator chose, lower-cased. */
   readonly chosen: string;
@@ -95,40 +100,6 @@ export interface BrandPalette {
   readonly adjusted: boolean;
   readonly light: Readonly<Record<BrandToken, string>>;
   readonly dark: Readonly<Record<BrandToken, string>>;
-}
-
-interface Hsl {
-  readonly h: number;
-  readonly s: number;
-  readonly l: number;
-}
-
-function channels(hex: string): readonly [number, number, number] {
-  const n = Number.parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
-function toHsl(hex: string): Hsl {
-  const [r, g, b] = channels(hex).map((channel) => channel / 255) as [
-    number,
-    number,
-    number,
-  ];
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) {
-    return { h: 0, s: 0, l };
-  }
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  const sector =
-    max === r
-      ? (g - b) / d + (g < b ? 6 : 0)
-      : max === g
-        ? (b - r) / d + 2
-        : (r - g) / d + 4;
-  return { h: sector * 60, s, l };
 }
 
 function fromHsl({ h, s, l }: Hsl): string {
@@ -158,7 +129,7 @@ function fromHsl({ h, s, l }: Hsl): string {
 }
 
 function luminance(hex: string): number {
-  const [r, g, b] = channels(hex).map((channel) => {
+  const [r, g, b] = hexChannels(hex).map((channel) => {
     const s = channel / 255;
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
   }) as [number, number, number];
@@ -170,34 +141,6 @@ export function contrastRatio(a: string, b: string): number {
   const high = Math.max(luminance(a), luminance(b));
   const low = Math.min(luminance(a), luminance(b));
   return (high + 0.05) / (low + 0.05);
-}
-
-/**
- * Which status family a colour reads as, or null when it reads as none.
- *
- * The bands are wide on purpose, the same way the avatar palette's are: teal
- * and lime read as on track at chip size, orange and brown as at risk, and
- * rose as off track. What is left is the arc from cyan-blue through indigo and
- * violet to pink, and any grey.
- */
-export function statusHueOf(hex: string): StatusHue | null {
-  if (!HEX.test(hex)) {
-    return null;
-  }
-  const { h, s } = toHsl(hex);
-  if (s < NEUTRAL_SATURATION) {
-    return null;
-  }
-  if (h >= 340 || h < 15) {
-    return "red";
-  }
-  if (h < 65) {
-    return "amber";
-  }
-  if (h < 185) {
-    return "green";
-  }
-  return null;
 }
 
 /** Lightness is searched in steps this fine, which is below one RGB step. */
@@ -246,7 +189,7 @@ export function deriveBrandPalette(chosen: string): BrandPalette | null {
     return null;
   }
   const colour = chosen.toLowerCase();
-  const base = toHsl(colour);
+  const base = hexToHsl(colour);
   const at = (l: number, s = base.s) =>
     fromHsl({ h: base.h, s, l: Math.min(1, Math.max(0, l)) });
 

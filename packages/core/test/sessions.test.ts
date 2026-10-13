@@ -11,6 +11,8 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
+import type { RichTextDocument } from "../src/rich-text/schema.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "session-facilitator";
@@ -1563,6 +1565,82 @@ describe("sessions.digest carries the coordinator's note (P6-G19b)", () => {
     // not return it, so a surface could show the note it had just written only
     // by reloading somebody else's page.
     expect(digest?.note).toBe("Hiring is the constraint, not the roadmap.");
+  });
+
+  it("keeps a note written as a document, and carries it on one line", async () => {
+    // Guided-inputs change 11c. The digest, its narration and a channel post
+    // are lists of lines, so two paragraphs become one line there.
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await holdAWeek(0.6);
+    const note: RichTextDocument = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Hiring is the " },
+            { type: "text", text: "constraint", marks: [{ type: "bold" }] },
+            { type: "text", text: "." },
+          ],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Not the roadmap." }],
+        },
+      ],
+    };
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCoordinatorNote",
+      { sessionId, note },
+    );
+
+    const digest = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.digest",
+      { sessionId },
+    )) as { note: string | null; noteDocument: unknown; lines: string[] };
+    expect(digest.noteDocument).toEqual(note);
+    expect(digest.note).toBe("Hiring is the constraint. Not the roadmap.");
+    expect(digest.lines).toContain(
+      "For leadership: Hiring is the constraint. Not the roadmap.",
+    );
+
+    // The plain column, which the release before reads during an upgrade.
+    const { rows } = await wb.admin.query<{ note: string }>(
+      "select d.note from digests d join okr_sessions s on s.digest_id = d.id where s.id = $1",
+      [sessionId],
+    );
+    expect(rows[0]?.note).toBe("Hiring is the constraint.\n\nNot the roadmap.");
+  });
+
+  it("refuses a blank note, and reads one the backfill has not reached as a document", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await holdAWeek(0.6);
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "sessions.setCoordinatorNote",
+        { sessionId, note: { type: "doc", content: [{ type: "paragraph" }] } },
+      ),
+    ).rejects.toThrow(/something for leadership/);
+
+    await wb.admin.query(
+      `update digests set note = 'Written last release.'
+        where id = (select digest_id from okr_sessions where id = $1)`,
+      [sessionId],
+    );
+    const digest = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.digest",
+      { sessionId },
+    )) as { note: string | null; noteDocument: unknown };
+    expect(digest.note).toBe("Written last release.");
+    expect(digest.noteDocument).toEqual(
+      richTextFromPlainText("Written last release."),
+    );
   });
 });
 

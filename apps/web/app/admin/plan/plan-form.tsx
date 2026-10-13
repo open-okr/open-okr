@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { SelectInput, useTranslations } from "@openokr/ui";
 import {
   type FormEvent,
   startTransition,
@@ -60,11 +60,8 @@ export function PlanForm({
     >
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="plan-key">
-            {t("admin.plan.change")}
-          </label>
-          <select
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+          <SelectInput
+            label={t("admin.plan.change")}
             defaultValue={current ?? ""}
             id="plan-key"
             name="planKey"
@@ -75,7 +72,7 @@ export function PlanForm({
                 {plan.label}
               </option>
             ))}
-          </select>
+          </SelectInput>
         </div>
         <button
           className="rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60"

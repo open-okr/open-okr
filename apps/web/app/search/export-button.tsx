@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { SelectInput, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 
 /**
@@ -60,10 +60,9 @@ export function ExportButton({
   return (
     <span className="flex flex-col items-start gap-1">
       <span className="flex items-center gap-1.5">
-        <label className="sr-only" htmlFor="export-format">
-          {t("search.exportButton.exportFormat")}
-        </label>
-        <select
+        <SelectInput
+          label={t("search.exportButton.exportFormat")}
+          hideLabel
           id="export-format"
           value={format}
           disabled={pending}
@@ -72,14 +71,14 @@ export function ExportButton({
             setMessage(null);
             setError(null);
           }}
-          className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
+          inputClassName="h-6.5 w-auto px-1.5 text-xs text-ink-2"
         >
           {(Object.keys(LABELS) as ExportFormat[]).map((one) => (
             <option key={one} value={one}>
               {t(LABELS[one])}
             </option>
           ))}
-        </select>
+        </SelectInput>
         <button
           type="button"
           disabled={pending}

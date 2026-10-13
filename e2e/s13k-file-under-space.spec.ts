@@ -82,7 +82,7 @@ test("acceptance: Open drafting on the space files the new objective under it", 
 
   const space = page.locator("#goal-space");
   await expect(space).toBeVisible({ timeout: 15_000 });
-  await expect(space.locator("option:checked")).toHaveText(`Space: ${SPACE}`);
+  await expect(space).toHaveValue(SPACE);
 
   await page.locator("#goal-title").fill(TITLE);
   await page.getByRole("button", { name: "Add objective" }).click();

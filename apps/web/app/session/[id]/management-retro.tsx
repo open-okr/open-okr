@@ -24,6 +24,9 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  isBlankDocument,
+  RichTextEditor,
+  RichTextView,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -33,7 +36,11 @@ import { setManagementAnswerAction } from "./actions";
 interface ManagementQuestion {
   readonly questionKey: number;
   readonly question: string;
+  /** Plain text, shown only when the document does not render. */
   readonly body: string | null;
+  /** Editor JSON since guided-inputs change 11b, and what the editor opens on. */
+  readonly bodyDocument: unknown;
+  readonly bodyHtml: string | null;
   readonly answeredByName: string | null;
 }
 
@@ -59,21 +66,17 @@ function QuestionRow({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
-  const [body, setBody] = useState(question.body ?? "");
+  const [body, setBody] = useState<unknown>(question.bodyDocument);
 
   const save = useCallback(() => {
     onProblem(null);
-    if (body.trim().length === 0) {
+    if (body === null || isBlankDocument(body)) {
       onProblem(t("session.detail.managementRetro.anUnansweredQuestion"));
       return;
     }
     startTransition(async () => {
       try {
-        await setManagementAnswerAction(
-          sessionId,
-          question.questionKey,
-          body.trim(),
-        );
+        await setManagementAnswerAction(sessionId, question.questionKey, body);
         setOpen(false);
         router.refresh();
       } catch (error) {
@@ -103,15 +106,21 @@ function QuestionRow({
       </span>
 
       {question.body === null ? null : (
-        <span className="text-sm text-ink-2">
-          {question.body}
+        <div className="flex flex-col gap-0.5">
+          {question.bodyHtml === null ? (
+            <span className="text-sm text-ink-2">{question.body}</span>
+          ) : (
+            <RichTextView
+              html={question.bodyHtml}
+              className="text-sm text-ink-2"
+            />
+          )}
           {question.answeredByName ? (
             <span className="text-xs text-ink-4">
-              {" "}
               — {question.answeredByName}
             </span>
           ) : null}
-        </span>
+        </div>
       )}
 
       {canAnswer && !open ? (
@@ -132,23 +141,19 @@ function QuestionRow({
 
       {canAnswer && open ? (
         <>
-          <label
-            className="flex flex-col gap-1"
-            htmlFor={`answer-${question.questionKey}`}
-          >
-            <span className="sr-only">{question.question}</span>
-            <textarea
-              id={`answer-${question.questionKey}`}
-              rows={3}
-              className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-              value={body}
-              disabled={pending}
-              placeholder={t(
-                "session.detail.managementRetro.whatLeadershipActuallySaid",
-              )}
-              onChange={(event) => setBody(event.target.value)}
-            />
-          </label>
+          {/* Rich text since guided-inputs change 11b, up to the server's
+              2000 (sessions.setManagementAnswer). */}
+          <RichTextEditor
+            label={question.question}
+            variant="compact"
+            content={question.bodyDocument}
+            editable={!pending}
+            placeholder={t(
+              "session.detail.managementRetro.whatLeadershipActuallySaid",
+            )}
+            maxCharacters={2000}
+            onUpdate={setBody}
+          />
           <span className="flex flex-wrap items-center gap-2">
             <Button type="button" size="sm" disabled={pending} onClick={save}>
               {t("session.detail.managementRetro.saveTheAnswer")}

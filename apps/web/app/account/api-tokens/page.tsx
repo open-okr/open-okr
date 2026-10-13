@@ -1,5 +1,13 @@
 import { API_BASE, callAction, resourceIdentifier } from "@openokr/core";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  NumberInput,
+  TextInput,
+} from "@openokr/ui";
 import { instanceIssuer } from "../../../lib/issuer";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -107,17 +115,13 @@ export default async function ApiTokensPage() {
             agentEndpoint={agentEndpoint}
             className="flex flex-col gap-3"
           >
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-              {t("common.name")}
-              <input
-                type="text"
-                name="name"
-                required
-                maxLength={120}
-                placeholder={t("account.apiTokens.deployScript")}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm font-normal text-ink"
-              />
-            </label>
+            <TextInput
+              label={t("common.name")}
+              name="name"
+              required
+              maxLength={120}
+              placeholder={t("account.apiTokens.deployScript")}
+            />
 
             <fieldset className="flex flex-col gap-1.5">
               <legend className="mb-1 text-xs font-semibold text-ink-2">
@@ -168,17 +172,15 @@ export default async function ApiTokensPage() {
               ))}
             </fieldset>
 
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-              {t("account.apiTokens.expiresAfterInDays")}
-              <input
-                type="number"
-                name="expiresInDays"
-                min={1}
-                max={3650}
-                placeholder={t("account.apiTokens.leaveEmptyForNo")}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm font-normal text-ink"
-              />
-            </label>
+            <NumberInput
+              label={t("account.apiTokens.expiresAfterInDays")}
+              name="expiresInDays"
+              min={1}
+              max={3650}
+              step={1}
+              placeholder={t("account.apiTokens.leaveEmptyForNo")}
+              inputClassName="w-40"
+            />
 
             <Button type="submit" variant="primary" size="sm" className="w-fit">
               {t("account.apiTokens.createToken")}

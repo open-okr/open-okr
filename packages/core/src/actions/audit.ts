@@ -6,10 +6,11 @@
  * That is the wrong place for it: the person who has to answer an auditor is
  * a workspace administrator in a browser, not whoever holds a shell.
  *
- * Three actions. The third, `audit.list`, is the trail read a page at a time
+ * Four actions. The third, `audit.list`, is the trail read a page at a time
  * (completeness review L-19): the first two could check it and take it away,
  * and nothing could simply show it. It is a read like the verification, for
- * the same reason, and it hands over less than the export does.
+ * the same reason, and it hands over less than the export does. The fourth,
+ * `audit.names`, is the names the filter offers (guided-inputs §4.11).
  *
  * The first two are deliberately of different kinds.
  *
@@ -24,13 +25,13 @@
  * is intact. A verification that could not run on a frozen workspace would be
  * missing at the only moment it matters.
  *
- * All three are `full`. The trail names every actor and every change, and the
+ * All four are `full`. The trail names every actor and every change, and the
  * payloads carry the detail; that is an administrator's to read, and the same
  * argument `workspace.exportArchive` settled for the archive.
  */
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { listAuditRows } from "../audit/browse.ts";
+import { listAuditNames, listAuditRows } from "../audit/browse.ts";
 import {
   auditCsvFile,
   auditExportFilename,
@@ -258,6 +259,22 @@ export const listAudit = defineReadAction({
       })),
       more: page.more,
     };
+  },
+});
+
+export const listAuditNamesAction = defineReadAction({
+  name: "audit.names",
+  summary:
+    "The action and target type names this workspace's audit trail holds, so a filter offers only names it finds rows for.",
+  input: z.object({}),
+  output: z.object({
+    actions: z.array(z.string()),
+    targetTypes: z.array(z.string()),
+  }),
+  access: ACCESS_LEVELS.full,
+  async handler({ pool, workspaceId }) {
+    const names = await listAuditNames(pool, workspaceId);
+    return { actions: [...names.actions], targetTypes: [...names.targetTypes] };
   },
 });
 

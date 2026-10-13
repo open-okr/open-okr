@@ -14,6 +14,7 @@
  * restore, all refuse to act on the workspace's last full-access holder
  * (`isLastFullAccessHolder` in `../people/lifecycle.ts`).
  */
+
 import {
   accessBindings,
   activeOnly,
@@ -22,7 +23,19 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { and, eq, isNull, type SQL, sql } from "drizzle-orm";
+import { EMAIL_PATTERN, isListedTimezone } from "@openokr/formats";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
@@ -54,15 +67,13 @@ import {
 } from "../people/profile.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
-import {
-  isKnownTimezone,
-  resolveMemberSettings,
-} from "../settings/registry.ts";
+import { resolveMemberSettings } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { wallClock } from "./wall-clock.ts";
 
 /** `null` clears the bio; anything else must be a valid rich text
  * document (docs/design/rich-text-editor.md). Validated at the input
- * boundary, same as `isKnownTimezone` below, rather than inside
+ * boundary, same as the timezone below, rather than inside
  * `execute()` — a bad document is refused before the transaction opens. */
 const bioInputSchema = z
   .unknown()
@@ -100,9 +111,13 @@ export const updateOwnProfile = defineWriteAction({
   summary:
     "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
   input: z.object({
+    // On the list the profile offers, trimmed first (docs/design/
+    // guided-inputs.md §4.6). A name the runtime merely resolves, such as
+    // `EST`, was stored as typed.
     timezone: z
       .string()
-      .refine(isKnownTimezone, { message: "Unknown timezone." })
+      .trim()
+      .refine(isListedTimezone, { message: "Unknown timezone." })
       .optional(),
     avatarBlobId: z.uuid().nullable().optional(),
     bio: bioInputSchema,
@@ -143,10 +158,7 @@ export const updateOwnProfile = defineWriteAction({
      * nothing.
      */
     quietHours: z
-      .object({
-        start: z.string().regex(/^\d{1,2}:\d{2}$/, "Use HH:MM."),
-        end: z.string().regex(/^\d{1,2}:\d{2}$/, "Use HH:MM."),
-      })
+      .object({ start: wallClock, end: wallClock })
       .nullable()
       .optional(),
   }),
@@ -299,7 +311,12 @@ export const updateMember = defineWriteAction({
   summary: "Update another member's name, title or manager (org fields).",
   input: z.object({
     memberId: z.uuid(),
-    name: z.string().trim().min(1).max(200).optional(),
+    name: z
+      .string()
+      .trim()
+      .min(1, "A member needs a name.")
+      .max(200)
+      .optional(),
     title: z.string().trim().max(200).nullable().optional(),
     managerId: z.uuid().nullable().optional(),
   }),
@@ -986,6 +1003,19 @@ export const directory = defineReadAction({
      * default (P6-G09).
      */
     includeSuspended: z.boolean().optional(),
+    /**
+     * Only members whose name or title holds every word typed, the closest
+     * name first (guided-inputs §4.10): a picker over more members than the
+     * browser filters asks this as the person types.
+     */
+    search: z.string().trim().min(1).max(200).optional(),
+    /** Only these kinds: a champion is a person, never an agent. */
+    kinds: z
+      .array(z.enum(["human", "guest", "agent", "placeholder"]))
+      .min(1)
+      .optional(),
+    /** At most this many, for a search. */
+    limit: z.number().int().min(1).max(100).optional(),
   }),
   output: z.array(memberSummary),
   access: ACCESS_LEVELS.view,
@@ -996,7 +1026,20 @@ export const directory = defineReadAction({
       if (!input.includeSuspended) {
         filters.push(eq(workspaceMembers.status, "active"));
       }
-      return tx
+      if (input.kinds) {
+        filters.push(inArray(workspaceMembers.kind, input.kinds));
+      }
+      const phrase = input.search ?? "";
+      for (const word of phrase.split(/\s+/).filter(Boolean).slice(0, 6)) {
+        const like = `%${escapeLike(word)}%`;
+        filters.push(
+          or(
+            ilike(workspaceMembers.name, like),
+            ilike(workspaceMembers.title, like),
+          ) as SQL,
+        );
+      }
+      const query = tx
         .select({
           id: workspaceMembers.id,
           name: workspaceMembers.name,
@@ -1009,9 +1052,30 @@ export const directory = defineReadAction({
         })
         .from(workspaceMembers)
         .where(activeOnly(workspaceMembers, ...filters));
+      if (phrase === "") {
+        return input.limit ? query.limit(input.limit) : query;
+      }
+      // A name that starts with it, then a word in the name that does, then
+      // the rest, which matched on a title or inside a word.
+      const start = escapeLike(phrase);
+      return query
+        .orderBy(
+          desc(ilike(workspaceMembers.name, `${start}%`)),
+          desc(ilike(workspaceMembers.name, `% ${start}%`)),
+          desc(ilike(workspaceMembers.name, `%${start}%`)),
+          asc(workspaceMembers.name),
+        )
+        .limit(input.limit ?? 50);
     });
   },
 });
+
+/**
+ * `%`, `_` and the backslash mean something to `LIKE`, and a person typing
+ * "50%" means the character. Backslash is Postgres's default escape.
+ */
+const escapeLike = (text: string) =>
+  text.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
 
 const memberProfile = z.object({
   id: z.uuid(),
@@ -1213,7 +1277,7 @@ export const importMember = defineWriteAction({
   input: z.object({
     name: z.string().trim().min(1).max(200),
     /** The address the source system knew them by. */
-    email: z.email().max(320),
+    email: z.email({ pattern: EMAIL_PATTERN }).max(320),
     title: z.string().trim().max(200).optional(),
     timezone: z.string().trim().max(64).optional(),
     /** Required: this action exists for imports and for nothing else. */

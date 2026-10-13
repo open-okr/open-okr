@@ -1,4 +1,13 @@
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  EntityPicker,
+  SelectInput,
+  TextArea,
+  TextInput,
+} from "@openokr/ui";
+import { type MemberLike, memberOption } from "../../../lib/entity-options.ts";
 import { getTranslations } from "../../../lib/translations";
 import {
   addSpaceMember,
@@ -66,7 +75,7 @@ export async function SpaceManagement({
   readonly mission: string | null;
   readonly members: readonly ManageMember[];
   /** Everyone in the workspace who is not already in this space. */
-  readonly candidates: readonly { id: string; name: string }[];
+  readonly candidates: readonly MemberLike[];
   readonly canManage: boolean;
   readonly canArchive: boolean;
 }) {
@@ -91,28 +100,21 @@ export async function SpaceManagement({
       <CardBody className="flex flex-col gap-4">
         <SpaceForm action={updateSpace} className="flex flex-col gap-2">
           <input type="hidden" name="id" value={spaceId} />
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.name")}
-            <input
-              name="name"
-              defaultValue={name}
-              maxLength={80}
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.mission")}
-            <input
-              name="mission"
-              defaultValue={mission ?? ""}
-              maxLength={280}
-              placeholder={t("common.whatThisTeamIs")}
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-            <span className="text-ink-4">
-              {t("spaces.detail.manage.leavingItEmptyClears")}
-            </span>
-          </label>
+          <TextInput
+            label={t("common.name")}
+            name="name"
+            defaultValue={name}
+            maxLength={80}
+          />
+          <TextArea
+            label={t("common.mission")}
+            name="mission"
+            defaultValue={mission ?? ""}
+            maxLength={280}
+            placeholder={t("common.whatThisTeamIs")}
+            description={t("spaces.detail.manage.leavingItEmptyClears")}
+            rows={2}
+          />
           <button
             type="submit"
             className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
@@ -141,20 +143,21 @@ export async function SpaceManagement({
                       name="memberId"
                       value={member.memberId}
                     />
-                    <select
-                      name="role"
-                      aria-label={t("spaces.detail.manage.roleFor", {
+                    <SelectInput
+                      label={t("spaces.detail.manage.roleFor", {
                         name: member.name,
                       })}
+                      hideLabel
+                      name="role"
                       defaultValue={member.role}
-                      className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink"
+                      inputClassName="h-6.5 w-auto px-1.5 text-xs"
                     >
                       {ROLES.map((role) => (
                         <option key={role.id} value={role.id}>
                           {role.label}
                         </option>
                       ))}
-                    </select>
+                    </SelectInput>
                     <button
                       type="submit"
                       className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2"
@@ -196,34 +199,29 @@ export async function SpaceManagement({
             className="flex flex-wrap items-end gap-2 rounded-md bg-raised p-2.5"
           >
             <input type="hidden" name="spaceId" value={spaceId} />
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("spaces.detail.manage.addSomebody")}
-              <select
-                name="memberId"
-                required
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-              >
-                {candidates.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("spaces.detail.manage.as")}
-              <select
-                name="role"
-                defaultValue="member"
-                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-              >
-                {ROLES.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {/* Chosen, where the select opened on the first candidate. No
+             * directory search: it would offer back the people already in
+             * the space, whom this list leaves out. */}
+            <EntityPicker
+              label={t("spaces.detail.manage.addSomebody")}
+              name="memberId"
+              required
+              options={candidates.map((candidate) =>
+                memberOption(candidate, t("common.agent")),
+              )}
+              className="w-60"
+            />
+            <SelectInput
+              label={t("spaces.detail.manage.as")}
+              name="role"
+              defaultValue="member"
+            >
+              {ROLES.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.label}
+                </option>
+              ))}
+            </SelectInput>
             <button
               type="submit"
               className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"

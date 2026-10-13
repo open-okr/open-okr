@@ -1,5 +1,5 @@
-import { callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { callAction, SEARCH_TEXT_MAX_LENGTH } from "@openokr/core";
+import { Card, CardBody, CardHeader, Chip, SearchInput } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
@@ -51,7 +51,10 @@ export default async function SearchPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
   const query = await searchParams;
-  const phrase = (query.q ?? "").trim();
+  // Held to what the search takes: a longer phrase in the address, which
+  // anybody can send, used to throw while the page was drawn (guided-inputs
+  // §4.11).
+  const phrase = (query.q ?? "").trim().slice(0, SEARCH_TEXT_MAX_LENGTH).trim();
   const type = TYPES.find((one) => one.value === query.type);
 
   const hits =
@@ -112,15 +115,14 @@ export default async function SearchPage({
 
         <CardBody className="flex flex-col gap-3">
           <form action="/search" className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
-              {t("search.whatAreYouLooking")}
-              <input
-                name="q"
-                defaultValue={phrase}
-                placeholder={t("search.midMarketActivation")}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-              />
-            </label>
+            <SearchInput
+              label={t("search.whatAreYouLooking")}
+              name="q"
+              defaultValue={phrase}
+              placeholder={t("search.midMarketActivation")}
+              maxLength={SEARCH_TEXT_MAX_LENGTH}
+              className="flex-1"
+            />
             {type ? (
               <input type="hidden" name="type" value={type.value} />
             ) : null}

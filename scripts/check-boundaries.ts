@@ -8,13 +8,17 @@
  * row. The rules themselves live in `packages/config/src/boundaries.ts`,
  * where they are unit tested.
  */
-import { readFile, readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   type BoundarySourceFile,
   checkBoundaries,
 } from "../packages/config/src/boundaries.ts";
+import {
+  countRawFields,
+  rawFieldFindings,
+} from "../packages/config/src/raw-fields.ts";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -110,18 +114,39 @@ if (guardedTables.size === 0) {
 
 const violations = checkBoundaries(sources, { guardedTables });
 
-if (violations.length > 0) {
+/**
+ * Every field on the field kit (docs/design/guided-inputs.md §6). The ratchet
+ * that took `apps/web` from 336 raw fields to none is spent, so a screen file
+ * that draws a raw `<input>`, `<textarea>` or `<select>` now fails outright.
+ */
+const fieldCounts = new Map<string, number>();
+for (const source of sources) {
+  if (source.path.startsWith("apps/web/") && source.path.endsWith(".tsx")) {
+    const count = countRawFields(source.text);
+    if (count > 0) {
+      fieldCounts.set(source.path, count);
+    }
+  }
+}
+const fieldFindings = rawFieldFindings(fieldCounts);
+
+if (violations.length > 0 || fieldFindings.length > 0) {
   const lines = violations.map(
     (violation) =>
       `  ${violation.path}:${violation.line} [${violation.rule}] ${violation.message}`,
   );
+  const fieldLines = fieldFindings.map(
+    (finding) => `  ${finding.path} [raw-field] ${finding.message}`,
+  );
   process.stderr.write(
     [
-      `Boundary check failed. ${violations.length} violation(s):`,
+      `Boundary check failed. ${violations.length + fieldFindings.length} violation(s):`,
       ...lines,
+      ...fieldLines,
       "",
       "These boundaries are what keep the ports meaningful and side effects",
-      "atomic with their writes. See CLAUDE.md, hard rules.",
+      "atomic with their writes, and every field on the field kit. See",
+      "CLAUDE.md, hard rules, and docs/design/guided-inputs.md.",
       "",
     ].join("\n"),
   );
@@ -129,5 +154,5 @@ if (violations.length > 0) {
 }
 
 process.stdout.write(
-  `Boundary check passed. ${sources.length} file(s) checked.\n`,
+  `Boundary check passed. ${sources.length} file(s) checked, and no screen file draws a raw field.\n`,
 );

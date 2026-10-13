@@ -12,6 +12,7 @@
  * That comment is widened alongside this file rather than left describing
  * only the first of its two callers.
  */
+
 import {
   activeOnly,
   INVITE_MEMBER_KINDS,
@@ -22,6 +23,7 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
+import { DOMAIN_PATTERN, EMAIL_PATTERN } from "@openokr/formats";
 import { desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -182,8 +184,22 @@ export const createWorkspaceLink = defineWriteAction({
   summary: "Create a reusable link anyone holding it may join through.",
   input: z.object({
     maxUses: z.number().int().positive().optional(),
-    expiresInDays: z.number().int().positive().optional(),
-    allowedDomains: z.array(z.string().trim().toLowerCase().min(1)).optional(),
+    // A year at most (guided-inputs §6): a link open for longer is a
+    // standing door rather than an invitation.
+    expiresInDays: z.number().int().positive().max(365).optional(),
+    /** Each a domain, on the rule trusted domains use (guided-inputs §4.11). */
+    allowedDomains: z
+      .array(
+        z
+          .string()
+          .trim()
+          .toLowerCase()
+          .regex(
+            DOMAIN_PATTERN,
+            "An allowed domain is written like example.com, without @ or https://.",
+          ),
+      )
+      .optional(),
   }),
   output: linkSummary.extend({ token: z.string() }),
   access: ACCESS_LEVELS.full,
@@ -272,8 +288,10 @@ export const createPersonalLink = defineWriteAction({
   summary:
     "Invite one email address, usable once, as a member or as a guest of one space.",
   input: z.object({
-    email: z.string().trim().toLowerCase().email(),
-    expiresInDays: z.number().int().positive().optional(),
+    email: z.string().trim().toLowerCase().email({ pattern: EMAIL_PATTERN }),
+    // A year at most (guided-inputs §6): a link open for longer is a
+    // standing door rather than an invitation.
+    expiresInDays: z.number().int().positive().max(365).optional(),
     /**
      * Makes the invitation a guest's, of this space and nothing else. Absent
      * invites a member, as every invitation did before.
