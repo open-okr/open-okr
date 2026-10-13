@@ -512,6 +512,10 @@ const sessionOutput = z.object({
    * `toOutput` returned the whole map to every caller from P4-T07a until
    * P4-T10a-a. Nothing wrote notes in between, so nothing leaked, and the
    * shape was still wrong.
+   *
+   * Each value is editor JSON since guided-inputs change 11b. A note still
+   * stored as text, before data change 0030 reaches its row, is handed back
+   * wrapped, so no reader meets both shapes.
    */
   notes: z.record(z.string(), z.unknown()),
   /** Whole minutes added per stage by the facilitator (METHOD.md §8.1). */
@@ -532,6 +536,23 @@ const sessionOutput = z.object({
 });
 
 type SessionOutput = z.infer<typeof sessionOutput>;
+
+/** The stage notes as documents, with text the backfill has not reached wrapped. */
+function stageNotesAsDocuments(notes: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [stageKey, note] of Object.entries(
+    (notes ?? {}) as Record<string, unknown>,
+  )) {
+    const document = documentOrPlainText(
+      typeof note === "string" ? null : note,
+      typeof note === "string" ? note : null,
+    );
+    if (document !== null) {
+      out[stageKey] = document;
+    }
+  }
+  return out;
+}
 
 /**
  * A session as a caller may see it.
@@ -559,7 +580,7 @@ function toOutput(
     stageKey: row.stageKey ?? null,
     stageStartedAt: row.stageStartedAt?.toISOString() ?? null,
     elapsed: (row.elapsed ?? {}) as Record<string, number>,
-    notes: isFacilitator ? ((row.notes ?? {}) as Record<string, unknown>) : {},
+    notes: isFacilitator ? stageNotesAsDocuments(row.notes) : {},
     addedMinutes: (row.addedMinutes ?? {}) as Record<string, number>,
     wins: (row.wins ?? []) as string[],
     reviewPart: row.reviewPart ?? null,
@@ -4122,6 +4143,12 @@ const SHIFTS_MAX_CHARACTERS = 4000;
 /** The longest decision, the textarea's limit before it was an editor. */
 const DECISION_MAX_CHARACTERS = 2000;
 
+/** The longest private stage note, the textarea's limit before it was an editor. */
+const STAGE_NOTE_MAX_CHARACTERS = 4000;
+
+/** The longest management retro answer, the textarea's limit before it was an editor. */
+const MANAGEMENT_ANSWER_MAX_CHARACTERS = 2000;
+
 /** A decision's two text columns, written together for one release. */
 function decisionTextColumns(document: RichTextDocument | null): {
   text: string;
@@ -5079,7 +5106,13 @@ export const setStageNote = defineWriteAction({
     "Writes the facilitator's private note for the running stage (METHOD.md §8.1).",
   input: z.object({
     id: z.uuid(),
-    note: z.string().trim().max(4000),
+    /**
+     * Editor JSON, or for this release the plain text it took before
+     * (guided-inputs change 11b), which is wrapped as a document.
+     */
+    note: richTextOrPlainTextSchema({
+      maxCharacters: STAGE_NOTE_MAX_CHARACTERS,
+    }),
   }),
   output: z.object({ id: z.uuid(), stageKey: z.string() }),
   access: ACCESS_LEVELS.edit,
@@ -5109,12 +5142,16 @@ export const setStageNote = defineWriteAction({
       // facilitator reads these back stage by stage while the review runs.
       const notes = (session.notes ?? {}) as Record<string, unknown>;
       const next = { ...notes };
-      if (input.note.length === 0) {
+      const document = documentOfInput(input.note);
+      if (document === null) {
         // Cleared rather than stored empty, so the screen can tell "nothing
         // written" from "written and then emptied".
         delete next[session.stageKey];
       } else {
-        next[session.stageKey] = input.note;
+        // The map has no second column to keep text in for the previous
+        // release, and needs none: the facilitator alone reads it, and that
+        // release shows a note it cannot read as empty rather than failing.
+        next[session.stageKey] = document;
       }
 
       await tx
@@ -6899,7 +6936,21 @@ export const setManagementAnswer = defineWriteAction({
     // `packages/method` and never in a row: §11 lists the management-retro
     // questions as unchangeable structure.
     questionKey: z.number().int().min(1).max(4),
-    body: z.string().trim().min(1).max(2000),
+    /**
+     * Editor JSON, or for this release the plain text it took before
+     * (guided-inputs change 11b), which is wrapped as a document. Words
+     * rather than only a mention or an attachment, because the plain column
+     * the previous release reads may not be empty.
+     */
+    body: richTextOrPlainTextSchema({
+      maxCharacters: MANAGEMENT_ANSWER_MAX_CHARACTERS,
+    }).refine(
+      (value) => {
+        const document = documentOfInput(value);
+        return document !== null && plainTextOfDocument(document).trim() !== "";
+      },
+      { message: "An answer says what leadership said." },
+    ),
   }),
   output: z.object({ questionKey: z.number().int() }),
   access: ACCESS_LEVELS.edit,
@@ -6918,6 +6969,14 @@ export const setManagementAnswer = defineWriteAction({
       );
 
       const now = new Date();
+      // Both columns, the plain one for the previous release during a rolling
+      // upgrade. The schema has already refused a blank answer.
+      const document = documentOfInput(input.body) as RichTextDocument;
+      const body = {
+        body: plainTextOfDocument(document),
+        bodyDocument: document,
+        bodyDocumentVersion: RICH_TEXT_SCHEMA_VERSION,
+      };
       const [existing] = await tx
         .select({ id: managementAnswers.id })
         .from(managementAnswers)
@@ -6936,7 +6995,7 @@ export const setManagementAnswer = defineWriteAction({
         // record is one answer; a second row would list the question twice.
         await tx
           .update(managementAnswers)
-          .set({ body: input.body, answeredById: memberId, updatedAt: now })
+          .set({ ...body, answeredById: memberId, updatedAt: now })
           .where(
             activeOnly(
               managementAnswers,
@@ -6948,7 +7007,7 @@ export const setManagementAnswer = defineWriteAction({
           workspaceId,
           sessionId: input.sessionId,
           questionKey: input.questionKey,
-          body: input.body,
+          ...body,
           answeredById: memberId,
         });
       }
@@ -6988,7 +7047,10 @@ export const readManagementRetro = defineReadAction({
         questionKey: z.number().int(),
         /** The canon text, from `packages/method`. Never stored on the row. */
         question: z.string(),
+        /** Plain text, as before guided-inputs change 11b. */
         body: z.string().nullable(),
+        /** The answer as editor JSON, which the screen shows. */
+        bodyDocument: z.unknown().nullable(),
         answeredByName: z.string().nullable(),
       }),
     ),
@@ -7023,6 +7085,7 @@ export const readManagementRetro = defineReadAction({
           .select({
             questionKey: managementAnswers.questionKey,
             body: managementAnswers.body,
+            bodyDocument: managementAnswers.bodyDocument,
             answeredByName: answerers.name,
           })
           .from(managementAnswers)
@@ -7048,6 +7111,9 @@ export const readManagementRetro = defineReadAction({
             questionKey: index + 1,
             question,
             body: answer?.body ?? null,
+            bodyDocument: answer
+              ? documentOrPlainText(answer.bodyDocument, answer.body)
+              : null,
             answeredByName: answer?.answeredByName ?? null,
           };
         });
@@ -9198,6 +9264,7 @@ export const readMinutes = defineReadAction({
             .select({
               questionKey: managementAnswers.questionKey,
               body: managementAnswers.body,
+              bodyDocument: managementAnswers.bodyDocument,
             })
             .from(managementAnswers)
             .where(
@@ -9212,7 +9279,16 @@ export const readMinutes = defineReadAction({
             question:
               MANAGEMENT_RETRO_QUESTIONS[row.questionKey - 1] ??
               `Question ${row.questionKey}`,
-            body: row.body,
+            // One line, as every other row of the minutes is: the markdown
+            // indents it under its question, and a blank line between two
+            // paragraphs would end the list.
+            body: excerptRichText(
+              documentOrPlainText(
+                row.bodyDocument,
+                row.body,
+              ) as RichTextDocument,
+              4000,
+            ),
           }));
         }
 

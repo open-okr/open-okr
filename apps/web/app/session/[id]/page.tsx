@@ -553,9 +553,20 @@ export default async function SessionPage({ params }: SessionPageProps) {
   let managementWithheld = false;
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[5]) {
     try {
-      managementRetro = (await callAction(context, "sessions.managementRetro", {
+      const read = (await callAction(context, "sessions.managementRetro", {
         sessionId: id,
-      })) as ManagementRetro;
+      })) as Omit<ManagementRetro, "questions"> & {
+        questions: (Omit<ManagementRetro["questions"][number], "bodyHtml"> & {
+          bodyDocument: unknown;
+        })[];
+      };
+      managementRetro = {
+        ...read,
+        questions: read.questions.map((question) => ({
+          ...question,
+          bodyHtml: richTextHtml(question.bodyDocument),
+        })),
+      };
     } catch {
       managementWithheld = true;
     }
@@ -928,11 +939,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           addedMinutes={sessionRow.addedMinutes}
           // Empty for everybody but the facilitator: `sessions.read` refuses to
           // hand the notes over, so this is not the screen deciding.
-          note={
-            typeof sessionRow.notes[sessionRow.stageKey ?? ""] === "string"
-              ? (sessionRow.notes[sessionRow.stageKey ?? ""] as string)
-              : ""
-          }
+          // A document, which `sessions.read` hands back even for a note
+          // stored as text before guided-inputs change 11b.
+          note={sessionRow.notes[sessionRow.stageKey ?? ""] ?? null}
           isFacilitator={isFacilitator}
           isRunning={isRunning}
         />

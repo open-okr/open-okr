@@ -31,6 +31,8 @@ import { verifyFirstAccount } from "../src/data-changes/0025_verify_first_accoun
 import { kpiCorridorFollowsWorkspace } from "../src/data-changes/0026_kpi_corridor_follows_workspace.ts";
 import { sessionShiftsDocument } from "../src/data-changes/0027_session_shifts_document.ts";
 import { decisionTextDocument } from "../src/data-changes/0028_decision_text_document.ts";
+import { managementAnswerDocument } from "../src/data-changes/0029_management_answer_document.ts";
+import { stageNoteDocuments } from "../src/data-changes/0030_stage_note_documents.ts";
 import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { runMigrations } from "../src/migrate.ts";
 
@@ -1648,6 +1650,80 @@ describe("0027 and 0028: the monthly review's prose as documents", () => {
     await client.query("delete from _data_changes");
     const again = await runDataChanges(client, {
       scripts: [sessionShiftsDocument, decisionTextDocument],
+    });
+    expect(again.map((outcome) => outcome.rowsChanged)).toEqual([0, 0]);
+  });
+});
+
+describe("0029 and 0030: the quarterly review's prose as documents", () => {
+  it("writes each answer as a document, turns each text stage note into one, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    const written = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Already rich" }],
+        },
+      ],
+    };
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       ), s as (
+         insert into okr_sessions (id, workspace_id, kind, title,
+                                   scheduled_for, facilitator_id, notes)
+         select gen_random_uuid(), m.workspace_id, 'quarterly', 'Q3 review',
+                now(), m.id,
+                jsonb_build_object(
+                  'open', 'Pulse was low.\n\nName it first.',
+                  'score', '   ',
+                  'retro', $1::jsonb)
+           from m
+         returning id, workspace_id
+       )
+       insert into management_answers (id, workspace_id, session_id,
+                                       question_key, body, answered_by_id)
+       select gen_random_uuid(), s.workspace_id, s.id, 1,
+              'Mostly. Two were leftovers.', m.id
+         from s, m`,
+      [JSON.stringify(written)],
+    );
+
+    const [answers, notes] = await runDataChanges(client, {
+      scripts: [managementAnswerDocument, stageNoteDocuments],
+    });
+    expect(answers?.rowsChanged).toBe(1);
+    expect(notes?.rowsChanged).toBe(1);
+
+    const { rows: answerRows } = await client.query<{
+      body_document: unknown;
+      body_document_version: number | null;
+    }>("select body_document, body_document_version from management_answers");
+    expect(answerRows[0]?.body_document).toEqual(
+      plainTextDocument("Mostly. Two were leftovers."),
+    );
+    expect(answerRows[0]?.body_document_version).toBe(1);
+
+    const { rows: sessionRows } = await client.query<{
+      notes: Record<string, unknown>;
+    }>("select notes from okr_sessions");
+    expect(sessionRows[0]?.notes).toEqual({
+      open: plainTextDocument("Pulse was low.\n\nName it first."),
+      // Whitespace alone was a note nobody wrote, and its key goes.
+      retro: written,
+    });
+
+    await client.query("delete from _data_changes");
+    const again = await runDataChanges(client, {
+      scripts: [managementAnswerDocument, stageNoteDocuments],
     });
     expect(again.map((outcome) => outcome.rowsChanged)).toEqual([0, 0]);
   });

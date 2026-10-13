@@ -29,7 +29,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
-  TextArea,
+  RichTextEditor,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -79,7 +79,8 @@ export function QuarterlyReview({
   readonly stageStartedAt: string | null;
   readonly elapsed: Record<string, number>;
   readonly addedMinutes: Record<string, number>;
-  readonly note: string;
+  /** The running stage's note as editor JSON, or null when none is written. */
+  readonly note: unknown;
   readonly isFacilitator: boolean;
   readonly isRunning: boolean;
 }) {
@@ -88,7 +89,7 @@ export function QuarterlyReview({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
-  const [noteDraft, setNoteDraft] = useState(note);
+  const [noteDraft, setNoteDraft] = useState<unknown>(note);
   const [now, setNow] = useState(() => Date.now());
 
   // One second, and only while a stage is actually running. A timer left
@@ -328,18 +329,22 @@ export function QuarterlyReview({
                 </span>
               </CardHeader>
               <CardBody className="flex flex-col gap-2">
-                <TextArea
+                {/* Rich text since guided-inputs change 11b, up to the
+                    server's 4000 (sessions.setStageNote). Keyed on the stage,
+                    because an editor reads its content once: without the key
+                    stage one's note would stay on screen through stage two. */}
+                <RichTextEditor
+                  key={currentStageKey ?? ""}
                   label={t("session.detail.quarterlyReview.privateNoteFor", {
                     title: current.title,
                   })}
-                  hideLabel
-                  value={noteDraft}
+                  variant="compact"
+                  content={note}
                   placeholder={t(
                     "session.detail.quarterlyReview.onlyYouCanRead",
                   )}
-                  onChange={(event) => setNoteDraft(event.target.value)}
-                  maxLength={4000}
-                  inputClassName="min-h-20"
+                  maxCharacters={4000}
+                  onUpdate={setNoteDraft}
                 />
                 <span className="flex flex-wrap items-center gap-2">
                   <Button

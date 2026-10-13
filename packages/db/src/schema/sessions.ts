@@ -76,6 +76,10 @@ export const sessions = pgTable("okr_sessions", {
    * **Private to the facilitator.** `sessions.read` returns this only to the
    * member the session names as facilitator and an empty object to everybody
    * else (P4-T10a-a). Nothing else may be filed in here for that reason.
+   *
+   * Each value is editor JSON since guided-inputs change 11b. One written
+   * before is a string until data change 0030 turns it into a document, and
+   * readers take either until change 13.
    */
   notes: jsonb("notes").$type<Record<string, unknown>>().notNull().default({}),
   /**

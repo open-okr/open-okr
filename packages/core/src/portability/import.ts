@@ -86,6 +86,17 @@ const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   // Guided inputs change 11a: the monthly review's prose as documents.
   "okr_sessions.shifts_document",
   "decisions.text_document",
+  // Change 11b: the quarterly review's prose.
+  "management_answers.body_document",
+]);
+
+/**
+ * Columns that hold a map of rich text documents, one per key: the
+ * facilitator's private stage notes since guided-inputs change 11b. The
+ * walk above reaches a document's nodes, not the documents inside a map.
+ */
+const RICH_TEXT_MAP_COLUMNS: ReadonlySet<string> = new Set([
+  "okr_sessions.notes",
 ]);
 
 function isRichTextColumn(table: string, column: string): boolean {
@@ -308,6 +319,21 @@ function remapRow(
     // Rewrite rich text columns
     if (isRichTextColumn(table, column) && value !== null) {
       result[column] = remapRichText(value, keyMap);
+      continue;
+    }
+    if (
+      RICH_TEXT_MAP_COLUMNS.has(`${table}.${column}`) &&
+      typeof value === "object" &&
+      value !== null
+    ) {
+      // A note still stored as text, from before the backfill, has no node
+      // to rewrite and passes through as it is.
+      result[column] = Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([key, doc]) => [
+          key,
+          remapRichText(doc, keyMap),
+        ]),
+      );
       continue;
     }
 

@@ -226,7 +226,8 @@ const runTheReview = async () => {
     {
       sessionId,
       questionKey: 4,
-      body: "Between the platform space and support. Nobody owned the handover.",
+      // Two paragraphs, which the minutes give back as one line.
+      body: "Between the platform space and support.\n\nNobody owned the handover.",
     },
     MANAGER,
   );
@@ -423,8 +424,11 @@ describe("the management retro's audience survives the export", () => {
   it("is in the minutes for a manager and the coordinator", async () => {
     await runTheReview();
 
-    expect((await minutes(MANAGER)).management?.[0]?.body).toContain(
-      "Nobody owned the handover",
+    // One line, as every row of the minutes is: the markdown indents it
+    // under its question, and a blank line inside would end the list
+    // (guided-inputs change 11b).
+    expect((await minutes(MANAGER)).management?.[0]?.body).toBe(
+      "Between the platform space and support. Nobody owned the handover.",
     );
     // The facilitator here is the founding member and the space's coordinator.
     expect((await minutes(FACILITATOR)).management).not.toBeNull();

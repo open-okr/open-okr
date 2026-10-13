@@ -64,6 +64,18 @@ const CONNECTION = process.env.DATABASE_URL
 
 const NEWLINE = String.fromCharCode(10);
 
+/**
+ * Resolves once the next server action has answered. Started before the
+ * click that sends it, so an answer that arrives first is not missed.
+ */
+function serverActionDone(target: Page) {
+  return target.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.request().headers()["next-action"] !== undefined,
+  );
+}
+
 // Serial, and one shared context: these tests build on each other's state the
 // way the session specs do, and the database connection is opened once.
 test.describe.configure({ mode: "serial" });
@@ -222,7 +234,12 @@ test("a monthly review records a trend and a decision, and the goal shows it", a
     });
   await shiftsBox().click();
   await shiftsBox().pressSequentially("Two people move onto activation");
+  // **The save is waited for before the reload.** A reload straight after the
+  // click can abort the server action in flight, and the note then reads back
+  // empty for a reason that has nothing to do with the product.
+  const shiftsSaved = serverActionDone(page);
   await page.getByRole("button", { name: "Save the note" }).click();
+  await shiftsSaved;
   await page.reload();
   await expect(shiftsBox()).toContainText("Two people move onto activation", {
     timeout: 15_000,
@@ -468,14 +485,24 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(room).toContainText("The room has energy");
   await expect(room).toContainText("relieved");
 
-  // The private note, written and read back by the facilitator.
-  await page
-    .getByLabel("Private note for Open and check-in")
-    .fill("Pulse was low. Name it before scoring.");
+  // The private note, written and read back by the facilitator. Rich text
+  // since guided-inputs change 11b, so it is read back after a reload: the
+  // editor holds what was typed whether or not it was stored.
+  const privateNote = () =>
+    page.getByRole("textbox", {
+      name: "Private note for Open and check-in",
+      exact: true,
+    });
+  await privateNote().click();
+  await privateNote().pressSequentially("Pulse was low. Name it before scoring.");
+  const noteSaved = serverActionDone(page);
   await page.getByRole("button", { name: "Save the note" }).click();
-  await expect(page.getByText("Pulse was low. Name it before scoring.")).toBeVisible({
-    timeout: 10_000,
-  });
+  await noteSaved;
+  await page.reload();
+  await expect(privateNote()).toContainText(
+    "Pulse was low. Name it before scoring.",
+    { timeout: 15_000 },
+  );
 
   // Add a minute: stage one's budget moves from 5 to 6 and nothing else does.
   await expect(page.getByText(/of 5:00/)).toBeVisible();
@@ -848,17 +875,25 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     .getByRole("button", { name: "Answer it" })
     .first()
     .click();
-  await managementRetro
-    .getByRole("textbox")
-    .first()
-    .fill("Mostly. Two of the five were the previous quarter's leftovers.");
+  // Rich text since guided-inputs change 11b: two paragraphs, which come
+  // back as two once the answer is stored and the editor has closed.
+  const answer = managementRetro.getByRole("textbox").first();
+  await answer.click();
+  await answer.pressSequentially("Mostly.");
+  await answer.press("Enter");
+  await answer.pressSequentially(
+    "Two of the five were the previous quarter's leftovers.",
+  );
   await managementRetro.getByRole("button", { name: "Save the answer" }).click();
   await expect(managementRetro).toContainText("1 of 4 answered", {
     timeout: 10_000,
   });
   await expect(
+    managementRetro.getByRole("paragraph").filter({ hasText: /^Mostly\.$/ }),
+  ).toBeVisible();
+  await expect(
     managementRetro.getByText(
-      "Mostly. Two of the five were the previous quarter's leftovers.",
+      "Two of the five were the previous quarter's leftovers.",
     ),
   ).toBeVisible();
 

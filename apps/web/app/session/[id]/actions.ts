@@ -227,7 +227,7 @@ export async function addMinuteAction(sessionId: string) {
   revalidatePath(`/session/${sessionId}`);
 }
 
-export async function setStageNoteAction(sessionId: string, note: string) {
+export async function setStageNoteAction(sessionId: string, note: unknown) {
   const { session, workspace } = await requireWorkspace();
   await callAction(
     {
@@ -236,7 +236,8 @@ export async function setStageNoteAction(sessionId: string, note: string) {
       actor: { kind: "human", userId: session.user.id },
     },
     "sessions.setStageNote",
-    { id: sessionId, note },
+    // Editor JSON from the field, checked by the action's own schema.
+    { id: sessionId, note: note as RichTextDocument | null },
   );
   revalidatePath(`/session/${sessionId}`);
 }
@@ -552,7 +553,7 @@ export async function castRetroVoteAction(sessionId: string, noteId: string) {
 export async function setManagementAnswerAction(
   sessionId: string,
   questionKey: number,
-  body: string,
+  body: unknown,
 ) {
   const { session, workspace } = await requireWorkspace();
   await callAction(
@@ -562,7 +563,8 @@ export async function setManagementAnswerAction(
       actor: { kind: "human", userId: session.user.id },
     },
     "sessions.setManagementAnswer",
-    { sessionId, questionKey, body },
+    // Editor JSON from the field, checked by the action's own schema.
+    { sessionId, questionKey, body: body as RichTextDocument },
   );
   revalidatePath(`/session/${sessionId}`);
 }

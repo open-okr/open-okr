@@ -307,6 +307,89 @@ describe("what a move keeps", () => {
     });
   });
 
+  it("points a mention in a stage note or a management answer at the member's new id", async () => {
+    // Guided-inputs change 11b. The notes are a map of documents, one per
+    // stage, which the import walks key by key.
+    const source = (input: unknown, name: string) =>
+      callAction(
+        {
+          pool,
+          workspaceId: sourceWorkspaceId,
+          actor: { kind: "human", userId: OWNER_A },
+        },
+        name as never,
+        input as never,
+      );
+    const [space] = (await source({}, "spaces.list")) as { id: string }[];
+    const wb = await workerDb();
+    const owner = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1",
+      [sourceWorkspaceId],
+    );
+    const ownerMemberId = owner.rows[0]?.id as string;
+    const session = (await source(
+      {
+        // No cycle: the target's own current cycle has the same dates, so
+        // the source's is skipped on import and a session naming it would
+        // be skipped with it.
+        spaceId: space?.id,
+        kind: "quarterly",
+        title: "Q1 review",
+        scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+        facilitatorId: ownerMemberId,
+      },
+      "sessions.create",
+    )) as { id: string };
+    await source({ id: session.id }, "sessions.open");
+    const mentioning = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ask " },
+            {
+              type: "mention",
+              attrs: { id: ownerMemberId, label: "Source Owner" },
+            },
+          ],
+        },
+      ],
+    };
+    await source({ id: session.id, note: mentioning }, "sessions.setStageNote");
+    await source(
+      { sessionId: session.id, questionKey: 1, body: mentioning },
+      "sessions.setManagementAnswer",
+    );
+
+    const exported = await exportSource();
+    await importIntoTarget(exported.bytes, false);
+
+    const moved = await wb.admin.query<{ id: string }>(
+      `select id from workspace_members
+        where workspace_id = $1 and lower(placeholder_email) = 'source-owner@example.com'`,
+      [targetWorkspaceId],
+    );
+    const movedMemberId = moved.rows[0]?.id as string;
+    expect(movedMemberId).not.toBe(ownerMemberId);
+
+    const notes = await wb.admin.query<{ notes: Record<string, unknown> }>(
+      "select notes from okr_sessions where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    const answers = await wb.admin.query<{ body_document: unknown }>(
+      "select body_document from management_answers where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    for (const document of [
+      Object.values(notes.rows[0]?.notes ?? {})[0],
+      answers.rows[0]?.body_document,
+    ]) {
+      expect(JSON.stringify(document)).toContain(movedMemberId);
+      expect(JSON.stringify(document)).not.toContain(ownerMemberId);
+    }
+  });
+
   it("writes every file's bytes back, under the new workspace", async () => {
     const contents = randomBytes(48);
     const source = new Map<string, Buffer>();

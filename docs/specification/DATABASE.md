@@ -393,7 +393,7 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 
 `shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes. Since guided-inputs change 11a (migration 0140) the note is editor JSON in `shifts_document`, and `shifts` holds its plain text for one release so the release before reads it; change 13 drops `shifts`.
 
-`notes` is private to the facilitator. `sessions.read` returns it only to the member the session names as facilitator and an empty object to everybody else, so nothing else may be filed in there.
+`notes` is private to the facilitator. `sessions.read` returns it only to the member the session names as facilitator and an empty object to everybody else, so nothing else may be filed in there. It is keyed by `stage_key`, and since guided-inputs change 11b each value is editor JSON: data change 0030 rewrites a value still stored as text, and `sessions.read` wraps any it has not reached yet. Change 13 stops taking text.
 
 `added_minutes` is the whole minutes the facilitator added per stage (METHOD.md §8.1), keyed by `stage_key` exactly as `elapsed` is. Separate from §11's `sessions.quarterlyStageMinutes`, which is the workspace's standing agenda: one room running long on one day must not retune every future review.
 
@@ -442,7 +442,7 @@ Every table references `session_id` to sessions.
 | `kudos` | `from_member_id`, `to_member_id`, `text` |
 | `retro_notes` | `column_key` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
 | `retro_votes` | `note_id` to retro_notes, `member_id` |
-| `management_answers` | `question_key smallint` (1 to 4), `body`, `answered_by_id` |
+| `management_answers` | `question_key smallint` (1 to 4), `body`, `body_document jsonb?`, `body_document_version?`, `answered_by_id` |
 | `root_causes` | `key_result_id`, `cause_key smallint` (1 to 9), `secondary_cause_key smallint?` (1 to 9, never the primary; 0134), `detail?` (required where either cause is 9, "Other"), `named_by_id` |
 | `process_health_responses` | `statement_key smallint` (1 to 5), `score smallint`, `respondent_hash` |
 | `review_decisions` | `goal_id`, `decision` (`achieved` / `keep` / `modify` / `defer` / `abandon`; achieved and defer since 0136, P9-T20e-a), `why`, `decided_by_id` |
@@ -463,7 +463,7 @@ Every table references `session_id` to sessions.
 
 `retro_notes.votes` is denormalised from `retro_votes`, recounted from the rows and rewritten inside the same transaction as every vote. TECHNICAL-PLAN §4 specifies the column and the board sorts on it; a test asserts it equals the count behind it rather than trusting that it was maintained. `column_key` rather than `column`, because `column` is a reserved word in SQL.
 
-`management_answers` is unique on `(workspace_id, session_id, question_key)`: leadership answers out loud and the record is one answer per question. The question text is canon in `packages/method` and never stored, so a workspace cannot edit a question §11 lists as unchangeable structure and no old answer ends up quoting a question nobody asked. **Read by a space's managers and its coordinator only.** §8.7 says leadership answers, the write-access floor here is `edit` for every active member (P3-T16), and a review with no space falls back to workspace administration because there are no space roles to read.
+`management_answers` is unique on `(workspace_id, session_id, question_key)`: leadership answers out loud and the record is one answer per question. The question text is canon in `packages/method` and never stored, so a workspace cannot edit a question §11 lists as unchangeable structure and no old answer ends up quoting a question nobody asked. **Read by a space's managers and its coordinator only.** §8.7 says leadership answers, the write-access floor here is `edit` for every active member (P3-T16), and a review with no space falls back to workspace administration because there are no space roles to read. Since guided-inputs change 11b (migration 0141) the answer is editor JSON in `body_document`, checked to be set with its version, and `body` holds its plain text for one release so the release before reads it; data change 0029 fills the documents and change 13 drops `body`.
 
 `root_causes` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: one primary per key result, and since P9-T20c (migration 0134) v2's "and may name a second" is `secondary_cause_key` on the same row, so a key result never carries two primaries. `cause_key` indexes the canon taxonomy in `packages/method`, never the text, so a workspace cannot edit a taxonomy §11 lists as unchangeable structure and no old row ends up naming a cause the method no longer has. The stage's list comes from `review_scores` rather than `key_results.score`, because grades do not land on the key results until the session closes and stage seven runs before that.
 

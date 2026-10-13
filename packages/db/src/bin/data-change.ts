@@ -38,6 +38,8 @@ import { verifyFirstAccount } from "../data-changes/0025_verify_first_account.ts
 import { kpiCorridorFollowsWorkspace } from "../data-changes/0026_kpi_corridor_follows_workspace.ts";
 import { sessionShiftsDocument } from "../data-changes/0027_session_shifts_document.ts";
 import { decisionTextDocument } from "../data-changes/0028_decision_text_document.ts";
+import { managementAnswerDocument } from "../data-changes/0029_management_answer_document.ts";
+import { stageNoteDocuments } from "../data-changes/0030_stage_note_documents.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -84,6 +86,9 @@ try {
       // Guided inputs change 11a: the monthly review's prose as documents.
       sessionShiftsDocument,
       decisionTextDocument,
+      // Change 11b: the quarterly review's prose as documents.
+      managementAnswerDocument,
+      stageNoteDocuments,
     ],
   });
   process.stdout.write(

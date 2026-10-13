@@ -17,6 +17,7 @@ import { REVIEW_STAGE_KEYS } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "quarterly-facilitator";
@@ -191,10 +192,56 @@ describe("private facilitator notes", () => {
       note: "Ask Dita about the activation number before stage two.",
     });
 
+    // Text is still taken until change 13, and comes back as the document
+    // it was wrapped into (guided-inputs change 11b).
     const mine = await read();
-    expect(mine.notes[REVIEW_STAGE_KEYS[0] as string]).toBe(
-      "Ask Dita about the activation number before stage two.",
+    expect(mine.notes[REVIEW_STAGE_KEYS[0] as string]).toEqual(
+      richTextFromPlainText(
+        "Ask Dita about the activation number before stage two.",
+      ),
     );
+  });
+
+  it("keeps a document as it was written, and a blank one clears the stage", async () => {
+    await call("sessions.open", { id: sessionId });
+    const note = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ask " },
+            { type: "text", text: "Dita", marks: [{ type: "bold" }] },
+            { type: "text", text: " first." },
+          ],
+        },
+      ],
+    };
+    await call("sessions.setStageNote", { id: sessionId, note });
+    expect((await read()).notes[REVIEW_STAGE_KEYS[0] as string]).toEqual(note);
+
+    // What an editor hands back once everything in it is deleted.
+    await call("sessions.setStageNote", {
+      id: sessionId,
+      note: { type: "doc", content: [{ type: "paragraph" }] },
+    });
+    expect((await read()).notes).toEqual({});
+  });
+
+  it("reads a note stored as text before the backfill as a document", async () => {
+    await call("sessions.open", { id: sessionId });
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update okr_sessions set notes = jsonb_build_object($2::text, $3::text)
+        where id = $1`,
+      [sessionId, REVIEW_STAGE_KEYS[0], "Written last release."],
+    );
+
+    expect((await read()).notes).toEqual({
+      [REVIEW_STAGE_KEYS[0] as string]: richTextFromPlainText(
+        "Written last release.",
+      ),
+    });
   });
 
   it("are never visible to a participant", async () => {
@@ -232,8 +279,12 @@ describe("private facilitator notes", () => {
     await call("sessions.setStageNote", { id: sessionId, note: "Stage two." });
 
     const after = await read();
-    expect(after.notes[REVIEW_STAGE_KEYS[0] as string]).toBe("Stage one.");
-    expect(after.notes[REVIEW_STAGE_KEYS[1] as string]).toBe("Stage two.");
+    expect(after.notes[REVIEW_STAGE_KEYS[0] as string]).toEqual(
+      richTextFromPlainText("Stage one."),
+    );
+    expect(after.notes[REVIEW_STAGE_KEYS[1] as string]).toEqual(
+      richTextFromPlainText("Stage two."),
+    );
   });
 });
 
