@@ -49,8 +49,14 @@ jobs:
 
       - name: Start the test database stack
         run: pnpm db:up
+      # **One package at a time.** Every package's tests at once, on one
+      # runner beside the database stack, slowed them about fifty times: the
+      # Draft Coach's timing test measured 1.0 to 1.4 ms per evaluation here
+      # against 0.025 ms on a workstation, and v0.3.0 failed verification
+      # three times on that and an entity picker timeout. CI splits the suite
+      # across two runners instead; this job has one.
       - name: Tests
-        run: pnpm test
+        run: pnpm test --concurrency=1
 
       # A tag reaches customers, so it gets more scrutiny than a pull request,
       # not less. These three were only on the pull-request workflow, which
