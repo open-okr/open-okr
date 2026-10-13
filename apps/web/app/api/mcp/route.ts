@@ -51,6 +51,7 @@ import {
   closeSessionFor,
   dispatchResource,
   dispatchTool,
+  initializeVersion,
   MCP_PROMPTS,
   MCP_RESOURCES,
   MCP_TOOLS,
@@ -295,16 +296,33 @@ async function answer(request: NextRequest): Promise<Response> {
       name: prompt.name,
       description: prompt.description,
       arguments: prompt.arguments,
+      render: prompt.render,
     })),
     dispatch: (name, input) => dispatchTool(pool, principal, name, input, ring),
     readResource: (uri) =>
       dispatchResource(pool, principal, uri, MCP_RESOURCES, ring),
   });
 
+  // The version an `initialize` settles on is this server's to choose, not
+  // the protocol library's, so it is written into the request before the
+  // library answers it (see `initializeVersion`).
+  let initialized: string | null = null;
+  if (methodOf(body) === "initialize") {
+    const init = body as { params?: Record<string, unknown> };
+    initialized = initializeVersion(init.params?.protocolVersion);
+    rawBody = JSON.stringify({
+      ...init,
+      params: { ...(init.params ?? {}), protocolVersion: initialized },
+    });
+  }
+
+  // The body may have been rewritten above, so its length is the new one.
+  const forwarded = new Headers(request.headers);
+  forwarded.delete("content-length");
   const answered = await server.handle(
     new Request(request.url, {
       method: request.method,
-      headers: request.headers,
+      headers: forwarded,
       ...(request.method === "POST" ? { body: rawBody } : {}),
     }),
   );
@@ -322,7 +340,7 @@ async function answer(request: NextRequest): Promise<Response> {
       workspaceId: resolved.workspaceId,
       grantId: resolved.grantId,
       sessionId,
-      protocolVersion: version,
+      protocolVersion: initialized ?? version,
       now: new Date(),
     });
     const headers = new Headers(answered.headers);

@@ -187,6 +187,8 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
             }
             const outbound = {
               text: message.text,
+              // Read by the email driver only (docs/design/email-templates.md).
+              ...(message.html ? { html: message.html } : {}),
               ...(message.subject ? { subject: message.subject } : {}),
               ...(message.buttons ? { buttons: message.buttons } : {}),
               // WhatsApp outside its conversation window (P5-T04b-b). Every

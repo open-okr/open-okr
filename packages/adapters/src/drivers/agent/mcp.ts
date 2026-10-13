@@ -23,9 +23,13 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import {
   CallToolRequestSchema,
+  ErrorCode,
+  GetPromptRequestSchema,
   ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
+  McpError,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { AgentServerConfig, AgentServerPort } from "../../ports/agent.ts";
@@ -77,6 +81,14 @@ export class McpAgentServer implements AgentServerPort {
       };
     });
 
+    // Every resource here is a template, addressed by its URI, so the plain
+    // list is empty. Answered rather than left unhandled: the server declares
+    // the resources capability, and a client that lists on connect read the
+    // missing method as a fault (MCP test against the UAT, 9 October 2026).
+    server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: [],
+    }));
+
     server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
       resourceTemplates: this.#config.resources.map((resource) => ({
         uriTemplate: resource.uriTemplate,
@@ -110,6 +122,40 @@ export class McpAgentServer implements AgentServerPort {
         })),
       })),
     }));
+
+    // The prompt itself, which a client asks for after listing them. A
+    // missing required argument and an unknown name are the client's
+    // mistake, so both are the protocol's invalid-params error.
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const prompt = this.#config.prompts.find(
+        (one) => one.name === request.params.name,
+      );
+      if (!prompt) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `No prompt is called ${request.params.name}.`,
+        );
+      }
+      const args = request.params.arguments ?? {};
+      const missing = prompt.arguments.find(
+        (argument) => argument.required && !args[argument.name],
+      );
+      if (missing) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `The prompt ${prompt.name} needs ${missing.name}.`,
+        );
+      }
+      return {
+        description: prompt.description,
+        messages: [
+          {
+            role: "user" as const,
+            content: { type: "text" as const, text: prompt.render(args) },
+          },
+        ],
+      };
+    });
 
     return server;
   }

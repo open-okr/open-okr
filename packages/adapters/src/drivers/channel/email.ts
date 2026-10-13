@@ -96,6 +96,8 @@ export class EmailChannel implements Channel {
       to,
       subject: message.subject ?? this.#defaultSubject,
       text: renderEmailBody(message),
+      // The layout's own part, which already carries the buttons as buttons.
+      ...(message.html ? { html: message.html } : {}),
       ...(message.idempotencyKey
         ? { idempotencyKey: message.idempotencyKey }
         : {}),

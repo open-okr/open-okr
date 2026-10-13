@@ -1,6 +1,6 @@
 # Reference mockups
 
-Eleven hand-built screens showing what the specifications in [UIUX-PLAN.md](../specification/UIUX-PLAN.md) look like when they are drawn. They exist so that a person or an agent changing a screen can see the target before writing any code. The README's tour of the product uses them too.
+Hand-built screens showing what the specifications in [UIUX-PLAN.md](../specification/UIUX-PLAN.md) look like when they are drawn. They exist so that a person or an agent changing a screen can see the target before writing any code. The README's tour of the product uses them too.
 
 ## What authority they have
 
@@ -30,6 +30,7 @@ Never cite a mockup as the reason for a behaviour. Cite the specification.
 | [08-quarterly-review](png/08-quarterly-review.png) | S-24 | The lap bar proportional to stage minutes, the stage rail grouped by act, the diagnostic card, the eight root causes, the five process-health statements |
 | [09-channels](png/09-channels.png) | AI-NATIVE-PLAN §5 | The same nudge in four channels, a conversational check-in capturing a typed blocker, and nudge provenance on every message |
 | [10-review-inbox](png/10-review-inbox.png) | S-02 | Overdue-first grouping, agent proposals in the queue, the five-step escalation ladder, the provenance panel with snooze and change-channel |
+| [12-email-templates](src/12-email-templates.html) | AI-NATIVE-PLAN §5, [email-templates.md](../design/email-templates.md) | The six mails in one layout, light and dark: account mail, invitation, notification digest, agent nudges with their rule keys, the weekly digest |
 
 ## The OKRs screen, as first proposed
 

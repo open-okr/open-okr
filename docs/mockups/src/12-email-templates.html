@@ -1,0 +1,307 @@
+<!doctype html>
+<!-- window-width:1320 window-height:2200 -->
+<!--
+  Email templates, as proposed in docs/design/email-templates.md.
+
+  Each email below is the markup a mail client receives: tables for layout,
+  inline styles, no web font and no remote image, so it renders the same in
+  Gmail, Outlook and Apple Mail and on an air-gapped instance. The <style>
+  block only adds what a client may ignore safely: dark mode and the narrow
+  screen. The page around the emails (the grey stage and the captions) is
+  not part of any email.
+-->
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>Email templates</title>
+<style>
+  body { margin: 0; background: #e8edf5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .stage { padding: 28px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; align-items: start; }
+  .cap { font-size: 12px; font-weight: 700; color: #334155; margin: 0 0 8px 4px; letter-spacing: .2px; }
+  .cap span { font-weight: 500; color: #617087; }
+  .mail { border-radius: 14px; overflow: hidden; box-shadow: 0 6px 22px rgba(15,23,42,.10), 0 1px 3px rgba(15,23,42,.06); }
+  .inbox { background: #fff; padding: 10px 14px; border-bottom: 1px solid #e4e9f2; font-size: 12px; color: #334155; }
+  .inbox b { color: #0f172a; }
+  .inbox .pre { color: #617087; }
+
+  /* What an email ships in its own <style>: safe to lose. */
+  @media (prefers-color-scheme: dark) {
+    .em-bg { background: #0b1220 !important; }
+    .em-card { background: #111827 !important; border-color: #1e293b !important; }
+    .em-ink { color: #f1f5f9 !important; }
+    .em-ink2 { color: #cbd5e1 !important; }
+    .em-ink3 { color: #94a3b8 !important; }
+    .em-line { border-color: #1e293b !important; }
+    .em-soft { background: #1a2332 !important; }
+    .em-link { color: #818cf8 !important; }
+    .em-edge { border-top-color: #1e293b !important; border-right-color: #1e293b !important; border-bottom-color: #1e293b !important; }
+    .em-chip { background: #1e1b4b !important; color: #a5b4fc !important; }
+    .em-chip-warn { background: #3a2a06 !important; color: #fbbf24 !important; }
+    .em-ok { background: #052e1b !important; color: #4ade80 !important; }
+    .em-warn { background: #3a2a06 !important; color: #fbbf24 !important; }
+    .em-bad { background: #3b0d0d !important; color: #f87171 !important; }
+    .em-ok p, .em-warn p, .em-bad p { color: inherit !important; }
+  }
+  @media (max-width: 600px) {
+    .em-card { padding: 20px !important; }
+  }
+</style>
+
+<div class="stage">
+
+<!-- ============================================================= 1 -->
+<div>
+<p class="cap">1. Password reset <span>· instance mail</span></p>
+<div class="mail">
+<div class="inbox"><b>Reset your OpenOKR password</b><br><span class="pre">Choose a new password. The link works once.</span></div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#eff3f9;">
+<tr><td align="center" style="padding:24px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+    <tr><td style="padding:0 4px 14px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td width="24" height="24" align="center" style="width:24px;height:24px;background:#4f46e5;border-radius:6px;color:#fff;font:700 10px/24px -apple-system,Segoe UI,Roboto,Arial,sans-serif;">OK</td>
+        <td class="em-ink" style="padding-left:8px;font:650 14px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;">OpenOKR</td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="em-card" style="background:#ffffff;border:1px solid #e4e9f2;border-radius:12px;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <p class="em-ink3" style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#55637a;">Account security</p>
+      <h1 class="em-ink" style="margin:0 0 10px;font-size:18px;line-height:1.35;font-weight:700;color:#0f172a;">Reset your password</h1>
+      <p class="em-ink2" style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#334155;">Someone asked to reset the password for <b>sara@northwind.example</b>. Choose a new one with the button below.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#4f46e5" style="border-radius:8px;">
+        <a href="#" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Choose a new password</a>
+      </td></tr></table>
+      <p class="em-ink3" style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#55637a;">Button not working? Paste this link into your browser:<br><a class="em-link" href="#" style="color:#4338ca;word-break:break-all;">https://okr.northwind.example/reset-password?token=…</a></p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;"><tr><td class="em-soft em-ink2" style="background:#eff3f9;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.5;color:#334155;">
+        Not you? Ignore this email. Your password stays the same, and the link expires.
+      </td></tr></table>
+    </td></tr>
+    <tr><td class="em-ink3" style="padding:14px 4px 0;font:12px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#617087;">
+      Sent by OpenOKR at okr.northwind.example because a password reset was requested.
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ============================================================= 2 -->
+<div>
+<p class="cap">2. Confirm your email <span>· instance mail</span></p>
+<div class="mail">
+<div class="inbox"><b>Confirm your email address for OpenOKR</b><br><span class="pre">One click and your account is ready.</span></div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#eff3f9;">
+<tr><td align="center" style="padding:24px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+    <tr><td style="padding:0 4px 14px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td width="24" height="24" align="center" style="width:24px;height:24px;background:#4f46e5;border-radius:6px;color:#fff;font:700 10px/24px -apple-system,Segoe UI,Roboto,Arial,sans-serif;">OK</td>
+        <td class="em-ink" style="padding-left:8px;font:650 14px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;">OpenOKR</td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="em-card" style="background:#ffffff;border:1px solid #e4e9f2;border-radius:12px;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <p class="em-ink3" style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#55637a;">Welcome</p>
+      <h1 class="em-ink" style="margin:0 0 10px;font-size:18px;line-height:1.35;font-weight:700;color:#0f172a;">Confirm your email address</h1>
+      <p class="em-ink2" style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#334155;">Confirm <b>amara@northwind.example</b> to finish setting up your OpenOKR account.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#4f46e5" style="border-radius:8px;">
+        <a href="#" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Confirm email</a>
+      </td></tr></table>
+      <p class="em-ink3" style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#55637a;">Button not working? Paste this link into your browser:<br><a class="em-link" href="#" style="color:#4338ca;word-break:break-all;">https://okr.northwind.example/verify-email?token=…</a></p>
+    </td></tr>
+    <tr><td class="em-ink3" style="padding:14px 4px 0;font:12px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#617087;">
+      Did not sign up? Ignore this email and no account is created.
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ============================================================= 3 -->
+<div>
+<p class="cap">3. Invitation <span>· workspace mail</span></p>
+<div class="mail">
+<div class="inbox"><b>You have been invited to Northwind Labs</b><br><span class="pre">Priya Raman added you. Join to see your team's OKRs.</span></div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#eff3f9;">
+<tr><td align="center" style="padding:24px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+    <tr><td style="padding:0 4px 14px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td width="24" height="24" align="center" style="width:24px;height:24px;background:#4f46e5;border-radius:6px;color:#fff;font:700 10px/24px -apple-system,Segoe UI,Roboto,Arial,sans-serif;">NL</td>
+        <td class="em-ink" style="padding-left:8px;font:650 14px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;">Northwind Labs</td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="em-card" style="background:#ffffff;border:1px solid #e4e9f2;border-radius:12px;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <p class="em-ink3" style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#55637a;">Invitation</p>
+      <h1 class="em-ink" style="margin:0 0 10px;font-size:18px;line-height:1.35;font-weight:700;color:#0f172a;">Join Northwind Labs on OpenOKR</h1>
+      <p class="em-ink2" style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#334155;"><b>Priya Raman</b> invited you. Northwind Labs sets and tracks its OKRs here: the goals, the weekly check-ins and the reviews.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#4f46e5" style="border-radius:8px;">
+        <a href="#" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Accept the invitation</a>
+      </td></tr></table>
+      <p class="em-ink3" style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#55637a;">Button not working? Paste this link into your browser:<br><a class="em-link" href="#" style="color:#4338ca;word-break:break-all;">https://okr.northwind.example/join/…</a></p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;"><tr><td class="em-soft em-ink2" style="background:#eff3f9;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.5;color:#334155;">
+        The invitation is for this address only and expires on <b>19 October 2026</b>.
+      </td></tr></table>
+    </td></tr>
+    <tr><td class="em-ink3" style="padding:14px 4px 0;font:12px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#617087;">
+      Not expecting this? Ignore it. Nothing happens until you accept.
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ============================================================= 4 -->
+<div>
+<p class="cap">4. Notification digest <span>· workspace mail</span></p>
+<div class="mail">
+<div class="inbox"><b>Northwind Labs: 3 updates</b><br><span class="pre">Priya Raman commented on "Make the weekly rhythm part of…"</span></div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#eff3f9;">
+<tr><td align="center" style="padding:24px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+    <tr><td style="padding:0 4px 14px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td width="24" height="24" align="center" style="width:24px;height:24px;background:#4f46e5;border-radius:6px;color:#fff;font:700 10px/24px -apple-system,Segoe UI,Roboto,Arial,sans-serif;">NL</td>
+        <td class="em-ink" style="padding-left:8px;font:650 14px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;">Northwind Labs</td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="em-card" style="background:#ffffff;border:1px solid #e4e9f2;border-radius:12px;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <h1 class="em-ink" style="margin:0 0 4px;font-size:18px;line-height:1.35;font-weight:700;color:#0f172a;">3 updates since this morning</h1>
+      <p class="em-ink3" style="margin:0 0 14px;font-size:13px;color:#55637a;">From the goals you follow.</p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td class="em-line" style="padding:12px 0;border-top:1px solid #e4e9f2;">
+          <span class="em-chip" style="display:inline-block;padding:1px 7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:11px;font-weight:600;">Comment</span>
+          <span class="em-ink3" style="font-size:12px;color:#617087;">&nbsp;09:14</span>
+          <p class="em-ink" style="margin:6px 0 2px;font-size:14px;line-height:1.5;color:#0f172a;"><b>Priya Raman</b> · "Can Customer Success take the onboarding calls?"</p>
+          <a class="em-link" href="#" style="font-size:13px;color:#4338ca;text-decoration:none;">Make the weekly rhythm part of how we work →</a>
+        </td></tr>
+        <tr><td class="em-line" style="padding:12px 0;border-top:1px solid #e4e9f2;">
+          <span class="em-chip" style="display:inline-block;padding:1px 7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:11px;font-weight:600;">Mentioned you</span>
+          <span class="em-ink3" style="font-size:12px;color:#617087;">&nbsp;10:02</span>
+          <p class="em-ink" style="margin:6px 0 2px;font-size:14px;line-height:1.5;color:#0f172a;"><b>Tomás Herrera</b> · "@Sara the dependency is confirmed, we start Monday."</p>
+          <a class="em-link" href="#" style="font-size:13px;color:#4338ca;text-decoration:none;">Bring Daily signups back to 100 →</a>
+        </td></tr>
+        <tr><td class="em-line" style="padding:12px 0;border-top:1px solid #e4e9f2;border-bottom:1px solid #e4e9f2;">
+          <span class="em-chip-warn" style="display:inline-block;padding:1px 7px;border-radius:999px;background:#fdf3d5;color:#b45309;font-size:11px;font-weight:600;">At risk</span>
+          <span class="em-ink3" style="font-size:12px;color:#617087;">&nbsp;11:40</span>
+          <p class="em-ink" style="margin:6px 0 2px;font-size:14px;line-height:1.5;color:#0f172a;"><b>Daniel Osei</b> checked in: confidence 0.4, win rate at 21%.</p>
+          <a class="em-link" href="#" style="font-size:13px;color:#4338ca;text-decoration:none;">Raise mid-market win rate from 18% to 28% →</a>
+        </td></tr>
+      </table>
+
+      <p class="em-ink3" style="margin:12px 0 18px;font-size:13px;color:#55637a;">And 2 more in your inbox.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#4f46e5" style="border-radius:8px;">
+        <a href="#" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Open your inbox</a>
+      </td></tr></table>
+    </td></tr>
+    <tr><td class="em-ink3" style="padding:14px 4px 0;font:12px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#617087;">
+      You get this because you follow these goals. <a class="em-link" href="#" style="color:#4338ca;">Change what you receive</a> · OpenOKR
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ============================================================= 5 -->
+<div>
+<p class="cap">5. Agent nudges <span>· OKR Champion, daily</span></p>
+<div class="mail">
+<div class="inbox"><b>Northwind Labs: 2 things need you today</b><br><span class="pre">Check-in overdue on "Make the weekly rhythm part of how we work"</span></div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#eff3f9;">
+<tr><td align="center" style="padding:24px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+    <tr><td style="padding:0 4px 14px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td width="24" height="24" align="center" style="width:24px;height:24px;background:#4f46e5;border-radius:6px;color:#fff;font:700 10px/24px -apple-system,Segoe UI,Roboto,Arial,sans-serif;">NL</td>
+        <td class="em-ink" style="padding-left:8px;font:650 14px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;">Northwind Labs</td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="em-card" style="background:#ffffff;border:1px solid #e4e9f2;border-radius:12px;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:12px;"><tr>
+        <td class="em-chip" width="28" height="28" align="center" style="width:28px;height:28px;background:#eef2ff;border-radius:999px;color:#4338ca;font:700 11px/28px -apple-system,Segoe UI,Roboto,Arial,sans-serif;">CH</td>
+        <td style="padding-left:9px;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;">
+          <span class="em-ink" style="font-size:13px;font-weight:700;color:#0f172a;">OKR Champion</span>
+          <span class="em-soft em-ink3" style="display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:#eff3f9;color:#55637a;font-size:10px;font-weight:700;letter-spacing:.4px;">AGENT</span><br>
+          <span class="em-ink3" style="font-size:12px;color:#617087;">Keeps the rhythm of your OKRs</span>
+        </td>
+      </tr></table>
+      <h1 class="em-ink" style="margin:0 0 14px;font-size:18px;line-height:1.35;font-weight:700;color:#0f172a;">2 things need you today</h1>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;"><tr><td class="em-edge" style="border:1px solid #e4e9f2;border-left:3px solid #b91c1c;border-radius:8px;padding:12px 14px;">
+        <p class="em-ink" style="margin:0 0 4px;font-size:14px;font-weight:600;color:#0f172a;">Check-in overdue, 2 days</p>
+        <p class="em-ink2" style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#334155;">Make the weekly rhythm part of how we work. The cycle reads stale until the champion checks in.</p>
+        <a class="em-link" href="#" style="font-size:13px;font-weight:600;color:#4338ca;text-decoration:none;">Check in now →</a>
+        <span class="em-ink3" style="float:right;font-size:11px;color:#617087;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">checkin.overdue · step 2</span>
+      </td></tr></table>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="em-edge" style="border:1px solid #e4e9f2;border-left:3px solid #b45309;border-radius:8px;padding:12px 14px;">
+        <p class="em-ink" style="margin:0 0 4px;font-size:14px;font-weight:600;color:#0f172a;">Confidence fell into the low band</p>
+        <p class="em-ink2" style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#334155;">Cut overdue blockers from 6 to 1 dropped from 0.7 to 0.3. What would it take to move it back?</p>
+        <a class="em-link" href="#" style="font-size:13px;font-weight:600;color:#4338ca;text-decoration:none;">Open the key result →</a>
+        <span class="em-ink3" style="float:right;font-size:11px;color:#617087;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">confidence.low · step 1</span>
+      </td></tr></table>
+    </td></tr>
+    <tr><td class="em-ink3" style="padding:14px 4px 0;font:12px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#617087;">
+      Every nudge names the rule it follows. Quiet hours are respected. <a class="em-link" href="#" style="color:#4338ca;">Snooze or change channel</a>
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ============================================================= 6 -->
+<div>
+<p class="cap">6. Weekly digest <span>· space post</span></p>
+<div class="mail">
+<div class="inbox"><b>Customer Success: week of 12 October</b><br><span class="pre">5 on track, 2 at risk, 1 off track. Two wins this week.</span></div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#eff3f9;">
+<tr><td align="center" style="padding:24px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+    <tr><td style="padding:0 4px 14px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td width="24" height="24" align="center" style="width:24px;height:24px;background:#4f46e5;border-radius:6px;color:#fff;font:700 10px/24px -apple-system,Segoe UI,Roboto,Arial,sans-serif;">NL</td>
+        <td class="em-ink" style="padding-left:8px;font:650 14px -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;">Northwind Labs</td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="em-card" style="background:#ffffff;border:1px solid #e4e9f2;border-radius:12px;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <p class="em-ink3" style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#55637a;">Weekly digest · Customer Success</p>
+      <h1 class="em-ink" style="margin:0 0 14px;font-size:18px;line-height:1.35;font-weight:700;color:#0f172a;">Week of 12 October</h1>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:18px;"><tr>
+        <td width="32%" class="em-ok" style="background:#e4f9ec;border-radius:8px;padding:10px 12px;">
+          <p style="margin:0;font-size:20px;font-weight:700;color:#15803d;">5</p><p style="margin:0;font-size:12px;color:#15803d;">On track</p></td>
+        <td width="8" style="width:8px;font-size:0;line-height:0;">&nbsp;</td>
+        <td width="32%" class="em-warn" style="background:#fdf3d5;border-radius:8px;padding:10px 12px;">
+          <p style="margin:0;font-size:20px;font-weight:700;color:#b45309;">2</p><p style="margin:0;font-size:12px;color:#b45309;">At risk</p></td>
+        <td width="8" style="width:8px;font-size:0;line-height:0;">&nbsp;</td>
+        <td width="32%" class="em-bad" style="background:#fde9e9;border-radius:8px;padding:10px 12px;">
+          <p style="margin:0;font-size:20px;font-weight:700;color:#b91c1c;">1</p><p style="margin:0;font-size:12px;color:#b91c1c;">Off track</p></td>
+      </tr></table>
+
+      <p class="em-ink" style="margin:0 0 6px;font-size:13px;font-weight:700;color:#0f172a;">Wins</p>
+      <ul class="em-ink2" style="margin:0 0 14px;padding-left:18px;font-size:14px;line-height:1.6;color:#334155;">
+        <li>Self-serve completion reached 64%, up from 52%.</li>
+        <li>Every new account had its first call within 2 days.</li>
+      </ul>
+      <p class="em-ink" style="margin:0 0 6px;font-size:13px;font-weight:700;color:#0f172a;">Needs attention</p>
+      <ul class="em-ink2" style="margin:0 0 18px;padding-left:18px;font-size:14px;line-height:1.6;color:#334155;">
+        <li>Support tickets per new account is flat at 4.</li>
+        <li>One blocker waits on Product: the onboarding checklist API.</li>
+      </ul>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#4f46e5" style="border-radius:8px;">
+        <a href="#" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Open Customer Success</a>
+      </td></tr></table>
+    </td></tr>
+    <tr><td class="em-ink3" style="padding:14px 4px 0;font:12px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#617087;">
+      Posted after the weekly session on Monday. <a class="em-link" href="#" style="color:#4338ca;">Change what you receive</a>
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</div>
+</div>
+
+</div>

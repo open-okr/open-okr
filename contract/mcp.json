@@ -3119,6 +3119,7 @@
       "name": "settings.resetWorkspaceSettings",
       "description": "Reset one workspace setting, or a whole admin card, to its default.",
       "inputSchema": {
+        "type": "object",
         "anyOf": [
           {
             "type": "object",

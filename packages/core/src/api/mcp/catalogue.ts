@@ -81,6 +81,13 @@ export interface McpPrompt {
     readonly description: string;
     readonly required: boolean;
   }[];
+  /**
+   * The message `prompts/get` answers with: the starting question, and which
+   * tools answer it. A client lists the prompts and then asks for one, and a
+   * server that could list but not answer told every client "method not
+   * found" (MCP Inspector against the UAT instance, 13 October 2026).
+   */
+  readonly render: (args: Readonly<Record<string, string>>) => string;
 }
 
 export interface McpCatalogue {
@@ -100,7 +107,13 @@ function jsonSchema(schema: ZodType): JsonObject {
     target: "draft-2020-12",
   }) as JsonObject;
   const { $schema, ...rest } = converted;
-  return rest;
+  // **The protocol requires an object at the top** (`type: "object"`), and a
+  // client built on the official SDK validates every tool of a list against
+  // that. An input that is a union of objects converts to a bare `anyOf`, and
+  // one such tool made the whole list unreadable to those clients (found by
+  // the MCP test against the UAT instance, 9 October 2026). The union stays
+  // as it is, under an object type it already satisfies.
+  return rest.type === "object" ? rest : { type: "object", ...rest };
 }
 
 /**
@@ -238,6 +251,17 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
     name: "weekly-check-in",
     description: "Walk me through my check-ins that are due this week.",
     arguments: [],
+    render: () =>
+      [
+        "Walk me through my check-ins that are due this week, one goal at a time.",
+        "",
+        "1. Call goals.list with mine set to true to find the goals I champion.",
+        "2. For each one, call goals.read for its key results, their current values and the next check-in date. Skip a goal that is not due in the next seven days.",
+        "3. For each goal that is due, ask me for every key result's new value, my confidence from 0 to 10, a status (on track, at risk or off track) and one sentence on what changed.",
+        "4. Show me the check-in before you publish it with goals.publishCheckIn, and wait for my yes.",
+        "",
+        "Never invent a number. If I do not know a value, leave it as it is.",
+      ].join("\n"),
   },
   {
     name: "review-against-the-canon",
@@ -250,16 +274,50 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
         required: false,
       },
     ],
+    render: (args) =>
+      [
+        "Review this cycle's objectives against the product's quality checks, and tell me what fails.",
+        "",
+        args.cycleId
+          ? `1. Call workflow.read for the cycle ${args.cycleId}.`
+          : "1. Call cycles.current, then workflow.read for that cycle.",
+        "2. Publish gate 2 names every objective and key result that fails a check. For each, call goals.read and quote the check exactly as the product words it.",
+        "3. Suggest one rewrite per failure, and list the failures by objective, the ones that block publishing first.",
+        "",
+        "Change nothing. This is a review.",
+      ].join("\n"),
   },
   {
     name: "prepare-my-review",
     description: "Gather what I need for my quarterly review conversation.",
     arguments: [],
+    render: () =>
+      [
+        "Gather what I need for my quarterly review conversation.",
+        "",
+        "1. Call sessions.mine to find my next quarterly review.",
+        "2. Call goals.list with mine set to true, then goals.read for each, for every key result's latest value, confidence and check-ins.",
+        "3. Call blockers.board for the blockers on those key results.",
+        "4. For each objective, tell me where it ended, the score I could propose with one line of evidence, what got in the way, and one thing to carry into the next cycle.",
+        "",
+        "Record no score. The review records scores together, in the room.",
+      ].join("\n"),
   },
   {
     name: "what-do-i-owe",
     description: "List what is waiting on me: check-ins, blockers and reviews.",
     arguments: [],
+    render: () =>
+      [
+        "List what is waiting on me, the latest first.",
+        "",
+        "1. Call review.inbox for the check-ins waiting on my review and my other obligations.",
+        "2. Call goals.list with mine set to true. A goal whose next check-in is today or past is a check-in I owe.",
+        "3. Call blockers.board for the blockers I own.",
+        "4. Call notifications.list for what I have not read.",
+        "",
+        "Give me one list. Each line says what it is, how late it is and where to open it. Change nothing.",
+      ].join("\n"),
   },
 ];
 

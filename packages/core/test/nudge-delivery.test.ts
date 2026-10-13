@@ -203,8 +203,15 @@ describe("what a nudge says", () => {
       "Check-in due today: Become the preferred platform for mid-market teams",
     );
     expect(text).not.toContain("reminder waiting");
+    // A mail is from the workspace, so its subject starts with the
+    // workspace's name (docs/design/email-templates.md §5).
     expect(checkIn?.payload.subject).toBe(
-      "OpenOKR: Check-in due today: Become the preferred platform for mid-market teams",
+      "Owner's workspace: Check-in due today: Become the preferred platform for mid-market teams",
+    );
+    // And it carries the email layout's blocks, with the check-in as its
+    // button.
+    expect(JSON.stringify(checkIn?.payload.email)).toContain(
+      `https://okr.example.com/check-in?goal=${goalId}`,
     );
     expect(checkIn?.payload.buttons).toEqual([
       {

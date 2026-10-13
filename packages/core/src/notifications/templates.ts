@@ -46,6 +46,10 @@ export function renderMentionNotification(
 export interface DigestItem {
   readonly summary: string;
   readonly link: string;
+  /** Why the member got it, which the mail shows as a chip. */
+  readonly reason?: string;
+  /** The member whose action this was, when one was. */
+  readonly actorName?: string | null;
 }
 
 export interface DigestInput {
