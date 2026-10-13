@@ -455,13 +455,16 @@ export default async function SessionPage({ params }: SessionPageProps) {
   // room will be looking at before they open it.
   interface MonthlyRecord {
     shifts: string | null;
+    shiftsDocument: unknown;
     trends: MonthlyTrend[];
     untrended: MonthlyUntrended[];
     additions: MonthlyAddition[];
     stops: MonthlyStop[];
     updates: MonthlyUpdate[];
     dependencies: MonthlyDependency[];
-    decisions: MonthlyDecision[];
+    decisions: (Omit<MonthlyDecision, "textHtml"> & {
+      readonly textDocument: unknown;
+    })[];
   }
   let monthly: MonthlyRecord | null = null;
   const decisionSubjects: DecisionSubject[] = [];
@@ -1050,14 +1053,17 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {monthly ? (
         <MonthlyReview
           sessionId={id}
-          shifts={monthly.shifts}
+          shiftsDocument={monthly.shiftsDocument}
           trends={monthly.trends}
           untrended={monthly.untrended}
           additions={monthly.additions}
           stops={monthly.stops}
           updates={monthly.updates}
           dependencies={monthly.dependencies}
-          decisions={monthly.decisions}
+          decisions={monthly.decisions.map((decision) => ({
+            ...decision,
+            textHtml: richTextHtml(decision.textDocument),
+          }))}
           subjects={decisionSubjects}
           canEdit={isRunning}
         />

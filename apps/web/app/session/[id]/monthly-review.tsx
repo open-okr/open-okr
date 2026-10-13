@@ -31,7 +31,9 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
-  TextArea,
+  isBlankDocument,
+  RichTextEditor,
+  RichTextView,
   TextInput,
   useTranslations,
 } from "@openokr/ui";
@@ -83,6 +85,8 @@ export interface MonthlyDependency {
 export interface MonthlyDecision {
   readonly id: string;
   readonly text: string;
+  /** The decision drawn as rich text, rendered on the server; null when blank. */
+  readonly textHtml: string | null;
   readonly at: string;
   readonly authorName: string;
   readonly goalId: string | null;
@@ -129,7 +133,7 @@ export interface DecisionSubject {
 
 export function MonthlyReview({
   sessionId,
-  shifts,
+  shiftsDocument,
   trends,
   untrended,
   additions,
@@ -141,7 +145,8 @@ export function MonthlyReview({
   canEdit,
 }: {
   readonly sessionId: string;
-  readonly shifts: string | null;
+  /** The shifts note as editor JSON, or null when none was noted. */
+  readonly shiftsDocument: unknown;
   readonly trends: readonly MonthlyTrend[];
   readonly untrended: readonly MonthlyUntrended[];
   /** What was started mid-cycle, read beside the decisions that made it. */
@@ -158,8 +163,10 @@ export function MonthlyReview({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
-  const [shiftsDraft, setShiftsDraft] = useState(shifts ?? "");
-  const [decisionText, setDecisionText] = useState("");
+  const [shiftsDraft, setShiftsDraft] = useState<unknown>(shiftsDocument);
+  const [decisionDocument, setDecisionDocument] = useState<unknown>(null);
+  // Bumped once a decision is recorded, so its editor starts empty again.
+  const [decisionEditor, setDecisionEditor] = useState(0);
   const [stopGoalId, setStopGoalId] = useState("");
   const [stopReason, setStopReason] = useState("");
   const [subjectKey, setSubjectKey] = useState(
@@ -314,15 +321,16 @@ export function MonthlyReview({
           {t("session.detail.monthlyReview.resourceOrPriorityShifts")}
         </CardHeader>
         <CardBody className="flex flex-col gap-2">
-          <TextArea
+          {/* Rich text since guided-inputs change 11a, up to the server's
+              4000 (sessions.setShifts). */}
+          <RichTextEditor
             label={t("session.detail.monthlyReview.resourceOrPriorityShifts")}
-            hideLabel
-            value={shiftsDraft}
-            disabled={!canEdit}
+            variant="compact"
+            content={shiftsDocument}
+            editable={canEdit}
             placeholder={t("session.detail.monthlyReview.whatMovedAndWhy")}
-            onChange={(event) => setShiftsDraft(event.target.value)}
-            maxLength={4000}
-            inputClassName="min-h-24"
+            maxCharacters={4000}
+            onUpdate={setShiftsDraft}
           />
           {canEdit ? (
             <span>
@@ -523,7 +531,14 @@ export function MonthlyReview({
                   key={decision.id}
                   className="flex flex-col gap-1 rounded-md border border-line p-2.5"
                 >
-                  <span className="text-sm text-ink">{decision.text}</span>
+                  {decision.textHtml === null ? (
+                    <span className="text-sm text-ink">{decision.text}</span>
+                  ) : (
+                    <RichTextView
+                      html={decision.textHtml}
+                      className="text-sm text-ink"
+                    />
+                  )}
                   <span className="text-xs text-ink-3">
                     {decision.keyResultTitle ?? decision.goalTitle} ·{" "}
                     {new Date(decision.at).toLocaleDateString()} ·{" "}
@@ -550,20 +565,26 @@ export function MonthlyReview({
                   label: subject.label,
                 }))}
               />
-              <TextArea
+              {/* Rich text since guided-inputs change 11a, up to the
+                  server's 2000 (sessions.recordDecision). */}
+              <RichTextEditor
+                key={decisionEditor}
                 label={t("session.detail.monthlyReview.theDecision")}
-                id="decision-text"
-                value={decisionText}
+                variant="compact"
+                content={null}
                 placeholder={t("session.detail.monthlyReview.whatWasDecided")}
-                onChange={(event) => setDecisionText(event.target.value)}
-                maxLength={2000}
-                inputClassName="min-h-20"
+                maxCharacters={2000}
+                onUpdate={setDecisionDocument}
               />
               <span>
                 <Button
                   type="button"
                   variant="primary"
-                  disabled={pending || decisionText.trim().length === 0}
+                  disabled={
+                    pending ||
+                    decisionDocument === null ||
+                    isBlankDocument(decisionDocument)
+                  }
                   onClick={() => {
                     const [kind, id] = subjectKey.split(":");
                     run(async () => {
@@ -571,9 +592,10 @@ export function MonthlyReview({
                         ...(kind === "keyResult"
                           ? { keyResultId: id }
                           : { goalId: id }),
-                        text: decisionText.trim(),
+                        text: decisionDocument,
                       });
-                      setDecisionText("");
+                      setDecisionDocument(null);
+                      setDecisionEditor((one) => one + 1);
                     });
                   }}
                 >

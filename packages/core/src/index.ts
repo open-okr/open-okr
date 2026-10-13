@@ -1023,6 +1023,12 @@ export {
   isBlankText,
   richTextFromPlainText,
 } from "./rich-text/from-text.ts";
+export {
+  documentOfInput,
+  documentOrPlainText,
+  plainTextOfDocument,
+  richTextOrPlainTextSchema,
+} from "./rich-text/moving.ts";
 export type { RichTextResolvers } from "./rich-text/render.ts";
 export { renderRichTextToHtml } from "./rich-text/render.ts";
 export {

@@ -83,6 +83,9 @@ const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   "kpi_categories.description",
   "review_narratives.body",
   "goal_retrospectives.body",
+  // Guided inputs change 11a: the monthly review's prose as documents.
+  "okr_sessions.shifts_document",
+  "decisions.text_document",
 ]);
 
 function isRichTextColumn(table: string, column: string): boolean {

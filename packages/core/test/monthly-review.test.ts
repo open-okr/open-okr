@@ -316,6 +316,117 @@ describe("sessions.recordDecision", () => {
   });
 });
 
+describe("the monthly review's prose as rich text (guided-inputs change 11a)", () => {
+  const bold = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Pause " },
+          { type: "text", text: "self-serve", marks: [{ type: "bold" }] },
+        ],
+      },
+      { type: "paragraph", content: [{ type: "text", text: "until June." }] },
+    ],
+  };
+
+  it("keeps a decision as written, and its plain text for the release before", async () => {
+    await call("sessions.recordDecision", {
+      sessionId,
+      keyResultId,
+      text: bold,
+    });
+
+    const record = (await call("sessions.monthlyRecord", { sessionId })) as {
+      decisions: { text: string; textDocument: unknown }[];
+    };
+    expect(record.decisions[0]?.textDocument).toEqual(bold);
+    // What the previous release reads, during a rolling upgrade.
+    expect(record.decisions[0]?.text).toBe("Pause self-serve\n\nuntil June.");
+  });
+
+  it("still takes plain text from an API client, as a document", async () => {
+    await call("sessions.recordDecision", {
+      sessionId,
+      keyResultId,
+      text: "One line.\n\nAnother.",
+    });
+    const record = (await call("sessions.monthlyRecord", { sessionId })) as {
+      decisions: { textDocument: { content: unknown[] } }[];
+    };
+    expect(record.decisions[0]?.textDocument.content).toHaveLength(2);
+  });
+
+  it("refuses a decision with nothing in it, as text or as a document", async () => {
+    for (const text of [
+      "   ",
+      { type: "doc", content: [{ type: "paragraph" }] },
+    ]) {
+      await expect(
+        call("sessions.recordDecision", { sessionId, keyResultId, text }),
+      ).rejects.toThrow();
+    }
+  });
+
+  it("reads a decision the backfill has not reached from its plain text", async () => {
+    await call("sessions.recordDecision", {
+      sessionId,
+      keyResultId,
+      text: "Written before the document existed",
+    });
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update decisions set text_document = null, text_document_version = null where session_id = $1",
+      [sessionId],
+    );
+    const record = (await call("sessions.monthlyRecord", { sessionId })) as {
+      decisions: { textDocument: unknown }[];
+    };
+    expect(record.decisions[0]?.textDocument).toEqual({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Written before the document existed" },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("keeps the shifts note as written, takes plain text, and clears both when emptied", async () => {
+    const read = async () =>
+      (await call("sessions.monthlyRecord", { sessionId })) as {
+        shifts: string | null;
+        shiftsDocument: unknown;
+      };
+
+    await call("sessions.setShifts", { sessionId, shifts: bold });
+    expect(await read()).toMatchObject({
+      shifts: "Pause self-serve\n\nuntil June.",
+      shiftsDocument: bold,
+    });
+
+    await call("sessions.setShifts", { sessionId, shifts: "Two people move." });
+    expect((await read()).shiftsDocument).toEqual({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Two people move." }],
+        },
+      ],
+    });
+
+    await call("sessions.setShifts", { sessionId, shifts: "" });
+    expect(await read()).toEqual(
+      expect.objectContaining({ shifts: null, shiftsDocument: null }),
+    );
+  });
+});
+
 describe("a decision's date (P9-T22c-b-b)", () => {
   it("is the day the review sat, when it is recorded after", async () => {
     // A review held on 2 March and written up a week later: its decision

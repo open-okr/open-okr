@@ -206,15 +206,15 @@ The existing `RichTextEditor` gains a `variant` prop:
 
 | Field | Screen | Column today | Becomes | Read as text by |
 |---|---|---|---|---|
-| Resource or priority shifts | Monthly review | `okr_sessions.shifts` | `shifts_rich` + `shifts_rich_version` | The minutes |
-| The decision | Monthly review | `decisions.text` | `text_rich` + `text_rich_version` | The minutes, and the AI minutes draft |
+| Resource or priority shifts | Monthly review | `okr_sessions.shifts` | `shifts_document` + `shifts_document_version` (11a) | The monthly record |
+| The decision | Monthly review | `decisions.text` | `text_document` + `text_document_version` (11a) | The monthly record, the goal page, the cycle page's decision list and its running cadence |
 | Management retro answers | Quarterly review | `management_answers.body` | `body_rich` + `body_rich_version` | The minutes |
 | Coordinator note | Weekly session | `digests.note` | `note_rich` + `note_rich_version` | The digest, its AI narration, and the channel posts |
 | What changed | Quarterly revalidation | `cycle_revalidations.change_note` | `change_note_rich` + version | Nothing else |
 | Focus areas | Quarterly revalidation | `cycle_revalidations.focus_note` | `focus_note_rich` + version | Nothing else |
 | Private stage note | Quarterly review | A string inside the `okr_sessions.notes` map | The same map, holding editor JSON | The facilitator alone |
 
-The `_rich` names are placeholders. The final names are settled in the change, with `DATABASE.md` and TECHNICAL-PLAN §4 updated in the same change, as they always are.
+The `_rich` names are placeholders. The final names are settled in the change, with `DATABASE.md` and TECHNICAL-PLAN §4 updated in the same change, as they always are. As built in 11a: `_document` and `_document_version`, and a check that the two are set together. The monthly review's two fields were said to be read by the minutes and the AI minutes draft; they are not, those read the quarterly review's own decisions. Their readers are the monthly record, the goal page and the cycle page. The actions take `richTextOrPlainTextSchema` (decided 13 October 2026: a string is still taken until change 13, and wrapped), write both columns, and readers take `documentOrPlainText`. The data changes are 0027 and 0028; `packages/db` repeats `richTextFromPlainText`'s rule in `plain-text-document.ts`, because it cannot import core.
 
 **How each column moves, over two releases** (PLAN.md §5.1):
 
@@ -385,7 +385,9 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 10b | Session and KPI screens | The same kit, and `RangeInput` for the one slider: the gate counts a slider as it counts a dropdown, and, as with dropdowns, the slider is wrapped rather than exempted. The room pulse word is checked as one word, the rule the server refuses a sentence by. Done 13 October 2026 | Every session stage, scheduling, the KPI list, a KPI's page, judged by, the suggestion, recovery, KPI trees |
 | 10c | Admin, account and operator | The same kit; `NumberInput` gains `invalid` and `aria-describedby` for a refusal drawn once for several fields; a link's expiry is held to 365 days on the server; the nudge ladder's rungs are named, in days. Done 13 October 2026 | AI, agents, channels, general, imports, invitations, nudges, plan, practice, rhythm, roles, SSO, support, your AI keys, API tokens, the channels cadence, security, and the operator's lifecycle, plan, support request and site message |
 | 10d | The rest, and the ratchet at zero | `SearchInput`; the search page holds its phrase to the server's 500 rather than throwing; the baseline file is deleted and the gate refuses any raw field. Done 13 October 2026 | Spaces, people, search and the palette, the board, check-ins, the copilot, documents, initiatives, the OAuth consent, the scorecard, tasks, the workspace switcher |
-| 11 | `feat/rich-session-prose` | First release for five fields: the rich columns, writing both, the readers, the data-change backfill, the editor on screen | Monthly review (shifts, decision), quarterly review (management answers, private stage note), weekly session (coordinator note) |
+| 11a | The monthly review's prose | First release for the shifts note and the decision: migration 0140, writing both, the readers, data changes 0027 and 0028, the editor on screen. Done 13 October 2026 | Monthly review (shifts, decision), and the decisions on the goal and cycle pages |
+| 11b | The quarterly review's prose | The same, for the management retro answers and the private stage note | Quarterly review |
+| 11c | The coordinator's note | The same, for the weekly digest's note, read by the digest, its narration and the channel posts | Weekly session |
 | 12 | `feat/rich-revalidation-notes` | The same, for the two revalidation notes | Quarterly revalidation |
 | 13 | `chore/drop-plain-prose-columns` | Second release, one release after 11 and 12: drop the six old `text` columns, and stop accepting string stage notes | None. Nothing a person sees changes |
 | Later | `PhoneInput` | §4.12 | The first screen that needs a phone number |

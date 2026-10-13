@@ -15423,8 +15423,13 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "shifts": {
-            "type": "string",
-            "maxLength": 4000
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {}
+            ]
           }
         },
         "required": [
@@ -15440,7 +15445,7 @@
       },
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
-        "shifts": "…"
+        "shifts": {}
       }
     },
     {
@@ -15465,9 +15470,13 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "text": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {}
+            ]
           }
         },
         "required": [
@@ -15483,7 +15492,7 @@
       },
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
-        "text": "…"
+        "text": {}
       }
     },
     {

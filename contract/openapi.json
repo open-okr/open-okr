@@ -61426,8 +61426,13 @@
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
                   "shifts": {
-                    "type": "string",
-                    "maxLength": 4000
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 4000
+                      },
+                      {}
+                    ]
                   }
                 },
                 "required": [
@@ -61536,9 +61541,13 @@
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
                   "text": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2000
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      {}
+                    ]
                   }
                 },
                 "required": [
@@ -61577,6 +61586,7 @@
                             "null"
                           ]
                         },
+                        "shiftsDocument": {},
                         "trends": {
                           "type": "array",
                           "items": {
@@ -61840,6 +61850,7 @@
                               "text": {
                                 "type": "string"
                               },
+                              "textDocument": {},
                               "at": {
                                 "type": "string"
                               },
@@ -61903,6 +61914,7 @@
                             "required": [
                               "id",
                               "text",
+                              "textDocument",
                               "at",
                               "authorMemberId",
                               "authorName",
@@ -61918,6 +61930,7 @@
                       },
                       "required": [
                         "shifts",
+                        "shiftsDocument",
                         "trends",
                         "untrended",
                         "additions",
@@ -62008,6 +62021,7 @@
                           "text": {
                             "type": "string"
                           },
+                          "textDocument": {},
                           "at": {
                             "type": "string"
                           },
@@ -62071,6 +62085,7 @@
                         "required": [
                           "id",
                           "text",
+                          "textDocument",
                           "at",
                           "authorMemberId",
                           "authorName",
@@ -62163,6 +62178,7 @@
                           "text": {
                             "type": "string"
                           },
+                          "textDocument": {},
                           "at": {
                             "type": "string"
                           },
@@ -62226,6 +62242,7 @@
                         "required": [
                           "id",
                           "text",
+                          "textDocument",
                           "at",
                           "authorMemberId",
                           "authorName",

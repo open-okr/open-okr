@@ -11,7 +11,14 @@
  * type for the `elapsed` and `notes` columns — they are typed as jsonb in the
  * migration and as Record<string, unknown> here.
  */
-import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
 import { cycles } from "./cycles.ts";
 import { spaces } from "./spaces.ts";
@@ -96,8 +103,15 @@ export const sessions = pgTable("okr_sessions", {
    * facilitator's private per-stage notes (P4-T10a). A shared record inside a
    * private-by-design column is one refactor away from being published by
    * accident.
+   *
+   * Plain text until change 11a of guided inputs (migration 0140), which
+   * added `shiftsDocument` beside it and writes both for one release. The
+   * plain column is dropped a release later (change 13).
    */
   shifts: text("shifts"),
+  /** The shifts as editor JSON, and its rich text schema version. */
+  shiftsDocument: jsonb("shifts_document"),
+  shiftsDocumentVersion: integer("shifts_document_version"),
   /**
    * Which objective holds the mic in stage three (METHOD.md §8.1, P4-T10c).
    *

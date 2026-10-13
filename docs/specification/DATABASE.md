@@ -389,9 +389,9 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 ## 10. The rhythm (domain G)
 
 ### sessions *(short_id)*
-`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c), `review_part?` (`review` / `retrospective`; null is the whole review in one session) and `review_session_id?` to sessions (the review session a retrospective reads its scores from), both 0133, P9-T20b-a, checked so only a quarterly session has a part and only a retrospective names a review.
+`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `shifts_document jsonb?`, `shifts_document_version?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c), `review_part?` (`review` / `retrospective`; null is the whole review in one session) and `review_session_id?` to sessions (the review session a retrospective reads its scores from), both 0133, P9-T20b-a, checked so only a quarterly session has a part and only a retrospective names a review.
 
-`shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes.
+`shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes. Since guided-inputs change 11a (migration 0140) the note is editor JSON in `shifts_document`, and `shifts` holds its plain text for one release so the release before reads it; change 13 drops `shifts`.
 
 `notes` is private to the facilitator. `sessions.read` returns it only to the member the session names as facilitator and an empty object to everybody else, so nothing else may be filed in there.
 
@@ -416,7 +416,9 @@ A row is created when somebody takes part, not when the session is made. Seeding
 `session_id?` to sessions, `space_id` to spaces, `week_start date`, `text`, `owner_id` to workspace_members, `key_result_id?` to key_results, `delivered bool?`, `closed_at?`, `closing_note?` (the line on why written when it was closed, where it helps; 0130, P9-T19a-d-c).
 
 ### decisions
-`cycle_id?` to cycles, `key_result_id?` to key_results, `goal_id?` to goals, `at date`, `text`, `author_member_id` to workspace_members, `session_id?` to sessions.
+`cycle_id?` to cycles, `key_result_id?` to key_results, `goal_id?` to goals, `at date`, `text`, `text_document jsonb?`, `text_document_version?`, `author_member_id` to workspace_members, `session_id?` to sessions.
+
+Since guided-inputs change 11a (migration 0140) a decision is editor JSON in `text_document`, and `text` holds its plain text for one release so the release before reads it; change 13 drops `text`.
 
 ### digests
 `scope` (`space` / `workspace` / `member`), `scope_id?`, `period` (`daily` / `weekly` / `cycle`), `period_start`, `body jsonb`, `note?`, `generated_at`, `published_at?`, `channels text[]`.

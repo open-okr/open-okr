@@ -7,8 +7,10 @@
  * per pair would make the second piece of recognition overwrite the first.
  *
  * Plain text rather than rich text. Three minutes of naming effort does not
- * produce formatted paragraphs, and every other free line in a session
- * (`okr_sessions.shifts`, `decisions.text`) is plain text for the same reason.
+ * produce formatted paragraphs. (The monthly review's shifts and decisions
+ * were plain for the same reason until guided-inputs change 11a, which made
+ * them rich text: they are paragraphs somebody returns to, a kudos is one
+ * line.)
  */
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";

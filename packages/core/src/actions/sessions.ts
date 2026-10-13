@@ -139,7 +139,16 @@ import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
-import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import {
+  documentOfInput,
+  documentOrPlainText,
+  plainTextOfDocument,
+  richTextOrPlainTextSchema,
+} from "../rich-text/moving.ts";
+import {
+  RICH_TEXT_SCHEMA_VERSION,
+  type RichTextDocument,
+} from "../rich-text/schema.ts";
 import { computedScoresInTx } from "../scoring/computed.ts";
 import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
 import { sessionChannel } from "../sessions/live.ts";
@@ -4107,13 +4116,36 @@ export const setTrend = defineWriteAction({
   }),
 });
 
+/** The longest shifts note, the textarea's limit before it was an editor. */
+const SHIFTS_MAX_CHARACTERS = 4000;
+
+/** The longest decision, the textarea's limit before it was an editor. */
+const DECISION_MAX_CHARACTERS = 2000;
+
+/** A decision's two text columns, written together for one release. */
+function decisionTextColumns(document: RichTextDocument | null): {
+  text: string;
+  textDocument: RichTextDocument | null;
+  textDocumentVersion: number | null;
+} {
+  return {
+    text: document === null ? "" : plainTextOfDocument(document),
+    textDocument: document,
+    textDocumentVersion: document === null ? null : RICH_TEXT_SCHEMA_VERSION,
+  };
+}
+
 export const setShifts = defineWriteAction({
   name: "sessions.setShifts",
   summary:
     "Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5).",
   input: z.object({
     sessionId: z.uuid(),
-    shifts: z.string().trim().max(4000),
+    /**
+     * Editor JSON, or for this release the plain text it took before
+     * (guided-inputs change 11a), which is wrapped as a document.
+     */
+    shifts: richTextOrPlainTextSchema({ maxCharacters: SHIFTS_MAX_CHARACTERS }),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -4133,12 +4165,17 @@ export const setShifts = defineWriteAction({
       );
 
       // Empty is a real answer and means the room noted no shift, so the
-      // column goes back to null rather than holding an empty string that
-      // reads on screen as somebody having written nothing.
+      // columns go back to null rather than holding an empty note that reads
+      // on screen as somebody having written nothing. Both are written, the
+      // plain one for the previous release during a rolling upgrade.
+      const document = documentOfInput(input.shifts);
       await tx
         .update(sessions)
         .set({
-          shifts: input.shifts.length === 0 ? null : input.shifts,
+          shifts: document === null ? null : plainTextOfDocument(document),
+          shiftsDocument: document,
+          shiftsDocumentVersion:
+            document === null ? null : RICH_TEXT_SCHEMA_VERSION,
           updatedAt: new Date(),
         })
         .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
@@ -4242,7 +4279,15 @@ export const recordDecision = defineWriteAction({
       sessionId: z.uuid(),
       goalId: z.uuid().optional(),
       keyResultId: z.uuid().optional(),
-      text: z.string().trim().min(1).max(2000),
+      /**
+       * Editor JSON, or for this release the plain text it took before
+       * (guided-inputs change 11a), which is wrapped as a document.
+       */
+      text: richTextOrPlainTextSchema({
+        maxCharacters: DECISION_MAX_CHARACTERS,
+      }).refine((value) => documentOfInput(value) !== null, {
+        message: "A decision says what was decided.",
+      }),
     })
     // §7.5: "Every decision names the key result it affects." A decision with
     // no subject is a meeting note, and the log is not a notepad. Refused at
@@ -4326,7 +4371,9 @@ export const recordDecision = defineWriteAction({
           sessionId: input.sessionId,
           goalId,
           keyResultId: input.keyResultId ?? null,
-          text: input.text,
+          // Both, the plain one for the previous release during a rolling
+          // upgrade. The refinement above means there is a document.
+          ...decisionTextColumns(documentOfInput(input.text)),
           // The day the review sat, or today while it has not passed: a
           // decision recorded after the session belongs to the session's day
           // (P9-T22c-b-b), as its diagnostic does.
@@ -4371,7 +4418,10 @@ export const recordDecision = defineWriteAction({
 
 const decisionOutput = z.object({
   id: z.uuid(),
+  /** The decision as plain text, as it always was. */
   text: z.string(),
+  /** The decision as editor JSON (guided-inputs change 11a). */
+  textDocument: z.unknown(),
   at: z.string(),
   authorMemberId: z.uuid(),
   authorName: z.string(),
@@ -4388,6 +4438,7 @@ type DecisionOutput = z.infer<typeof decisionOutput>;
 function decisionRow(row: {
   id: string;
   text: string;
+  textDocument: unknown;
   at: string;
   authorMemberId: string;
   authorName: string | null;
@@ -4400,6 +4451,9 @@ function decisionRow(row: {
   return {
     id: row.id,
     text: row.text,
+    // The stored document, or the plain text wrapped while data change
+    // 0028 has not reached this row.
+    textDocument: documentOrPlainText(row.textDocument, row.text),
     at: row.at,
     authorMemberId: row.authorMemberId,
     // Left-joined, so a decision by a member who has since been removed still
@@ -4416,6 +4470,7 @@ function decisionRow(row: {
 const decisionColumns = {
   id: decisions.id,
   text: decisions.text,
+  textDocument: decisions.textDocument,
   at: decisions.at,
   authorMemberId: decisions.authorMemberId,
   authorName: workspaceMembers.name,
@@ -4432,7 +4487,10 @@ export const readMonthlyRecord = defineReadAction({
     "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
+    /** The shifts as plain text, as they always were. */
     shifts: z.string().nullable(),
+    /** The shifts as editor JSON, or null when none were noted (change 11a). */
+    shiftsDocument: z.unknown(),
     trends: z.array(
       z.object({
         goalId: z.uuid(),
@@ -4772,6 +4830,12 @@ export const readMonthlyRecord = defineReadAction({
 
         return {
           shifts: session.shifts,
+          // The stored document, or the plain text wrapped while data
+          // change 0027 has not reached this session.
+          shiftsDocument: documentOrPlainText(
+            session.shiftsDocument,
+            session.shifts,
+          ),
           trends,
           untrended,
           additions,

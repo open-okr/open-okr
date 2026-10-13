@@ -13,6 +13,7 @@ import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
+import { DecisionText } from "../../lib/decision-text.tsx";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
@@ -179,6 +180,7 @@ export default async function CyclePage({
   })) as Array<{
     id: string;
     text: string;
+    textDocument: unknown;
     at: string;
     authorName: string;
     goalId: string | null;
@@ -763,7 +765,10 @@ export default async function CyclePage({
                 <ul className="flex flex-col gap-2">
                   {cycleDecisions.map((decision) => (
                     <li key={decision.id} className="flex flex-col gap-0.5">
-                      <span className="text-sm text-ink">{decision.text}</span>
+                      <DecisionText
+                        document={decision.textDocument}
+                        text={decision.text}
+                      />
                       <span className="text-xs text-ink-3">
                         {decision.goalId ? (
                           <a

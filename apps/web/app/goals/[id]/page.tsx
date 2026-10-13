@@ -37,6 +37,7 @@ import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { readConversation } from "../../../lib/conversation.ts";
+import { DecisionText } from "../../../lib/decision-text.tsx";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { healthWord } from "../../../lib/health-words.ts";
@@ -157,6 +158,7 @@ export default async function GoalPage({
   })) as Array<{
     id: string;
     text: string;
+    textDocument: unknown;
     at: string;
     authorName: string;
     keyResultTitle: string | null;
@@ -642,7 +644,10 @@ export default async function GoalPage({
                     key={decision.id}
                     className="flex flex-col gap-1 rounded-md border border-line p-2.5"
                   >
-                    <span className="text-sm text-ink">{decision.text}</span>
+                    <DecisionText
+                      document={decision.textDocument}
+                      text={decision.text}
+                    />
                     {/* The criterion names the date and the author, and the
                         key result when one was named, because a decision
                         about one number is not a decision about the goal. */}

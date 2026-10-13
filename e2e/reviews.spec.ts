@@ -213,6 +213,21 @@ test("a monthly review records a trend and a decision, and the goal shows it", a
   await page.getByRole("button", { name: "Declining" }).first().click();
   await expect(unrecorded).toHaveCount(before - 1, { timeout: 10_000 });
 
+  // The shifts note, rich text since guided-inputs change 11a: typed, saved,
+  // and there again once the page is read again.
+  const shiftsBox = () =>
+    page.getByRole("textbox", {
+      name: "Resource or priority shifts",
+      exact: true,
+    });
+  await shiftsBox().click();
+  await shiftsBox().pressSequentially("Two people move onto activation");
+  await page.getByRole("button", { name: "Save the note" }).click();
+  await page.reload();
+  await expect(shiftsBox()).toContainText("Two people move onto activation", {
+    timeout: 15_000,
+  });
+
   // A decision against this goal's own key result, named rather than picked by
   // position: the panel lists every objective in the space, so "the first
   // option with a separator" was landing the decision on whichever objective
@@ -220,9 +235,15 @@ test("a monthly review records a trend and a decision, and the goal shows it", a
   // Found by typing its title into the picker, which offers it as
   // "objective · key result".
   await chooseContaining(page.getByLabel("What it affects"), keyResult.title);
-  await page
-    .getByLabel("The decision")
-    .fill("Move two engineers off billing onto activation");
+  // The compact editor since guided-inputs change 11a.
+  const decision = page.getByRole("textbox", {
+    name: "The decision",
+    exact: true,
+  });
+  await decision.click();
+  await decision.pressSequentially(
+    "Move two engineers off billing onto activation",
+  );
   await page.getByRole("button", { name: "Record the decision" }).click();
   // **Scoped to the list, not the page.** A bare `getByText` here also matched
   // the textarea the sentence was just typed into, so it went green the moment

@@ -29,6 +29,9 @@ import { blockerClockToCheckIn } from "../src/data-changes/0023_blocker_clock_to
 import { retireRhythmScoreThreshold } from "../src/data-changes/0024_retire_rhythm_score_threshold.ts";
 import { verifyFirstAccount } from "../src/data-changes/0025_verify_first_account.ts";
 import { kpiCorridorFollowsWorkspace } from "../src/data-changes/0026_kpi_corridor_follows_workspace.ts";
+import { sessionShiftsDocument } from "../src/data-changes/0027_session_shifts_document.ts";
+import { decisionTextDocument } from "../src/data-changes/0028_decision_text_document.ts";
+import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -1541,5 +1544,111 @@ describe("0026: a KPI's corridor follows the workspace", () => {
       // 85 now, so 87% is healthy.
       { short_id: "K-4", healthy_pct: null, watch_pct: null, state: "healthy" },
     ]);
+  });
+});
+
+describe("0027 and 0028: the monthly review's prose as documents", () => {
+  it("splits plain text the way richTextFromPlainText does", () => {
+    // packages/core's rule, held here by example because packages/db cannot
+    // import it: blank lines split, each block trimmed, empties dropped, and
+    // nothing interpreted.
+    expect(
+      plainTextDocument("  One *line*\r\n\r\n\n Two \nlines\n\n\n"),
+    ).toEqual({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "One *line*" }] },
+        { type: "paragraph", content: [{ type: "text", text: "Two \nlines" }] },
+      ],
+    });
+    expect(plainTextDocument("   \n\n  ").content).toEqual([]);
+  });
+
+  it("writes each shifts note and decision as a document, keeps one already written, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe)
+         select gen_random_uuid(), m.workspace_id, 'Keep customers', 'company',
+                'workspace', m.id, m.id,
+                '{"start": "2026-07-01", "end": "2026-09-30"}'::jsonb
+           from m
+         returning id, workspace_id
+       ), s as (
+         insert into okr_sessions (id, workspace_id, kind, title,
+                                   scheduled_for, facilitator_id, shifts,
+                                   shifts_document, shifts_document_version)
+         select gen_random_uuid(), m.workspace_id, 'monthly', d.title, now(),
+                m.id, d.shifts, d.document, d.version
+           from m,
+                (values ('Noted', 'Two people to support.\n\nThe rest stays.',
+                         null::jsonb, null::int),
+                        ('Silent', null, null, null),
+                        ('Blank', '   ', null, null),
+                        ('Edited', 'old words',
+                         '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Written in the editor"}]}]}'::jsonb,
+                         1))
+                  as d(title, shifts, document, version)
+         returning id
+       )
+       insert into decisions (id, workspace_id, goal_id, at, text,
+                              author_member_id)
+       select gen_random_uuid(), g.workspace_id, g.id, '2026-08-01',
+              'Pause the self-serve tier', m.id
+         from g, m`,
+    );
+
+    const [shifts, decisionsRun] = await runDataChanges(client, {
+      scripts: [sessionShiftsDocument, decisionTextDocument],
+    });
+    expect(shifts?.rowsChanged).toBe(1);
+    expect(decisionsRun?.rowsChanged).toBe(1);
+
+    const { rows: sessionRows } = await client.query<{
+      title: string;
+      shifts_document: unknown;
+      shifts_document_version: number | null;
+    }>(
+      "select title, shifts_document, shifts_document_version from okr_sessions order by title",
+    );
+    const byTitle = Object.fromEntries(
+      sessionRows.map((row) => [row.title, row]),
+    );
+    expect(byTitle.Noted?.shifts_document).toEqual(
+      plainTextDocument("Two people to support.\n\nThe rest stays."),
+    );
+    expect(byTitle.Noted?.shifts_document_version).toBe(1);
+    expect(byTitle.Silent?.shifts_document).toBeNull();
+    expect(byTitle.Blank?.shifts_document).toBeNull();
+    // Already written in the editor: left alone, not rewritten from the
+    // plain column.
+    expect(JSON.stringify(byTitle.Edited?.shifts_document)).toContain(
+      "Written in the editor",
+    );
+
+    const { rows: decisionRows } = await client.query<{
+      text_document: unknown;
+      text_document_version: number | null;
+    }>("select text_document, text_document_version from decisions");
+    expect(decisionRows[0]?.text_document).toEqual(
+      plainTextDocument("Pause the self-serve tier"),
+    );
+    expect(decisionRows[0]?.text_document_version).toBe(1);
+
+    await client.query("delete from _data_changes");
+    const again = await runDataChanges(client, {
+      scripts: [sessionShiftsDocument, decisionTextDocument],
+    });
+    expect(again.map((outcome) => outcome.rowsChanged)).toEqual([0, 0]);
   });
 });

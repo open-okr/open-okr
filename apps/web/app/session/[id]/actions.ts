@@ -6,6 +6,7 @@ import {
   OperationError,
   parseRichText,
   RICH_TEXT_SCHEMA_VERSION,
+  type RichTextDocument,
   richTextFromPlainText,
 } from "@openokr/core";
 import { isBlankDocument } from "@openokr/ui";
@@ -137,7 +138,8 @@ export async function setTrendAction(
   revalidatePath(`/session/${sessionId}`);
 }
 
-export async function setShiftsAction(sessionId: string, shifts: string) {
+/** The shifts as editor JSON, which the action validates (change 11a). */
+export async function setShiftsAction(sessionId: string, shifts: unknown) {
   const { session, workspace } = await requireWorkspace();
   await callAction(
     {
@@ -146,14 +148,15 @@ export async function setShiftsAction(sessionId: string, shifts: string) {
       actor: { kind: "human", userId: session.user.id },
     },
     "sessions.setShifts",
-    { sessionId, shifts },
+    // Editor JSON from the field, checked by the action's own schema.
+    { sessionId, shifts: shifts as RichTextDocument | null },
   );
   revalidatePath(`/session/${sessionId}`);
 }
 
 export async function recordDecisionAction(
   sessionId: string,
-  input: { goalId?: string; keyResultId?: string; text: string },
+  input: { goalId?: string; keyResultId?: string; text: unknown },
 ) {
   const { session, workspace } = await requireWorkspace();
   const { goalId } = (await callAction(
@@ -163,7 +166,8 @@ export async function recordDecisionAction(
       actor: { kind: "human", userId: session.user.id },
     },
     "sessions.recordDecision",
-    { sessionId, ...input },
+    // Editor JSON from the field, checked by the action's own schema.
+    { sessionId, ...input, text: input.text as RichTextDocument },
   )) as { goalId: string };
   revalidatePath(`/session/${sessionId}`);
   // §7.5 calls the decision log the artifact that survives the meeting, and

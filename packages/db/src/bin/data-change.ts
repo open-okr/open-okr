@@ -36,6 +36,8 @@ import { blockerClockToCheckIn } from "../data-changes/0023_blocker_clock_to_che
 import { retireRhythmScoreThreshold } from "../data-changes/0024_retire_rhythm_score_threshold.ts";
 import { verifyFirstAccount } from "../data-changes/0025_verify_first_account.ts";
 import { kpiCorridorFollowsWorkspace } from "../data-changes/0026_kpi_corridor_follows_workspace.ts";
+import { sessionShiftsDocument } from "../data-changes/0027_session_shifts_document.ts";
+import { decisionTextDocument } from "../data-changes/0028_decision_text_document.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -79,6 +81,9 @@ try {
       retireRhythmScoreThreshold,
       verifyFirstAccount,
       kpiCorridorFollowsWorkspace,
+      // Guided inputs change 11a: the monthly review's prose as documents.
+      sessionShiftsDocument,
+      decisionTextDocument,
     ],
   });
   process.stdout.write(
