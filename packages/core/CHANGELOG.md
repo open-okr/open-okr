@@ -1,5 +1,15 @@
 # @openokr/core
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @openokr/config@0.3.1
+  - @openokr/db@0.3.1
+  - @openokr/formats@0.3.1
+  - @openokr/method@0.3.1
+
 ## 0.3.0
 
 ### Patch Changes
