@@ -1,5 +1,849 @@
 # @openokr/web
 
+## 0.3.0
+
+### Minor Changes
+
+- Every field in the product guides what it takes.
+  
+  Each field is drawn from one kit: an email, a time zone, a date, a range,
+  a number with its unit, a confidence on the workspace's own scale, a
+  person, an objective or a key result picked from a list, a colour, a
+  domain, an address. A field says what it holds, refuses what it cannot take
+  before anything is sent, and is held to the same limit on the server. The
+  prose of the monthly and quarterly reviews, the weekly note for leadership
+  and the quarterly revalidation is written with the editor, with formatting
+  and mentions.
+  
+  Four migrations (0140 to 0143) add a document column beside six plain text
+  columns, and data changes 0027 to 0032 (`pnpm db:change`) fill them. This
+  release writes both, so an instance can be upgraded while the previous
+  release still runs. Run the data changes once after upgrading, as
+  `docs/runbooks/upgrade.md` says: the next release drops the plain columns,
+  and needs every row to have its document first.
+  
+  `sessions.draftNextCycle` and `sessions.proposeFromLearnings`, deprecated
+  in 0.2.0 and announced for removal in 0.3, stay for one more release and
+  are removed in 0.4, with the `next_cycle_drafts` table. A client still
+  calling them has until then.
+
+### Patch Changes
+
+- [#123](https://github.com/open-okr/open-okr/pull/123) [`13d99be`](https://github.com/open-okr/open-okr/commit/13d99be2b275b8b46f320551e41b3515d252c6d1) Thanks [@agungksidik](https://github.com/agungksidik)! - The password reset and email confirmation mails have an HTML part in the
+  product's layout, beside the plain text, and are written in the instance's
+  language. One renderer builds both parts from the same content, so they
+  cannot differ; it escapes every value and fetches nothing, so it works on an
+  air-gapped instance. The other mails move to it next.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`ad8a192`](https://github.com/open-okr/open-okr/commit/ad8a1929697ff892f88d2b85568f152064e5a3cc) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Every admin, account and operator field is labelled and sized for what it holds.
+  
+  The operator's reasons and the site message grow with the text and count near
+  their limit. Numbers (a token's expiry, a link's uses and expiry, a budget,
+  a model's context window and costs, a tier's temperature and token limit,
+  the ladder rungs, the rhythm thresholds, a plan's seats) are number fields
+  in the reader's locale, with their unit beside them where they have one.
+  Keys and passphrases are masked with a way to show what was typed. The nudge
+  ladder's rungs are named ("Then the coordinator", in days) where their keys
+  were shown, and each term label says which term and number it is.
+  
+  A link's expiry is now at most 365 days. API clients sending
+  `invitations.createPersonalLink` or `invitations.createWorkspaceLink` with a
+  longer expiry get a refusal.
+
+- [#123](https://github.com/open-okr/open-okr/pull/123) [`1470238`](https://github.com/open-okr/open-okr/commit/14702382070cbf7c8d279758ff0432231171fe18) Thanks [@agungksidik](https://github.com/agungksidik)! - An agent run started from Admin, Agents now sends its nudges with their
+  links, as a scheduled run does. A run pressed there sent every nudge with no
+  "Check in" or "Open" link and could not build the daily summary.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`ddbdb29`](https://github.com/open-okr/open-okr/commit/ddbdb294dc95416d9e1f9c15ef7dd1569e84cc45) Thanks [@agungksidik](https://github.com/agungksidik)! - The AI screen tests a provider key when it is stored, and on request.
+  
+  Every key stayed "unverified" for good, working or not, so an administrator
+  could not tell a working key from a wrong one. Storing a key now sends one
+  request of a few tokens, carrying no workspace content, to the provider's
+  cheapest model: an answer marks the key verified, a 401 or 403 marks it
+  invalid, and a provider that cannot be reached leaves it unverified and says
+  so. "Test the connection" runs the same test again.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`3c14449`](https://github.com/open-okr/open-okr/commit/3c1444983aa59d92fa3ae3e5cafcb8d0d6aa3857) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Saving an empty value from the Work Map no longer records 0.
+  
+  The side panel's "Record a value" box read an empty box as 0, so pressing Save
+  after clearing it wrote a real reading of 0 into the key result's history and
+  moved its progress. The box is now required, and an empty value is refused
+  with "Type a value before saving." instead of being recorded.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`89a8ef7`](https://github.com/open-okr/open-okr/commit/89a8ef7d66ed717b2fb72d9edde62f8423897e47) Thanks [@agungksidik](https://github.com/agungksidik)! - Archiving a cycle asks first, and an open cycle that still holds goals is
+  closed before it can be archived.
+  
+  One click archived the current cycle with no question, and a second click
+  archived the next one, leaving the workspace with no cycle and an empty work
+  map; nothing on any screen brings an archived cycle back. The button now asks
+  for confirmation, and the server refuses to archive a cycle that has goals
+  and has not been closed on the scorecard, so its result is recorded first.
+  A cycle with no goals still archives straight away.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`ad52c4d`](https://github.com/open-okr/open-okr/commit/ad52c4d98758caf45cea2e3540d850433c858f3f) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Moving a workspace with its archive keeps its own AI models and every
+  revision of an agreed annual frame.
+  
+  The import wrote a list held in a Postgres array column as JSON, which the
+  column refused, and counted the row as skipped. A workspace's custom AI
+  models and each frame revision, with its written reason, were left behind.
+  The import now asks the database which of a table's columns are arrays and
+  writes those as arrays, so a column added later is written too.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`7eaa3a9`](https://github.com/open-okr/open-okr/commit/7eaa3a95e1652c13c4008b4aebac79f190f870e2) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Moving a workspace with its archive now points every mention and attachment
+  at the new workspace's members and files.
+  
+  The import rewrote them in some rich text and not in the rest: a mention in
+  a check-in narrative, the annual frame, a cycle's baseline health or its
+  capacity cuts, or a KPI tree's description still named the member from the
+  workspace it came from. Each of these is now rewritten, as is what an agreed
+  annual frame held before a revision. A test reads the database and fails
+  when a table the archive carries gains a rich text column the import does
+  not rewrite.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`3bcd231`](https://github.com/open-okr/open-okr/commit/3bcd231b17b12084c30bf39d615e6dfaf5d460e8) Thanks [@agungksidik](https://github.com/agungksidik)! - "Ask to come in" says why when a request is refused.
+  
+  An operator whose request was refused, for example because they are already
+  a member of that workspace, saw the page reload as if the request had gone,
+  and nothing had. The refusal is now shown on the form.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`18bcbe9`](https://github.com/open-okr/open-okr/commit/18bcbe95fd03358e7c60a728813762d323b13263) Thanks [@agungksidik](https://github.com/agungksidik)! - A drafting assist that gets nothing back no longer blames the wording.
+  
+  When the AI provider refused or did not answer, "Draft from an ambition" said
+  "Nothing was drafted from that. Try saying what changes.", which sent people
+  rewriting a sentence that was never the problem. The notices now say the
+  provider may not have answered, and the assists' notices are translated like
+  the rest of the screen.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`6b1d4a8`](https://github.com/open-okr/open-okr/commit/6b1d4a8673551d518dff5c3f4908a8b2fcabed79) Thanks [@agungksidik](https://github.com/agungksidik)! - A goal's champion and reviewer are told about comments and changes on it
+  without pressing Watch.
+  
+  Comment notifications went to subscribers only, and nobody subscribed the
+  people who answer for the goal, so a question left on an objective reached
+  nobody unless it mentioned them. They now count as watching from the start,
+  the Watch control says so, and turning it off keeps them out. Turning a watch
+  back on after turning it off also works again: it used to stay off.
+
+- [#125](https://github.com/open-okr/open-okr/pull/125) [`1a89c72`](https://github.com/open-okr/open-okr/commit/1a89c72bedafc2793d70cd11b24e1853f213706b) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The chat `status` command answers with all three things its help promises:
+  the goal's health, how far it is, and when its next check-in is due.
+  
+  It read field names the goal does not have, so it answered with the health
+  alone, written as a code ("health off_track"). It now says, for example,
+  "health off track, 42% of the way, next check-in 2026-10-16".
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`4c56446`](https://github.com/open-okr/open-okr/commit/4c56446682dd38d2001f8472c275c1cbc39965ca) Thanks [@agungksidik](https://github.com/agungksidik)! - An operator's plan catalogue can be set with `OPENOKR_CLOUD_PLANS`.
+  
+  The plans offered on the operator console were read from a settings row that
+  nothing wrote and no page described, so a cloud instance offered Free and
+  nothing else. The variable now bootstraps the catalogue as JSON, a stored
+  catalogue still wins, and the cloud install page says how.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`c4bd792`](https://github.com/open-okr/open-okr/commit/c4bd792505d9a9e4f641512ed328bc38b1a604ee) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - One-time codes are typed one character per cell, and send themselves.
+  
+  The six-digit code at sign-in and when turning on an authenticator, and the
+  backup code, are now drawn as cells, one per character. Typing fills them in
+  order, pasting fills them all whatever separates the characters, and the code
+  is checked as soon as the last cell is filled, with no button to press. A code
+  that is refused empties the cells and says why, ready for the next one. A
+  phone's one-time-code autofill and a password manager still see one field.
+  
+  The terminal login page, opened without the link, now takes the code the
+  terminal printed, typed into the same cells: it upper-cases what is typed and
+  drops the characters the codes never use. It does not send itself, because the
+  next page says which terminal is asking before anything is granted.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`ad1f083`](https://github.com/open-okr/open-okr/commit/ad1f083d07829f761422dafbae254ddce81c55e2) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The brand colour can be picked, and each channel's form names its own fields.
+  
+  Branding has a colour picker beside the hex box, and a colour that reads as
+  red, amber or green is refused as it is picked rather than after Save. Reset
+  to defaults works whatever the box holds.
+  
+  Each channel's connect form now asks for what its provider calls things:
+  Slack's Bot User OAuth Token, Signing Secret and Workspace ID; Teams'
+  Application (client) ID, client secret and Directory (tenant) ID; WhatsApp's
+  access token, app secret, verify token and phone number ID; Telegram's bot
+  token, webhook secret and bot ID. Ids are shown as typed, Teams' App ID
+  included, which was masked. WhatsApp's verify token has its own box: it was
+  typed after the app secret in one box, split on a space. The hints are
+  translated.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`710a20d`](https://github.com/open-okr/open-okr/commit/710a20d04f74d86cee9c988054621fd0e6144294) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A comment's body is checked against the rich text schema when it is written.
+  
+  Posting or editing a comment accepted any body at all, so an API client could
+  store text that was not editor JSON, or a link to `javascript:`. Both writes
+  now hold a comment to the same schema an imported comment already met, and
+  refuse anything else without storing it. Comments written from the screen are
+  unaffected.
+
+- [#122](https://github.com/open-okr/open-okr/pull/122) [`3e6780e`](https://github.com/open-okr/open-okr/commit/3e6780e6538e32ea9c37e439f75a369623eb249f) Thanks [@agungksidik](https://github.com/agungksidik)! - The session schedule form marks the company space, whose quarterly review
+  grades every objective in the cycle, the workspace's own included. Nothing
+  said so, so a review was booked in another space and the company's
+  objectives looked as if they could not be scored. `spaces.list` returns
+  `isCompany` for each space.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`26845fd`](https://github.com/open-okr/open-okr/commit/26845fd21b91520ad01b84cec49876dd6bc6364f) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Confidence is shown the way your workspace chose.
+  
+  The practice setting "Confidence shown as" now does what it says. With the
+  default, "x in 10", a confidence of 0.7 reads "7 in 10" wherever it is typed
+  or shown; "0.0 to 1.0" shows 0.7, and "Percent" shows 70%. It is still stored
+  as 0.7.
+  
+  Every place confidence is set uses one field: the check-in composer, the
+  OKR drawer's check-in, a key result on its goal page, a confidence vote and
+  the correction on the check-in history. The sliders, which never showed
+  their value, are gone. The field names the confidence band beside the number
+  (High, Medium or Low), from your workspace's own thresholds.
+  
+  Fixed: emptying the confidence on a check-in, a correction or a vote used to
+  record a confidence of 0. Publishing or voting now asks for one, and a
+  correction keeps the confidence it had.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`8286bd1`](https://github.com/open-okr/open-okr/commit/8286bd1afe19f4d39ef6f31bf891b5c5d722f1d7) Thanks [@agungksidik](https://github.com/agungksidik)! - Confirming a dependency you do not provide says whose call it is.
+  
+  Somebody outside the providing space who pressed Confirm was told "No such
+  space, or you do not have access to it." about a space named on the same
+  row. They are now told that only that space's people can confirm what they
+  will deliver, and that they can ask them or name a risk owner.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`f016bdb`](https://github.com/open-okr/open-okr/commit/f016bdb9bb7a078b80f9d43c57354ea363bed5ea) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Dates say when they are.
+  
+  Due dates, cycle and planning-session dates, a new cycle's date, task and
+  board due dates, a recovery's due date and a session's actions now say the
+  date in words beside the field: "in 12 days", "today", "3 days ago", or
+  "Sep 2027" for a date further away.
+  
+  A key result due outside its cycle is warned about in the OKR list and drawer,
+  and is still saved: nothing in the method forbids it.
+  
+  For API clients: a task's due date and an initiative's start and end must be
+  written as YYYY-MM-DD, as a key result's due date already had to be. Anything
+  else is refused with a message.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`c4505e0`](https://github.com/open-okr/open-okr/commit/c4505e06aa128f848173cf6c431388426683934f) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Date ranges say when they do not fit.
+  
+  An initiative's start and end, a member's leave, a space's holidays and the
+  audit filter are now one range: the end's calendar opens from the start, and
+  an end before the start says so under the end straight away.
+  
+  An initiative that ends before it starts is refused with a sentence instead of
+  a database error, on creation and when either date changes. This applies to
+  API clients too.
+  
+  Imports no longer fail on such an initiative. Both the FlowyTeam and the
+  spreadsheet importer keep its start, leave out the end, and name each one in
+  the report, with both dates.
+  
+  The audit filter's days now run midnight to midnight in the workspace's
+  timezone, the zone the rows are shown in, instead of in UTC. The screen says
+  which zone.
+  
+  A form that adds one row after another (a key result, a KPI reading, a task,
+  an initiative) is empty again after each save. Before, a date, a number, a
+  confidence or a unit typed into the last row stayed in the form and was sent
+  with the next.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`2ed4b62`](https://github.com/open-okr/open-okr/commit/2ed4b6288a5b4dd67726fb5bcea545f92c70bbe8) Thanks [@agungksidik](https://github.com/agungksidik)! - A due goal reads as due to everyone who opens its check-ins.
+  
+  Anybody but the champion who opened a goal's check-in page while it was due
+  was told "This goal is not due. Its next check-in is" with today's date. The
+  page judged "due" from the reader's own list, which only holds goals they
+  champion. It now reads the goal's own date, and says they can read the
+  check-ins and the champion posts them.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`f11cbb6`](https://github.com/open-okr/open-okr/commit/f11cbb673e1e0405e2477ce81abd8d14a17d92b5) Thanks [@agungksidik](https://github.com/agungksidik)! - Each "Objective, checked as you type" field has its own label.
+  
+  Every objective on phase 4 used the same element id, so the label named only
+  the first field and a screen reader announced the others with no name.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`596e640`](https://github.com/open-okr/open-okr/commit/596e6403a93cdc233dbab420f8b213d78490ee9e) Thanks [@agungksidik](https://github.com/agungksidik)! - An empty number field is refused instead of saved as zero.
+  
+  A key result's baseline and target, a recorded value and a goal's weight were
+  read with `Number()`, which turns an empty field into 0, so a form that
+  reached the server empty saved a zero nobody typed: a key result "0 to 0", a
+  value of 0, or a weight of 0 that took the goal out of its parent's progress.
+  Empty now reads as missing, and each form answers with its own sentence.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`553c840`](https://github.com/open-okr/open-okr/commit/553c840c2ab7fcae6bf08b11d9fe1ec7f0ede131) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - People, spaces, roles and admin settings are found by typing, and no id is pasted.
+  
+  A member's manager, a leave delegate, adding somebody to a space, a new
+  space's manager, a member's role, the audit filter's "who", a guest's space
+  and a reminder's channel template are now lists you can search.
+  
+  Three admin fields asked for an id or a model name to be pasted or typed. An
+  agent's scope now finds its space, KPI tree or goal by name (goals by
+  searching, since a workspace can hold thousands). A budget names whose it is,
+  the whole workspace, a person or an agent, in one choice, and the budget
+  list shows that name instead of part of an id. A tier's model is chosen from
+  the catalogue on the same page, and the choice carries its provider.
+  
+  For API clients: `search.entities` takes an optional `kinds`, to search only
+  some kinds of thing.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`ba02815`](https://github.com/open-okr/open-okr/commit/ba028150aff5b9ce8aa824cca2fbbdd9c0398615) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - KPI and session screens find people and things by typing.
+  
+  A KPI's owner, the KPI you file into a tree, a recovery's owner, space,
+  objective and key result, and every person or key result chosen in a session
+  (next actions, blockers, commitments, the monthly review, forward actions,
+  recognition and process health), plus scheduling's space and facilitator, are
+  now a list you can search, with each person's initials.
+  
+  A recovery's objective and the existing key result that answers a KPI are now
+  chosen. Before, they started on whichever came first in the list.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`9f54104`](https://github.com/open-okr/open-okr/commit/9f541043a3794503bc3bf24beecaf0c7691006d6) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The cycle's planning forms find people and things by typing.
+  
+  Choosing a sponsor or facilitator, a key result's owner or the KPI it reads
+  from, a new objective's champion, reviewer or space, a dependency's risk
+  owner, key result or providing space, the issue a priority answers, the
+  strategy an annual objective serves, and the cycle to open is now a list you
+  can search. So is the board's and the initiatives screen's space, owner and
+  key result.
+  
+  A new objective's champion now starts as you, and its reviewer as nobody.
+  Before, both started as whoever came first in the member list, so it was
+  easy to name somebody by accident.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`21c5a00`](https://github.com/open-okr/open-okr/commit/21c5a004c4f32901beda610a771705d8bd218ff2) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - People, spaces, cycles, key results and KPIs are found by typing.
+  
+  On the OKR list, drawer and diagram, the goal page and decompose, choosing a
+  champion, an owner, a space, a cycle, a key result or a KPI is a list you
+  can search, not a long drop-down. Type part of a name, or a member's title or
+  a KPI's short id, and choose with the mouse or the keyboard. A member is shown
+  with their initials and title, and an agent is marked as one. Somebody who has
+  left the directory still shows as who they are.
+  
+  In a workspace of more than two hundred members, the list asks the server as
+  you type rather than loading everyone.
+  
+  For API clients: `people.directory` takes an optional `search` (words found in
+  a member's name or title), `kinds` and `limit`.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`e43d670`](https://github.com/open-okr/open-okr/commit/e43d6700f63c9cca65fa15f0b9fe0679eff8b228) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Every field in the product is now drawn the same way, and the search page no longer breaks on a long phrase.
+  
+  The last screens move onto the field kit: spaces, people, search and the
+  command palette, the board, check-ins, the copilot, documents, initiatives,
+  the OAuth consent, the scorecard, tasks and the workspace switcher. A space's
+  mission grows with the text. The search boxes are search fields, held to the
+  length the search takes, and the search page cuts a longer phrase from its
+  address to that length instead of failing to draw.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`c3f2d2b`](https://github.com/open-okr/open-okr/commit/c3f2d2b4b9a269046bb4421b2d296d4f78856beb) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Sign-in, sign-up, password reset, setup and the welcome wizard check an email
+  address with the server's own rule.
+  
+  An address like `priya@northwind`, which the browser accepts and the server
+  refuses, is now caught when you leave the field, with a sentence saying what
+  it needs, and the form does not send it. The forgot-password page used to say a
+  reset link was on its way for such an address. A space a phone's autocomplete
+  adds after the address is taken off.
+  
+  Every password field, on sign-in and reset too, now has a "Show what you typed"
+  toggle. Password fields stop at 128 characters, where the server does, and a
+  field near its limit says how much of it is used. These screens, the backup
+  code page and the single sign-on form share one field style, with the error
+  and the hint read out with the field.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`2edd845`](https://github.com/open-okr/open-okr/commit/2edd845d18662a0647efbb0e97696239764d09bb) Thanks [@agungksidik](https://github.com/agungksidik)! - A new objective can be filed under a space when it is drafted.
+  
+  The drafting form on phase 4 created every objective with no space, so a
+  space's weekly session had no key results to vote on, its page listed no
+  goals, and a quarterly review in it could grade nothing. The form now has a
+  space picker, and "Open drafting" on a space's page starts it on that space.
+  
+  Filing a new objective under a space asks edit on that space, the same
+  question moving one there already asks, and refuses a space that is not in
+  the workspace.
+
+- [#122](https://github.com/open-okr/open-okr/pull/122) [`37a1fdc`](https://github.com/open-okr/open-okr/commit/37a1fdc1cbb3369deefc3985cc31e82ec40f5276) Thanks [@agungksidik](https://github.com/agungksidik)! - The account the setup wizard creates is verified, so an instance with mail
+  configured before its first run no longer locks its operator out.
+  
+  With mail configured, a verified address is required to sign in, and the
+  wizard's account was created unverified: finishing setup failed, and every
+  later sign-in was refused with the same words as a wrong password. The first
+  account is now created verified and signed in straight away. The data-change
+  `0025_verify_first_account` verifies the earliest account on an existing
+  instance (run `pnpm db:change`). A correct password on an unverified address
+  now says to open the confirmation link instead of "Those details did not
+  match".
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`fa1e580`](https://github.com/open-okr/open-okr/commit/fa1e5808188883be09d431245ce573fc7b8db6e6) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A check-in's narrative can be formatted.
+  
+  The narrative box on the check-in screen and in the OKR drawer is now the
+  same small editor comments use: bold, italic, strikethrough, code, bulleted
+  and numbered lists, and links. The check-in history shows each narrative as
+  it was written, lists and all, rather than as one line of text.
+  
+  Correcting a check-in from its history now opens the narrative itself, with
+  its formatting. The old one-line box could only replace a narrative of several
+  paragraphs with a single line. Leave it as it is, and the narrative is kept.
+  
+  Bulleted and numbered lists show their bullets and numbers again, in the
+  editor and wherever rich text is read: comments, check-ins and a person's
+  bio. Inline code has a background, and links are coloured.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`58dda46`](https://github.com/open-okr/open-okr/commit/58dda46ac532e1c57dc60f87676c8509f03e7b9a) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The cycle's written fields can be formatted: the annual frame's mission,
+  vision, strategy and what is not being done, phase 2's three baseline health
+  columns, and phase 5's record of what was cut.
+  
+  Each is the same small editor as comments and check-ins, and opens on what
+  was written, formatting included. Before, the frame and the baseline columns
+  opened as plain text, and saving them turned any formatting written through
+  the API back into plain paragraphs. Where the cycle is read rather than
+  edited, the text is shown as it was written.
+  
+  Baseline health columns and what was cut take up to 4000 characters, as they
+  did. The limit is now held by the server as well as the screen, so
+  `workflow.setBaselineHealth` and `workflow.setCapacityNotes` refuse a longer
+  document, saying how long it is. `workflow.read` also returns the stored
+  documents, as `baselineHealthDocuments` and `capacityCutsDocument`, beside
+  the plain text it already returned.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`f1ef43b`](https://github.com/open-okr/open-okr/commit/f1ef43b8d9d92fec98a794dcd482eb57e90805e3) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A goal's retrospective, an initiative's description in the decompose panel,
+  and what the number does not show in a quarterly review can be formatted.
+  
+  All three use the same small editor as comments and check-ins: bold, italic,
+  strikethrough, code, bulleted and numbered lists, and links. The closed goal
+  and the review stage show what was written with its formatting, where they
+  showed one line of plain text.
+  
+  The decompose panel still takes up to 1000 characters for each description.
+  Near the limit the field counts what is used, and past it says how much to
+  take out, and Create waits until it fits. The limit applies to that panel
+  only: an initiative created through the API or an import keeps its whole
+  description.
+  
+  A retrospective of nothing but spaces is refused, as an empty one always was.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`f96ba67`](https://github.com/open-okr/open-okr/commit/f96ba6743d62ff947edaac82d6589c9c06cbce84) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Documents have a formatting toolbar.
+  
+  The document editor shows the same toolbar as comments, plus Heading 1,
+  Heading 2, Quote and Insert a table, which the `/` menu already offered.
+  A button is greyed out where what it makes could not be saved: there is no
+  heading inside a list item, and a table cell holds text and lists only.
+  
+  A review's written-up minutes open in the document editor, so a draft can be
+  given headings and lists before it is saved as a document.
+  
+  Fixed: a document with a heading, and a comment, check-in note or review
+  note with a link or a mention, could not be saved. The editor handed those
+  parts over in a shape the server could not read, so the save was refused.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`f30243a`](https://github.com/open-okr/open-okr/commit/f30243abf8e8ae89b845d15c7efdaf5745540c67) Thanks [@agungksidik](https://github.com/agungksidik)! - Gate 6's "Set the publication date" goes to the deadline field.
+  
+  It opened Admin, Rhythm, which has no publication deadline. It now jumps to
+  the Cycles card on the cycle page, where the deadline is set.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`525fb6c`](https://github.com/open-okr/open-okr/commit/525fb6ce7295b3a6e107a50bae23f8debc220e79) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Admin > General says why a save was refused, instead of failing.
+  
+  A timezone the server does not know, or a trusted domain that is not a domain,
+  sent the administrator to the error page, and any other refusal saved nothing
+  and said nothing. The card now stays where it is and names the problem, for
+  example "priya@northwind is not a domain", keeping what was typed so it can be
+  corrected. A save that works now says "Saved."
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`003b152`](https://github.com/open-okr/open-okr/commit/003b152e47374fec02f036d5842acf41b42d9575) Thanks [@agungksidik](https://github.com/agungksidik)! - A guest with no space is told what they can see, not that something was lost.
+  
+  A guest invited to no space yet saw "No spaces yet ... an empty list means it
+  was archived." on Spaces and "You do not have access to this workspace. Ask a
+  workspace administrator to restore it." on Inbox. Both now say that their
+  access is limited to what they were invited to.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`390ebea`](https://github.com/open-okr/open-okr/commit/390ebead58e57b299363b220b8c1b9457a9c0b0b) Thanks [@agungksidik](https://github.com/agungksidik)! - Inbox rows for a check-in to review, a mention or a comment say what they are.
+  
+  A check-in waiting for acknowledgement, and a comment on something followed,
+  reach the inbox without an activity behind them, so every such row read
+  "Something happened here." They now say what they are, from their reason.
+
+- [#122](https://github.com/open-okr/open-okr/pull/122) [`d7d812d`](https://github.com/open-okr/open-okr/commit/d7d812dfac7a928908ee5e1eda969fa80f0ca93f) Thanks [@agungksidik](https://github.com/agungksidik)! - The inbox says who commented and what. A comment's notification carried no
+  activity, so it read "Something new here, which you follow." It now reads,
+  for example, "Priya Raman · Commented on a goal: Blocked?". Every notification
+  a write makes in its own words is linked to that write's activity.
+
+- [#122](https://github.com/open-okr/open-okr/pull/122) [`760b0a7`](https://github.com/open-okr/open-okr/commit/760b0a7d5cd65266688d9770afaf87394894bd0b) Thanks [@agungksidik](https://github.com/agungksidik)! - A KPI's healthy and watch thresholds follow the workspace unless the KPI sets
+  its own, so moving them on Rhythm recolours existing KPIs.
+  
+  Each KPI used to copy the workspace's thresholds when it was created, so a
+  change on /admin/rhythm reached only KPIs created afterwards. Migration 0139
+  makes both columns optional, where empty means the workspace's current value,
+  and changing either threshold recomputes every KPI that follows it. A KPI
+  given its own line through `kpis.update` keeps it; sending null returns it to
+  the workspace. Run `pnpm db:change` after upgrading: data change
+  `0026_kpi_corridor_follows_workspace` clears every stored line that equals
+  the workspace's current one or the canon's 90 and 70, and rereads the band
+  of each KPI judged on the ratio.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`200c017`](https://github.com/open-okr/open-okr/commit/200c0170b061a43f6499b76a9f150676ff2746e5) Thanks [@agungksidik](https://github.com/agungksidik)! - A KPI's ID is shown on its page, and the grid links to that page.
+  
+  The kpi-records import names each KPI by its ID, and no screen showed one, so
+  a spreadsheet filled in with KPI titles had every row skipped. The ID is now
+  under the KPI's title on its own page, and each title in the KPI grid opens
+  that page, which before could only be reached from a tree.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`149f16e`](https://github.com/open-okr/open-okr/commit/149f16ea69d791c1e6d4b6abcd84c14f13cc9dc7) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - KPI numbers are easier to type and check.
+  
+  The KPI add form, a tree's new driver, how a KPI is judged, the KPI grid,
+  the suggestion and a recovery's from and to all use number fields that show
+  numbers grouped the way you read them and step with the arrow keys. In the
+  grid the arrow keys still move between cells.
+  
+  Adding a KPI or a driver now asks for its unit, suggesting the units your
+  KPIs already use and common ones. How a KPI is judged says straight away when
+  its red value sits on the wrong side of green, with the same sentence a save
+  would be refused with, and shows the KPI's unit beside each value. A range's
+  band is labelled "Green from" and "Green to", where the second was only "to".
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`9229546`](https://github.com/open-okr/open-okr/commit/9229546ea329e52152c9bc18ddc3072ca22b026a) Thanks [@agungksidik](https://github.com/agungksidik)! - A mail relay without TLS can be used when somebody chooses to.
+  
+  The instance always required STARTTLS, so a local relay such as Mailpit,
+  which the staging guide recommended, failed every send. A new instance
+  setting, `mail.requireTls` (`OPENOKR_MAIL_REQUIRE_TLS`), turns that off. It
+  stays on by default, and the staging guide says when not to turn it off.
+
+- [#123](https://github.com/open-okr/open-okr/pull/123) [`e00d918`](https://github.com/open-okr/open-okr/commit/e00d9185b2fda42956f56911e019724816e430a9) Thanks [@agungksidik](https://github.com/agungksidik)! - Agents built on the current MCP SDK can connect and read the tool list.
+  
+  The handshake echoed a protocol version the endpoint then refused on the
+  next request, so a client asking for 2025-11-25 failed right after
+  connecting; it is now answered with 2025-06-18. One tool's input schema had
+  no object type at the top, which made the whole tool list unreadable to the
+  official client. `resources/list` answers with an empty list instead of
+  "method not found".
+
+- [#124](https://github.com/open-okr/open-okr/pull/124) [`cb18797`](https://github.com/open-okr/open-okr/commit/cb18797ad48ff0715a051e57821f51e38ea186a3) Thanks [@agungksidik](https://github.com/agungksidik)! - An agent can open the four prompts the MCP endpoint lists (weekly check-in,
+  review against the quality checks, prepare my review, what do I owe). The
+  endpoint listed them but answered "method not found" when a client asked for
+  one; each now answers with its starting question and the tools that answer it.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`9c4eb58`](https://github.com/open-okr/open-okr/commit/9c4eb58f1fc97715778b56945c16faeb355a4075) Thanks [@agungksidik](https://github.com/agungksidik)! - The work map stops counting toward the publication deadline once the set is
+  published.
+  
+  After publishing, the strip said "Published. The set is live." and, in red,
+  "Publication deadline passed 8 days ago". The countdown now shows only while
+  the set is unpublished.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`dd0db12`](https://github.com/open-okr/open-okr/commit/dd0db12b8c7f3b6ddca31997d5c5713c231d33cf) Thanks [@agungksidik](https://github.com/agungksidik)! - Nudge volume counts what quiet hours held back.
+  
+  A reminder due inside a member's quiet hours waits for the window to end,
+  which is right, but Nudge volume's "Why it stayed quiet" never listed quiet
+  hours, so an administrator could not see that anything had waited. It now
+  counts them under "Quiet hours".
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`ba0488e`](https://github.com/open-okr/open-okr/commit/ba0488e4787f05b21570d30f9e30d39bdfa962da) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Numbers on the OKR screens are easier to type and read.
+  
+  Values, targets, baselines and weights in the OKR list, drawer and diagram,
+  on a goal's page and in drafting show numbers grouped the way you read them
+  (1,234.5), step with the arrow keys, and show the measure's unit beside them.
+  A value field also says where the measure starts and where it is going, for
+  example "from 40 to 75 %". Emptying a field records nothing rather than 0.
+  
+  The unit field suggests the units the cycle already uses, then common ones
+  (%, people, US$, days, hours, points), and still takes any unit you type.
+  
+  Breaking for API clients: a weight must be from 0 to 100. A goal or key
+  result sent with a weight outside that range is now refused with a message,
+  where it used to be stored as 0 or 100 without saying so. Both importers
+  still bring a weight outside the range in as 0 or 100, as before.
+
+- [#119](https://github.com/open-okr/open-okr/pull/119) [`86a5bdc`](https://github.com/open-okr/open-okr/commit/86a5bdc7878ee32fcbbc186083182bb9e08c4b47) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Fixes from a review of the 0.2.0 practice work. What changes for a workspace:
+  
+  - **The rhythm diagnostic counts the week a late check-in was late for.** A
+    team that checks in three days after every Monday no longer reads as on
+    time for the following week, so §8.6 can name a rhythm problem it used to
+    hide. A check-in early for its own due date still counts.
+  - **Easing a target is judged by direction.** Lowering an increase target or
+    raising a reduce target asks for the reason, wherever the baseline sits; a
+    maintain key result eases when its band widens. A target changed in the
+    same edit as its baseline is judged against the baseline it had.
+  - **Four company objectives no longer warn.** OBJ-5 holds the company to its
+    own cap of five, and counts each team's objectives within the team.
+  - **A company space's quarterly review can close its scoring stage.** The
+    screen lists every objective the stage asks about.
+  - **Nothing the weekly ceiling holds back is lost.** Held messages join the
+    inbox with the morning summary, or at once for a member who turned the
+    summary off, and one run can no longer send a member past the ceiling.
+  - **A recovery's own key result shows recovery.** It reads from the KPI's
+    reading at launch to its healthy boundary, so it starts at 0%.
+  - **Carrying forward keeps a maintain key result's band.**
+  - **A leave delegate can acknowledge** a check-in owed by the reviewer they
+    stand in for, and past leave no longer blocks adding more.
+  - **Holidays and a slower check-in frequency move a goal's open blockers**
+    with its next check-in.
+  - **A confidence fall in a session's first round is seen**, measured from what
+    the key result held before the session.
+  - **Smaller fixes:** reset to profile restores the profile's value; moving an
+    objective into a running cycle is judged as adding it there; withdrawing an
+    agreed annual frame needs a reason; a required reviewer defaults to the
+    writer's manager where they have one; a stopped draft cannot be published; a KPI owned by an imported person is
+    accepted; the feed says the right counts; the timeline matches METHOD §2.4.
+  - **On screen:** typing a "why now" reason no longer jumps the caret to the
+    title; the diagram shows conflicts and errors; `+ New` opens the form on the
+    OKRs screen too; a first baseline of 0 is recorded from the drawer.
+  - **The demo:** no check-in dated after today, the year builds in every
+    calendar year, personas are offered only once they have joined, and
+    `demo:prepare` refuses any workspace that does not hold the demo's own
+    objectives.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`17f2471`](https://github.com/open-okr/open-okr/commit/17f2471a184b37c676cb71e21bf2578ab9b7580a) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Saving your profile no longer deletes your quiet hours.
+  
+  The quiet-hours boxes on your profile were always empty, even when a window
+  was set, and two empty boxes mean "off". So saving anything on the profile,
+  such as a new timezone, turned quiet hours off, and nudges could reach you at
+  night. The boxes now show the saved window. On both the profile and Where to
+  reach you, filling in one time without the other is refused with a message,
+  instead of being read as "off".
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`4cf905e`](https://github.com/open-okr/open-okr/commit/4cf905e430ce611d630c1d2601aa6228a8339291) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A refused save says why.
+  
+  Four forms failed quietly. An operator's lifecycle change and a site message
+  left the form as it was when refused, and an administrator's edit of somebody
+  else's name, title or manager threw its answer away, so a refused save and a
+  saved one looked the same. Each now says why under its button, keeps what was
+  typed so it can be corrected, and says so when it worked.
+  
+  An operator's plan change no longer goes to the error page when a value is
+  refused, and a refused support request now says the refusal in a sentence
+  instead of as raw validation output.
+  
+  For API clients: a member's name of only spaces is refused with "A member
+  needs a name."
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`04bddd1`](https://github.com/open-okr/open-okr/commit/04bddd137037b8427c32c6af5248c6114f7eda9c) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A weekly session's note for leadership is written with the editor.
+  
+  The coordinator's note can carry bold, lists and links. The digest, its
+  narration and a post to the space's channel still carry it as one line
+  after "For leadership:". Migration 0142 adds a document column beside it,
+  and data change 0031 (`pnpm db:change`) turns every note written before
+  into a document with the same paragraphs; until it runs, each reads exactly
+  as before.
+  
+  For this release the note is written twice, the document and its plain
+  text, so the release before still reads it during an upgrade.
+  `sessions.setCoordinatorNote` takes editor JSON, and still takes plain
+  text, which is wrapped as a document; `sessions.digest` returns
+  `noteDocument` beside the plain `note`. The plain column, and the plain
+  text input, go a release later. `RichTextField` takes `hideLabel`, for a
+  field a heading beside it already names.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`0020453`](https://github.com/open-okr/open-okr/commit/0020453719e5ac8bf330e4d185f9f7e46322be81) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A monthly review's shifts note and its decisions are written with the editor.
+  
+  The resource or priority shifts and each decision can carry bold, lists and
+  links, and a decision shows as written on the review, the goal page and the
+  cycle page. Migration 0140 adds a document column beside each, and data
+  changes 0027 and 0028 (`pnpm db:change`) turn every note and decision
+  written before into a document with the same paragraphs; until they run,
+  each reads exactly as before.
+  
+  For this release both are written, the document and its plain text, so the
+  release before still reads them during an upgrade. `sessions.setShifts` and
+  `sessions.recordDecision` take editor JSON, and still take plain text, which
+  is wrapped as a document; the read actions return `shiftsDocument` and each
+  decision's `textDocument` beside the plain text. The plain columns, and the
+  plain text input, go a release later.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`376b799`](https://github.com/open-okr/open-okr/commit/376b799a9ff7223868645d8050cc9fc233b60d7c) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A quarterly review's management retro answers and the facilitator's private
+  stage notes are written with the editor.
+  
+  Each answer and each note can carry bold, lists and links, and an answer
+  shows as written on the review. The minutes still give each answer on one
+  line. Migration 0141 adds a document column beside each answer, and data
+  changes 0029 and 0030 (`pnpm db:change`) turn every answer and stage note
+  written before into a document with the same paragraphs; until they run,
+  each reads exactly as before.
+  
+  For this release an answer is written twice, the document and its plain
+  text, so the release before still reads it during an upgrade. A stage note
+  lives in a map with no second column, so the release before shows a note
+  written in this one as empty; the facilitator alone reads it.
+  `sessions.setManagementAnswer` and `sessions.setStageNote` take editor JSON,
+  and still take plain text, which is wrapped as a document;
+  `sessions.managementRetro` returns each answer's `bodyDocument` beside the
+  plain text, and `sessions.read` returns each stage note as a document. The
+  plain column, and the plain text input, go a release later.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`832595b`](https://github.com/open-okr/open-okr/commit/832595bf39d5f4996567a3bb7d1813a4fec34a32) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A quarter's revalidation notes, what changed and the focus areas, are
+  written with the editor.
+  
+  Both notes can carry bold, lists and links. A member who cannot edit the
+  cycle sees them as written rather than as a form they cannot submit.
+  Migration 0143 adds a document column beside each, and data change 0032
+  (`pnpm db:change`) turns every note written before into a document with
+  the same paragraphs; until it runs, each reads exactly as before.
+  
+  For this release each note is written twice, the document and its plain
+  text, so the release before still reads it during an upgrade.
+  `workflow.setRevalidation` takes editor JSON, and still takes plain text,
+  which is wrapped as a document; `workflow.read` returns
+  `revalidationDocuments` beside the plain `revalidation`. The plain columns,
+  and the plain text input, go a release later.
+
+- [#122](https://github.com/open-okr/open-okr/pull/122) [`d8d4f9d`](https://github.com/open-okr/open-okr/commit/d8d4f9d89fa81137f7a0c4c9706ffd09eb339b61) Thanks [@agungksidik](https://github.com/agungksidik)! - Account security lists the passkeys an account holds, each with the date it
+  was added and a way to remove it. Adding a passkey used to leave nothing on
+  the page to show it had worked, and a lost device's passkey could not be
+  taken away.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`91dfef3`](https://github.com/open-okr/open-okr/commit/91dfef374fe56afcd684f31f4ee526e97cf5b1e8) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Every session and KPI field is labelled, limited, and sized for what it holds.
+  
+  The session stages' notes and answers (the coordinator's note, the monthly
+  review's shifts and decision, a management answer, a private stage note, a
+  retro note) grow with the text and count near their limit, where several
+  were boxes of a fixed size or one line. Every title, reason and note on the
+  session and KPI screens stops at the length the server accepts, rather than
+  being refused after the press. The room pulse asks for one word and says so
+  as you type a second. The fixed lists on these screens keep the browser's
+  own dropdown, and the score slider stays the browser's own, with the same
+  labelling as every other field.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`48dee0a`](https://github.com/open-okr/open-okr/commit/48dee0a3e4aeea11d0c16afd5ff3b35d75314d78) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Comments, and your bio, can be formatted.
+  
+  The comment box is now a small editor with a toolbar: bold, italic,
+  strikethrough, code, bulleted and numbered lists, and links. Type `@` to
+  mention somebody, who is told. Editing a comment keeps the formatting it had;
+  the old box turned every edit back into plain text. Comments are shown as
+  they were written, with their formatting, lists and links.
+  
+  Rich text can now hold underlined text, and every screen, email and export
+  shows it. Nothing can add it yet: that arrives in the next release, once every
+  running copy of the app can read it.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`f43618d`](https://github.com/open-okr/open-okr/commit/f43618de2c5a5e5d86dd312c9be48b4a4e0e5e46) Thanks [@agungksidik](https://github.com/agungksidik)! - A space name that is already taken is refused with a sentence.
+  
+  Creating or renaming a space to a name another space holds sent the screen to
+  "We could not load the spaces" with a reference number. It now says the name
+  exists and asks for another, the same way roles already do.
+
+- [#122](https://github.com/open-okr/open-okr/pull/122) [`4e214f3`](https://github.com/open-okr/open-okr/commit/4e214f35761330cb722a995c3a9af70db2f95c33) Thanks [@agungksidik](https://github.com/agungksidik)! - An operator can be let into a workspace again after an earlier support
+  session ended. The guest the first session left was taken for a membership,
+  so every later request answered "You are already a member of this
+  workspace". It is now woken by the next grant, at that grant's level.
+
+- [#122](https://github.com/open-okr/open-okr/pull/122) [`f96cfd4`](https://github.com/open-okr/open-okr/commit/f96cfd40c5561aead7f2d256b0321f09005e164f) Thanks [@agungksidik](https://github.com/agungksidik)! - A support session sees the workspace as a member does, never past the level
+  the customer granted.
+  
+  A read-only support session saw no goals and no spaces: its binding was on
+  the workspace alone, and every goal and space has access of its own. The
+  operator now gets the built-in Viewer role (Member for an edit grant), and
+  access treats them like a member up to the granted level, so a read-only
+  session reads everything a member reads and still changes nothing.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`000d621`](https://github.com/open-okr/open-okr/commit/000d621124e294ece6d98c3259c64b5d00545acc) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Reasons get room to be written, and every goal and cycle field is labelled and limited.
+  
+  A goal's close reason, the gate override reason, a strategy's meaning, a
+  frame revision's reason and the revalidation notes are now boxes that grow
+  with the text, with a count as you near the limit, where several were one
+  line that scrolled sideways out of sight. Every title and reason on the goal
+  and cycle screens now stops at the length the server accepts, rather than
+  being refused after Save.
+  
+  The annual frame's strategies are labelled, where only a placeholder named
+  them. The fixed lists on these screens (status, outcome, decision, level,
+  kind, impact, direction) keep the browser's own dropdown, and take the same
+  look and labelling as every other field. The cycle's publication deadline
+  is the date field every other date uses.
+
+- [#118](https://github.com/open-okr/open-okr/pull/118) [`07da458`](https://github.com/open-okr/open-okr/commit/07da458fd132b25ce590918713b1c473c02c824a) Thanks [@agungksidik](https://github.com/agungksidik)! - The people directory lists the OKR Coach and the OKR Champion.
+  
+  Both are members of every workspace and the org chart on the same screen
+  already named them, but the Directory tab filtered them out. They are now
+  listed with an Agent badge, and their profile carries the same badge.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`dd08538`](https://github.com/open-okr/open-okr/commit/dd08538ffd39a6313b88bb2a646f9128a520aca1) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Times say whose clock they are on.
+  
+  A site message's window is now read on the operator's own clock. Before, the
+  two times were read in the server's zone, so a message set for 09:00 in Kuala
+  Lumpur on a server running in UTC went up at 17:00 there. The form names the
+  zone beside each time.
+  
+  Scheduling a session names the workspace zone beside its date and time, and
+  booking a cycle beside its hour. The daily summary's time has a full label and
+  names your own zone.
+  
+  Quiet hours, on the profile and on Where to reach you, open on the saved
+  window, which may run overnight (22:00 to 07:00). Setting one time without
+  the other is held back with a message under the empty one, instead of being
+  sent and refused.
+  
+  A save on a form now leaves it showing what was just saved. Before, the quiet
+  hours just saved could be shown as the ones they replaced.
+  
+  For API clients: quiet hours, the daily summary time and a cycle booking's
+  time follow one rule. A time is HH:MM from 00:00 to 23:59. "9:30" is accepted
+  and stored as "09:30", and a time such as "99:99", which quiet hours used to
+  accept, is refused with a message.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`67c66d6`](https://github.com/open-okr/open-okr/commit/67c66d6ff63f6c8f57304988f080ad95a99aae5a) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A timezone is chosen from a list rather than typed.
+  
+  The welcome wizard, Admin > General and your profile now offer every timezone
+  the server knows, each shown with its city, its offset today and its name, and
+  grouped by region. Type a city, an offset such as `+8` or `GMT+8`, or the zone's
+  everyday name ("Malaysia Time") to find one, and use this device's zone in one
+  press. A timezone saved before that is not on the list still shows, marked, and
+  nothing is changed until you pick another.
+  
+  The server now accepts only a name on that list. It used to accept anything the
+  runtime could resolve, such as `EST`, `+08:00` or a name in the wrong case, and
+  stored it exactly as typed.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`da23cfd`](https://github.com/open-okr/open-okr/commit/da23cfd3f6f65ba2dbc2f0c0690684b12d7e9701) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Lists of domains, hosts, scopes and terms are entered one entry at a time.
+  
+  Trusted email domains, a link's allowed domains, SSO's scopes and email
+  domains, the hosts an AI request may reach, and a workspace's own word-list
+  terms now turn each entry into a chip as you type or paste. A wrong entry is
+  marked where it stands and says why, and the form will not save while one is
+  there. Each word list's box is now named with its list.
+  
+  A link's allowed domains and an SSO connection's email domains must now be
+  domains, like example.com, as trusted domains already had to be. Before, any
+  word was stored and matched nobody's address. API clients sending
+  `invitations.createWorkspaceLink` with an entry such as "@example.com" now
+  get a refusal that says so.
+
+- [#121](https://github.com/open-okr/open-okr/pull/121) [`6a466c0`](https://github.com/open-okr/open-okr/commit/6a466c09c7216161e30b5c96117bf3dbc7bbaf9f) Thanks [@agungksidik](https://github.com/agungksidik)! - A goal that does not exist, or is not yours to see, reads as not found.
+  
+  Opening one showed "We could not load the goals. This is our fault, not
+  something you did." with a reference number. It now shows the not-found page,
+  the same answer for a goal that is hidden as for one that does not exist.
+
+- [#120](https://github.com/open-okr/open-okr/pull/120) [`32249ab`](https://github.com/open-okr/open-okr/commit/32249ab9c1dedc24cce58dabc8071a5e9100e9d0) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Addresses and ids are checked as they are typed, and the server checks them too.
+  
+  Single sign-on's discovery, authorization, token and user info addresses
+  must now be whole https addresses, or plain http on localhost only, and the
+  screen marks one that is not before Save. Nothing checked them before, so a typo was stored and found at
+  somebody's sign-in. A refusal now shows on the field it is about, including
+  the three addresses that had nowhere to show one. The provider ID lowers
+  capitals as you type and marks anything that is not a lowercase letter, a
+  number or a hyphen.
+  
+  An AI provider's base URL must be a whole http or https address, and a
+  custom model's id one word of at most 200 characters. A refusal on the AI
+  screen is now a sentence rather than a block of JSON.
+  
+  A space's Slack and Teams channel ids are drawn monospace, without
+  spellcheck, and marked when they hold a space, the rule the server already
+  applied.
+  
+  The audit filter's action and target type are chosen from the names this
+  workspace's trail holds, rather than typed. A new read action,
+  `audit.names`, answers them.
+  
+  API clients sending `ai.updateProviderConfig` with a base URL that is not a
+  whole address, or `ai.addCustomModel` with a model id holding a space, now
+  get a refusal that says so.
+
+- [#123](https://github.com/open-okr/open-okr/pull/123) [`ca715ae`](https://github.com/open-okr/open-okr/commit/ca715aee40d0595062eb1f87afe8f0d77ba8f11c) Thanks [@agungksidik](https://github.com/agungksidik)! - The invitation, the notification digest and every agent nudge sent by email
+  now arrive in the product's mail layout, beside the plain text, in the
+  workspace's name, colour and language (English or Malay).
+  
+  The invitation names the workspace and who sent it, and when it expires. The
+  digest says who did what, with a chip for why it reached you, and its "and N
+  more" line is now in the HTML part as well as the text. A nudge shows the
+  agent that sent it, the action as a button, and the rule it follows; the
+  daily summary lists its rows. Every link opens a page the instance serves.
+- Updated dependencies [[`13d99be`](https://github.com/open-okr/open-okr/commit/13d99be2b275b8b46f320551e41b3515d252c6d1), [`ad8a192`](https://github.com/open-okr/open-okr/commit/ad8a1929697ff892f88d2b85568f152064e5a3cc), [`ddbdb29`](https://github.com/open-okr/open-okr/commit/ddbdb294dc95416d9e1f9c15ef7dd1569e84cc45), [`89a8ef7`](https://github.com/open-okr/open-okr/commit/89a8ef7d66ed717b2fb72d9edde62f8423897e47), [`ad52c4d`](https://github.com/open-okr/open-okr/commit/ad52c4d98758caf45cea2e3540d850433c858f3f), [`7eaa3a9`](https://github.com/open-okr/open-okr/commit/7eaa3a95e1652c13c4008b4aebac79f190f870e2), [`18bcbe9`](https://github.com/open-okr/open-okr/commit/18bcbe95fd03358e7c60a728813762d323b13263), [`6b1d4a8`](https://github.com/open-okr/open-okr/commit/6b1d4a8673551d518dff5c3f4908a8b2fcabed79), [`1a89c72`](https://github.com/open-okr/open-okr/commit/1a89c72bedafc2793d70cd11b24e1853f213706b), [`4c56446`](https://github.com/open-okr/open-okr/commit/4c56446682dd38d2001f8472c275c1cbc39965ca), [`c4bd792`](https://github.com/open-okr/open-okr/commit/c4bd792505d9a9e4f641512ed328bc38b1a604ee), [`ad1f083`](https://github.com/open-okr/open-okr/commit/ad1f083d07829f761422dafbae254ddce81c55e2), [`3e6780e`](https://github.com/open-okr/open-okr/commit/3e6780e6538e32ea9c37e439f75a369623eb249f), [`26845fd`](https://github.com/open-okr/open-okr/commit/26845fd21b91520ad01b84cec49876dd6bc6364f), [`8286bd1`](https://github.com/open-okr/open-okr/commit/8286bd1afe19f4d39ef6f31bf891b5c5d722f1d7), [`f016bdb`](https://github.com/open-okr/open-okr/commit/f016bdb9bb7a078b80f9d43c57354ea363bed5ea), [`c4505e0`](https://github.com/open-okr/open-okr/commit/c4505e06aa128f848173cf6c431388426683934f), [`553c840`](https://github.com/open-okr/open-okr/commit/553c840c2ab7fcae6bf08b11d9fe1ec7f0ede131), [`21c5a00`](https://github.com/open-okr/open-okr/commit/21c5a004c4f32901beda610a771705d8bd218ff2), [`e43d670`](https://github.com/open-okr/open-okr/commit/e43d6700f63c9cca65fa15f0b9fe0679eff8b228), [`c3f2d2b`](https://github.com/open-okr/open-okr/commit/c3f2d2b4b9a269046bb4421b2d296d4f78856beb), [`2edd845`](https://github.com/open-okr/open-okr/commit/2edd845d18662a0647efbb0e97696239764d09bb), [`37a1fdc`](https://github.com/open-okr/open-okr/commit/37a1fdc1cbb3369deefc3985cc31e82ec40f5276), [`fa1e580`](https://github.com/open-okr/open-okr/commit/fa1e5808188883be09d431245ce573fc7b8db6e6), [`58dda46`](https://github.com/open-okr/open-okr/commit/58dda46ac532e1c57dc60f87676c8509f03e7b9a), [`f1ef43b`](https://github.com/open-okr/open-okr/commit/f1ef43b8d9d92fec98a794dcd482eb57e90805e3), [`f96ba67`](https://github.com/open-okr/open-okr/commit/f96ba6743d62ff947edaac82d6589c9c06cbce84), [`003b152`](https://github.com/open-okr/open-okr/commit/003b152e47374fec02f036d5842acf41b42d9575), [`390ebea`](https://github.com/open-okr/open-okr/commit/390ebead58e57b299363b220b8c1b9457a9c0b0b), [`d7d812d`](https://github.com/open-okr/open-okr/commit/d7d812dfac7a928908ee5e1eda969fa80f0ca93f), [`760b0a7`](https://github.com/open-okr/open-okr/commit/760b0a7d5cd65266688d9770afaf87394894bd0b), [`200c017`](https://github.com/open-okr/open-okr/commit/200c0170b061a43f6499b76a9f150676ff2746e5), [`149f16e`](https://github.com/open-okr/open-okr/commit/149f16ea69d791c1e6d4b6abcd84c14f13cc9dc7), [`9229546`](https://github.com/open-okr/open-okr/commit/9229546ea329e52152c9bc18ddc3072ca22b026a), [`e00d918`](https://github.com/open-okr/open-okr/commit/e00d9185b2fda42956f56911e019724816e430a9), [`cb18797`](https://github.com/open-okr/open-okr/commit/cb18797ad48ff0715a051e57821f51e38ea186a3), [`dd0db12`](https://github.com/open-okr/open-okr/commit/dd0db12b8c7f3b6ddca31997d5c5713c231d33cf), [`ba0488e`](https://github.com/open-okr/open-okr/commit/ba0488e4787f05b21570d30f9e30d39bdfa962da), [`4cf905e`](https://github.com/open-okr/open-okr/commit/4cf905e430ce611d630c1d2601aa6228a8339291), [`04bddd1`](https://github.com/open-okr/open-okr/commit/04bddd137037b8427c32c6af5248c6114f7eda9c), [`0020453`](https://github.com/open-okr/open-okr/commit/0020453719e5ac8bf330e4d185f9f7e46322be81), [`376b799`](https://github.com/open-okr/open-okr/commit/376b799a9ff7223868645d8050cc9fc233b60d7c), [`832595b`](https://github.com/open-okr/open-okr/commit/832595bf39d5f4996567a3bb7d1813a4fec34a32), [`d8d4f9d`](https://github.com/open-okr/open-okr/commit/d8d4f9d89fa81137f7a0c4c9706ffd09eb339b61), [`91dfef3`](https://github.com/open-okr/open-okr/commit/91dfef374fe56afcd684f31f4ee526e97cf5b1e8), [`48dee0a`](https://github.com/open-okr/open-okr/commit/48dee0a3e4aeea11d0c16afd5ff3b35d75314d78), [`f43618d`](https://github.com/open-okr/open-okr/commit/f43618de2c5a5e5d86dd312c9be48b4a4e0e5e46), [`4e214f3`](https://github.com/open-okr/open-okr/commit/4e214f35761330cb722a995c3a9af70db2f95c33), [`f96cfd4`](https://github.com/open-okr/open-okr/commit/f96cfd40c5561aead7f2d256b0321f09005e164f), [`000d621`](https://github.com/open-okr/open-okr/commit/000d621124e294ece6d98c3259c64b5d00545acc), [`07da458`](https://github.com/open-okr/open-okr/commit/07da458fd132b25ce590918713b1c473c02c824a), [`dd08538`](https://github.com/open-okr/open-okr/commit/dd08538ffd39a6313b88bb2a646f9128a520aca1), [`67c66d6`](https://github.com/open-okr/open-okr/commit/67c66d6ff63f6c8f57304988f080ad95a99aae5a), [`da23cfd`](https://github.com/open-okr/open-okr/commit/da23cfd3f6f65ba2dbc2f0c0690684b12d7e9701), [`32249ab`](https://github.com/open-okr/open-okr/commit/32249ab9c1dedc24cce58dabc8071a5e9100e9d0), [`ca715ae`](https://github.com/open-okr/open-okr/commit/ca715aee40d0595062eb1f87afe8f0d77ba8f11c)]:
+  - @openokr/core@0.3.0
+  - @openokr/ui@0.3.0
+  - @openokr/formats@0.3.0
+  - @openokr/method@0.3.0
+  - @openokr/adapters@0.3.0
+  - @openokr/agents@0.3.0
+  - @openokr/config@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

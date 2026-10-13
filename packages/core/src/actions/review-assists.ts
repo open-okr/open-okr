@@ -459,7 +459,7 @@ export const proposeFromLearnings = defineReadAction({
   name: "sessions.proposeFromLearnings",
   // Deprecated with `sessions.draftNextCycle`, whose form it filled (P9-T22d).
   summary:
-    "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
+    "Deprecated since 0.2.0 and removed in 0.4: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
   input: z.object({ sessionId: z.uuid() }),
   output: z
     .array(
