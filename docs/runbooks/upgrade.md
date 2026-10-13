@@ -76,6 +76,36 @@ seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
 
+## 0.2 to 0.3: fields that guide, and prose written with the editor
+
+0.3.0 changes how fields look and what they accept. Nothing about the
+practice changes, and no setting needs choosing.
+
+What people will notice:
+
+| Area | In 0.2 | In 0.3 |
+|---|---|---|
+| Fields | Plain boxes, checked when saved | Each field says what it takes and refuses the rest before anything is sent: dates, times with their zone, numbers with their unit, people and goals picked from a list, domains, addresses, colours |
+| Confidence | Shown as 0.0 to 1.0 | Shown as Admin, Practice says, "7 in 10" by default |
+| Session prose | Plain text | The monthly review's shifts and decisions, the quarterly review's management answers and private stage notes, the weekly note for leadership and the revalidation's two notes are written with the editor |
+| Limits | Some only in the browser | Every limit the browser shows is held on the server too |
+
+What an API client may meet: a link's expiry over 365 days, an SSO address
+that is not https (plain http on localhost aside), or an AI base URL that is
+not http or https, is refused with a sentence. The session prose fields take
+editor JSON and, for this release, still take the plain text they took
+before.
+
+**Run the data changes once after the upgrade.** Six of them, 0027 to 0032,
+write each existing piece of session prose as a document beside its plain
+text. Until they run, every screen reads the plain text as before, so nothing
+is lost if they wait. The release after this one removes the plain columns,
+so they must have run before then.
+
+```sh
+OPENOKR_ENCRYPTION_KEY=... pnpm db:change
+```
+
 ## 0.1 to 0.2: the practice becomes yours to adapt
 
 0.2.0 is the first release that changes how the practice behaves for an
