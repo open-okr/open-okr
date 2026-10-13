@@ -23,6 +23,7 @@ import {
   postgresArrayLiteral,
 } from "../src/portability/import.ts";
 import { EXPORTED_TABLES } from "../src/portability/policy.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
@@ -466,6 +467,109 @@ describe("what a move keeps", () => {
       expect(JSON.stringify(document)).toContain(movedMemberId);
       expect(JSON.stringify(document)).not.toContain(ownerMemberId);
     }
+  });
+
+  it("takes an older archive's plain prose as documents, and leaves out a column this release lacks", async () => {
+    // Guided-inputs change 13 (docs/design/guided-inputs.md §4.7). An archive
+    // from 0.2 has the plain text alone, and 0.4 has no plain column, so the
+    // import writes the document itself rather than lose the prose.
+    const source = (input: unknown, name: string) =>
+      callAction(
+        {
+          pool,
+          workspaceId: sourceWorkspaceId,
+          actor: { kind: "human", userId: OWNER_A },
+        },
+        name as never,
+        input as never,
+      );
+    const [space] = (await source({}, "spaces.list")) as { id: string }[];
+    const wb = await workerDb();
+    const owner = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1",
+      [sourceWorkspaceId],
+    );
+    const session = (await source(
+      {
+        spaceId: space?.id,
+        kind: "quarterly",
+        title: "Q1 review",
+        scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+        facilitatorId: owner.rows[0]?.id,
+      },
+      "sessions.create",
+    )) as { id: string };
+    await source({ id: session.id }, "sessions.open");
+    await source(
+      { id: session.id, note: "Pulse was low.\n\nName it first." },
+      "sessions.setStageNote",
+    );
+    await source(
+      {
+        sessionId: session.id,
+        questionKey: 1,
+        body: "Mostly.\n\nTwo were leftovers.",
+      },
+      "sessions.setManagementAnswer",
+    );
+
+    // As 0.2 wrote them: no document columns, a stage note as a string, and
+    // one column this release does not have.
+    const exported = await exportSource();
+    const archive = readArchive(exported.bytes, { passphrase: PASSPHRASE });
+    const asOlder = {
+      ...archive,
+      records: archive.records.map((record) => {
+        if (record.r !== "row") return record;
+        const row = { ...(record.d as Record<string, unknown>) };
+        for (const key of Object.keys(row)) {
+          if (key.endsWith("_document") || key.endsWith("_document_version")) {
+            delete row[key];
+          }
+        }
+        if (record.t === "okr_sessions" && row.notes) {
+          row.notes = Object.fromEntries(
+            Object.keys(row.notes as object).map((stage) => [
+              stage,
+              "Pulse was low.\n\nName it first.",
+            ]),
+          );
+          row.retired_column = "from an older release";
+        }
+        return { ...record, d: row };
+      }),
+    };
+    const diff = await withWorkspace(drizzle(pool), targetWorkspaceId, (tx) =>
+      importWorkspace({
+        tx,
+        workspaceId: targetWorkspaceId,
+        archive: asOlder as typeof archive,
+        dryRun: false,
+        actorMemberId: targetMemberId,
+      }),
+    );
+
+    expect(diff.skipped.okr_sessions).toBeUndefined();
+    expect(diff.skipped.management_answers).toBeUndefined();
+    expect(diff.leftOut.okr_sessions).toEqual(["retired_column"]);
+    const sessions = await wb.admin.query<{ notes: Record<string, unknown> }>(
+      "select notes from okr_sessions where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    expect(Object.values(sessions.rows[0]?.notes ?? {})).toEqual([
+      richTextFromPlainText("Pulse was low.\n\nName it first."),
+    ]);
+    const answers = await wb.admin.query<{
+      body_document: unknown;
+      body_document_version: number | null;
+    }>(
+      "select body_document, body_document_version from management_answers where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    expect(answers.rows[0]).toEqual({
+      body_document: richTextFromPlainText("Mostly.\n\nTwo were leftovers."),
+      body_document_version: 1,
+    });
   });
 
   it("keeps a row with a Postgres array column, which it used to skip", async () => {

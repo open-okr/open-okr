@@ -10624,13 +10624,27 @@
                               "type": "integer",
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991
+                            },
+                            "leftOut": {
+                              "default": {},
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
                             }
                           },
                           "required": [
                             "created",
                             "merged",
                             "skipped",
-                            "blobs"
+                            "blobs",
+                            "leftOut"
                           ],
                           "additionalProperties": false
                         },

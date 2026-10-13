@@ -553,6 +553,8 @@
   "admin.imports.archiveImportCard.importWorkspaceArchive": "Import arkib ruang kerja",
   "admin.imports.archiveImportCard.imported": "Diimport",
   "admin.imports.archiveImportCard.importing": "Mengimport...",
+  "admin.imports.archiveImportCard.leftOut": "Arkib ini daripada keluaran yang lebih awal. Lajur ini tiada lagi di sini, jadi ia ditinggalkan:",
+  "admin.imports.archiveImportCard.leftOutColumns": "{table}: {columns}",
   "admin.imports.archiveImportCard.memberSWillMergeBy": "{length} ahli akan digabungkan mengikut e-mel:",
   "admin.imports.archiveImportCard.passphrase": "Frasa laluan",
   "admin.imports.archiveImportCard.passphraseHint": "Frasa laluan yang digunakan semasa arkib dieksport.",

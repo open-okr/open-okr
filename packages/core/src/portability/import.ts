@@ -21,6 +21,8 @@ import { enqueueOutbox, type WorkspaceTx } from "@openokr/db";
 import { sql } from "drizzle-orm";
 import { generateStorageKey } from "../blobs/provisioning.ts";
 import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
+import { richTextFromPlainText } from "../rich-text/from-text.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { INDEX_TOPIC } from "../search/subjects.ts";
 import type { ReadArchiveResult } from "./archive.ts";
 import { EXPORTED_TABLES, isDeferred } from "./policy.ts";
@@ -54,6 +56,12 @@ export interface ImportDifference {
   readonly merged: readonly MergedMember[];
   readonly skipped: Record<string, number>;
   readonly blobs: number;
+  /**
+   * Columns an archive from an earlier release carries that this release no
+   * longer has, by table. Left out of each row rather than failing it
+   * (docs/design/guided-inputs.md §4.7, change 13).
+   */
+  readonly leftOut: Record<string, string[]>;
 }
 
 // ── UUID detection ────────────────────────────────────────────────────────
@@ -130,6 +138,93 @@ export function postgresArrayLiteral(values: readonly unknown[]): string {
       : `"${String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`,
   );
   return `{${elements.join(",")}}`;
+}
+
+/**
+ * Prose an earlier release stored as plain text, beside the document a later
+ * one writes (guided-inputs changes 11 and 12). An archive from 0.2 has the
+ * plain text alone, and one from 0.3 may have both; 0.4 has no plain column.
+ */
+const PLAIN_PROSE: readonly {
+  readonly table: string;
+  readonly plain: string;
+  readonly document: string;
+}[] = [
+  { table: "okr_sessions", plain: "shifts", document: "shifts_document" },
+  { table: "decisions", plain: "text", document: "text_document" },
+  { table: "management_answers", plain: "body", document: "body_document" },
+  { table: "digests", plain: "note", document: "note_document" },
+  {
+    table: "cycle_revalidations",
+    plain: "change_note",
+    document: "change_note_document",
+  },
+  {
+    table: "cycle_revalidations",
+    plain: "focus_note",
+    document: "focus_note_document",
+  },
+];
+
+/**
+ * A row from an archive as this release's table takes it.
+ *
+ * Plain prose with no document beside it becomes one, by the same rule the
+ * data changes used, so prose from an older archive is not lost when its
+ * plain column is gone; a stage note stored as a string does too. Then any
+ * column the table no longer has is left out and recorded, rather than
+ * failing the whole row's insert.
+ */
+function toTargetShape(
+  table: string,
+  row: Record<string, unknown>,
+  targetColumns: ReadonlySet<string>,
+  leftOut: Record<string, string[]>,
+): Record<string, unknown> {
+  const shaped = { ...row };
+  for (const prose of PLAIN_PROSE) {
+    if (prose.table !== table || !targetColumns.has(prose.document)) {
+      continue;
+    }
+    const plain = shaped[prose.plain];
+    const document = shaped[prose.document];
+    if (
+      (document === null || document === undefined) &&
+      typeof plain === "string" &&
+      plain.trim() !== ""
+    ) {
+      shaped[prose.document] = richTextFromPlainText(plain);
+      shaped[`${prose.document}_version`] = RICH_TEXT_SCHEMA_VERSION;
+    }
+  }
+  if (
+    table === "okr_sessions" &&
+    typeof shaped.notes === "object" &&
+    shaped.notes !== null
+  ) {
+    const notes: Record<string, unknown> = {};
+    for (const [stage, note] of Object.entries(
+      shaped.notes as Record<string, unknown>,
+    )) {
+      if (typeof note !== "string") {
+        notes[stage] = note;
+      } else if (note.trim() !== "") {
+        notes[stage] = richTextFromPlainText(note);
+      }
+    }
+    shaped.notes = notes;
+  }
+  for (const column of Object.keys(shaped)) {
+    if (!targetColumns.has(column)) {
+      delete shaped[column];
+      const list = leftOut[table] ?? [];
+      if (!list.includes(column)) {
+        list.push(column);
+        leftOut[table] = list;
+      }
+    }
+  }
+  return shaped;
 }
 
 function isRichTextColumn(table: string, column: string): boolean {
@@ -414,6 +509,7 @@ export async function importWorkspace(
 
   const created: Record<string, number> = {};
   const skipped: Record<string, number> = {};
+  const leftOut: Record<string, string[]> = {};
   // Rows this run actually wrote, per indexed table, for the enqueue at the end.
   const written = new Map<string, string[]>();
   const deferredUpdates: {
@@ -437,23 +533,32 @@ export async function importWorkspace(
     const rows = rowsByTable.get(table);
     if (!rows || rows.length === 0) continue;
 
-    // The table's Postgres array columns, asked of the database rather than
-    // listed, so a column added later is written too.
+    // The table's columns as this release has them, asked of the database
+    // rather than listed: an array column takes an array literal, and a
+    // column an older archive carries that this release dropped is left out.
+    const columnTypes = (
+      await tx.execute<{ column_name: string; data_type: string }>(
+        sql`select column_name, data_type from information_schema.columns
+             where table_schema = 'public' and table_name = ${table}`,
+      )
+    ).rows;
+    const targetColumns = new Set(columnTypes.map((row) => row.column_name));
     const arrayColumns = new Set(
-      (
-        await tx.execute<{ column_name: string }>(
-          sql`select column_name from information_schema.columns
-               where table_schema = 'public' and table_name = ${table}
-                 and data_type = 'ARRAY'`,
-        )
-      ).rows.map((row) => row.column_name),
+      columnTypes
+        .filter((row) => row.data_type === "ARRAY")
+        .map((row) => row.column_name),
     );
 
     let tableCreated = 0;
     let tableSkipped = 0;
 
     for (const raw of rows) {
-      const remapped = remapRow(table, raw, keyMap);
+      const remapped = toTargetShape(
+        table,
+        remapRow(table, raw, keyMap),
+        targetColumns,
+        leftOut,
+      );
       const remappedId = String(remapped.id);
 
       // Collect deferred column values for the second pass
@@ -625,5 +730,5 @@ export async function importWorkspace(
     );
   }
 
-  return { created, merged, skipped, blobs: blobCount };
+  return { created, merged, skipped, blobs: blobCount, leftOut };
 }

@@ -238,6 +238,11 @@ const importDifferenceSchema = z.object({
   merged: z.array(mergedMemberSchema),
   skipped: z.record(z.string(), z.number().int()),
   blobs: z.number().int(),
+  /**
+   * Columns an earlier release's archive carries that this one dropped, by
+   * table, left out of each row. Empty for a report stored before 0.4.
+   */
+  leftOut: z.record(z.string(), z.array(z.string())).default({}),
 });
 
 /**

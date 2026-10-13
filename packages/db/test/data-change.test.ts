@@ -266,6 +266,76 @@ describe("runDataChanges", () => {
     );
   });
 
+  it("counts a script as done once the migration that retires it dropped its columns", async () => {
+    // Guided-inputs change 13 (docs/design/guided-inputs.md §4.7). A fresh
+    // instance never ran a backfill whose columns a later migration dropped,
+    // after that migration's own guard proved nothing was left to convert.
+    // Refusing it there would stop every script after it, for good.
+    let ran = false;
+    const retired: DataChangeScript = {
+      name: "0001_retired",
+      summary: "Read a column a later migration dropped.",
+      expects: [
+        { table: "_counting_fixture", column: "dropped", dataType: "text" },
+      ],
+      retiredBy: "0999_drop_it.sql",
+      async runBatch() {
+        ran = true;
+        return { done: true, rowsChanged: 0 };
+      },
+    };
+    const calls = { n: 0 };
+    const later = { ...countingScript(calls), name: "0002_counting" };
+    await client.query(
+      "create table _counting_fixture (id int primary key, flagged boolean not null default false)",
+    );
+    await client.query(
+      "insert into _counting_fixture (id) values (1), (2), (3)",
+    );
+    await client.query(
+      "create table _migrations (name text primary key, checksum text not null)",
+    );
+    await client.query(
+      "insert into _migrations (name, checksum) values ('0999_drop_it.sql', 'x')",
+    );
+
+    const outcomes = await runDataChanges(client, {
+      scripts: [retired, later],
+    });
+    expect(ran).toBe(false);
+    expect(
+      outcomes.map((outcome) => [outcome.name, outcome.rowsChanged]),
+    ).toEqual([
+      ["0001_retired", 0],
+      ["0002_counting", 3],
+    ]);
+    const { rows } = await client.query<{ completed_at: Date | null }>(
+      "select completed_at from _data_changes where name = '0001_retired'",
+    );
+    expect(rows[0]?.completed_at).not.toBeNull();
+  });
+
+  it("still refuses a retired script whose migration has not run", async () => {
+    // The columns missing and the migration not recorded is a schema that
+    // moved some other way, which is exactly what the check is for.
+    const retired: DataChangeScript = {
+      name: "0001_retired",
+      summary: "Read a column a later migration dropped.",
+      expects: [
+        { table: "_counting_fixture", column: "dropped", dataType: "text" },
+      ],
+      retiredBy: "0999_drop_it.sql",
+      async runBatch() {
+        return { done: true, rowsChanged: 0 };
+      },
+    };
+    await client.query("create table _counting_fixture (id int primary key)");
+
+    await expect(
+      runDataChanges(client, { scripts: [retired] }),
+    ).rejects.toThrow(/dropped/);
+  });
+
   it("refuses a script whose expected column changed type", async () => {
     const script: DataChangeScript = {
       name: "0001_retyped",

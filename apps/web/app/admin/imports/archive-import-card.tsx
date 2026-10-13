@@ -233,6 +233,29 @@ export function ArchiveImportCard() {
               </div>
             )}
 
+            {/* Columns an older archive carries that this release dropped
+                (guided-inputs change 13). Their prose arrives as documents;
+                saying what was left out is better than skipping the row. */}
+            {Object.keys(preview.difference.leftOut).length > 0 && (
+              <div className="rounded-md border border-line bg-raised px-3 py-2">
+                <p className="text-xs text-ink-2">
+                  {t("admin.imports.archiveImportCard.leftOut")}
+                </p>
+                <ul className="mt-1 flex flex-col gap-0.5 text-xs text-ink-3">
+                  {Object.entries(preview.difference.leftOut).map(
+                    ([table, columns]) => (
+                      <li key={table}>
+                        {t("admin.imports.archiveImportCard.leftOutColumns", {
+                          table,
+                          columns: columns.join(", "),
+                        })}
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            )}
+
             <div className="flex gap-2">
               {!preview.alreadyImported && (
                 <Button

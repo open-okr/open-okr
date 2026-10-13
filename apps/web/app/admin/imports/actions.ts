@@ -346,6 +346,8 @@ export interface ImportResult {
     }[];
     readonly skipped: Record<string, number>;
     readonly blobs: number;
+    /** Columns an earlier release's archive carries that this one dropped. */
+    readonly leftOut: Record<string, string[]>;
   };
   readonly alreadyImported: boolean;
 }
