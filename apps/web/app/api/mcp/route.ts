@@ -296,6 +296,7 @@ async function answer(request: NextRequest): Promise<Response> {
       name: prompt.name,
       description: prompt.description,
       arguments: prompt.arguments,
+      render: prompt.render,
     })),
     dispatch: (name, input) => dispatchTool(pool, principal, name, input, ring),
     readResource: (uri) =>

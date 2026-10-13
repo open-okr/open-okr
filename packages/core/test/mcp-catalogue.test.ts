@@ -310,3 +310,26 @@ describe("the catalogue itself", () => {
     expect(buildCatalogue().version).toBe(CATALOGUE_VERSION);
   });
 });
+
+describe("the prompts an agent can ask for", () => {
+  it("each answers with a message, and every tool it names is a tool here", () => {
+    const names = new Set(MCP_TOOLS.map((tool) => tool.name));
+    for (const prompt of MCP_PROMPTS) {
+      const text = prompt.render({});
+      expect(text.length, prompt.name).toBeGreaterThan(40);
+      const mentioned = [...text.matchAll(/\b([a-z]+\.[a-zA-Z]+)\b/g)].map(
+        (match) => match[1] as string,
+      );
+      for (const tool of mentioned) {
+        expect(names.has(tool), `${prompt.name} names ${tool}`).toBe(true);
+      }
+    }
+  });
+
+  it("uses the argument it was given", () => {
+    const review = MCP_PROMPTS.find(
+      (prompt) => prompt.name === "review-against-the-canon",
+    );
+    expect(review?.render({ cycleId: "c-1" })).toContain("c-1");
+  });
+});
