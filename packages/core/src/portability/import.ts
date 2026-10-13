@@ -118,6 +118,20 @@ export const RICH_TEXT_MAP_COLUMNS: ReadonlySet<string> = new Set([
   "annual_frame_revisions.before",
 ]);
 
+/**
+ * A one-dimensional Postgres array literal, `{"a","b"}`, for an array column.
+ * Every element is quoted, so a comma, a brace or the word NULL inside one
+ * stays text, and a null element is written as NULL.
+ */
+export function postgresArrayLiteral(values: readonly unknown[]): string {
+  const elements = values.map((value) =>
+    value === null || value === undefined
+      ? "NULL"
+      : `"${String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`,
+  );
+  return `{${elements.join(",")}}`;
+}
+
 function isRichTextColumn(table: string, column: string): boolean {
   return RICH_TEXT_COLUMNS.has(`${table}.${column}`);
 }
@@ -423,6 +437,18 @@ export async function importWorkspace(
     const rows = rowsByTable.get(table);
     if (!rows || rows.length === 0) continue;
 
+    // The table's Postgres array columns, asked of the database rather than
+    // listed, so a column added later is written too.
+    const arrayColumns = new Set(
+      (
+        await tx.execute<{ column_name: string }>(
+          sql`select column_name from information_schema.columns
+               where table_schema = 'public' and table_name = ${table}
+                 and data_type = 'ARRAY'`,
+        )
+      ).rows.map((row) => row.column_name),
+    );
+
     let tableCreated = 0;
     let tableSkipped = 0;
 
@@ -467,15 +493,21 @@ export async function importWorkspace(
         continue;
       }
 
-      // Serialise array/object values as JSON strings before interpolation.
-      // Drizzle's sql template tag treats JS arrays as SQL tuples `(a, b)`
-      // instead of Postgres array literals, which breaks array columns
-      // like `session_dates` and `levels`. JSON strings let Postgres cast
-      // to the column's own type.
+      // Serialise array/object values as strings before interpolation.
+      // Drizzle's sql template tag treats JS arrays as SQL tuples `(a, b)`.
+      // A `jsonb` column, `session_dates` and `levels` among them, takes the
+      // value as JSON. A Postgres array column takes an array literal: sent
+      // as JSON it refused the insert, and the row was counted as skipped,
+      // which lost every revision of an agreed annual frame and a
+      // workspace's own AI models in a move.
       const columns = Object.keys(remapped);
-      const values = Object.values(remapped).map((v) =>
-        v !== null && typeof v === "object" ? JSON.stringify(v) : v,
-      );
+      const values = columns.map((column) => {
+        const v = remapped[column];
+        if (Array.isArray(v) && arrayColumns.has(column)) {
+          return postgresArrayLiteral(v);
+        }
+        return v !== null && typeof v === "object" ? JSON.stringify(v) : v;
+      });
 
       const columnList = columns
         .map((c) => sql.identifier(c))

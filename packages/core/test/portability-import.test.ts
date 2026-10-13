@@ -20,7 +20,9 @@ import { exportWorkspace } from "../src/portability/export.ts";
 import {
   type ImportDifference,
   importWorkspace,
+  postgresArrayLiteral,
 } from "../src/portability/import.ts";
+import { EXPORTED_TABLES } from "../src/portability/policy.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
@@ -439,16 +441,111 @@ describe("what a move keeps", () => {
       "select vision from annual_frames where workspace_id = $1 and year_label = 'FY2030'",
       [targetWorkspaceId],
     );
+    // The revision arrives too, since its array column is written as one,
+    // and what the mission held before is a document in a map.
+    const revisions = await wb.admin.query<{
+      fields: string[];
+      before: Record<string, unknown>;
+    }>(
+      "select fields, before from annual_frame_revisions where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    expect(revisions.rows).toHaveLength(1);
+    expect([...(revisions.rows[0]?.fields ?? [])].sort()).toEqual([
+      "mission",
+      "vision",
+    ]);
     for (const document of [
       Object.values(notes.rows[0]?.notes ?? {})[0],
       answers.rows[0]?.body_document,
       revalidations.rows[0]?.change_note_document,
       revalidations.rows[0]?.focus_note_document,
       frames.rows[0]?.vision,
+      revisions.rows[0]?.before.mission,
     ]) {
       expect(JSON.stringify(document)).toContain(movedMemberId);
       expect(JSON.stringify(document)).not.toContain(ownerMemberId);
     }
+  });
+
+  it("keeps a row with a Postgres array column, which it used to skip", async () => {
+    // The import sent an array as JSON, which a `text[]` column refuses, and
+    // counted the row as skipped: a workspace's own AI models and every
+    // revision of an agreed annual frame were lost in a move.
+    await callAction(
+      {
+        pool,
+        workspaceId: sourceWorkspaceId,
+        actor: { kind: "human", userId: OWNER_A },
+      },
+      "ai.addCustomModel",
+      {
+        provider: "ollama",
+        modelId: "my-fine-tune:latest",
+        displayName: "My Fine-Tune",
+        contextWindow: 32_000,
+        costInPerMillion: 0,
+        costOutPerMillion: 0,
+        supportsTools: false,
+        supportsVision: false,
+        supportsJsonMode: false,
+        supportsStreaming: true,
+        embeddingDimensions: null,
+        tiers: ["balanced", "fast"],
+      },
+    );
+
+    const exported = await exportSource();
+    const diff = await importIntoTarget(exported.bytes, false);
+    expect(diff.skipped.ai_models).toBeUndefined();
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ tiers: string[] }>(
+      "select tiers from ai_models where workspace_id = $1 and model_id = 'my-fine-tune:latest'",
+      [targetWorkspaceId],
+    );
+    expect(rows[0]?.tiers).toEqual(["balanced", "fast"]);
+  });
+
+  it("moves a row in every exported table with an array column", async () => {
+    // The two above are the tests that move one. A third such table fails
+    // here, so whoever adds it adds a row to move as well.
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ table_name: string }>(
+      `select distinct table_name from information_schema.columns
+        where table_schema = 'public' and data_type = 'ARRAY'
+        order by table_name`,
+    );
+    expect(
+      rows
+        .map((row) => row.table_name)
+        .filter((table) => EXPORTED_TABLES.includes(table)),
+    ).toEqual(["ai_models", "annual_frame_revisions"]);
+  });
+
+  it("writes an array literal Postgres reads back as it was", async () => {
+    const wb = await workerDb();
+    const values = [
+      "plain",
+      "two words",
+      'a "quoted" one',
+      "a, comma",
+      "{braces}",
+      "back\\slash",
+      "",
+      "NULL",
+      null,
+    ];
+    const { rows } = await wb.admin.query<{ read: (string | null)[] }>(
+      "select $1::text[] as read",
+      [postgresArrayLiteral(values)],
+    );
+    expect(rows[0]?.read).toEqual(values);
+    const empty = await wb.admin.query<{ read: string[] }>(
+      "select $1::text[] as read",
+      [postgresArrayLiteral([])],
+    );
+    expect(empty.rows[0]?.read).toEqual([]);
   });
 
   it("writes every file's bytes back, under the new workspace", async () => {
