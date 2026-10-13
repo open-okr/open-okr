@@ -69,9 +69,11 @@ function isUuid(value: unknown): value is string {
 
 /**
  * Columns that hold rich text and need uuid rewriting. Identified by
- * having a companion `*_version` column in the schema.
+ * having a companion `*_version` column in the schema, which
+ * `portability-policy.test.ts` checks against the database, so a rich text
+ * column added to an exported table without a line here fails the build.
  */
-const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
+export const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   "workspace_members.bio",
   "goals.description",
   "comments.body",
@@ -80,9 +82,20 @@ const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   "tasks.description",
   "initiatives.description",
   "kpis.description",
-  "kpi_categories.description",
+  "kpi_trees.description",
   "review_narratives.body",
   "goal_retrospectives.body",
+  "check_ins.narrative",
+  // The cycle's planning prose: the annual frame and phases 2 and 5.
+  "annual_frames.mission",
+  "annual_frames.vision",
+  "annual_frames.strategy",
+  "annual_frames.open_issues",
+  "annual_frames.not_doing",
+  "cycle_baseline_health.stable",
+  "cycle_baseline_health.declining",
+  "cycle_baseline_health.business_as_usual",
+  "cycle_capacity_notes.cuts",
   // Guided inputs change 11a: the monthly review's prose as documents.
   "okr_sessions.shifts_document",
   "decisions.text_document",
@@ -95,11 +108,14 @@ const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
 
 /**
  * Columns that hold a map of rich text documents, one per key: the
- * facilitator's private stage notes since guided-inputs change 11b. The
- * walk above reaches a document's nodes, not the documents inside a map.
+ * facilitator's private stage notes since guided-inputs change 11b, and what
+ * an agreed annual frame's revised fields held before. The walk above
+ * reaches a document's nodes, not the documents inside a map, and leaves a
+ * value that is not a document, such as the strategies list, as it is.
  */
-const RICH_TEXT_MAP_COLUMNS: ReadonlySet<string> = new Set([
+export const RICH_TEXT_MAP_COLUMNS: ReadonlySet<string> = new Set([
   "okr_sessions.notes",
+  "annual_frame_revisions.before",
 ]);
 
 function isRichTextColumn(table: string, column: string): boolean {

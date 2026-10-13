@@ -20,6 +20,10 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  RICH_TEXT_COLUMNS,
+  RICH_TEXT_MAP_COLUMNS,
+} from "../src/portability/import.ts";
+import {
   DEFERRED_COLUMNS,
   EXCLUDED_TABLES,
   EXPORTED_TABLES,
@@ -325,5 +329,57 @@ describe("the deferred columns", () => {
     }
 
     expect([...remaining].sort()).toEqual([]);
+  });
+});
+
+/**
+ * The columns whose mentions and attachments an import rewrites, against the
+ * real schema.
+ *
+ * A document names members and files by id, and a move gives both new ids, so
+ * a rich text column the import does not walk keeps pointing at the source
+ * workspace. Four tables' columns were missing for months because the list is
+ * written by hand (found during guided-inputs change 12). A rich text column
+ * is a `jsonb` one with an integer `<name>_version` beside it, which the
+ * rich text rules require, so the database can say what the list must hold.
+ */
+describe("the rich text an import rewrites", () => {
+  it("names every versioned rich text column of an exported table, and only those", async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      table_name: string;
+      column_name: string;
+    }>(
+      `select c.table_name, c.column_name
+         from information_schema.columns c
+         join information_schema.columns v
+           on v.table_schema = c.table_schema
+          and v.table_name = c.table_name
+          and v.column_name = c.column_name || '_version'
+          and v.data_type = 'integer'
+        where c.table_schema = 'public' and c.data_type = 'jsonb'
+        order by c.table_name, c.column_name`,
+    );
+    const versioned = rows
+      .filter((row) => EXPORTED_TABLES.includes(row.table_name))
+      .map((row) => `${row.table_name}.${row.column_name}`);
+
+    expect([...RICH_TEXT_COLUMNS].sort()).toEqual(versioned);
+  });
+
+  it("names only map columns the database holds as jsonb, in exported tables", async () => {
+    // A map of documents has no version column of its own, so these are
+    // named by hand; this only proves each one is real.
+    const wb = await workerDb();
+    for (const name of RICH_TEXT_MAP_COLUMNS) {
+      const [table, column] = name.split(".");
+      const { rows } = await wb.admin.query<{ data_type: string }>(
+        `select data_type from information_schema.columns
+          where table_schema = 'public' and table_name = $1 and column_name = $2`,
+        [table, column],
+      );
+      expect(rows[0]?.data_type, name).toBe("jsonb");
+      expect(EXPORTED_TABLES, name).toContain(table);
+    }
   });
 });

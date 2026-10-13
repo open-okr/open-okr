@@ -307,9 +307,10 @@ describe("what a move keeps", () => {
     });
   });
 
-  it("points a mention in a stage note, a management answer or a revalidation note at the member's new id", async () => {
-    // Guided-inputs changes 11b and 12. The stage notes are a map of
-    // documents, one per stage, which the import walks key by key.
+  it("points a mention in a stage note, a management answer, a revalidation note or the annual frame at the member's new id", async () => {
+    // Guided-inputs changes 11b and 12. The stage notes, and what a
+    // revision of an agreed frame held before, are maps of documents, which
+    // the import walks key by key.
     const source = (input: unknown, name: string) =>
       callAction(
         {
@@ -377,6 +378,35 @@ describe("what a move keeps", () => {
       },
       "workflow.setRevalidation",
     );
+    // An agreed frame whose mission is then revised, so the revision keeps
+    // the mentioning mission in its `before`, and the vision mentions too.
+    const strategies = [
+      { text: "Activation first" },
+      { text: "Fewer markets" },
+    ];
+    await source(
+      { yearLabel: "FY2030", agreed: true, mission: mentioning, strategies },
+      "frame.set",
+    );
+    await source(
+      {
+        yearLabel: "FY2030",
+        agreed: true,
+        mission: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Activation, everywhere." }],
+            },
+          ],
+        },
+        vision: mentioning,
+        strategies,
+        reason: "The board narrowed the mission.",
+      },
+      "frame.set",
+    );
 
     const exported = await exportSource();
     await importIntoTarget(exported.bytes, false);
@@ -405,11 +435,16 @@ describe("what a move keeps", () => {
          from cycle_revalidations where workspace_id = $1`,
       [targetWorkspaceId],
     );
+    const frames = await wb.admin.query<{ vision: unknown }>(
+      "select vision from annual_frames where workspace_id = $1 and year_label = 'FY2030'",
+      [targetWorkspaceId],
+    );
     for (const document of [
       Object.values(notes.rows[0]?.notes ?? {})[0],
       answers.rows[0]?.body_document,
       revalidations.rows[0]?.change_note_document,
       revalidations.rows[0]?.focus_note_document,
+      frames.rows[0]?.vision,
     ]) {
       expect(JSON.stringify(document)).toContain(movedMemberId);
       expect(JSON.stringify(document)).not.toContain(ownerMemberId);
