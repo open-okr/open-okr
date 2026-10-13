@@ -1,6 +1,6 @@
 # Ids inside JSON across a workspace move
 
-Status: proposed, 13 October 2026. Waiting for "design approved".
+Status: approved 13 October 2026, with option A and the rule covering every `jsonb` column.
 
 A workspace archive moves a workspace to another instance (TECHNICAL-PLAN §7.3). Every row gets a new id, and the import rewrites references to them. It rewrites a column that holds an id, and the mentions and attachments inside rich text (`RICH_TEXT_COLUMNS`). It does not rewrite an id anywhere else inside a `jsonb` value. This document is about those, starting with the review queue.
 
@@ -51,7 +51,9 @@ The difference report and the archive preview already say what is created, merge
 - **Given** an activity whose payload names a goal, **when** the workspace moves, **then** the payload names the goal's new id.
 - **Given** a `jsonb` value holding a uuid the archive does not carry, **when** the workspace moves, **then** that uuid is unchanged.
 - **Given** two pending agent proposals (option A), **when** the workspace moves, **then** neither row is written, the difference report's `proposalsLeftBehind` is 2, the preview says so, and nothing counts them as skipped.
-- **Given** any exported table with a `jsonb` column, **when** the guard test runs, **then** it moves a row that holds a key-mapped uuid in that column and checks it was rewritten. A new `jsonb` column fails until the test moves one.
+- **Given** a moved row's id inside nested objects, an array or a document, and a uuid the archive does not carry, **when** the workspace moves, **then** the first are rewritten and the second is unchanged.
+
+As built: the rule names no column, so there is no list to fall behind and no per-column guard. One round-trip test moves a copilot proposal (an id at the top, one inside an array, a mention inside a document, and a uuid of nothing), an agent's proposal, and an activity, and fails without the walk.
 
 ## 4. Decisions for a person
 
