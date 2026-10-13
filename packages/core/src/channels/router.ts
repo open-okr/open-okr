@@ -361,17 +361,19 @@ function replyFor(command: ChatCommand, result: unknown): string {
   const record = result as Record<string, unknown>;
 
   if (command.verb === "status") {
+    // `goals.read`'s own field names. This read `progress`, `confidence` and
+    // `nextCheckInAt`, none of which a goal has, so the reply said the health
+    // alone. A goal has no confidence of its own; its key results do.
     const title = typeof record.title === "string" ? record.title : "That goal";
     const parts = [
-      typeof record.health === "string" ? `health ${record.health}` : null,
-      typeof record.progress === "number"
-        ? `${Math.round(record.progress)}% of the way`
+      typeof record.health === "string"
+        ? `health ${record.health.replaceAll("_", " ")}`
         : null,
-      typeof record.confidence === "number"
-        ? `confidence ${record.confidence}`
+      typeof record.progressPct === "number"
+        ? `${Math.round(record.progressPct)}% of the way`
         : null,
-      typeof record.nextCheckInAt === "string"
-        ? `next check-in ${record.nextCheckInAt.slice(0, 10)}`
+      typeof record.nextCheckInOn === "string"
+        ? `next check-in ${record.nextCheckInOn}`
         : null,
     ].filter((part): part is string => part !== null);
     return parts.length > 0 ? `${title}: ${parts.join(", ")}.` : `${title}.`;

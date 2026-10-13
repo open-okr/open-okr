@@ -228,7 +228,22 @@ describe("what a member may do", () => {
     const reply = await route(`status ${goalId}`, OWNER);
     expect(reply.kind).toBe("done");
     expect(reply.text).toContain("Become the preferred platform");
-    expect(reply.text).toMatch(/health|% of the way/);
+
+    // All three things the command's help promises. The reply read
+    // `progress`, `confidence` and `nextCheckInAt`, which `goals.read` does
+    // not return, so it said the health alone, and this test, which asked
+    // for health or progress, passed on that.
+    const wb = await workerDb();
+    const goal = (await callAction(
+      { pool: wb.appPool, ...asOwner() },
+      "goals.read",
+      { id: goalId },
+    )) as { health: string; progressPct: number; nextCheckInOn: string };
+    expect(reply.text).toContain(`health ${goal.health.replaceAll("_", " ")}`);
+    expect(reply.text).toContain(`${Math.round(goal.progressPct)}% of the way`);
+    expect(reply.text).toContain(`next check-in ${goal.nextCheckInOn}`);
+    // Health in words, as a person would say it.
+    expect(reply.text).not.toContain("_");
   });
 
   it("answers help with the catalogue", async () => {
