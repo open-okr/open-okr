@@ -99,12 +99,10 @@ export const managementAnswers = pgTable("management_answers", {
    */
   questionKey: smallint("question_key").notNull(),
   /**
-   * The answer as plain text. Since change 11b of guided inputs (migration
-   * 0141) it is written beside `bodyDocument` for one release, so the
-   * previous release still reads it, and it goes in change 13.
+   * The answer as editor JSON, and its rich text schema version. The plain
+   * `body` column it replaced (guided-inputs change 11b) was dropped in 0.4
+   * (change 13b, migration 0144).
    */
-  body: text("body").notNull(),
-  /** The answer as editor JSON, and its rich text schema version. */
   bodyDocument: jsonb("body_document"),
   bodyDocumentVersion: integer("body_document_version"),
   answeredById: uuid("answered_by_id")

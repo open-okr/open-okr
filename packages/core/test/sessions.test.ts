@@ -1552,7 +1552,12 @@ describe("sessions.digest carries the coordinator's note (P6-G19b)", () => {
     await callAction(
       { pool: wb.appPool, ...context() },
       "sessions.setCoordinatorNote",
-      { sessionId, note: "Hiring is the constraint, not the roadmap." },
+      {
+        sessionId,
+        note: richTextFromPlainText(
+          "Hiring is the constraint, not the roadmap.",
+        ),
+      },
     );
 
     const digest = (await callAction(
@@ -1606,16 +1611,9 @@ describe("sessions.digest carries the coordinator's note (P6-G19b)", () => {
     expect(digest.lines).toContain(
       "For leadership: Hiring is the constraint. Not the roadmap.",
     );
-
-    // The plain column, which the release before reads during an upgrade.
-    const { rows } = await wb.admin.query<{ note: string }>(
-      "select d.note from digests d join okr_sessions s on s.digest_id = d.id where s.id = $1",
-      [sessionId],
-    );
-    expect(rows[0]?.note).toBe("Hiring is the constraint.\n\nNot the roadmap.");
   });
 
-  it("refuses a blank note, and reads one the backfill has not reached as a document", async () => {
+  it("refuses a blank note, and plain text since 0.4", async () => {
     const wb = await workerDb();
     await createGoalWithKr();
     const sessionId = await holdAWeek(0.6);
@@ -1626,21 +1624,14 @@ describe("sessions.digest carries the coordinator's note (P6-G19b)", () => {
         { sessionId, note: { type: "doc", content: [{ type: "paragraph" }] } },
       ),
     ).rejects.toThrow(/something for leadership/);
-
-    await wb.admin.query(
-      `update digests set note = 'Written last release.'
-        where id = (select digest_id from okr_sessions where id = $1)`,
-      [sessionId],
-    );
-    const digest = (await callAction(
-      { pool: wb.appPool, ...context() },
-      "sessions.digest",
-      { sessionId },
-    )) as { note: string | null; noteDocument: unknown };
-    expect(digest.note).toBe("Written last release.");
-    expect(digest.noteDocument).toEqual(
-      richTextFromPlainText("Written last release."),
-    );
+    // Guided-inputs change 13b: editor JSON only, as the 0.3.0 notes said.
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "sessions.setCoordinatorNote",
+        { sessionId, note: "Plain text." as never },
+      ),
+    ).rejects.toThrow();
   });
 });
 

@@ -91,12 +91,10 @@ export const decisions = pgTable("decisions", {
   /** §7.5 dates a decision to the day. Ordering within one falls to `created_at`. */
   at: date("at").notNull(),
   /**
-   * The decision as plain text. Since change 11a of guided inputs (migration
-   * 0140) it is written beside `textDocument` for one release, so the
-   * previous release still reads it, and it goes in change 13.
+   * The decision as editor JSON, and its rich text schema version. The plain
+   * `text` column it replaced (guided-inputs change 11a) was dropped in 0.4
+   * (change 13b, migration 0144).
    */
-  text: text("text").notNull(),
-  /** The decision as editor JSON, and its rich text schema version. */
   textDocument: jsonb("text_document"),
   textDocumentVersion: integer("text_document_version"),
   authorMemberId: uuid("author_member_id")

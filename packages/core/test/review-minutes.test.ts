@@ -14,6 +14,7 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "minutes-facilitator";
@@ -227,7 +228,9 @@ const runTheReview = async () => {
       sessionId,
       questionKey: 4,
       // Two paragraphs, which the minutes give back as one line.
-      body: "Between the platform space and support.\n\nNobody owned the handover.",
+      body: richTextFromPlainText(
+        "Between the platform space and support.\n\nNobody owned the handover.",
+      ),
     },
     MANAGER,
   );
@@ -407,7 +410,9 @@ describe("every stage's record", () => {
   it("leaves the facilitator's private notes out", async () => {
     await call("sessions.setStageNote", {
       id: sessionId,
-      note: "Pulse was low. Do not put this in the minutes.",
+      note: richTextFromPlainText(
+        "Pulse was low. Do not put this in the minutes.",
+      ),
     });
     await runTheReview();
 
