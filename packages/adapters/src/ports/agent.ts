@@ -44,6 +44,8 @@ export interface AgentPrompt {
     readonly description: string;
     readonly required: boolean;
   }[];
+  /** The message `prompts/get` answers with, from the arguments given. */
+  readonly render: (args: Readonly<Record<string, string>>) => string;
 }
 
 /**

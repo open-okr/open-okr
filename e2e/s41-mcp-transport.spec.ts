@@ -222,6 +222,22 @@ test("a client on a newer protocol is answered with this server's, and its next 
   expect(listed.status()).toBe(200);
 });
 
+test("answers a prompt it lists, and refuses one it does not", async () => {
+  // Listed but unanswerable was "method not found" in every client (MCP
+  // Inspector against the UAT instance, 13 October 2026).
+  const body = await bodyOf(
+    await rpc("prompts/get", { name: "what-do-i-owe", arguments: {} }),
+  );
+  const result = body.result as {
+    messages: { role: string; content: { text: string } }[];
+  };
+  expect(result.messages[0]?.role).toBe("user");
+  expect(result.messages[0]?.content.text).toContain("review.inbox");
+
+  const unknown = await bodyOf(await rpc("prompts/get", { name: "nonsense" }));
+  expect(unknown.error).toBeDefined();
+});
+
 test("answers a plain resource list, since it declares resources", async () => {
   // Every resource is a template, so the list is empty, but it is an answer:
   // a client that lists on connect read "method not found" as a fault.
