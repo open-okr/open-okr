@@ -256,11 +256,19 @@ const runTheReview = async () => {
     text: "We learned that a dependency nobody owns is a dependency nobody clears.",
     carryForward: true,
   });
-  await call("sessions.draftNextCycle", {
-    sessionId,
-    title: "Make onboarding something a team finishes in one sitting",
-    why: "Three of five losses were onboarding, not features.",
-  });
+  // A draft as an earlier release wrote it: nothing writes one since 0.4,
+  // and the minutes still read the ones there are.
+  await (await workerDb()).admin.query(
+    `insert into next_cycle_drafts (id, workspace_id, session_id, title, why, created_by_id)
+     values (gen_random_uuid(), $1, $2, $3, $4, $5)`,
+    [
+      workspaceId,
+      sessionId,
+      "Make onboarding something a team finishes in one sitting",
+      "Three of five losses were onboarding, not features.",
+      facilitatorMemberId,
+    ],
+  );
   await call("sessions.addAction", {
     sessionId,
     what: "Write the dependency contract with the platform space",
