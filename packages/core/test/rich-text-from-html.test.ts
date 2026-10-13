@@ -82,6 +82,17 @@ describe("richTextFromHtml", () => {
     });
   });
 
+  it("reads <u> as underline, which the editor writes since change 4b", () => {
+    const doc = richTextFromHtml("<p>Mind <u>this</u></p>");
+    expect(doc.content[0]).toEqual({
+      type: "paragraph",
+      content: [
+        { type: "text", text: "Mind " },
+        { type: "text", text: "this", marks: [{ type: "underline" }] },
+      ],
+    });
+  });
+
   it("builds lists, headings and a rule", () => {
     const doc = richTextFromHtml(
       "<h2>Title</h2><ul><li>one</li><li>two</li></ul><hr>",
