@@ -209,7 +209,7 @@ The existing `RichTextEditor` gains a `variant` prop:
 | Resource or priority shifts | Monthly review | `okr_sessions.shifts` | `shifts_document` + `shifts_document_version` (11a) | The monthly record |
 | The decision | Monthly review | `decisions.text` | `text_document` + `text_document_version` (11a) | The monthly record, the goal page, the cycle page's decision list and its running cadence |
 | Management retro answers | Quarterly review | `management_answers.body` | `body_document` + `body_document_version` (11b) | The minutes |
-| Coordinator note | Weekly session | `digests.note` | `note_rich` + `note_rich_version` | The digest, its AI narration, and the channel posts |
+| Coordinator note | Weekly session | `digests.note` | `note_document` + `note_document_version` (11c) | The digest, its AI narration, and the channel posts |
 | What changed | Quarterly revalidation | `cycle_revalidations.change_note` | `change_note_rich` + version | Nothing else |
 | Focus areas | Quarterly revalidation | `cycle_revalidations.focus_note` | `focus_note_rich` + version | Nothing else |
 | Private stage note | Quarterly review | A string inside the `okr_sessions.notes` map | The same map, holding editor JSON (11b) | The facilitator alone |
@@ -227,6 +227,8 @@ The `_rich` names are placeholders. The final names are settled in the change, w
 The private stage note has no column to add. In the first release its readers accept a string or a document, the data-change script turns every string into a document, and the second release accepts documents only.
 
 As built in 11b: migration 0141 and data changes 0029 (the answers) and 0030 (the notes). `sessions.read` wraps a note still stored as text, so the screen meets one shape, and `sessions.setStageNote` writes a document or removes the stage's key when the note is blank. The previous release shows a stored document as an empty note rather than failing, which is acceptable for one release because the facilitator alone reads it. An answer must hold words, not only a mention, because `management_answers.body` refuses an empty string. The minutes read the answer as `excerptRichText` of the document: their markdown indents it under its question, and a blank line between paragraphs would end the list. The workspace archive's import remaps a mention in each note of the map, as it does in a single document.
+
+As built in 11c: migration 0142 and data change 0031. Every reader of the note goes through one assembler, `digestInputFor`, which feeds the digest, its narration and the channel post, so the note becomes one line there (`richTextAsLine`, with no length because the action holds the note to 2000). `sessions.digest` returns `noteDocument` beside it for the form, which is a `RichTextField` with `sendUnchanged`, so pressing replace on a note nobody touched writes the same note, as the textarea did. `RichTextField` gained `hideLabel`, because the card's heading already names the field. The workspace archive leaves digests out, so its import needs nothing here.
 
 Everything that reads these fields as text (the digest, its narration, the minutes, channel posts) reads `excerptRichText` of the document, so the AI and the chat channels see the same text they see today. All seven tables are marked "no legacy source" in TECHNICAL-PLAN §7.2, so the importer mapping gains no rows.
 

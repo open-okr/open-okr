@@ -2991,6 +2991,7 @@
   "session.detail.actions.chooseWhoItMovesTo": "Pilih kepada siapa ia dipindahkan.",
   "session.detail.actions.commitmentHasNobody": "\"{text}\" tidak mempunyai sesiapa yang bertanggungjawab. Setiap komitmen menamakan seorang.",
   "session.detail.actions.nameTheKeyResultBlocked": "Namakan keputusan utama yang dihalang oleh perkara ini.",
+  "session.detail.actions.noteUnreadable": "Nota itu tidak dapat dibaca. Muat semula halaman dan tulis semula.",
   "session.detail.actions.nothingWasAnswered": "Tiada apa-apa yang dijawab, jadi tiada apa-apa yang ditutup.",
   "session.detail.actions.somebodyOwnsClearingIt": "Seseorang mesti bertanggungjawab menyelesaikannya. Dalam §6.2, tiada halangan tanpa pemilik.",
   "session.detail.actions.somebodyOwnsTheNextAction": "Seseorang memiliki tindakan seterusnya. Pilih siapa.",

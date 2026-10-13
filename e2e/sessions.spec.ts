@@ -475,7 +475,11 @@ test("the coordinator's note reaches the digest once the session is closed", asy
     page.getByRole("heading", { name: "The coordinator's note" }),
   ).toBeVisible();
 
-  await page.locator("textarea[name='note']").fill(note);
+  // The compact editor since guided-inputs change 11c.
+  const noteBox = () =>
+    page.getByRole("textbox", { name: "The coordinator's note", exact: true });
+  await noteBox().click();
+  await noteBox().pressSequentially(note);
   await page.getByRole("button", { name: "Add the note" }).click();
 
   // Written, and read back: the form now offers to replace it, which it can
@@ -483,6 +487,13 @@ test("the coordinator's note reaches the digest once the session is closed", asy
   await expect(
     page.getByRole("button", { name: "Replace the note" }),
   ).toBeVisible({ timeout: 10_000 });
+  // And the digest says it, on its own line for leadership.
+  await expect(page.getByRole("list", { name: "The digest" })).toContainText(
+    `For leadership: ${note}`,
+  );
+  // The editor opens on what is stored once the page is read again.
+  await page.reload();
+  await expect(noteBox()).toContainText(note, { timeout: 15_000 });
 });
 
 /**

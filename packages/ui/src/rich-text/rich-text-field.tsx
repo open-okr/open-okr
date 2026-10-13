@@ -20,6 +20,12 @@ export interface RichTextFieldProps {
    * nothing.
    */
   readonly sendUnchanged?: boolean;
+  /**
+   * No visible legend, where a heading beside the field already names it.
+   * The editing surface keeps the label as its accessible name, as the
+   * kit's other fields do.
+   */
+  readonly hideLabel?: boolean;
 }
 
 /**
@@ -41,6 +47,7 @@ export function RichTextField({
   placeholder,
   maxCharacters,
   sendUnchanged = false,
+  hideLabel = false,
 }: RichTextFieldProps) {
   const [edited, setEdited] = useState<string | null>(() =>
     sendUnchanged && content !== null && content !== undefined
@@ -57,7 +64,9 @@ export function RichTextField({
       className="m-0 flex flex-col gap-1 border-0 p-0"
       aria-describedby={description ? descriptionId : undefined}
     >
-      <legend className="mb-1 text-sm font-medium text-ink-2">{label}</legend>
+      {hideLabel ? null : (
+        <legend className="mb-1 text-sm font-medium text-ink-2">{label}</legend>
+      )}
       <div className="rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
         <RichTextEditor
           label={label}

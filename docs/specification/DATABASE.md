@@ -421,7 +421,9 @@ A row is created when somebody takes part, not when the session is made. Seeding
 Since guided-inputs change 11a (migration 0140) a decision is editor JSON in `text_document`, and `text` holds its plain text for one release so the release before reads it; change 13 drops `text`.
 
 ### digests
-`scope` (`space` / `workspace` / `member`), `scope_id?`, `period` (`daily` / `weekly` / `cycle`), `period_start`, `body jsonb`, `note?`, `generated_at`, `published_at?`, `channels text[]`.
+`scope` (`space` / `workspace` / `member`), `scope_id?`, `period` (`daily` / `weekly` / `cycle`), `period_start`, `body jsonb`, `note?`, `note_document jsonb?`, `note_document_version?`, `generated_at`, `published_at?`, `channels text[]`.
+
+`note` is the coordinator's note for leadership. Since guided-inputs change 11c (migration 0142) it is editor JSON in `note_document`, checked to be set with its version, and `note` holds its plain text for one release so the release before reads it; data change 0031 fills the documents and change 13 drops `note`. The digest, its narration and a channel post carry it as one line.
 
 `published_at` and `channels` were written by nothing until completeness review M-23. `sessions.postDigest` now sets both when the facilitator posts a closed weekly session's digest to its space's channel: `published_at` on the first post, and the providers it went to added to `channels`.
 

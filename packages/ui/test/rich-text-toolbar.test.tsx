@@ -259,6 +259,21 @@ describe("a rich text field in a form", () => {
     // version of something nobody changed.
     expect(container.querySelector('input[name="bio"]')).toBeNull();
   });
+
+  test("with hideLabel, draws no legend and keeps the label as the editor's name", async () => {
+    const { container } = inEnglish(
+      <form>
+        <h2>The coordinator's note</h2>
+        <RichTextField label="The coordinator's note" name="note" hideLabel />
+      </form>,
+    );
+    await editorReady(container);
+
+    expect(container.querySelector("legend")).toBeNull();
+    expect(
+      screen.getByRole("textbox", { name: "The coordinator's note" }),
+    ).not.toBeNull();
+  });
 });
 
 describe("a rich text field in a form that writes every field", () => {

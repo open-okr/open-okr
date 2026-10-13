@@ -399,8 +399,10 @@ export default async function SessionPage({ params }: SessionPageProps) {
   interface WeeklyDigestRead {
     weekStart: string;
     lines: string[];
-    /** What the coordinator added for leadership (P6-G19b). */
+    /** What the coordinator added for leadership (P6-G19b), as one line. */
     note: string | null;
+    /** The same note as editor JSON, which the form edits (change 11c). */
+    noteDocument: unknown;
     /** Where it has been posted, and where it could be now (M-23). */
     postedTo: string[];
     postableTo: string[];
@@ -871,7 +873,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {sessionRow.state === "closed" &&
         isFacilitator &&
         weeklyDigest !== null && (
-          <CoordinatorNote sessionId={id} note={weeklyDigest.note} />
+          <CoordinatorNote sessionId={id} note={weeklyDigest.noteDocument} />
         )}
 
       {isRunning &&

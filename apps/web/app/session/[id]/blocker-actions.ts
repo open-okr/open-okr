@@ -15,6 +15,7 @@ import { callAction, OperationError } from "@openokr/core";
 import { BLOCKER_TYPE_DEFINITIONS } from "@openokr/method";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { readRichTextField } from "../../../lib/rich-text-form.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { type CommitmentState, NO_ERROR } from "./commitment-state.ts";
@@ -144,19 +145,26 @@ export async function setCoordinatorNoteAction(
   form: FormData,
 ): Promise<CommitmentState> {
   const sessionId = String(form.get("sessionId") ?? "");
-  const note = String(form.get("note") ?? "").trim();
-  // The action schema asks for at least one character, so an empty box would
-  // come back as a Zod error rather than a sentence. There is no action for
+  // Editor JSON since guided-inputs change 11c, sent as it is stored when
+  // nobody touched it, so pressing replace on a kept note rewrites the same.
+  const note = readRichTextField(form, "note");
+  // The action schema refuses a blank note, so an empty editor would come
+  // back as a Zod error rather than a sentence. There is no action for
   // clearing a note that is already written; saying so is better than a
   // control that looks as though it does.
-  if (note === "") {
+  if (note.state !== "document") {
     const { t } = await getTranslations();
-    return { error: t("session.detail.actions.writeTheNoteFirst") };
+    return {
+      error:
+        note.state === "malformed"
+          ? t("session.detail.actions.noteUnreadable")
+          : t("session.detail.actions.writeTheNoteFirst"),
+    };
   }
   try {
     await callAction(await context(), "sessions.setCoordinatorNote", {
       sessionId,
-      note,
+      note: note.document,
     });
   } catch (error) {
     if (error instanceof OperationError) {

@@ -40,6 +40,7 @@ import { sessionShiftsDocument } from "../data-changes/0027_session_shifts_docum
 import { decisionTextDocument } from "../data-changes/0028_decision_text_document.ts";
 import { managementAnswerDocument } from "../data-changes/0029_management_answer_document.ts";
 import { stageNoteDocuments } from "../data-changes/0030_stage_note_documents.ts";
+import { digestNoteDocument } from "../data-changes/0031_digest_note_document.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -89,6 +90,8 @@ try {
       // Change 11b: the quarterly review's prose as documents.
       managementAnswerDocument,
       stageNoteDocuments,
+      // Change 11c: the weekly coordinator note as a document.
+      digestNoteDocument,
     ],
   });
   process.stdout.write(

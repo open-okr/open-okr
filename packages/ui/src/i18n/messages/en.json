@@ -2991,6 +2991,7 @@
   "session.detail.actions.chooseWhoItMovesTo": "Choose who it moves to.",
   "session.detail.actions.commitmentHasNobody": "\"{text}\" has nobody against it. Every commitment names one person.",
   "session.detail.actions.nameTheKeyResultBlocked": "Name the key result this is blocking.",
+  "session.detail.actions.noteUnreadable": "That note could not be read. Reload the page and write it again.",
   "session.detail.actions.nothingWasAnswered": "Nothing was answered, so nothing was closed.",
   "session.detail.actions.somebodyOwnsClearingIt": "Somebody owns clearing it. §6.2 has no unowned blocker.",
   "session.detail.actions.somebodyOwnsTheNextAction": "Somebody owns the next action. Choose who.",

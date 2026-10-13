@@ -33,6 +33,7 @@ import { sessionShiftsDocument } from "../src/data-changes/0027_session_shifts_d
 import { decisionTextDocument } from "../src/data-changes/0028_decision_text_document.ts";
 import { managementAnswerDocument } from "../src/data-changes/0029_management_answer_document.ts";
 import { stageNoteDocuments } from "../src/data-changes/0030_stage_note_documents.ts";
+import { digestNoteDocument } from "../src/data-changes/0031_digest_note_document.ts";
 import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { runMigrations } from "../src/migrate.ts";
 
@@ -1726,5 +1727,50 @@ describe("0029 and 0030: the quarterly review's prose as documents", () => {
       scripts: [managementAnswerDocument, stageNoteDocuments],
     });
     expect(again.map((outcome) => outcome.rowsChanged)).toEqual([0, 0]);
+  });
+});
+
+describe("0031: the weekly coordinator note as a document", () => {
+  it("writes each note as a document, leaves a digest with none, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       )
+       insert into digests (id, workspace_id, scope, period, period_start, note)
+       select gen_random_uuid(), w.id, 'space', 'weekly', d.week, d.note
+         from w,
+              (values ('2026-08-24'::date, 'Hiring is the constraint.\n\nNot the roadmap.'),
+                      ('2026-08-31'::date, null)) as d(week, note)`,
+    );
+
+    const [outcome] = await runDataChanges(client, {
+      scripts: [digestNoteDocument],
+    });
+    expect(outcome?.rowsChanged).toBe(1);
+
+    const { rows } = await client.query<{
+      note_document: unknown;
+      note_document_version: number | null;
+    }>(
+      "select note_document, note_document_version from digests order by period_start",
+    );
+    expect(rows[0]?.note_document).toEqual(
+      plainTextDocument("Hiring is the constraint.\n\nNot the roadmap."),
+    );
+    expect(rows[0]?.note_document_version).toBe(1);
+    expect(rows[1]).toEqual({
+      note_document: null,
+      note_document_version: null,
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [digestNoteDocument],
+    });
+    expect(again?.rowsChanged).toBe(0);
   });
 });

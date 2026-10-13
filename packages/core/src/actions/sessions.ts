@@ -3844,12 +3844,23 @@ export const confidenceTrend = defineReadAction({
   },
 });
 
+/** The longest coordinator note, the textarea's limit before it was an editor. */
+const COORDINATOR_NOTE_MAX_CHARACTERS = 2000;
+
 export const setCoordinatorNote = defineWriteAction({
   name: "sessions.setCoordinatorNote",
   summary: "Adds the coordinator's note to the session digest.",
   input: z.object({
     sessionId: z.uuid(),
-    note: z.string().trim().min(1).max(2000),
+    /**
+     * Editor JSON, or for this release the plain text it took before
+     * (guided-inputs change 11c), which is wrapped as a document.
+     */
+    note: richTextOrPlainTextSchema({
+      maxCharacters: COORDINATOR_NOTE_MAX_CHARACTERS,
+    }).refine((value) => documentOfInput(value) !== null, {
+      message: "A note says something for leadership.",
+    }),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -3875,9 +3886,17 @@ export const setCoordinatorNote = defineWriteAction({
         );
       }
 
+      // Both columns, the plain one for the previous release during a rolling
+      // upgrade. The schema has already refused a blank note.
+      const document = documentOfInput(input.note) as RichTextDocument;
       await tx
         .update(digests)
-        .set({ note: input.note, updatedAt: new Date() })
+        .set({
+          note: plainTextOfDocument(document),
+          noteDocument: document,
+          noteDocumentVersion: RICH_TEXT_SCHEMA_VERSION,
+          updatedAt: new Date(),
+        })
         .where(activeOnly(digests, eq(digests.id, session.digestId)));
 
       return {
