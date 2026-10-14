@@ -82,8 +82,6 @@ const MARK_TAGS: Readonly<Record<string, Exclude<Mark["type"], "link">>> = {
   s: "strike",
   strike: "strike",
   del: "strike",
-  // Since guided-inputs change 4b, a release after every reader knew it.
-  u: "underline",
 };
 
 /** Discarded with everything inside them. Anything else unknown is unwrapped

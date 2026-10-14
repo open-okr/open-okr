@@ -1881,7 +1881,6 @@
   "editor.toolbar.orderedList": "Numbered list",
   "editor.toolbar.strike": "Strikethrough",
   "editor.toolbar.table": "Insert a table",
-  "editor.toolbar.underline": "Underline",
   "error.somethingWentWrong": "Something went wrong",
   "error.weCouldNotLoad": "We could not load your workspace. This is our fault, not something\n            you did.",
   "feedPanel.aMember": "A member",

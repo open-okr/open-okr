@@ -482,12 +482,13 @@ describe("extractMentionIds / extractAttachments: decode-safe", () => {
 });
 
 /**
- * Underline (docs/design/guided-inputs.md §4.7). Step 1 taught every reader
- * the mark before anything could write it, so a document carrying one still
- * validates and renders during a rolling upgrade. Step 2, change 4b, a
- * release later, lets the editor and the HTML import write it.
+ * Underline, step 1 (docs/design/guided-inputs.md §4.7): every reader knows
+ * the mark before anything can write it, so a document carrying one, written
+ * by a later release, still validates and still renders during a rolling
+ * upgrade. Nothing in this release adds the mark: not the editor's keyboard,
+ * not a paste, and not the HTML import.
  */
-describe("underline, which every reader knows", () => {
+describe("underline, which readers know before anything writes it", () => {
   const underlined = {
     type: "doc",
     content: [
