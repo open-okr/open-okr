@@ -255,28 +255,6 @@ test("a comment keeps the formatting it was written with", async () => {
   ).toBeVisible({ timeout: 15_000 });
 });
 
-test("a comment can be underlined with Mod-U", async () => {
-  // Underline, step 2 (guided-inputs change 4b): every reader has known the
-  // mark since 0.3, so the editor writes it now, and the server keeps it and
-  // renders it as <u>.
-  const thread = page.getByTestId("comment-thread");
-  const composer = thread.getByRole("textbox", { name: "Your comment" });
-  await composer.fill("Countersigned by finance");
-  await composer.click();
-  await page.keyboard.press("ControlOrMeta+a");
-  await page.keyboard.press("ControlOrMeta+u");
-  await expect(
-    thread.getByRole("button", { name: "Underline" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await thread.getByRole("button", { name: "Post" }).click();
-
-  await expect(
-    thread
-      .locator('[id^="comment-"] u')
-      .filter({ hasText: "Countersigned by finance" }),
-  ).toBeVisible({ timeout: 15_000 });
-});
-
 test("the goal carries files beside its documents", async () => {
   await goTo(page, `/goals/${goalId}`);
   await expect(page.getByTestId("document-count")).toBeVisible({

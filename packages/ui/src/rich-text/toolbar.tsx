@@ -14,7 +14,6 @@ import {
   Quote,
   Strikethrough,
   Table,
-  Underline,
 } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { TextInput } from "../fields/text-input.tsx";
@@ -61,13 +60,6 @@ const FORMATS: readonly Format[] = [
     active: (editor) => editor.isActive("italic"),
     toggle: (editor) => editor.chain().focus().toggleItalic().run(),
     shortcut: "Control+I Meta+I",
-  },
-  {
-    key: "underline",
-    icon: <Underline className="size-4" aria-hidden="true" />,
-    active: (editor) => editor.isActive("underline"),
-    toggle: (editor) => editor.chain().focus().toggleUnderline().run(),
-    shortcut: "Control+U Meta+U",
   },
   {
     key: "strike",
@@ -164,7 +156,6 @@ export function EditorToolbar({
   const labels: Record<string, string> = {
     bold: t("editor.toolbar.bold"),
     italic: t("editor.toolbar.italic"),
-    underline: t("editor.toolbar.underline"),
     strike: t("editor.toolbar.strike"),
     code: t("editor.toolbar.code"),
     bulletList: t("editor.toolbar.bulletList"),
