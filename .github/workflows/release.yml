@@ -22,6 +22,8 @@ jobs:
   verify:
     name: Verify the tagged commit
     runs-on: ubuntu-latest
+    # About thirty minutes when healthy. Twice that is a hang, not a slow day.
+    timeout-minutes: 60
     # Its own stack name, so a leftover container from another job on the same
     # host cannot hold this one's port. The default ports are fine: the only
     # other database here is the compose target's, which the smoke step starts
@@ -32,6 +34,30 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      # **First, before anything slow.** v0.3.1 was first pushed on a stale
+      # local checkout and landed on a commit that still said 0.2.0. Nothing
+      # noticed: verification would have passed, because that commit was good
+      # code, and the image would have shipped 0.2.0 under the 0.3.1 tag. The
+      # version a release PR wrote is the one thing a wrong commit cannot fake.
+      #
+      # A prerelease is compared without its suffix, so v1.2.3-rc.1 belongs on
+      # the commit that says 1.2.3.
+      - name: The tag matches the version the commit carries
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          want="${TAG#v}"
+          want="${want%%-*}"
+          have="$(node -p 'require("./apps/web/package.json").version')"
+          if [ "$want" != "$have" ]; then
+            echo "::error::${TAG} is on a commit whose version is ${have}, not ${want}." >&2
+            echo "Tag the merge of the release pull request: git fetch origin, then git tag ${TAG} origin/main." >&2
+            exit 1
+          fi
+          echo "${TAG} matches ${have}"
+
       - uses: ./.github/actions/setup
 
       - name: Type check
@@ -77,10 +103,31 @@ jobs:
           OPENOKR_IMAGE=openokr:release-check OPENOKR_SKIP_PULL=1 \
             sh deploy/docker/smoke-test.sh
 
-  publish:
-    name: Build, publish and sign
+  # Both architectures: a customer's cluster is as likely to be arm64 as
+  # amd64, and a single-architecture image fails at pull time with a message
+  # nobody enjoys reading. Each is built natively and pushed by digest only,
+  # so nothing a customer pulls points at either until it is signed.
+  build:
+    name: Build
     needs: verify
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/image.yml
+    with:
+      publish: true
+
+  # **The version tag first, the floating tags last.** v0.3.1's second
+  # attempt pushed `latest` and then failed before signing, so every Compose
+  # install, which defaults to `latest`, would have pulled an unsigned image
+  # with no release notes beside it. Here only the exact version tag exists
+  # until the signature has been verified, and that tag is not the one
+  # anybody lands on by default.
+  publish:
+    name: Join, publish and sign
+    needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       # Push to GitHub Container Registry.
@@ -93,11 +140,25 @@ jobs:
       # Lets the attestation be recorded against the repository.
       attestations: write
     outputs:
-      digest: ${{ steps.build.outputs.digest }}
+      digest: ${{ steps.join.outputs.digest }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Collect both digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: image-digest-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
 
-      - uses: docker/setup-qemu-action@v4
+      - name: Both architectures are here
+        run: |
+          set -euo pipefail
+          count="$(find "${RUNNER_TEMP}/digests" -type f | wc -l | tr -d ' ')"
+          if [ "$count" != "2" ]; then
+            echo "::error::Expected one digest per architecture, two in all, and found ${count}." >&2
+            ls -la "${RUNNER_TEMP}/digests" >&2 || true
+            exit 1
+          fi
+
       - uses: docker/setup-buildx-action@v4
 
       - name: Sign in to the registry
@@ -107,37 +168,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Work out the tags
+      - name: Work out the version tag
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
-          # v1.2.3 publishes 1.2.3, 1.2 and 1. No `latest` on a prerelease.
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
 
-      - name: Build and push
-        id: build
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: deploy/docker/Dockerfile
-          # Both architectures: a customer's cluster is as likely to be arm64
-          # as amd64, and a single-architecture image fails at pull time with a
-          # message nobody enjoys reading.
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Records the commit and workflow that produced the image, so a
-          # published artefact can be traced back without trusting the tag.
-          provenance: mode=max
-          sbom: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Join both architectures under the version tag
+        id: join
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          REF: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          sources=()
+          for digest in *; do
+            sources+=("${REGISTRY}/${IMAGE}@sha256:${digest}")
+          done
+          docker buildx imagetools create --tag "$REF" "${sources[@]}"
+          digest="$(docker buildx imagetools inspect "$REF" --format '{{json .Manifest}}' | jq -r .digest)"
+          case "$digest" in
+            sha256:*) ;;
+            *) echo "::error::Could not read the digest of ${REF}" >&2; exit 1 ;;
+          esac
+          docker buildx imagetools inspect "$REF"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
@@ -148,7 +205,7 @@ jobs:
         # transparency log. Verifying proves which workflow, at which commit,
         # built the image, rather than proving somebody held a key.
         env:
-          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.join.outputs.digest }}
         run: |
           cosign sign --yes "${REGISTRY}/${IMAGE}@${DIGEST}"
 
@@ -156,7 +213,7 @@ jobs:
         uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ steps.join.outputs.digest }}
           push-to-registry: true
 
   # A published signature nobody checks is decoration. This verifies the
@@ -165,6 +222,7 @@ jobs:
     name: Verify the published signature
     needs: publish
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       # Read-only, deliberately. Verification is what a customer does, and a
@@ -185,10 +243,75 @@ jobs:
             "${REGISTRY}/${IMAGE}@${DIGEST}"
           echo "Signature verified for ${REGISTRY}/${IMAGE}@${DIGEST}"
 
+  # `latest`, `1.2` and `1` move onto the signed digest only now, after its
+  # signature has been verified from outside. A prerelease moves none of them.
+  promote:
+    name: Move the floating tags
+    needs: [publish, verify-signature]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to the registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Work out the floating tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          # The semver patterns skip a prerelease on their own, and `latest`
+          # is switched off for one by name.
+          tags: |
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+
+      - name: Point them at the signed digest
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          tags=()
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && tags+=("$tag")
+          done <<< "$TAGS"
+          if [ "${#tags[@]}" = "0" ]; then
+            echo "A prerelease: no floating tag moves."
+            exit 0
+          fi
+          args=()
+          for tag in "${tags[@]}"; do
+            args+=(--tag "$tag")
+          done
+          # One source and no annotations: buildx pushes the source's bytes
+          # unchanged (util/imagetools/create.go, "on single source, return
+          # original bytes"), so the digest and its signature carry over.
+          docker buildx imagetools create "${args[@]}" "${REGISTRY}/${IMAGE}@${DIGEST}"
+          # Checked rather than assumed. A tag on any other digest has no
+          # signature, which is the exact state this ordering exists to avoid.
+          for tag in "${tags[@]}"; do
+            got="$(docker buildx imagetools inspect "$tag" --format '{{json .Manifest}}' | jq -r .digest)"
+            if [ "$got" != "$DIGEST" ]; then
+              echo "::error::${tag} resolves to ${got}, not the signed ${DIGEST}" >&2
+              exit 1
+            fi
+            echo "${tag} -> ${got}"
+          done
+
   # The artefact set, in one place (P7-T09b).
   #
   # **A bill of materials attested to an image is not a bill of materials a
-  # person can read.** `sbom: true` on the build step puts one in the
+  # person can read.** `sbom: true` on the build in image.yml puts one in the
   # registry, where reading it needs cosign, a digest and a reason to look.
   # An auditor asking "what is in the release we deployed in March" wants a
   # file on the release page. So the same image is scanned again into a file
@@ -200,8 +323,11 @@ jobs:
   # it broke anything.
   release:
     name: Publish the release and its bill of materials
-    needs: [publish, verify-signature]
+    # After the floating tags, so the release GitHub marks Latest is never
+    # ahead of the image `latest` pulls.
+    needs: [publish, verify-signature, promote]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
       packages: read
@@ -275,8 +401,11 @@ jobs:
 
   chart:
     name: Package the chart
-    needs: publish
+    # The chart installs the version tag by default, so it waits for that
+    # image's signature to verify rather than publishing beside an unsigned one.
+    needs: [publish, verify-signature]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       packages: write
