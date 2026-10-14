@@ -238,6 +238,11 @@ const importDifferenceSchema = z.object({
   merged: z.array(mergedMemberSchema),
   skipped: z.record(z.string(), z.number().int()),
   blobs: z.number().int(),
+  /**
+   * Agent proposals left behind on purpose: the run that made each one does
+   * not travel. Zero for a report stored before this field existed.
+   */
+  proposalsLeftBehind: z.number().int().default(0),
 });
 
 /**

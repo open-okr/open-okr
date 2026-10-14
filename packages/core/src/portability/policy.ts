@@ -382,7 +382,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "agent_runs",
     decision: "exclude",
     reason:
-      "An agent run's state machine and its cost, recorded against this instance's provider. The proposals it produced are carried; the run that produced them is not.",
+      "An agent run's state machine and its cost, recorded against this instance's provider. The proposals a run made stay behind with it, counted in the import's report: the agents propose again on their next run, against the moved rows (docs/design/ids-across-a-move.md).",
   },
   {
     table: "ai_usage_events",
@@ -739,7 +739,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "proposed_changes",
     decision: "export",
     reason:
-      "Proposals sitting in the review queue. Somebody has to answer them, and they should not have to answer them twice.",
+      "Proposals a person made through the copilot, sitting in the review queue. Somebody has to answer them, and they should not have to answer them twice. An agent's proposals stay behind with the run that made it.",
   },
   {
     table: "alignment_findings",
