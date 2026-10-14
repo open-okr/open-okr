@@ -1,5 +1,15 @@
 # @openokr/importer
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @openokr/adapters@0.3.1
+  - @openokr/config@0.3.1
+  - @openokr/core@0.3.1
+  - @openokr/method@0.3.1
+
 ## 0.3.0
 
 ### Patch Changes
