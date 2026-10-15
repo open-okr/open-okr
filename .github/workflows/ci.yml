@@ -180,7 +180,12 @@ jobs:
         with:
           name: flaky-report-${{ matrix.shard }}
           path: .flaky/report-*.json
-          if-no-files-found: ignore
+          # `.flaky` is a hidden directory, and a glob skips hidden files
+          # unless told otherwise. Without this no shard report was ever
+          # uploaded and the flakiness gate merged nothing, green every time.
+          # An error rather than ignore, so a missing report says so.
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 14
 
   e2e:
@@ -249,7 +254,9 @@ jobs:
         with:
           name: flaky-report-e2e-${{ matrix.shard }}
           path: .flaky/report-e2e-*.json
-          if-no-files-found: ignore
+          # Hidden directory and a glob, as for the unit shards above.
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 14
 
       - name: Upload the Playwright report
