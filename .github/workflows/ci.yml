@@ -137,8 +137,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Sharding scaffold. Raise this as the suite grows; nothing else changes.
-        shard: [1, 2]
+        # Four, because two took 12 to 15 minutes each. Raise this as the suite
+        # grows; nothing else changes.
+        shard: [1, 2, 3, 4]
     env:
       COMPOSE_PROJECT_NAME: openokr-test-shard${{ matrix.shard }}
     steps:
@@ -179,17 +180,31 @@ jobs:
         with:
           name: flaky-report-${{ matrix.shard }}
           path: .flaky/report-*.json
-          if-no-files-found: ignore
+          # `.flaky` is a hidden directory, and a glob skips hidden files
+          # unless told otherwise. Without this no shard report was ever
+          # uploaded and the flakiness gate merged nothing, green every time.
+          # An error rather than ignore, so a missing report says so.
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 14
 
   e2e:
-    name: End to end
+    name: End to end (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     needs: scope
     if: needs.scope.outputs.code == 'true'
     runs-on: ubuntu-latest
+    # **Split across machines, not across workers.** The suite runs one spec at
+    # a time against one claimed instance, which took 33 minutes on one runner.
+    # Each shard is its own runner with its own database and its own instance,
+    # and the `claim` project in playwright.config.ts registers on every one
+    # before its share of the specs.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # Its own stack name; the ports are whatever Docker gives it.
     env:
-      COMPOSE_PROJECT_NAME: openokr-test-e2e
+      COMPOSE_PROJECT_NAME: openokr-test-e2e-${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -225,7 +240,9 @@ jobs:
         run: pnpm build
 
       - name: Run the end-to-end suite
-        run: pnpm test:e2e
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       # The flakiness report, which is not the Playwright report and is uploaded
       # whether the run passed or not (P8-T15). Playwright retries once here,
@@ -235,16 +252,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: flaky-report-e2e
-          path: .flaky/report-e2e.json
-          if-no-files-found: ignore
+          name: flaky-report-e2e-${{ matrix.shard }}
+          path: .flaky/report-e2e-*.json
+          # Hidden directory and a glob, as for the unit shards above.
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 14
 
       - name: Upload the Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             playwright-report
             test-results
