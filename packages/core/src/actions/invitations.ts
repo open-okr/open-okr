@@ -36,6 +36,7 @@ import {
   hashInviteToken,
 } from "../invitations/tokens.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { timezoneSchema } from "../settings/registry.ts";
 import {
   addSpaceMemberInTx,
   resolveSpaceContextId,
@@ -452,7 +453,16 @@ const REFUSAL = "This invitation is no longer valid.";
 export const acceptLink = defineWriteAction({
   name: "invitations.acceptLink",
   summary: "Accept an invite link and join the workspace.",
-  input: z.object({ token: z.string().min(1) }),
+  input: z.object({
+    token: z.string().min(1),
+    /**
+     * The joining browser's timezone, which becomes the member's own
+     * (TECHNICAL-PLAN §4.14). Optional: without it the member reads the
+     * workspace's. A zone off the list is refused, as at every other
+     * timezone write.
+     */
+    timezone: timezoneSchema.optional(),
+  }),
   output: z.object({ memberId: z.uuid() }),
   // Declarative only: `bootstrap: true` below makes `runOperation` treat the
   // caller as `full` unconditionally, since there is no member yet to hold
@@ -544,6 +554,7 @@ export const acceptLink = defineWriteAction({
       const provisioned = await provisionMemberForInvite(tx, {
         workspaceId,
         user: { id: userRow.id, name: userRow.name },
+        ...(input.timezone ? { timezone: input.timezone } : {}),
         ...(guestSpaceId
           ? { kind: "guest" as const, bindWorkspace: false }
           : {}),
@@ -633,11 +644,14 @@ export const joinByTrustedDomain = defineWriteAction({
   name: "invitations.joinByTrustedDomain",
   summary:
     "Join a workspace because it trusts the domain of your confirmed email address.",
-  input: z.object({}),
+  input: z.object({
+    /** As `invitations.acceptLink`'s: the member's own timezone, optional. */
+    timezone: timezoneSchema.optional(),
+  }),
   output: z.object({ memberId: z.uuid() }),
   // Declarative only: see acceptLink above, same bootstrap reasoning.
   access: ACCESS_LEVELS.edit,
-  operation: (context, _input) => ({
+  operation: (context, input) => ({
     bootstrap: true,
     async execute({ tx, workspaceId }) {
       const userId = context.actor.userId;
@@ -711,6 +725,7 @@ export const joinByTrustedDomain = defineWriteAction({
       const provisioned = await provisionMemberForInvite(tx, {
         workspaceId,
         user: { id: userRow.id, name: userRow.name },
+        ...(input.timezone ? { timezone: input.timezone } : {}),
       });
 
       return {

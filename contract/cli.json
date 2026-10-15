@@ -589,6 +589,12 @@
           "field": "token",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "timezone",
+          "field": "timezone",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -600,7 +606,14 @@
       "path": "/invitations/joinByTrustedDomain",
       "scope": "write",
       "summary": "Join a workspace because it trusts the domain of your confirmed email address.",
-      "flags": [],
+      "flags": [
+        {
+          "name": "timezone",
+          "field": "timezone",
+          "type": "string",
+          "required": false
+        }
+      ],
       "pages": false
     },
     {
