@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      image: ${{ steps.filter.outputs.image }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -39,10 +40,22 @@ jobs:
           if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
             echo "No usable base commit. Running everything."
             echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "image=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" HEAD)
           echo "Changed files:"; echo "$CHANGED"
+          # What the release image installs or how it is built. The Compose
+          # and Helm jobs build amd64 on every code change already; what only
+          # a release used to find is the arm64 half and the publishing path,
+          # and those change with the dependencies and the build files.
+          IMAGE=$(echo "$CHANGED" | grep -E '^(deploy/docker/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|\.npmrc$|\.nvmrc$|\.dockerignore$|(apps|packages)/[^/]+/package\.json$|\.github/workflows/(image|image-rehearsal|release)\.yml$)' || true)
+          if [ -n "$IMAGE" ]; then
+            echo "The image's inputs changed:"; echo "$IMAGE"
+            echo "image=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=false" >> "$GITHUB_OUTPUT"
+          fi
           # Anything that is not documentation counts as code. Tested with a
           # non-empty check rather than `grep -qv`, whose exit code differs
           # between GNU and BSD grep.
@@ -349,6 +362,16 @@ jobs:
       - name: Build (affected only)
         run: pnpm turbo run build --affected
 
+  # The release image, both architectures, each on its own native runner,
+  # with nothing pushed. The same workflow the release calls, so a change
+  # that would break the arm64 build or the publishing path fails here, on
+  # the pull request, rather than on a tag.
+  image:
+    name: Release image
+    needs: scope
+    if: needs.scope.outputs.image == 'true'
+    uses: ./.github/workflows/image.yml
+
   compliance:
     name: Licences and sign-off
     runs-on: ubuntu-latest
@@ -381,7 +404,7 @@ jobs:
   # documentation-only skip can change without touching branch protection.
   ci:
     name: CI
-    needs: [scope, quality, test, e2e, deploy, helm, flakiness, build, compliance]
+    needs: [scope, quality, test, e2e, deploy, helm, flakiness, build, image, compliance]
     if: always()
     runs-on: ubuntu-latest
     steps:

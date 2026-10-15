@@ -10624,13 +10624,20 @@
                               "type": "integer",
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991
+                            },
+                            "proposalsLeftBehind": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
                             }
                           },
                           "required": [
                             "created",
                             "merged",
                             "skipped",
-                            "blobs"
+                            "blobs",
+                            "proposalsLeftBehind"
                           ],
                           "additionalProperties": false
                         },
