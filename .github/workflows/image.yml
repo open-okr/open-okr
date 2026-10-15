@@ -1,0 +1,113 @@
+name: Image
+
+# **Each architecture is built on a machine of that architecture.** Until
+# 0.3.1 one amd64 runner built both, the arm64 half inside QEMU, an emulator.
+# That was slow, and on 14 October 2026 it was worse than slow: QEMU died with
+# "Illegal instruction" during `pnpm install` and the build then sat silent for
+# four hours. GitHub's arm64 runners are free for a public repository, so the
+# emulator is out of the path entirely.
+#
+# **The same build runs before release day, not only on it.** The release
+# workflow calls this to publish. CI calls it on any pull request that could
+# change what the image installs, and `image-rehearsal.yml` calls it weekly on
+# main, both with nothing pushed. Until this existed the arm64 build and the
+# publishing steps ran for the first time when a tag was already pushed, which
+# is why releases failed in ways pull requests never did.
+#
+# Signing is deliberately not here. Customers verify against a certificate
+# identity naming `release.yml`, and a job inside this file would sign as
+# `image.yml` instead.
+
+on:
+  workflow_call:
+    inputs:
+      publish:
+        description: >-
+          Push each architecture's image to the registry by digest, untagged.
+          The caller joins the digests under a tag and signs the result.
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
+
+jobs:
+  build:
+    name: Image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    # A native build from nothing takes minutes. Without a limit of its own a
+    # hung build holds the job for GitHub's six-hour default, which is how
+    # long the QEMU hang would have run had nobody cancelled it.
+    timeout-minutes: 30
+    strategy:
+      # Both results, always. A failure on one architecture says more next to
+      # the other one's success than next to a cancellation.
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to the registry
+        if: inputs.publish
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Work out the labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+
+      - name: Build
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # By digest, with no tag. Nothing a customer pulls points at this
+          # yet: the release workflow joins both architectures under the
+          # version tag, signs that, and only then moves `latest`.
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=${{ inputs.publish }}
+          # Records the commit and workflow that produced the image, so a
+          # published artefact can be traced back without trusting the tag.
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+          # **A cache is an optimisation, never a reason to fail.** v0.3.1's
+          # second attempt pushed the image and then failed on a 503 from
+          # GitHub's cache service, which skipped signing and left `latest`
+          # on an unsigned image.
+          cache-to: type=gha,mode=max,scope=image-${{ matrix.arch }},ignore-error=true
+
+      - name: Record the digest
+        if: inputs.publish
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/digests"
+          touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
+
+      - name: Hand the digest to the release
+        if: inputs.publish
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+          # A re-run of a failed release uploads again under the same name.
+          overwrite: true
