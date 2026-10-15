@@ -41,7 +41,7 @@ This pulls the published image, `ghcr.io/open-okr/open-okr:latest`. To pin a
 release instead, which is the better habit on a server, name it:
 
 ```sh
-OPENOKR_IMAGE=ghcr.io/open-okr/open-okr:0.2.0 ./openokr up
+OPENOKR_IMAGE=ghcr.io/open-okr/open-okr:0.3.1 ./openokr up
 ```
 
 Each release image is built for amd64 and arm64, signed with cosign, and ships
@@ -128,7 +128,8 @@ a browser binds a passkey to an origin and nothing can migrate that.
 | Symptom | What to do |
 |---|---|
 | "the application did not become healthy in 180s" | `./openokr logs`. A database that cannot start and a bad `DATABASE_URL` both look like this |
-| "the application is healthy but the proxy is ..." | `./openokr logs proxy`. Usually port 80 or 443 is already taken |
+| "Ports are not available: ... address already in use" | Something else on the machine already answers on port 80 or 443. Docker names the first one it met, so check both. Start on others with `OPENOKR_HTTP_PORT=8080 OPENOKR_HTTPS_PORT=8443 ./openokr up`; the helper moves the sign-in address with them |
+| "the application is healthy but the proxy is ..." | The proxy started and then stopped. `./openokr logs proxy` says why |
 | The browser cannot reach it | Check a firewall between you and the machine before looking at the instance |
 | The wizard says setup is already done | Somebody has claimed this instance. Sign in, or ask them for an invitation |
 

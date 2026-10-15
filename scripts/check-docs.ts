@@ -281,6 +281,41 @@ try {
   );
 }
 
+// 6. Every release a page pins is the release this checkout is.
+//
+// "To pin a release, name it" is followed by a real version, because a reader
+// copies the line. It said 0.2.0 in four places for a week after 0.3.1 was
+// out. The version comes from where the release workflow's own guard reads
+// it, so the pull request that bumps the version is the one this refuses
+// until the pages say the same. `1.2.3` is the placeholder the runbooks use
+// on purpose and is left alone.
+const PINNING = ["README.md", "deploy/helm/README.md", ...pages];
+const PLACEHOLDER = "1.2.3";
+try {
+  const { version } = JSON.parse(
+    await readFile(join(ROOT, "apps/web/package.json"), "utf8"),
+  ) as { version: string };
+  const pinned =
+    /ghcr\.io\/open-okr\/open-okr:(\d+\.\d+\.\d+)|--version\s+(\d+\.\d+\.\d+)/g;
+  for (const page of new Set(PINNING)) {
+    const source = await readFile(join(ROOT, page), "utf8");
+    source.split("\n").forEach((line, index) => {
+      for (const match of line.matchAll(pinned)) {
+        const named = match[1] ?? match[2];
+        if (named && named !== version && named !== PLACEHOLDER) {
+          problems.push(
+            `${page}:${index + 1} pins ${named}; this checkout is ${version}`,
+          );
+        }
+      }
+    });
+  }
+} catch (error) {
+  problems.push(
+    `could not check the pinned versions: ${error instanceof Error ? error.message : String(error)}`,
+  );
+}
+
 if (problems.length > 0) {
   process.stderr.write(
     `Documentation check failed. ${problems.length} problem(s):\n${problems

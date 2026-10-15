@@ -30,6 +30,11 @@ versions a monorepo's root package, so a changeset naming the root stops
 group in `.changeset/config.json` moves every `@openokr/*` package to the same
 number, because OpenOKR ships as one instance with one version.
 
+**Then `pnpm check:docs`.** It names every page that still pins the previous
+release in an install command: the root README, the Helm README and the
+Compose guide each show a real version, because a reader copies the line.
+Change them to the new number in the same commit.
+
 Commit it, with a sign-off, and merge it to `main`.
 
 ## Tag

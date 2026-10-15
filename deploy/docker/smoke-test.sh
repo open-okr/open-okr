@@ -245,8 +245,20 @@ pass "the admin reached a provisioned workspace"
 # The image is already on this host, so the pull is skipped: reaching a
 # registry that does not have it takes minutes to fail and proves nothing.
 backups_before="$(ls -1d "$OPENOKR_BACKUP_DIR"/*/ 2>/dev/null | wc -l | tr -d ' ')"
-OPENOKR_SKIP_PULL=1 ./openokr upgrade >/dev/null 2>&1 || fail "upgrade failed"
+upgrade_log="$(OPENOKR_SKIP_PULL=1 ./openokr upgrade 2>&1)" || fail "upgrade failed"
 pass "the upgrade command ran"
+
+# **The rollback names the image it would go back to.** This printed the raw
+# JSON of `compose images` until 15 October 2026, so the one line an operator
+# needs at the worst moment had to be decoded first.
+running="${OPENOKR_IMAGE:-ghcr.io/open-okr/open-okr:latest}"
+printf '%s\n' "$upgrade_log" | grep -qF "current image: ${running}" \
+  || fail "the upgrade did not name the image it replaced (${running})"
+printf '%s\n' "$upgrade_log" | grep -qF "OPENOKR_IMAGE=${running} ./openokr up" \
+  || fail "the rollback line does not name the image to go back to"
+printf '%s\n' "$upgrade_log" | grep -qF "./openokr restore ${OPENOKR_BACKUP_DIR}/" \
+  || fail "the rollback line does not name the backup it just wrote"
+pass "the upgrade names the image it replaced, in a rollback you can copy"
 
 # **The backup is the rollback** (P7-T09c). Migrations are forward-only, so
 # once one has applied the previous image cannot read the schema and
