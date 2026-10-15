@@ -137,38 +137,67 @@ test("scrolling a long list stays inside the frame budget", async () => {
   // drop frames": each one is a frame that took longer than the threshold.
   // Counting them across a scroll is more honest than timing the scroll,
   // which averages a stutter away.
+  //
+  // **Only frames that start once scrolling has, on a page that has settled.**
+  // This used to observe with `buffered: true` from the moment the navigation
+  // was visible, which is server-rendered and so arrives before React has
+  // hydrated. The frames it reported included loading the page, and in 6 of
+  // 39 runs to 14 October 2026 one of them was 232 to 242 ms, the same frame
+  // each time rather than a stutter, and the retry passed. Loading has its
+  // own budget, largest contentful paint, above. So the scroll starts once no
+  // long frame has ended for half a second, or after ten seconds whatever the
+  // page is doing, and anything that began before it is not counted.
   const longest = await page.evaluate(
     () =>
       new Promise<number>((resolve) => {
         let worst = 0;
-        let supported = true;
+        let scrollStart = Number.POSITIVE_INFINITY;
+        let lastBusy = performance.now();
+        let observer: PerformanceObserver;
         try {
-          const observer = new PerformanceObserver((list) => {
+          observer = new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
-              worst = Math.max(worst, entry.duration);
+              if (entry.startTime >= scrollStart) {
+                worst = Math.max(worst, entry.duration);
+              } else {
+                lastBusy = Math.max(lastBusy, entry.startTime + entry.duration);
+              }
             }
           });
           observer.observe({ type: "long-animation-frame", buffered: true });
-          setTimeout(() => {
-            observer.disconnect();
-            resolve(supported ? worst : 0);
-          }, 3_000);
         } catch {
           // Not every engine reports long animation frames. Reporting zero is
           // honest here: the budget is unmeasured rather than met, and the
           // design document says which browsers answer it.
-          supported = false;
           resolve(0);
+          return;
         }
-        let scrolled = 0;
-        const step = () => {
-          scrolled += 400;
-          window.scrollBy(0, 400);
-          if (scrolled < 6_000) {
-            requestAnimationFrame(step);
+        const scroll = () => {
+          scrollStart = performance.now();
+          let scrolled = 0;
+          const step = () => {
+            scrolled += 400;
+            window.scrollBy(0, 400);
+            if (scrolled < 6_000) {
+              requestAnimationFrame(step);
+            }
+          };
+          requestAnimationFrame(step);
+          setTimeout(() => {
+            observer.disconnect();
+            resolve(worst);
+          }, 3_000);
+        };
+        const waitingSince = performance.now();
+        const waitUntilQuiet = () => {
+          const now = performance.now();
+          if (now - lastBusy >= 500 || now - waitingSince >= 10_000) {
+            scroll();
+          } else {
+            setTimeout(waitUntilQuiet, 100);
           }
         };
-        requestAnimationFrame(step);
+        waitUntilQuiet();
       }),
   );
 

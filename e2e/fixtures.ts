@@ -55,6 +55,7 @@ async function settle(page: Page): Promise<void> {
 }
 
 const SETTLING = Symbol("settling navigation");
+const CLOSING = Symbol("closing connections");
 
 /**
  * Makes a page's `goto` and `reload` wait for the document to settle.
@@ -111,6 +112,37 @@ export const test = base.extend({
         };
       }
       await use(browser);
+    },
+    { scope: "worker" },
+  ],
+  // **And every API client a spec opens for itself, with no connection kept
+  // between calls.** Playwright's request client keeps its socket alive and
+  // reuses it, and the standalone server closes a socket that has been idle
+  // for five seconds, Node's default. A call sent on a socket the server has
+  // just closed fails with "read ECONNRESET", which `s13d-okr-drawer` did in
+  // a run to 14 October 2026: a lookup in the spec, nothing the product did.
+  // `Connection: close` gives each call a socket of its own, so there is
+  // nothing to race. Thirty-five specs call `playwright.request.newContext`,
+  // so it is set here, where each one inherits it, for the reason the two
+  // patches above are.
+  playwright: [
+    async ({ playwright }, use) => {
+      const request = playwright.request as typeof playwright.request & {
+        [CLOSING]?: true;
+      };
+      if (!request[CLOSING]) {
+        request[CLOSING] = true;
+        const newContext = request.newContext.bind(request);
+        request.newContext = (options = {}) =>
+          newContext({
+            ...options,
+            extraHTTPHeaders: {
+              connection: "close",
+              ...options.extraHTTPHeaders,
+            },
+          });
+      }
+      await use(playwright);
     },
     { scope: "worker" },
   ],
