@@ -153,6 +153,7 @@ forward with a new one.
 | `pnpm <script>` on a page when `package.json` defines no such script | An instruction that cannot be followed, which is worse than no instruction |
 | A threshold `docs/handbook/numbers.md` quotes that the method registry disagrees with | A handbook telling a practitioner something the product does not do |
 | `docs/api/reference.md` drifting from the contract | The registry moved and the page did not. `pnpm gen:docs` rewrites it |
+| An image or chart version a page pins (`ghcr.io/open-okr/open-okr:X.Y.Z`, `--version X.Y.Z`) that is not `apps/web`'s version, in the root README, the Helm README or the docs | A reader copies the line. The pages said 0.2.0 for a week after 0.3.1 shipped. The release pull request is the one this refuses, until it updates them. `1.2.3` is the runbooks' placeholder and is left alone |
 
 `docs/specification`, `docs/design` and `docs/mockups` are linked from the
 index by folder rather than page by page.
