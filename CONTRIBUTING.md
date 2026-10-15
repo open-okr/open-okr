@@ -88,8 +88,12 @@ than adding a library.
 | `pnpm lint` | Biome lint and format check (`pnpm lint:fix` writes the fixes) |
 | `pnpm dead-code` | Fail on unused files, exports and dependencies |
 | `pnpm build` | Production build |
+| `pnpm check:fast` | Every static gate CI runs, in a minute or two |
+| `pnpm test:changed` | Only the tests that import what you changed |
 
-All of these must pass before a change is reviewed.
+Before you push, `pnpm check:fast` and `pnpm test:changed` are enough. CI runs
+the full suites, split across machines, and all of it must pass before a change
+is reviewed.
 
 Some need a database. `pnpm db:up` starts Postgres and PgBouncer in Docker,
 and `pnpm db:down` stops them.

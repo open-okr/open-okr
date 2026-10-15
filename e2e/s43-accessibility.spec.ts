@@ -3,7 +3,11 @@ import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
-import type { BrowserContext, Page } from "@playwright/test";
+import type {
+  BrowserContext,
+  Page,
+  PlaywrightWorkerArgs,
+} from "@playwright/test";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
@@ -82,9 +86,11 @@ const NOT_CHECKED_HERE: Readonly<Record<string, string>> = {
  * Twenty-six routes used to be skipped here as "needs an id", which was true
  * and was not a reason: the goal, key result, space, session, task, person and
  * initiative pages are where members spend their time. Each is now opened on
- * the first row of its kind in the instance account's workspace. The suite
- * runs in file order and earlier specs make every one of these, so a missing
- * row is a failure that names which, never a quiet skip.
+ * the first row of its kind in the instance account's workspace. In a full
+ * run earlier specs make every one of these. A CI shard runs only its share,
+ * so `makeMissingRows` creates the ones the shard did not, through the API,
+ * and a row still missing after that is a failure that names which, never a
+ * quiet skip.
  *
  * `$1` is the workspace. Read as the superuser, for the reason every spec here
  * records: the forced tenant policy would otherwise answer with nothing.
@@ -230,7 +236,7 @@ let page: Page;
 let pool: pg.Pool;
 let workspaceId: string;
 
-test.beforeAll(async ({ browser }) => {
+test.beforeAll(async ({ browser, playwright, baseURL }) => {
   pool = new pg.Pool(CONNECTION);
   const member = await pool.query<{ workspace_id: string }>(
     `select m.workspace_id
@@ -247,19 +253,12 @@ test.beforeAll(async ({ browser }) => {
   context = await browser.newContext();
   page = await context.newPage();
   await signIn(page);
+  await makeMissingRows(playwright, baseURL ?? "");
 });
 
-test.afterAll(async () => {
-  await pool?.end();
-  await context?.close();
-});
-
-/** The url to open for a route: itself, or its detail page on a real row. */
-async function urlFor(route: string): Promise<string> {
-  const query = DETAIL[route];
-  if (query === undefined) {
-    return route;
-  }
+/** The id of the first row a detail route opens on, if there is one. */
+async function rowFor(route: string): Promise<string | undefined> {
+  const query = DETAIL[route] ?? "";
   const rows = await pool.query<{ id: string }>(
     query,
     query.includes("$2")
@@ -268,10 +267,114 @@ async function urlFor(route: string): Promise<string> {
         ? [workspaceId]
         : [],
   );
-  const id = rows.rows[0]?.id;
+  return rows.rows[0]?.id;
+}
+
+/**
+ * The detail rows a CI shard may not have, made through the API.
+ *
+ * Only what is missing, so a full run, where earlier specs made all of them,
+ * is unchanged. Each is made in a space the account belongs to, because a
+ * session opens only for somebody in its space (M-21).
+ */
+async function makeMissingRows(
+  playwright: PlaywrightWorkerArgs["playwright"],
+  baseURL: string,
+): Promise<void> {
+  const missing = new Set<string>();
+  for (const route of [
+    "/initiatives/[id]",
+    "/tasks/[id]",
+    "/documents/[id]",
+    "/session/[id]",
+    "/session/[id]/minutes",
+  ]) {
+    if (!(await rowFor(route))) missing.add(route);
+  }
+  if (missing.size === 0) return;
+
+  const mine = (
+    await pool.query<{ member_id: string; space_id: string }>(
+      `select m.id::text as member_id, sm.space_id::text as space_id
+         from workspace_members m
+         join users u on u.id = m.user_id
+         join space_members sm on sm.member_id = m.id and sm.deleted_at is null
+        where u.email = $1 and m.workspace_id = $2 and m.deleted_at is null
+        order by sm.created_at
+        limit 1`,
+      [INSTANCE_ACCOUNT.email, workspaceId],
+    )
+  ).rows[0];
+  if (!mine) throw new Error("The instance account belongs to no space.");
+
+  await goTo(page, "/account/api-tokens");
+  await page.getByLabel("Name").fill("Accessibility scan e2e");
+  await page.getByRole("checkbox", { name: "Write" }).check();
+  await page.getByRole("button", { name: "Create token" }).click();
+  const shown = page.getByTestId("minted-token");
+  await expect(shown).toBeVisible({ timeout: 10_000 });
+  const token = ((await shown.textContent()) ?? "").trim();
+
+  const api = await playwright.request.newContext({ baseURL });
+  const post = async (action: string, data: unknown) => {
+    const response = await api.post(`/api/v1/${action.replace(".", "/")}`, {
+      headers: { authorization: `Bearer ${token}` },
+      data,
+    });
+    expect(response.status(), `${action}: ${await response.text()}`).toBe(200);
+    return (await response.json()).data as { id: string };
+  };
+
+  const spaceId = mine.space_id;
+  try {
+    if (missing.has("/initiatives/[id]")) {
+      await post("initiatives.create", {
+        spaceId,
+        title: "Accessibility scan initiative",
+        ownerId: mine.member_id,
+      });
+    }
+    if (missing.has("/tasks/[id]")) {
+      await post("tasks.create", { spaceId, title: "Accessibility scan task" });
+    }
+    if (missing.has("/documents/[id]")) {
+      const document = await post("documents.create", {
+        subjectType: "space",
+        subjectId: spaceId,
+        title: "Accessibility scan document",
+      });
+      await post("documents.publish", { id: document.id });
+    }
+    // One quarterly review serves both: any session in the space, and the
+    // minutes, which are a quarterly review's.
+    if (missing.has("/session/[id]") || missing.has("/session/[id]/minutes")) {
+      await post("sessions.create", {
+        spaceId,
+        kind: "quarterly",
+        title: "Accessibility scan review",
+        scheduledFor: new Date().toISOString(),
+        facilitatorId: mine.member_id,
+      });
+    }
+  } finally {
+    await api.dispose();
+  }
+}
+
+test.afterAll(async () => {
+  await pool?.end();
+  await context?.close();
+});
+
+/** The url to open for a route: itself, or its detail page on a real row. */
+async function urlFor(route: string): Promise<string> {
+  if (DETAIL[route] === undefined) {
+    return route;
+  }
+  const id = await rowFor(route);
   expect(
     id,
-    `${route}: no row of its kind in the workspace, so an earlier spec that makes one did not run`,
+    `${route}: no row of its kind in the workspace, and makeMissingRows did not make one`,
   ).toBeTruthy();
   return route.replace(/\[[^\]]+\]/, id ?? "");
 }

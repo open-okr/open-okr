@@ -10,26 +10,36 @@ will refuse the work, and why each refusal exists.
 
 ## Run these before every push
 
-In this order. The first few take seconds; the rest take minutes. A push should
-leave continuous integration green, and every one of these is cheaper to run
-locally than to discover on a pull request.
+Two commands, about two minutes together. CI runs the full unit suite and the
+full browser suite, each split across four machines. Running them locally as
+well doubled the wait and caught nothing CI does not, so they are CI's job.
 
 ```
-pnpm typecheck        # strict types across every package
-pnpm lint             # Biome. Read the whole tail, not the last line
-pnpm dead-code        # knip
-pnpm db:lint          # migration rules, shipped migrations unchanged, then soft-delete usage
-pnpm check:boundaries # the architecture gate
-pnpm check:licences   # dependency licences
-pnpm check:air-gap    # the air-gap checklist, against the guide
-pnpm check:docs       # links, reachability and commands in docs/
-pnpm check:contract   # the committed OpenAPI document against the registry
-pnpm method:check     # packages/method against METHOD.md
-pnpm test             # unit and integration, needs a database. One run at a time
-pnpm build            # then pnpm test:e2e
-pnpm check:signoff origin/main HEAD   # CI runs this on pull requests only
-pnpm check:changeset origin/main HEAD # and this one
+pnpm check:fast       # every static gate below, sign-off and changeset included
+pnpm test:changed     # the tests that import what changed since origin/main
 ```
+
+`pnpm check:fast` runs, in order: the typecheck for affected packages, lint,
+dead code, `db:lint`, `check:boundaries`, `check:air-gap`, `check:docs`,
+`method:check`, `check:contract`, `check:licences`, `check:signoff` and
+`check:changeset`. It runs every one even after one fails and prints the tail
+of each failure, so one run names everything to fix. Each is still its own
+script, for running one alone.
+
+`pnpm test:changed` follows imports, so it cannot see a change to a migration's
+SQL or to Markdown. After a migration, run the package's suite too:
+`pnpm --filter @openokr/db test`.
+
+**A change a person sees** also runs the spec files it wrote or touched:
+`pnpm build && pnpm test:e2e e2e/<file>.spec.ts`. The `claim` project registers
+first on its own, so any one file can run alone. That is also the rule for
+writing one: a spec may rely on the claim and nothing else, because a row
+another spec file made is on another shard. Make what it needs, or make it
+when it is missing.
+
+**Run the full suites locally only to reproduce a CI failure**, or when
+somebody asks: `pnpm test:ci --shard=i/4` and `pnpm test:e2e --shard=i/4` run
+exactly what one CI machine runs.
 
 **`pnpm test` needs a PostgreSQL with `pgvector`.** `pnpm db:up` starts one in
 Docker, with PgBouncer and the MySQL the FlowyTeam connector's suites read.
@@ -52,16 +62,18 @@ point in this repository refuses at run time: they all run under Node's
 transpiles, so a suite stays green while the real command dies on its first
 import. Write the field out and assign it in the constructor body.
 
-If all of those pass locally, CI passes, with the two exceptions named under
-**Dependency review** and **Sign-off** below.
+If those pass locally, the static gates pass in CI too, with the exception
+named under **Dependency review** below. The suites are decided in CI, and a
+red run on your own branch is the normal way to learn about a failure there:
+fix it and push again. A pull request merges only when CI is green.
 
 ## What CI runs, job by job
 
 | Job | Steps | Skipped when |
 |---|---|---|
 | Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm check:air-gap`, `pnpm check:docs`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
-| Tests | `pnpm test:ci`, sharded, against a real Postgres | The push changed no code |
-| End to end | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e` | The push changed no code |
+| Tests | `pnpm test:ci`, four shards, each against its own Postgres | The push changed no code |
+| End to end | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e`, four shards. Each runs the `claim` project, then its share of the specs | The push changed no code |
 | Accessibility and web vitals | Part of the same end-to-end job. `s43-accessibility.spec.ts` scans every screen the route tree lists and fails on a `serious` or `critical` axe finding; `s43b-accessibility-keyboard.spec.ts` drives the primary flows with no mouse; `s44-web-vitals.spec.ts` fails on a TECHNICAL-PLAN §13.1 paint or interaction budget. A screen added with no coverage is scanned anyway, because the list is derived rather than maintained | With the end-to-end job |
 | Compose target | Builds the Docker image and drives the first-run wizard | The push changed no code |
 | Helm chart | Chart checks, then a real install into a kind cluster | The push changed no code |
@@ -263,7 +275,7 @@ never rendered, a write refusing at run time, a chart drawing every value
 backwards: each of those is green under typecheck and lint. So a change is done
 when both of these hold:
 
-1. Every gate above is green.
+1. CI is green on the pull request.
 2. The change was driven **in a real browser against a real database**, when it
    is something a person sees.
 
