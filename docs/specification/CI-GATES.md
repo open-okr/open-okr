@@ -79,6 +79,7 @@ fix it and push again. A pull request merges only when CI is green.
 | Helm chart | Chart checks, then a real install into a kind cluster | The push changed no code |
 | Flakiness report | Merges the shard reports and fails on real failures | Tests were skipped |
 | Build | `turbo run build --affected` | The push changed no code |
+| Release image | The release workflow's own image build (`image.yml`), amd64 and arm64 each on a native runner, nothing pushed. The only place the arm64 half is built before a tag. `image-rehearsal.yml` runs the same thing weekly on `main` | The push changed none of `deploy/docker/`, the lockfile, a `package.json`, `.npmrc`, `.nvmrc`, `.dockerignore`, or the image, rehearsal or release workflows. Nothing local runs both architectures; `docker build -f deploy/docker/Dockerfile .` checks your own |
 | Licences and sign-off | `pnpm check:licences`, `pnpm check:signoff` | Sign-off runs on pull requests only |
 | Changeset | `pnpm check:changeset` | Refuses a branch that changes what an instance does and names no version bump. Pull requests only |
 | Dependency review | `actions/dependency-review-action`, `fail-on-severity: moderate` plus the licence allow list | Pull requests only. Nothing local checks it |
