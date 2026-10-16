@@ -1,0 +1,24 @@
+name: Image rehearsal
+
+# The release image, built weekly on main for both architectures with nothing
+# pushed. CI builds it whenever a pull request changes what it installs; this
+# catches what changes underneath with no pull request at all: the
+# `node:22-alpine` base image, the runner images, the actions themselves. A
+# release is then never the first build in a month.
+#
+# It also keeps the build cache warm. GitHub evicts a cache entry nobody has
+# read for seven days, and a release's cache reads fall back to main's.
+
+on:
+  schedule:
+    # Mondays at 03:40 UTC, clear of the nightly upgrade job at 02:15.
+    - cron: "40 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    name: Release image
+    uses: ./.github/workflows/image.yml

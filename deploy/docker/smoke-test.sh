@@ -43,14 +43,17 @@ service_log() {
 app_log() { service_log app; }
 proxy_log() { service_log proxy; }
 
-# One value from the bundled database, asked as its admin role.
-db_query() {
+# A command in the bundled database's container.
+db_exec() {
   if docker compose version >/dev/null 2>&1; then
-    docker compose -p "$PROJECT" exec -T db psql -U openokr -d openokr -tAc "$1"
+    docker compose -p "$PROJECT" exec -T db "$@"
   else
-    docker-compose -p "$PROJECT" exec -T db psql -U openokr -d openokr -tAc "$1"
+    docker-compose -p "$PROJECT" exec -T db "$@"
   fi
 }
+
+# One value from the bundled database, asked as its admin role.
+db_query() { db_exec psql -U openokr -d openokr -tAc "$1"; }
 
 # Waits until the proxy stops answering 502, which is what it says while the
 # application container it fronts has been recreated and has not opened its
@@ -242,8 +245,20 @@ pass "the admin reached a provisioned workspace"
 # The image is already on this host, so the pull is skipped: reaching a
 # registry that does not have it takes minutes to fail and proves nothing.
 backups_before="$(ls -1d "$OPENOKR_BACKUP_DIR"/*/ 2>/dev/null | wc -l | tr -d ' ')"
-OPENOKR_SKIP_PULL=1 ./openokr upgrade >/dev/null 2>&1 || fail "upgrade failed"
+upgrade_log="$(OPENOKR_SKIP_PULL=1 ./openokr upgrade 2>&1)" || fail "upgrade failed"
 pass "the upgrade command ran"
+
+# **The rollback names the image it would go back to.** This printed the raw
+# JSON of `compose images` until 15 October 2026, so the one line an operator
+# needs at the worst moment had to be decoded first.
+running="${OPENOKR_IMAGE:-ghcr.io/open-okr/open-okr:latest}"
+printf '%s\n' "$upgrade_log" | grep -qF "current image: ${running}" \
+  || fail "the upgrade did not name the image it replaced (${running})"
+printf '%s\n' "$upgrade_log" | grep -qF "OPENOKR_IMAGE=${running} ./openokr up" \
+  || fail "the rollback line does not name the image to go back to"
+printf '%s\n' "$upgrade_log" | grep -qF "./openokr restore ${OPENOKR_BACKUP_DIR}/" \
+  || fail "the rollback line does not name the backup it just wrote"
+pass "the upgrade names the image it replaced, in a rollback you can copy"
 
 # **The backup is the rollback** (P7-T09c). Migrations are forward-only, so
 # once one has applied the previous image cannot read the schema and
@@ -353,17 +368,41 @@ pass "a backup was taken ($drill)"
   || fail "verify-backup refused the backup it had just taken"
 pass "the backup verified without touching the live database"
 
-rows_before="$(db_query "select (select count(*) from workspaces) || ',' || (select count(*) from workspace_members) || ',' || (select count(*) from audit_events)")"
+# **What the backup holds is read from the backup, not from the live
+# database.** The scheduler keeps writing audit rows while this runs, on both
+# sides of the restore. Counting the live database after the backup found a
+# row the dump did not hold ("before 1,3,2, after 1,3,1") and failed release
+# verification at random; counting before the backup would only race the
+# other way. The dump is the one thing nothing writes to.
+backup_rows() {
+  key="$(grep '^OPENOKR_ENCRYPTION_KEY=' secrets/app.env | cut -d= -f2-)"
+  # pg_restore prints a table's data as one line per row between its COPY
+  # header and the `\.` that ends it.
+  openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$key" -in "$drill/db.dump.enc" \
+    | db_exec pg_restore --data-only --table="$1" -f - \
+    | awk '/^COPY /{on=1; next} /^\\\.$/{on=0; next} on{n++} END{print n+0}'
+}
+rows_in_backup="$(backup_rows workspaces),$(backup_rows workspace_members),$(backup_rows audit_events)"
+# A parse that read nothing would agree with an empty restore. The instance
+# has had a workspace since its first account, so the backup must too.
+case "$rows_in_backup" in
+  0,*) fail "could not read the rows the backup holds ($rows_in_backup)" ;;
+esac
+
 name_before="$(db_query "select name from workspaces order by created_at limit 1")"
 db_query "update workspaces set name = 'Changed after the backup'" >/dev/null
 
+# Anything recorded from here on was written after the backup, so the backup
+# cannot hold it, and the restored instance's scheduler starts writing again
+# as soon as it is up.
+restore_began="$(db_query "select now()")"
 ./openokr restore "$drill" >/dev/null 2>&1 || fail "the restore failed"
 wait_until_serving "after the restore"
 pass "the backup restored"
 
-rows_after="$(db_query "select (select count(*) from workspaces) || ',' || (select count(*) from workspace_members) || ',' || (select count(*) from audit_events)")"
-[ "$rows_after" = "$rows_before" ] \
-  || fail "the restored rows differ (before $rows_before, after $rows_after)"
+rows_after="$(db_query "select (select count(*) from workspaces) || ',' || (select count(*) from workspace_members) || ',' || (select count(*) from audit_events where at < '$restore_began')")"
+[ "$rows_after" = "$rows_in_backup" ] \
+  || fail "the restored rows differ from the backup's (backup $rows_in_backup, restored $rows_after)"
 [ "$(db_query "select name from workspaces order by created_at limit 1")" = "$name_before" ] \
   || fail "the change made after the backup survived the restore"
 pass "the restore brought back the backup's state and nothing after it"

@@ -35,16 +35,16 @@ If two documents disagree, the one higher in this list wins, with one exception:
 
 You work on one change at a time, only when a human names it: an issue, a bug, or a request. Your side:
 
-1. Restate the change: the goal, what you will deliver, how you will test it, and any open question. For anything bigger than a small fix, wait for confirmation before writing code.
+1. Restate the change: the goal, what you will deliver, how you will test it, and any open question. Wait for confirmation before writing code only when the change needs a design first (below). Otherwise restate it and start.
 2. Tests first: write the tests so they fail for the right reason.
 3. Implement until green. Obey every hard rule below.
-4. Quality checks: type checking, linting, the full affected suite, and every gate in "Committing and pushing". Exercise the feature in the running application when a person would see it.
+4. Quality checks: the local tier in "Committing and pushing", which takes minutes, not the whole suite. Exercise the feature in the running application when a person would see it.
 5. Branch `<kind>/<slug>` from `main` (`fix/`, `feat/`, `docs/`, `chore/`). One commit, signed off, with a changeset when it changes what a running instance does.
 6. Stop. Never start the next change on your own. Never merge your own work.
 
 **One change is one working session and one commit.** If you get partway through and realise it will not fit, stop before writing more code, say so, and propose how to split it. The human decides. Splitting a change across four commits without saying so reads as progress and hides that nothing is finishable.
 
-**A change that alters the design starts with the design.** Write or update the document in `docs/design/` first, and wait for the human to approve it with an explicit "design approved" before the code.
+**Three kinds of change start with the design:** a new engine or subsystem, a schema change (a migration), and a change to security, access or tenant isolation. For those, write or update the document in `docs/design/` first, and wait for the human to approve it with an explicit "design approved" before the code. Everything else goes straight to code. When it deviates from a design document, update the document in the same change.
 
 Blocked? Write down exactly why, and ask. Do not improvise around a blocker.
 
@@ -52,28 +52,19 @@ Blocked? Write down exactly why, and ask. Do not improvise around a blocker.
 
 **Commit on your own. Never push on your own.** Committing is how the work becomes reviewable and you do it without being asked, one commit per change. Pushing is what starts continuous integration and puts the work in front of other people, and it happens only when a human says to push.
 
-**A push must leave continuous integration green. Every job, no exception.** Not "green except the one that was already failing", and not "green except the gate this machine cannot run". A red build on a shared branch blocks everybody else's work and the next person cannot tell your failure from theirs.
+**CI is the full gate. Your machine runs the fast tier.** The full unit suite and the full browser suite run in CI, split across four machines each, in about fifteen minutes. Running them again locally before every push doubled the wait and caught nothing CI does not. A pull request must be green before it merges, every job, no exception. A red run on your own branch blocks nobody: read it, fix it, push again.
 
-So before you say the work is ready to push, run the whole set in the order `docs/specification/CI-GATES.md` gives, and read the output rather than the exit code:
+| When | Run | Takes |
+|---|---|---|
+| While coding | `pnpm test:changed`, or one package's Vitest in watch mode | Seconds |
+| Before you say it is ready to push | `pnpm check:fast` (every static gate, sign-off and changeset included) and `pnpm test:changed` | About two minutes |
+| The change is something a person sees | Also the spec files you wrote or touched: `pnpm build && pnpm test:e2e e2e/<file>.spec.ts`. The claim project registers first on its own | A few minutes |
+| The change touches `deploy/` | The deployment scripts below | As long as they take |
+| Everything else | CI. Never run the full `pnpm test`, `pnpm test:ci` or `pnpm test:e2e` as a routine step. Run them only when a human asks, or to reproduce a CI failure | |
 
-```
-pnpm typecheck
-pnpm lint             # read the last three lines, not the last one
-pnpm dead-code
-pnpm db:lint
-pnpm check:boundaries
-pnpm check:air-gap
-pnpm check:docs
-pnpm check:licences
-pnpm check:contract
-pnpm method:check
-pnpm test             # needs a database. One suite at a time
-pnpm build && pnpm test:e2e
-pnpm check:signoff origin/main HEAD
-pnpm check:changeset origin/main HEAD
-```
+`pnpm test:changed` runs the tests that import what changed since `origin/main`. It cannot see a change to a migration's SQL or to METHOD.md, so after one of those run that package's suite too: `pnpm --filter @openokr/db test`, or `pnpm method:check`, which `check:fast` already runs.
 
-**A gate you did not run is not a gate that passed.** When this machine cannot run one, say which, why, and what would run it, in the summary you give the human and in the pull request. Never write "all gates pass" when you ran nine of eleven.
+**Say what you ran.** In the summary you give the human, name the local tier you ran and that the full suites are CI's. Never write "all gates pass" before CI has said so.
 
 The deployment scripts run wherever Docker, helm, kind and kubectl are installed:
 
@@ -87,9 +78,9 @@ OPENOKR_IMAGE_TAG=test sh deploy/helm/cluster-test.sh
 
 **On Windows**, Git Bash rewrites an argument shaped like an absolute path before handing it to a native program, which is why `deploy/docker/openokr` exports `MSYS_NO_PATHCONV`; a `docker exec` you add elsewhere needs the same. Kubernetes 1.32 and later refuse a host on cgroup v1, so a WSL virtual machine running kind needs the unified hierarchy.
 
-**`pnpm check:signoff` runs in CI on pull requests only**, so a branch can look green for days and fail the moment one opens. Run it yourself, and commit with `-s`.
+**`pnpm check:signoff` runs in CI on pull requests only**, so a branch can look green for days and fail the moment one opens. `pnpm check:fast` runs it, after you commit with `-s`.
 
-**Two jobs are not in the list above and still have to be green:** CodeQL and Dependency review. Neither is runnable locally. A new dependency is what usually turns them red, which is a second reason not to add one without asking.
+**Two jobs no local command covers and still have to be green:** CodeQL and Dependency review. Neither is runnable locally. A new dependency is what usually turns them red, which is a second reason not to add one without asking.
 
 ### Watch the run. A push is not finished until CI says so
 
@@ -104,7 +95,7 @@ gh run view <id> --log-failed         # why
 
 **A push with no run is not a pass.** `ci.yml` triggers on `push` to `main` and on `pull_request`, so a push to a branch with no open pull request gets no verdict at all. Say that plainly and ask whether to open one. Never let silence read as green.
 
-Local gates cannot see a rendered Helm manifest, a security query, a transitive licence, or a spec that encoded the old behaviour. That is the whole argument for watching the run.
+The local tier cannot see the full suites, a rendered Helm manifest, a security query, a transitive licence, or a spec that encoded the old behaviour. CI is where those are decided, which is why the run is watched.
 
 **A change to a spec's expectations is part of the change.** When you serve something a spec asserted was missing, the spec is now wrong and updating it is yours, not the next person's.
 
@@ -213,6 +204,8 @@ Keep this list current. A command that is written down and absent, or present an
 - `pnpm dev`: run the application locally
 - `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs a Postgres, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs the standalone server the Docker image runs rather than the development server. It builds two databases on every run: one instance already set up for the dashboard specs, and one that never has been for the wizard specs. **Docker is not required.** `pnpm db:up` is the easy way to get the Postgres, and `TEST_DB_PORT` points the suite at one you already run, exactly as it does for the unit suites: `TEST_DB_PORT=5432 pnpm build && TEST_DB_PORT=5432 pnpm test:e2e`
 
+  **One spec file runs on its own**: `pnpm test:e2e e2e/s27-board.spec.ts`. `registration-to-dashboard.spec.ts` is the `claim` project every application spec depends on, so Playwright runs it first, then the file. The same rule is what lets CI split the suite into four shards, `pnpm test:e2e --shard=i/4`, each claiming its own fresh instance. **So a spec file may rely on the claim and nothing else**: a row another spec file made is not there on another shard. Make what the spec needs, or make it when it is missing, the way `s43-accessibility.spec.ts` does
+
   **On Windows, warm the traced symlinks after a build, or the first run times out.** `start-server.sh` rewrites about eighty traced pnpm links as junctions before the server binds, inside Playwright's readiness window, and it does it for both servers. After a fresh `pnpm build` that first start can exceed the 240-second timeout, which reads as flakiness and is not. Running the repair once first moves the work out of the window and costs a quarter of a second when there is nothing to do:
 
   ```
@@ -221,7 +214,9 @@ Keep this list current. A command that is written down and absent, or present an
   TEST_DB_PORT=5432 pnpm test:e2e
   ```
 
-- `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
+- `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`. CI runs it as four shards
+- `pnpm test:changed`: only the tests that import a file changed since `origin/main`, committed or not. The routine local test run. It cannot see SQL or Markdown, so a migration or METHOD.md change also needs that package's own suite
+- `pnpm check:fast`: every static gate CI runs, in one command and about a minute or two: affected typecheck, lint, dead code, `db:lint`, boundaries, air gap, docs, method conformance, contract drift, licences, sign-off and changeset. It runs every gate even after one fails and prints the tail of each failure, so one run names everything to fix. `CHECK_BASE` compares against a ref other than `origin/main`
 - **The accessibility and web-vitals gates are part of `pnpm test:e2e`**, not separate commands. `e2e/s43-accessibility.spec.ts` scans every screen with axe and fails on a `serious` or `critical` finding; **its screen list is derived by walking `apps/web/app`**, so a screen added tomorrow is scanned tomorrow and nobody has to remember. `e2e/s43b-accessibility-keyboard.spec.ts` drives the primary flows with the keyboard alone, which is the half a scan cannot answer, and `e2e/s44-web-vitals.spec.ts` measures the three §13.1 rows `pnpm perf:budgets` hands to a browser. The screen-reader procedure is a person's job and is written out in `docs/design/accessibility.md`
 - **`pnpm test` and `pnpm build` at the root honour `TEST_DB_PORT`, `TEST_PGBOUNCER_PORT`, `TEST_MYSQL_PORT`, `TEST_MYSQL_HOST`, `TEST_MYSQL_USER`, `TEST_MYSQL_PASSWORD`, `TEST_DB_HOST` and `DATABASE_URL`** through `passThroughEnv` in `turbo.json`. The same two port variables also drive the compose stack itself, so the database and the suite move together, and continuous integration gives each job its own pair. Without that entry Turbo filters them out and the harness looks for the Docker stack on port 55432, which fails with `ECONNREFUSED`. Add any new variable a test needs to that list, or the root command will quietly not see it
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes. **The typecheck is TypeScript 7, the native compiler, single-threaded and four packages at a time.** Every workspace package exports its source, so each check re-reads the packages it imports; four single-threaded processes is what measured fastest, because each multi-threaded one already takes every core. TypeScript 7 has no compiler API, so the two web tests and the script that walk a syntax tree import `typescript5`, which is 5.9 under another name. Next.js type-checks through the `tsc` command, so the build runs on 7 too
@@ -241,11 +236,11 @@ Keep this list current. A command that is written down and absent, or present an
 - `pnpm gen:contract` and `pnpm check:contract`: regenerate `contract/openapi.json` and `contract/cli.json` from the action registry, then the drift gate that compares fresh artifacts against the committed ones and fails naming the actions and commands that moved. One script in two modes, so a generator and a checker cannot disagree about what the artifact should be. The document is also served live at `/api/v1/openapi.json`, built by the same function, so it describes the running instance
 - `pnpm check:air-gap`: the air-gap checklist. Reads the checklist table in `docs/runbooks/air-gap.md` and checks each row against the source, in both directions: a row with no check fails, and a check with no row fails too. The checks cover fonts, external hosts, what the image's runtime stage installs, whether AI is off until somebody enables it, whether every outbound request goes through the port, and whether the component registries stay build-time. The two claims that are about a machine rather than about source, watching for egress and proving it is not cached, are written out in the guide for whoever commissions the instance
 - `pnpm gen:docs`: regenerates `docs/api/reference.md` from `contract/openapi.json`, which is itself generated from the action registry. One script in two modes, like `gen:contract`: `--check` is what `check:docs` runs, so a generator and a checker cannot disagree about what the page should hold
-- `pnpm check:docs`: the documentation gate. Every relative link under `docs/` resolves, every page in `docs/install`, `docs/admin` and `docs/runbooks` is reachable from `docs/README.md`, and every `pnpm <script>` a page tells somebody to run exists in `package.json`. It also checks every threshold `docs/handbook/numbers.md` quotes against the method registry, and `docs/api/reference.md` against the contract. The specification, the designs and the mockups are linked from the index by folder rather than page by page
+- `pnpm check:docs`: the documentation gate. Every relative link under `docs/` resolves, every page in `docs/install`, `docs/admin` and `docs/runbooks` is reachable from `docs/README.md`, and every `pnpm <script>` a page tells somebody to run exists in `package.json`. It also checks every threshold `docs/handbook/numbers.md` quotes against the method registry, `docs/api/reference.md` against the contract, and every release a page pins (the root README, the Helm README, the docs) against `apps/web`'s version, so the release pull request updates them. The specification, the designs and the mockups are linked from the index by folder rather than page by page
 - `pnpm check:boundaries`: the architecture boundary gate (vendor SDKs stay in `packages/adapters`, application code consumes ports, write paths cause side effects only through the outbox, and domain writes go through the Operation pipeline), and the field rule: no screen file in `apps/web` may draw a raw `<input>`, `<textarea>` or `<select>`. Every field is the kit's, from `packages/ui`: `TextInput`, `TextArea`, `SelectInput`, `NumberInput` and the rest. Hidden inputs, checkboxes, radios, file pickers and buttons are not fields here
 - `pnpm audit:verify`: verify the append-only audit hash chain. Every workspace with a maintenance role, or named workspaces with any role
 - `pnpm cadence:sweep`: flip health to `outdated` for every goal past its staleness grace. Every workspace, or named ones. Idempotent, and runs through the Operation pipeline so the change is audited. **The scheduler host runs this on its own** as part of the Champion's daily cadence; the command stays for an operator who wants it now, and for an instance running with `OPENOKR_SCHEDULER=off`
-- `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky. **The end-to-end suite writes one too**: `e2e/flaky-reporter.ts` produces `.flaky/report-e2e.json` in the same shape and with the same identifiers as the Vitest shards, so one merge and one quarantine list cover the whole repository. It is written locally as well, because a report that exists only in continuous integration is one nobody can read before pushing
+- `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky. **The end-to-end suite writes one too**: `e2e/flaky-reporter.ts` produces `.flaky/report-e2e.json` (`report-e2e-<n>.json` on CI shard n) in the same shape and with the same identifiers as the Vitest shards, so one merge and one quarantine list cover the whole repository. It is written locally as well, because a report that exists only in continuous integration is one nobody can read before pushing
 - `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres, PgBouncer and MySQL, all in Docker). `TEST_DB_PORT`, `TEST_PGBOUNCER_PORT` and `TEST_MYSQL_PORT` choose the host ports; set any of them to `0` and Docker picks a free one, which `pnpm db:ports` then reads back as the three lines the harness needs. Continuous integration does exactly that. **MySQL is the FlowyTeam source the importer's connector reads, and it is test-only**: the product needs Postgres and nothing else. Point the suite at a MySQL you already run with `TEST_MYSQL_PORT`, and say so when its root account has no password: `TEST_MYSQL_PASSWORD=` set to empty means empty, unlike every other variable here. Without a MySQL the connector's three suites skip themselves and say why
 - `pnpm db:seed`: fills the first workspace with the Northwind year as of today (`docs/design/northwind-year-seed.md`), and refuses a workspace that already holds company objectives. The scenario in `docs/scenarios/northwind-year` is placed on the real calendar, the scenario's 2027 on the year that holds today, with every event dated on or before today written in date order and nothing after it; each date keeps its distance from its quarter's first Monday, so a Monday check-in stays a Monday. Takes a minute or two. **`--quarter` builds the smaller one-quarter demo instead.** The year's tests place it on the latest real year whose dates they read have passed (`packages/core/test/year-placement.ts`), so every quarter is checked whatever day the suite runs
 - `pnpm demo:prepare`: turns a seeded workspace into one a visitor can sign into. `pnpm db:seed` writes the story and leaves the cast as members with nobody behind them, which is wrong for a public instance where the visitor is nobody: the only way to see the product as Priya sees it is to be Priya. So this gives each of the invented people an account at `@northwind.example`, the seven of the one-quarter demo and the five the Northwind year adds (Ben, who leaves in May, is suspended and gets none) (RFC 2606 reserves the domain, so it can never be registered and can never receive mail), attaches it to the member row the builder already wrote, runs the Coach and the Champion once so the nudges on screen are ones the product produced, and then puts both agents in `sandbox`, which commits nothing from then on. **It refuses a workspace the demo builder did not build**, by the builder's own test, because giving a real organisation's members invented accounts with a published password is the one mistake it could make that matters, and it never touches a member who already has somebody behind them. The password is `explore-openokr` and is published on purpose; `--password` sets another. Accounts go through Better Auth rather than beside it, under a `demo` provisioning authority that skips the join and the provisioning the sign-up hook would otherwise do, because a persona is attached to a member that already exists rather than being a person who has just arrived
@@ -290,7 +285,7 @@ Keep this list current. A command that is written down and absent, or present an
 - Every AI affordance is hidden or disabled when the provider is off, and the deterministic path is unchanged.
 - The specification and the design document are updated if implementation deviated.
 - A changeset is written when a running instance behaves differently.
-- Every gate in "Committing and pushing" ran and is green, or the summary names the ones this machine could not run and why. The commit is made; the push waits for the human.
+- The local tier in "Committing and pushing" ran and is green: `pnpm check:fast`, `pnpm test:changed`, and the touched spec files for anything user-visible. The full suites are CI's. The commit is made; the push waits for the human.
 - After a push, the run for that commit was watched to its conclusion and reported per job. No run means no verdict, and the summary says so rather than implying green.
 
 ## Writing style for everything you write in this repo

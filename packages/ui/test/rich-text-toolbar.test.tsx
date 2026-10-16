@@ -48,13 +48,14 @@ describe("the compact editor's toolbar", () => {
     expect(names).toEqual([
       en("editor.toolbar.bold"),
       en("editor.toolbar.italic"),
-      en("editor.toolbar.underline"),
       en("editor.toolbar.strike"),
       en("editor.toolbar.code"),
       en("editor.toolbar.bulletList"),
       en("editor.toolbar.orderedList"),
       en("editor.toolbar.link"),
     ]);
+    // Underline is read, not written, until the release after this one.
+    expect(names).not.toContain("Underline");
     const reachable = [...toolbar.querySelectorAll("button")].filter(
       (button) => button.getAttribute("tabindex") !== "-1",
     );
@@ -121,7 +122,6 @@ describe("the full editor's toolbar", () => {
     expect(names).toEqual([
       en("editor.toolbar.bold"),
       en("editor.toolbar.italic"),
-      en("editor.toolbar.underline"),
       en("editor.toolbar.strike"),
       en("editor.toolbar.code"),
       en("editor.toolbar.bulletList"),
@@ -217,12 +217,7 @@ describe("the full editor's toolbar", () => {
   });
 });
 
-/**
- * Underline, step 2 (docs/design/guided-inputs.md §4.7, change 4b): every
- * editor has read the mark since the release before, so this one may write
- * it, from the toolbar, from Mod-U, and from pasted `<u>`.
- */
-describe("underline", () => {
+describe("underline, which this release reads and does not write", () => {
   test("shows a document that carries it", async () => {
     const underlined = {
       type: "doc",
@@ -238,67 +233,6 @@ describe("underline", () => {
     };
     const { container } = inEnglish(
       <RichTextEditor label="Comment" variant="compact" content={underlined} />,
-    );
-    await editorReady(container);
-    expect(container.querySelector("u")?.textContent).toBe("this");
-  });
-
-  test("is turned on from the toolbar, and says it is on", async () => {
-    const user = userEvent.setup();
-    const seen: unknown[] = [];
-    const { container } = inEnglish(
-      <RichTextEditor
-        label="Comment"
-        variant="compact"
-        content={PARAGRAPH}
-        onUpdate={(json) => seen.push(json)}
-      />,
-    );
-    await editorReady(container);
-    const editable = container.querySelector(
-      '[contenteditable="true"]',
-    ) as HTMLElement;
-    editable.focus();
-    await user.keyboard("{Control>}a{/Control}");
-    const underline = screen.getByRole("button", {
-      name: en("editor.toolbar.underline"),
-    });
-    expect(underline.getAttribute("aria-pressed")).toBe("false");
-    await user.click(underline);
-
-    await waitFor(() =>
-      expect(container.querySelector("u")?.textContent).toBe("Hello"),
-    );
-    expect(underline.getAttribute("aria-pressed")).toBe("true");
-    expect(JSON.stringify(seen.at(-1))).toContain('"underline"');
-  });
-
-  test("is turned on and off with Mod-U", async () => {
-    const user = userEvent.setup();
-    const { container } = inEnglish(
-      <RichTextEditor label="Comment" variant="compact" content={PARAGRAPH} />,
-    );
-    await editorReady(container);
-    const editable = container.querySelector(
-      '[contenteditable="true"]',
-    ) as HTMLElement;
-    editable.focus();
-    await user.keyboard("{Control>}a{/Control}");
-    await user.keyboard("{Control>}u{/Control}");
-    await waitFor(() =>
-      expect(container.querySelector("u")?.textContent).toBe("Hello"),
-    );
-    await user.keyboard("{Control>}u{/Control}");
-    await waitFor(() => expect(container.querySelector("u")).toBeNull());
-  });
-
-  test("reads pasted <u> as underline", async () => {
-    const { container } = inEnglish(
-      <RichTextEditor
-        label="Comment"
-        variant="compact"
-        content="<p>Mind <u>this</u></p>"
-      />,
     );
     await editorReady(container);
     expect(container.querySelector("u")?.textContent).toBe("this");
