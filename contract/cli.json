@@ -10669,23 +10669,6 @@
       "pages": false
     },
     {
-      "name": "sessions proposeFromLearnings",
-      "action": "sessions.proposeFromLearnings",
-      "method": "GET",
-      "path": "/sessions/proposeFromLearnings",
-      "scope": "read",
-      "summary": "Deprecated since 0.2.0 and removed in 0.4: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
-      "flags": [
-        {
-          "name": "session-id",
-          "field": "sessionId",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "pages": false
-    },
-    {
       "name": "goals draftRetrospective",
       "action": "goals.draftRetrospective",
       "method": "GET",
@@ -10792,35 +10775,6 @@
           "field": "retroNoteId",
           "type": "string",
           "required": false
-        }
-      ],
-      "pages": false
-    },
-    {
-      "name": "sessions draftNextCycle",
-      "action": "sessions.draftNextCycle",
-      "method": "POST",
-      "path": "/sessions/draftNextCycle",
-      "scope": "write",
-      "summary": "Deprecated since 0.2.0 and removed in 0.4: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
-      "flags": [
-        {
-          "name": "session-id",
-          "field": "sessionId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "title",
-          "field": "title",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "why",
-          "field": "why",
-          "type": "string",
-          "required": true
         }
       ],
       "pages": false
