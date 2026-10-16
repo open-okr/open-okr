@@ -1,6 +1,6 @@
 -- The plain prose columns go (docs/design/guided-inputs.md §4.7, change 13b).
 --
--- 0.3.0 wrote each piece of session prose twice, as a document and as its
+-- 0.3 wrote each piece of session prose twice, as a document and as its
 -- plain text, and data changes 0027 to 0032 wrote a document for everything
 -- written before. This release reads only the document, so the plain columns
 -- are dropped. The release before this one, still serving during a rolling
@@ -79,20 +79,20 @@ end $$;
 -- action refuses an answer with no words, as it did.
 alter table management_answers drop constraint management_answers_body_present;
 
--- openokr:replaces: 0.3.0 added okr_sessions.shifts_document (migration 0140)
+-- openokr:replaces: 0.3.1 added okr_sessions.shifts_document (migration 0140)
 alter table okr_sessions drop column shifts;
 
--- openokr:replaces: 0.3.0 added decisions.text_document (migration 0140)
+-- openokr:replaces: 0.3.1 added decisions.text_document (migration 0140)
 alter table decisions drop column text;
 
--- openokr:replaces: 0.3.0 added management_answers.body_document (migration 0141)
+-- openokr:replaces: 0.3.1 added management_answers.body_document (migration 0141)
 alter table management_answers drop column body;
 
--- openokr:replaces: 0.3.0 added digests.note_document (migration 0142)
+-- openokr:replaces: 0.3.1 added digests.note_document (migration 0142)
 alter table digests drop column note;
 
--- openokr:replaces: 0.3.0 added cycle_revalidations.change_note_document (migration 0143)
+-- openokr:replaces: 0.3.1 added cycle_revalidations.change_note_document (migration 0143)
 alter table cycle_revalidations drop column change_note;
 
--- openokr:replaces: 0.3.0 added cycle_revalidations.focus_note_document (migration 0143)
+-- openokr:replaces: 0.3.1 added cycle_revalidations.focus_note_document (migration 0143)
 alter table cycle_revalidations drop column focus_note;
