@@ -10625,6 +10625,19 @@
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991
                             },
+                            "leftOut": {
+                              "default": {},
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
                             "proposalsLeftBehind": {
                               "default": 0,
                               "type": "integer",
@@ -10637,6 +10650,7 @@
                             "merged",
                             "skipped",
                             "blobs",
+                            "leftOut",
                             "proposalsLeftBehind"
                           ],
                           "additionalProperties": false

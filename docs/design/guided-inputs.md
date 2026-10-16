@@ -234,6 +234,34 @@ As built in 12: migration 0143 and data change 0032, one script for both notes, 
 
 Everything that reads these fields as text (the digest, its narration, the minutes, channel posts) reads `excerptRichText` of the document, so the AI and the chat channels see the same text they see today. All seven tables are marked "no legacy source" in TECHNICAL-PLAN §7.2, so the importer mapping gains no rows.
 
+**Change 13, the second release (0.4).** 0.3.0 wrote both columns and read the document first. 0.4 drops the plain column and reads only the document.
+
+The hard part is the jump. The upgrade guide and PLAN.md §5.1 let any release upgrade straight to any later one in the same major. So an instance can go from 0.2 to 0.4 without ever running 0.3's data changes, and its old prose would be dropped unconverted. Decided 13 October 2026: the drop refuses until every row is converted, and no backfill goes inside the migration.
+
+| Part | What it does |
+|---|---|
+| The guard | The migration first counts, per column, the rows whose plain text has no document, and any stage note still stored as a string. If any count is above zero it raises, and the transaction drops nothing. The message names each table and its count, and says: run `pnpm db:change` against this database (docs/runbooks/upgrade.md), then start again |
+| The drop | Then it drops `okr_sessions.shifts`, `decisions.text`, `management_answers.body` with its `management_answers_body_present` check, `digests.note`, `cycle_revalidations.change_note` and `focus_note`. Each line carries `-- openokr:replaces: 0.3.0`, the linter's marker for the release that added the replacement. It is the repository's first column drop |
+| The runner | Data changes 0027, 0028, 0029, 0031 and 0032 read the dropped columns. On an instance that never ran them, often a fresh one with nothing to convert, the runner would refuse each because its columns are gone, and stop before later scripts. Each therefore names the migration that retires it (`retiredBy`). The runner treats a script as complete, with nothing changed, when its columns are missing **and** that migration is recorded as applied, because the guard proved nothing was left. Otherwise it refuses as before. `retiredBy` is not part of a script's checksum, so a script started on 0.3 resumes on 0.4. 0030 reads `okr_sessions.notes`, which stays, so it is not retired |
+| Writes | The six actions take editor JSON only, through `richTextSchema`. A string is refused, as the 0.3.0 notes announced, and the stage note too |
+| Reads | Every reader takes the document and drops its fallback to the old column. `sessions.read` stops wrapping a string stage note, because the guard leaves none |
+| The contract | The read actions keep their plain text fields (`body`, `text`, `note`, `changeNote`, `focusNote`, `shifts`), now computed from the document, so a client reading text keeps working |
+| Archives | An archive from 0.2 or 0.3 still carries the plain columns, and 0.2's has no documents. The import builds each missing document from the plain text, by core's `richTextFromPlainText`, and does the same for a stage note stored as a string. It then leaves out any column the target table no longer has, and names it in the report, rather than failing the row and counting it as skipped |
+
+Proposed split, each part one commit, both in 0.4 and neither before 0.3.0 ships:
+
+| Part | What | Why apart |
+|---|---|---|
+| 13a | The runner's `retiredBy`, and the archive import's conversion and column filtering | Neither changes what a running instance stores. Both must be in place before anything is dropped |
+| 13b | The guard and the drop, writes refusing strings, readers on documents only, the contract's derived fields, the docs and the 0.3 to 0.4 upgrade section | The change itself |
+
+Acceptance:
+
+- **Given** an instance upgraded from 0.2 that never ran data changes 0027 to 0032, **when** 0.4 starts, **then** the migration raises naming each table and its count, nothing is dropped, and after `pnpm db:change` and a restart the columns are gone and every note reads as before.
+- **Given** a fresh 0.4 install, **when** `pnpm db:change` runs, **then** 0027, 0028, 0029, 0031 and 0032 are recorded complete with no rows changed, and every later script runs.
+- **Given** a 0.2 archive, **when** it is imported into 0.4, **then** every session's shifts, decision, management answer, revalidation note and stage note arrives as a document with the same paragraphs (digests are not in an archive), no row is skipped for a column the target lacks, and the import's report names each column it left out.
+- **Given** 0.4, **when** a client sends a string to one of the six actions, **then** it is refused at the boundary with the schema's sentence.
+
 **Stays plain on purpose.** Each of these becomes a `TextArea` that grows with its text and has a counter.
 
 | Field | Why plain |
@@ -395,7 +423,8 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 | 11b | The quarterly review's prose | The same, for the management retro answers and the private stage note: migration 0141, data changes 0029 and 0030. Done 13 October 2026 | Quarterly review |
 | 11c | The coordinator's note | The same, for the weekly digest's note, read by the digest, its narration and the channel posts: migration 0142, data change 0031. Done 13 October 2026 | Weekly session |
 | 12 | `feat/rich-revalidation-notes` | The same, for the two revalidation notes: migration 0143, data change 0032. Done 13 October 2026 | Quarterly revalidation |
-| 13 | `chore/drop-plain-prose-columns` | Second release, one release after 11 and 12: drop the six old `text` columns, and stop accepting string stage notes | None. Nothing a person sees changes |
+| 13a | `chore/prepare-plain-prose-drop` | Before anything is dropped: the data-change runner's `retiredBy`, and the archive import building documents from an older archive's plain prose and leaving out (and reporting) columns this release no longer has. Done 13 October 2026, for 0.4 | Admin, Imports: the archive preview names columns left out |
+| 13b | `chore/drop-plain-prose-columns` | Second release, one release after 11 and 12: the guard, drop the six old `text` columns, refuse strings, read documents only | None. Nothing a person sees changes |
 | Later | `PhoneInput` | §4.12 | The first screen that needs a phone number |
 
 **Each part of the kit arrives with the change that first uses it.** The length limit of §4.7 waits for 4d, whose initiative description is the first rich field with a cap, and the full editor's toolbar for change 5, which moves the first full-editor field. Change 1 was planned with `TextArea`, `UrlInput` and the server field errors of §4.2, but none of the screens it moved has a textarea, a URL or a server action that reports a field: they talk to Better Auth or keep their own state. So `UrlInput` arrives with change 9, `TextArea` with change 10, and the field errors with the first change whose form is a server action, rather than shipping unused.
